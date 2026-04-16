@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    dd(session('staging_access'), session('test'));
+
     return view('welcome');
 });
 
@@ -27,10 +27,8 @@ Route::post('/staging-login', function (Request $request) {
     ) {
         session(['staging_access' => true]);
 
-        return redirect('/')->with('test', 'ok');
+        return redirect('/');
     }
-
-    dd('failed');
 
     return back()->withErrors([
         'login' => 'Invalid credentials',
