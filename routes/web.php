@@ -26,9 +26,7 @@ Route::post('/staging-login', function (Request $request) {
     ) {
         session(['staging_access' => true]);
 
-        dd('hit');
-
-        return redirect('/');
+        return redirect('/')->with('test', 'ok');
     }
 
     dd('failed');
