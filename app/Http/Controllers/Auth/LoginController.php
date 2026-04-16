@@ -30,7 +30,9 @@ class LoginController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended('/');
+        return redirect()->intended(
+            'https://crm.' . parse_url(config('app.url'), PHP_URL_HOST)
+        );
     }
 
     public function destroy(Request $request): RedirectResponse
