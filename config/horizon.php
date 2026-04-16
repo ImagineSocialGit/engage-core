@@ -232,6 +232,13 @@ return [
             ],
         ],
 
+        'staging' => [
+            'supervisor-1' => [
+                'maxProcesses' => 3,
+                'queue' => ['default', 'webinars', 'emails', 'notifications'],
+            ],
+        ],
+
         'local' => [
             'supervisor-1' => [
                 'maxProcesses' => 3,
