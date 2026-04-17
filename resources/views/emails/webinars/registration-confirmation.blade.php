@@ -15,8 +15,8 @@
     </p>
 
     <p>
-        <strong>{{ ucwords($data->platform) }} link:</strong>
-        <a href="{{ $data->joinUrl }}">{{ $data->joinUrl }}</a>
+        <strong>{{ ucwords($data->webinarPlatform) }} link:</strong>
+        <a href="{{ $data->webinarJoinUrl }}">{{ $data->webinarJoinUrl }}</a>
     </p>
 
     <p>We’ll send reminders before the webinar starts.</p>
