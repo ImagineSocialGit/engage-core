@@ -40,7 +40,7 @@
 
     <p>
         <strong>Join link:</strong>
-        <a href="{{ $data->joinUrl }}">{{ $data->joinUrl }}</a>
+        <a href="{{ $data->webinarJoinUrl }}">{{ $data->webinarJoinUrl }}</a>
     </p>
 </body>
 </html>

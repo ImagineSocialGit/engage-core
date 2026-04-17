@@ -29,7 +29,7 @@ class SmsMessagingService
             "You're registered for %s on %s. Join here: %s",
             $data->webinarTitle,
             $data->formattedStart('M j g:i A'),
-            $data->joinUrl
+            $data->webinarJoinUrl
         );
 
         if (app()->environment('local')) {
@@ -126,35 +126,35 @@ class SmsMessagingService
                 $data->webinarTitle,
                 $data->webinarTitle,
                 $data->formattedStart('M j g:i A'),
-                $data->joinUrl
+                $data->webinarJoinUrl
             ),
             'reminder_7d' => sprintf(
                 "%s is 1 week away. It starts %s. Join here: %s",
                 $data->webinarTitle,
                 $data->formattedStart('M j g:i A'),
-                $data->joinUrl
+                $data->webinarJoinUrl
             ),
             'reminder_24h' => sprintf(
                 "Reminder: %s is tomorrow at %s. Join here: %s",
                 $data->webinarTitle,
                 $data->formattedStart('M j g:i A'),
-                $data->joinUrl
+                $data->webinarJoinUrl
             ),
             'reminder_30m' => sprintf(
                 "%s starts in 30 minutes at %s. Join here: %s",
                 $data->webinarTitle,
                 $data->formattedStart('g:i A'),
-                $data->joinUrl
+                $data->webinarJoinUrl
             ),
             'reminder_10m' => sprintf(
                 "%s starts in 10 minutes. Join here: %s",
                 $data->webinarTitle,
-                $data->joinUrl
+                $data->webinarJoinUrl
             ),
             'late_joiner_5m' => sprintf(
                 "%s is live now. Join here: %s",
                 $data->webinarTitle,
-                $data->joinUrl
+                $data->webinarJoinUrl
             ),
             default => null,
         };
