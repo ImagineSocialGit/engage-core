@@ -17,12 +17,6 @@ class SendWebinarConfirmationSmsJob implements ShouldQueue
 
     public function handle(SmsMessagingService $smsMessagingService): void
     {
-        file_put_contents(
-            storage_path('app/sms-job-ran.txt'),
-            now() . "\n",
-            FILE_APPEND
-        );
-
         $smsMessagingService->sendRegistrationConfirmation(
             WebinarMessageData::fromArray($this->payload)
         );
