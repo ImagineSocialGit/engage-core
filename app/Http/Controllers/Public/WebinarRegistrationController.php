@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Public;
 use App\Actions\Webinars\CreateWebinarRegistration;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Public\StoreWebinarRegistrationRequest;
-use App\Jobs\Messaging\SendWebinarConfirmationEmail;
 use App\Jobs\Webinars\ProcessWebinarRegistration;
 use App\Models\Webinar;
 
@@ -33,7 +32,6 @@ class WebinarRegistrationController extends Controller
         );
 
         ProcessWebinarRegistration::dispatch($registration->id);
-        SendWebinarConfirmationEmail::dispatch($registration->id);
 
         return redirect('/' . $webinar->slug . '/thank-you');
     }

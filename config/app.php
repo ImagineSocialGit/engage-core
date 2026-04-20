@@ -53,6 +53,7 @@ return [
     */
 
     'url' => env('APP_URL', 'http://localhost'),
+    'webinar_url' => env('WEBINAR_APP_URL', env('APP_URL')),
 
     /*
     |--------------------------------------------------------------------------

@@ -3,6 +3,7 @@
 namespace App\Data;
 
 use App\Models\WebinarRegistration;
+use App\Support\Webinars\WebinarJoinLinkGenerator;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 
@@ -29,6 +30,7 @@ readonly class WebinarMessageData
 
         $lead = $registration->lead;
         $webinar = $registration->webinar;
+        $joinLinkGenerator = app(WebinarJoinLinkGenerator::class);
 
         return new self(
             registrationId: $registration->id,
@@ -45,7 +47,7 @@ readonly class WebinarMessageData
             webinarTitle: $webinar->title,
             webinarStartsAt: $webinar->starts_at,
             webinarTimezone: $webinar->timezone ?: config('app.timezone', 'America/Chicago'),
-            webinarJoinUrl: $webinar->join_url,
+            webinarJoinUrl: $joinLinkGenerator->forRegistration($registration),
             webinarPlatform: $webinar->platform,
         );
     }

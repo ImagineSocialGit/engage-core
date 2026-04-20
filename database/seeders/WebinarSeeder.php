@@ -16,12 +16,13 @@ class WebinarSeeder extends Seeder
         Webinar::updateOrCreate(
             ['slug' => 'test-webinar'],
             [
-                'title' => 'Staging Test Webinar',
+                'title' => 'Test Webinar',
                 'status' => 'active',
                 'platform' => 'zoom',
                 'join_url' => 'https://example.com/join-test',
-                'starts_at' => Carbon::now()->addMinutes(32),
-                'ends_at' => Carbon::now()->addMinutes(92),
+                'external_id' => '86488123410',
+                'starts_at' => Carbon::create(2026, 4, 20, 12, 30, 0, 'America/Chicago'),
+                'ends_at' => Carbon::create(2026, 4, 20, 12, 45, 0, 'America/Chicago'),
                 'timezone' => 'America/Chicago',
                 'description' => 'Seeded webinar for staging/testing.',
                 'meta' => null,

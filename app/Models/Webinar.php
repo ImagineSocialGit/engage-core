@@ -12,12 +12,16 @@ class Webinar extends Model
         'slug',
         'status',
         'join_url',
+        'registration_url',
         'platform',
+        'external_id',
+        'host_account_key',
         'starts_at',
         'timezone',
         'ends_at',
         'description',
         'meta',
+        'provider_settings',
     ];
 
     protected function casts(): array

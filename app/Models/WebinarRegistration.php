@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class WebinarRegistration extends Model
 {
     protected $fillable = [
+        'join_token',
         'lead_id',
         'webinar_id',
         'webinar_slug',
@@ -33,6 +35,24 @@ class WebinarRegistration extends Model
             'attended_at' => 'datetime',
             'converted_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $registration): void {
+            if (blank($registration->join_token)) {
+                $registration->join_token = static::generateJoinToken();
+            }
+        });
+    }
+
+    public static function generateJoinToken(): string
+    {
+        do {
+            $token = Str::lower(Str::random(16));
+        } while (static::query()->where('join_token', $token)->exists());
+
+        return $token;
     }
 
     public function lead(): BelongsTo

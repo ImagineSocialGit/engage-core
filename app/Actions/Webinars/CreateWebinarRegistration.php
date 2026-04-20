@@ -67,6 +67,8 @@ class CreateWebinarRegistration
 
                 $registration->load(['lead', 'webinar']);
 
+                $this->syncRegistrationToWebinarPlatform($registration, $webinar);
+
                 DispatchWebinarRegistrationMessagesJob::dispatch(
                     WebinarMessageData::fromRegistration($registration)->toArray()
                 )->onQueue('notifications');
@@ -80,5 +82,38 @@ class CreateWebinarRegistration
 
             return $registration;
         });
+    }
+
+    private function syncRegistrationToWebinarPlatform(
+        WebinarRegistration $registration,
+        Webinar $webinar
+        ): void {
+        if ($webinar->platform !== 'zoom') {
+            return;
+        }
+
+        if (blank($webinar->external_id)) {
+            return;
+        }
+
+        $zoom = app(\App\Services\Zoom\ZoomWebinarService::class);
+
+        $response = $zoom->registerAttendee(
+            $webinar->external_id,
+            [
+                'email' => $registration->email,
+                'first_name' => $registration->first_name,
+                'last_name' => $registration->last_name,
+            ]
+        );
+
+        $registration->update([
+            'meta' => array_merge($registration->meta ?? [], [
+                'zoom' => [
+                    'registrant_id' => $response['registrant_id'] ?? null,
+                    'join_url' => $response['join_url'] ?? null,
+                ],
+            ]),
+        ]);
     }
 }
