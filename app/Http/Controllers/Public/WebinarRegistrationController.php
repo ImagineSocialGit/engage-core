@@ -17,12 +17,6 @@ class WebinarRegistrationController extends Controller
 
     public function show(Webinar $webinar)
     {
-        dd(
-            $webinar->starts_at,
-            $webinar->starts_at?->toDateTimeString(),
-            $webinar->starts_at?->timezoneName,
-            $webinar->starts_at?->copy()->setTimezone('America/Chicago')->toDateTimeString()
-        );
 
         return view('webinar.register', compact('webinar'));
     }
