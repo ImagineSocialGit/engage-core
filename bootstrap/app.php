@@ -16,11 +16,17 @@ return Application::configure(basePath: dirname(__DIR__))
 
             Route::middleware(['web'])
                 ->domain('webinar.' . $domain)
-                ->group(base_path('routes/webinar.php'));
+                ->group(function () {
+                    require base_path('routes/staging.php');
+                    require base_path('routes/webinar.php');
+                });
 
             Route::middleware(['web', 'auth'])
                 ->domain('crm.' . $domain)
-                ->group(base_path('routes/crm.php'));
+                ->group(function () {
+                    require base_path('routes/staging.php');
+                    require base_path('routes/crm.php');
+                });
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
