@@ -6,25 +6,45 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
         Schema::create('webinar_registrations', function (Blueprint $table) {
             $table->id();
+
             $table->foreignId('lead_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('webinar_id')->nullable()->constrained()->nullOnDelete();
+
+            $table->string('join_token')->unique();
+
             $table->string('webinar_slug')->default('default')->index();
             $table->string('status')->default('pending')->index();
             $table->string('source')->default('webinar_subdomain')->index();
+
             $table->string('first_name')->nullable();
             $table->string('last_name')->nullable();
+
             $table->string('email')->index();
             $table->string('phone')->nullable()->index();
+
             $table->text('notes')->nullable();
             $table->json('meta')->nullable();
+
             $table->timestamp('registered_at')->nullable();
+
+            $table->timestamp('attended_at')->nullable()->index();
+            $table->timestamp('converted_at')->nullable()->index();
+            $table->string('follow_up_status')->nullable()->index();
+
             $table->timestamps();
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('webinar_registrations');

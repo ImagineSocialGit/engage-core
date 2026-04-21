@@ -13,20 +13,36 @@ class WebinarSeeder extends Seeder
      */
     public function run(): void
     {
-        Webinar::updateOrCreate(
-            ['slug' => 'dev-webinar'],
-            [
-                'title' => 'Dev Webinar',
-                'status' => 'active',
-                'platform' => 'zoom',
-                'join_url' => 'https://example.com/join-test',
-                'external_id' => '86027600155',
-                'starts_at' => Carbon::create(2026, 4, 20, 14, 30, 0, 'America/Chicago')->utc(),
-                'ends_at' => Carbon::create(2026, 4, 20, 14, 45, 0, 'America/Chicago')->utc(),
-                'timezone' => 'America/Chicago',
-                'description' => 'Seeded webinar for staging/testing.',
-                'meta' => null,
-            ]
-        );
+
+        $homebuyerSeries = \App\Models\WebinarSeries::firstOrCreate([
+            'slug' => 'homebuyer-game-plan',
+        ], [
+            'title' => 'Homebuyer Game Plan',
+        ]);
+
+        $vaSeries = \App\Models\WebinarSeries::firstOrCreate([
+            'slug' => 'va-homebuyer',
+        ], [
+            'title' => 'VA Homebuyer Class',
+        ]);
+
+        $relocationSeries = \App\Models\WebinarSeries::firstOrCreate([
+            'slug' => 'relocation',
+        ], [
+            'title' => 'Relocation to Florida',
+        ]);
+
+        $investorSeries = \App\Models\WebinarSeries::firstOrCreate([
+            'slug' => 'investor',
+        ], [
+            'title' => 'Investor/DSCR',
+        ]);
+
+        $constructionSeries = \App\Models\WebinarSeries::firstOrCreate([
+            'slug' => 'construction',
+        ], [
+            'title' => 'Construction Loans',
+        ]);
+
     }
 }

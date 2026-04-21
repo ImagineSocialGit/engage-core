@@ -11,9 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('webinars', function (Blueprint $table) {
-            $table->text('join_url')->after('status');
-            $table->string('platform')->default('zoom')->after('join_url');
+        Schema::create('lead_tags', function (Blueprint $table) {
+            $table->id();
+
+            $table->foreignId('lead_id')->constrained()->cascadeOnDelete();
+
+            $table->string('tag')->index();
+
+            $table->timestamps();
+
+            $table->unique(['lead_id', 'tag']);
         });
     }
 
@@ -22,8 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('webinars', function (Blueprint $table) {
-            $table->dropColumn(['platform', 'join_url']);
-        });
+        Schema::dropIfExists('lead_tags');
     }
 };

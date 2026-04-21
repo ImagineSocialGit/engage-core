@@ -7,7 +7,7 @@
                 </a>
 
                 <nav class="hidden items-center gap-6 text-sm font-medium md:flex">
-                    <a href="/webinars" class="transition hover:opacity-70">Webinar</a>
+                    <a href="/" class="transition hover:opacity-70">Webinar</a>
                 </nav>
             </div>
         </header>

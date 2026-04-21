@@ -6,21 +6,30 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
-        Schema::create('tasks', function (Blueprint $table) {
+        Schema::create('webinar_series', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('lead_id')->constrained()->cascadeOnDelete();
+
+            $table->string('slug')->unique();
             $table->string('title');
-            $table->string('status')->default('open')->index();
-            $table->timestamp('due_at')->nullable()->index();
-            $table->timestamp('completed_at')->nullable();
+
+            $table->string('status')->default('active')->index();
+
+            $table->json('meta')->nullable();
+
             $table->timestamps();
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
-        Schema::dropIfExists('tasks');
+        Schema::dropIfExists('webinar_series');
     }
 };

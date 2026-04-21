@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Webinar extends Model
 {
     protected $fillable = [
+        'series_id',
         'title',
         'slug',
         'status',
@@ -30,11 +32,17 @@ class Webinar extends Model
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
             'meta' => 'array',
+            'provider_settings' => 'array',
         ];
     }
 
     public function registrations(): HasMany
     {
         return $this->hasMany(WebinarRegistration::class);
+    }
+
+    public function series(): BelongsTo
+    {
+        return $this->belongsTo(WebinarSeries::class, 'series_id');
     }
 }
