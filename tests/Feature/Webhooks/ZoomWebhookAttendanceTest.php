@@ -4,9 +4,9 @@ namespace Tests\Feature\Webhooks;
 
 use App\Models\Webinar;
 use App\Models\WebinarRegistration;
+use App\Services\Zoom\ZoomWebinarService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class ZoomWebhookAttendanceTest extends TestCase
@@ -15,11 +15,7 @@ class ZoomWebhookAttendanceTest extends TestCase
 
     public function test_webinar_ended_webhook_reconciles_attendance(): void
     {
-
-        config()->set('services.zoom.base_url', 'https://api.zoom.us/v2');
-        config()->set('services.zoom.account_id', 'test-account-id');
-        config()->set('services.zoom.client_id', 'test-client-id');
-        config()->set('services.zoom.client_secret', 'test-client-secret');
+        config()->set('services.zoom.webhook_secret', 'test-webhook-secret');
 
         $webinar = Webinar::query()->create([
             'title' => 'Home Buyer Game Plan',
@@ -67,7 +63,7 @@ class ZoomWebhookAttendanceTest extends TestCase
         ]);
 
         $this->mock(
-            \App\Services\Zoom\ZoomWebinarService::class,
+            ZoomWebinarService::class,
             function ($mock) {
                 $mock->shouldReceive('listPastWebinarParticipants')
                     ->once()
@@ -85,14 +81,22 @@ class ZoomWebhookAttendanceTest extends TestCase
             }
         );
 
-        $response = $this->postJson('/webhooks/zoom', [
+        $payload = [
             'event' => 'webinar.ended',
             'payload' => [
                 'object' => [
                     'id' => '987654321',
                 ],
             ],
-        ]);
+        ];
+
+        $timestamp = (string) time();
+        $signature = $this->zoomSignature($payload, $timestamp, 'test-webhook-secret');
+
+        $response = $this->withHeaders([
+            'x-zm-request-timestamp' => $timestamp,
+            'x-zm-signature' => $signature,
+        ])->postJson('/webhooks/zoom', $payload);
 
         $response->assertNoContent();
 
@@ -105,5 +109,62 @@ class ZoomWebhookAttendanceTest extends TestCase
 
         $this->assertNull($missed->attended_at);
         $this->assertSame('missed', data_get($missed->meta, 'attendance.status'));
+    }
+
+    public function test_zoom_webhook_rejects_invalid_signature(): void
+    {
+        config()->set('services.zoom.webhook_secret', 'test-webhook-secret');
+
+        $payload = [
+            'event' => 'webinar.ended',
+            'payload' => [
+                'object' => [
+                    'id' => '987654321',
+                ],
+            ],
+        ];
+
+        $timestamp = (string) time();
+
+        $response = $this->withHeaders([
+            'x-zm-request-timestamp' => $timestamp,
+            'x-zm-signature' => 'v0=invalid-signature',
+        ])->postJson('/webhooks/zoom', $payload);
+
+        $response->assertStatus(401);
+    }
+
+    public function test_zoom_webhook_handles_endpoint_url_validation(): void
+    {
+        config()->set('services.zoom.webhook_secret', 'test-webhook-secret');
+
+        $payload = [
+            'event' => 'endpoint.url_validation',
+            'payload' => [
+                'plainToken' => 'plain-token-123',
+            ],
+        ];
+
+        $response = $this->postJson('/webhooks/zoom', $payload);
+
+        $response
+            ->assertOk()
+            ->assertJson([
+                'plainToken' => 'plain-token-123',
+                'encryptedToken' => hash_hmac(
+                    'sha256',
+                    'plain-token-123',
+                    'test-webhook-secret'
+                ),
+            ]);
+    }
+
+    private function zoomSignature(array $payload, string $timestamp, string $secret): string
+    {
+        return 'v0=' . hash_hmac(
+            'sha256',
+            'v0:' . $timestamp . ':' . json_encode($payload),
+            $secret
+        );
     }
 }
