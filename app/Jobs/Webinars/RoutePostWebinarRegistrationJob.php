@@ -25,14 +25,6 @@ class RoutePostWebinarRegistrationJob implements ShouldQueue
             return;
         }
 
-        if (! $registration->webinar->ends_at) {
-            return;
-        }
-
-        if ($registration->webinar->ends_at->isFuture()) {
-            return;
-        }
-
         $processWebinarOutcomeAction->execute($registration);
     }
 }
