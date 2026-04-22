@@ -4,7 +4,6 @@ use App\Http\Controllers\CRM\LeadController;
 use App\Http\Controllers\CRM\LeadNoteController;
 use App\Http\Controllers\CRM\LeadTaskController;
 use App\Http\Controllers\CRM\WebinarController;
-use App\Http\Controllers\CRM\WebinarCopyController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
@@ -13,20 +12,22 @@ Route::middleware('auth')->group(function () {
     Route::get('/leads/{lead}', [LeadController::class, 'show']);
 
     Route::get('/webinars', [WebinarController::class, 'index'])
-    ->name('crm.webinars.index');
+        ->name('crm.webinars.index');
 
-    Route::get('/webinars/{webinar}/copies/create', [WebinarCopyController::class, 'create'])
-        ->name('crm.webinar.copies.create');
+    Route::post('/webinar-series', [WebinarController::class, 'storeSeries'])
+        ->name('crm.webinar-series.store');
+
+    Route::post('/webinar-series/sync', [WebinarController::class, 'syncSeries'])
+        ->name('crm.webinar-series.sync');
+
+    Route::post('/webinar-series/{series}/fix-active', [WebinarController::class, 'fixActive'])
+        ->name('crm.webinar-series.fix-active');
 
     Route::post('/leads/{lead}/notes', [LeadNoteController::class, 'store']);
     Route::post('/leads/{lead}/tasks', [LeadTaskController::class, 'store']);
 
-    Route::post('/webinars/{webinar}/copies', [WebinarCopyController::class, 'store'])
-        ->name('crm.webinar.copies.store');
-
     Route::patch('/leads/{lead}/tasks/{task}/complete', [LeadTaskController::class, 'complete']);
     Route::patch('/leads/{lead}/tasks/{task}/reopen', [LeadTaskController::class, 'reopen']);
-
 
     Route::patch(
         '/leads/{lead}/registrations/{registration}/convert',

@@ -13,11 +13,14 @@ Route::get('/j/{token}', WebinarJoinRedirectController::class)
 Route::get('/{seriesSlug}', [WebinarRegistrationController::class, 'show'])
     ->name('webinar.show');
 
-Route::post('/{seriesSlug}/register', [WebinarRegistrationController::class, 'store'])
-    ->name('webinar.register');
+Route::post('/{seriesSlug}', [WebinarRegistrationController::class, 'store'])
+    ->name('webinar.store');
 
-Route::view('/{seriesSlug}/thank-you', 'webinar.thank-you')
-    ->name('webinar.thank_you');
+Route::get('/{seriesSlug}/thank-you', function (string $seriesSlug) {
+    return view('webinar.thank-you', [
+        'seriesSlug' => $seriesSlug,
+    ]);
+})->name('webinar.thank_you');
 
 Route::fallback(function () {
     abort(404);

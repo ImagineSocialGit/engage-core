@@ -33,10 +33,7 @@ return new class extends Migration
             $table->json('meta')->nullable();
 
             $table->timestamp('registered_at')->nullable();
-
             $table->timestamp('attended_at')->nullable()->index();
-            $table->timestamp('converted_at')->nullable()->index();
-            $table->string('follow_up_status')->nullable()->index();
 
             $table->timestamps();
         });

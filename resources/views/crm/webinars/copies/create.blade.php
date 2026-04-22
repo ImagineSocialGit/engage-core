@@ -1,4 +1,4 @@
-<x-layous.crm
+<x-layouts.crm
     :title="$title"
     :heading="$heading"
     :subheading="$subheading"
@@ -196,4 +196,4 @@
             };
         }
     </script>
-</x-layous.crm>
+</x-layouts.crm>

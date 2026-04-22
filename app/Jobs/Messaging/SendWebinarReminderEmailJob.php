@@ -3,9 +3,11 @@
 namespace App\Jobs\Messaging;
 
 use App\Data\WebinarMessageData;
+use App\Models\WebinarScheduledMessage;
 use App\Services\Messaging\EmailMessagingService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Throwable;
 
 class SendWebinarReminderEmailJob implements ShouldQueue
 {
@@ -17,9 +19,34 @@ class SendWebinarReminderEmailJob implements ShouldQueue
 
     public function handle(EmailMessagingService $emailMessagingService): void
     {
-        $emailMessagingService->sendReminder(
-            WebinarMessageData::fromArray($this->payload),
-            $this->payload['message_type']
+        $scheduled = WebinarScheduledMessage::find(
+            $this->payload['scheduled_message_id'] ?? null
         );
+
+        try {
+            $emailMessagingService->sendReminder(
+                WebinarMessageData::fromArray($this->payload),
+                $this->payload['message_type']
+            );
+
+            if ($scheduled) {
+                $scheduled->update([
+                    'status' => 'sent',
+                    'sent_at' => now(),
+                ]);
+            }
+
+        } catch (Throwable $e) {
+
+            if ($scheduled) {
+                $scheduled->update([
+                    'status' => 'failed',
+                    'failed_at' => now(),
+                    'failure_reason' => $e->getMessage(),
+                ]);
+            }
+
+            throw $e;
+        }
     }
 }

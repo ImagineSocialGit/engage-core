@@ -2,7 +2,6 @@
 
 namespace App\Actions\Webinars;
 
-use App\Actions\Leads\AttachTagToLeadAction;
 use App\Data\WebinarMessageData;
 use App\Jobs\Messaging\DispatchWebinarRegistrationMessagesJob;
 use App\Jobs\Webinars\RoutePostWebinarRegistrationJob;
@@ -16,7 +15,6 @@ use Illuminate\Support\Facades\DB;
 class CreateWebinarRegistration
 {
     public function __construct(
-        protected AttachTagToLeadAction $attachTagToLeadAction,
         protected PhoneNumberNormalizer $phoneNumberNormalizer,
         protected ScheduleWebinarRemindersAction $scheduleWebinarRemindersAction,
     ) {}
@@ -38,47 +36,53 @@ class CreateWebinarRegistration
                     'first_name' => $validated['first_name'],
                     'last_name' => $validated['last_name'] ?? null,
                     'phone' => $normalizedPhone,
+                    'status' => 'new',
+                    'source' => 'webinar',
+                    'subsource' => $webinar->slug,
                 ]
             );
 
-            $registration = WebinarRegistration::query()->where([
+            $registration = WebinarRegistration::query()
+                ->where('lead_id', $lead->id)
+                ->where('webinar_id', $webinar->id)
+                ->first();
+
+            if ($registration) {
+                return $registration;
+            }
+
+            $registration = WebinarRegistration::query()->create([
                 'lead_id' => $lead->id,
                 'webinar_id' => $webinar->id,
-            ])->first();
+                'webinar_slug' => $webinar->slug,
+                'status' => 'pending',
+                'source' => 'webinar_subdomain',
+                'first_name' => $validated['first_name'],
+                'last_name' => $validated['last_name'] ?? null,
+                'email' => $validated['email'],
+                'phone' => $normalizedPhone,
+                'notes' => $validated['notes'] ?? null,
+                'meta' => [
+                    'ip' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                ],
+                'registered_at' => now(),
+                'attended_at' => null,
+            ]);
 
-            if (! $registration) {
-                $registration = WebinarRegistration::query()->create([
-                    'lead_id' => $lead->id,
-                    'webinar_id' => $webinar->id,
-                    'webinar_slug' => $webinar->slug,
-                    'status' => 'pending',
-                    'source' => 'webinar_subdomain',
-                    'first_name' => $validated['first_name'],
-                    'last_name' => $validated['last_name'] ?? null,
-                    'email' => $validated['email'],
-                    'phone' => $normalizedPhone,
-                    'notes' => $validated['notes'] ?? null,
-                    'registered_at' => now(),
-                    'meta' => [
-                        'ip' => $request->ip(),
-                        'user_agent' => $request->userAgent(),
-                    ],
-                ]);
+            $registration->load(['lead', 'webinar']);
 
-                $registration->load(['lead', 'webinar']);
+            $this->syncRegistrationToWebinarPlatform($registration, $webinar);
 
-                $this->syncRegistrationToWebinarPlatform($registration, $webinar);
+            DispatchWebinarRegistrationMessagesJob::dispatch(
+                WebinarMessageData::fromRegistration($registration)->toArray()
+            )->onQueue('notifications');
 
-                DispatchWebinarRegistrationMessagesJob::dispatch(
-                    WebinarMessageData::fromRegistration($registration)->toArray()
-                )->onQueue('notifications');
+            $this->scheduleWebinarRemindersAction->execute($registration);
 
-                $this->scheduleWebinarRemindersAction->execute($registration);
-
-                RoutePostWebinarRegistrationJob::dispatch($registration->id)
-                    ->delay($webinar->ends_at)
-                    ->onQueue('notifications');
-            }
+            RoutePostWebinarRegistrationJob::dispatch($registration->id)
+                ->delay($webinar->ends_at)
+                ->onQueue('notifications');
 
             return $registration;
         });
@@ -87,7 +91,7 @@ class CreateWebinarRegistration
     private function syncRegistrationToWebinarPlatform(
         WebinarRegistration $registration,
         Webinar $webinar
-        ): void {
+    ): void {
         if ($webinar->platform !== 'zoom') {
             return;
         }

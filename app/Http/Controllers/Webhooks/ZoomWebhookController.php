@@ -3,26 +3,44 @@
 namespace App\Http\Controllers\Webhooks;
 
 use App\Actions\Webinars\RecordZoomAttendanceAction;
-use Illuminate\Http\JsonResponse;
+use App\Http\Controllers\Controller;
+use App\Services\Zoom\ZoomWebinarService;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
+use Symfony\Component\HttpFoundation\Response;
 
 class ZoomWebhookController extends Controller
 {
-    public function __invoke(Request $request, RecordZoomAttendanceAction $recordZoomAttendanceAction): JsonResponse
-    {
-        $payload = $request->all();
+    public function __invoke(
+        Request $request,
+        ZoomWebinarService $zoomWebinarService,
+        RecordZoomAttendanceAction $recordZoomAttendanceAction
+    ): Response {
+        $event = $request->input('event');
 
-        // Zoom endpoint validation handshake can be added here later if needed.
-
-        $event = $payload['event'] ?? null;
-
-        if (! $event) {
-            return response()->json(['ok' => true]);
+        if (! in_array($event, [
+            'webinar.ended',
+            'webinar.completed',
+        ], true)) {
+            return response()->noContent();
         }
 
-        $recordZoomAttendanceAction->execute($payload);
+        $webinarId = (string) (
+            $request->input('payload.object.id')
+            ?? ''
+        );
 
-        return response()->json(['ok' => true]);
+        if ($webinarId === '') {
+            return response()->noContent();
+        }
+
+        $participants = $zoomWebinarService
+            ->listPastWebinarParticipants($webinarId);
+
+        $recordZoomAttendanceAction->execute(
+            $webinarId,
+            $participants
+        );
+
+        return response()->noContent();
     }
 }

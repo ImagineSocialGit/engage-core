@@ -1,0 +1,238 @@
+.
+├── app
+│   ├── Actions
+│   │   ├── Leads
+│   │   │   └── UpsertLeadFromRegistration.php
+│   │   └── Webinars
+│   │       ├── AdvanceWebinarSeriesStatusAction.php
+│   │       ├── CreateWebinarCopiesAction.php
+│   │       ├── CreateWebinarRegistration.php
+│   │       ├── MarkWebinarRegistrationConvertedAction.php
+│   │       ├── ProcessWebinarOutcomeAction.php
+│   │       ├── RecordZoomAttendanceAction.php
+│   │       ├── ResolveWebinarJoinUrlAction.php
+│   │       └── ScheduleWebinarRemindersAction.php
+│   ├── Console
+│   │   └── Commands
+│   │       └── AdvanceWebinarSeriesStatuses.php
+│   ├── Data
+│   │   └── WebinarMessageData.php
+│   ├── Enums
+│   │   ├── TagType.php
+│   │   └── WebinarTag.php
+│   ├── Http
+│   │   ├── Controllers
+│   │   │   ├── Auth
+│   │   │   │   └── LoginController.php
+│   │   │   ├── CRM
+│   │   │   │   ├── LeadController.php
+│   │   │   │   ├── LeadNoteController.php
+│   │   │   │   ├── LeadTaskController.php
+│   │   │   │   ├── WebinarController.php
+│   │   │   │   └── WebinarCopyController.php
+│   │   │   ├── Public
+│   │   │   │   ├── WebinarJoinRedirectController.php
+│   │   │   │   └── WebinarRegistrationController.php
+│   │   │   ├── Webhooks
+│   │   │   │   └── ZoomWebhookController.php
+│   │   │   └── Controller.php
+│   │   ├── Middleware
+│   │   │   └── ForceStagingAccess.php
+│   │   └── Requests
+│   │       ├── CRM
+│   │       │   ├── StoreLeadNoteRequest.php
+│   │       │   ├── StoreLeadTaskRequest.php
+│   │       │   ├── StoreWebinarSeriesRequest.php
+│   │       │   └── SyncWebinarSeriesRequest.php
+│   │       └── Public
+│   │           └── StoreWebinarRegistrationRequest.php
+│   ├── Jobs
+│   │   ├── Leads
+│   │   │   ├── CreateLeadFromWebinarRegistration.php
+│   │   │   └── SendLeadConfirmationEmail.php
+│   │   ├── Messaging
+│   │   │   ├── DispatchWebinarRegistrationMessagesJob.php
+│   │   │   ├── SendWebinarConfirmationEmailJob.php
+│   │   │   ├── SendWebinarConfirmationSmsJob.php
+│   │   │   ├── SendWebinarMissedYouFollowUpJob.php
+│   │   │   ├── SendWebinarReminderEmailJob.php
+│   │   │   ├── SendWebinarReminderSmsJob.php
+│   │   │   └── SendWebinarReplayFollowUpJob.php
+│   │   ├── Webinars
+│   │   │   └── RoutePostWebinarRegistrationJob.php
+│   │   ├── FailingQueueJob.php
+│   │   └── TestQueueJob.php
+│   ├── Mail
+│   │   ├── WebinarPostFollowUpMail.php
+│   │   ├── WebinarRegistrationConfirmationMail.php
+│   │   └── WebinarReminderMail.php
+│   ├── Models
+│   │   ├── Lead.php
+│   │   ├── LeadTag.php
+│   │   ├── Note.php
+│   │   ├── Task.php
+│   │   ├── User.php
+│   │   ├── Webinar.php
+│   │   ├── WebinarRegistration.php
+│   │   ├── WebinarScheduledMessage.php
+│   │   └── WebinarSeries.php
+│   ├── Providers
+│   │   ├── AppServiceProvider.php
+│   │   └── HorizonServiceProvider.php
+│   ├── Services
+│   │   ├── Leads
+│   │   ├── Messaging
+│   │   │   ├── DevMessageSink.php
+│   │   │   ├── EmailMessagingService.php
+│   │   │   ├── PhoneNumberNormalizer.php
+│   │   │   └── SmsMessagingService.php
+│   │   └── Zoom
+│   │       ├── ZoomOAuthService.php
+│   │       └── ZoomWebinarService.php
+│   └── Support
+│       └── Webinars
+│           └── WebinarJoinLinkGenerator.php
+├── bootstrap
+│   ├── cache
+│   │   ├── .gitignore
+│   │   ├── packages.php
+│   │   └── services.php
+│   ├── app.php
+│   └── providers.php
+├── config
+│   ├── app.php
+│   ├── auth.php
+│   ├── cache.php
+│   ├── database.php
+│   ├── filesystems.php
+│   ├── horizon.php
+│   ├── logging.php
+│   ├── mail.php
+│   ├── queue.php
+│   ├── services.php
+│   ├── session.php
+│   ├── staging.php
+│   └── webinar_messaging.php
+├── database
+│   ├── factories
+│   │   └── UserFactory.php
+│   ├── migrations
+│   │   ├── 0001_01_01_000000_create_users_table.php
+│   │   ├── 0001_01_01_000001_create_cache_table.php
+│   │   ├── 0001_01_01_000002_create_jobs_table.php
+│   │   ├── 2026_04_15_195850_create_leads_table.php
+│   │   ├── 2026_04_15_195851_create_lead_tags_table.php
+│   │   ├── 2026_04_15_203545_create_tasks_table.php
+│   │   ├── 2026_04_15_203546_create_notes_table.php
+│   │   ├── 2026_04_15_203547_create_webinar_series_table.php
+│   │   ├── 2026_04_15_203548_create_webinars_table.php
+│   │   ├── 2026_04_15_203549_create_webinar_registrations_table.php
+│   │   └── 2026_04_16_055534_create_webinar_scheduled_messages_table.php
+│   ├── schema
+│   ├── seeders
+│   │   ├── DatabaseSeeder.php
+│   │   ├── TagSeeder.php
+│   │   ├── UserSeeder.php
+│   │   └── WebinarSeeder.php
+│   ├── database.sqlite
+│   └── .gitignore
+├── public
+│   ├── build
+│   │   ├── assets
+│   │   │   ├── app-BJ_y095e.css
+│   │   │   └── app-D6NZYg2N.js
+│   │   └── manifest.json
+│   ├── favicon.ico
+│   ├── .htaccess
+│   ├── index.php
+│   └── robots.txt
+├── resources
+│   ├── css
+│   │   └── app.css
+│   ├── js
+│   │   └── app.js
+│   └── views
+│       ├── auth
+│       │   └── login.blade.php
+│       ├── components
+│       │   ├── layouts
+│       │   │   ├── app.blade.php
+│       │   │   ├── crm.blade.php
+│       │   │   └── public.blade.php
+│       │   ├── ui
+│       │   │   ├── data
+│       │   │   │   ├── empty-state.blade.php
+│       │   │   │   └── table.blade.php
+│       │   │   ├── feedback
+│       │   │   │   ├── alert.blade.php
+│       │   │   │   └── badge.blade.php
+│       │   │   ├── form
+│       │   │   │   ├── checkbox.blade.php
+│       │   │   │   ├── error.blade.php
+│       │   │   │   ├── input.blade.php
+│       │   │   │   ├── label.blade.php
+│       │   │   │   ├── select.blade.php
+│       │   │   │   └── textarea.blade.php
+│       │   │   ├── layout
+│       │   │   │   ├── page-header.blade.php
+│       │   │   │   └── section.blade.php
+│       │   │   ├── button.blade.php
+│       │   │   └── card.blade.php
+│       │   ├── head.blade.php
+│       │   ├── hero.blade.php
+│       │   └── section.blade.php
+│       ├── crm
+│       │   ├── leads
+│       │   │   ├── index.blade.php
+│       │   │   └── show.blade.php
+│       │   ├── webinars
+│       │   │   ├── copies
+│       │   │   │   └── create.blade.php
+│       │   │   └── index.blade.php
+│       │   └── dashboard.blade.php
+│       ├── emails
+│       │   └── webinars
+│       │       ├── post-follow-up.blade.php
+│       │       ├── registration-confirmation.blade.php
+│       │       └── reminder.blade.php
+│       ├── staging
+│       │   └── login.blade.php
+│       ├── webinar
+│       │   ├── index.blade.php
+│       │   ├── none-scheduled.blade.php
+│       │   ├── register.blade.php
+│       │   └── thank-you.blade.php
+│       └── welcome.blade.php
+├── routes
+│   ├── console.php
+│   ├── crm.php
+│   ├── staging.php
+│   ├── webinar.php
+│   └── web.php
+├── tests
+│   ├── Feature
+│   │   ├── CRM
+│   │   │   └── WebinarSyncTest.php
+│   │   └── ExampleTest.php
+│   ├── Unit
+│   │   └── ExampleTest.php
+│   └── TestCase.php
+├── artisan
+├── composer.json
+├── composer.lock
+├── .editorconfig
+├── .env
+├── .env.example
+├── .env.testing
+├── .gitattributes
+├── .gitignore
+├── .npmrc
+├── package.json
+├── package-lock.json
+├── .phpunit.result.cache
+├── phpunit.xml
+├── README.md
+├── structure.txt
+└── vite.config.js
+
+68 directories, 168 files

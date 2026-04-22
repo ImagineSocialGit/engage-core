@@ -2,65 +2,95 @@
 
 namespace App\Actions\Webinars;
 
-use App\Models\WebinarRegistration;
+use App\Models\Webinar;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 
 class RecordZoomAttendanceAction
 {
-    public function execute(array $payload): void
+    public function execute(string $webinarId, Collection $participants): void
     {
-        $event = $payload['event'] ?? null;
-        $object = $payload['payload']['object'] ?? [];
-        $participant = $object['participant'] ?? [];
-
-        if (! in_array($event, [
-            'meeting.participant_joined',
-            'webinar.participant_joined',
-        ], true)) {
-            return;
-        }
-
-        $webinarUuid = $object['uuid'] ?? null;
-        $webinarId = $object['id'] ?? null;
-        $participantEmail = $participant['email'] ?? null;
-
-        if (! $participantEmail) {
-            return;
-        }
-
-        $registration = WebinarRegistration::query()
-            ->with('webinar')
-            ->where(function ($query) use ($participantEmail) {
-                $query->where('email', $participantEmail)
-                    ->orWhereHas('lead', fn ($q) => $q->where('email', $participantEmail));
-            })
-            ->when($webinarId, function ($query) use ($webinarId) {
-                $query->whereHas('webinar', function ($q) use ($webinarId) {
-                    $q->where('meta->zoom_meeting_id', (string) $webinarId)
-                      ->orWhere('meta->zoom_meeting_id', (int) $webinarId);
-                });
-            })
-            ->latest('registered_at')
+        $webinar = Webinar::query()
+            ->where('external_id', (string) $webinarId)
             ->first();
 
-        if (! $registration) {
+        if (! $webinar) {
             return;
         }
 
-        if (! $registration->attended_at) {
-            $registration->update([
-                'attended_at' => Carbon::now(),
-                'meta' => array_merge($registration->meta ?? [], [
-                    'zoom' => [
-                        'last_event' => $event,
-                        'meeting_uuid' => $webinarUuid,
-                        'meeting_id' => $webinarId,
-                        'participant_email' => $participantEmail,
-                        'recorded_at' => Carbon::now()->toIso8601String(),
-                    ],
-                ]),
-            ]);
+        $registrations = $webinar->registrations()->get();
+
+        $participantMatches = $participants
+            ->map(function (array $participant) {
+                return [
+                    'registrant_id' => $participant['registrant_id'] ?? null,
+                    'email' => isset($participant['email']) && filled($participant['email'])
+                        ? mb_strtolower(trim($participant['email']))
+                        : null,
+                    'join_time' => $participant['join_time'] ?? null,
+                    'leave_time' => $participant['leave_time'] ?? null,
+                    'duration' => $participant['duration'] ?? null,
+                    'raw' => $participant['raw'] ?? $participant,
+                ];
+            });
+
+        $matchedRegistrationIds = [];
+
+        foreach ($registrations as $registration) {
+            $registrationRegistrantId = data_get($registration->meta, 'zoom.registrant_id');
+            $registrationEmail = filled($registration->email)
+                ? mb_strtolower(trim($registration->email))
+                : null;
+
+            $match = $participantMatches->first(function (array $participant) use ($registrationRegistrantId, $registrationEmail) {
+                if (filled($registrationRegistrantId) && filled($participant['registrant_id'])) {
+                    return (string) $participant['registrant_id'] === (string) $registrationRegistrantId;
+                }
+
+                if (filled($registrationEmail) && filled($participant['email'])) {
+                    return $participant['email'] === $registrationEmail;
+                }
+
+                return false;
+            });
+
+            if (! $match) {
+                continue;
+            }
+
+            $meta = $registration->meta ?? [];
+            $meta['attendance'] = [
+                'provider' => 'zoom',
+                'duration' => $match['duration'],
+                'join_time' => $match['join_time']?->toIso8601String(),
+                'leave_time' => $match['leave_time']?->toIso8601String(),
+                'recorded_at' => now()->toIso8601String(),
+                'raw' => $match['raw'],
+            ];
+
+            $registration->forceFill([
+                'attended_at' => $registration->attended_at ?? ($match['join_time'] instanceof Carbon ? $match['join_time'] : now()),
+                'meta' => $meta,
+            ])->save();
+
+            $matchedRegistrationIds[] = $registration->id;
         }
+
+        $webinar->registrations()
+            ->whereNotIn('id', $matchedRegistrationIds)
+            ->whereNull('attended_at')
+            ->get()
+            ->each(function ($registration) {
+                $meta = $registration->meta ?? [];
+                $meta['attendance'] = [
+                    'provider' => 'zoom',
+                    'status' => 'missed',
+                    'recorded_at' => now()->toIso8601String(),
+                ];
+
+                $registration->forceFill([
+                    'meta' => $meta,
+                ])->save();
+            });
     }
 }

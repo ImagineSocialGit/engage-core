@@ -1,8 +1,11 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use App\Actions\Webinars\AdvanceWebinarSeriesStatusAction;
+use App\Models\WebinarSeries;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+Schedule::call(function (AdvanceWebinarSeriesStatusAction $action) {
+    WebinarSeries::query()->each(function ($series) use ($action) {
+        $action->execute($series);
+    });
+})->everyMinute();

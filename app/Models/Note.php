@@ -9,7 +9,7 @@ class Note extends Model
 {
     protected $fillable = [
         'lead_id',
-        'body',
+        'content',
     ];
 
     public function lead(): BelongsTo

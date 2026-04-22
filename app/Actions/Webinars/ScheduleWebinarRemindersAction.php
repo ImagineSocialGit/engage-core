@@ -19,73 +19,104 @@ class ScheduleWebinarRemindersAction
         $schedule = $this->scheduleFor($data);
 
         foreach ($schedule as $messageType => $runAt) {
-            if ($this->shouldSkip($runAt)) {
-                continue;
-            }
-
-            $payload = [
-                ...$data->toArray(),
-                'message_type' => $messageType,
-            ];
-
             $channels = $this->channelsFor($messageType);
 
             if ($channels['email']) {
-                $this->scheduleEmailIfMissing($registration, $payload, $messageType, $runAt);
+                $this->scheduleEmail($registration, $data, $messageType, $runAt);
             }
 
             if ($channels['sms']) {
-                $this->scheduleSmsIfMissing($registration, $payload, $messageType, $runAt);
+                $this->scheduleSms($registration, $data, $messageType, $runAt);
             }
         }
     }
 
-    protected function scheduleEmailIfMissing(
+    protected function scheduleEmail(
         WebinarRegistration $registration,
-        array $payload,
+        WebinarMessageData $data,
         string $messageType,
         CarbonInterface $runAt
     ): void {
-        $scheduled = WebinarScheduledMessage::query()->firstOrCreate(
-            [
-                'webinar_registration_id' => $registration->id,
-                'channel' => 'email',
-                'message_type' => $messageType,
-            ],
-            [
-                'scheduled_for' => $runAt,
-            ]
-        );
+        $scheduled = WebinarScheduledMessage::query()->firstOrNew([
+            'webinar_registration_id' => $registration->id,
+            'channel' => 'email',
+            'message_type' => $messageType,
+        ]);
 
-        if (! $scheduled->wasRecentlyCreated) {
+        if ($scheduled->exists) {
             return;
         }
+
+        if ($this->shouldSkip($runAt)) {
+            $scheduled->fill([
+                'status' => 'skipped',
+                'send_at' => $runAt,
+                'skipped_at' => now(),
+                'meta' => [
+                    'reason' => 'send_at_in_past',
+                ],
+            ])->save();
+
+            return;
+        }
+
+        $scheduled->fill([
+            'status' => 'pending',
+            'send_at' => $runAt,
+            'meta' => null,
+        ])->save();
+
+        $payload = [
+            ...$data->toArray(),
+            'message_type' => $messageType,
+            'scheduled_message_id' => $scheduled->id,
+        ];
 
         SendWebinarReminderEmailJob::dispatch($payload)
             ->delay($runAt)
             ->onQueue('notifications');
     }
 
-    protected function scheduleSmsIfMissing(
+    protected function scheduleSms(
         WebinarRegistration $registration,
-        array $payload,
+        WebinarMessageData $data,
         string $messageType,
         CarbonInterface $runAt
     ): void {
-        $scheduled = WebinarScheduledMessage::query()->firstOrCreate(
-            [
-                'webinar_registration_id' => $registration->id,
-                'channel' => 'sms',
-                'message_type' => $messageType,
-            ],
-            [
-                'scheduled_for' => $runAt,
-            ]
-        );
+        $scheduled = WebinarScheduledMessage::query()->firstOrNew([
+            'webinar_registration_id' => $registration->id,
+            'channel' => 'sms',
+            'message_type' => $messageType,
+        ]);
 
-        if (! $scheduled->wasRecentlyCreated) {
+        if ($scheduled->exists) {
             return;
         }
+
+        if ($this->shouldSkip($runAt)) {
+            $scheduled->fill([
+                'status' => 'skipped',
+                'send_at' => $runAt,
+                'skipped_at' => now(),
+                'meta' => [
+                    'reason' => 'send_at_in_past',
+                ],
+            ])->save();
+
+            return;
+        }
+
+        $scheduled->fill([
+            'status' => 'pending',
+            'send_at' => $runAt,
+            'meta' => null,
+        ])->save();
+
+        $payload = [
+            ...$data->toArray(),
+            'message_type' => $messageType,
+            'scheduled_message_id' => $scheduled->id,
+        ];
 
         SendWebinarReminderSmsJob::dispatch($payload)
             ->delay($runAt)

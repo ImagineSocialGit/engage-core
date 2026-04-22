@@ -14,7 +14,7 @@
             </div>
 
             <x-ui.card>
-                <form method="POST" action="/{{ $webinar->slug }}/register" class="space-y-4">
+                <form method="POST" action="{{ route('webinar.store', $series->slug) }}" class="space-y-4">
                     @csrf
 
                     <div>

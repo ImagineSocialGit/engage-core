@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Public;
 
+use App\Actions\Webinars\AdvanceWebinarSeriesStatusAction;
 use App\Actions\Webinars\CreateWebinarRegistration;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Public\StoreWebinarRegistrationRequest;
-use App\Jobs\Webinars\ProcessWebinarRegistration;
 use App\Models\Webinar;
 use App\Models\WebinarSeries;
 
@@ -39,12 +39,16 @@ class WebinarRegistrationController extends Controller
         ]);
     }
 
-    public function show(string $seriesSlug)
-    {
+    public function show(
+        string $seriesSlug,
+        AdvanceWebinarSeriesStatusAction $advanceWebinarSeriesStatusAction
+    ){
         $series = WebinarSeries::query()
             ->where('slug', $seriesSlug)
-            ->where('status', 'active')
             ->firstOrFail();
+
+        $advanceWebinarSeriesStatusAction->execute($series);
+        $series->refresh();
 
         $webinar = $this->resolveUpcomingWebinar($series);
 
@@ -71,16 +75,34 @@ class WebinarRegistrationController extends Controller
     public function store(
         StoreWebinarRegistrationRequest $request,
         string $seriesSlug,
-        CreateWebinarRegistration $createWebinarRegistration
+        CreateWebinarRegistration $createWebinarRegistration,
+        AdvanceWebinarSeriesStatusAction $advanceWebinarSeriesStatusAction
     ) {
         $series = WebinarSeries::query()
             ->where('slug', $seriesSlug)
-            ->where('status', 'active')
             ->firstOrFail();
+
+        $advanceWebinarSeriesStatusAction->execute($series);
+        $series->refresh();
 
         $webinar = $this->resolveUpcomingWebinar($series);
 
-        abort_unless($webinar, 404);
+        if (! $webinar) {
+            $otherUpcomingSeries = WebinarSeries::query()
+                ->where('status', 'active')
+                ->where('id', '!=', $series->id)
+                ->whereHas('webinars', function ($query) {
+                    $query->where('status', 'active')
+                        ->where('ends_at', '>', now());
+                })
+                ->orderBy('title')
+                ->get();
+
+            return response()->view('webinar.none-scheduled', [
+                'series' => $series,
+                'otherUpcomingSeries' => $otherUpcomingSeries,
+            ], 409);
+        }
 
         $registration = $createWebinarRegistration->handle(
             $request->validated(),
@@ -88,17 +110,11 @@ class WebinarRegistrationController extends Controller
             $webinar->slug
         );
 
-        ProcessWebinarRegistration::dispatch($registration->id);
-
         return redirect()->route('webinar.thank_you', $seriesSlug);
     }
 
     private function resolveUpcomingWebinar(WebinarSeries $series): ?Webinar
     {
-        return $series->webinars()
-            ->where('status', 'active')
-            ->where('ends_at', '>', now())
-            ->orderBy('starts_at')
-            ->first();
+        return $series->nextUpcomingWebinar();
     }
 }

@@ -5,49 +5,100 @@ namespace App\Actions\Webinars;
 use App\Jobs\Messaging\SendWebinarMissedYouFollowUpJob;
 use App\Jobs\Messaging\SendWebinarReplayFollowUpJob;
 use App\Models\WebinarRegistration;
+use App\Models\WebinarScheduledMessage;
 
 class ProcessWebinarOutcomeAction
 {
     public function execute(WebinarRegistration $registration): void
     {
-        $registration->refresh();
+        $registration->loadMissing(['lead', 'webinar']);
 
-        // Prevent duplicate processing
-        if ($registration->follow_up_status) {
+        if ($registration->attended_at && $registration->lead?->converted_at) {
             return;
         }
 
-        // Case 1: Attended AND converted → do nothing
-        if ($registration->attended_at && $registration->converted_at) {
-            $registration->update([
-                'follow_up_status' => 'converted',
-            ]);
+        if ($registration->attended_at && ! $registration->lead?->converted_at) {
+            $this->dispatchFollowUpMessages($registration, 'post_replay');
 
             return;
         }
 
-        // Case 2: Attended but NOT converted → send replay
-        if ($registration->attended_at && ! $registration->converted_at) {
-            SendWebinarReplayFollowUpJob::dispatch($registration->id)
-                ->onQueue('notifications');
-
-            $registration->update([
-                'follow_up_status' => 'replay_sent',
-            ]);
-
-            return;
-        }
-
-        // Case 3: Did NOT attend → send missed-you
         if (! $registration->attended_at) {
-            SendWebinarMissedYouFollowUpJob::dispatch($registration->id)
-                ->onQueue('notifications');
-
-            $registration->update([
-                'follow_up_status' => 'missed',
-            ]);
+            $this->dispatchFollowUpMessages($registration, 'post_missed');
 
             return;
         }
+    }
+
+    protected function dispatchFollowUpMessages(
+        WebinarRegistration $registration,
+        string $messageType
+    ): void {
+        $this->dispatchEmail($registration, $messageType);
+        $this->dispatchSms($registration, $messageType);
+    }
+
+    protected function dispatchEmail(
+        WebinarRegistration $registration,
+        string $messageType
+    ): void {
+        $scheduled = WebinarScheduledMessage::query()->firstOrCreate(
+            [
+                'webinar_registration_id' => $registration->id,
+                'channel' => 'email',
+                'message_type' => $messageType,
+            ],
+            [
+                'status' => 'pending',
+                'send_at' => now(),
+                'meta' => null,
+            ]
+        );
+
+        if (! $scheduled->wasRecentlyCreated) {
+            return;
+        }
+
+        if ($messageType === 'post_replay') {
+            SendWebinarReplayFollowUpJob::dispatch($registration->id, $scheduled->id)
+                ->onQueue('notifications');
+
+            return;
+        }
+
+        SendWebinarMissedYouFollowUpJob::dispatch($registration->id, $scheduled->id)
+            ->onQueue('notifications');
+    }
+
+    protected function dispatchSms(
+        WebinarRegistration $registration,
+        string $messageType
+    ): void {
+        $scheduled = WebinarScheduledMessage::query()->firstOrCreate(
+            [
+                'webinar_registration_id' => $registration->id,
+                'channel' => 'sms',
+                'message_type' => $messageType,
+            ],
+            [
+                'status' => 'pending',
+                'send_at' => now(),
+                'meta' => null,
+            ]
+        );
+
+        if (! $scheduled->wasRecentlyCreated) {
+            return;
+        }
+
+        if ($messageType === 'post_replay') {
+            SendWebinarReplayFollowUpJob::dispatch($registration->id, $scheduled->id)
+                ->onQueue('notifications');
+
+            return;
+        }
+
+        SendWebinarMissedYouFollowUpJob::dispatch($registration->id, $scheduled->id)
+            ->onQueue('notifications');
     }
 }

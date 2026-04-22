@@ -25,6 +25,9 @@ return new class extends Migration
             $table->string('source')->default('webinar')->index();
             $table->string('subsource')->nullable()->index();
 
+            $table->string('crm_status')->default('new')->index();
+            $table->timestamp('converted_at')->nullable()->index();
+
             $table->timestamp('last_contacted_at')->nullable();
 
             $table->timestamps();

@@ -11,15 +11,22 @@ class WebinarScheduledMessage extends Model
         'webinar_registration_id',
         'channel',
         'message_type',
-        'scheduled_for',
+        'status',
+        'send_at',
+        'sent_at',
+        'skipped_at',
+        'failed_at',
+        'failure_reason',
+        'meta',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'scheduled_for' => 'datetime',
-        ];
-    }
+    protected $casts = [
+        'send_at' => 'datetime',
+        'sent_at' => 'datetime',
+        'skipped_at' => 'datetime',
+        'failed_at' => 'datetime',
+        'meta' => 'array',
+    ];
 
     public function registration(): BelongsTo
     {

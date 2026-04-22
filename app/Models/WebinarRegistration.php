@@ -4,14 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class WebinarRegistration extends Model
 {
     protected $fillable = [
-        'join_token',
         'lead_id',
         'webinar_id',
+        'join_token',
         'webinar_slug',
         'status',
         'source',
@@ -23,18 +24,27 @@ class WebinarRegistration extends Model
         'meta',
         'registered_at',
         'attended_at',
-        'converted_at',
-        'follow_up_status',
     ];
 
-    protected function casts(): array
+    protected $casts = [
+        'meta' => 'array',
+        'registered_at' => 'datetime',
+        'attended_at' => 'datetime',
+    ];
+
+    public function lead(): BelongsTo
     {
-        return [
-            'meta' => 'array',
-            'registered_at' => 'datetime',
-            'attended_at' => 'datetime',
-            'converted_at' => 'datetime',
-        ];
+        return $this->belongsTo(Lead::class);
+    }
+
+    public function webinar(): BelongsTo
+    {
+        return $this->belongsTo(Webinar::class);
+    }
+
+    public function scheduledMessages(): HasMany
+    {
+        return $this->hasMany(WebinarScheduledMessage::class, 'webinar_registration_id');
     }
 
     protected static function booted(): void
@@ -53,15 +63,5 @@ class WebinarRegistration extends Model
         } while (static::query()->where('join_token', $token)->exists());
 
         return $token;
-    }
-
-    public function lead(): BelongsTo
-    {
-        return $this->belongsTo(Lead::class);
-    }
-
-    public function webinar(): BelongsTo
-    {
-        return $this->belongsTo(Webinar::class);
     }
 }

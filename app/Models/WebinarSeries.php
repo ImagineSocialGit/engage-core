@@ -4,27 +4,25 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class WebinarSeries extends Model
 {
     protected $fillable = [
-        'slug',
         'title',
+        'slug',
         'status',
         'meta',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'meta' => 'array',
-        ];
-    }
+    protected $casts = [
+        'meta' => 'array',
+    ];
 
     protected static function booted(): void
     {
-        static::saving(function (self $series): void {
-            if (($series->isDirty('title') && blank($series->slug)) || blank($series->slug)) {
+        static::creating(function ($series) {
+            if (empty($series->slug)) {
                 $series->slug = Str::slug($series->title);
             }
         });
@@ -33,5 +31,14 @@ class WebinarSeries extends Model
     public function webinars(): HasMany
     {
         return $this->hasMany(Webinar::class, 'series_id');
+    }
+
+    public function nextUpcomingWebinar(): ?\App\Models\Webinar
+    {
+        return $this->webinars()
+            ->where('status', 'active')
+            ->where('ends_at', '>', now())
+            ->orderBy('starts_at')
+            ->first();
     }
 }
