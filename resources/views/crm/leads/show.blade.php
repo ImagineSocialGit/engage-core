@@ -36,7 +36,7 @@
                 <x-ui.card class="space-y-3">
                     <h3 class="text-lg font-semibold tracking-tight">Webinar History</h3>
 
-                    @forelse ($lead->webinarRegistrations as $registration)
+                    @forelse ($lead->registrations as $registration)
                         <div class="rounded-xl border border-slate-200 p-3 space-y-2">
                             <p class="font-medium text-slate-900">
                                 {{ $registration->webinar?->title ?? $registration->webinar_slug }}
@@ -95,7 +95,7 @@
                 </form>
 
                 <div class="space-y-3 border-t border-slate-200 pt-4">
-                    @forelse ($lead->leadNotes as $note)
+                    @forelse ($lead->notes as $note)
                         <div class="rounded-xl border border-slate-200 p-3">
                             <p class="text-slate-800">{{ $note->body }}</p>
                             <p class="mt-2 text-xs text-slate-500">{{ $note->created_at->format('M j, Y g:i A') }}</p>
