@@ -162,10 +162,40 @@ return [
             'primary_cta' => [
                 'enabled' => true,
                 'wrapper' => 'mt-10 flex flex-col items-center gap-4 text-center',
+                'action_row' => 'flex flex-col items-center justify-center gap-24 sm:flex-row',
                 'pretext' => 'Seats are limited for this live training.',
                 'label' => 'Save My Seat',
                 'route' => 'webinar.show',
                 'helper_text' => 'No pressure. No fluff. Just strategy.',
+            ],
+
+            'countdown' => [
+                'enabled' => true,
+                'label' => 'Class starts in',
+                'wrapper' => 'rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white shadow-xl shadow-black/20 backdrop-blur',
+                'label_class' => 'mb-2 text-center text-xs font-semibold uppercase tracking-[0.2em] text-white/60',
+                'grid' => 'grid grid-cols-4 gap-3 text-center',
+                'item' => 'min-w-12',
+                'value' => 'text-xl font-bold tabular-nums leading-none text-white',
+                'unit' => 'mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-white/50',
+                'items' => [
+                    [
+                        'method' => 'days',
+                        'label' => 'Days',
+                    ],
+                    [
+                        'method' => 'hours',
+                        'label' => 'Hrs',
+                    ],
+                    [
+                        'method' => 'minutes',
+                        'label' => 'Min',
+                    ],
+                    [
+                        'method' => 'seconds',
+                        'label' => 'Sec',
+                    ],
+                ],
             ],
 
             'event_details' => [
@@ -200,10 +230,14 @@ return [
 
             'instructor' => [
                 'enabled' => true,
-                'wrapper' => 'mt-20 grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center',
-                'image' => null,
-                'image_alt' => 'Instructor',
-                'image_wrapper' => 'mx-auto max-w-md',
+                'wrapper' => 'mt-20 mx-auto grid max-w-6xl gap-8 lg:grid-cols-[0.92fr_1.08fr] lg:items-start',
+                'image' => config('generated.images.webinar-landing'),
+                'image_alt' => 'Stacey Sandlin and family',
+                'image_wrapper' => 'mx-auto w-full max-w-sm lg:max-w-xl',
+                'image_class' => 'w-full object-contain',
+                'image_sizes' => '(min-width: 1024px) 34vw, 90vw',
+                'image_caption' => 'A 3-generation mortgage family. We don’t guess — we underwrite upfront.',
+                'content_wrapper' => 'space-y-4 text-left',
                 'eyebrow' => null,
                 'heading' => 'Meet Your Mortgage Strategist',
                 'body' => [

@@ -7,6 +7,7 @@
 
     $tokens = config('theme.webinar_public.tokens', []);
     $webinar = $series->nextUpcomingWebinar();
+    $countdownTarget = $webinar?->starts_at?->timezone('UTC')->toIso8601String();
     $secondaryCtaRoute = $page['secondary_cta']['route'] ?? 'webinar.show';
     $secondaryCtaHref = route($secondaryCtaRoute, $series->slug);
 
@@ -43,8 +44,9 @@
                     </p>
                 @endif
 
-                <h1 class="{{ $tokens['hero_title'] ?? 'text-4xl font-bold tracking-tight sm:text-5xl' }} mt-4">
-                    {{ $page['hero']['title'] ?? (($page['hero']['title_prefix'] ?? 'Register for') . ' ' . $series->title) }}
+                <h1 class="{{ $tokens['hero_title'] ?? 'text-4xl font-bold tracking-tight sm:text-5xl' }} mt-4 flex flex-col gap-4">
+                    <span class="text-3xl">{{ $page['hero']['title'] ?? $page['hero']['title_prefix'] ?? 'Register for'}}</span>
+                    <span>{{ $series->title }}</span>
                 </h1>
 
                 @if(filled($page['hero']['body'] ?? null))
@@ -79,19 +81,73 @@
         @endif
 
         @if($page['primary_cta']['enabled'] ?? false)
-            <div class="{{ $page['primary_cta']['wrapper'] ?? 'mt-10 flex flex-col items-center gap-4 text-center' }}">
+            <div
+                x-data="{
+                    countdownTarget: @js($countdownTarget),
+                    remaining: 0,
+                    init() {
+                        if (!this.countdownTarget) return;
+
+                        this.tick();
+                        setInterval(() => this.tick(), 1000);
+                    },
+                    tick() {
+                        this.remaining = Math.max(0, new Date(this.countdownTarget).getTime() - Date.now());
+                    },
+                    days() {
+                        return Math.floor(this.remaining / 86400000);
+                    },
+                    hours() {
+                        return Math.floor((this.remaining % 86400000) / 3600000);
+                    },
+                    minutes() {
+                        return Math.floor((this.remaining % 3600000) / 60000);
+                    },
+                    seconds() {
+                        return Math.floor((this.remaining % 60000) / 1000);
+                    },
+                }"
+                class="{{ $page['primary_cta']['wrapper'] ?? 'mt-10 flex flex-col items-center gap-4 text-center' }}"
+            >
                 @if(filled($page['primary_cta']['pretext'] ?? null))
                     <p class="{{ $tokens['muted'] ?? 'text-sm text-slate-500' }}">
                         {{ $page['primary_cta']['pretext'] }}
                     </p>
                 @endif
 
-                <x-ui.button
-                    type="button"
-                    @click="formOpen = true"
-                >
-                    {{ $page['primary_cta']['label'] ?? 'Save My Seat' }}
-                </x-ui.button>
+                <div class="{{ $page['primary_cta']['action_row'] ?? 'flex flex-col items-center justify-center gap-4 sm:flex-row' }}">
+                    <x-ui.button
+                        type="button"
+                        @click="formOpen = true"
+                    >
+                        {{ $page['primary_cta']['label'] ?? 'Save My Seat' }}
+                    </x-ui.button>
+
+                    @if(($page['countdown']['enabled'] ?? false) && filled($countdownTarget))
+                        <div class="{{ $page['countdown']['wrapper'] ?? 'rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white shadow-xl shadow-black/20 backdrop-blur' }}">
+                            @if(filled($page['countdown']['label'] ?? null))
+                                <p class="{{ $page['countdown']['label_class'] ?? 'mb-2 text-center text-xs font-semibold uppercase tracking-[0.2em] text-white/60' }}">
+                                    {{ $page['countdown']['label'] }}
+                                </p>
+                            @endif
+
+                            <div class="{{ $page['countdown']['grid'] ?? 'grid grid-cols-4 gap-3 text-center' }}">
+                                @foreach(($page['countdown']['items'] ?? []) as $item)
+                                    <div class="{{ $page['countdown']['item'] ?? 'min-w-12' }}">
+                                        <p
+                                            class="{{ $page['countdown']['value'] ?? 'text-xl font-bold tabular-nums leading-none text-white' }}"
+                                            x-text="{{ $item['method'] ?? 'days' }}().toString().padStart(2, '0')"
+                                        ></p>
+
+                                        <p class="{{ $page['countdown']['unit'] ?? 'mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-white/50' }}">
+                                            {{ $item['label'] ?? '' }}
+                                        </p>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                </div>
 
                 @if(filled($page['primary_cta']['helper_text'] ?? null))
                     <p class="{{ $tokens['muted'] ?? 'text-sm text-slate-500' }}">
@@ -133,21 +189,26 @@
             </div>
         @endif
 
-        <div class="bg-green-400">TEST</div>
-
         @if($page['instructor']['enabled'] ?? false)
             <div class="{{ $page['instructor']['wrapper'] ?? 'mt-20 grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center' }}">
                 @if(filled($page['instructor']['image'] ?? null))
                     <div class="{{ $page['instructor']['image_wrapper'] ?? 'mx-auto max-w-md' }}">
-                        <img
-                            src="{{ $page['instructor']['image'] }}"
-                            alt="{{ $page['instructor']['image_alt'] ?? 'Instructor' }}"
-                            class="w-full rounded-3xl object-cover shadow-2xl shadow-slate-950/30"
-                        >
+                        <x-ui.image
+                            :path="$page['instructor']['image']"
+                            :alt="$page['instructor']['image_alt'] ?? 'Instructor'"
+                            sizes="{{ $page['instructor']['image_sizes'] ?? '(min-width: 1024px) 40vw, 100vw' }}"
+                            class="{{ $page['instructor']['image_class'] ?? 'w-full rounded-3xl object-cover shadow-2xl shadow-slate-950/30' }}"
+                        />
+
+                        @if(filled($page['instructor']['image_caption'] ?? null))
+                            <p class="{{ $tokens['muted'] ?? 'text-sm text-slate-500' }} mt-4 text-center">
+                                {{ $page['instructor']['image_caption'] }}
+                            </p>
+                        @endif
                     </div>
                 @endif
 
-                <div class="space-y-4">
+                <div class="{{ $page['instructor']['content_wrapper'] ?? 'space-y-4' }}">
                     @if(filled($page['instructor']['eyebrow'] ?? null))
                         <p class="{{ $tokens['eyebrow'] ?? 'text-sm font-semibold uppercase tracking-[0.2em]' }}">
                             {{ $page['instructor']['eyebrow'] }}
