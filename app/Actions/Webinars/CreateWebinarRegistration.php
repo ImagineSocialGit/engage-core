@@ -60,7 +60,6 @@ class CreateWebinarRegistration
                 'last_name' => $validated['last_name'] ?? null,
                 'email' => $validated['email'],
                 'phone' => $normalizedPhone,
-                'notes' => $validated['notes'] ?? null,
                 'meta' => [
                     'ip' => $request->ip(),
                     'user_agent' => $request->userAgent(),

@@ -17,8 +17,16 @@ class StoreWebinarRegistrationRequest extends FormRequest
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['nullable', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'notes' => ['nullable', 'string', 'max:5000'],
+            'phone' => ['required', 'string', 'max:30'],
+            'consent_messages' => ['accepted'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'consent_messages.accepted' =>
+                'Registering for this webinar requires accepting messages containing links to the event.',
         ];
     }
 }

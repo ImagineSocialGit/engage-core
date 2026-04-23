@@ -1,16 +1,16 @@
 @props([
-    'padding' => 'default',
+    'padding' => 'lg',
 ])
 
 @php
-    $paddingClasses = [
-        'none' => '',
-        'sm' => 'p-4',
-        'default' => 'p-6',
-        'lg' => 'p-8',
-    ];
+    $config = config('theme.webinar_public.components.card', []);
+
+    $classes = trim(implode(' ', array_filter([
+        $config['base'] ?? '',
+        $config['padding'][$padding] ?? ($config['padding']['lg'] ?? ''),
+    ])));
 @endphp
 
-<div {{ $attributes->merge(['class' => 'rounded-2xl border border-slate-200 bg-white shadow-sm ' . ($paddingClasses[$padding] ?? $paddingClasses['default'])]) }}>
+<div {{ $attributes->merge(['class' => $classes]) }}>
     {{ $slot }}
 </div>

@@ -35,7 +35,6 @@ class CreateLeadFromWebinarRegistration implements ShouldQueue
                 'status' => 'new',
                 'source' => 'webinar',
                 'subsource' => $registration->webinar_slug,
-                'notes' => $registration->notes,
             ]
         );
 

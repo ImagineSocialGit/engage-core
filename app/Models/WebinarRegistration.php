@@ -20,7 +20,6 @@ class WebinarRegistration extends Model
         'last_name',
         'email',
         'phone',
-        'notes',
         'meta',
         'registered_at',
         'attended_at',

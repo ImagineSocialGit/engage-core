@@ -29,7 +29,6 @@ return new class extends Migration
             $table->string('email')->index();
             $table->string('phone')->nullable()->index();
 
-            $table->text('notes')->nullable();
             $table->json('meta')->nullable();
 
             $table->timestamp('registered_at')->nullable();

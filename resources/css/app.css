@@ -6,6 +6,8 @@
 @source '../**/*.js';
 
 @theme {
+    --color-primary: #FF50BA;
+    --color-secondary: #2D2D2D;
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }

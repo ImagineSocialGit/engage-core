@@ -1,30 +1,56 @@
-<x-layouts.public title="Webinars">
-    <section class="mx-auto max-w-4xl px-6 py-16 text-center">
-        <h1 class="text-4xl font-bold tracking-tight text-slate-900">
-            No webinars are currently scheduled
-        </h1>
+@php
+    $page = config('theme.webinar_public.pages.index', []);
+    $tokens = config('theme.webinar_public.tokens', []);
+@endphp
 
-        <p class="mx-auto mt-4 max-w-2xl text-lg text-slate-600">
-            We do not have any upcoming sessions available right now. Please check back soon.
-        </p>
+<x-layouts.public
+    :title="$page['title'] ?? 'Upcoming Webinars'"
+    :meta-description="$page['meta_description'] ?? null"
+>
+    <section class="{{ $page['section'] ?? 'mx-auto max-w-4xl px-6 py-20' }}">
 
-        @if($upcomingSeries->isNotEmpty())
-            <div class="mt-10">
-                <h2 class="text-xl font-semibold text-slate-900">Upcoming webinar series</h2>
+        @if($page['hero']['enabled'] ?? true)
+            <div class="{{ $page['hero']['wrapper'] ?? 'mx-auto max-w-4xl' }} {{ $page['hero']['align'] ?? 'text-center' }}">
+                @if(filled($page['hero']['eyebrow'] ?? null))
+                    <p class="{{ $tokens['eyebrow'] ?? 'text-sm font-semibold uppercase tracking-[0.2em]' }}">
+                        {{ $page['hero']['eyebrow'] }}
+                    </p>
+                @endif
 
-                <div class="mt-6 space-y-3">
-                    @foreach($upcomingSeries as $series)
-                        <div>
-                            <a
-                                href="{{ route('webinar.show', $series->slug) }}"
-                                class="text-base font-medium text-slate-900 underline hover:text-slate-700"
-                            >
-                                {{ $series->title }}
-                            </a>
-                        </div>
-                    @endforeach
-                </div>
+                <h1 class="{{ $tokens['hero_title'] ?? 'text-4xl font-bold tracking-tight sm:text-5xl' }} mt-4">
+                    {{ $page['hero']['title'] ?? 'Upcoming Webinars' }}
+                </h1>
+
+                @if(filled($page['hero']['body'] ?? null))
+                    <p class="{{ $tokens['body'] ?? 'text-lg leading-8 text-slate-600' }} mt-6">
+                        {{ $page['hero']['body'] }}
+                    </p>
+                @endif
             </div>
         @endif
+
+        @if(($page['series_list']['enabled'] ?? true) && isset($seriesOptions) && count($seriesOptions))
+            <div class="{{ $page['series_list']['wrapper'] ?? 'mt-12 rounded-3xl border bg-white p-8 shadow-sm' }}">
+                @if(filled($page['series_list']['heading'] ?? null))
+                    <h2 class="{{ $tokens['section_title'] ?? 'text-3xl font-bold tracking-tight' }}">
+                        {{ $page['series_list']['heading'] }}
+                    </h2>
+                @endif
+
+                <ul class="{{ $page['series_list']['list'] ?? 'mt-6 space-y-3' }}">
+                    @foreach($seriesOptions as $option)
+                        <li>
+                            <a
+                                href="{{ route('webinar.show', $option->slug) }}"
+                                class="{{ $tokens['list_link'] ?? 'font-semibold underline underline-offset-4' }}"
+                            >
+                                {{ $option->title }}
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
     </section>
 </x-layouts.public>
