@@ -133,6 +133,8 @@
             </div>
         @endif
 
+        <div class="bg-green-400">TEST</div>
+
         @if($page['instructor']['enabled'] ?? false)
             <div class="{{ $page['instructor']['wrapper'] ?? 'mt-20 grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center' }}">
                 @if(filled($page['instructor']['image'] ?? null))

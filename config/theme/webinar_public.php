@@ -200,7 +200,7 @@ return [
 
             'instructor' => [
                 'enabled' => true,
-                'wrapper' => '',
+                'wrapper' => 'mt-20 grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center',
                 'image' => null,
                 'image_alt' => 'Instructor',
                 'image_wrapper' => 'mx-auto max-w-md',

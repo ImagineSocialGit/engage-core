@@ -16,6 +16,8 @@
 /public/build
 /public/hot
 /public/storage
+/public/images/processed
+/resources/images/raw
 /storage/*.key
 /storage/pail
 /storage/app/*
