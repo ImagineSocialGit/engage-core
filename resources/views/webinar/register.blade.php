@@ -107,7 +107,7 @@
                         @endif
 
                         @if(filled($page['hero']['closing_copy'] ?? null))
-                            <p class="{{ $tokens['body'] ?? 'text-lg leading-8 text-slate-600' }} mt-5">
+                            <p class="{{ $tokens['emphasize'] ?? 'text-lg leading-8 text-slate-600' }} mt-5">
                                 {{ $page['hero']['closing_copy'] }}
                             </p>
                         @endif
