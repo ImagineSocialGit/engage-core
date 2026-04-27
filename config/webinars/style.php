@@ -68,6 +68,13 @@ return [
         ],
     ],
 
+    'footer' => [
+        'compliance_identity' => [
+            'wrapper' => 'mt-6 text-center',
+            'line' => 'block text-xs font-medium leading-6 text-white/90',
+        ],
+    ],
+
     'tokens' => [
         'eyebrow' => 'text-sm font-extrabold uppercase tracking-[0.24em] text-primary',
         'hero_title' => 'text-4xl font-extrabold tracking-[-0.04em] leading-[0.95] text-white sm:text-6xl',
@@ -84,4 +91,5 @@ return [
         'form_grid' => 'space-y-4',
         'field_error' => 'mt-1 text-sm text-red-600',
     ],
+
 ];

@@ -181,7 +181,7 @@ return [
             'label' => 'Text me the reminder',
         ],
         'consent_messages' => [
-            'label' => 'I agree to receive automated email and text messages related to webinar registration, including private access details, class reminders, replay access, and follow-up communications. Message frequency varies. Reply STOP to opt out.',
+            'label' => 'I agree to receive automated email and text messages from Slam Dunk Home Loans related to webinar registration, including private access details, class reminders, replay access, and follow-up communications. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help. Consent is not a condition of purchase.',
         ],
     ],
 
@@ -259,6 +259,21 @@ return [
 
     'sticky_mobile' => [
         'label' => 'Save My Seat',
+    ],
+
+    'legal_links' => [
+        'enabled' => true,
+        'text' => 'By registering, you agree to our Terms & Conditions and Privacy Policy.',
+        'links' => [
+            [
+                'label' => 'Terms & Conditions',
+                'url' => 'https://slamdunkhomeloans.com/terms-and-conditions/',
+            ],
+            [
+                'label' => 'Privacy Policy',
+                'url' => 'https://slamdunkhomeloans.com/privacy-policy/',
+            ],
+        ],
     ],
 
     'blocks' => [

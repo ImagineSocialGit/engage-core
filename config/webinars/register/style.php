@@ -146,6 +146,11 @@ return [
         'button' => 'w-full rounded-2xl bg-primary px-6 py-4 text-center text-sm font-extrabold uppercase tracking-[0.16em] text-white shadow-xl shadow-primary/25',
     ],
 
+    'legal_links' => [
+        'wrapper' => 'text-xs leading-5 text-slate-600',
+        'link' => 'font-extrabold text-primary underline underline-offset-4 hover:text-primary/80',
+    ],
+
     'compliance' => [
         'wrapper' => 'bg-white px-6 pb-10 text-center',
         'text' => 'mx-auto max-w-4xl text-xs leading-6 text-ink/45',

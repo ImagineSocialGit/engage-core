@@ -196,6 +196,29 @@
                     @enderror
                 </div>
 
+                @if($page['legal_links']['enabled'] ?? false)
+                    <p class="{{ $style['legal_links']['wrapper'] ?? 'text-xs leading-5 text-slate-600' }}">
+                        By registering, you agree to our
+                        <a
+                            href="{{ $page['legal_links']['links'][0]['url'] }}"
+                            target="_blank"
+                            rel="noopener"
+                            class="{{ $style['legal_links']['link'] ?? 'font-semibold underline' }}"
+                        >
+                            {{ $page['legal_links']['links'][0]['label'] }}
+                        </a>
+                        and
+                        <a
+                            href="{{ $page['legal_links']['links'][1]['url'] }}"
+                            target="_blank"
+                            rel="noopener"
+                            class="{{ $style['legal_links']['link'] ?? 'font-semibold underline' }}"
+                        >
+                            {{ $page['legal_links']['links'][1]['label'] }}
+                        </a>.
+                    </p>
+                @endif
+
                 <x-ui.button type="submit" class="{{ $tokens['primary_button'] ?? 'w-full' }}">
                     {{ $page['submit']['label'] ?? 'Reserve My Spot' }}
                 </x-ui.button>

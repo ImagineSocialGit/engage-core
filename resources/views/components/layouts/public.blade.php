@@ -39,6 +39,15 @@
         </main>
 
         <footer class="{{ $footer['wrap'] ?? 'border-t border-slate-200 bg-white' }}">
+            @if($sharedContent['footer']['compliance_identity']['enabled'] ?? false)
+                <div class="{{ $sharedStyle['footer']['compliance_identity']['wrapper'] ?? 'mt-6 text-center' }}">
+                    @foreach(($sharedContent['footer']['compliance_identity']['lines'] ?? []) as $line)
+                        <span class="{{ $sharedStyle['footer']['compliance_identity']['line'] ?? 'block text-xs leading-6 text-white/90' }}">
+                            {{ $line }}
+                        </span>
+                    @endforeach
+                </div>
+            @endif
             <div class="{{ $footer['inner'] ?? 'mx-auto w-full max-w-7xl px-6 py-6 text-sm text-slate-500' }}">
                 {{ $footer['text'] ?? $brandName }}
             </div>
