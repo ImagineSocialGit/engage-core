@@ -6,7 +6,10 @@
 ])
 
 @php
-    $config = config('theme.webinar_public.components.button', []);
+    $config = array_replace_recursive(
+        config('webinars.style.components.button', []),
+        config('webinars.register.style.components.button', []),
+    );
 
     $classes = trim(implode(' ', array_filter([
         $config['base'] ?? '',

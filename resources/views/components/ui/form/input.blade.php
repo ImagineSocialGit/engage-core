@@ -1,18 +1,20 @@
 @props([
     'type' => 'text',
-    'value' => null,
 ])
 
 @php
-    $config = config('theme.webinar_public.components.input', []);
+    $config = array_replace_recursive(
+        config('webinars.style.components.input', []),
+        config('webinars.register.style.components.input', []),
+    );
 
-    $classes = trim(implode(' ', array_filter([
-        $config['base'] ?? '',
-    ])));
+    $classes = trim($config['base']
+        ?? 'block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-ink');
 @endphp
 
 <input
     type="{{ $type }}"
-    value="{{ $value }}"
-    {{ $attributes->merge(['class' => $classes]) }}
+    {{ $attributes->merge([
+        'class' => $classes,
+    ]) }}
 >

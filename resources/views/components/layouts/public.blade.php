@@ -1,14 +1,21 @@
 @php
-    $theme = config('theme.webinar_public', []);
-    $brand = $theme['brand'] ?? [];
-    $layout = $theme['layout'] ?? [];
+    $sharedContent = config('webinars.content', []);
+    $sharedStyle = config('webinars.style', []);
+
+    $brand = $sharedContent['brand'] ?? [];
+    $layout = $sharedStyle['layout'] ?? [];
+
     $header = $layout['header'] ?? [];
     $footer = $layout['footer'] ?? [];
     $primaryLink = $header['primary_link'] ?? [];
 
     $brandName = $brand['name'] ?? config('app.name');
+
     $primaryLinkLabel = $primaryLink['label'] ?? 'Webinars';
-    $primaryLinkHref = isset($primaryLink['route']) ? route($primaryLink['route']) : '/';
+
+    $primaryLinkHref = isset($primaryLink['route'])
+        ? route($primaryLink['route'])
+        : url('/');
 @endphp
 
 <x-layouts.app :title="$title ?? $brandName" :meta-description="$metaDescription ?? null">
