@@ -268,13 +268,16 @@ return [
     'final_close' => [
         'enabled' => true,
         'headline' => 'Most Buyers Don’t Know There’s a Problem… Until It’s Too Late',
-        'body' => 'By the time something goes wrong, you’ve already made an offer, spent money, and started planning your move.',
         'bullets' => [
-            'You’ve made an offer',
-            'You’re under contract',
-            'You’ve spent money',
-            'You’re planning your move',
+            'intro' => 'By the time something goes wrong',
+            'list' => [
+                'You’ve made an offer',
+                'You’re under contract',
+                'You’ve spent money',
+                'You’re planning your move',
+            ],
         ],
+        'body' => 'And then everything stops.',
         'closing_copy' => 'Not because you couldn’t buy. Because it wasn’t set up right from the beginning.',
         'label' => 'Secure My Spot Before It Fills',
         'helper_text' => 'No pressure • No sales pitch • Just strategy',

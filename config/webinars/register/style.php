@@ -10,7 +10,7 @@ return [
     'hero' => [
         'theme' => 'dark',
         'section' => 'bg-secondary text-white',
-        'inner' => 'mx-auto grid w-full max-w-7xl lg:gap-10 px-6 pt-14 pb-2 sm:pt-8 lg:pb-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center',
+        'inner' => 'mx-auto grid w-full max-w-7xl lg:gap-10 px-6 pt-14 pb-6 sm:pt-8 lg:pb-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center',
         'wrapper' => 'max-w-4xl text-left',
         'align' => 'text-left',
         'title' => 'mt-5 flex flex-col gap-4',
