@@ -93,6 +93,45 @@
                                         {{ ucfirst($webinar->status) }}
                                     </span>
                                 </td>
+                                
+                                <td class="px-6 py-4 text-right">
+                                @php
+                                    $registrationUrl = $webinar->series?->slug
+                                        ? rtrim(config('app.webinar_url') ?: config('app.url'), '/') . route('webinar.show', $webinar->series->slug, false)
+                                        : null;
+                                @endphp
+
+                                @if($registrationUrl)
+                                    <div
+                                        x-data="{ copied: false }"
+                                        class="inline-flex items-center gap-2"
+                                    >
+                                        <a
+                                            href="{{ $registrationUrl }}"
+                                            target="_blank"
+                                            rel="noopener"
+                                            class="text-xs font-semibold text-slate-600 underline hover:text-slate-900"
+                                        >
+                                            View
+                                        </a>
+
+                                        <button
+                                            type="button"
+                                            x-on:click="
+                                                navigator.clipboard.writeText(@js($registrationUrl));
+                                                copied = true;
+                                                setTimeout(() => copied = false, 1500);
+                                            "
+                                            class="inline-flex items-center rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+                                        >
+                                            <span x-show="!copied">Copy Link</span>
+                                            <span x-show="copied">Copied</span>
+                                        </button>
+                                    </div>
+                                @else
+                                    <span class="text-xs text-slate-400">No link</span>
+                                @endif
+                            </td>
                             </tr>
                         @empty
                             <tr>
