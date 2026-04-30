@@ -15,16 +15,19 @@ return Application::configure(basePath: dirname(__DIR__))
             $domain = parse_url(config('app.url'), PHP_URL_HOST);
 
             Route::middleware(['web'])
-                ->domain('webinar.' . $domain)
                 ->group(function () {
                     require base_path('routes/staging.php');
+                });
+
+            Route::middleware(['web'])
+                ->domain('webinar.' . $domain)
+                ->group(function () {
                     require base_path('routes/webinar.php');
                 });
 
             Route::middleware(['web', 'auth'])
                 ->domain('crm.' . $domain)
                 ->group(function () {
-                    require base_path('routes/staging.php');
                     require base_path('routes/crm.php');
                 });
         },
