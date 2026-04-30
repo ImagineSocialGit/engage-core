@@ -31,27 +31,11 @@
     <meta name="twitter:image" content="{{ $image }}">
 
     {{-- FAVICONS --}}
-    @if(isset($favicon))
-        @if($favicon->favicon_96x96)
-            <link rel="icon" type="image/png" sizes="96x96" href="{{ asset('storage/' . $favicon->favicon_96x96) }}" />
-        @endif
-
-        @if($favicon->favicon_svg)
-            <link rel="icon" type="image/svg+xml" href="{{ asset('storage/' . $favicon->favicon_svg) }}" />
-        @endif
-
-        @if($favicon->favicon_icon)
-            <link rel="shortcut icon" href="{{ asset('storage/' . $favicon->favicon_icon) }}" />
-        @endif
-
-        @if($favicon->apple_touch_icon)
-            <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('storage/' . $favicon->apple_touch_icon) }}" />
-        @endif
-
-        @if($favicon->site_manifest)
-            <link rel="manifest" href="{{ asset('storage/' . $favicon->site_manifest) }}" />
-        @endif
-    @endif
+    <link rel="icon" type="image/png" sizes="96x96" href="{{ config('filesystems.disks.spaces.url') }}/favicon/favicon-96x96.png" />
+    <link rel="icon" type="image/svg+xml" href="{{ config('filesystems.disks.spaces.url') }}/favicon/favicon.svg" />
+    <link rel="shortcut icon" href="{{ config('filesystems.disks.spaces.url') }}/favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ config('filesystems.disks.spaces.url') }}/favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="{{ config('filesystems.disks.spaces.url') }}/favicon/site.webmanifest" />
 
     {{-- DESIGN TOKENS --}}
     <style>
