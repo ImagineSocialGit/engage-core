@@ -21,27 +21,9 @@ class WebinarSeeder extends Seeder
         ]);
 
         $vaSeries = \App\Models\WebinarSeries::firstOrCreate([
-            'slug' => 'va-homebuyer',
+            'slug' => 'va-homebuyer-game-plan',
         ], [
-            'title' => 'VA Homebuyer Class',
-        ]);
-
-        $relocationSeries = \App\Models\WebinarSeries::firstOrCreate([
-            'slug' => 'relocation',
-        ], [
-            'title' => 'Relocation to Florida',
-        ]);
-
-        $investorSeries = \App\Models\WebinarSeries::firstOrCreate([
-            'slug' => 'investor',
-        ], [
-            'title' => 'Investor/DSCR',
-        ]);
-
-        $constructionSeries = \App\Models\WebinarSeries::firstOrCreate([
-            'slug' => 'construction',
-        ], [
-            'title' => 'Construction Loans',
+            'title' => 'VA Homebuyer Game Plan',
         ]);
 
     }
