@@ -28,6 +28,9 @@
             'resolved_value' => $resolvedValue,
         ];
     })->filter(fn (array $item) => filled($item['resolved_value'] ?? null))->values();
+
+    $heroTheme = $style['hero']['theme'] ?? 'dark';
+    $heroCountdown = $style['countdown']['themes'][$heroTheme] ?? $style['countdown']['themes']['dark'];
 @endphp
 
 <x-layouts.public
@@ -35,270 +38,24 @@
     :meta-description="$page['meta_description'] ?? null"
 >
     <section
-        x-data="{
-            formOpen: {{ $errors->any() ? 'true' : 'false' }},
-            exitIntentOpen: false,
-            exitIntentShown: false,
-            showStickyCta: false,
-            handleMouseLeave(event) {
-                if (!({{ ($page['exit_intent']['enabled'] ?? false) ? 'true' : 'false' }})) return;
-                if (this.exitIntentShown) return;
-                if (event.clientY > 0) return;
-
-                this.exitIntentShown = true;
-                this.exitIntentOpen = true;
-            },
-            countdownTarget: @js($countdownTarget),
-            remaining: 0,
-            initCountdown() {
-                if (!this.countdownTarget) return;
-
-                this.tickCountdown();
-                setInterval(() => this.tickCountdown(), 1000);
-            },
-            tickCountdown() {
-                this.remaining = Math.max(0, new Date(this.countdownTarget).getTime() - Date.now());
-            },
-            days() {
-                return Math.floor(this.remaining / 86400000);
-            },
-            hours() {
-                return Math.floor((this.remaining % 86400000) / 3600000);
-            },
-            minutes() {
-                return Math.floor((this.remaining % 3600000) / 60000);
-            },
-            seconds() {
-                return Math.floor((this.remaining % 60000) / 1000);
-            },
-        }"
-        x-init="
-            initCountdown();
-            const observer = new IntersectionObserver(([entry]) => {
-                showStickyCta = !entry.isIntersecting;
-            }, { threshold: 0 });
-
-            $nextTick(() => {
-                if ($refs.heroSection) observer.observe($refs.heroSection);
-            });
-        "
-        @keydown.escape.window="formOpen = false; exitIntentOpen = false"
-        @mouseleave.window="handleMouseLeave($event)"
+        x-data="webinarRegistrationPage(@js([
+            'countdownTarget' => $countdownTarget,
+        ]))"
         class="{{ $style['section'] ?? 'bg-white' }}"
-    >
-        @if($page['hero']['enabled'] ?? true)
-            @php
-                $heroTheme = $style['hero']['theme'] ?? 'dark';
-                $heroCountdown = $style['countdown']['themes'][$heroTheme] ?? $style['countdown']['themes']['dark'];
-            @endphp
-            <div
-                x-ref="heroSection" 
-                class="{{ $style['hero']['section'] ?? 'bg-secondary text-white' }}">
-                <div class="{{ $style['hero']['inner'] ?? 'mx-auto grid w-full max-w-7xl gap-10 px-6 py-14 sm:py-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center' }}">
-                    <div class="{{ $style['hero']['wrapper'] ?? 'max-w-4xl text-left' }} {{ $style['hero']['align'] ?? 'text-left' }}">
-                        @if(filled($page['hero']['eyebrow'] ?? null))
-                            <p class="{{ $tokens['eyebrow'] ?? 'text-sm font-semibold uppercase tracking-[0.2em]' }}">
-                                {{ $page['hero']['eyebrow'] }}
-                            </p>
-                        @endif
+        >
 
-                        <h2 class="{{ $tokens['hero_title'] ?? 'text-4xl font-bold tracking-tight sm:text-5xl' }} {{ $style['hero']['title'] ?? 'mt-4 flex flex-col gap-4' }}">
-                            <span>
-                                {{ $page['hero']['title'] ?? $page['hero']['title_prefix'] ?? 'Register for Webinar' }}
-                            </span>
+        <x-webinars.hero
+            :page="$page"
+            :style="$style"
+            :tokens="$tokens"
+            :series="$series"
+            :event-details-items="$eventDetailsItems"
+            :countdown-target="$countdownTarget"
+            :hero-countdown="$heroCountdown"
+        />
 
-                            @if(filled($page['hero']['subtitle'] ?? null))
-                                <span class="text-3xl sm:text-4xl">
-                                    {{ $page['hero']['subtitle'] }}
-                                </span>
-                            @elseif(blank($page['hero']['title'] ?? null))
-                                <span>
-                                    {{ $series->title }}
-                                </span>
-                            @endif
-                        </h2>
-
-                        @if(filled($page['hero']['body'] ?? null))
-                            <p class="{{ $tokens['body'] ?? 'text-lg leading-8 text-slate-600' }} {{ $style['hero']['body'] ?? 'mt-6' }}">
-                                {{ $page['hero']['body'] }}
-                            </p>
-                        @endif
-
-                        @if(filled($page['hero']['supporting_copy'] ?? null))
-                            @foreach ($page['hero']['supporting_copy'] as $item)
-                            <p class="{{ $style['hero']['supporting_copy'] ?? 'mt-4' }}{{ $loop->last ? ' text-lg font-semibold' : ' text-base' }}">
-                                {{ $item }}
-                            </p>                                
-                            @endforeach
-
-                        @endif
-
-                        @if(filled($page['hero']['closing_copy'] ?? null))
-                            <p class="hidden lg:block {{ $tokens['emphasize'] ?? 'text-lg leading-8 text-slate-600' }} mt-5">
-                                {{ $page['hero']['closing_copy'] }}
-                            </p>
-                        @endif
-
-                        @if(filled($page['hero']['authority_line'] ?? null))
-                            <p class="{{ $tokens['muted'] ?? 'text-sm text-slate-500' }} mt-5 font-extrabold">
-                                {{ $page['hero']['authority_line'] }}
-                            </p>
-                        @endif
-
-                        @if(filled($page['hero']['bullets'] ?? []))
-                            <p class="text-2xl font-semibold text-primary mt-6 mb-2">{{ $page['hero']['bullets']['intro']}}</p>
-                            <ul class="{{ $style['hero']['list'] ?? 'space-y-3' }}">
-                                @foreach($page['hero']['bullets']['list'] as $bullet)
-                                    <li class="{{ $style['hero']['list_item'] ?? 'ml-4 flex gap-3 text-base font-bold' }}">
-                                        <span class="{{ $style['hero']['icon'] ?? 'mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-extrabold text-white' }}">✓</span>
-                                        <span>{{ $bullet }}</span>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        @endif
-
-                        @if($page['urgency_stats']['enabled'] ?? false)
-                            <div class="{{ $style['urgency_stats']['wrapper'] ?? 'mt-8' }}">
-                                @if(filled($page['urgency_stats']['intro'] ?? null))
-                                    <p class="{{ $style['urgency_stats']['intro'] ?? 'mt-6 text-lg font-bold' }}">
-                                        {{ $page['urgency_stats']['intro'] }}
-                                    </p>
-                                @endif
-
-                                <div class="{{ $style['urgency_stats']['stats_wrapper'] ?? 'mt-4 grid gap-3 sm:grid-cols-3' }}">
-                                    @foreach(($page['urgency_stats']['items'] ?? []) as $item)
-                                        <div class="{{ $style['urgency_stats']['item'] ?? 'rounded-2xl p-5' }}">
-                                            <span class="{{ $style['urgency_stats']['value'] ?? 'block text-3xl font-extrabold' }}">
-                                                {{ $item['value'] ?? '' }}
-                                            </span>
-
-                                            <span class="{{ $style['urgency_stats']['label'] ?? 'mt-1 block text-sm font-bold' }}">
-                                                {{ $item['label'] ?? '' }}
-                                            </span>
-                                        </div>
-                                    @endforeach
-                                </div>
-
-                                @if(filled($page['urgency_stats']['closing_line'] ?? null))
-                                    <p class="{{ $style['urgency_stats']['closing_line'] ?? 'mt-6 text-lg font-bold' }}">
-                                        {{ $page['urgency_stats']['closing_line'] }}
-                                    </p>
-                                @endif
-                            </div>
-                        @endif
-
-                        @if(filled($page['hero']['closing_copy'] ?? null))
-                            <p class="block lg:hidden {{ $tokens['emphasize'] ?? 'text-lg leading-8 text-slate-600' }} mt-8">
-                                {{ $page['hero']['closing_copy'] }}
-                            </p>
-                        @endif
-                    </div>
-
-                    @if($page['primary_cta']['enabled'] ?? false)
-                        <div class="{{ $style['primary_cta']['wrapper'] ?? 'mt-10 flex flex-col gap-4 text-left' }}">
-
-                            @if (($page['webinar_title']['enabled'] ?? false))
-                                <span class="{{ $style['webinar_title']['lead'] ?? 'text-xl text-white/85' }}">
-                                    Seminar Details for the
-                                </span>
-                                <h1 class="{{ $style['webinar_title']['title'] }}">
-                                    {{ $series->title }}
-                                </h1>
-                            @endif
-
-                            @if(($page['event_details']['enabled'] ?? false) && $eventDetailsItems->isNotEmpty())
-                                <div class="{{ $style['event_details']['wrapper'] ?? 'mt-16 lg:col-span-2' }}">
-                                    @if(filled($page['event_details']['heading'] ?? null))
-                                        <div class="{{ $style['event_details']['heading_class'] ?? 'text-center' }}">
-                                            <h2 class="{{ $tokens['section_title'] ?? 'text-3xl font-bold tracking-tight' }}">
-                                                {{ $page['event_details']['heading'] }}
-                                            </h2>
-                                        </div>
-                                    @endif
-
-                                    <div class="{{ $style['event_details']['grid'] ?? 'mt-8 grid gap-4 md:grid-cols-3' }}">
-                                        @foreach($eventDetailsItems as $item)
-                                            <div class="{{ $style['event_details']['card'] ?? 'rounded-2xl border bg-white p-6 shadow-sm' }}">
-                                                <p class="{{ $style['event_details']['label'] ?? 'text-sm font-semibold uppercase tracking-[0.2em]' }}">
-                                                    {{ $item['label'] ?? '' }}
-                                                </p>
-
-                                                <p class="{{ $style['event_details']['value'] ?? 'mt-3 text-xl font-bold tracking-tight' }}">
-                                                    {{ $item['resolved_value'] }}
-                                                </p>
-                                            </div>
-                                        @endforeach
-                                    </div>
-
-                                    @if(filled($page['event_details']['footnote'] ?? null))
-                                        <p class="{{ $style['event_details']['footnote'] ?? ($tokens['muted'] ?? 'mt-6 text-sm') }}">
-                                            {{ $page['event_details']['footnote'] }}
-                                        </p>
-                                    @endif
-                                </div>
-                            @endif
-
-                            <div class="hidden {{ $style['primary_cta']['countdown_split'] ?? 'lg:flex flex-col gap-4' }}">
-
-                                @if(filled($page['primary_cta']['pretext'] ?? null))
-                                    <p class="{{ $style['primary_cta']['pretext'] ?? ($tokens['muted'] ?? 'text-sm text-slate-500') }}">
-                                        {{ $page['primary_cta']['pretext'] }}
-                                    </p>
-                                @endif
-
-                                @if(($page['countdown']['enabled'] ?? false) && filled($countdownTarget))
-                                    <div class="{{ $heroCountdown['wrapper'] ?? 'rounded-2xl border border-white/10 bg-white/10 px-5 py-4' }}">
-                                        @if(filled($page['countdown']['label'] ?? null))
-                                            <p class="{{ $heroCountdown['label_class'] ?? 'mb-2 text-xs uppercase' }}">
-                                                {{ $page['countdown']['label'] }}
-                                            </p>
-                                        @endif
-
-                                        <div class="{{ $heroCountdown['grid'] ?? 'grid grid-cols-4 gap-3 text-center' }}">
-                                            @foreach(($page['countdown']['items'] ?? []) as $item)
-                                                <div class="{{ $heroCountdown['item'] ?? 'min-w-12' }}">
-                                                    <p
-                                                        class="{{ $heroCountdown['value'] ?? 'text-xl font-bold tabular-nums' }}"
-                                                        x-text="{{ $item['method'] ?? 'days' }}().toString().padStart(2, '0')"
-                                                    ></p>
-
-                                                    <p class="{{ $heroCountdown['unit'] ?? 'mt-1 text-[0.65rem] uppercase' }}">
-                                                        {{ $item['label'] ?? '' }}
-                                                    </p>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                @endif
-
-                                <x-ui.button
-                                    type="button"
-                                    @click="formOpen = true"
-                                    class="{{ $tokens['primary_button'] ?? 'w-full' }}"
-                                >
-                                    {{ $page['primary_cta']['label'] ?? 'Save My Seat' }}
-                                </x-ui.button>
-
-                                @if(filled($page['primary_cta']['helper_text'] ?? null))
-                                    <p class="{{ $style['primary_cta']['helper_text'] ?? ($tokens['muted'] ?? 'text-sm text-slate-500') }}">
-                                        {{ $page['primary_cta']['helper_text'] }}
-                                    </p>
-                                @endif
-
-                                @if(filled($page['primary_cta']['micro_trust'] ?? null))
-                                    <p class="{{ $tokens['muted'] ?? 'text-sm text-slate-500' }}">
-                                        {{ $page['primary_cta']['micro_trust'] }}
-                                    </p>
-                                @endif
-
-                            </div>
-                        </div>
-                    @endif
-
-                </div>
-            </div>
-        @endif
         <div>
+
             @if(($page['problem']['enabled'] ?? false) || ($page['instructor']['enabled'] ?? false))
             
                 <div class="{{ $style['problem']['section'] ?? 'bg-white text-ink' }}">
@@ -508,25 +265,7 @@
                     $finalCloseTheme = $style['final_close']['theme'] ?? 'light';
                     $finalCloseCountdown = $style['countdown']['themes'][$finalCloseTheme] ?? $style['countdown']['themes']['dark'];
                 @endphp
-                <div
-                    x-data="{
-                        countdownTarget: @js($countdownTarget),
-                        remaining: 0,
-                        init() {
-                            if (!this.countdownTarget) return;
-                            this.tick();
-                            setInterval(() => this.tick(), 1000);
-                        },
-                        tick() {
-                            this.remaining = Math.max(0, new Date(this.countdownTarget).getTime() - Date.now());
-                        },
-                        days() { return Math.floor(this.remaining / 86400000); },
-                        hours() { return Math.floor((this.remaining % 86400000) / 3600000); },
-                        minutes() { return Math.floor((this.remaining % 3600000) / 60000); },
-                        seconds() { return Math.floor((this.remaining % 60000) / 1000); },
-                    }"
-                    class="{{ $style['final_close']['wrapper'] ?? 'bg-secondary px-6 pb-20 text-white sm:pb-28' }}"
-                >
+                <div class="{{ $style['final_close']['wrapper'] ?? 'bg-secondary px-6 pb-20 text-white sm:pb-28' }}">
                     <div class="{{ $style['final_close']['inner'] ?? 'mx-auto max-w-4xl text-center' }}">
                         @if(filled($page['final_close']['headline'] ?? null))
                             <h2 class="{{ $style['final_close']['headline'] ?? ($tokens['dark_section_title'] ?? 'text-4xl font-bold tracking-tight sm:text-5xl') }}">
@@ -561,30 +300,13 @@
                         @endif
 
                         @if(($page['final_close']['countdown']['enabled'] ?? false) && filled($countdownTarget))
-                            <div class="mx-auto mt-10 max-w-md">
-                                <div class="{{ $finalCloseCountdown['wrapper'] ?? 'rounded-2xl border border-white/10 bg-white/10 px-5 py-4' }}">
-                                    @if(filled($page['countdown']['label'] ?? null))
-                                        <p class="{{ $style['countdown']['label_class'] ?? 'mb-2 text-xs uppercase' }}">
-                                            {{ $page['countdown']['label'] }}
-                                        </p>
-                                    @endif
-
-                                    <div class="{{ $style['countdown']['grid'] ?? 'grid grid-cols-4 gap-3 text-center' }}">
-                                        @foreach(($page['countdown']['items'] ?? []) as $item)
-                                            <div class="{{ $style['countdown']['item'] ?? 'min-w-12' }}">
-                                                <p
-                                                    class="{{ $style['countdown']['value'] ?? 'text-xl font-bold tabular-nums' }}"
-                                                    x-text="{{ $item['method'] ?? 'days' }}().toString().padStart(2, '0')"
-                                                ></p>
-
-                                                <p class="{{ $style['countdown']['unit'] ?? 'mt-1 text-[0.65rem] uppercase' }}">
-                                                    {{ $item['label'] ?? '' }}
-                                                </p>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            </div>
+                            <x-webinars.countdown
+                                :content="$page"
+                                :countdown="$page['final_close']['countdown'] ?? []"
+                                :style="$style"
+                                :target="$countdownTarget"
+                                :theme="$finalCloseTheme"
+                            />
                         @endif
 
                         <div class="{{ $style['final_close']['cta_wrapper'] ?? 'mt-10 flex flex-col items-center gap-4' }}">
@@ -613,62 +335,10 @@
                     </p>
                 </div>
             @endif
-
-            @if($page['exit_intent']['enabled'] ?? false)
-                <div
-                    x-cloak
-                    x-show="exitIntentOpen"
-                    x-transition:enter="transition ease-out duration-200"
-                    x-transition:enter-start="opacity-0 scale-105"
-                    x-transition:enter-end="opacity-100 scale-100"
-                    x-transition:leave="transition ease-in duration-150"
-                    x-transition:leave-start="opacity-100 scale-100"
-                    x-transition:leave-end="opacity-0 scale-105"
-                    class="fixed inset-0 z-60 flex items-center justify-center p-4"
-                    aria-modal="true"
-                    role="dialog"
-                >
-                    <div
-                        class="absolute inset-0 bg-black/75"
-                        @click="exitIntentOpen = false"
-                    ></div>
-
-                    <div class="relative z-10 w-full max-w-lg rounded-3xl bg-white p-8 text-center shadow-2xl">
-                        <button
-                            type="button"
-                            @click="exitIntentOpen = false"
-                            class="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                            aria-label="Close exit intent popup"
-                        >
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-
-                        @if(filled($page['exit_intent']['headline'] ?? null))
-                            <h2 class="{{ $tokens['section_title'] ?? 'text-3xl font-bold tracking-tight text-ink' }}">
-                                {{ $page['exit_intent']['headline'] }}
-                            </h2>
-                        @endif
-
-                        <div class="mt-6">
-                            <x-ui.button
-                                type="button"
-                                @click="exitIntentOpen = false; formOpen = true"
-                                class="{{ $tokens['secondary_button'] ?? 'w-full' }}"
-                            >
-                                {{ $page['exit_intent']['label'] ?? 'Let Me In' }}
-                            </x-ui.button>
-                        </div>
-                    </div>
-                </div>
-            @endif
             
         </div>
 
         @if($page['primary_cta']['enabled'] ?? false)
-            @php
-                $heroTheme = $style['hero']['theme'] ?? 'dark';
-                $heroCountdown = $style['countdown']['themes'][$heroTheme] ?? $style['countdown']['themes']['dark'];
-            @endphp
             <div class="{{ $style['mobile_after_hero_cta']['wrapper'] ?? 'lg:hidden flex flex-col gap-3 bg-secondary px-4 py-4' }}">
                 @if(filled($page['primary_cta']['pretext'] ?? null))
                     <p class="{{ $style['primary_cta']['pretext'] ?? ($tokens['muted'] ?? 'text-sm text-slate-500') }}">
@@ -677,28 +347,12 @@
                 @endif
 
                 @if(($page['countdown']['enabled'] ?? false) && filled($countdownTarget))
-                    <div class="{{ $heroCountdown['wrapper'] ?? 'rounded-2xl border border-white/10 bg-white/10 px-5 py-4' }}">
-                        @if(filled($page['countdown']['label'] ?? null))
-                            <p class="{{ $heroCountdown['label_class'] ?? 'mb-2 text-xs uppercase' }}">
-                                {{ $page['countdown']['label'] }}
-                            </p>
-                        @endif
-
-                        <div class="{{ $heroCountdown['grid'] ?? 'grid grid-cols-4 gap-3 text-center' }}">
-                            @foreach(($page['countdown']['items'] ?? []) as $item)
-                                <div class="{{ $heroCountdown['item'] ?? 'min-w-12' }}">
-                                    <p
-                                        class="{{ $heroCountdown['value'] ?? 'text-xl font-bold tabular-nums' }}"
-                                        x-text="{{ $item['method'] ?? 'days' }}().toString().padStart(2, '0')"
-                                    ></p>
-
-                                    <p class="{{ $heroCountdown['unit'] ?? 'mt-1 text-[0.65rem] uppercase' }}">
-                                        {{ $item['label'] ?? '' }}
-                                    </p>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
+                    <x-webinars.countdown
+                        :content="$page"
+                        :style="$style"
+                        :target="$countdownTarget"
+                        :theme="$heroTheme"
+                    />
                 @endif
 
                 <x-ui.button

@@ -286,12 +286,6 @@ return [
         ]
     ],
 
-    'exit_intent' => [
-        'enabled' => true,
-        'headline' => 'Wait — before you go… this could save your deal',
-        'label' => 'Let Me In',
-    ],
-
     'compliance' => [
         'enabled' => true,
         'text' => 'This is an educational class designed to help consumers better understand the homebuying and mortgage process. No application is required to attend. Loan approval is subject to credit, income, assets, and underwriting guidelines.',

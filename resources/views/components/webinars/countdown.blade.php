@@ -3,10 +3,12 @@
     'style' => [],
     'target' => null,
     'theme' => 'dark',
+    'countdown' => null,
 ])
 
 @php
-    $countdownContent = $content['countdown'] ?? [];
+    $countdownContent = $countdown ?? ($content['countdown'] ?? []);
+
     $countdownStyle = $style['countdown']['themes'][$theme]
         ?? $style['countdown']['themes']['dark']
         ?? [];
@@ -15,7 +17,7 @@
 @if(($countdownContent['enabled'] ?? false) && filled($target))
     <div class="{{ $countdownStyle['wrapper'] ?? '' }}">
         <div class="{{ $countdownStyle['grid'] ?? 'grid grid-cols-4 gap-3 text-center' }}">
-            @foreach(($countdownContent['items'] ?? []) as $item)
+            @foreach(($countdownContent['items'] ?? $content['countdown']['items'] ?? []) as $item)
                 <div class="{{ $countdownStyle['item'] ?? '' }}">
                     <p
                         class="{{ $countdownStyle['value'] ?? '' }}"
