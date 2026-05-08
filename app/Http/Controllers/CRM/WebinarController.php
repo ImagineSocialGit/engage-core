@@ -43,7 +43,7 @@ class WebinarController extends Controller
             ->limit(50)
             ->get();
 
-        return view('crm.webinars.index', [
+        return view('crm.webinar-series.index', [
             'title' => 'Webinars',
             'heading' => 'Webinars',
             'webinars' => $webinars,
@@ -57,7 +57,7 @@ class WebinarController extends Controller
         WebinarSeries::query()->create($request->validated());
 
         return redirect()
-            ->route('crm.webinars.index')
+            ->route('crm.webinar-series.index')
             ->with('success', 'Webinar series created.');
     }
 
@@ -165,7 +165,7 @@ class WebinarController extends Controller
         }
 
         return redirect()
-            ->route('crm.webinars.index')
+            ->route('crm.webinar-series.index')
             ->with(
                 'success',
                 "Sync complete: {$created} created, {$updated} updated, {$deleted} deleted, "
@@ -186,7 +186,7 @@ class WebinarController extends Controller
 
         if (! $earliest) {
             return redirect()
-                ->route('crm.webinars.index')
+                ->route('crm.webinar-series.index')
                 ->with('error', 'No upcoming webinars found.');
         }
 
@@ -194,13 +194,13 @@ class WebinarController extends Controller
 
         if (! $currentActive) {
             return redirect()
-                ->route('crm.webinars.index')
+                ->route('crm.webinar-series.index')
                 ->with('error', 'No active webinar to correct.');
         }
 
         if ($currentActive->id === $earliest->id) {
             return redirect()
-                ->route('crm.webinars.index')
+                ->route('crm.webinar-series.index')
                 ->with('error', 'Active webinar is already correct.');
         }
 
@@ -216,7 +216,7 @@ class WebinarController extends Controller
         ]);
 
         return redirect()
-            ->route('crm.webinars.index')
+            ->route('crm.webinar-series.index')
             ->with('success', 'Active webinar corrected.');
     }
 

@@ -67,7 +67,7 @@
 
             <form
                 method="POST"
-                action="{{ route('webinar.store', $series->slug) }}"
+                action="{{ route('webinar.registration.store', $series->slug) }}"
                 class="{{ $tokens['form_grid'] ?? 'space-y-4' }}"
             >
                 @csrf

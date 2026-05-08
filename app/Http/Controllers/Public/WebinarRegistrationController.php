@@ -110,7 +110,18 @@ class WebinarRegistrationController extends Controller
             $webinar->slug
         );
 
-        return redirect()->route('webinar.thank_you', $seriesSlug);
+        return redirect()->route('webinar.thank-you', $seriesSlug);
+    }
+
+    public function showThankYou(string $seriesSlug)
+    {
+        $series = WebinarSeries::query()
+            ->where('slug', $seriesSlug)
+            ->firstOrFail();
+
+        return view('webinar.thank-you', [
+            'series' => $series,
+        ]);
     }
 
     private function resolveUpcomingWebinar(WebinarSeries $series): ?Webinar

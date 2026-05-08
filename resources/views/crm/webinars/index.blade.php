@@ -51,7 +51,7 @@
                     </h2>
 
                     <a
-                        href="{{ $showArchived ? route('crm.webinars.index') : route('crm.webinars.index', ['archived' => 1]) }}"
+                        href="{{ $showArchived ? route('crm.webinar-series.index') : route('crm.webinar-series.index', ['archived' => 1]) }}"
                         class="text-sm font-medium text-slate-600 hover:text-slate-900 underline"
                     >
                         {{ $showArchived ? 'View Upcoming' : 'View Archived' }}

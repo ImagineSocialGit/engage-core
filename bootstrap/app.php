@@ -12,7 +12,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
 
         then: function () {
-            $domain = parse_url(config('app.url'), PHP_URL_HOST);
+            $domain = config('app.root_domain');
 
             Route::middleware(['web'])
                 ->group(function () {
@@ -25,7 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
                     require base_path('routes/webinar.php');
                 });
 
-            Route::middleware(['web', 'auth'])
+            Route::middleware(['web'])
                 ->domain('crm.' . $domain)
                 ->group(function () {
                     require base_path('routes/crm.php');

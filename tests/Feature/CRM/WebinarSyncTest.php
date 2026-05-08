@@ -64,7 +64,7 @@ class WebinarSyncTest extends TestCase
             'series_id' => $series->id,
         ]);
 
-        $response->assertRedirect(route('crm.webinars.index'));
+        $response->assertRedirect(route('crm.webinar-series.index'));
         $response->assertSessionHas('success', 'Sync complete: 2 created, 0 updated, 0 deleted, 0 missing preserved.');
 
         $this->assertDatabaseCount('webinars', 2);
@@ -160,7 +160,7 @@ class WebinarSyncTest extends TestCase
             'series_id' => $series->id,
         ]);
 
-        $response->assertRedirect(route('crm.webinars.index'));
+        $response->assertRedirect(route('crm.webinar-series.index'));
         $response->assertSessionHas('success', 'Sync complete: 0 created, 1 updated, 0 deleted, 0 missing preserved.');
 
         $webinar->refresh();
@@ -216,7 +216,7 @@ class WebinarSyncTest extends TestCase
             'series_id' => $series->id,
         ]);
 
-        $response->assertRedirect(route('crm.webinars.index'));
+        $response->assertRedirect(route('crm.webinar-series.index'));
         $response->assertSessionHas('success', 'Sync complete: 0 created, 0 updated, 1 deleted, 0 missing preserved.');
 
         $this->assertDatabaseMissing('webinars', [
@@ -268,7 +268,7 @@ class WebinarSyncTest extends TestCase
             'series_id' => $series->id,
         ]);
 
-        $response->assertRedirect(route('crm.webinars.index'));
+        $response->assertRedirect(route('crm.webinar-series.index'));
         $response->assertSessionHas('success', 'Sync complete: 0 created, 0 updated, 0 deleted, 1 missing preserved.');
 
         $this->assertDatabaseHas('webinars', [
@@ -360,7 +360,7 @@ class WebinarSyncTest extends TestCase
             route('crm.webinar-series.fix-active', $series)
         );
 
-        $fix->assertRedirect(route('crm.webinars.index'));
+        $fix->assertRedirect(route('crm.webinar-series.index'));
         $fix->assertSessionHas('success', 'Active webinar corrected.');
 
         $earliest->refresh();
