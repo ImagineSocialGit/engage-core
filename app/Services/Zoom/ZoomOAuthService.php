@@ -10,18 +10,23 @@ class ZoomOAuthService
 {
     public function getAccessToken(): string
     {
-        $provider = config('webinars.provider', 'zoom');
+        $provider = config('webinars.provider');
 
-        $cacheKey = config("webinars.providers.{$provider}.oauth_token_cache_key", 'zoom_access_token');
-        $ttl = (int) config("webinars.providers.{$provider}.oauth_token_ttl_seconds", 3500);
+        $cacheKey = config("webinars.providers.{$provider}.oauth_token_cache_key");
+        $ttl = (int) config("webinars.providers.{$provider}.oauth_token_ttl_seconds");
+        $oauthUrl = config("webinars.providers.{$provider}.oauth_url");
 
-        return Cache::remember($cacheKey, $ttl, function () use ($provider): string {
+        if (! is_string($oauthUrl) || $oauthUrl === '') {
+            throw new RuntimeException("OAuth URL is not configured for webinar provider [{$provider}].");
+        }
+
+        return Cache::remember($cacheKey, $ttl, function () use ($oauthUrl): string {
             $response = Http::asForm()
                 ->withBasicAuth(
                     config('services.zoom.client_id'),
                     config('services.zoom.client_secret')
                 )
-                ->post(config("webinars.providers.{$provider}.oauth_url"), [
+                ->post($oauthUrl, [
                     'grant_type' => 'account_credentials',
                     'account_id' => config('services.zoom.account_id'),
                 ]);

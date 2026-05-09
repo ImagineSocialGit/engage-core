@@ -44,7 +44,7 @@ class SmsMessagingService
         }
 
         $this->twilio->messages->create($to, [
-            'from' => config('services.twilio.from'),
+            'from' => config('sms.from'),
             'body' => $message,
         ]);
     }

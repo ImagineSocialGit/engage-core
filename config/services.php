@@ -22,6 +22,7 @@ return [
         'sid' => env('TWILIO_SID'),
         'token' => env('TWILIO_AUTH_TOKEN'),
         'from' => env('TWILIO_FROM'),
+        'virtual_phone' => env('TWILIO_VIRTUAL_PHONE'),
     ],
 
     'ses' => [
