@@ -75,7 +75,7 @@ class CreateWebinarRegistration
 
             DispatchWebinarRegistrationMessagesJob::dispatch(
                 WebinarMessageData::fromRegistration($registration)->toArray()
-            )->onQueue('notifications');
+            )->onQueue(config('webinars.queues.registrations'));
 
             $this->scheduleWebinarRemindersAction->execute($registration);
 

@@ -74,7 +74,7 @@ class ScheduleWebinarRemindersAction
 
         SendWebinarReminderEmailJob::dispatch($payload)
             ->delay($runAt)
-            ->onQueue('notifications');
+            ->onQueue(config('webinars.queues.reminders'));
     }
 
     protected function scheduleSms(
@@ -120,7 +120,7 @@ class ScheduleWebinarRemindersAction
 
         SendWebinarReminderSmsJob::dispatch($payload)
             ->delay($runAt)
-            ->onQueue('notifications');
+            ->onQueue(config('webinars.queues.reminders'));
     }
 
     protected function scheduleFor(WebinarMessageData $data): array

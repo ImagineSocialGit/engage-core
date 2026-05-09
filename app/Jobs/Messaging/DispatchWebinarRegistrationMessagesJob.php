@@ -17,9 +17,9 @@ class DispatchWebinarRegistrationMessagesJob implements ShouldQueue
     public function handle(): void
     {
         SendWebinarConfirmationEmailJob::dispatch($this->payload)
-            ->onQueue('notifications');
+            ->onQueue(config('webinars.queues.confirmation_messages'));
 
         SendWebinarConfirmationSmsJob::dispatch($this->payload)
-            ->onQueue('notifications');
+            ->onQueue(config('webinars.queues.confirmation_messages'));
     }
 }

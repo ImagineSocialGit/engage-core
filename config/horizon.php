@@ -228,7 +228,10 @@ return [
                 'maxProcesses' => 10,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
-                'queue' => ['default', 'webinars', 'emails', 'notifications'],
+                'queue' => explode(',', env(
+                    'HORIZON_SUPERVISOR_1_QUEUES',
+                    'default,webinars,emails,notifications,webhooks'
+                )),
             ],
         ],
 

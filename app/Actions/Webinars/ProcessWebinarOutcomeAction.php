@@ -65,13 +65,13 @@ class ProcessWebinarOutcomeAction
 
         if ($messageType === 'post_replay') {
             SendWebinarReplayFollowUpJob::dispatch($registration->id, $scheduled->id)
-                ->onQueue('notifications');
+                ->onQueue(config('webinars.queues.followups'));
 
             return;
         }
 
         SendWebinarMissedYouFollowUpJob::dispatch($registration->id, $scheduled->id)
-            ->onQueue('notifications');
+            ->onQueue(config('webinars.queues.followups'));
     }
 
     protected function dispatchSms(
@@ -97,12 +97,12 @@ class ProcessWebinarOutcomeAction
 
         if ($messageType === 'post_replay') {
             SendWebinarReplayFollowUpJob::dispatch($registration->id, $scheduled->id)
-                ->onQueue('notifications');
+                ->onQueue(config('webinars.queues.followups'));
 
             return;
         }
 
         SendWebinarMissedYouFollowUpJob::dispatch($registration->id, $scheduled->id)
-            ->onQueue('notifications');
+            ->onQueue(config('webinars.queues.followups'));
     }
 }
