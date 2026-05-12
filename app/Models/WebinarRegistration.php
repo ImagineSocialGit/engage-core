@@ -20,12 +20,18 @@ class WebinarRegistration extends Model
         'last_name',
         'email',
         'phone',
+        'ip_address',
+        'user_agent',
+        'email_consent_at',
+        'sms_consent_at',
         'meta',
         'registered_at',
         'attended_at',
     ];
 
     protected $casts = [
+        'email_consent_at' => 'datetime',
+        'sms_consent_at' => 'datetime',
         'meta' => 'array',
         'registered_at' => 'datetime',
         'attended_at' => 'datetime',

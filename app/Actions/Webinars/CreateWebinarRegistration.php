@@ -55,16 +55,29 @@ class CreateWebinarRegistration
                 'lead_id' => $lead->id,
                 'webinar_id' => $webinar->id,
                 'webinar_slug' => $webinar->slug,
+
                 'status' => 'pending',
                 'source' => 'webinar_subdomain',
+
                 'first_name' => $validated['first_name'],
                 'last_name' => $validated['last_name'] ?? null,
+
                 'email' => $validated['email'],
                 'phone' => $normalizedPhone,
+
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+
+                'email_consent_at' => now(),
+                'sms_consent_at' => now(),
+
                 'meta' => [
-                    'request_ip' => $request->ip(),
-                    'user_agent' => $request->userAgent(),
+                    'consent' => [
+                        'ip_address' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                    ],
                 ],
+
                 'registered_at' => now(),
                 'attended_at' => null,
             ]);

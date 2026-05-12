@@ -29,6 +29,12 @@ return new class extends Migration
             $table->string('email')->index();
             $table->string('phone')->nullable()->index();
 
+            $table->string('ip_address', 45)->nullable()->index();
+            $table->text('user_agent')->nullable();
+
+            $table->timestamp('email_consent_at')->nullable();
+            $table->timestamp('sms_consent_at')->nullable();
+
             $table->json('meta')->nullable();
 
             $table->timestamp('registered_at')->nullable();

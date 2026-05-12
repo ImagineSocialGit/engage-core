@@ -4,22 +4,16 @@ namespace App\Http\Controllers\Public;
 
 use App\Actions\Webinars\AdvanceWebinarSeriesStatusAction;
 use App\Actions\Webinars\CreateWebinarRegistration;
+use App\Actions\Webinars\GetNextUpcomingWebinarAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Public\StoreWebinarRegistrationRequest;
-use App\Models\Webinar;
 use App\Models\WebinarSeries;
 
 class WebinarRegistrationController extends Controller
 {
-    public function index()
+    public function index(GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction)
     {
-        $nextWebinar = Webinar::query()
-            ->with('series')
-            ->where('status', 'active')
-            ->whereNotNull('series_id')
-            ->where('ends_at', '>', now())
-            ->orderBy('starts_at')
-            ->first();
+        $nextWebinar = $getNextUpcomingWebinarAction->getGlobal();
 
         if ($nextWebinar) {
             return redirect()->route('webinar.show', $nextWebinar->series->slug);
@@ -29,7 +23,7 @@ class WebinarRegistrationController extends Controller
             ->where('status', 'active')
             ->whereHas('webinars', function ($query) {
                 $query->where('status', 'active')
-                    ->where('ends_at', '>', now());
+                    ->where('starts_at', '>', now()->subMinutes(10));
             })
             ->orderBy('title')
             ->get();
@@ -41,7 +35,8 @@ class WebinarRegistrationController extends Controller
 
     public function show(
         string $seriesSlug,
-        AdvanceWebinarSeriesStatusAction $advanceWebinarSeriesStatusAction
+        AdvanceWebinarSeriesStatusAction $advanceWebinarSeriesStatusAction,
+        GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction
     ) {
         $series = WebinarSeries::query()
             ->where('slug', $seriesSlug)
@@ -50,7 +45,7 @@ class WebinarRegistrationController extends Controller
         $advanceWebinarSeriesStatusAction->execute($series);
         $series->refresh();
 
-        $webinar = $this->resolveUpcomingWebinar($series);
+        $webinar = $getNextUpcomingWebinarAction->getForSeries($series);
 
         if (! $webinar) {
             $otherUpcomingSeries = WebinarSeries::query()
@@ -58,7 +53,7 @@ class WebinarRegistrationController extends Controller
                 ->where('id', '!=', $series->id)
                 ->whereHas('webinars', function ($query) {
                     $query->where('status', 'active')
-                        ->where('ends_at', '>', now());
+                        ->where('starts_at', '>', now()->subMinutes(10));
                 })
                 ->orderBy('title')
                 ->get();
@@ -76,7 +71,8 @@ class WebinarRegistrationController extends Controller
         StoreWebinarRegistrationRequest $request,
         string $seriesSlug,
         CreateWebinarRegistration $createWebinarRegistration,
-        AdvanceWebinarSeriesStatusAction $advanceWebinarSeriesStatusAction
+        AdvanceWebinarSeriesStatusAction $advanceWebinarSeriesStatusAction,
+        GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction
     ) {
         $series = WebinarSeries::query()
             ->where('slug', $seriesSlug)
@@ -85,7 +81,7 @@ class WebinarRegistrationController extends Controller
         $advanceWebinarSeriesStatusAction->execute($series);
         $series->refresh();
 
-        $webinar = $this->resolveUpcomingWebinar($series);
+        $webinar = $getNextUpcomingWebinarAction->getForSeries($series);
 
         if (! $webinar) {
             $otherUpcomingSeries = WebinarSeries::query()
@@ -93,7 +89,7 @@ class WebinarRegistrationController extends Controller
                 ->where('id', '!=', $series->id)
                 ->whereHas('webinars', function ($query) {
                     $query->where('status', 'active')
-                        ->where('ends_at', '>', now());
+                        ->where('starts_at', '>', now()->subMinutes(10));
                 })
                 ->orderBy('title')
                 ->get();
@@ -122,10 +118,5 @@ class WebinarRegistrationController extends Controller
         return view('webinar.thank-you', [
             'series' => $series,
         ]);
-    }
-
-    private function resolveUpcomingWebinar(WebinarSeries $series): ?Webinar
-    {
-        return $series->nextUpcomingWebinar();
     }
 }
