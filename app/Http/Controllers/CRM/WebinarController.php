@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\CRM;
 
+use App\Actions\Caching\FlushWebinarCachesAction;
+use App\Actions\Webinars\GetNextUpcomingWebinarAction;
 use App\Actions\Webinars\SyncWebinarSeriesFromProviderAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CRM\StoreWebinarSeriesRequest;
@@ -16,9 +18,13 @@ use Illuminate\View\View;
 
 class WebinarController extends Controller
 {
-    public function index(
-        Request $request,
-    ): View {
+    public function __construct(
+        protected FlushWebinarCachesAction $flushWebinarCachesAction,
+        protected GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction,
+    ) {}
+
+    public function index(Request $request): View
+    {
         $series = WebinarSeries::query()
             ->orderBy('title')
             ->get();
@@ -29,7 +35,7 @@ class WebinarController extends Controller
             ->with('series');
 
         if (! $showArchived) {
-            $query->where('status', '!=', 'completed');
+            $query->where('ends_at', '>', now());
         }
 
         $webinars = $query
@@ -49,6 +55,8 @@ class WebinarController extends Controller
     public function storeSeries(StoreWebinarSeriesRequest $request): RedirectResponse
     {
         WebinarSeries::query()->create($request->validated());
+
+        $this->flushWebinarCachesAction->handle();
 
         return redirect()
             ->route('crm.webinar-series.index')
@@ -94,46 +102,18 @@ class WebinarController extends Controller
 
     public function fixActive(WebinarSeries $series): RedirectResponse
     {
-        $webinars = $series->webinars()
-            ->where('ends_at', '>', now())
-            ->orderBy('starts_at')
-            ->get();
+        $webinar = $this->getNextUpcomingWebinarAction->getForSeries($series);
 
-        $earliest = $webinars->first();
-
-        if (! $earliest) {
+        if (! $webinar) {
             return redirect()
                 ->route('crm.webinar-series.index')
                 ->with('error', 'No upcoming webinars found.');
         }
 
-        $currentActive = $webinars->firstWhere('status', 'active');
-
-        if (! $currentActive) {
-            return redirect()
-                ->route('crm.webinar-series.index')
-                ->with('error', 'No active webinar to correct.');
-        }
-
-        if ($currentActive->id === $earliest->id) {
-            return redirect()
-                ->route('crm.webinar-series.index')
-                ->with('error', 'Active webinar is already correct.');
-        }
-
-        // Set all to scheduled except completed
-        $series->webinars()
-            ->where('status', '!=', 'completed')
-            ->update([
-                'status' => 'scheduled',
-            ]);
-
-        $earliest->update([
-            'status' => 'active',
-        ]);
+        $this->flushWebinarCachesAction->handle(seriesSlug: $series->slug);
 
         return redirect()
             ->route('crm.webinar-series.index')
-            ->with('success', 'Active webinar corrected.');
+            ->with('success', 'Upcoming webinar cache refreshed.');
     }
 }

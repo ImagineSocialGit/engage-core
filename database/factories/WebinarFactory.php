@@ -5,44 +5,33 @@ namespace Database\Factories;
 use App\Models\Webinar;
 use App\Models\WebinarSeries;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
+/**
+ * @extends Factory<Webinar>
+ */
 class WebinarFactory extends Factory
 {
     protected $model = Webinar::class;
 
     public function definition(): array
     {
-        $startsAt = Carbon::now()->addDays(7);
+        $title = fake()->sentence(4);
 
         return [
-            'title' => 'Test Webinar',
-            'slug' => 'test-webinar-'.Str::lower(Str::random(6)),
-            'series_id' => WebinarSeries::query()->create([
-                'title' => 'Test Series',
-                'slug' => 'test-series-'.Str::lower(Str::random(6)),
-                'status' => 'active',
-            ])->id,
+            'series_id' => WebinarSeries::factory(),
+            'external_id' => (string) fake()->unique()->numberBetween(100000, 999999),
+            'host_account_key' => 'default',
             'platform' => 'zoom',
-            'external_id' => (string) fake()->numerify('#########'),
-            'starts_at' => $startsAt,
-            'ends_at' => $startsAt->copy()->addHour(),
+            'title' => $title,
+            'slug' => Str::slug($title).'-'.fake()->unique()->numberBetween(1000, 9999),
+            'description' => fake()->paragraph(),
+            'starts_at' => now()->addWeek(),
+            'ends_at' => now()->addWeek()->addHour(),
             'timezone' => 'America/Chicago',
-            'description' => 'Factory webinar',
+            'join_url' => fake()->url(),
+            'registration_url' => fake()->url(),
             'meta' => [],
         ];
-    }
-
-    public function completed(): static
-    {
-        return $this->state(function () {
-            $startsAt = Carbon::now()->subHours(2);
-
-            return [
-                'starts_at' => $startsAt,
-                'ends_at' => $startsAt->copy()->addHour(),
-            ];
-        });
     }
 }

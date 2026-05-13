@@ -70,12 +70,14 @@
                 </div>
 
                 @if($page['form_card']['enabled'] ?? true)
-                    @if(session('success'))
-                        <div class="mb-6 rounded-2xl bg-green-100 px-4 py-3 text-sm font-bold text-green-800">
-                            {{ session('success') }}
-                        </div>
-                    @endif
                     <div class="{{ $style['form_card']['class'] ?? 'rounded-3xl border border-black/10 bg-white p-6 text-ink shadow-2xl shadow-black/20 sm:p-8' }}">
+                        
+                        @if(session('success'))
+                            <div class="mb-6 rounded-2xl bg-green-100 px-4 py-3 text-sm font-bold text-green-800">
+                                {{ session('success') }}
+                            </div>
+                        @endif
+
                         <h2 class="{{ $style['form_card']['title'] ?? 'text-2xl font-extrabold tracking-[-0.03em] text-ink' }}">
                             {{ $page['form_card']['title'] ?? 'Get Notified' }}
                         </h2>

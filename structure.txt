@@ -244,10 +244,29 @@ resources
     │   └── login.blade.php
     ├── webinar
     │   ├── index.blade.php
-    │   ├── none-scheduled.blade.php
     │   ├── notify-me.blade.php
     │   ├── register.blade.php
     │   └── thank-you.blade.php
     └── welcome.blade.php
+tests
+├── Feature
+│   ├── Auth
+│   │   └── LoginThrottlingTest.php
+│   ├── CRM
+│   │   └── WebinarSyncTest.php
+│   ├── Feature
+│   │   └── Webinars
+│   │       └── NotifyWebinarWaitlistActionTest.php
+│   ├── Messaging
+│   │   └── SmsSendGuardTest.php
+│   ├── tests
+│   │   └── Feature
+│   │       └── Webinars
+│   │           └── WebinarRegistrationControllerTest.php
+│   └── Webhooks
+│       ├── ProcessWebinarOutcomeActionTest.php
+│       └── ZoomWebhookTest.php
+├── TestCase.php
+└── Unit
 
-79 directories, 172 files
+91 directories, 179 files

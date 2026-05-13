@@ -2,6 +2,7 @@
 
 namespace App\Actions\Webinars;
 
+use App\Actions\Caching\FlushWebinarCachesAction;
 use App\Jobs\Webinars\NotifyWebinarWaitlistJob;
 use App\Models\Webinar;
 use App\Models\WebinarSeries;
@@ -12,8 +13,9 @@ use Illuminate\Support\Str;
 class SyncWebinarSeriesFromProviderAction
 {
     public function __construct(
-        protected ZoomWebinarService $zoomWebinarService,
+        protected FlushWebinarCachesAction $flushWebinarCachesAction,
         protected GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction,
+        protected ZoomWebinarService $zoomWebinarService,
     ) {}
 
     public function execute(WebinarSeries $series): array
@@ -94,6 +96,8 @@ class SyncWebinarSeriesFromProviderAction
 
         $this->getNextUpcomingWebinarAction->forgetForSeries($series);
         $this->getNextUpcomingWebinarAction->forgetGlobal();
+
+        $this->flushWebinarCachesAction->handle(seriesSlug: $series->slug);
 
         $hasUpcomingWebinarAfterSync = filled(
             $this->getNextUpcomingWebinarAction->getForSeries($series)

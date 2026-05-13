@@ -7,7 +7,6 @@ use App\Actions\Webinars\GetActiveWebinarSeriesAction;
 use App\Actions\Webinars\GetNextUpcomingWebinarAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Public\StoreWebinarRegistrationRequest;
-use App\Models\WebinarSeries;
 use App\Support\Caching\CacheKey;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
@@ -56,34 +55,22 @@ class WebinarRegistrationController extends Controller
         StoreWebinarRegistrationRequest $request,
         string $seriesSlug,
         CreateWebinarRegistration $createWebinarRegistration,
+        GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
         GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction
     ) {
-        $series = WebinarSeries::query()
-            ->where('slug', $seriesSlug)
-            ->firstOrFail();
+        $series = $getActiveWebinarSeriesAction->findBySlug($seriesSlug);
 
-        $series->refresh();
+        abort_unless($series, 404);
 
         $webinar = $getNextUpcomingWebinarAction->getForSeries($series);
 
         if (! $webinar) {
-            $otherUpcomingSeries = WebinarSeries::query()
-                ->where('status', 'active')
-                ->where('id', '!=', $series->id)
-                ->whereHas('webinars', function ($query) {
-                    $query->where('status', 'active')
-                        ->where('starts_at', '>', now()->subMinutes(10));
-                })
-                ->orderBy('title')
-                ->get();
-
-            return response()->view('webinar.none-scheduled', [
-                'series' => $series,
-                'otherUpcomingSeries' => $otherUpcomingSeries,
-            ], 409);
+            return redirect()->route('webinar.show', [
+                'seriesSlug' => $series->slug,
+            ]);
         }
 
-        $registration = $createWebinarRegistration->handle(
+        $createWebinarRegistration->handle(
             $request->validated(),
             $request,
             $webinar->slug
@@ -92,11 +79,13 @@ class WebinarRegistrationController extends Controller
         return redirect()->route('webinar.thank-you', $seriesSlug);
     }
 
-    public function showThankYou(string $seriesSlug)
-    {
-        $series = WebinarSeries::query()
-            ->where('slug', $seriesSlug)
-            ->firstOrFail();
+    public function showThankYou(
+        string $seriesSlug,
+        GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction
+    ) {
+        $series = $getActiveWebinarSeriesAction->findBySlug($seriesSlug);
+
+        abort_unless($series, 404);
 
         return view('webinar.thank-you', [
             'series' => $series,

@@ -3,12 +3,15 @@
 namespace App\Models;
 
 use App\Actions\Caching\FlushWebinarCachesAction;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class WebinarSeries extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'title',
         'slug',
