@@ -1,12 +1,16 @@
 app
 ├── Actions
+│   ├── Caching
+│   │   └── FlushWebinarCachesAction.php
 │   ├── Leads
 │   │   └── UpsertLeadFromRegistration.php
 │   └── Webinars
-│       ├── AdvanceWebinarSeriesStatusAction.php
 │       ├── CreateWebinarCopiesAction.php
 │       ├── CreateWebinarRegistration.php
+│       ├── GetActiveWebinarSeriesAction.php
+│       ├── GetNextUpcomingWebinarAction.php
 │       ├── MarkWebinarRegistrationConvertedAction.php
+│       ├── NotifyWebinarWaitlistAction.php
 │       ├── ProcessWebinarOutcomeAction.php
 │       ├── RecordWebinarAttendanceAction.php
 │       ├── RegisterAttendeeWithWebinarProviderAction.php
@@ -15,8 +19,10 @@ app
 │       └── SyncWebinarSeriesFromProviderAction.php
 ├── Console
 │   └── Commands
-│       └── AdvanceWebinarSeriesStatuses.php
 ├── Contracts
+│   ├── Messaging
+│   │   ├── EmailMessagePayload.php
+│   │   └── SmsMessagePayload.php
 │   └── Webinars
 │       └── WebinarProvider.php
 ├── Data
@@ -39,8 +45,9 @@ app
 │   │   ├── Public
 │   │   │   ├── WebinarJoinRedirectController.php
 │   │   │   └── WebinarRegistrationController.php
-│   │   └── Webhooks
-│   │       └── WebinarWebhookController.php
+│   │   ├── Webhooks
+│   │   │   └── WebinarWebhookController.php
+│   │   └── WebinarWaitlistSignupController.php
 │   ├── Middleware
 │   │   └── ForceStagingAccess.php
 │   └── Requests
@@ -58,19 +65,28 @@ app
 │   │   └── SendLeadConfirmationEmail.php
 │   ├── Messaging
 │   │   ├── DispatchWebinarRegistrationMessagesJob.php
-│   │   ├── SendWebinarConfirmationEmailJob.php
-│   │   ├── SendWebinarConfirmationSmsJob.php
-│   │   ├── SendWebinarMissedYouFollowUpJob.php
-│   │   ├── SendWebinarReminderEmailJob.php
-│   │   ├── SendWebinarReminderSmsJob.php
-│   │   └── SendWebinarReplayFollowUpJob.php
+│   │   ├── SendEmailMessageJob.php
+│   │   ├── SendSmsMessageJob.php
+│   │   └── SendWebinarReminderSmsJob.php
 │   ├── TestQueueJob.php
 │   └── Webinars
+│       ├── NotifyWebinarWaitlistJob.php
 │       └── RoutePostWebinarRegistrationJob.php
 ├── Mail
 │   ├── WebinarPostFollowUpMail.php
 │   ├── WebinarRegistrationConfirmationMail.php
 │   └── WebinarReminderMail.php
+├── Messaging
+│   └── Payloads
+│       └── Webinars
+│           ├── WebinarConfirmationEmailPayload.php
+│           ├── WebinarConfirmationSmsPayload.php
+│           ├── WebinarFollowUpEmailPayload.php
+│           ├── WebinarFollowUpSmsPayload.php
+│           ├── WebinarReminderEmailPayload.php
+│           ├── WebinarReminderSmsPayload.php
+│           ├── WebinarWaitlistScheduledEmailPayload.php
+│           └── WebinarWaitlistScheduledSmsPayload.php
 ├── Models
 │   ├── Lead.php
 │   ├── LeadTag.php
@@ -80,7 +96,8 @@ app
 │   ├── Webinar.php
 │   ├── WebinarRegistration.php
 │   ├── WebinarScheduledMessage.php
-│   └── WebinarSeries.php
+│   ├── WebinarSeries.php
+│   └── WebinarWaitlistSignup.php
 ├── Providers
 │   ├── AppServiceProvider.php
 │   └── HorizonServiceProvider.php
@@ -90,7 +107,8 @@ app
 │   │   ├── DevMessageSink.php
 │   │   ├── EmailMessagingService.php
 │   │   ├── PhoneNumberNormalizer.php
-│   │   └── SmsMessagingService.php
+│   │   ├── SmsMessagingService.php
+│   │   └── SmsSendGuard.php
 │   ├── Webinars
 │   │   ├── Providers
 │   │   │   ├── Zoom
@@ -103,11 +121,14 @@ app
 │       ├── ZoomOAuthService.php
 │       └── ZoomWebinarService.php
 └── Support
+    ├── Caching
+    │   └── CacheKey.php
     └── Webinars
         └── WebinarJoinLinkGenerator.php
 config
 ├── app.php
 ├── auth.php
+├── cache-keys.php
 ├── cache.php
 ├── database.php
 ├── filesystems.php
@@ -118,6 +139,7 @@ config
 ├── logging.php
 ├── mail.php
 ├── queue.php
+├── security.php
 ├── services.php
 ├── session.php
 ├── setup.php
@@ -135,6 +157,9 @@ config
 │   ├── none-scheduled
 │   │   ├── content.php
 │   │   └── style.php
+│   ├── notify-me
+│   │   ├── content.php
+│   │   └── style.php
 │   ├── register
 │   │   ├── content.php
 │   │   └── style.php
@@ -144,7 +169,6 @@ config
 │       └── style.php
 └── webinars.php
 routes
-├── console.php
 ├── crm.php
 ├── staging.php
 ├── webinar.php
@@ -221,8 +245,9 @@ resources
     ├── webinar
     │   ├── index.blade.php
     │   ├── none-scheduled.blade.php
+    │   ├── notify-me.blade.php
     │   ├── register.blade.php
     │   └── thank-you.blade.php
     └── welcome.blade.php
 
-72 directories, 154 files
+79 directories, 172 files
