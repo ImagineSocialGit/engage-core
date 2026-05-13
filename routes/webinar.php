@@ -19,6 +19,10 @@ Route::pattern('seriesSlug', '[a-z0-9-]+');
 Route::get('/{seriesSlug}', [WebinarRegistrationController::class, 'show'])
     ->name('webinar.show');
 
+Route::post('/{seriesSlug}/notify-me', [WebinarRegistrationController::class, 'storeNotificationSignup'])
+    ->middleware('throttle:webinar-registration')
+    ->name('webinar.notify-me.store');
+
 Route::post('/{seriesSlug}', [WebinarRegistrationController::class, 'store'])
     ->middleware('throttle:webinar-registration')
     ->name('webinar.registration.store');

@@ -4,7 +4,7 @@
 
 return [
     'layout' => [
-        'body' => 'min-h-screen flex flex-col bg-secondary text-white font-sans',
+        'body' => 'min-h-screen flex flex-col text-white font-sans',
         'main' => 'flex-1',
         'container' => 'mx-auto w-full max-w-7xl px-6',
         'content_width' => 'mx-auto w-full max-w-4xl',

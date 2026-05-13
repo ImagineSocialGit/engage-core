@@ -1,21 +1,27 @@
 <?php
 
 return [
-
-    'title' => 'Upcoming Webinars',
-    'meta_description' => 'Browse upcoming webinar opportunities and reserve your spot.',
+    'title' => 'Webinar Series',
+    'meta_description' => 'Browse available webinar series and choose the topic that fits your goals.',
 
     'hero' => [
         'enabled' => true,
         'eyebrow' => 'Live Online Classes',
-        'title' => 'Browse upcoming webinars',
-        'body' => 'Choose a webinar series below to view details and register for the next available session.',
+        'title' => 'Choose Your Series',
+        'body' => 'Explore our current webinar topics below. Each series page includes the next available session when one is scheduled.',
     ],
 
     'series_list' => [
         'enabled' => true,
-        'heading' => 'Available webinar series',
-        'empty_hide' => true,
+    ],
+
+    'series_card' => [
+        'cta' => 'Lock in your seat',
+    ],
+
+    'empty_state' => [
+        'heading' => 'No webinar series are available right now.',
+        'body' => 'Please check back soon for new webinar topics and upcoming sessions.',
     ],
 
     'blocks' => [

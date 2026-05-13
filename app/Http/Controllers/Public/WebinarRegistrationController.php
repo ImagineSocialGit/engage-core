@@ -4,67 +4,52 @@ namespace App\Http\Controllers\Public;
 
 use App\Actions\Webinars\AdvanceWebinarSeriesStatusAction;
 use App\Actions\Webinars\CreateWebinarRegistration;
+use App\Actions\Webinars\GetActiveWebinarSeriesAction;
 use App\Actions\Webinars\GetNextUpcomingWebinarAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Public\StoreWebinarRegistrationRequest;
 use App\Models\WebinarSeries;
+use App\Support\Caching\CacheKey;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 
 class WebinarRegistrationController extends Controller
 {
-    public function index(GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction)
+    public function index(GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction)
     {
-        $nextWebinar = $getNextUpcomingWebinarAction->getGlobal();
-
-        if ($nextWebinar) {
-            return redirect()->route('webinar.show', $nextWebinar->series->slug);
-        }
-
-        $upcomingSeries = WebinarSeries::query()
-            ->where('status', 'active')
-            ->whereHas('webinars', function ($query) {
-                $query->where('status', 'active')
-                    ->where('starts_at', '>', now()->subMinutes(10));
-            })
-            ->orderBy('title')
-            ->get();
-
         return view('webinar.index', [
-            'upcomingSeries' => $upcomingSeries,
+            'series' => $getActiveWebinarSeriesAction->handle(),
         ]);
     }
 
     public function show(
         string $seriesSlug,
-        AdvanceWebinarSeriesStatusAction $advanceWebinarSeriesStatusAction,
         GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction
-    ) {
-        $series = WebinarSeries::query()
-            ->where('slug', $seriesSlug)
-            ->firstOrFail();
+    ): Response {
+        $html = Cache::remember(
+            CacheKey::webinarLandingPage($seriesSlug),
+            (int) config('cache-keys.ttl.webinar_landing_page_seconds'),
+            function () use ($seriesSlug, $getNextUpcomingWebinarAction): string {
+                $series = WebinarSeries::query()
+                    ->where('slug', $seriesSlug)
+                    ->firstOrFail();
 
-        $advanceWebinarSeriesStatusAction->execute($series);
-        $series->refresh();
+                $webinar = $getNextUpcomingWebinarAction->getForSeries($series);
 
-        $webinar = $getNextUpcomingWebinarAction->getForSeries($series);
+                if (! $webinar) {
+                    return view('webinar.notify-me', [
+                        'series' => $series,
+                    ])->render();
+                }
 
-        if (! $webinar) {
-            $otherUpcomingSeries = WebinarSeries::query()
-                ->where('status', 'active')
-                ->where('id', '!=', $series->id)
-                ->whereHas('webinars', function ($query) {
-                    $query->where('status', 'active')
-                        ->where('starts_at', '>', now()->subMinutes(10));
-                })
-                ->orderBy('title')
-                ->get();
+                return view('webinar.register', [
+                    'webinar' => $webinar,
+                    'series' => $series,
+                ])->render();
+            }
+        );
 
-            return view('webinar.none-scheduled', [
-                'series' => $series,
-                'otherUpcomingSeries' => $otherUpcomingSeries,
-            ]);
-        }
-
-        return view('webinar.register', compact('webinar', 'series'));
+        return response($html);
     }
 
     public function store(

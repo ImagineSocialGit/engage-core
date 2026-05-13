@@ -11,7 +11,6 @@
     );
 
     $tokens = $style['tokens'] ?? [];
-    $webinar = $series->nextUpcomingWebinar();
     $countdownTarget = $webinar?->starts_at?->timezone('UTC')->toIso8601String();
 
     $eventDetailsItems = collect($page['event_details']['items'] ?? [])->map(function (array $item) use ($webinar) {

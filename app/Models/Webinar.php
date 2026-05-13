@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Caching\FlushWebinarCachesAction;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -36,6 +37,29 @@ class Webinar extends Model
         'provider_settings' => 'array',
     ];
 
+    protected static function booted(): void
+    {
+        static::saved(function (Webinar $webinar): void {
+            if (! $webinar->wasChanged([
+                'starts_at',
+                'ends_at',
+                'status',
+                'series_id',
+                'registration_url',
+                'join_url',
+                'timezone',
+            ])) {
+                return;
+            }
+
+            app(FlushWebinarCachesAction::class)->handle($webinar);
+        });
+
+        static::deleted(function (Webinar $webinar): void {
+            app(FlushWebinarCachesAction::class)->handle($webinar);
+        });
+    }
+
     public function series(): BelongsTo
     {
         return $this->belongsTo(WebinarSeries::class, 'series_id');
@@ -45,4 +69,5 @@ class Webinar extends Model
     {
         return $this->hasMany(WebinarRegistration::class);
     }
+
 }

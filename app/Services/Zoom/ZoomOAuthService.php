@@ -2,6 +2,7 @@
 
 namespace App\Services\Zoom;
 
+use App\Support\Caching\CacheKey;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -12,7 +13,7 @@ class ZoomOAuthService
     {
         $provider = config('webinars.provider');
 
-        $cacheKey = config("webinars.providers.{$provider}.oauth_token_cache_key");
+        $cacheKey = CacheKey::zoomOAuthToken($provider);
         $ttl = (int) config("webinars.providers.{$provider}.oauth_token_ttl_seconds");
         $oauthUrl = config("webinars.providers.{$provider}.oauth_url");
 

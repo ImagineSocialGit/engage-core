@@ -2,8 +2,10 @@
 
 namespace App\Services\Zoom;
 
+use App\Support\Caching\CacheKey;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class ZoomWebinarService
@@ -35,6 +37,15 @@ class ZoomWebinarService
     }
 
     public function listPastWebinarParticipants(string $webinarId): Collection
+    {
+        return Cache::remember(
+            CacheKey::externalApiResponse('zoom', 'past-webinar-participants', $webinarId),
+            (int) config('cache-keys.ttl.external_api_response_seconds'),
+            fn () => $this->fetchPastWebinarParticipants($webinarId)
+        );
+    }
+
+    private function fetchPastWebinarParticipants(string $webinarId): Collection
     {
         $participants = collect();
         $nextPageToken = null;

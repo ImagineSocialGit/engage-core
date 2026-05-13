@@ -9,6 +9,11 @@ class CacheKey
         return 'webinars:next-upcoming:' . ($seriesSlug ?: 'default');
     }
 
+    public static function activeWebinarSeries(): string
+    {
+        return 'webinars:active-series';
+    }
+
     public static function publicPageConfig(string $page, ?string $seriesSlug = null): string
     {
         return 'public-pages:' . $page . ':config:' . ($seriesSlug ?: 'default');
@@ -24,9 +29,9 @@ class CacheKey
         return 'integrations:zoom:oauth-token:' . $accountKey;
     }
 
-    public static function externalApiResponse(string $provider, string $identifier): string
+    public static function externalApiResponse(string $provider, string $resource, string $identifier): string
     {
-        return 'external-api:' . $provider . ':' . sha1($identifier);
+        return 'external-api:' . $provider . ':' . $resource . ':' . sha1($identifier);
     }
 
     public static function imageManifest(?string $namespace = null): string

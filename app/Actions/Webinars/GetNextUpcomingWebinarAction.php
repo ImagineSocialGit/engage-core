@@ -4,6 +4,7 @@ namespace App\Actions\Webinars;
 
 use App\Models\Webinar;
 use App\Models\WebinarSeries;
+use App\Support\Caching\CacheKey;
 use Illuminate\Support\Facades\Cache;
 
 class GetNextUpcomingWebinarAction
@@ -12,20 +13,24 @@ class GetNextUpcomingWebinarAction
 
     public function getGlobal(): ?Webinar
     {
-        return Cache::remember(
+        $webinarId = Cache::remember(
             $this->globalCacheKey(),
             $this->globalTtl(),
-            fn () => $this->queryGlobal()
+            fn (): ?int => $this->queryGlobal()?->id
         );
+
+        return $this->hydrateGlobal($webinarId);
     }
 
     public function getForSeries(WebinarSeries $series): ?Webinar
     {
-        return Cache::remember(
+        $webinarId = Cache::remember(
             $this->seriesCacheKey($series),
             $this->seriesTtl($series),
-            fn () => $this->queryForSeries($series)
+            fn (): ?int => $this->queryForSeries($series)?->id
         );
+
+        return $this->hydrateForSeries($webinarId, $series);
     }
 
     public function forgetGlobal(): void
@@ -50,7 +55,6 @@ class GetNextUpcomingWebinarAction
     private function queryGlobal(): ?Webinar
     {
         return Webinar::query()
-            ->with('series')
             ->where('status', 'active')
             ->whereNotNull('series_id')
             ->where('starts_at', '>', now()->subMinutes(self::LATE_JOIN_MINUTES))
@@ -68,6 +72,30 @@ class GetNextUpcomingWebinarAction
             ->first();
     }
 
+    private function hydrateGlobal(?int $webinarId): ?Webinar
+    {
+        if (! $webinarId) {
+            return null;
+        }
+
+        return Webinar::query()
+            ->with('series')
+            ->whereKey($webinarId)
+            ->first();
+    }
+
+    private function hydrateForSeries(?int $webinarId, WebinarSeries $series): ?Webinar
+    {
+        if (! $webinarId) {
+            return null;
+        }
+
+        return Webinar::query()
+            ->whereKey($webinarId)
+            ->where('series_id', $series->id)
+            ->first();
+    }
+
     private function globalTtl(): int
     {
         return $this->ttlForWebinar($this->queryGlobal());
@@ -81,11 +109,11 @@ class GetNextUpcomingWebinarAction
     private function ttlForWebinar(?Webinar $webinar): int
     {
         if (! $webinar?->starts_at) {
-            return 300;
+            return (int) config('cache-keys.ttl.next_upcoming_webinar_empty_seconds');
         }
 
         return max(
-            60,
+            (int) config('cache-keys.ttl.next_upcoming_webinar_min_seconds'),
             now()->diffInSeconds(
                 $webinar->starts_at->copy()->addMinutes(self::LATE_JOIN_MINUTES),
                 false
@@ -95,11 +123,11 @@ class GetNextUpcomingWebinarAction
 
     private function globalCacheKey(): string
     {
-        return 'webinars:next-upcoming:global';
+        return CacheKey::nextUpcomingWebinar();
     }
 
     private function seriesCacheKey(WebinarSeries $series): string
     {
-        return "webinars:next-upcoming:series:{$series->id}";
+        return CacheKey::nextUpcomingWebinar($series->slug);
     }
 }
