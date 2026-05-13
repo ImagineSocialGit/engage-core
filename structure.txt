@@ -44,10 +44,10 @@ app
 │   │   │   └── WebinarCopyController.php
 │   │   ├── Public
 │   │   │   ├── WebinarJoinRedirectController.php
-│   │   │   └── WebinarRegistrationController.php
-│   │   ├── Webhooks
-│   │   │   └── WebinarWebhookController.php
-│   │   └── WebinarWaitlistSignupController.php
+│   │   │   ├── WebinarRegistrationController.php
+│   │   │   └── WebinarWaitlistSignupController.php
+│   │   └── Webhooks
+│   │       └── WebinarWebhookController.php
 │   ├── Middleware
 │   │   └── ForceStagingAccess.php
 │   └── Requests
@@ -262,11 +262,12 @@ tests
 │   ├── tests
 │   │   └── Feature
 │   │       └── Webinars
-│   │           └── WebinarRegistrationControllerTest.php
+│   │           ├── WebinarRegistrationControllerTest.php
+│   │           └── WebinarWaitlistSignupControllerTest.php
 │   └── Webhooks
 │       ├── ProcessWebinarOutcomeActionTest.php
 │       └── ZoomWebhookTest.php
 ├── TestCase.php
 └── Unit
 
-91 directories, 179 files
+91 directories, 180 files
