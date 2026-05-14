@@ -37,6 +37,19 @@ class SmsSendGuard
             return false;
         }
 
+        $dailyKey = 'sms:daily-send-count:'.now()->toDateString();
+
+        $count = (int) Cache::get($dailyKey, 0);
+
+        if ($count >= (int) config('sms.monitoring.daily_send_hard_limit', 2000)) {
+            Log::critical('SMS daily hard limit reached.', [
+                'count' => $count,
+                'kind' => $kind,
+            ]);
+
+            return false;
+        }
+
         return true;
     }
 

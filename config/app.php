@@ -52,10 +52,11 @@ return [
     |
     */
 
-    'root_domain' => env('ROOT_DOMAIN', 'http://localhost'),
+    'root_domain' => env('ROOT_DOMAIN', 'localhost'),
     'url' => env('APP_URL', 'http://localhost'),
     'webinar_url' => env('WEBINAR_APP_URL', env('APP_URL')),
-
+    'crm_url' => env('CRM_APP_URL'),
+    
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

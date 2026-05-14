@@ -38,6 +38,8 @@ return [
 
     'monitoring' => [
         'daily_send_alert_threshold' => env('SMS_DAILY_ALERT_THRESHOLD', 500),
+
+        'daily_send_hard_limit' => env('SMS_DAILY_HARD_LIMIT', 2000),
     ],
 
 ];
