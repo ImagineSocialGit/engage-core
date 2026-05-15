@@ -172,24 +172,50 @@
 
                 <div>
                     <label
-                        for="consent_messages"
+                        for="email_consent"
                         class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
                     >
                         <input
-                            id="consent_messages"
-                            name="consent_messages"
+                            id="email_consent"
+                            name="email_consent"
                             type="checkbox"
                             value="1"
-                            @checked(old('consent_messages'))
+                            @checked(old('email_consent'))
                             class="{{ $checkbox['input'] ?? 'mt-1 h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary' }}"
                         >
 
                         <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
-                            {{ $page['fields']['consent_messages']['label'] }}
+                            {{ $page['fields']['consent_messages']['email']['label'] }}
                         </span>
                     </label>
 
-                    @error('consent_messages')
+                    @error('email_consent')
+                        <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                            {{ $message }}
+                        </p>
+                    @enderror
+                </div>
+
+                <div>
+                    <label
+                        for="sms_consent"
+                        class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
+                    >
+                        <input
+                            id="sms_consent"
+                            name="sms_consent"
+                            type="checkbox"
+                            value="1"
+                            @checked(old('sms_consent'))
+                            class="{{ $checkbox['input'] ?? 'mt-1 h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary' }}"
+                        >
+
+                        <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
+                            {{ $page['fields']['consent_messages']['sms']['label'] }}
+                        </span>
+                    </label>
+
+                    @error('sms_consent')
                         <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
                             {{ $message }}
                         </p>

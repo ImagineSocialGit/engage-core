@@ -25,30 +25,48 @@ class WebinarRegistrationController extends Controller
         GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
         GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction
     ): Response {
+        if (! config('cache-keys.enabled')) {
+            return response($this->renderShowPage(
+                $seriesSlug,
+                $getActiveWebinarSeriesAction,
+                $getNextUpcomingWebinarAction
+            ));
+        }
+
         $html = Cache::remember(
             CacheKey::webinarLandingPage($seriesSlug),
             (int) config('cache-keys.ttl.webinar_landing_page_seconds'),
-            function () use ($seriesSlug, $getActiveWebinarSeriesAction, $getNextUpcomingWebinarAction): string {
-                $series = $getActiveWebinarSeriesAction->findBySlug($seriesSlug);
-
-                abort_unless($series, 404);
-
-                $webinar = $getNextUpcomingWebinarAction->getForSeries($series);
-
-                if (! $webinar) {
-                    return view('webinar.notify-me', [
-                        'series' => $series,
-                    ])->render();
-                }
-
-                return view('webinar.register', [
-                    'webinar' => $webinar,
-                    'series' => $series,
-                ])->render();
-            }
+            fn (): string => $this->renderShowPage(
+                $seriesSlug,
+                $getActiveWebinarSeriesAction,
+                $getNextUpcomingWebinarAction
+            )
         );
 
         return response($html);
+    }
+
+    private function renderShowPage(
+        string $seriesSlug,
+        GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
+        GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction
+    ): string {
+        $series = $getActiveWebinarSeriesAction->findBySlug($seriesSlug);
+
+        abort_unless($series, 404);
+
+        $webinar = $getNextUpcomingWebinarAction->getForSeries($series);
+
+        if (! $webinar) {
+            return view('webinar.notify-me', [
+                'series' => $series,
+            ])->render();
+        }
+
+        return view('webinar.register', [
+            'webinar' => $webinar,
+            'series' => $series,
+        ])->render();
     }
 
     public function store(

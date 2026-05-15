@@ -11,6 +11,7 @@
     );
 
     $tokens = $style['tokens'] ?? [];
+
 @endphp
 
 <x-layouts.public
@@ -179,22 +180,57 @@
                                 @enderror
                             </div>
 
-                            <label class="{{ $style['form']['checkbox_row'] ?? 'flex gap-3 rounded-2xl bg-soft p-4 text-sm font-medium leading-6 text-ink' }}">
-                                <input
-                                    type="checkbox"
-                                    name="consent_messages"
-                                    value="1"
-                                    required
-                                    @checked(old('consent_messages'))
-                                    class="{{ $style['form']['checkbox'] ?? 'mt-1 h-4 w-4 rounded border-black/20 text-primary focus:ring-primary' }}"
+                            <div>
+                                <label
+                                    for="email_consent"
+                                    class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
                                 >
+                                    <input
+                                        id="email_consent"
+                                        name="email_consent"
+                                        type="checkbox"
+                                        value="1"
+                                        @checked(old('email_consent'))
+                                        class="{{ $checkbox['input'] ?? 'mt-1 h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary' }}"
+                                    >
 
-                                <span>{{ $page['fields']['consent_messages']['label'] ?? 'I agree to receive automated email and text messages related to webinar scheduling updates and follow-up communications. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help. Consent is not a condition of purchase.' }}</span>
-                            </label>
+                                    <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
+                                        {{ $page['fields']['consent_messages']['email']['label'] }}
+                                    </span>
+                                </label>
 
-                            @error('consent_messages')
-                                <p class="{{ $style['form']['error'] ?? 'mt-2 text-sm font-bold text-red-600' }}">{{ $message }}</p>
-                            @enderror
+                                @error('email_consent')
+                                    <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                                        {{ $message }}
+                                    </p>
+                                @enderror
+                            </div>
+
+                            <div>
+                                <label
+                                    for="sms_consent"
+                                    class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
+                                >
+                                    <input
+                                        id="sms_consent"
+                                        name="sms_consent"
+                                        type="checkbox"
+                                        value="1"
+                                        @checked(old('sms_consent'))
+                                        class="{{ $checkbox['input'] ?? 'mt-1 h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary' }}"
+                                    >
+
+                                    <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
+                                        {{ $page['fields']['consent_messages']['sms']['label'] }}
+                                    </span>
+                                </label>
+
+                                @error('sms_consent')
+                                    <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                                        {{ $message }}
+                                    </p>
+                                @enderror
+                            </div>
 
                             <x-ui.button
                                 type="submit"

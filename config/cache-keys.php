@@ -1,6 +1,9 @@
 <?php
 
 return [
+
+    'enabled' => env('PUBLIC_RESPONSE_CACHE_ENABLED', true),
+
     'ttl' => [
         'next_upcoming_webinar_empty_seconds' => env('CACHE_NEXT_UPCOMING_WEBINAR_EMPTY_SECONDS', 300),
         'next_upcoming_webinar_min_seconds' => env('CACHE_NEXT_UPCOMING_WEBINAR_MIN_SECONDS', 60),

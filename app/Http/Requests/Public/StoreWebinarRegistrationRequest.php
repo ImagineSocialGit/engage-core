@@ -18,7 +18,8 @@ class StoreWebinarRegistrationRequest extends FormRequest
             'last_name' => ['nullable', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:255'],
             'phone' => ['required', 'string', 'max:30'],
-            'consent_messages' => ['accepted'],
+            'email_consent' => ['accepted'],
+            'sms_consent' => ['nullable', 'accepted'],
         ];
     }
 

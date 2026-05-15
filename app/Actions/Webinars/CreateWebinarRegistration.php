@@ -69,14 +69,7 @@ class CreateWebinarRegistration
                 'user_agent' => $request->userAgent(),
 
                 'email_consent_at' => now(),
-                'sms_consent_at' => now(),
-
-                'meta' => [
-                    'consent' => [
-                        'ip_address' => $request->ip(),
-                        'user_agent' => $request->userAgent(),
-                    ],
-                ],
+                'sms_consent_at' => ($validated['sms_consent'] ?? false) ? now() : null,
 
                 'registered_at' => now(),
                 'attended_at' => null,
