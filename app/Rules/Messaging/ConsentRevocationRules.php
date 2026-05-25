@@ -2,6 +2,8 @@
 
 namespace App\Rules\Messaging;
 
+use App\Enums\MessageChannel;
+use App\Enums\MessagePurpose;
 use Illuminate\Validation\Rule;
 
 class ConsentRevocationRules
@@ -12,8 +14,8 @@ class ConsentRevocationRules
             'lead_id' => ['required', 'integer', 'exists:leads,id'],
             'message_consent_id' => ['nullable', 'integer', 'exists:message_consents,id'],
 
-            'channel' => ['required', 'string', Rule::in(['email', 'sms'])],
-            'purpose' => ['required', 'string', Rule::in(['transactional', 'marketing'])],
+            'channel' => ['required', 'string', Rule::in(MessageChannel::values())],
+            'purpose' => ['required', 'string', Rule::in(MessagePurpose::values())],
 
             'reason' => ['required', 'string', Rule::in([
                 'stop',

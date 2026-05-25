@@ -3,6 +3,8 @@
 namespace App\Actions\Webinars;
 
 use App\Data\WebinarMessageData;
+use App\Enums\MessageChannel;
+use App\Enums\MessagePurpose;
 use App\Jobs\Messaging\DispatchWebinarRegistrationMessagesJob;
 use App\Models\Lead;
 use App\Models\Webinar;
@@ -14,9 +16,9 @@ use Illuminate\Support\Facades\DB;
 class CreateWebinarRegistration
 {
     public function __construct(
-        protected PhoneNumberNormalizer $phoneNumberNormalizer,
-        protected ScheduleWebinarRemindersAction $scheduleWebinarRemindersAction,
-        protected RegisterAttendeeWithWebinarProviderAction $registerAttendeeWithWebinarProviderAction,
+        private readonly PhoneNumberNormalizer $phoneNumberNormalizer,
+        private readonly ScheduleWebinarRemindersAction $scheduleWebinarRemindersAction,
+        private readonly RegisterAttendeeWithWebinarProviderAction $registerAttendeeWithWebinarProviderAction,
     ) {}
 
     public function handle(array $validated, Request $request, string $webinarSlug = 'default'): WebinarRegistration
@@ -54,11 +56,6 @@ class CreateWebinarRegistration
             }
 
             $now = now();
-
-            $transactionalEmailConsented = (bool) ($validated['transactional_email_consent'] ?? false);
-            $transactionalSmsConsented = (bool) ($validated['transactional_sms_consent'] ?? false);
-            $marketingEmailConsented = (bool) ($validated['marketing_email_consent'] ?? false);
-            $marketingSmsConsented = (bool) ($validated['marketing_sms_consent'] ?? false);
 
             $registration = WebinarRegistration::query()->create([
                 'lead_id' => $lead->id,
@@ -104,10 +101,22 @@ class CreateWebinarRegistration
         $now ??= now();
 
         $consents = [
-            'transactional_email_consent' => ['channel' => 'email', 'purpose' => 'transactional'],
-            'transactional_sms_consent' => ['channel' => 'sms', 'purpose' => 'transactional'],
-            'marketing_email_consent' => ['channel' => 'email', 'purpose' => 'marketing'],
-            'marketing_sms_consent' => ['channel' => 'sms', 'purpose' => 'marketing'],
+            'transactional_email_consent' => [
+                'channel' => MessageChannel::Email,
+                'purpose' => MessagePurpose::Transactional,
+            ],
+            'transactional_sms_consent' => [
+                'channel' => MessageChannel::Sms,
+                'purpose' => MessagePurpose::Transactional,
+            ],
+            'marketing_email_consent' => [
+                'channel' => MessageChannel::Email,
+                'purpose' => MessagePurpose::Marketing,
+            ],
+            'marketing_sms_consent' => [
+                'channel' => MessageChannel::Sms,
+                'purpose' => MessagePurpose::Marketing,
+            ],
         ];
 
         foreach ($consents as $field => $consent) {
@@ -118,8 +127,8 @@ class CreateWebinarRegistration
             DB::table('message_consents')->updateOrInsert(
                 [
                     'lead_id' => $lead->id,
-                    'channel' => $consent['channel'],
-                    'purpose' => $consent['purpose'],
+                    'channel' => $consent['channel']->value,
+                    'purpose' => $consent['purpose']->value,
                 ],
                 [
                     'webinar_registration_id' => $registration->id,

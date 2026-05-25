@@ -9,7 +9,7 @@ use InvalidArgumentException;
 class WebinarProviderManager
 {
     public function __construct(
-        protected ZoomWebinarProvider $zoomWebinarProvider,
+        private readonly ZoomWebinarProvider $zoomWebinarProvider,
     ) {}
 
     public function provider(?string $name = null): WebinarProvider

@@ -3,36 +3,37 @@
 namespace App\Actions\Webinars;
 
 use App\Data\WebinarMessageData;
+use App\Enums\MessageChannel;
+use App\Enums\MessagePurpose;
 use App\Jobs\Messaging\SendEmailMessageJob;
 use App\Jobs\Messaging\SendSmsMessageJob;
 use App\Messaging\Payloads\Webinars\WebinarFollowUpEmailPayload;
 use App\Messaging\Payloads\Webinars\WebinarFollowUpSmsPayload;
 use App\Models\WebinarRegistration;
 use App\Models\WebinarScheduledMessage;
-use App\Services\Messaging\MessageConsentGate;
+use App\Services\Messaging\MessageEligibilityGate;
 
 class ProcessWebinarOutcomeAction
 {
-
     public function __construct(
-        protected MessageConsentGate $messageConsentGate,
+        private readonly MessageEligibilityGate $messageEligibilityGate,
     ) {}
 
     public function handle(WebinarRegistration $registration): void
     {
-        $registration->loadMissing('webinar');
+        $registration->loadMissing(['lead', 'webinar']);
 
         if (data_get($registration->meta, 'post_webinar_routed_at')) {
             return;
         }
 
         if ($registration->attended_at) {
-            $this->dispatchFollowUpMessages($registration, 'replay');
+            $this->dispatchFollowUpMessages($registration, 'webinar_replay');
 
             return;
         }
 
-        $this->dispatchFollowUpMessages($registration, 'missed');
+        $this->dispatchFollowUpMessages($registration, 'webinar_missed');
     }
 
     protected function dispatchFollowUpMessages(
@@ -46,19 +47,25 @@ class ProcessWebinarOutcomeAction
             'meta' => $meta,
         ])->save();
 
-        if ($this->messageConsentGate->canSend(
-            leadId: $registration->lead_id,
-            channel: 'email',
-            purpose: 'transactional',
-        )) {
+        if (
+            $registration->lead
+            && $this->messageEligibilityGate->canSend(
+                $registration->lead,
+                MessageChannel::Email,
+                MessagePurpose::Transactional,
+            )
+        ) {
             $this->dispatchEmail($registration, $followUpType);
         }
 
-        if ($this->messageConsentGate->canSend(
-            leadId: $registration->lead_id,
-            channel: 'sms',
-            purpose: 'transactional',
-        )) {
+        if (
+            $registration->lead
+            && $this->messageEligibilityGate->canSend(
+                $registration->lead,
+                MessageChannel::Sms,
+                MessagePurpose::Transactional,
+            )
+        ) {
             $this->dispatchSms($registration, $followUpType);
         }
     }
@@ -70,7 +77,7 @@ class ProcessWebinarOutcomeAction
         $scheduled = WebinarScheduledMessage::query()->firstOrCreate(
             [
                 'webinar_registration_id' => $registration->id,
-                'channel' => 'email',
+                'channel' => MessageChannel::Email->value,
                 'message_type' => 'post_'.$followUpType,
             ],
             [
@@ -101,7 +108,7 @@ class ProcessWebinarOutcomeAction
         $scheduled = WebinarScheduledMessage::query()->firstOrCreate(
             [
                 'webinar_registration_id' => $registration->id,
-                'channel' => 'sms',
+                'channel' => MessageChannel::Sms->value,
                 'message_type' => 'post_'.$followUpType,
             ],
             [

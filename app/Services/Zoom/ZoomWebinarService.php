@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Http;
 class ZoomWebinarService
 {
     public function __construct(
-        protected ZoomOAuthService $auth
+        private readonly ZoomOAuthService $auth
     ) {}
 
     protected function client()

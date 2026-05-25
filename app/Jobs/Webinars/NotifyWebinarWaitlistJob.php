@@ -25,6 +25,6 @@ class NotifyWebinarWaitlistJob implements ShouldQueue
             return;
         }
 
-        $notifyWebinarWaitlistAction->execute($series);
+        $notifyWebinarWaitlistAction->handle($series);
     }
 }

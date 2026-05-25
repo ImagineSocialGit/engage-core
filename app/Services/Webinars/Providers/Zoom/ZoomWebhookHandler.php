@@ -10,10 +10,10 @@ use Symfony\Component\HttpFoundation\Response;
 class ZoomWebhookHandler
 {
     public function __construct(
-        protected ZoomWebhookVerifier $verifier,
-        protected ZoomWebinarService $zoomWebinarService,
-        protected ZoomAttendanceMapper $zoomAttendanceMapper,
-        protected RecordWebinarAttendanceAction $recordWebinarAttendanceAction,
+        private readonly ZoomWebhookVerifier $verifier,
+        private readonly ZoomWebinarService $zoomWebinarService,
+        private readonly ZoomAttendanceMapper $zoomAttendanceMapper,
+        private readonly RecordWebinarAttendanceAction $recordWebinarAttendanceAction,
     ) {}
 
     public function handle(Request $request): Response

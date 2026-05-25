@@ -12,10 +12,10 @@ use App\Models\WebinarWaitlistSignup;
 class NotifyWebinarWaitlistAction
 {
     public function __construct(
-        protected GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction,
+        private readonly GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction,
     ) {}
 
-    public function execute(WebinarSeries $series): int
+    public function handle(WebinarSeries $series): int
     {
         $webinar = $this->getNextUpcomingWebinarAction->getForSeries($series);
 

@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Mail;
 class EmailMessagingService
 {
     public function __construct(
-        protected DevMessageSink $devMessageSink,
+        private readonly DevMessageSink $devMessageSink,
     ) {}
 
     public function sendRegistrationConfirmation(WebinarMessageData $data): void

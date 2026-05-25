@@ -7,6 +7,7 @@ use App\Models\Webinar;
 use App\Models\WebinarSeries;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class WebinarRegistrationControllerTest extends TestCase
@@ -101,7 +102,10 @@ class WebinarRegistrationControllerTest extends TestCase
             'last_name' => 'Yarnall',
             'email' => 'jeff@example.com',
             'phone' => '6155551212',
-            'consent_messages' => true,
+            'transactional_email_consent' => true,
+            'transactional_sms_consent' => true,
+            'marketing_email_consent' => false,
+            'marketing_sms_consent' => false,
         ]);
 
         $response->assertStatus(302);

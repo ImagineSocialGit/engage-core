@@ -50,7 +50,7 @@ class NotifyWebinarWaitlistActionTest extends TestCase
         ]);
 
         $count = app(NotifyWebinarWaitlistAction::class)
-            ->execute($series);
+            ->handle($series);
 
         $this->assertSame(1, $count);
 
@@ -94,7 +94,7 @@ class NotifyWebinarWaitlistActionTest extends TestCase
         ]);
 
         $count = app(NotifyWebinarWaitlistAction::class)
-            ->execute($series);
+            ->handle($series);
 
         $this->assertSame(0, $count);
 

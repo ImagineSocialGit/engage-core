@@ -19,8 +19,8 @@ use Illuminate\View\View;
 class WebinarController extends Controller
 {
     public function __construct(
-        protected FlushWebinarCachesAction $flushWebinarCachesAction,
-        protected GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction,
+        private readonly FlushWebinarCachesAction $flushWebinarCachesAction,
+        private readonly GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction,
     ) {}
 
     public function index(Request $request): View

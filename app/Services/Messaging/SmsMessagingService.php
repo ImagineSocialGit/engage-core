@@ -10,10 +10,10 @@ use Twilio\Rest\Client;
 class SmsMessagingService
 {
     public function __construct(
-        protected Client $twilio,
-        protected DevMessageSink $devMessageSink,
-        protected PhoneNumberNormalizer $phoneNumberNormalizer,
-        protected SmsSendGuard $smsSendGuard,
+        private readonly Client $twilio,
+        private readonly DevMessageSink $devMessageSink,
+        private readonly PhoneNumberNormalizer $phoneNumberNormalizer,
+        private readonly SmsSendGuard $smsSendGuard,
     ) {}
 
     public function sendRegistrationConfirmation(WebinarMessageData $data): void

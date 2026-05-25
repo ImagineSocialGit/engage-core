@@ -9,7 +9,7 @@ use App\Services\Webinars\WebinarProviderManager;
 class RegisterAttendeeWithWebinarProviderAction
 {
     public function __construct(
-        protected WebinarProviderManager $webinarProviderManager,
+        private readonly WebinarProviderManager $webinarProviderManager,
     ) {}
 
     public function handle(Webinar $webinar, WebinarRegistration $registration): array

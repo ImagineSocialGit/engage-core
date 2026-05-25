@@ -10,7 +10,7 @@ use App\Services\Zoom\ZoomWebinarService;
 class ZoomWebinarProvider implements WebinarProvider
 {
     public function __construct(
-        protected ZoomWebinarService $zoomWebinarService,
+        private readonly ZoomWebinarService $zoomWebinarService,
     ) {}
 
     public function name(): string

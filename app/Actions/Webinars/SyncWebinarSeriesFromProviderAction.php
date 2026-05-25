@@ -13,9 +13,9 @@ use Illuminate\Support\Str;
 class SyncWebinarSeriesFromProviderAction
 {
     public function __construct(
-        protected FlushWebinarCachesAction $flushWebinarCachesAction,
-        protected GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction,
-        protected ZoomWebinarService $zoomWebinarService,
+        private readonly FlushWebinarCachesAction $flushWebinarCachesAction,
+        private readonly GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction,
+        private readonly ZoomWebinarService $zoomWebinarService,
     ) {}
 
     public function execute(WebinarSeries $series): array
