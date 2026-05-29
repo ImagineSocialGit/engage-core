@@ -23,11 +23,16 @@ class TwilioWebhookVerifier
         return hash_equals(
             $signature,
             $this->signatureFor(
-                url: $request->fullUrl(),
+                url: $this->twilioUrl($request),
                 parameters: $request->post(),
                 authToken: $authToken,
             ),
         );
+    }
+
+    private function twilioUrl(Request $request): string
+    {
+        return $request->getSchemeAndHttpHost().$request->getRequestUri();
     }
 
     private function signatureFor(string $url, array $parameters, string $authToken): string

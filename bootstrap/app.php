@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 });
 
             Route::middleware(['web'])
+                ->domain('webhooks.'.$domain)
                 ->group(function () {
                     require base_path('routes/webhooks.php');
                 });
