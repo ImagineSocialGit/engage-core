@@ -2,10 +2,8 @@
 
 namespace App\Actions\Webinars;
 
-use App\Data\WebinarMessageData;
 use App\Enums\MessageChannel;
 use App\Enums\MessagePurpose;
-use App\Jobs\Messaging\DispatchWebinarRegistrationMessagesJob;
 use App\Models\Lead;
 use App\Models\Webinar;
 use App\Models\WebinarRegistration;
@@ -13,12 +11,12 @@ use App\Services\Messaging\PhoneNumberNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-class CreateWebinarRegistration
+class CreateWebinarRegistrationAction
 {
     public function __construct(
         private readonly PhoneNumberNormalizer $phoneNumberNormalizer,
-        private readonly ScheduleWebinarRemindersAction $scheduleWebinarRemindersAction,
-        private readonly RegisterAttendeeWithWebinarProviderAction $registerAttendeeWithWebinarProviderAction,
+        private readonly AddRegistrantToWebinarProviderAction $addRegistrantToWebinarProviderAction,
+        private readonly DispatchWebinarRegistrationMessagesAction $dispatchWebinarRegistrationMessagesAction,
     ) {}
 
     public function handle(array $validated, Request $request, string $webinarSlug = 'default'): WebinarRegistration
@@ -61,16 +59,8 @@ class CreateWebinarRegistration
                 'lead_id' => $lead->id,
                 'webinar_id' => $webinar->id,
                 'webinar_slug' => $webinar->slug,
-
                 'status' => 'pending',
                 'source' => 'webinar_subdomain',
-
-                'first_name' => $validated['first_name'],
-                'last_name' => $validated['last_name'] ?? null,
-
-                'email' => $validated['email'],
-                'phone' => $normalizedPhone,
-
                 'registered_at' => $now,
                 'attended_at' => null,
             ]);
@@ -81,11 +71,9 @@ class CreateWebinarRegistration
 
             $this->syncRegistrationToWebinarPlatform($registration, $webinar);
 
-            DispatchWebinarRegistrationMessagesJob::dispatch(
-                WebinarMessageData::fromRegistration($registration)->toArray()
-            )->onQueue(config('webinars.queues.registrations'));
-
-            $this->scheduleWebinarRemindersAction->handle($registration);
+            DB::afterCommit(function () use ($registration) {
+                $this->dispatchWebinarRegistrationMessagesAction->handle($registration);
+            });
 
             return $registration;
         });
@@ -155,7 +143,7 @@ class CreateWebinarRegistration
             return;
         }
 
-        $providerResponse = $this->registerAttendeeWithWebinarProviderAction->handle(
+        $providerResponse = $this->addRegistrantToWebinarProviderAction->handle(
             $webinar,
             $registration
         );
@@ -164,8 +152,8 @@ class CreateWebinarRegistration
 
         $meta['provider'] = [
             'name' => $providerResponse['name'],
-            'registrant_id' => $providerResponse['registrant_id'] ?? null,
-            'join_url' => $providerResponse['join_url'] ?? null,
+            'registrant_id' => data_get($providerResponse, 'data.registrant_id'),
+            'join_url' => data_get($providerResponse, 'data.join_url'),
             'raw' => $providerResponse['raw'] ?? null,
         ];
 

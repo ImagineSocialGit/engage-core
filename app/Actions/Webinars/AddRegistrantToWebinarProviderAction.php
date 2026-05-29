@@ -6,7 +6,7 @@ use App\Models\Webinar;
 use App\Models\WebinarRegistration;
 use App\Services\Webinars\WebinarProviderManager;
 
-class RegisterAttendeeWithWebinarProviderAction
+class AddRegistrantToWebinarProviderAction
 {
     public function __construct(
         private readonly WebinarProviderManager $webinarProviderManager,

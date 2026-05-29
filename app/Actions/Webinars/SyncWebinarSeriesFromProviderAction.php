@@ -41,7 +41,7 @@ class SyncWebinarSeriesFromProviderAction
             $webinar = Webinar::query()->firstOrNew([
                 'platform' => $provider,
                 'external_id' => $fetchedWebinar['external_id'],
-                'series_id' => $series->id,
+                'webinar_series_id' => $series->id,
             ]);
 
             $webinar->fill([

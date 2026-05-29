@@ -17,7 +17,7 @@ class ForceStagingAccess
         if (
             $request->routeIs('staging.login') ||
             $request->routeIs('staging.login.submit') ||
-            $request->routeIs('webhooks.zoom')
+            $request->routeIs('webhooks.*')
         ) {
             return $next($request);
         }

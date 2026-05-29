@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Public;
 
-use App\Actions\Webinars\CreateWebinarRegistration;
+use App\Actions\Webinars\CreateWebinarRegistrationAction;
 use App\Actions\Webinars\GetActiveWebinarSeriesAction;
 use App\Actions\Webinars\GetNextUpcomingWebinarAction;
 use App\Http\Controllers\Controller;
@@ -72,7 +72,7 @@ class WebinarRegistrationController extends Controller
     public function store(
         StoreWebinarRegistrationRequest $request,
         string $seriesSlug,
-        CreateWebinarRegistration $createWebinarRegistration,
+        CreateWebinarRegistrationAction $createWebinarRegistrationAction,
         GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
         GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction
     ) {
@@ -88,7 +88,7 @@ class WebinarRegistrationController extends Controller
             ]);
         }
 
-        $createWebinarRegistration->handle(
+        $createWebinarRegistrationAction->handle(
             $request->validated(),
             $request,
             $webinar->slug
@@ -99,14 +99,18 @@ class WebinarRegistrationController extends Controller
 
     public function showThankYou(
         string $seriesSlug,
-        GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction
+        GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
+        GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction
     ) {
         $series = $getActiveWebinarSeriesAction->findBySlug($seriesSlug);
 
         abort_unless($series, 404);
 
+        $webinar = $getNextUpcomingWebinarAction->getForSeries($series);
+
         return view('webinar.thank-you', [
             'series' => $series,
+            'webinar' => $webinar,
         ]);
     }
 }

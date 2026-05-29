@@ -180,26 +180,30 @@
                                 @enderror
                             </div>
 
+                            <div class="{{ $style['form']['helper_notice'] ?? 'rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700' }}">
+                                You must select at least one notification method below to receive updates regarding this webinar series.
+                            </div>
+
                             <div>
                                 <label
-                                    for="email_consent"
+                                    for="transactional_email_consent"
                                     class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
                                 >
                                     <input
-                                        id="email_consent"
-                                        name="email_consent"
+                                        id="transactional_email_consent"
+                                        name="transactional_email_consent"
                                         type="checkbox"
                                         value="1"
-                                        @checked(old('email_consent'))
+                                        @checked(old('transactional_email_consent'))
                                         class="{{ $checkbox['input'] ?? 'mt-1 h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary' }}"
                                     >
 
                                     <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
-                                        {{ $page['fields']['consent_messages']['email']['label'] }}
+                                        {{ $page['fields']['consent_messages']['email']['label'] ?? 'Email me when this webinar is scheduled.' }}
                                     </span>
                                 </label>
 
-                                @error('email_consent')
+                                @error('transactional_email_consent')
                                     <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
                                         {{ $message }}
                                     </p>
@@ -208,24 +212,24 @@
 
                             <div>
                                 <label
-                                    for="sms_consent"
+                                    for="transactional_sms_consent"
                                     class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
                                 >
                                     <input
-                                        id="sms_consent"
-                                        name="sms_consent"
+                                        id="transactional_sms_consent"
+                                        name="transactional_sms_consent"
                                         type="checkbox"
                                         value="1"
-                                        @checked(old('sms_consent'))
+                                        @checked(old('transactional_sms_consent'))
                                         class="{{ $checkbox['input'] ?? 'mt-1 h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary' }}"
                                     >
 
                                     <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
-                                        {{ $page['fields']['consent_messages']['sms']['label'] }}
+                                        {{ $page['fields']['consent_messages']['sms']['label'] ?? 'Text me when this webinar is scheduled.' }}
                                     </span>
                                 </label>
 
-                                @error('sms_consent')
+                                @error('transactional_sms_consent')
                                     <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
                                         {{ $message }}
                                     </p>

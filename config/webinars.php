@@ -31,19 +31,6 @@ return [
         'followups' => env('WEBINAR_FOLLOWUP_QUEUE', 'notifications'),
     ],
 
-    'reminders' => [
-
-        'enabled' => true,
-
-        'schedule' => [
-            '10_days',
-            '7_days',
-            '24_hours',
-            '30_minutes',
-            '10_minutes',
-        ],
-    ],
-
     'registration' => [
 
         'require_unique_email_per_webinar' => true,
@@ -56,9 +43,9 @@ return [
 
         'rate_limits' => [
 
-            'per_ip_per_minute' => 10,
+            'per_ip_per_minute' => 400,
 
-            'per_email_per_hour' => 5,
+            'per_email_per_hour' => 500,
         ],
     ],
 

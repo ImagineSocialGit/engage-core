@@ -14,20 +14,14 @@ return new class extends Migration
         Schema::create('webinar_registrations', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('lead_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('webinar_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('lead_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('webinar_id')->constrained()->cascadeOnDelete();
 
             $table->string('join_token')->unique();
 
             $table->string('webinar_slug')->default('default')->index();
             $table->string('status')->default('pending')->index();
             $table->string('source')->default('webinar_subdomain')->index();
-
-            $table->string('first_name')->nullable();
-            $table->string('last_name')->nullable();
-
-            $table->string('email')->index();
-            $table->string('phone')->nullable()->index();
 
             $table->json('meta')->nullable();
 

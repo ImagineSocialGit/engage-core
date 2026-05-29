@@ -23,7 +23,9 @@ class RecordWebinarAttendanceAction
             return;
         }
 
-        $registrations = $webinar->registrations()->get();
+        $registrations = $webinar->registrations()
+            ->with('lead')
+            ->get();
 
         $matchedRegistrationIds = [];
 
@@ -31,8 +33,8 @@ class RecordWebinarAttendanceAction
             $registrationRegistrantId = data_get($registration->meta, 'provider.data.registrant_id')
                 ?? data_get($registration->meta, 'provider.registrant_id');
 
-            $registrationEmail = filled($registration->email)
-                ? mb_strtolower(trim($registration->email))
+            $registrationEmail = filled($registration->lead?->email)
+                ? mb_strtolower(trim($registration->lead->email))
                 : null;
 
             $match = $attendanceRecords->first(
@@ -100,7 +102,9 @@ class RecordWebinarAttendanceAction
         array $attendanceRecord,
     ): bool {
         $attendanceRegistrantId = $attendanceRecord['registrant_id'] ?? null;
-        $attendanceEmail = $attendanceRecord['email'] ?? null;
+        $attendanceEmail = filled($attendanceRecord['email'] ?? null)
+            ? mb_strtolower(trim($attendanceRecord['email']))
+            : null;
 
         if (filled($registrationRegistrantId) && filled($attendanceRegistrantId)) {
             return (string) $attendanceRegistrantId === (string) $registrationRegistrantId;

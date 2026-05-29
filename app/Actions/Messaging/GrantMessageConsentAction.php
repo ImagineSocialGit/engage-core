@@ -2,8 +2,9 @@
 
 namespace App\Actions\Messaging;
 
+use App\Models\MessageConsent;
 use App\Rules\Messaging\MessageConsentRules;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -12,26 +13,23 @@ class GrantMessageConsentAction
     /**
      * @throws ValidationException
      */
-    public function handle(array $data): void
+    public function handle(Model $recipient, array $data): MessageConsent
     {
         $validated = Validator::make($data, MessageConsentRules::rules())->validate();
 
-        $now = now();
-
-        DB::table('message_consents')->updateOrInsert(
+        return MessageConsent::query()->updateOrCreate(
             [
-                'lead_id' => $validated['lead_id'],
+                'recipient_type' => $recipient->getMorphClass(),
+                'recipient_id' => $recipient->getKey(),
                 'channel' => $validated['channel'],
                 'purpose' => $validated['purpose'],
             ],
             [
-                'webinar_registration_id' => $validated['webinar_registration_id'] ?? null,
-                'consented_at' => $validated['consented_at'] ?? $now,
+                'consented_at' => $validated['consented_at'] ?? now(),
                 'ip_address' => $validated['ip_address'] ?? null,
                 'user_agent' => $validated['user_agent'] ?? null,
                 'source' => $validated['source'] ?? null,
-                'updated_at' => $now,
-                'created_at' => $now,
+                'meta' => $validated['meta'] ?? null,
             ]
         );
     }

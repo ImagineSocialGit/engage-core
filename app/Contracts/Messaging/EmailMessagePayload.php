@@ -2,11 +2,15 @@
 
 namespace App\Contracts\Messaging;
 
-use App\Services\Messaging\EmailMessagingService;
+use Illuminate\Mail\Mailable;
 
 interface EmailMessagePayload
 {
     public static function fromArray(array $payload): self;
 
-    public function send(EmailMessagingService $emailMessagingService): void;
+    public function to(): string;
+
+    public function mailable(): Mailable;
+
+    public function devPayload(): array;
 }

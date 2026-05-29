@@ -2,7 +2,7 @@
 
 namespace App\Jobs\Webinars;
 
-use App\Actions\Webinars\NotifyWebinarWaitlistAction;
+use App\Actions\Webinars\DispatchWebinarWaitlistMessagesAction;
 use App\Models\WebinarSeries;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -17,7 +17,7 @@ class NotifyWebinarWaitlistJob implements ShouldQueue
         $this->onQueue(config('webinars.queues.notifications'));
     }
 
-    public function handle(NotifyWebinarWaitlistAction $notifyWebinarWaitlistAction): void
+    public function handle(DispatchWebinarWaitlistMessagesAction $dispatchWebinarWaitlistMessagesAction): void
     {
         $series = WebinarSeries::query()->find($this->seriesId);
 
@@ -25,6 +25,6 @@ class NotifyWebinarWaitlistJob implements ShouldQueue
             return;
         }
 
-        $notifyWebinarWaitlistAction->handle($series);
+        $dispatchWebinarWaitlistMessagesAction->handle($series);
     }
 }

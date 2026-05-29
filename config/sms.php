@@ -18,6 +18,13 @@ return [
 
     ],
 
+    'webhooks' => [
+        'twilio' => [
+            'stop_response' => 'You have been opted out of SMS messages. Reply START to resubscribe.',
+            'help_response' => 'Reply STOP to opt out of SMS messages. Message and data rates may apply.',
+        ],
+    ],
+
     'queues' => [
         'default' => env('SMS_QUEUE', 'sms'),
     ],
@@ -29,11 +36,6 @@ return [
 
     'cooldowns' => [
         'duplicate_window_minutes' => env('SMS_DUPLICATE_WINDOW_MINUTES', 15),
-    ],
-
-    'compliance' => [
-        'require_opt_in' => true,
-        'respect_stop_requests' => true,
     ],
 
     'monitoring' => [

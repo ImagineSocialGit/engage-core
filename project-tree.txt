@@ -5,19 +5,22 @@
 │   │   │   └── FlushWebinarCachesAction.php
 │   │   ├── Leads
 │   │   ├── Messaging
+│   │   │   ├── DispatchMessageAction.php
 │   │   │   ├── GrantMessageConsentAction.php
 │   │   │   └── RevokeMessageConsentAction.php
+│   │   ├── Sms
+│   │   │   └── HandleTwilioInboundSmsWebhookAction.php
 │   │   └── Webinars
-│   │       ├── CreateWebinarRegistration.php
+│   │       ├── AddRegistrantToWebinarProviderAction.php
+│   │       ├── CreateWebinarRegistrationAction.php
+│   │       ├── DispatchWebinarOutcomeMessagesAction.php
+│   │       ├── DispatchWebinarRegistrationMessagesAction.php
+│   │       ├── DispatchWebinarWaitlistMessagesAction.php
 │   │       ├── GetActiveWebinarSeriesAction.php
 │   │       ├── GetNextUpcomingWebinarAction.php
 │   │       ├── MarkWebinarRegistrationConvertedAction.php
-│   │       ├── NotifyWebinarWaitlistAction.php
-│   │       ├── ProcessWebinarOutcomeAction.php
 │   │       ├── RecordWebinarAttendanceAction.php
-│   │       ├── RegisterAttendeeWithWebinarProviderAction.php
 │   │       ├── ResolveWebinarJoinUrlAction.php
-│   │       ├── ScheduleWebinarRemindersAction.php
 │   │       └── SyncWebinarSeriesFromProviderAction.php
 │   ├── Console
 │   │   └── Commands
@@ -46,10 +49,12 @@
 │   │   │   │   ├── LeadTaskController.php
 │   │   │   │   └── WebinarController.php
 │   │   │   ├── Public
+│   │   │   │   ├── ConsentRevocationController.php
 │   │   │   │   ├── WebinarJoinRedirectController.php
 │   │   │   │   ├── WebinarRegistrationController.php
 │   │   │   │   └── WebinarWaitlistSignupController.php
 │   │   │   └── Webhooks
+│   │   │       ├── TwilioSmsWebhookController.php
 │   │   │       └── WebinarWebhookController.php
 │   │   ├── Middleware
 │   │   │   └── ForceStagingAccess.php
@@ -65,17 +70,17 @@
 │   │   ├── FailingQueueJob.php
 │   │   ├── Leads
 │   │   ├── Messaging
-│   │   │   ├── DispatchWebinarRegistrationMessagesJob.php
-│   │   │   ├── SendEmailMessageJob.php
-│   │   │   └── SendSmsMessageJob.php
+│   │   │   └── SendScheduledMessageJob.php
 │   │   ├── TestQueueJob.php
 │   │   └── Webinars
 │   │       ├── NotifyWebinarWaitlistJob.php
 │   │       └── RoutePostWebinarRegistrationJob.php
 │   ├── Mail
-│   │   ├── WebinarPostFollowUpMail.php
-│   │   ├── WebinarRegistrationConfirmationMail.php
-│   │   └── WebinarReminderMail.php
+│   │   └── Webinars
+│   │       ├── WebinarPostFollowUpMail.php
+│   │       ├── WebinarRegistrationConfirmationMail.php
+│   │       ├── WebinarReminderMail.php
+│   │       └── WebinarWaitlistScheduledMail.php
 │   ├── Messaging
 │   │   └── Payloads
 │   │       └── Webinars
@@ -94,11 +99,11 @@
 │   │   ├── MessageConsent.php
 │   │   ├── MessageSuppression.php
 │   │   ├── Note.php
+│   │   ├── ScheduledMessage.php
 │   │   ├── Task.php
 │   │   ├── User.php
 │   │   ├── Webinar.php
 │   │   ├── WebinarRegistration.php
-│   │   ├── WebinarScheduledMessage.php
 │   │   ├── WebinarSeries.php
 │   │   └── WebinarWaitlistSignup.php
 │   ├── Providers
@@ -117,7 +122,8 @@
 │   │   │   ├── MessageSuppressionService.php
 │   │   │   ├── PhoneNumberNormalizer.php
 │   │   │   ├── SmsMessagingService.php
-│   │   │   └── SmsSendGuard.php
+│   │   │   ├── SmsSendGuard.php
+│   │   │   └── TwilioWebhookVerifier.php
 │   │   ├── Webinars
 │   │   │   ├── Providers
 │   │   │   │   ├── Zoom
@@ -132,6 +138,8 @@
 │   └── Support
 │       ├── Caching
 │       │   └── CacheKey.php
+│       ├── Messaging
+│       │   └── EmailConsentRevocationLinkGenerator.php
 │       └── Webinars
 │           └── WebinarJoinLinkGenerator.php
 ├── artisan
@@ -156,7 +164,9 @@
 │   ├── leads.php
 │   ├── logging.php
 │   ├── mail.php
+│   ├── messaging.php
 │   ├── queue.php
+│   ├── reminders.php
 │   ├── security.php
 │   ├── services.php
 │   ├── session.php
@@ -165,8 +175,6 @@
 │   ├── staging.php
 │   ├── theme
 │   │   └── webinar_public.php
-│   ├── webhooks.php
-│   ├── webinar_messaging.php
 │   ├── webinars
 │   │   ├── content.php
 │   │   ├── index
@@ -189,6 +197,7 @@
 ├── database
 │   ├── database.sqlite
 │   ├── factories
+│   │   ├── LeadFactory.php
 │   │   ├── UserFactory.php
 │   │   ├── WebinarFactory.php
 │   │   ├── WebinarSeriesFactory.php
@@ -204,11 +213,11 @@
 │   │   ├── 2026_04_15_203547_create_webinar_series_table.php
 │   │   ├── 2026_04_15_203548_create_webinars_table.php
 │   │   ├── 2026_04_15_203549_create_webinar_registrations_table.php
-│   │   ├── 2026_04_16_055534_create_webinar_scheduled_messages_table.php
 │   │   ├── 2026_05_12_155410_create_webinar_waitlist_signups_table.php
 │   │   ├── 2026_05_15_215534_create_message_consents_table.php
 │   │   ├── 2026_05_15_215834_create_consent_revocations_table.php
-│   │   └── 2026_05_19_221010_create_message_suppressions_table.php
+│   │   ├── 2026_05_19_221010_create_message_suppressions_table.php
+│   │   └── 2026_05_26_211538_create_scheduled_messages_table.php
 │   ├── schema
 │   └── seeders
 │       ├── DatabaseSeeder.php
@@ -280,7 +289,15 @@
 │       │   └── webinars
 │       │       ├── post-follow-up.blade.php
 │       │       ├── registration-confirmation.blade.php
-│       │       └── reminder.blade.php
+│       │       ├── reminder.blade.php
+│       │       └── waitlist-scheduled.blade.php
+│       ├── messaging
+│       │   ├── transactional-opt-out-already-confirmed.blade.php
+│       │   ├── transactional-opt-out-confirmed.blade.php
+│       │   ├── transactional-opt-out-invalid.blade.php
+│       │   ├── unsubscribe-already-confirmed.blade.php
+│       │   ├── unsubscribe-confirmed.blade.php
+│       │   └── unsubscribe-invalid.blade.php
 │       ├── staging
 │       │   └── login.blade.php
 │       ├── webinar
@@ -292,6 +309,7 @@
 ├── routes
 │   ├── crm.php
 │   ├── staging.php
+│   ├── webhooks.php
 │   ├── webinar.php
 │   └── web.php
 ├── scripts
@@ -305,21 +323,26 @@
 │   │   ├── CRM
 │   │   │   └── WebinarSyncTest.php
 │   │   ├── Feature
+│   │   │   ├── Public
+│   │   │   │   └── WebinarWaitlistSignupControllerTest.php
+│   │   │   ├── Webhooks
+│   │   │   │   └── TwilioSmsWebhookControllerTest.php
 │   │   │   └── Webinars
-│   │   │       └── NotifyWebinarWaitlistActionTest.php
+│   │   │       └── DispatchWebinarWaitlistMessagesActionTest.php
 │   │   ├── Messaging
+│   │   │   ├── EmailConsentRevocationControllerTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
-│   │   │   └── SmsSendGuardTest.php
+│   │   │   ├── SmsSendGuardTest.php
+│   │   │   └── WebinarEmailRenderingTest.php
 │   │   ├── tests
 │   │   │   └── Feature
 │   │   │       └── Webinars
-│   │   │           ├── WebinarRegistrationControllerTest.php
-│   │   │           └── WebinarWaitlistSignupControllerTest.php
+│   │   │           └── WebinarRegistrationControllerTest.php
 │   │   └── Webhooks
-│   │       ├── ProcessWebinarOutcomeActionTest.php
+│   │       ├── DispatchWebinarOutcomeMessagesActionTest.php
 │   │       └── ZoomWebhookTest.php
 │   ├── TestCase.php
 │   └── Unit
 └── vite.config.js
 
-98 directories, 225 files
+104 directories, 242 files

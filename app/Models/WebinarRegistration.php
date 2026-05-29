@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Models\ScheduledMessage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
 
 class WebinarRegistration extends Model
@@ -16,22 +18,14 @@ class WebinarRegistration extends Model
         'webinar_slug',
         'status',
         'source',
-        'first_name',
-        'last_name',
-        'email',
-        'phone',
         'ip_address',
         'user_agent',
-        'email_consent_at',
-        'sms_consent_at',
         'meta',
         'registered_at',
         'attended_at',
     ];
 
     protected $casts = [
-        'email_consent_at' => 'datetime',
-        'sms_consent_at' => 'datetime',
         'meta' => 'array',
         'registered_at' => 'datetime',
         'attended_at' => 'datetime',
@@ -47,9 +41,9 @@ class WebinarRegistration extends Model
         return $this->belongsTo(Webinar::class);
     }
 
-    public function scheduledMessages(): HasMany
+    public function scheduledMessages(): MorphMany
     {
-        return $this->hasMany(WebinarScheduledMessage::class, 'webinar_registration_id');
+        return $this->morphMany(ScheduledMessage::class, 'remindable');
     }
 
     protected static function booted(): void

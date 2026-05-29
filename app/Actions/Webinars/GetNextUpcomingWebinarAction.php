@@ -47,15 +47,15 @@ class GetNextUpcomingWebinarAction
     {
         $this->forgetGlobal();
 
-        if ($webinar->series) {
-            $this->forgetForSeries($webinar->series);
+        if ($webinar->webinarSeries) {
+            $this->forgetForSeries($webinar->webinarSeries);
         }
     }
 
     private function queryGlobal(): ?Webinar
     {
         return Webinar::query()
-            ->whereNotNull('series_id')
+            ->whereNotNull('webinar_series_id')
             ->where('starts_at', '>', now()->subMinutes(self::LATE_JOIN_MINUTES))
             ->orderBy('starts_at')
             ->first();
@@ -64,7 +64,7 @@ class GetNextUpcomingWebinarAction
     private function queryForSeries(WebinarSeries $series): ?Webinar
     {
         return Webinar::query()
-            ->where('series_id', $series->id)
+            ->where('webinar_series_id', $series->id)
             ->where('starts_at', '>', now()->subMinutes(self::LATE_JOIN_MINUTES))
             ->orderBy('starts_at')
             ->first();
@@ -90,7 +90,7 @@ class GetNextUpcomingWebinarAction
 
         return Webinar::query()
             ->whereKey($webinarId)
-            ->where('series_id', $series->id)
+            ->where('webinar_series_id', $series->id)
             ->first();
     }
 

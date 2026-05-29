@@ -2,7 +2,7 @@
 
 namespace App\Jobs\Webinars;
 
-use App\Actions\Webinars\ProcessWebinarOutcomeAction;
+use App\Actions\Webinars\DispatchWebinarOutcomeMessagesAction;
 use App\Models\WebinarRegistration;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -15,7 +15,7 @@ class RoutePostWebinarRegistrationJob implements ShouldQueue
         public int $registrationId
     ) {}
 
-    public function handle(ProcessWebinarOutcomeAction $processWebinarOutcomeAction): void
+    public function handle(DispatchWebinarOutcomeMessagesAction $dispatchWebinarOutcomeMessagesAction): void
     {
         $registration = WebinarRegistration::query()
             ->with('webinar')
@@ -25,6 +25,6 @@ class RoutePostWebinarRegistrationJob implements ShouldQueue
             return;
         }
 
-        $processWebinarOutcomeAction->handle($registration);
+        $dispatchWebinarOutcomeMessagesAction->handle($registration);
     }
 }

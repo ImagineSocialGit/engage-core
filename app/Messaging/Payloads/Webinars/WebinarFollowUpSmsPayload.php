@@ -4,7 +4,7 @@ namespace App\Messaging\Payloads\Webinars;
 
 use App\Contracts\Messaging\SmsMessagePayload;
 use App\Data\WebinarMessageData;
-use App\Services\Messaging\SmsMessagingService;
+use InvalidArgumentException;
 
 class WebinarFollowUpSmsPayload implements SmsMessagePayload
 {
@@ -21,8 +21,43 @@ class WebinarFollowUpSmsPayload implements SmsMessagePayload
         );
     }
 
-    public function send(SmsMessagingService $smsMessagingService): void
+    public function to(): string
     {
-        $smsMessagingService->sendPostWebinarFollowUp($this->data, $this->followUpType);
+        return $this->data->leadPhone;
+    }
+
+    public function message(): string
+    {
+        return match ($this->followUpType) {
+            'missed' => sprintf(
+                "Sorry we missed you for %s. We'll follow up with next steps soon.",
+                $this->data->webinarTitle
+            ),
+            'replay' => sprintf(
+                "Thanks for joining %s. We'll send your replay and next steps soon.",
+                $this->data->webinarTitle
+            ),
+            default => throw new InvalidArgumentException("Unsupported webinar follow-up type [{$this->followUpType}]."),
+        };
+    }
+
+    public function kind(): string
+    {
+        return 'post_webinar_follow_up';
+    }
+
+    public function devPayload(): array
+    {
+        return [
+            ...$this->data->toArray(),
+            'kind' => $this->kind(),
+            'follow_up_type' => $this->followUpType,
+            'message' => $this->message(),
+        ];
+    }
+
+    public function sourceIp(): ?string
+    {
+        return $this->data->requestIp;
     }
 }

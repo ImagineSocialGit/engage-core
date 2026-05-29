@@ -41,7 +41,7 @@
                                 {{ $conflict['series'] }} — active: {{ $conflict['active'] }}, expected: {{ $conflict['expected'] }}
                             </span>
 
-                            <form method="POST" action="{{ route('crm.webinar-series.fix-active', $conflict['series_id']) }}">
+                            <form method="POST" action="{{ route('crm.webinar-series.fix-active', $conflict['webinar_series_id']) }}">
                                 @csrf
 
                                 <button
@@ -94,7 +94,6 @@
                             <th class="px-6 py-3">Series</th>
                             <th class="px-6 py-3">Start</th>
                             <th class="px-6 py-3">Timezone</th>
-                            <th class="px-6 py-3">Status</th>
                             <th class="px-6 py-3 text-right">Actions</th>
                         </tr>
                     </thead>
@@ -107,7 +106,7 @@
                                 </td>
 
                                 <td class="px-6 py-4 text-slate-600">
-                                    {{ $webinar->series?->title ?? '—' }}
+                                    {{ $webinar->webinarSeries?->title ?? '—' }}
                                 </td>
 
                                 <td class="px-6 py-4 text-slate-700">
@@ -117,17 +116,11 @@
                                 <td class="px-6 py-4 text-slate-600">
                                     {{ $webinar->timezone }}
                                 </td>
-
-                                <td class="px-6 py-4">
-                                    <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                                        {{ ucfirst($webinar->status) }}
-                                    </span>
-                                </td>
                                 
                                 <td class="px-6 py-4 text-right">
                                 @php
-                                    $registrationUrl = $webinar->series?->slug
-                                        ? rtrim(config('app.webinar_url') ?: config('app.url'), '/') . route('webinar.show', $webinar->series->slug, false)
+                                    $registrationUrl = $webinar->webinarSeries?->slug
+                                        ? rtrim(config('app.webinar_url') ?: config('app.url'), '/') . route('webinar.show', $webinar->webinarSeries->slug, false)
                                         : null;
                                 @endphp
 
@@ -238,13 +231,13 @@
                         @csrf
 
                         <div>
-                            <label for="series_id" class="block text-sm font-medium text-slate-700">
+                            <label for="webinar_series_id" class="block text-sm font-medium text-slate-700">
                                 Webinar Series
                             </label>
 
                             <select
-                                id="series_id"
-                                name="series_id"
+                                id="webinar_series_id"
+                                name="webinar_series_id"
                                 class="mt-1 block w-full rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-0"
                                 required
                             >
@@ -253,14 +246,14 @@
                                 @foreach($series as $seriesItem)
                                     <option
                                         value="{{ $seriesItem->id }}"
-                                        @selected(old('series_id') == $seriesItem->id)
+                                        @selected(old('webinar_series_id') == $seriesItem->id)
                                     >
                                         {{ $seriesItem->title }}
                                     </option>
                                 @endforeach
                             </select>
 
-                            @error('series_id')
+                            @error('webinar_series_id')
                                 <p class="mt-2 text-sm text-red-600">
                                     {{ $message }}
                                 </p>

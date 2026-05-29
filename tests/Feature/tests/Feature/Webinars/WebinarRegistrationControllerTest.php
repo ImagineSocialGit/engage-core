@@ -30,7 +30,7 @@ class WebinarRegistrationControllerTest extends TestCase
         ]);
 
         Webinar::factory()->create([
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
             'starts_at' => now()->subDay(),
         ]);
 
@@ -51,7 +51,7 @@ class WebinarRegistrationControllerTest extends TestCase
         ]);
 
         Webinar::factory()->create([
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
             'starts_at' => now()->addDay(),
         ]);
 
@@ -130,7 +130,7 @@ class WebinarRegistrationControllerTest extends TestCase
             ->assertSee('notify');
 
         Webinar::factory()->create([
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
             'title' => 'New Webinar',
             'slug' => 'new-webinar',
             'join_url' => 'https://example.com/join',

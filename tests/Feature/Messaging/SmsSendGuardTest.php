@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Messaging;
 
-use App\Data\WebinarMessageData;
 use App\Services\Messaging\SmsSendGuard;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
@@ -15,7 +14,7 @@ class SmsSendGuardTest extends TestCase
         $guard = app(SmsSendGuard::class);
 
         $this->assertTrue(
-            $guard->allows($this->messageData(), '+15555555555', 'Test message', 'test')
+            $guard->allows('+15555555555', 'Test message', 'test')
         );
     }
 
@@ -24,14 +23,13 @@ class SmsSendGuardTest extends TestCase
         config(['sms.cooldowns.duplicate_window_minutes' => 15]);
 
         $guard = app(SmsSendGuard::class);
-        $data = $this->messageData();
         $to = '+15555555555';
         $message = 'Test message';
 
-        $guard->record($data, $to, $message, 'test');
+        $guard->record($to, $message, 'test');
 
         $this->assertFalse(
-            $guard->allows($data, $to, $message, 'test')
+            $guard->allows($to, $message, 'test')
         );
     }
 
@@ -40,13 +38,12 @@ class SmsSendGuardTest extends TestCase
         config(['sms.rate_limits.per_phone_per_day' => 1]);
 
         $guard = app(SmsSendGuard::class);
-        $data = $this->messageData();
         $to = '+15555555555';
 
-        $guard->record($data, $to, 'First message', 'test');
+        $guard->record($to, 'First message', 'test');
 
         $this->assertFalse(
-            $guard->allows($data, $to, 'Second message', 'test')
+            $guard->allows($to, 'Second message', 'test')
         );
     }
 
@@ -55,14 +52,12 @@ class SmsSendGuardTest extends TestCase
         config(['sms.rate_limits.per_ip_per_hour' => 1]);
 
         $guard = app(SmsSendGuard::class);
-        $data = $this->messageData([
-            'requestIp' => '203.0.113.10',
-        ]);
+        $ip = '203.0.113.10';
 
-        $guard->record($data, '+15555555555', 'First message', 'test');
+        $guard->record('+15555555555', 'First message', 'test', $ip);
 
         $this->assertFalse(
-            $guard->allows($data, '+15555555556', 'Second message', 'test')
+            $guard->allows('+15555555556', 'Second message', 'test', $ip)
         );
     }
 
@@ -74,24 +69,5 @@ class SmsSendGuardTest extends TestCase
         RateLimiter::clear('sms:ip:hourly:203.0.113.10');
 
         parent::tearDown();
-    }
-
-    private function messageData(array $overrides = []): WebinarMessageData
-    {
-        return new WebinarMessageData(
-            registrationId: $overrides['registrationId'] ?? 1,
-            leadId: $overrides['leadId'] ?? 1,
-            leadFirstName: $overrides['leadFirstName'] ?? 'Test',
-            leadEmail: $overrides['leadEmail'] ?? 'test@example.com',
-            leadPhone: $overrides['leadPhone'] ?? '+15555555555',
-            webinarId: $overrides['webinarId'] ?? 1,
-            webinarSlug: $overrides['webinarSlug'] ?? 'test-webinar',
-            webinarTitle: $overrides['webinarTitle'] ?? 'Test Webinar',
-            webinarStartsAt: $overrides['webinarStartsAt'] ?? now()->addDay(),
-            webinarTimezone: $overrides['webinarTimezone'] ?? 'America/Chicago',
-            webinarJoinUrl: $overrides['webinarJoinUrl'] ?? 'https://example.com/join',
-            webinarPlatform: $overrides['webinarPlatform'] ?? 'zoom',
-            requestIp: $overrides['requestIp'] ?? null,
-        );
     }
 }

@@ -53,6 +53,6 @@ class WebinarSeries extends Model
 
     public function webinars(): HasMany
     {
-        return $this->hasMany(Webinar::class, 'series_id');
+        return $this->hasMany(Webinar::class, 'webinar_series_id');
     }
 }

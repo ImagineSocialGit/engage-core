@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Mail;
+namespace App\Mail\Webinars;
 
 use App\Data\WebinarMessageData;
 use Illuminate\Bus\Queueable;
@@ -11,11 +11,9 @@ class WebinarRegistrationConfirmationMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    /**
-     * Create a new message instance.
-     */
     public function __construct(
-        public WebinarMessageData $data
+        public WebinarMessageData $data,
+        public string $transactionalOptOutUrl,
     ) {}
 
     public function build(): self

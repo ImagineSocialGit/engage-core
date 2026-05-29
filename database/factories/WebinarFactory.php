@@ -19,7 +19,7 @@ class WebinarFactory extends Factory
         $title = fake()->sentence(4);
 
         return [
-            'series_id' => WebinarSeries::factory(),
+            'webinar_series_id' => WebinarSeries::factory(),
             'external_id' => (string) fake()->unique()->numberBetween(100000, 999999),
             'host_account_key' => 'default',
             'platform' => 'zoom',

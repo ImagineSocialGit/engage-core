@@ -20,11 +20,15 @@ class ZoomWebinarProvider implements WebinarProvider
 
     public function registerAttendee(Webinar $webinar, WebinarRegistration $registration): array
     {
+        $registration->loadMissing('lead');
+
+        $lead = $registration->lead;
+
         $response = $this->zoomWebinarService->registerAttendee($webinar->external_id, [
-            'first_name' => $registration->first_name,
-            'last_name' => $registration->last_name,
-            'email' => $registration->email,
-            'phone' => $registration->phone,
+            'first_name' => $lead->first_name,
+            'last_name' => $lead->last_name,
+            'email' => $lead->email,
+            'phone' => $lead->phone,
         ]);
 
         return [

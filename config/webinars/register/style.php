@@ -50,6 +50,12 @@ return [
         ',
     ],
 
+    'form_card' => [
+        'class' => 'rounded-3xl border border-black/10 bg-white p-4 text-ink shadow-2xl shadow-black/20 sm:p-8',
+        'title' => 'text-xl font-extrabold tracking-[-0.03em] text-ink sm:text-2xl',
+        'body' => 'mt-2 text-sm font-medium leading-6 text-slate-600',
+    ],
+
     'countdown' => [
         'themes' => [
             'dark' => [

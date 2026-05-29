@@ -4,6 +4,7 @@ namespace Tests\Feature\CRM;
 
 use App\Actions\Caching\FlushWebinarCachesAction;
 use App\Jobs\Webinars\NotifyWebinarWaitlistJob;
+use App\Models\Lead;
 use App\Models\User;
 use App\Models\Webinar;
 use App\Models\WebinarSeries;
@@ -66,7 +67,7 @@ class WebinarSyncTest extends TestCase
         $this->app->instance(ZoomWebinarService::class, $zoomWebinarService);
 
         $response = $this->actingAs($user)->post(route('crm.webinar-series.sync'), [
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
         ]);
 
         $response->assertRedirect(route('crm.webinar-series.index'));
@@ -75,7 +76,7 @@ class WebinarSyncTest extends TestCase
         $this->assertDatabaseCount('webinars', 2);
 
         $this->assertDatabaseHas('webinars', [
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
             'platform' => 'zoom',
             'external_id' => 'zoom-1001',
             'title' => 'Home Buyer Game Plan',
@@ -86,7 +87,7 @@ class WebinarSyncTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('webinars', [
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
             'platform' => 'zoom',
             'external_id' => 'zoom-1002',
             'title' => 'Home Buyer Game Plan',
@@ -120,7 +121,7 @@ class WebinarSyncTest extends TestCase
         ]);
 
         $webinar = Webinar::query()->create([
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
             'platform' => 'zoom',
             'external_id' => 'zoom-1001',
             'title' => 'Old Title',
@@ -159,7 +160,7 @@ class WebinarSyncTest extends TestCase
         $this->app->instance(ZoomWebinarService::class, $zoomWebinarService);
 
         $response = $this->actingAs($user)->post(route('crm.webinar-series.sync'), [
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
         ]);
 
         $response->assertRedirect(route('crm.webinar-series.index'));
@@ -188,7 +189,7 @@ class WebinarSyncTest extends TestCase
         ]);
 
         $missingWebinar = Webinar::query()->create([
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
             'platform' => 'zoom',
             'external_id' => 'zoom-missing-1',
             'title' => 'Missing Webinar',
@@ -213,7 +214,7 @@ class WebinarSyncTest extends TestCase
         $this->app->instance(ZoomWebinarService::class, $zoomWebinarService);
 
         $response = $this->actingAs($user)->post(route('crm.webinar-series.sync'), [
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
         ]);
 
         $response->assertRedirect(route('crm.webinar-series.index'));
@@ -239,7 +240,7 @@ class WebinarSyncTest extends TestCase
         ]);
 
         $missingWebinar = Webinar::query()->create([
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
             'platform' => 'zoom',
             'external_id' => 'zoom-missing-active',
             'title' => 'Missing Webinar',
@@ -255,7 +256,16 @@ class WebinarSyncTest extends TestCase
             ],
         ]);
 
+        $lead = Lead::query()->create([
+            'first_name' => 'Test',
+            'last_name' => 'Registrant',
+            'email' => 'registered@example.com',
+            'status' => 'new',
+            'source' => 'webinar_subdomain',
+        ]);
+
         $missingWebinar->registrations()->create([
+            'lead_id' => $lead->id,
             'webinar_slug' => $missingWebinar->slug,
             'status' => 'registered',
             'source' => 'webinar_subdomain',
@@ -272,7 +282,7 @@ class WebinarSyncTest extends TestCase
         $this->app->instance(ZoomWebinarService::class, $zoomWebinarService);
 
         $response = $this->actingAs($user)->post(route('crm.webinar-series.sync'), [
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
         ]);
 
         $response->assertRedirect(route('crm.webinar-series.index'));
@@ -324,7 +334,7 @@ class WebinarSyncTest extends TestCase
         $this->app->instance(ZoomWebinarService::class, $zoomWebinarService);
 
         $this->actingAs($user)->post(route('crm.webinar-series.sync'), [
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
         ]);
 
         Queue::assertPushed(NotifyWebinarWaitlistJob::class);
@@ -344,7 +354,7 @@ class WebinarSyncTest extends TestCase
         ]);
 
         Webinar::query()->create([
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
             'platform' => 'zoom',
             'external_id' => 'zoom-existing',
             'title' => 'Home Buyer Game Plan',
@@ -380,7 +390,7 @@ class WebinarSyncTest extends TestCase
         $this->app->instance(ZoomWebinarService::class, $zoomWebinarService);
 
         $this->actingAs($user)->post(route('crm.webinar-series.sync'), [
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
         ]);
 
         Queue::assertNotPushed(NotifyWebinarWaitlistJob::class);

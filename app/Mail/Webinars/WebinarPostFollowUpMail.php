@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Mail;
+namespace App\Mail\Webinars;
 
 use App\Data\WebinarMessageData;
 use Illuminate\Bus\Queueable;
@@ -15,6 +15,7 @@ class WebinarPostFollowUpMail extends Mailable
         public WebinarMessageData $data,
         public string $followUpType,
         public string $subjectLine,
+        public string $transactionalOptOutUrl,
     ) {}
 
     public function build(): self

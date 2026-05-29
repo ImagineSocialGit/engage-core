@@ -14,7 +14,7 @@ class SyncWebinarSeriesRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'series_id' => ['required', 'integer', 'exists:webinar_series,id'],
+            'webinar_series_id' => ['required', 'integer', 'exists:webinar_series,id'],
         ];
     }
 }

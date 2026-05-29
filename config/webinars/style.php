@@ -64,8 +64,8 @@ return [
 
         'checkbox' => [
             'wrapper' => 'flex items-start gap-3',
-            'input' => 'mt-1 h-5 w-5 rounded border-slate-300 accent-primary text-primary focus:ring-primary',
-            'label' => 'text-sm leading-6 text-slate-700',
+            'input' => 'mt-1 rounded border-slate-300 accent-primary text-primary focus:ring-primary',
+            'label' => 'text-xs leading-4 text-slate-700',
         ],
 
         'input' => [
@@ -76,7 +76,7 @@ return [
     'footer' => [
         'compliance_identity' => [
             'wrapper' => 'mt-6 text-center',
-            'line' => 'block text-xs font-medium leading-6 text-white/90',
+            'line' => 'block text-xs font-medium leading-4 text-white/90',
         ],
     ],
 

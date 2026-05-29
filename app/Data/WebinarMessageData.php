@@ -2,6 +2,7 @@
 
 namespace App\Data;
 
+use App\Models\Lead;
 use App\Models\WebinarRegistration;
 use App\Support\Webinars\WebinarJoinLinkGenerator;
 use Carbon\Carbon;
@@ -13,6 +14,7 @@ readonly class WebinarMessageData
         public int $registrationId,
         public int $leadId,
         public string $leadFirstName,
+        public ?string $leadLastName,
         public ?string $leadEmail,
         public ?string $leadPhone,
         public int $webinarId,
@@ -35,14 +37,11 @@ readonly class WebinarMessageData
 
         return new self(
             registrationId: $registration->id,
-            leadId: $lead?->id ?? 0,
-            leadFirstName: $registration->first_name
-                ?? $lead?->first_name
-                ?? 'there',
-            leadEmail: $registration->email
-                ?? $lead?->email,
-            leadPhone: $registration->phone
-                ?? $lead?->phone,
+            leadId: $lead->id,
+            leadFirstName: $lead->first_name ?? 'there',
+            leadLastName: $lead->last_name,
+            leadEmail: $lead->email,
+            leadPhone: $lead->phone,
             webinarId: $webinar->id,
             webinarSlug: $webinar->slug,
             webinarTitle: $webinar->title,
@@ -62,6 +61,7 @@ readonly class WebinarMessageData
             'registration_id' => $this->registrationId,
             'lead_id' => $this->leadId,
             'lead_first_name' => $this->leadFirstName,
+            'lead_last_name' => $this->leadLastName,
             'lead_email' => $this->leadEmail,
             'lead_phone' => $this->leadPhone,
             'webinar_id' => $this->webinarId,
@@ -81,6 +81,7 @@ readonly class WebinarMessageData
             registrationId: $data['registration_id'],
             leadId: $data['lead_id'],
             leadFirstName: $data['lead_first_name'],
+            leadLastName: $data['lead_last_name'] ?? null,
             leadEmail: $data['lead_email'],
             leadPhone: $data['lead_phone'],
             webinarId: $data['webinar_id'],
@@ -100,5 +101,10 @@ readonly class WebinarMessageData
             ->copy()
             ->setTimezone($this->webinarTimezone)
             ->format($format);
+    }
+
+    public function lead(): Lead
+    {
+        return Lead::query()->findOrFail($this->leadId);
     }
 }

@@ -6,50 +6,37 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('message_consents', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('lead_id')
-                ->constrained()
-                ->cascadeOnDelete();
+            $table->morphs('recipient');
 
-            $table->foreignId('webinar_registration_id')
-                ->nullable()
-                ->constrained()
-                ->nullOnDelete();
-
-            $table->string('channel'); // sms|email
-            $table->string('purpose'); // transactional|marketing
+            $table->string('channel');
+            $table->string('purpose');
 
             $table->timestamp('consented_at');
 
+            $table->string('source')->nullable();
             $table->string('ip_address', 45)->nullable();
             $table->text('user_agent')->nullable();
-
-            $table->string('source')->nullable();
+            $table->json('meta')->nullable();
 
             $table->timestamps();
 
             $table->unique([
-                'lead_id',
+                'recipient_type',
+                'recipient_id',
                 'channel',
                 'purpose',
-            ]);
+            ], 'message_consents_recipient_channel_purpose_unique');
 
             $table->index(['channel', 'purpose']);
             $table->index('consented_at');
-            $table->index('webinar_registration_id');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('message_consents');

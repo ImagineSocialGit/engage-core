@@ -2,15 +2,18 @@
 
 namespace App\Services\Messaging;
 
-use App\Data\WebinarMessageData;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 
 class SmsSendGuard
 {
-    public function allows(WebinarMessageData $data, string $to, string $message, string $kind): bool
-    {
+    public function allows(
+        string $to,
+        string $message,
+        string $kind,
+        ?string $sourceIp = null,
+    ): bool {
         if (Cache::has($this->duplicateKey($to, $message))) {
             Log::warning('Duplicate SMS suppressed.', compact('kind', 'to'));
 
@@ -26,18 +29,19 @@ class SmsSendGuard
             return false;
         }
 
-        $ip = $this->sourceIp($data);
-
-        if ($ip && RateLimiter::tooManyAttempts(
-            $this->ipKey($ip),
+        if ($sourceIp && RateLimiter::tooManyAttempts(
+            $this->ipKey($sourceIp),
             (int) config('sms.rate_limits.per_ip_per_hour', 5)
         )) {
-            Log::warning('SMS per-IP hourly limit exceeded.', compact('kind', 'ip'));
+            Log::warning('SMS per-IP hourly limit exceeded.', [
+                'kind' => $kind,
+                'ip' => $sourceIp,
+            ]);
 
             return false;
         }
 
-        $dailyKey = 'sms:daily-send-count:'.now()->toDateString();
+        $dailyKey = $this->dailySendCountKey();
 
         $count = (int) Cache::get($dailyKey, 0);
 
@@ -53,8 +57,12 @@ class SmsSendGuard
         return true;
     }
 
-    public function record(WebinarMessageData $data, string $to, string $message, string $kind): void
-    {
+    public function record(
+        string $to,
+        string $message,
+        string $kind,
+        ?string $sourceIp = null,
+    ): void {
         Cache::put(
             $this->duplicateKey($to, $message),
             true,
@@ -66,11 +74,11 @@ class SmsSendGuard
             now()->diffInSeconds(now()->endOfDay())
         );
 
-        if ($ip = $this->sourceIp($data)) {
-            RateLimiter::hit($this->ipKey($ip), 3600);
+        if ($sourceIp) {
+            RateLimiter::hit($this->ipKey($sourceIp), 3600);
         }
 
-        $dailyKey = 'sms:daily-send-count:'.now()->toDateString();
+        $dailyKey = $this->dailySendCountKey();
 
         $count = Cache::increment($dailyKey);
 
@@ -86,11 +94,6 @@ class SmsSendGuard
         }
     }
 
-    private function sourceIp(WebinarMessageData $data): ?string
-    {
-        return $data->requestIp;
-    }
-
     private function duplicateKey(string $to, string $message): string
     {
         return 'sms:duplicate:'.hash('sha256', $to.'|'.$message);
@@ -104,5 +107,10 @@ class SmsSendGuard
     private function ipKey(string $ip): string
     {
         return 'sms:ip:hourly:'.$ip;
+    }
+
+    private function dailySendCountKey(): string
+    {
+        return 'sms:daily-send-count:'.now()->toDateString();
     }
 }

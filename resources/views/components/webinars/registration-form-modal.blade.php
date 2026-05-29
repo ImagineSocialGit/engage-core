@@ -22,21 +22,21 @@
     x-transition:leave="transition ease-in duration-150"
     x-transition:leave-start="opacity-100 scale-100"
     x-transition:leave-end="opacity-0 scale-105"
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+    class="fixed inset-0 z-50 overflow-y-auto p-3 sm:p-6"
     aria-labelledby="register-modal-title"
     aria-modal="true"
     role="dialog"
 >
     <div
-        class="absolute inset-0 bg-black/70"
+        class="fixed inset-0 bg-black/70"
         @click="formOpen = false"
     ></div>
 
     <div
-        class="relative z-10 w-full max-w-2xl"
+        class="relative z-10 mx-auto flex min-h-full w-full max-w-2xl items-start sm:items-center"
         @click.stop
     >
-        <x-ui.card class="{{ $page['form_card']['class'] ?? '' }}">
+        <x-ui.card class="{{ $page['form_card']['class'] ?? '' }} max-h-[calc(100dvh-1.5rem)] w-full overflow-y-auto sm:max-h-[calc(100dvh-3rem)]">
             <div class="mb-6 flex items-start justify-between gap-4">
                 <div class="space-y-2">
                     @if(filled($page['form_card']['title'] ?? null))
@@ -72,154 +72,217 @@
             >
                 @csrf
 
-                <div>
-                    <x-ui.form.label for="first_name">
-                        {{ $page['fields']['first_name']['label'] ?? 'First Name' }}
-                    </x-ui.form.label>
-
-                    <x-ui.form.input
-                        id="first_name"
-                        name="first_name"
-                        x-ref="firstName"
-                        :value="old('first_name')"
-                        :placeholder="$page['fields']['first_name']['placeholder'] ?? 'First name'"
-                    />
-
-                    @error('first_name')
-                        <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
-                    <x-ui.form.label for="last_name">
-                        {{ $page['fields']['last_name']['label'] ?? 'Last Name' }}
-                    </x-ui.form.label>
-
-                    <x-ui.form.input
-                        id="last_name"
-                        name="last_name"
-                        :value="old('last_name')"
-                        :placeholder="$page['fields']['last_name']['placeholder'] ?? 'Last name'"
-                    />
-
-                    @error('last_name')
-                        <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
-                    <x-ui.form.label for="email">
-                        {{ $page['fields']['email']['label'] ?? 'Email Address' }}
-                    </x-ui.form.label>
-
-                    <x-ui.form.input
-                        id="email"
-                        name="email"
-                        type="email"
-                        :value="old('email')"
-                        :placeholder="$page['fields']['email']['placeholder'] ?? 'Email address'"
-                    />
-
-                    @error('email')
-                        <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
-                    <x-ui.form.label for="phone">
-                        {{ $page['fields']['phone']['label'] ?? 'Phone Number' }}
-                    </x-ui.form.label>
-
-                    <x-ui.form.input
-                        id="phone"
-                        name="phone"
-                        :value="old('phone')"
-                        :placeholder="$page['fields']['phone']['placeholder'] ?? 'Phone number'"
-                    />
-
-                    @error('phone')
-                        <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                {{-- @if(filled($page['fields']['sms_reminder']['label'] ?? null))
+                
+                <div class="grid gap-4 sm:grid-cols-2">
                     <div>
-                        <label
-                            for="sms_reminder"
-                            class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
-                        >
-                            <input
-                                id="sms_reminder"
-                                name="sms_reminder"
-                                type="checkbox"
-                                value="1"
-                                @checked(old('sms_reminder'))
-                                class="{{ $checkbox['input'] ?? 'mt-1 h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary' }}"
-                            >
+                        <x-ui.form.label for="first_name">
+                            {{ $page['fields']['first_name']['label'] ?? 'First Name' }}
+                        </x-ui.form.label>
 
-                            <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
-                                {{ $page['fields']['sms_reminder']['label'] }}
-                            </span>
-                        </label>
+                        <x-ui.form.input
+                            id="first_name"
+                            name="first_name"
+                            x-ref="firstName"
+                            :value="old('first_name')"
+                            :placeholder="$page['fields']['first_name']['placeholder'] ?? 'First name'"
+                        />
 
-                        @error('sms_reminder')
+                        @error('first_name')
                             <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
                                 {{ $message }}
                             </p>
                         @enderror
                     </div>
-                @endif --}}
 
-                <div>
-                    <label
-                        for="email_consent"
-                        class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
-                    >
-                        <input
-                            id="email_consent"
-                            name="email_consent"
-                            type="checkbox"
-                            value="1"
-                            @checked(old('email_consent'))
-                            class="{{ $checkbox['input'] ?? 'mt-1 h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary' }}"
+                    <div>
+                        <x-ui.form.label for="last_name">
+                            {{ $page['fields']['last_name']['label'] ?? 'Last Name' }}
+                        </x-ui.form.label>
+
+                        <x-ui.form.input
+                            id="last_name"
+                            name="last_name"
+                            :value="old('last_name')"
+                            :placeholder="$page['fields']['last_name']['placeholder'] ?? 'Last name'"
+                        />
+
+                        @error('last_name')
+                            <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                                {{ $message }}
+                            </p>
+                        @enderror
+                    </div>
+                </div>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <x-ui.form.label for="email">
+                            {{ $page['fields']['email']['label'] ?? 'Email Address' }}
+                        </x-ui.form.label>
+
+                        <x-ui.form.input
+                            id="email"
+                            name="email"
+                            type="email"
+                            :value="old('email')"
+                            :placeholder="$page['fields']['email']['placeholder'] ?? 'Email address'"
+                        />
+
+                        @error('email')
+                            <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                                {{ $message }}
+                            </p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <x-ui.form.label for="phone">
+                            {{ $page['fields']['phone']['label'] ?? 'Phone Number' }}
+                        </x-ui.form.label>
+
+                        <x-ui.form.input
+                            id="phone"
+                            name="phone"
+                            :value="old('phone')"
+                            :placeholder="$page['fields']['phone']['placeholder'] ?? 'Phone number'"
+                        />
+
+                        @error('phone')
+                            <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                                {{ $message }}
+                            </p>
+                        @enderror
+                    </div>
+                </div>
+
+                <div class="rounded-2xl bg-slate-50 p-4 space-y-2">
+                    <div>
+                        <p class="text-sm font-bold text-slate-900">
+                            Notifications
+                        </p>
+
+                        <p class="mt-1 text-xs leading-5 text-slate-600">
+                            Please select <span class="underline">at least</span> one method below
+                        </p>
+                    </div>
+
+                    <div>
+                        <label
+                            for="transactional_email_consent"
+                            class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
                         >
+                            <input
+                                id="transactional_email_consent"
+                                name="transactional_email_consent"
+                                type="checkbox"
+                                value="1"
+                                @checked(old('transactional_email_consent'))
+                                class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
+                            >
 
-                        <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
-                            {{ $page['fields']['consent_messages']['email']['label'] }}
-                        </span>
-                    </label>
+                            <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
+                                {{ $page['fields']['consent_messages']['email']['label'] }}
+                            </span>
+                        </label>
 
-                    @error('email_consent')
-                        <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                        @error('transactional_email_consent')
+                            <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                                {{ $message }}
+                            </p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label
+                            for="transactional_sms_consent"
+                            class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
+                        >
+                            <input
+                                id="transactional_sms_consent"
+                                name="transactional_sms_consent"
+                                type="checkbox"
+                                value="1"
+                                @checked(old('transactional_sms_consent'))
+                                class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
+                            >
+
+                            <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
+                                {{ $page['fields']['consent_messages']['sms']['label'] }}
+                            </span>
+                        </label>
+
+                        @error('transactional_sms_consent')
+                            <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                                {{ $message }}
+                            </p>
+                        @enderror
+                    </div>
+
+                    @error('transactional_consent')
+                        <p class="{{ $tokens['field_error'] ?? 'text-sm text-red-600' }}">
                             {{ $message }}
                         </p>
                     @enderror
                 </div>
 
-                <div>
-                    <label
-                        for="sms_consent"
-                        class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
-                    >
-                        <input
-                            id="sms_consent"
-                            name="sms_consent"
-                            type="checkbox"
-                            value="1"
-                            @checked(old('sms_consent'))
-                            class="{{ $checkbox['input'] ?? 'mt-1 h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary' }}"
-                        >
-
-                        <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
-                            {{ $page['fields']['consent_messages']['sms']['label'] }}
-                        </span>
-                    </label>
-
-                    @error('sms_consent')
-                        <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
-                            {{ $message }}
+                <div class="rounded-2xl border border-slate-200 p-4 space-y-2">
+                    <div>
+                        <p class="mt-1 text-xs leading-5 text-slate-600">
+                            The following are not required for registration
                         </p>
-                    @enderror
+                    </div>
+
+                    <div>
+                        <label
+                            for="marketing_email_consent"
+                            class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
+                        >
+                            <input
+                                id="marketing_email_consent"
+                                name="marketing_email_consent"
+                                type="checkbox"
+                                value="1"
+                                @checked(old('marketing_email_consent'))
+                                class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
+                            >
+
+                            <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
+                                I agree to receive occasional marketing emails from Slam Dunk Home Loans.
+                            </span>
+                        </label>
+
+                        @error('marketing_email_consent')
+                            <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                                {{ $message }}
+                            </p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label
+                            for="marketing_sms_consent"
+                            class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
+                        >
+                            <input
+                                id="marketing_sms_consent"
+                                name="marketing_sms_consent"
+                                type="checkbox"
+                                value="1"
+                                @checked(old('marketing_sms_consent'))
+                                class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
+                            >
+
+                            <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
+                                I agree to receive occasional marketing text messages from Slam Dunk Home Loans. Message and data rates may apply. Reply STOP to opt out.
+                            </span>
+                        </label>
+
+                        @error('marketing_sms_consent')
+                            <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                                {{ $message }}
+                            </p>
+                        @enderror
+                    </div>
                 </div>
 
                 @if($page['legal_links']['enabled'] ?? false)

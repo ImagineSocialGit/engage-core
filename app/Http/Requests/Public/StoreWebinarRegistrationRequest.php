@@ -3,12 +3,21 @@
 namespace App\Http\Requests\Public;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class StoreWebinarRegistrationRequest extends FormRequest
 {
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'transactional_email_consent' => $this->boolean('transactional_email_consent'),
+            'transactional_sms_consent' => $this->boolean('transactional_sms_consent'),
+        ]);
     }
 
     public function rules(): array
@@ -19,18 +28,28 @@ class StoreWebinarRegistrationRequest extends FormRequest
             'email' => ['required', 'email', 'max:255'],
             'phone' => ['required', 'string', 'max:30'],
 
-            'transactional_email_consent' => ['accepted'],
-            'transactional_sms_consent' => ['nullable', 'accepted'],
+            'transactional_email_consent' => ['required', 'boolean'],
+            'transactional_sms_consent' => ['required', 'boolean'],
+
             'marketing_email_consent' => ['nullable', 'boolean'],
             'marketing_sms_consent' => ['nullable', 'boolean'],
         ];
     }
 
-    public function messages(): array
+    public function after(): array
     {
         return [
-            'transactional_email_consent.accepted' => 'Registering for this webinar requires accepting transactional email messages containing links and event details.',
-            'transactional_sms_consent.accepted' => 'SMS reminders require accepting transactional text messages for this webinar.',
+            function (Validator $validator): void {
+                if (
+                    ! $this->boolean('transactional_email_consent')
+                    && ! $this->boolean('transactional_sms_consent')
+                ) {
+                    $validator->errors()->add(
+                        'transactional_consent',
+                        'At least one of Email or SMS transactional messages containing links are required for this webinar.'
+                    );
+                }
+            },
         ];
     }
 }

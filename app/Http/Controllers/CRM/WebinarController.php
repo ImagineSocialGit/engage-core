@@ -32,7 +32,7 @@ class WebinarController extends Controller
         $showArchived = $request->boolean('archived');
 
         $query = Webinar::query()
-            ->with('series');
+            ->with('webinarSeries');
 
         if (! $showArchived) {
             $query->where('ends_at', '>', now());
@@ -67,7 +67,7 @@ class WebinarController extends Controller
         SyncWebinarSeriesRequest $request,
         SyncWebinarSeriesFromProviderAction $syncWebinarSeriesFromProviderAction,
     ): RedirectResponse {
-        $series = WebinarSeries::query()->findOrFail($request->validated('series_id'));
+        $series = WebinarSeries::query()->findOrFail($request->validated('webinar_series_id'));
 
         try {
             $result = $syncWebinarSeriesFromProviderAction->execute($series);

@@ -4,8 +4,9 @@ namespace App\Services\Messaging;
 
 use App\Enums\MessageChannel;
 use App\Enums\MessagePurpose;
-use App\Models\Lead;
-use Illuminate\Support\Facades\DB;
+use App\Models\MessageConsent;
+use App\Models\ConsentRevocation;
+use Illuminate\Database\Eloquent\Model;
 
 class MessageEligibilityGate
 {
@@ -13,53 +14,50 @@ class MessageEligibilityGate
         private readonly MessageSuppressionService $messageSuppressionService,
     ) {}
 
-    public function canSend(Lead $lead, MessageChannel|string $channel, MessagePurpose|string $purpose): bool
+    public function canSend(Model $recipient, MessageChannel|string $channel, MessagePurpose|string $purpose): bool
     {
         $channel = $this->normalizeChannel($channel);
         $purpose = $this->normalizePurpose($purpose);
 
-        $destination = $this->destinationFor($lead, $channel);
+        $destination = $this->destinationFor($recipient, $channel);
 
         if (! $destination) {
             return false;
         }
 
-        if (! $this->hasActiveConsent($lead, $channel, $purpose)) {
+        if (! $this->hasActiveConsent($recipient, $channel, $purpose)) {
             return false;
         }
 
-        if ($this->messageSuppressionService->isSuppressed($channel, $destination)) {
-            return false;
-        }
-
-        return true;
+        return ! $this->messageSuppressionService->isSuppressed($channel, $destination);
     }
 
-    private function hasActiveConsent(Lead $lead, string $channel, string $purpose): bool
+    private function hasActiveConsent(Model $recipient, string $channel, string $purpose): bool
     {
-        $latestConsentAt = DB::table('message_consents')
-            ->where('lead_id', $lead->id)
+        $latestConsent = MessageConsent::query()
+            ->whereMorphedTo('recipient', $recipient)
             ->where('channel', $channel)
             ->where('purpose', $purpose)
-            ->value('consented_at');
+            ->latest('consented_at')
+            ->first();
 
-        if (! $latestConsentAt) {
+        if (! $latestConsent) {
             return false;
         }
 
-        return ! DB::table('consent_revocations')
-            ->where('lead_id', $lead->id)
+        return ! ConsentRevocation::query()
+            ->whereMorphedTo('recipient', $recipient)
             ->where('channel', $channel)
             ->where('purpose', $purpose)
-            ->where('revoked_at', '>=', $latestConsentAt)
+            ->where('revoked_at', '>=', $latestConsent->consented_at)
             ->exists();
     }
 
-    private function destinationFor(Lead $lead, string $channel): ?string
+    private function destinationFor(Model $recipient, string $channel): ?string
     {
         return match ($channel) {
-            MessageChannel::Sms->value => $lead->phone,
-            MessageChannel::Email->value => $lead->email,
+            MessageChannel::Sms->value => $recipient->phone ?? null,
+            MessageChannel::Email->value => $recipient->email ?? null,
             default => null,
         };
     }

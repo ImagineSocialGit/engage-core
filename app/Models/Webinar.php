@@ -13,7 +13,7 @@ class Webinar extends Model
     use HasFactory;
 
     protected $fillable = [
-        'series_id',
+        'webinar_series_id',
         'title',
         'slug',
         'platform',
@@ -42,7 +42,7 @@ class Webinar extends Model
             if (! $webinar->wasChanged([
                 'starts_at',
                 'ends_at',
-                'series_id',
+                'webinar_series_id',
                 'registration_url',
                 'join_url',
                 'timezone',
@@ -58,9 +58,9 @@ class Webinar extends Model
         });
     }
 
-    public function series(): BelongsTo
+    public function webinarSeries(): BelongsTo
     {
-        return $this->belongsTo(WebinarSeries::class, 'series_id');
+        return $this->belongsTo(WebinarSeries::class);
     }
 
     public function registrations(): HasMany

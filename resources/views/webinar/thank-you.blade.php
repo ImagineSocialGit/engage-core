@@ -9,8 +9,6 @@
         config('webinars.thank-you.content', []),
     );
 
-    $webinar = $registration->webinar ?? $series->nextUpcomingWebinar();
-
     $eventDetailsItems = collect($page['event_details']['items'] ?? [])->map(function (array $item) use ($webinar) {
         $key = $item['key'] ?? null;
 
@@ -48,7 +46,7 @@
                     @endif
 
                     @if(filled($page['hero']['body'] ?? null))
-                        <p class="{{ $style['hero']['body'] ?? '' }}">
+                        <p class="{{ $style['hero']['body'] ?? '' }}">  
                             {{ $page['hero']['body'] }}
                         </p>
                     @endif

@@ -4,6 +4,7 @@ use App\Http\Middleware\ForceStagingAccess;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Routing\Exceptions\InvalidSignatureException;
 use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -18,6 +19,11 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::middleware(['web'])
                 ->group(function () {
                     require base_path('routes/staging.php');
+                });
+
+            Route::middleware(['web'])
+                ->group(function () {
+                    require base_path('routes/webhooks.php');
                 });
 
             Route::middleware(['web'])
@@ -41,13 +47,22 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->validateCsrfTokens(except: [
             'webhooks/zoom',
+            'webhooks/twilio/sms',
         ]);
 
         $middleware->web(append: [
             ForceStagingAccess::class,
         ]);
     })
-    ->withExceptions(function (Exceptions $exceptions): void {
-        //
+    ->withExceptions(function ($exceptions): void {
+        $exceptions->render(function (
+            InvalidSignatureException $exception,
+            $request
+        ) {
+            return response()->view(
+                'messaging.unsubscribe-invalid',
+                status: 403,
+            );
+        });
     })
     ->create();

@@ -11,26 +11,22 @@ class WebinarWaitlistSignup extends Model
     use HasFactory;
 
     protected $fillable = [
+        'lead_id',
         'webinar_series_id',
-        'first_name',
-        'last_name',
-        'email',
-        'phone',
-        'email_consent_at',
-        'sms_consent_at',
         'notified_at',
         'source_page',
-        'ip_address',
-        'user_agent',
         'meta',
     ];
 
     protected $casts = [
-        'email_consent_at' => 'datetime',
-        'sms_consent_at' => 'datetime',
         'notified_at' => 'datetime',
         'meta' => 'array',
     ];
+
+    public function lead(): BelongsTo
+    {
+        return $this->belongsTo(Lead::class);
+    }
 
     public function series(): BelongsTo
     {
