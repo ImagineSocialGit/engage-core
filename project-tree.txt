@@ -3,9 +3,9 @@
 │   ├── Actions
 │   │   ├── Caching
 │   │   │   └── FlushWebinarCachesAction.php
+│   │   ├── Contacts
 │   │   ├── Email
 │   │   │   └── HandleResendWebhookAction.php
-│   │   ├── Leads
 │   │   ├── Messaging
 │   │   │   ├── DispatchMessageAction.php
 │   │   │   ├── GrantMessageConsentAction.php
@@ -47,8 +47,8 @@
 │   │   │   ├── Controller.php
 │   │   │   ├── CRM
 │   │   │   │   ├── ContactController.php
-│   │   │   │   ├── LeadNoteController.php
-│   │   │   │   ├── LeadTaskController.php
+│   │   │   │   ├── ContactNoteController.php
+│   │   │   │   ├── ContactTaskController.php
 │   │   │   │   └── WebinarController.php
 │   │   │   ├── Public
 │   │   │   │   ├── ConsentRevocationController.php
@@ -63,8 +63,8 @@
 │   │   │   └── ForceStagingAccess.php
 │   │   └── Requests
 │   │       ├── CRM
-│   │       │   ├── StoreLeadNoteRequest.php
-│   │       │   ├── StoreLeadTaskRequest.php
+│   │       │   ├── StoreContactNoteRequest.php
+│   │       │   ├── StoreContactTaskRequest.php
 │   │       │   ├── StoreWebinarSeriesRequest.php
 │   │       │   └── SyncWebinarSeriesRequest.php
 │   │       └── Public
@@ -97,8 +97,8 @@
 │   │           └── WebinarWaitlistScheduledSmsPayload.php
 │   ├── Models
 │   │   ├── ConsentRevocation.php
-│   │   ├── Lead.php
-│   │   ├── LeadTag.php
+│   │   ├── Contact.php
+│   │   ├── ContactTag.php
 │   │   ├── MessageConsent.php
 │   │   ├── MessageSuppression.php
 │   │   ├── Note.php
@@ -121,7 +121,6 @@
 │   │   ├── Messaging
 │   │   │   ├── DevMessageSink.php
 │   │   │   ├── EmailMessagingService.php
-│   │   │   ├── EmailRecipientResolver.php
 │   │   │   ├── MessageEligibilityGate.php
 │   │   │   ├── MessageSuppressionService.php
 │   │   │   ├── PhoneNumberNormalizer.php
@@ -161,12 +160,12 @@
 │   ├── auth.php
 │   ├── cache-keys.php
 │   ├── cache.php
+│   ├── contacts.php
 │   ├── database.php
 │   ├── filesystems.php
 │   ├── generated
 │   │   └── images.php
 │   ├── horizon.php
-│   ├── leads.php
 │   ├── logging.php
 │   ├── mail.php
 │   ├── messaging.php
@@ -202,7 +201,7 @@
 ├── database
 │   ├── database.sqlite
 │   ├── factories
-│   │   ├── LeadFactory.php
+│   │   ├── ContactFactory.php
 │   │   ├── UserFactory.php
 │   │   ├── WebinarFactory.php
 │   │   ├── WebinarSeriesFactory.php
@@ -211,8 +210,8 @@
 │   │   ├── 0001_01_01_000000_create_users_table.php
 │   │   ├── 0001_01_01_000001_create_cache_table.php
 │   │   ├── 0001_01_01_000002_create_jobs_table.php
-│   │   ├── 2026_04_15_195850_create_leads_table.php
-│   │   ├── 2026_04_15_195851_create_lead_tags_table.php
+│   │   ├── 2026_04_15_195850_create_contacts_table.php
+│   │   ├── 2026_04_15_195851_create_contact_tags_table.php
 │   │   ├── 2026_04_15_203545_create_tasks_table.php
 │   │   ├── 2026_04_15_203546_create_notes_table.php
 │   │   ├── 2026_04_15_203547_create_webinar_series_table.php
@@ -284,10 +283,10 @@
 │       │       ├── hero.blade.php
 │       │       └── registration-form-modal.blade.php
 │       ├── crm
-│       │   ├── dashboard.blade.php
-│       │   ├── leads
+│       │   ├── contacts
 │       │   │   ├── index.blade.php
 │       │   │   └── show.blade.php
+│       │   ├── dashboard.blade.php
 │       │   └── webinars
 │       │       └── index.blade.php
 │       ├── emails
@@ -354,4 +353,4 @@
 │   └── Unit
 └── vite.config.js
 
-106 directories, 249 files
+106 directories, 248 files
