@@ -16,14 +16,14 @@ class MessageEligibilityGateTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_active_email_suppression_blocks_otherwise_eligible_recipient(): void
+    public function test_active_email_suppression_blocks_otherwise_eligible_contact(): void
     {
         $contact = Contact::factory()->create([
             'email' => 'person@example.com',
         ]);
 
         MessageConsent::query()->create([
-            'recipient_id' => $contact->id,
+            'contact_id' => $contact->id,
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Transactional->value,
             'consented_at' => now(),
@@ -40,7 +40,7 @@ class MessageEligibilityGateTest extends TestCase
 
         $this->assertFalse(
             app(MessageEligibilityGate::class)->canSend(
-                recipient: $contact,
+                contact: $contact,
                 channel: MessageChannel::Email,
                 purpose: MessagePurpose::Transactional,
             )

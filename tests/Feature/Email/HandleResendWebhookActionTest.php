@@ -15,17 +15,6 @@ class HandleResendWebhookActionTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        config([
-            'messaging.email.recipient_models' => [
-                Contact::class,
-            ],
-        ]);
-    }
-
     public function test_bounce_event_suppresses_email_destination(): void
     {
         app(HandleResendWebhookAction::class)->handle(
@@ -85,7 +74,7 @@ class HandleResendWebhookActionTest extends TestCase
                 data: [
                     'email_id' => 'email_123',
                     'to' => ['person@example.com'],
-                    'reason' => 'Recipient address is invalid',
+                    'reason' => 'Contact address is invalid',
                 ],
             ),
             sourceEventId: 'evt_failed_invalid_1',
@@ -130,7 +119,7 @@ class HandleResendWebhookActionTest extends TestCase
         );
 
         $this->assertDatabaseHas('consent_revocations', [
-            'recipient_id' => $contact->id,
+            'contact_id' => $contact->id,
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Marketing->value,
             'reason' => ConsentRevocation::REASON_PROVIDER_UNSUBSCRIBE,
@@ -140,7 +129,7 @@ class HandleResendWebhookActionTest extends TestCase
         $this->assertDatabaseCount('message_suppressions', 0);
     }
 
-    public function test_unsubscribe_event_for_unknown_recipient_does_not_create_revocation_or_suppression(): void
+    public function test_unsubscribe_event_for_unknown_contact_does_not_create_revocation_or_suppression(): void
     {
         app(HandleResendWebhookAction::class)->handle(
             event: $this->event(type: 'email.unsubscribed'),

@@ -38,7 +38,7 @@ return new class extends Migration
             $table->index([
                 'channel',
                 'purpose',
-            ], 'scheduled_messages_recipient_channel_purpose_index');
+            ], 'scheduled_messages_channel_purpose_index');
 
             $table->index([
                 'context_type',

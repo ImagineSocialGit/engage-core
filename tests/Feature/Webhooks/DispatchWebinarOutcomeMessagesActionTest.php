@@ -121,7 +121,7 @@ class DispatchWebinarOutcomeMessagesActionTest extends TestCase
         string $followUpType,
     ): void {
         $scheduledMessage = ScheduledMessage::query()
-            ->where('contact', $contact->getKey())
+            ->where('contact_id', $registration->contact->getKey())
             ->whereMorphedTo('context', $registration)
             ->where('channel', $channel)
             ->where('message_type', $messageType)

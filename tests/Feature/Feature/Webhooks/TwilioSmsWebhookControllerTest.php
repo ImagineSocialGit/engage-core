@@ -43,7 +43,7 @@ class TwilioSmsWebhookControllerTest extends TestCase
             ->assertSee('<Response><Message>You have been opted out of SMS messages. Reply START to resubscribe.</Message></Response>', false);
 
         $this->assertDatabaseHas('consent_revocations', [
-            'recipient_id' => $contact->id,
+            'contact_id' => $contact->id,
             'channel' => MessageChannel::Sms->value,
             'purpose' => MessagePurpose::Transactional->value,
             'reason' => ConsentRevocation::REASON_STOP,
@@ -51,7 +51,7 @@ class TwilioSmsWebhookControllerTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('consent_revocations', [
-            'recipient_id' => $contact->id,
+            'contact_id' => $contact->id,
             'channel' => MessageChannel::Sms->value,
             'purpose' => MessagePurpose::Marketing->value,
             'reason' => ConsentRevocation::REASON_STOP,

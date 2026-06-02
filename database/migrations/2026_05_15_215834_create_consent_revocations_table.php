@@ -32,11 +32,6 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index([
-                'channel',
-                'purpose',
-            ], 'consent_revocations_channel_purpose_index');
-
             $table->index(['channel', 'purpose']);
             $table->index('revoked_at');
         });

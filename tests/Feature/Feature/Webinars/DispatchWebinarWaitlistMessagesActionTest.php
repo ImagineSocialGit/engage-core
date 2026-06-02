@@ -26,7 +26,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
 
         $series = $this->createSeries();
         $webinar = $this->createWebinar($series);
-        $contact = $this->createLead();
+        $contact = $this->createContact();
 
         $signup = WebinarWaitlistSignup::query()->create([
             'contact_id' => $contact->id,
@@ -47,7 +47,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         $this->assertSame(2, ScheduledMessage::query()->count());
 
         $this->assertDatabaseHas('scheduled_messages', [
-            'recipient_id' => $contact->id,
+            'contact_id' => $contact->id,
             'context_type' => $signup->getMorphClass(),
             'context_id' => $signup->id,
             'channel' => MessageChannel::Email->value,
@@ -57,7 +57,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('scheduled_messages', [
-            'recipient_id' => $contact->id,
+            'contact_id' => $contact->id,
             'context_type' => $signup->getMorphClass(),
             'context_id' => $signup->id,
             'channel' => MessageChannel::Sms->value,
@@ -77,7 +77,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
 
         $series = $this->createSeries();
         $webinar = $this->createWebinar($series);
-        $contact = $this->createLead();
+        $contact = $this->createContact();
 
         WebinarWaitlistSignup::query()->create([
             'contact_id' => $contact->id,
@@ -138,7 +138,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
     private function grantConsent(Contact $contact, MessageChannel $channel): void
     {
         DB::table('message_consents')->insert([
-            'recipient_id' => $contact->id,
+            'contact_id' => $contact->id,
             'channel' => $channel->value,
             'purpose' => MessagePurpose::Transactional->value,
             'consented_at' => now(),

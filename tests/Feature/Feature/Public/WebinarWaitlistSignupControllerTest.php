@@ -41,7 +41,7 @@ class WebinarWaitlistSignupControllerTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('message_consents', [
-            'recipient_id' => $contact->id,
+            'contact_id' => $contact->id,
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Transactional->value,
             'source' => 'webinar_waitlist',
@@ -125,14 +125,14 @@ class WebinarWaitlistSignupControllerTest extends TestCase
         $this->assertNotNull($contact);
 
         $this->assertDatabaseHas('message_consents', [
-            'recipient_id' => $contact->id,
+            'contact_id' => $contact->id,
             'channel' => MessageChannel::Sms->value,
             'purpose' => MessagePurpose::Transactional->value,
             'source' => 'webinar_waitlist',
         ]);
 
         $this->assertDatabaseMissing('message_consents', [
-            'recipient_id' => $contact->id,
+            'contact_id' => $contact->id,
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Transactional->value,
         ]);
@@ -158,14 +158,14 @@ class WebinarWaitlistSignupControllerTest extends TestCase
         $this->assertNotNull($contact);
 
         $this->assertDatabaseHas('message_consents', [
-            'recipient_id' => $contact->id,
+            'contact_id' => $contact->id,
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Transactional->value,
             'source' => 'webinar_waitlist',
         ]);
 
         $this->assertDatabaseHas('message_consents', [
-            'recipient_id' => $contact->id,
+            'contact_id' => $contact->id,
             'channel' => MessageChannel::Sms->value,
             'purpose' => MessagePurpose::Transactional->value,
             'source' => 'webinar_waitlist',
