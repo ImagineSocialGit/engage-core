@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Services\Webinars\Providers\Zoom;
+namespace App\Integrations\Webinars\Zoom;
 
 use App\Actions\Webinars\RecordWebinarAttendanceAction;
-use App\Services\Zoom\ZoomWebinarService;
+use App\Integrations\Webinars\Zoom\Mappers\ZoomAttendanceMapper;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 

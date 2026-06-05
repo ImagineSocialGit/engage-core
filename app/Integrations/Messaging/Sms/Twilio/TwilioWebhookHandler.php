@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Services\Messaging\Providers;
+namespace App\Integrations\Messaging\Sms\Twilio;
 
-use App\Contracts\Services\Messaging\SmsWebhookHandler;
+use App\Contracts\Messaging\SmsWebhookHandler;
 use App\Services\Messaging\SmsWebhookPayload;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
-class TwilioSmsWebhookHandler implements SmsWebhookHandler
+class TwilioWebhookHandler implements SmsWebhookHandler
 {
     public function provider(): string
     {

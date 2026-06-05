@@ -228,7 +228,7 @@ return [
                 'label' => 'I agree to receive emails from Slam Dunk Home Loans related to webinar registration, including private access details, class reminders, replay access, and follow-up communications. I may unsubscribe at any time.',
             ],
             'sms' => [
-                'label' => 'I agree to receive automated text messages from Slam Dunk Home Loans related to webinar registration, including private access details, class reminders, replay access, and follow-up communications. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help. Consent is not a condition of registration.',
+                'label' => 'I agree to receive automated text messages from Slam Dunk Home Loans related to webinar registration, including private access details, class reminders, replay access, and follow-up communications. Consent is not a condition of registration. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help. Mobile information will not be shared with third parties for promotional or marketing purposes.',
             ]
         ],
     ],

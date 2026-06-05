@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Webinars\Providers\Zoom;
+namespace App\Integrations\Webinars\Zoom;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;

@@ -3,8 +3,8 @@
 namespace Tests\Feature\Webhooks;
 
 use App\Actions\Webinars\RecordWebinarAttendanceAction;
-use App\Services\Webinars\Providers\Zoom\ZoomAttendanceMapper;
-use App\Services\Zoom\ZoomWebinarService;
+use App\Integrations\Webinars\Zoom\Mappers\ZoomAttendanceMapper;
+use App\Integrations\Webinars\Zoom\ZoomWebinarService;
 use Mockery\MockInterface;
 use Tests\TestCase;
 

@@ -1,14 +1,14 @@
 <?php
 
-namespace App\Services\Messaging\Providers;
+namespace App\Integrations\Messaging\Sms\Telnyx;
 
-use App\Contracts\Services\Messaging\SmsWebhookHandler;
+use App\Contracts\Messaging\SmsWebhookHandler;
 use App\Services\Messaging\SmsWebhookPayload;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 
-class TelnyxSmsWebhookHandler implements SmsWebhookHandler
+class TelnyxWebhookHandler implements SmsWebhookHandler
 {
     public function provider(): string
     {

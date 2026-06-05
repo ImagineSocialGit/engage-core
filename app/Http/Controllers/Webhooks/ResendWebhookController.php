@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Webhooks;
 
 use App\Actions\Email\HandleResendWebhookAction;
 use App\Http\Controllers\Controller;
-use App\Services\Messaging\ResendWebhookVerifier;
+use App\Integrations\Messaging\Email\Resend\ResendWebhookVerifier;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use JsonException;

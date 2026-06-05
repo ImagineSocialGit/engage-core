@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Messaging;
+namespace App\Integrations\Messaging\Email\Resend;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Contracts\Services\Messaging;
+namespace App\Contracts\Messaging;
 
 use App\Services\Messaging\SmsWebhookPayload;
 use Illuminate\Http\Request;

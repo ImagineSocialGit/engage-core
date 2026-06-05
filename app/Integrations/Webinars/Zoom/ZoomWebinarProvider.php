@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Webinars\Providers;
+namespace App\Integrations\Webinars\Zoom;
 
 use App\Contracts\Webinars\WebinarProvider;
 use App\Models\Webinar;

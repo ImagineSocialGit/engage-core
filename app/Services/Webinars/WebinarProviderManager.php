@@ -3,7 +3,7 @@
 namespace App\Services\Webinars;
 
 use App\Contracts\Webinars\WebinarProvider;
-use App\Services\Webinars\Providers\ZoomWebinarProvider;
+use App\Integrations\Webinars\Zoom\ZoomWebinarProvider;
 use InvalidArgumentException;
 
 class WebinarProviderManager

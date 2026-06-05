@@ -3,14 +3,13 @@
 namespace App\Services\Messaging;
 
 use App\Contracts\Messaging\SmsMessagePayload;
-use Twilio\Rest\Client;
 
 class SmsMessagingService
 {
     public function __construct(
-        private readonly Client $twilio,
         private readonly DevMessageSink $devMessageSink,
         private readonly PhoneNumberNormalizer $phoneNumberNormalizer,
+        private readonly SmsProviderManager $smsProviderManager,
         private readonly SmsSendGuard $smsSendGuard,
     ) {}
 
@@ -41,6 +40,7 @@ class SmsMessagingService
         if (app()->environment('local')) {
             $this->devMessageSink->store('sms', [
                 ...$payload->devPayload(),
+                'provider' => config('sms.provider', 'twilio'),
                 'normalized_phone' => $to,
             ]);
 
@@ -49,10 +49,12 @@ class SmsMessagingService
             return;
         }
 
-        $this->twilio->messages->create($to, [
-            'from' => config('sms.from'),
-            'body' => $message,
-        ]);
+        $this->smsProviderManager
+            ->defaultProvider()
+            ->send($to, $message, [
+                'kind' => $kind,
+                'source_ip' => $sourceIp,
+            ]);
 
         $this->smsSendGuard->record($to, $message, $kind, $sourceIp);
     }

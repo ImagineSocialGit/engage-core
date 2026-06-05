@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Zoom;
+namespace App\Integrations\Webinars\Zoom;
 
 use App\Support\Caching\CacheKey;
 use Illuminate\Support\Facades\Cache;

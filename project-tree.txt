@@ -29,10 +29,9 @@
 │   ├── Contracts
 │   │   ├── Messaging
 │   │   │   ├── EmailMessagePayload.php
-│   │   │   └── SmsMessagePayload.php
-│   │   ├── Services
-│   │   │   └── Messaging
-│   │   │       └── SmsWebhookHandler.php
+│   │   │   ├── SmsMessagePayload.php
+│   │   │   ├── SmsProvider.php
+│   │   │   └── SmsWebhookHandler.php
 │   │   └── Webinars
 │   │       └── WebinarProvider.php
 │   ├── Data
@@ -72,6 +71,27 @@
 │   │       │   └── SyncWebinarSeriesRequest.php
 │   │       └── Public
 │   │           └── StoreWebinarRegistrationRequest.php
+│   ├── Integrations
+│   │   ├── Messaging
+│   │   │   ├── Email
+│   │   │   │   └── Resend
+│   │   │   │       └── ResendWebhookVerifier.php
+│   │   │   └── Sms
+│   │   │       ├── Telnyx
+│   │   │       │   ├── TelnyxSmsProvider.php
+│   │   │       │   └── TelnyxWebhookHandler.php
+│   │   │       └── Twilio
+│   │   │           ├── TwilioSmsProvider.php
+│   │   │           └── TwilioWebhookHandler.php
+│   │   └── Webinars
+│   │       └── Zoom
+│   │           ├── Mappers
+│   │           │   └── ZoomAttendanceMapper.php
+│   │           ├── ZoomOAuthService.php
+│   │           ├── ZoomWebhookHandler.php
+│   │           ├── ZoomWebhookVerifier.php
+│   │           ├── ZoomWebinarProvider.php
+│   │           └── ZoomWebinarService.php
 │   ├── Jobs
 │   │   ├── FailingQueueJob.php
 │   │   ├── Leads
@@ -129,26 +149,13 @@
 │   │   │   ├── MessageEligibilityGate.php
 │   │   │   ├── MessageSuppressionService.php
 │   │   │   ├── PhoneNumberNormalizer.php
-│   │   │   ├── Providers
-│   │   │   │   ├── TelnyxSmsWebhookHandler.php
-│   │   │   │   └── TwilioSmsWebhookHandler.php
-│   │   │   ├── ResendWebhookVerifier.php
 │   │   │   ├── SmsMessagingService.php
+│   │   │   ├── SmsProviderManager.php
 │   │   │   ├── SmsSendGuard.php
 │   │   │   ├── SmsWebhookHandlerResolver.php
-│   │   │   ├── SmsWebhookPayload.php
-│   │   │   └── SmsWebhookResponseFactory.php
-│   │   ├── Webinars
-│   │   │   ├── Providers
-│   │   │   │   ├── Zoom
-│   │   │   │   │   ├── ZoomAttendanceMapper.php
-│   │   │   │   │   ├── ZoomWebhookHandler.php
-│   │   │   │   │   └── ZoomWebhookVerifier.php
-│   │   │   │   └── ZoomWebinarProvider.php
-│   │   │   └── WebinarProviderManager.php
-│   │   └── Zoom
-│   │       ├── ZoomOAuthService.php
-│   │       └── ZoomWebinarService.php
+│   │   │   └── SmsWebhookPayload.php
+│   │   └── Webinars
+│   │       └── WebinarProviderManager.php
 │   └── Support
 │       ├── Caching
 │       │   └── CacheKey.php
@@ -349,10 +356,15 @@
 │   │   │   │   └── SmsWebhookControllerTest.php
 │   │   │   └── Webinars
 │   │   │       └── DispatchWebinarWaitlistMessagesActionTest.php
+│   │   ├── Integrations
+│   │   │   └── Messaging
+│   │   │       └── Sms
+│   │   │           └── Telnyx
 │   │   ├── Messaging
 │   │   │   ├── EmailConsentRevocationControllerTest.php
 │   │   │   ├── MessageEligibilityGateTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
+│   │   │   ├── SmsMessagingServiceTest.php
 │   │   │   ├── SmsSendGuardTest.php
 │   │   │   └── WebinarEmailRenderingTest.php
 │   │   ├── tests
@@ -367,4 +379,4 @@
 │   └── Unit
 └── vite.config.js
 
-109 directories, 259 files
+117 directories, 263 files

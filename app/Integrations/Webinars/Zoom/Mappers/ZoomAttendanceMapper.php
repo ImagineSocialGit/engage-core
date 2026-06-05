@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Webinars\Providers\Zoom;
+namespace App\Integrations\Webinars\Zoom\Mappers;
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;

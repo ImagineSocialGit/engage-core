@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Webhooks;
 
 use App\Http\Controllers\Controller;
-use App\Services\Webinars\Providers\Zoom\ZoomWebhookHandler;
+use App\Integrations\Webinars\Zoom\ZoomWebhookHandler;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
