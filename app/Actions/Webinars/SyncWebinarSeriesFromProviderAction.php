@@ -3,10 +3,10 @@
 namespace App\Actions\Webinars;
 
 use App\Actions\Caching\FlushWebinarCachesAction;
+use App\Integrations\Webinars\Zoom\ZoomWebinarService;
 use App\Jobs\Webinars\NotifyWebinarWaitlistJob;
 use App\Models\Webinar;
 use App\Models\WebinarSeries;
-use App\Services\Zoom\ZoomWebinarService;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 

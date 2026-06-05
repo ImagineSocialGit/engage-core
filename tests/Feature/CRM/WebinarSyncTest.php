@@ -3,12 +3,12 @@
 namespace Tests\Feature\CRM;
 
 use App\Actions\Caching\FlushWebinarCachesAction;
+use App\Integrations\Webinars\Zoom\ZoomWebinarService;
 use App\Jobs\Webinars\NotifyWebinarWaitlistJob;
 use App\Models\Contact;
 use App\Models\User;
 use App\Models\Webinar;
 use App\Models\WebinarSeries;
-use App\Services\Zoom\ZoomWebinarService;
 use App\Support\Caching\CacheKey;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;

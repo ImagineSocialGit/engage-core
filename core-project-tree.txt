@@ -144,6 +144,7 @@
 │   │   └── WebinarWaitlistSignup.php
 │   ├── Providers
 │   │   ├── AppServiceProvider.php
+│   │   ├── ClientServiceProvider.php
 │   │   └── HorizonServiceProvider.php
 │   ├── Rules
 │   │   └── Messaging
@@ -172,6 +173,8 @@
 │   └── Support
 │       ├── Caching
 │       │   └── CacheKey.php
+│       ├── Clients
+│       │   └── ViewResolver.php
 │       ├── Messaging
 │       │   └── EmailConsentRevocationLinkGenerator.php
 │       └── Webinars
@@ -183,21 +186,27 @@
 │   │   ├── packages.php
 │   │   └── services.php
 │   └── providers.php
+├── client -> ../leadflow-clients/slam-dunk-home-loans
 ├── composer.json
 ├── composer.lock
 ├── config
 │   ├── app.php
 │   ├── auth.php
+│   ├── brand.php
 │   ├── cache-keys.php
 │   ├── cache.php
+│   ├── client.php
 │   ├── contacts.php
 │   ├── database.php
 │   ├── filesystems.php
 │   ├── generated
-│   │   └── images.php
 │   ├── horizon.php
 │   ├── logging.php
 │   ├── mail.php
+│   ├── messaging
+│   │   ├── emails
+│   │   │   └── webinars.php
+│   │   └── emails.php
 │   ├── messaging.php
 │   ├── queue.php
 │   ├── reminders.php
@@ -208,13 +217,9 @@
 │   ├── sms.php
 │   ├── staging.php
 │   ├── theme
-│   │   └── webinar_public.php
 │   ├── webinars
 │   │   ├── content.php
 │   │   ├── index
-│   │   │   ├── content.php
-│   │   │   └── style.php
-│   │   ├── none-scheduled
 │   │   │   ├── content.php
 │   │   │   └── style.php
 │   │   ├── notify-me
@@ -228,6 +233,7 @@
 │   │       ├── content.php
 │   │       └── style.php
 │   └── webinars.php
+├── core-project-tree.txt
 ├── database
 │   ├── database.sqlite
 │   ├── factories
@@ -265,13 +271,43 @@
 ├── phpunit.xml
 ├── project-tree.txt
 ├── public
+│   ├── client -> ../../leadflow-clients/slam-dunk-home-loans/public
 │   ├── favicon.ico
+│   ├── hot
+│   ├── images
+│   │   └── processed
+│   │       ├── brand
+│   │       │   └── logo
+│   │       │       ├── 320.avif
+│   │       │       ├── 320.webp
+│   │       │       ├── 640.avif
+│   │       │       ├── 640.webp
+│   │       │       └── placeholder.webp
+│   │       └── webinar
+│   │           ├── landing
+│   │           │   ├── 320.avif
+│   │           │   ├── 320.webp
+│   │           │   ├── 640.avif
+│   │           │   ├── 640.webp
+│   │           │   ├── 960.avif
+│   │           │   ├── 960.webp
+│   │           │   └── placeholder.webp
+│   │           └── register
+│   │               └── instructor
 │   ├── index.php
 │   └── robots.txt
 ├── README.md
 ├── resources
 │   ├── css
 │   │   └── app.css
+│   ├── images
+│   │   ├── manifest.json
+│   │   └── raw
+│   │       ├── brand
+│   │       │   └── logo.png
+│   │       └── webinar
+│   │           └── register
+│   │               └── instructor.png
 │   ├── js
 │   │   ├── app.js
 │   │   └── pages
@@ -374,6 +410,8 @@
 │   │   │       └── Sms
 │   │   │           └── Telnyx
 │   │   ├── Messaging
+│   │   │   ├── Email
+│   │   │   │   └── EmailMessagingServiceTest.php
 │   │   │   ├── EmailConsentRevocationControllerTest.php
 │   │   │   ├── MessageEligibilityGateTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
@@ -392,4 +430,4 @@
 │   └── Unit
 └── vite.config.js
 
-123 directories, 270 files
+141 directories, 290 files

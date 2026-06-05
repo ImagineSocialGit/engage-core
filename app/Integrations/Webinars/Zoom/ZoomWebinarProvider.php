@@ -3,9 +3,9 @@
 namespace App\Integrations\Webinars\Zoom;
 
 use App\Contracts\Webinars\WebinarProvider;
+use App\Integrations\Webinars\Zoom\ZoomWebinarService;
 use App\Models\Webinar;
 use App\Models\WebinarRegistration;
-use App\Services\Zoom\ZoomWebinarService;
 
 class ZoomWebinarProvider implements WebinarProvider
 {

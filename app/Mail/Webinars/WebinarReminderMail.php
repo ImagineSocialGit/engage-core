@@ -3,6 +3,7 @@
 namespace App\Mail\Webinars;
 
 use App\Data\WebinarMessageData;
+use App\Support\Clients\ViewResolver;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
@@ -21,7 +22,24 @@ class WebinarReminderMail extends Mailable
     public function build(): self
     {
         return $this
-            ->subject($this->subjectLine)
-            ->view('emails.webinars.reminder');
+            ->subject($this->configuredSubjectLine())
+            ->view(ViewResolver::resolve('emails.webinars.reminder'));
+    }
+
+    private function configuredSubjectLine(): string
+    {
+        $configured = config(
+            "messaging.emails.webinars.reminders.messages.{$this->messageType}.subject"
+        );
+
+        return $this->replaceTokens($configured ?: $this->subjectLine);
+    }
+
+    private function replaceTokens(string $value): string
+    {
+        return strtr($value, [
+            ':webinar_title' => $this->data->webinarTitle,
+            ':first_name' => $this->data->contactFirstName,
+        ]);
     }
 }

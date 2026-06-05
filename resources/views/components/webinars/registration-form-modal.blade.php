@@ -247,7 +247,7 @@
                             >
 
                             <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
-                                I agree to receive occasional marketing emails from Slam Dunk Home Loans.
+                                {{ $page['fields']['marketing_consent_messages']['email']['label'] ?? '' }}
                             </span>
                         </label>
 
@@ -273,7 +273,7 @@
                             >
 
                             <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
-                                I agree to receive occasional marketing text messages from Slam Dunk Home Loans. Consent to marketing text messages is not a condition of registration. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help. Mobile information will not be shared with third parties for promotional or marketing purposes.
+                                {{ $page['fields']['marketing_consent_messages']['sms']['label'] ?? '' }}
                             </span>
                         </label>
 
