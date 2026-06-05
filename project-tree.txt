@@ -4,14 +4,14 @@
 │   │   ├── Caching
 │   │   │   └── FlushWebinarCachesAction.php
 │   │   ├── Contacts
-│   │   ├── Email
-│   │   │   └── HandleResendWebhookAction.php
 │   │   ├── Messaging
 │   │   │   ├── DispatchMessageAction.php
+│   │   │   ├── Email
+│   │   │   │   └── HandleInboundEmailWebhookAction.php
 │   │   │   ├── GrantMessageConsentAction.php
-│   │   │   ├── HandleInboundSmsWebhookAction.php
-│   │   │   └── RevokeMessageConsentAction.php
-│   │   ├── Sms
+│   │   │   ├── RevokeMessageConsentAction.php
+│   │   │   └── Sms
+│   │   │       └── HandleInboundSmsWebhookAction.php
 │   │   └── Webinars
 │   │       ├── AddRegistrantToWebinarProviderAction.php
 │   │       ├── CreateWebinarRegistrationAction.php
@@ -30,7 +30,8 @@
 │   │   ├── Messaging
 │   │   │   ├── Email
 │   │   │   │   ├── EmailMessage.php
-│   │   │   │   └── EmailProvider.php
+│   │   │   │   ├── EmailProvider.php
+│   │   │   │   └── EmailWebhookHandler.php
 │   │   │   └── Sms
 │   │   │       ├── SmsMessage.php
 │   │   │       ├── SmsProvider.php
@@ -61,7 +62,7 @@
 │   │   │   │   ├── WebinarRegistrationController.php
 │   │   │   │   └── WebinarWaitlistSignupController.php
 │   │   │   └── Webhooks
-│   │   │       ├── ResendWebhookController.php
+│   │   │       ├── EmailWebhookController.php
 │   │   │       ├── SmsWebhookController.php
 │   │   │       └── WebinarWebhookController.php
 │   │   ├── Middleware
@@ -78,6 +79,8 @@
 │   │   ├── Messaging
 │   │   │   ├── Email
 │   │   │   │   └── Resend
+│   │   │   │       ├── ResendEmailProvider.php
+│   │   │   │       ├── ResendWebhookHandler.php
 │   │   │   │       └── ResendWebhookVerifier.php
 │   │   │   └── Sms
 │   │   │       ├── Telnyx
@@ -151,7 +154,10 @@
 │   │   ├── Messaging
 │   │   │   ├── DevMessageSink.php
 │   │   │   ├── Email
-│   │   │   │   └── EmailMessagingService.php
+│   │   │   │   ├── EmailMessagingService.php
+│   │   │   │   ├── EmailProviderManager.php
+│   │   │   │   ├── EmailWebhookHandlerResolver.php
+│   │   │   │   └── EmailWebhookPayload.php
 │   │   │   ├── MessageEligibilityGate.php
 │   │   │   ├── MessageSuppressionService.php
 │   │   │   ├── PhoneNumberNormalizer.php
@@ -355,7 +361,7 @@
 │   │   ├── CRM
 │   │   │   └── WebinarSyncTest.php
 │   │   ├── Email
-│   │   │   └── HandleResendWebhookActionTest.php
+│   │   │   └── HandleInboundEmailWebhookActionTest.php
 │   │   ├── Feature
 │   │   │   ├── Public
 │   │   │   │   └── WebinarWaitlistSignupControllerTest.php
@@ -380,10 +386,10 @@
 │   │   │           └── WebinarRegistrationControllerTest.php
 │   │   └── Webhooks
 │   │       ├── DispatchWebinarOutcomeMessagesActionTest.php
-│   │       ├── ResendWebhookControllerTest.php
+│   │       ├── EmailWebhookControllerTest.php
 │   │       └── ZoomWebhookTest.php
 │   ├── TestCase.php
 │   └── Unit
 └── vite.config.js
 
-123 directories, 264 files
+123 directories, 270 files

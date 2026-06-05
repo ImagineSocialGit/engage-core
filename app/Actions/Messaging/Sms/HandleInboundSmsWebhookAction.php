@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Actions\Messaging;
+namespace App\Actions\Messaging\Sms;
 
+use App\Actions\Messaging\RevokeMessageConsentAction;
 use App\Enums\MessageChannel;
 use App\Enums\MessagePurpose;
 use App\Models\ConsentRevocation;

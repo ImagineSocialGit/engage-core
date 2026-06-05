@@ -2,19 +2,20 @@
 
 namespace App\Integrations\Messaging\Email\Resend;
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
 class ResendWebhookVerifier
 {
-
     private const REPLAY_CACHE_TTL_SECONDS = 86400;
 
-    public function isValid(Request $request): bool
+    /**
+     * @param array<string, mixed> $headers
+     */
+    public function isValid(string $payload, array $headers): bool
     {
-        $eventId = $this->header($request, 'svix-id');
-        $timestamp = $this->header($request, 'svix-timestamp');
-        $signature = $this->header($request, 'svix-signature');
+        $eventId = $this->header($headers, 'svix-id');
+        $timestamp = $this->header($headers, 'svix-timestamp');
+        $signature = $this->header($headers, 'svix-signature');
         $secret = config('services.resend.webhook_secret');
 
         if (
@@ -34,7 +35,7 @@ class ResendWebhookVerifier
         if (! $this->signatureMatches(
             eventId: $eventId,
             timestamp: $timestamp,
-            payload: $request->getContent(),
+            payload: $payload,
             signatureHeader: $signature,
             secret: $secret,
         )) {
@@ -44,9 +45,16 @@ class ResendWebhookVerifier
         return $this->markEventSeen($eventId);
     }
 
-    private function header(Request $request, string $name): ?string
+    /**
+     * @param array<string, mixed> $headers
+     */
+    private function header(array $headers, string $name): ?string
     {
-        $value = $request->header($name);
+        $value = $headers[$name] ?? $headers[strtolower($name)] ?? null;
+
+        if (is_array($value)) {
+            $value = $value[0] ?? null;
+        }
 
         if (! is_string($value)) {
             return null;

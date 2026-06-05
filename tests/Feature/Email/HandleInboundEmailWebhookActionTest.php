@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Email;
 
-use App\Actions\Email\HandleResendWebhookAction;
+use App\Actions\Messaging\Email\HandleInboundEmailWebhookAction;
 use App\Enums\MessageChannel;
 use App\Enums\MessagePurpose;
 use App\Models\ConsentRevocation;
@@ -11,15 +11,16 @@ use App\Models\MessageSuppression;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class HandleResendWebhookActionTest extends TestCase
+class HandleInboundEmailWebhookActionTest extends TestCase
 {
     use RefreshDatabase;
 
     public function test_bounce_event_suppresses_email_destination(): void
     {
-        app(HandleResendWebhookAction::class)->handle(
+        app(HandleInboundEmailWebhookAction::class)->handle(
             event: $this->event(type: 'email.bounced', email: 'Person@Example.com'),
             sourceEventId: 'evt_bounce_1',
+            provider: MessageSuppression::PROVIDER_RESEND,
         );
 
         $this->assertDatabaseHas('message_suppressions', [
@@ -34,9 +35,10 @@ class HandleResendWebhookActionTest extends TestCase
 
     public function test_complaint_event_suppresses_email_destination(): void
     {
-        app(HandleResendWebhookAction::class)->handle(
+        app(HandleInboundEmailWebhookAction::class)->handle(
             event: $this->event(type: 'email.complained'),
             sourceEventId: 'evt_complaint_1',
+            provider: MessageSuppression::PROVIDER_RESEND,
         );
 
         $this->assertDatabaseHas('message_suppressions', [
@@ -51,9 +53,10 @@ class HandleResendWebhookActionTest extends TestCase
 
     public function test_provider_suppressed_event_suppresses_email_destination(): void
     {
-        app(HandleResendWebhookAction::class)->handle(
+        app(HandleInboundEmailWebhookAction::class)->handle(
             event: $this->event(type: 'email.suppressed'),
             sourceEventId: 'evt_suppressed_1',
+            provider: MessageSuppression::PROVIDER_RESEND,
         );
 
         $this->assertDatabaseHas('message_suppressions', [
@@ -68,7 +71,7 @@ class HandleResendWebhookActionTest extends TestCase
 
     public function test_failed_event_with_invalid_destination_suppresses_email_destination(): void
     {
-        app(HandleResendWebhookAction::class)->handle(
+        app(HandleInboundEmailWebhookAction::class)->handle(
             event: $this->event(
                 type: 'email.failed',
                 data: [
@@ -78,6 +81,7 @@ class HandleResendWebhookActionTest extends TestCase
                 ],
             ),
             sourceEventId: 'evt_failed_invalid_1',
+            provider: MessageSuppression::PROVIDER_RESEND,
         );
 
         $this->assertDatabaseHas('message_suppressions', [
@@ -92,7 +96,7 @@ class HandleResendWebhookActionTest extends TestCase
 
     public function test_failed_event_with_temporary_reason_does_not_suppress(): void
     {
-        app(HandleResendWebhookAction::class)->handle(
+        app(HandleInboundEmailWebhookAction::class)->handle(
             event: $this->event(
                 type: 'email.failed',
                 data: [
@@ -102,6 +106,7 @@ class HandleResendWebhookActionTest extends TestCase
                 ],
             ),
             sourceEventId: 'evt_failed_temp_1',
+            provider: MessageSuppression::PROVIDER_RESEND,
         );
 
         $this->assertDatabaseCount('message_suppressions', 0);
@@ -113,9 +118,10 @@ class HandleResendWebhookActionTest extends TestCase
             'email' => 'person@example.com',
         ]);
 
-        app(HandleResendWebhookAction::class)->handle(
+        app(HandleInboundEmailWebhookAction::class)->handle(
             event: $this->event(type: 'email.unsubscribed'),
             sourceEventId: 'evt_unsubscribe_1',
+            provider: MessageSuppression::PROVIDER_RESEND,
         );
 
         $this->assertDatabaseHas('consent_revocations', [
@@ -131,9 +137,10 @@ class HandleResendWebhookActionTest extends TestCase
 
     public function test_unsubscribe_event_for_unknown_contact_does_not_create_revocation_or_suppression(): void
     {
-        app(HandleResendWebhookAction::class)->handle(
+        app(HandleInboundEmailWebhookAction::class)->handle(
             event: $this->event(type: 'email.unsubscribed'),
             sourceEventId: 'evt_unsubscribe_unknown_1',
+            provider: MessageSuppression::PROVIDER_RESEND,
         );
 
         $this->assertDatabaseCount('consent_revocations', 0);
@@ -144,14 +151,16 @@ class HandleResendWebhookActionTest extends TestCase
     {
         $event = $this->event(type: 'email.bounced');
 
-        app(HandleResendWebhookAction::class)->handle(
+        app(HandleInboundEmailWebhookAction::class)->handle(
             event: $event,
             sourceEventId: 'evt_same_1',
+            provider: MessageSuppression::PROVIDER_RESEND,
         );
 
-        app(HandleResendWebhookAction::class)->handle(
+        app(HandleInboundEmailWebhookAction::class)->handle(
             event: $event,
             sourceEventId: 'evt_same_1',
+            provider: MessageSuppression::PROVIDER_RESEND,
         );
 
         $this->assertDatabaseCount('message_suppressions', 1);
@@ -159,9 +168,10 @@ class HandleResendWebhookActionTest extends TestCase
 
     public function test_unknown_event_is_ignored(): void
     {
-        app(HandleResendWebhookAction::class)->handle(
+        app(HandleInboundEmailWebhookAction::class)->handle(
             event: $this->event(type: 'email.delivered'),
             sourceEventId: 'evt_delivered_1',
+            provider: MessageSuppression::PROVIDER_RESEND,
         );
 
         $this->assertDatabaseCount('message_suppressions', 0);

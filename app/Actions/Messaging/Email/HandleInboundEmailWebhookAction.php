@@ -1,16 +1,16 @@
 <?php
 
-namespace App\Actions\Email;
+namespace App\Actions\Messaging\Email;
 
 use App\Actions\Messaging\RevokeMessageConsentAction;
 use App\Enums\MessageChannel;
 use App\Enums\MessagePurpose;
 use App\Models\ConsentRevocation;
+use App\Models\Contact;
 use App\Models\MessageSuppression;
 use App\Services\Messaging\MessageSuppressionService;
-use App\Models\Contact;
 
-class HandleResendWebhookAction
+class HandleInboundEmailWebhookAction
 {
     private const SUPPRESSION_EVENTS = [
         'email.bounced',
@@ -19,12 +19,15 @@ class HandleResendWebhookAction
     ];
 
     public function __construct(
-    private readonly MessageSuppressionService $messageSuppressionService,
-    private readonly RevokeMessageConsentAction $revokeMessageConsentAction,
-) {}
+        private readonly MessageSuppressionService $messageSuppressionService,
+        private readonly RevokeMessageConsentAction $revokeMessageConsentAction,
+    ) {}
 
-    public function handle(array $event, ?string $sourceEventId = null): void
-    {
+    public function handle(
+        array $event,
+        ?string $sourceEventId = null,
+        string $provider = 'resend',
+    ): void {
         $type = $this->stringValue($event['type'] ?? null);
 
         if ($type === null) {
@@ -32,24 +35,28 @@ class HandleResendWebhookAction
         }
 
         if (in_array($type, self::SUPPRESSION_EVENTS, true)) {
-            $this->suppressContacts($event, $type, $sourceEventId);
+            $this->suppressContacts($event, $type, $sourceEventId, $provider);
 
             return;
         }
 
         if ($type === 'email.failed') {
-            $this->handleFailedEvent($event, $sourceEventId);
+            $this->handleFailedEvent($event, $sourceEventId, $provider);
 
             return;
         }
 
         if ($type === 'email.unsubscribed') {
-            $this->revokeMarketingConsent($event, $sourceEventId);
+            $this->revokeMarketingConsent($event, $sourceEventId, $provider);
         }
     }
 
-    private function suppressContacts(array $event, string $type, ?string $sourceEventId): void
-    {
+    private function suppressContacts(
+        array $event,
+        string $type,
+        ?string $sourceEventId,
+        string $provider,
+    ): void {
         $reason = match ($type) {
             'email.bounced' => MessageSuppression::REASON_BOUNCE,
             'email.complained' => MessageSuppression::REASON_COMPLAINT,
@@ -61,15 +68,18 @@ class HandleResendWebhookAction
                 channel: MessageChannel::Email,
                 destination: $email,
                 reason: $reason,
-                provider: MessageSuppression::PROVIDER_RESEND,
+                provider: $provider,
                 sourceEventId: $sourceEventId ?? $this->fallbackSourceEventId($event),
-                meta: $this->meta($event),
+                meta: $this->meta($event, $provider),
             );
         }
     }
 
-    private function handleFailedEvent(array $event, ?string $sourceEventId): void
-    {
+    private function handleFailedEvent(
+        array $event,
+        ?string $sourceEventId,
+        string $provider,
+    ): void {
         $failureText = strtolower(json_encode($event['data'] ?? [], JSON_THROW_ON_ERROR));
 
         $reason = match (true) {
@@ -93,15 +103,18 @@ class HandleResendWebhookAction
                 channel: MessageChannel::Email,
                 destination: $email,
                 reason: $reason,
-                provider: MessageSuppression::PROVIDER_RESEND,
+                provider: $provider,
                 sourceEventId: $sourceEventId ?? $this->fallbackSourceEventId($event),
-                meta: $this->meta($event),
+                meta: $this->meta($event, $provider),
             );
         }
     }
 
-    private function revokeMarketingConsent(array $event, ?string $sourceEventId): void
-    {
+    private function revokeMarketingConsent(
+        array $event,
+        ?string $sourceEventId,
+        string $provider,
+    ): void {
         foreach ($this->contactEmails($event) as $email) {
             $contact = $this->contactForEmail($email);
 
@@ -113,18 +126,15 @@ class HandleResendWebhookAction
                 'channel' => MessageChannel::Email->value,
                 'purpose' => MessagePurpose::Marketing->value,
                 'reason' => ConsentRevocation::REASON_PROVIDER_UNSUBSCRIBE,
-                'source' => 'resend_webhook',
+                'source' => "{$provider}_webhook",
                 'meta' => [
-                    ...$this->meta($event),
+                    ...$this->meta($event, $provider),
                     'source_event_id' => $sourceEventId ?? $this->fallbackSourceEventId($event),
                 ],
             ]);
         }
     }
 
-    /**
-     * @return array<int, string>
-     */
     private function contactEmails(array $event): array
     {
         $data = is_array($event['data'] ?? null) ? $event['data'] : [];
@@ -141,9 +151,6 @@ class HandleResendWebhookAction
             ->all();
     }
 
-    /**
-     * @return array<int, string>
-     */
     private function emailList(mixed $value): array
     {
         if (is_string($value)) {
@@ -190,10 +197,10 @@ class HandleResendWebhookAction
             ?? $this->stringValue($data['id'] ?? null);
     }
 
-    private function meta(array $event): array
+    private function meta(array $event, string $provider): array
     {
         return [
-            'provider' => 'resend',
+            'provider' => $provider,
             'event_type' => $this->stringValue($event['type'] ?? null),
             'created_at' => $this->stringValue($event['created_at'] ?? null),
             'data' => $event['data'] ?? null,

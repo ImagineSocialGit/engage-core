@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Webhooks;
 
-use App\Actions\Messaging\HandleInboundSmsWebhookAction;
+use App\Actions\Messaging\Sms\HandleInboundSmsWebhookAction;
 use App\Http\Controllers\Controller;
 use App\Services\Messaging\Sms\SmsWebhookHandlerResolver;
 use Illuminate\Http\Request;

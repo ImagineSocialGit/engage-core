@@ -5,7 +5,6 @@ namespace App\Messaging\Payloads\Webinars\Email;
 use App\Contracts\Messaging\Email\EmailMessage;
 use App\Mail\Webinars\WebinarWaitlistScheduledMail;
 use Illuminate\Mail\Mailable;
-use Illuminate\Support\Facades\Mail;
 
 class WebinarWaitlistScheduledEmailPayload implements EmailMessage
 {

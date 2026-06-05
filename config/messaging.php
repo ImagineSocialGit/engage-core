@@ -4,6 +4,15 @@ return [
 
     'email' => [
 
+        'provider' => env('EMAIL_PROVIDER', 'resend'),
+
+        'providers' => [
+            'resend' => [
+                'provider' => App\Integrations\Messaging\Email\Resend\ResendEmailProvider::class,
+                'webhook_handler' => App\Integrations\Messaging\Email\Resend\ResendWebhookHandler::class,
+            ],
+        ],
+
         'recipient_models' => [
             App\Models\Contact::class,
         ],

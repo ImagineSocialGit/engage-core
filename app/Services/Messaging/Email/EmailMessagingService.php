@@ -4,12 +4,12 @@ namespace App\Services\Messaging\Email;
 
 use App\Contracts\Messaging\Email\EmailMessage;
 use App\Services\Messaging\DevMessageSink;
-use Illuminate\Support\Facades\Mail;
 
 class EmailMessagingService
 {
     public function __construct(
         private readonly DevMessageSink $devMessageSink,
+        private readonly EmailProviderManager $emailProviderManager,
     ) {}
 
     public function send(EmailMessage $payload): void
@@ -24,6 +24,6 @@ class EmailMessagingService
             return;
         }
 
-        Mail::to($payload->to())->send($payload->mailable());
+        $this->emailProviderManager->provider()->send($payload);
     }
 }

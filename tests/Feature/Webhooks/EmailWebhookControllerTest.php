@@ -8,7 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
-class ResendWebhookControllerTest extends TestCase
+class EmailWebhookControllerTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -112,7 +112,7 @@ class ResendWebhookControllerTest extends TestCase
         $this
             ->call(
                 method: 'POST',
-                uri: route('webhooks.resend'),
+                uri: route('webhooks.email', ['provider' => 'resend']),
                 server: [
                     'CONTENT_TYPE' => 'application/json',
                     'HTTP_ACCEPT' => 'application/json',
@@ -139,7 +139,7 @@ class ResendWebhookControllerTest extends TestCase
 
         return $this->call(
             method: 'POST',
-            uri: route('webhooks.resend'),
+            uri: route('webhooks.email', ['provider' => 'resend']),
             server: [
                 'CONTENT_TYPE' => 'application/json',
                 'HTTP_ACCEPT' => 'application/json',

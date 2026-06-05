@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Services\Messaging\Email\EmailProviderManager;
+use App\Services\Messaging\Email\EmailWebhookHandlerResolver;
 use App\Services\Messaging\Sms\SmsProviderManager;
 use App\Services\Messaging\Sms\SmsWebhookHandlerResolver;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -31,6 +33,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(SmsProviderManager::class, function () {
             return SmsProviderManager::default();
         });
+
+        $this->app->singleton(EmailProviderManager::class);
+
+        $this->app->singleton(EmailWebhookHandlerResolver::class);
     }
 
     /**
