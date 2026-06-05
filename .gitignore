@@ -12,8 +12,11 @@
 /.vscode
 /.zed
 /auth.json
+/client/*
+!/client/.gitignore
 /node_modules
 /public/build
+/public/client
 /public/hot
 /public/storage
 /public/images/processed
