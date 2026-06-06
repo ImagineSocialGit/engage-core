@@ -30,6 +30,18 @@ return [
             'label' => 'Mobile phone',
             'placeholder' => '(555) 555-5555',
         ],
+
+        'sections' => [
+            'notifications' => [
+                'title' => 'Notifications',
+                'body' => 'Please select at least one method below',
+            ],
+
+            'marketing' => [
+                'body' => 'The following are not required for registration',
+            ],
+        ],
+
         'consent_messages' => [
             'email' => [
                 'label' => 'I agree to receive emails related to my registration, including access details, reminders, replay access, and follow-up communications. I may unsubscribe at any time.',

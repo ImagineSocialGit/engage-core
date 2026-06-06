@@ -9,6 +9,9 @@
         config('webinars.style.components.checkbox', []),
         config('webinars.register.style.components.checkbox', []),
     );
+
+    $notificationSection = $page['sections']['notifications'] ?? [];
+    $marketingSection = $page['sections']['marketing'] ?? [];
 @endphp
 
 <div
@@ -157,12 +160,12 @@
 
                 <div class="rounded-2xl bg-slate-50 p-4 space-y-2">
                     <div>
-                        <p class="text-sm font-bold text-slate-900">
-                            Notifications
-                        </p>
+                        <h3 class="text-sm font-semibold text-slate-900">
+                            {{ $notificationSection['title'] ?? 'Notifications' }}
+                        </h3>
 
-                        <p class="mt-1 text-xs leading-5 text-slate-600">
-                            Please select <span class="underline">at least</span> one method below
+                        <p class="mt-1 text-sm text-slate-600">
+                            {{ $notificationSection['body'] ?? 'Please select at least one method below' }}
                         </p>
                     </div>
 
@@ -227,8 +230,8 @@
 
                 <div class="rounded-2xl border border-slate-200 p-4 space-y-2">
                     <div>
-                        <p class="mt-1 text-xs leading-5 text-slate-600">
-                            The following are not required for registration
+                         <p class="text-sm text-slate-500">
+                            {{ $marketingSection['body'] ?? 'The following are not required for registration' }}
                         </p>
                     </div>
 

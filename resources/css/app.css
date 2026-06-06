@@ -5,12 +5,25 @@
 @source '../**/*.blade.php';
 @source '../**/*.js';
 
+@source '../../client/**/*.php';
+@source '../../client/**/*.blade.php';
+@source '../../client/**/*.js';
+
+
 @theme {
-    --color-primary: #FF1ECE;
-    --color-primary-light: #FF4AD8;
-    --color-secondary: #0F0F0F;
-    --color-ink: #111111;
-    --color-soft: #FAFAFA;
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --color-primary: var(--brand-primary, #FF1ECE);
+    --color-primary-light: var(--brand-primary-light, #FF4AD8);
+    --color-secondary: var(--brand-secondary, #0F0F0F);
+    --color-ink: var(--brand-ink, #111111);
+    --color-soft: var(--brand-soft, #FAFAFA);
+
+    --font-sans:
+        var(--font-sans-family, 'Instrument Sans'),
+        ui-sans-serif,
+        system-ui,
+        sans-serif,
+        'Apple Color Emoji',
+        'Segoe UI Emoji',
+        'Segoe UI Symbol',
+        'Noto Color Emoji';
 }

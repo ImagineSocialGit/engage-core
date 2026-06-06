@@ -11,9 +11,7 @@ class ClientServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->loadClientEnvironment();
-
         $this->mergeClientConfig();
-
     }
 
     public function boot(): void
@@ -65,9 +63,9 @@ class ClientServiceProvider extends ServiceProvider
 
     private function loadClientEnvironment(): void
     {
-        $path = base_path('client/.env');
+        $path = config('client.env_path');
 
-        if (! file_exists($path)) {
+        if (! is_string($path) || ! file_exists($path)) {
             config()->set('client.env', []);
 
             return;
@@ -99,9 +97,6 @@ class ClientServiceProvider extends ServiceProvider
             );
         }
 
-        config()->set(
-            'client.env',
-            $values
-        );
+        config()->set('client.env', $values);
     }
 }

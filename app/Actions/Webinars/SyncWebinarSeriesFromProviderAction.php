@@ -3,7 +3,7 @@
 namespace App\Actions\Webinars;
 
 use App\Actions\Caching\FlushWebinarCachesAction;
-use App\Integrations\Webinars\Zoom\ZoomWebinarService;
+use App\Services\Webinars\WebinarProviderManager;
 use App\Jobs\Webinars\NotifyWebinarWaitlistJob;
 use App\Models\Webinar;
 use App\Models\WebinarSeries;
@@ -15,7 +15,7 @@ class SyncWebinarSeriesFromProviderAction
     public function __construct(
         private readonly FlushWebinarCachesAction $flushWebinarCachesAction,
         private readonly GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction,
-        private readonly ZoomWebinarService $zoomWebinarService,
+        private readonly WebinarProviderManager $webinarProviderManager,
     ) {}
 
     public function execute(WebinarSeries $series): array
@@ -24,14 +24,16 @@ class SyncWebinarSeriesFromProviderAction
             $this->getNextUpcomingWebinarAction->getForSeries($series)
         );
 
-        $fetchedWebinars = $this->zoomWebinarService->listWebinarsByTitle($series->title);
+        $webinarProvider = $this->webinarProviderManager->provider();
+
+        $fetchedWebinars = $webinarProvider->listWebinarsByTitle($series->title);
+
+        $provider = $webinarProvider->name();
 
         $created = 0;
         $updated = 0;
         $deleted = 0;
         $missing = [];
-
-        $provider = config('webinars.provider');
 
         $fetchedExternalIds = collect($fetchedWebinars)
             ->pluck('external_id')

@@ -12,6 +12,18 @@
 
     <x-layouts.favicons />
 
+    <style>
+    :root {
+        --brand-primary: {{ config('theme.colors.primary', '#FF1ECE') }};
+        --brand-primary-light: {{ config('theme.colors.primary_light', '#FF4AD8') }};
+        --brand-secondary: {{ config('theme.colors.secondary', '#0F0F0F') }};
+        --brand-ink: {{ config('theme.colors.ink', '#111111') }};
+        --brand-soft: {{ config('theme.colors.soft', '#FAFAFA') }};
+
+        --font-sans-family: "{{ config('theme.fonts.sans', 'Instrument Sans') }}";
+    }
+    </style>
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-white text-slate-900 antialiased">

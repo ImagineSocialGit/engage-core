@@ -9,5 +9,7 @@ interface WebinarProvider
 {
     public function name(): string;
 
+    public function listWebinarsByTitle(string $title): iterable;
+
     public function registerAttendee(Webinar $webinar, WebinarRegistration $registration): array;
 }

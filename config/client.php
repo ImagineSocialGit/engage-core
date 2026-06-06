@@ -1,13 +1,14 @@
 <?php
 
+$clientKey = env('CLIENT_KEY', 'default');
+
+$clientPath = base_path('client/'.$clientKey);
+
 return [
-    'key' => env('CLIENT_KEY', 'default'),
-
-    'base_path' => base_path('../leadflow-clients/'.env('CLIENT_KEY', 'default')),
-
-    'config_path' => base_path('../leadflow-clients/'.env('CLIENT_KEY', 'default').'/config'),
-
-    'views_path' => base_path('../leadflow-clients/'.env('CLIENT_KEY', 'default').'/resources/views'),
-
-    'public_path' => base_path('../leadflow-clients/'.env('CLIENT_KEY', 'default').'/public'),
+    'key' => $clientKey,
+    'path' => $clientPath,
+    'config_path' => $clientPath.'/config',
+    'views_path' => $clientPath.'/resources/views',
+    'env_path' => $clientPath.'/.env',
+    'env' => [],
 ];
