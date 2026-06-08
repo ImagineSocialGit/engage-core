@@ -115,6 +115,9 @@
 │   │       └── WebinarWaitlistScheduledMail.php
 │   ├── Messaging
 │   │   └── Payloads
+│   │       ├── Marketing
+│   │       │   └── Sms
+│   │       │       └── MarketingSmsPayload.php
 │   │       └── Webinars
 │   │           ├── Email
 │   │           │   ├── WebinarConfirmationEmailPayload.php
@@ -125,6 +128,7 @@
 │   │               ├── WebinarConfirmationSmsPayload.php
 │   │               ├── WebinarFollowUpSmsPayload.php
 │   │               ├── WebinarReminderSmsPayload.php
+│   │               ├── WebinarTransactionalSmsPayload.php
 │   │               └── WebinarWaitlistScheduledSmsPayload.php
 │   ├── Models
 │   │   ├── ConsentRevocation.php
@@ -160,6 +164,7 @@
 │   │   │   │   ├── EmailWebhookHandlerResolver.php
 │   │   │   │   └── EmailWebhookPayload.php
 │   │   │   ├── MessageEligibilityGate.php
+│   │   │   ├── MessageGate.php
 │   │   │   ├── MessageSuppressionService.php
 │   │   │   ├── PhoneNumberNormalizer.php
 │   │   │   └── Sms
@@ -178,7 +183,8 @@
 │       ├── Messaging
 │       │   └── EmailConsentRevocationLinkGenerator.php
 │       └── Webinars
-│           └── WebinarJoinLinkGenerator.php
+│           ├── WebinarJoinLinkGenerator.php
+│           └── WebinarRegisterPageConfig.php
 ├── artisan
 ├── bootstrap
 │   ├── app.php
@@ -186,7 +192,84 @@
 │   │   ├── packages.php
 │   │   └── services.php
 │   └── providers.php
-├── client -> ../leadflow-clients/slam-dunk-home-loans
+├── client
+│   ├── rob-the-mortgage-coach
+│   │   ├── config
+│   │   │   ├── brand.php
+│   │   │   ├── client.php
+│   │   │   ├── generated
+│   │   │   │   └── images.php
+│   │   │   ├── messaging
+│   │   │   │   └── emails
+│   │   │   │       └── webinars.php
+│   │   │   ├── theme.php
+│   │   │   └── webinars
+│   │   │       ├── content.php
+│   │   │       ├── index
+│   │   │       │   ├── content.php
+│   │   │       │   └── style.php
+│   │   │       ├── notify-me
+│   │   │       │   ├── content.php
+│   │   │       │   └── style.php
+│   │   │       ├── register
+│   │   │       │   ├── content.php
+│   │   │       │   └── style.php
+│   │   │       ├── style.php
+│   │   │       └── thank-you
+│   │   │           ├── content.php
+│   │   │           └── style.php
+│   │   ├── README.md
+│   │   └── resources
+│   │       └── views
+│   │           └── emails
+│   │               └── webinars
+│   └── slam-dunk-home-loans
+│       ├── client-project-tree.txt
+│       ├── config
+│       │   ├── brand.php
+│       │   ├── client.php
+│       │   ├── generated
+│       │   │   └── images.php
+│       │   ├── messaging
+│       │   │   └── emails
+│       │   │       └── webinars.php
+│       │   ├── theme.php
+│       │   └── webinars
+│       │       ├── content.php
+│       │       ├── index
+│       │       │   ├── content.php
+│       │       │   └── style.php
+│       │       ├── notify-me
+│       │       │   ├── content.php
+│       │       │   └── style.php
+│       │       ├── register
+│       │       │   ├── content.php
+│       │       │   ├── homebuyer-game-plan
+│       │       │   ├── style.php
+│       │       │   └── va-homebuyer-game-plan
+│       │       ├── style.php
+│       │       └── thank-you
+│       │           ├── content.php
+│       │           └── style.php
+│       ├── public
+│       │   └── images
+│       │       └── processed
+│       │           ├── instructor
+│       │           └── logo
+│       ├── README.md
+│       ├── resources
+│       │   ├── images
+│       │   │   ├── manifest.json
+│       │   │   └── raw
+│       │   │       ├── instructor.png
+│       │   │       └── logo.png
+│       │   └── views
+│       │       └── emails
+│       │           └── webinars
+│       └── scripts
+│           ├── build-image-manifest.php
+│           ├── process-images.sh
+│           └── upload-images.sh
 ├── composer.json
 ├── composer.lock
 ├── config
@@ -204,9 +287,14 @@
 │   ├── logging.php
 │   ├── mail.php
 │   ├── messaging
-│   │   ├── emails
+│   │   ├── email
 │   │   │   └── webinars.php
-│   │   └── emails.php
+│   │   ├── email.php
+│   │   ├── sms
+│   │   │   ├── marketing.php
+│   │   │   ├── opt-in.php
+│   │   │   └── webinars.php
+│   │   └── sms.php
 │   ├── messaging.php
 │   ├── queue.php
 │   ├── reminders.php
@@ -269,11 +357,9 @@
 ├── package.json
 ├── package-lock.json
 ├── phpunit.xml
-├── project-tree.txt
 ├── public
 │   ├── client -> ../../leadflow-clients/slam-dunk-home-loans/public
 │   ├── favicon.ico
-│   ├── hot
 │   ├── images
 │   │   └── processed
 │   │       ├── brand
@@ -388,6 +474,7 @@
 │   └── web.php
 ├── scripts
 │   ├── build-image-manifest.php
+│   ├── create-client.sh
 │   ├── process-images.sh
 │   └── upload-images.sh
 ├── tests
@@ -430,4 +517,4 @@
 │   └── Unit
 └── vite.config.js
 
-141 directories, 290 files
+181 directories, 337 files

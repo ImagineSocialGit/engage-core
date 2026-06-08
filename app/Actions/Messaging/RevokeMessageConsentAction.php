@@ -29,6 +29,7 @@ class RevokeMessageConsentAction
                 ->where('contact_id', $contact->getKey())
                 ->where('channel', $validated['channel'])
                 ->where('purpose', $validated['purpose'])
+                ->where('scope', $validated['scope'])
                 ->latest('consented_at')
                 ->first();
 
@@ -36,6 +37,7 @@ class RevokeMessageConsentAction
                 ->where('contact_id', $contact->getKey())
                 ->where('channel', $validated['channel'])
                 ->where('purpose', $validated['purpose'])
+                ->where('scope', $validated['scope'])
                 ->when($latestConsent, function ($query) use ($latestConsent) {
                     $query->where('revoked_at', '>=', $latestConsent->consented_at);
                 })
@@ -55,6 +57,7 @@ class RevokeMessageConsentAction
                     'message_consent_id' => $validated['message_consent_id'] ?? $latestConsent?->id,
                     'channel' => $validated['channel'],
                     'purpose' => $validated['purpose'],
+                    'scope' => $validated['scope'],
                     'reason' => $validated['reason'],
                     'revoked_at' => $revokedAt,
                     'source' => $validated['source'] ?? null,

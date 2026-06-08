@@ -13,6 +13,7 @@ class MessageConsentRules
         return [
             'channel' => ['required', 'string', Rule::in(MessageChannel::values())],
             'purpose' => ['required', 'string', Rule::in(MessagePurpose::values())],
+            'scope' => ['required', 'string', 'max:100'],
             'consented_at' => ['nullable', 'date'],
             'ip_address' => ['nullable', 'string', 'max:45'],
             'user_agent' => ['nullable', 'string'],

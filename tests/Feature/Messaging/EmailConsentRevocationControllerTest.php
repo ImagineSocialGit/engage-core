@@ -33,6 +33,7 @@ class EmailConsentRevocationControllerTest extends TestCase
             'message_consent_id' => $this->messageConsentId($contact, MessagePurpose::Transactional),
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Transactional->value,
+            'scope' => 'webinar',
             'reason' => ConsentRevocation::REASON_OPT_OUT,
             'source' => 'public_email_unsubscribe',
         ]);
@@ -51,6 +52,7 @@ class EmailConsentRevocationControllerTest extends TestCase
             'message_consent_id' => $this->messageConsentId($contact, MessagePurpose::Marketing),
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Marketing->value,
+            'scope' => 'general_drip',
             'reason' => ConsentRevocation::REASON_UNSUBSCRIBE,
             'source' => 'public_email_unsubscribe',
         ]);
@@ -109,11 +111,11 @@ class EmailConsentRevocationControllerTest extends TestCase
 
         $gate = app(MessageEligibilityGate::class);
 
-        $this->assertTrue($gate->canSend($contact, MessageChannel::Email, MessagePurpose::Marketing));
+        $this->assertTrue($gate->canSend($contact, MessageChannel::Email, MessagePurpose::Marketing, 'general_drip'));
 
         $this->get($this->signedUnsubscribeUrl($contact))->assertOk();
 
-        $this->assertFalse($gate->canSend($contact->refresh(), MessageChannel::Email, MessagePurpose::Marketing));
+        $this->assertFalse($gate->canSend($contact->refresh(), MessageChannel::Email, MessagePurpose::Marketing, 'general_drip'));
     }
 
     public function test_email_unsubscribe_does_not_revoke_transactional_email_consent(): void
@@ -143,6 +145,7 @@ class EmailConsentRevocationControllerTest extends TestCase
                 $contact->refresh(),
                 MessageChannel::Email,
                 MessagePurpose::Transactional,
+                'webinar',
             )
         );
     }
@@ -173,6 +176,9 @@ class EmailConsentRevocationControllerTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => MessageChannel::Email->value,
             'purpose' => $purpose->value,
+            'scope' => $purpose === MessagePurpose::Marketing
+            ? 'general_drip'
+            : 'webinar',
             'consented_at' => now(),
             'ip_address' => '127.0.0.1',
             'user_agent' => 'Feature Test',
@@ -187,6 +193,7 @@ class EmailConsentRevocationControllerTest extends TestCase
         return DB::table('message_consents')
             ->where('contact_id', $contact->id)
             ->where('channel', MessageChannel::Email->value)
+            ->where('scope', $purpose === MessagePurpose::Marketing ? 'general_drip' : 'webinar')
             ->where('purpose', $purpose->value)
             ->value('id');
     }

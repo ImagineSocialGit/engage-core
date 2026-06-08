@@ -2,9 +2,9 @@
 
 namespace App\Actions\Messaging;
 
+use App\Models\Contact;
 use App\Models\MessageConsent;
 use App\Rules\Messaging\MessageConsentRules;
-use App\Models\Contact;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -22,6 +22,7 @@ class GrantMessageConsentAction
                 'contact_id' => $contact->getKey(),
                 'channel' => $validated['channel'],
                 'purpose' => $validated['purpose'],
+                'scope' => $validated['scope'],
             ],
             [
                 'consented_at' => $validated['consented_at'] ?? now(),

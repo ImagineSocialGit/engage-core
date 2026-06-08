@@ -92,18 +92,25 @@ class CreateWebinarRegistrationAction
             'transactional_email_consent' => [
                 'channel' => MessageChannel::Email,
                 'purpose' => MessagePurpose::Transactional,
+                'scope' => 'webinar',
             ],
+
             'transactional_sms_consent' => [
                 'channel' => MessageChannel::Sms,
                 'purpose' => MessagePurpose::Transactional,
+                'scope' => 'webinar',
             ],
+
             'marketing_email_consent' => [
                 'channel' => MessageChannel::Email,
                 'purpose' => MessagePurpose::Marketing,
+                'scope' => 'general_drip',
             ],
+
             'marketing_sms_consent' => [
                 'channel' => MessageChannel::Sms,
                 'purpose' => MessagePurpose::Marketing,
+                'scope' => 'general_drip',
             ],
         ];
 
@@ -117,6 +124,7 @@ class CreateWebinarRegistrationAction
                     'contact_id' => $contact->id,
                     'channel' => $consent['channel']->value,
                     'purpose' => $consent['purpose']->value,
+                    'scope' => $consent['scope'],
                 ],
                 [
                     'consented_at' => $now,

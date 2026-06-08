@@ -27,6 +27,7 @@ class ConsentRevocationRules
             'message_consent_id' => ['nullable', 'integer', 'exists:message_consents,id'],
             'channel' => ['required', 'string', Rule::in(MessageChannel::values())],
             'purpose' => ['required', 'string', Rule::in(MessagePurpose::values())],
+            'scope' => ['required', 'string', 'max:100'],
             'reason' => ['required', 'string', Rule::in(ConsentRevocation::reasons())],
             'revoked_at' => ['nullable', 'date'],
             'source' => ['nullable', 'string', 'max:255'],

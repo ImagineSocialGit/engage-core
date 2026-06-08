@@ -5,15 +5,16 @@ namespace App\Actions\Webinars;
 use App\Actions\Messaging\DispatchMessageAction;
 use App\Data\WebinarMessageData;
 use App\Enums\MessageChannel;
-use App\Enums\MessagePurpose;
-use App\Messaging\Payloads\Webinars\Email\WebinarFollowUpEmailPayload;
-use App\Messaging\Payloads\Webinars\Sms\WebinarFollowUpSmsPayload;
 use App\Models\WebinarRegistration;
+use App\Services\Messaging\MessageDefinitionResolver;
 
 class DispatchWebinarOutcomeMessagesAction
 {
+    private const SCOPE = 'webinar';
+
     public function __construct(
         private readonly DispatchMessageAction $dispatchMessageAction,
+        private readonly MessageDefinitionResolver $messageDefinitionResolver,
     ) {}
 
     public function handle(WebinarRegistration $registration): void
@@ -24,82 +25,49 @@ class DispatchWebinarOutcomeMessagesAction
             return;
         }
 
-        if (data_get($registration->meta, 'post_webinar_routed_at')) {
-            return;
+        $followUpType = $registration->attended_at ? 'replay' : 'missed';
+        $payload = WebinarMessageData::fromRegistration($registration)->toArray();
+
+        foreach ([MessageChannel::Email, MessageChannel::Sms] as $channel) {
+            $definitions = $this->messageDefinitionResolver->resolve(
+                channel: $channel,
+                scope: self::SCOPE,
+                message: 'follow_up',
+                variant: $followUpType,
+            );
+
+            foreach ($definitions as $definition) {
+                $this->dispatchMessageAction->handle(
+                    contact: $registration->contact,
+                    channel: $channel->value,
+                    messageType: $definition['message_type'],
+                    purpose: $definition['purpose'],
+                    scope: $definition['scope'],
+                    payloadClass: $definition['payload_class'],
+                    payload: [
+                        ...$payload,
+                        'follow_up_type' => $followUpType,
+                        'message_type' => $definition['message_type'],
+                    ],
+                    sendAt: now(),
+                    context: $registration,
+                    dedupeKey: implode(':', [
+                        'scheduled-message',
+                        $registration->contact->getKey(),
+                        $registration->getMorphClass(),
+                        $registration->getKey(),
+                        $channel->value,
+                        $definition['scope'],
+                        $definition['message_type'],
+                    ]),
+                    meta: [
+                        'queue' => $definition['queue'] ?? null,
+                        'definition_config_path' => $definition['config_path'] ?? null,
+                        'message' => $definition['message'] ?? null,
+                        'variant' => $definition['variant'] ?? null,
+                    ],
+                );
+            }
         }
-
-        $followUpType = $registration->attended_at
-            ? 'replay'
-            : 'missed';
-
-        $this->dispatchFollowUpMessages($registration, $followUpType);
-
-        $meta = $registration->meta ?? [];
-        $meta['post_webinar_routed_at'] = now()->toIso8601String();
-
-        $registration->forceFill([
-            'meta' => $meta,
-        ])->save();
-    }
-
-    private function dispatchFollowUpMessages(WebinarRegistration $registration, string $followUpType): void
-    {
-        $payload = [
-            ...WebinarMessageData::fromRegistration($registration)->toArray(),
-            'follow_up_type' => $followUpType,
-        ];
-
-        $messageType = 'webinar_post_'.$followUpType;
-
-        $this->dispatchMessage(
-            registration: $registration,
-            channel: MessageChannel::Email->value,
-            messageType: $messageType,
-            payloadClass: WebinarFollowUpEmailPayload::class,
-            payload: $payload,
-        );
-
-        $this->dispatchMessage(
-            registration: $registration,
-            channel: MessageChannel::Sms->value,
-            messageType: $messageType,
-            payloadClass: WebinarFollowUpSmsPayload::class,
-            payload: $payload,
-        );
-    }
-
-    private function dispatchMessage(
-        WebinarRegistration $registration,
-        string $channel,
-        string $messageType,
-        string $payloadClass,
-        array $payload,
-    ): void {
-        $this->dispatchMessageAction->handle(
-            contact: $registration->contact,
-            channel: $channel,
-            messageType: $messageType,
-            purpose: MessagePurpose::Transactional->value,
-            payloadClass: $payloadClass,
-            payload: $payload,
-            sendAt: now(),
-            context: $registration,
-            dedupeKey: $this->dedupeKey($registration, $channel, $messageType),
-            meta: [
-                'queue' => config('webinars.queues.followups'),
-            ],
-        );
-    }
-
-    private function dedupeKey(WebinarRegistration $registration, string $channel, string $messageType): string
-    {
-        return implode(':', [
-            'scheduled-message',
-            $registration->contact->getKey(),
-            $registration->getMorphClass(),
-            $registration->getKey(),
-            $channel,
-            $messageType,
-        ]);
     }
 }

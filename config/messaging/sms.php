@@ -4,24 +4,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Cross-channel messaging behavior
+    | SMS messaging channel
     |--------------------------------------------------------------------------
+    |
+    | Messaging-level SMS behavior.
+    | Transport remains in config/sms.php.
+    |
     */
 
-    'recipient_models' => [
-        App\Models\Contact::class,
-    ],
-
     'consent' => [
-        'require_active_consent' => true,
+
+        'require_opt_in' => true,
+
     ],
 
     'suppression' => [
-        'enabled' => true,
-    ],
 
-    'scheduling' => [
-        'dedupe_enabled' => true,
+        'respect_stop_requests' => true,
+
     ],
 
 ];

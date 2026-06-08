@@ -12,25 +12,37 @@ return new class extends Migration
         Schema::create('scheduled_messages', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignIdFor(Contact::class)->constrained()->cascadeOnDelete();
+            $table->foreignIdFor(Contact::class)
+                ->constrained()
+                ->cascadeOnDelete();
+
             $table->nullableMorphs('context');
 
             $table->string('channel')->index();
             $table->string('message_type')->index();
+
             $table->string('purpose')->index();
+            $table->string('scope')->index();
 
             $table->string('payload_class');
             $table->json('payload');
 
             $table->timestamp('send_at')->index();
 
-            $table->string('status')->default('pending')->index();
+            $table->string('status')
+                ->default('pending')
+                ->index();
+
             $table->timestamp('sent_at')->nullable()->index();
             $table->timestamp('skipped_at')->nullable()->index();
             $table->timestamp('failed_at')->nullable()->index();
 
-            $table->string('dedupe_key')->nullable()->unique();
+            $table->string('dedupe_key')
+                ->nullable()
+                ->unique();
+
             $table->text('failure_reason')->nullable();
+
             $table->json('meta')->nullable();
 
             $table->timestamps();
@@ -38,7 +50,8 @@ return new class extends Migration
             $table->index([
                 'channel',
                 'purpose',
-            ], 'scheduled_messages_channel_purpose_index');
+                'scope',
+            ], 'scheduled_messages_channel_purpose_scope_index');
 
             $table->index([
                 'context_type',

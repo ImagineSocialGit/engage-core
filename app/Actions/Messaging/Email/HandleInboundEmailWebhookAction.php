@@ -125,6 +125,7 @@ class HandleInboundEmailWebhookAction
             $this->revokeMessageConsentAction->handle($contact, [
                 'channel' => MessageChannel::Email->value,
                 'purpose' => MessagePurpose::Marketing->value,
+                'scope' => 'general_drip',
                 'reason' => ConsentRevocation::REASON_PROVIDER_UNSUBSCRIBE,
                 'source' => "{$provider}_webhook",
                 'meta' => [

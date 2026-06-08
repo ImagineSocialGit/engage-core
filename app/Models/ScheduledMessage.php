@@ -15,6 +15,7 @@ class ScheduledMessage extends Model
         'channel',
         'message_type',
         'purpose',
+        'scope',
         'payload_class',
         'payload',
         'send_at',

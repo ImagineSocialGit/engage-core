@@ -28,6 +28,8 @@ class WebinarWaitlistSignupController extends Controller
         $request->merge([
             'transactional_email_consent' => $request->boolean('transactional_email_consent'),
             'transactional_sms_consent' => $request->boolean('transactional_sms_consent'),
+            'marketing_email_consent' => $request->boolean('marketing_email_consent'),
+            'marketing_sms_consent' => $request->boolean('marketing_sms_consent'),
         ]);
 
         $validator = Validator::make($request->all(), [
@@ -37,6 +39,8 @@ class WebinarWaitlistSignupController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
             'transactional_email_consent' => ['required', 'boolean'],
             'transactional_sms_consent' => ['required', 'boolean'],
+            'marketing_email_consent' => ['required', 'boolean'],
+            'marketing_sms_consent' => ['required', 'boolean'],
         ]);
 
         $validator->after(function ($validator) use ($request): void {
@@ -91,6 +95,7 @@ class WebinarWaitlistSignupController extends Controller
             $grantMessageConsentAction->handle($contact, [
                 'channel' => MessageChannel::Email->value,
                 'purpose' => MessagePurpose::Transactional->value,
+                'scope' => 'webinar_waitlist',
                 'consented_at' => now(),
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
@@ -102,6 +107,31 @@ class WebinarWaitlistSignupController extends Controller
             $grantMessageConsentAction->handle($contact, [
                 'channel' => MessageChannel::Sms->value,
                 'purpose' => MessagePurpose::Transactional->value,
+                'scope' => 'webinar_waitlist',
+                'consented_at' => now(),
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'source' => 'webinar_waitlist',
+            ]);
+        }
+
+        if ($validated['marketing_email_consent']) {
+            $grantMessageConsentAction->handle($contact, [
+                'channel' => MessageChannel::Email->value,
+                'purpose' => MessagePurpose::Marketing->value,
+                'scope' => 'general',
+                'consented_at' => now(),
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'source' => 'webinar_waitlist',
+            ]);
+        }
+
+        if ($validated['marketing_sms_consent'] && $phone) {
+            $grantMessageConsentAction->handle($contact, [
+                'channel' => MessageChannel::Sms->value,
+                'purpose' => MessagePurpose::Marketing->value,
+                'scope' => 'general',
                 'consented_at' => now(),
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),

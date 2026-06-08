@@ -52,7 +52,8 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
             'context_id' => $signup->id,
             'channel' => MessageChannel::Email->value,
             'message_type' => 'webinar_waitlist_scheduled',
-            'purpose' => MessagePurpose::Transactional->value,
+            'purpose' => MessagePurpose::Marketing->value,
+            'scope' => 'webinar_waitlist',
             'status' => 'pending',
         ]);
 
@@ -62,7 +63,8 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
             'context_id' => $signup->id,
             'channel' => MessageChannel::Sms->value,
             'message_type' => 'webinar_waitlist_scheduled',
-            'purpose' => MessagePurpose::Transactional->value,
+            'purpose' => MessagePurpose::Marketing->value,
+            'scope' => 'webinar_waitlist',
             'status' => 'pending',
         ]);
 
@@ -140,7 +142,8 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         DB::table('message_consents')->insert([
             'contact_id' => $contact->id,
             'channel' => $channel->value,
-            'purpose' => MessagePurpose::Transactional->value,
+            'purpose' => MessagePurpose::Marketing->value,
+            'scope' => 'webinar_waitlist',
             'consented_at' => now(),
             'ip_address' => '127.0.0.1',
             'user_agent' => 'PHPUnit',

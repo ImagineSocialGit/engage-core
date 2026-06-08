@@ -25,6 +25,7 @@ class MessageEligibilityGateTest extends TestCase
         MessageConsent::query()->create([
             'contact_id' => $contact->id,
             'channel' => MessageChannel::Email->value,
+            'scope' => 'webinar',
             'purpose' => MessagePurpose::Transactional->value,
             'consented_at' => now(),
             'source' => 'test',
@@ -40,9 +41,10 @@ class MessageEligibilityGateTest extends TestCase
 
         $this->assertFalse(
             app(MessageEligibilityGate::class)->canSend(
-                contact: $contact,
-                channel: MessageChannel::Email,
-                purpose: MessagePurpose::Transactional,
+                $contact,
+                MessageChannel::Email,
+                MessagePurpose::Transactional,
+                'webinar'
             )
         );
     }

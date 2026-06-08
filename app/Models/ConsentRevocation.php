@@ -21,6 +21,7 @@ class ConsentRevocation extends Model
         'message_consent_id',
         'channel',
         'purpose',
+        'scope',
         'reason',
         'revoked_at',
         'source',

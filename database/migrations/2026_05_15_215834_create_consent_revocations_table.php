@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Contact;
+use App\Models\MessageConsent;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -12,16 +13,20 @@ return new class extends Migration
         Schema::create('consent_revocations', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignIdFor(Contact::class)->constrained()->cascadeOnDelete();
+            $table->foreignIdFor(Contact::class)
+                ->constrained()
+                ->cascadeOnDelete();
 
-            $table->foreignId('message_consent_id')
+            $table->foreignIdFor(MessageConsent::class)
                 ->nullable()
                 ->constrained()
                 ->nullOnDelete();
 
             $table->string('channel');
             $table->string('purpose');
-            $table->string('reason');
+            $table->string('scope');
+
+            $table->string('reason')->nullable();
 
             $table->timestamp('revoked_at');
 
@@ -32,7 +37,20 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index(['channel', 'purpose']);
+            $table->index([
+                'contact_id',
+                'channel',
+                'purpose',
+                'scope',
+            ], 'consent_revocations_lookup_index');
+
+            $table->index([
+                'channel',
+                'purpose',
+                'scope',
+            ], 'consent_revocations_channel_purpose_scope_index');
+
+            $table->index('message_consent_id');
             $table->index('revoked_at');
         });
     }

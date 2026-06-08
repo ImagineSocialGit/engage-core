@@ -5,18 +5,17 @@ namespace App\Actions\Webinars;
 use App\Actions\Messaging\DispatchMessageAction;
 use App\Data\WebinarMessageData;
 use App\Enums\MessageChannel;
-use App\Enums\MessagePurpose;
-use App\Messaging\Payloads\Webinars\Email\WebinarConfirmationEmailPayload;
-use App\Messaging\Payloads\Webinars\Sms\WebinarConfirmationSmsPayload;
-use App\Messaging\Payloads\Webinars\Email\WebinarReminderEmailPayload;
-use App\Messaging\Payloads\Webinars\Sms\WebinarReminderSmsPayload;
 use App\Models\WebinarRegistration;
+use App\Services\Messaging\MessageDefinitionResolver;
 use Carbon\CarbonInterface;
 
 class DispatchWebinarRegistrationMessagesAction
 {
+    private const SCOPE = 'webinar';
+
     public function __construct(
         private readonly DispatchMessageAction $dispatchMessageAction,
+        private readonly MessageDefinitionResolver $messageDefinitionResolver,
     ) {}
 
     public function handle(WebinarRegistration $registration): void
@@ -29,7 +28,7 @@ class DispatchWebinarRegistrationMessagesAction
 
         $payload = WebinarMessageData::fromRegistration($registration)->toArray();
 
-        $this->dispatchConfirmationMessages($registration, $payload);
+        $this->dispatchImmediateMessages($registration, $payload);
 
         if (! $registration->webinar) {
             return;
@@ -38,126 +37,192 @@ class DispatchWebinarRegistrationMessagesAction
         $this->dispatchReminderMessages($registration, $payload);
     }
 
-    private function dispatchConfirmationMessages(WebinarRegistration $registration, array $payload): void
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function dispatchImmediateMessages(WebinarRegistration $registration, array $payload): void
     {
-        $this->dispatchMessage(
-            registration: $registration,
-            channel: MessageChannel::Email->value,
-            messageType: 'webinar_registration_confirmation',
-            payloadClass: WebinarConfirmationEmailPayload::class,
-            payload: $payload,
-            sendAt: now(),
-            queue: config('webinars.queues.confirmation_messages'),
-        );
+        foreach ([MessageChannel::Email, MessageChannel::Sms] as $channel) {
+            $this->dispatchDefinitions(
+                registration: $registration,
+                channel: $channel,
+                definitions: $this->messageDefinitionResolver->resolve(
+                    channel: $channel,
+                    scope: self::SCOPE,
+                    message: 'registration_confirmation',
+                ),
+                payload: $payload,
+                sendAt: now(),
+            );
 
-        $this->dispatchMessage(
-            registration: $registration,
-            channel: MessageChannel::Sms->value,
-            messageType: 'webinar_registration_confirmation',
-            payloadClass: WebinarConfirmationSmsPayload::class,
-            payload: $payload,
-            sendAt: now(),
-            queue: config('webinars.queues.confirmation_messages'),
-        );
+            if ($channel === MessageChannel::Sms) {
+                $this->dispatchSmsOptInMessages(
+                    registration: $registration,
+                    payload: $payload,
+                );
+            }
+        }
     }
 
+    /**
+     * @param  array<string, mixed>  $payload
+     */
     private function dispatchReminderMessages(WebinarRegistration $registration, array $payload): void
     {
-        $config = config('reminders.webinars', []);
-
-        if (! ($config['enabled'] ?? true)) {
-            return;
-        }
-
-        foreach ($config['schedule'] ?? [] as $reminderType) {
-            $offset = $config['reminder_offsets'][$reminderType] ?? null;
-
-            if ($offset === null) {
-                continue;
-            }
-
-            $sendAt = $registration->webinar->starts_at->copy()->subMinutes($offset);
-
-            if ($sendAt->isPast()) {
-                continue;
-            }
-
-            $messageType = $this->reminderMessageType($reminderType);
-
-            $reminderPayload = [
-                ...$payload,
-                'message_type' => $messageType,
-                'reminder_type' => $reminderType,
-            ];
-
-            $this->dispatchMessage(
-                registration: $registration,
-                channel: MessageChannel::Email->value,
-                messageType: $messageType,
-                payloadClass: WebinarReminderEmailPayload::class,
-                payload: $reminderPayload,
-                sendAt: $sendAt,
-                queue: config('webinars.queues.reminders'),
+        foreach ([MessageChannel::Email, MessageChannel::Sms] as $channel) {
+            $definitions = $this->messageDefinitionResolver->resolve(
+                channel: $channel,
+                scope: self::SCOPE,
+                message: 'reminders',
             );
 
-            $this->dispatchMessage(
+            foreach ($definitions as $definition) {
+                $offsetMinutes = $definition['offset_minutes_before_start'] ?? null;
+
+                if (! is_numeric($offsetMinutes)) {
+                    continue;
+                }
+
+                $sendAt = $registration->webinar->starts_at
+                    ->copy()
+                    ->subMinutes((int) $offsetMinutes);
+
+                if ($sendAt->isPast()) {
+                    continue;
+                }
+
+                $reminderPayload = [
+                    ...$payload,
+                    'message_type' => $definition['message_type'],
+                    'reminder_type' => $definition['variant'] ?? $definition['message_type'],
+                ];
+
+                $this->dispatchDefinition(
+                    registration: $registration,
+                    channel: $channel,
+                    definition: $definition,
+                    payload: $reminderPayload,
+                    sendAt: $sendAt,
+                );
+            }
+        }
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $definitions
+     * @param  array<string, mixed>  $payload
+     */
+    private function dispatchDefinitions(
+        WebinarRegistration $registration,
+        MessageChannel $channel,
+        array $definitions,
+        array $payload,
+        CarbonInterface $sendAt,
+    ): void {
+        foreach ($definitions as $definition) {
+            $this->dispatchDefinition(
                 registration: $registration,
-                channel: MessageChannel::Sms->value,
-                messageType: $messageType,
-                payloadClass: WebinarReminderSmsPayload::class,
-                payload: $reminderPayload,
+                channel: $channel,
+                definition: $definition,
+                payload: [
+                    ...$payload,
+                    'message_type' => $definition['message_type'],
+                ],
                 sendAt: $sendAt,
-                queue: config('webinars.queues.reminders'),
             );
         }
     }
 
-    private function dispatchMessage(
+    /**
+     * @param  array<string, mixed>  $definition
+     * @param  array<string, mixed>  $payload
+     */
+    private function dispatchDefinition(
         WebinarRegistration $registration,
-        string $channel,
-        string $messageType,
-        string $payloadClass,
+        MessageChannel $channel,
+        array $definition,
         array $payload,
         CarbonInterface $sendAt,
-        ?string $queue,
     ): void {
         $this->dispatchMessageAction->handle(
             contact: $registration->contact,
-            channel: $channel,
-            messageType: $messageType,
-            purpose: MessagePurpose::Transactional->value,
-            payloadClass: $payloadClass,
+            channel: $channel->value,
+            messageType: $definition['message_type'],
+            purpose: $definition['purpose'],
+            scope: $definition['scope'],
+            payloadClass: $definition['payload_class'],
             payload: $payload,
             sendAt: $sendAt,
             context: $registration,
-            dedupeKey: $this->dedupeKey($registration, $channel, $messageType),
+            dedupeKey: $this->dedupeKey(
+                registration: $registration,
+                channel: $channel->value,
+                scope: $definition['scope'],
+                messageType: $definition['message_type'],
+            ),
             meta: [
-                'queue' => $queue,
+                'queue' => $definition['queue'] ?? null,
+                'definition_config_path' => $definition['config_path'] ?? null,
+                'message' => $definition['message'] ?? null,
+                'variant' => $definition['variant'] ?? null,
             ],
         );
     }
 
-    private function reminderMessageType(string $reminderType): string
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function dispatchSmsOptInMessages(WebinarRegistration $registration, array $payload): void
     {
-        return match ($reminderType) {
-            '10_days' => 'reminder_10d',
-            '7_days' => 'reminder_7d',
-            '24_hours' => 'reminder_24h',
-            '30_minutes' => 'reminder_30m',
-            '10_minutes' => 'reminder_10m',
-            '5_minutes_after_start' => 'late_joiner_5m',
-            default => 'webinar_reminder_'.$reminderType,
-        };
+        $definitions = $this->messageDefinitionResolver->resolve(
+            channel: MessageChannel::Sms,
+            scope: self::SCOPE,
+            message: 'transactional_opt_in',
+        );
+
+        foreach ($definitions as $definition) {
+            $this->dispatchMessageAction->handle(
+                contact: $registration->contact,
+                channel: MessageChannel::Sms->value,
+                messageType: $definition['message_type'],
+                purpose: $definition['purpose'],
+                scope: $definition['scope'],
+                payloadClass: $definition['payload_class'],
+                payload: [
+                    ...$payload,
+                    'message_type' => $definition['message_type'],
+                ],
+                sendAt: now(),
+                context: $registration,
+                dedupeKey: implode(':', [
+                    'sms-opt-in',
+                    $registration->contact->getKey(),
+                    $definition['purpose'],
+                    $definition['scope'],
+                ]),
+                meta: [
+                    'queue' => $definition['queue'] ?? null,
+                    'definition_config_path' => $definition['config_path'] ?? null,
+                    'message' => $definition['message'] ?? null,
+                    'variant' => $definition['variant'] ?? null,
+                ],
+            );
+        }
     }
 
-    private function dedupeKey(WebinarRegistration $registration, string $channel, string $messageType): string
-    {
+    private function dedupeKey(
+        WebinarRegistration $registration,
+        string $channel,
+        string $scope,
+        string $messageType,
+    ): string {
         return implode(':', [
             'scheduled-message',
             $registration->contact->getKey(),
             $registration->getMorphClass(),
             $registration->getKey(),
             $channel,
+            $scope,
             $messageType,
         ]);
     }

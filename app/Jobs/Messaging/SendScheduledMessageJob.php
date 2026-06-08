@@ -47,12 +47,15 @@ class SendScheduledMessageJob implements ShouldQueue
             return;
         }
 
-        if (! $messageEligibilityGate->canSend(
+        if (! $messageEligibilityGate->allows(
             contact: $contact,
             channel: $scheduledMessage->channel,
             purpose: $scheduledMessage->purpose,
+            scope: $scheduledMessage->scope,
+            messageKey: $scheduledMessage->message_type,
+            definitionConfigPath: $scheduledMessage->meta['definition_config_path'] ?? null,
         )) {
-            $this->markSkipped($scheduledMessage, 'Contact is not eligible for this message.');
+            $scheduledMessage->markSkipped();
 
             return;
         }

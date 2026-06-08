@@ -126,6 +126,7 @@ class DispatchWebinarOutcomeMessagesActionTest extends TestCase
             ->where('channel', $channel)
             ->where('message_type', $messageType)
             ->where('purpose', MessagePurpose::Transactional->value)
+            ->where('scope', 'webinar')
             ->where('payload_class', $payloadClass)
             ->first();
 

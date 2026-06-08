@@ -75,9 +75,11 @@ class ConsentRevocationController extends Controller
             'source' => 'public_email_unsubscribe',
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
+            'scope' => $purpose === MessagePurpose::Marketing
+                ? 'general_drip'
+                : 'webinar',
             'meta' => [
                 'signed_url' => true,
-                'scope' => $purpose->value,
             ],
         ]);
     }

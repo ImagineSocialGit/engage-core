@@ -54,14 +54,36 @@ class HandleInboundSmsWebhookAction
             return;
         }
 
-        foreach ([MessagePurpose::Transactional, MessagePurpose::Marketing] as $purpose) {
+        $consents = $contact
+            ->messageConsents()
+            ->where('channel', MessageChannel::Sms->value)
+            ->get();
+
+        if ($consents->isEmpty()) {
+            $consents = collect([
+                (object) [
+                    'purpose' => MessagePurpose::Transactional->value,
+                    'scope' => 'webinar',
+                ],
+                (object) [
+                    'purpose' => MessagePurpose::Marketing->value,
+                    'scope' => 'general_drip',
+                ],
+            ]);
+        }
+
+        foreach ($consents as $consent) {
             $this->revokeMessageConsentAction->handle($contact, [
                 'channel' => MessageChannel::Sms->value,
-                'purpose' => $purpose->value,
+                'purpose' => $consent->purpose,
+                'scope' => $consent->scope,
+
                 'reason' => ConsentRevocation::REASON_STOP,
                 'source' => $payload->source,
+
                 'ip_address' => $payload->ipAddress,
                 'user_agent' => $payload->userAgent,
+
                 'meta' => [
                     'provider' => $payload->provider,
                     'provider_message_id' => $payload->providerMessageId,

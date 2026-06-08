@@ -4,52 +4,29 @@ namespace App\Actions\Webinars;
 
 use App\Actions\Messaging\DispatchMessageAction;
 use App\Enums\MessageChannel;
-use App\Enums\MessagePurpose;
-use App\Messaging\Payloads\Webinars\Email\WebinarWaitlistScheduledEmailPayload;
-use App\Messaging\Payloads\Webinars\Sms\WebinarWaitlistScheduledSmsPayload;
 use App\Models\Webinar;
 use App\Models\WebinarWaitlistSignup;
+use App\Services\Messaging\MessageDefinitionResolver;
 
 class DispatchWebinarWaitlistMessagesAction
 {
+    private const SCOPE = 'webinar_waitlist';
+
     public function __construct(
         private readonly DispatchMessageAction $dispatchMessageAction,
+        private readonly MessageDefinitionResolver $messageDefinitionResolver,
     ) {}
 
     public function handle(Webinar $webinar): void
     {
-        $webinar->loadMissing('webinarSeries');
-
         $signups = WebinarWaitlistSignup::query()
-            ->with('contact')
+            ->with(['contact', 'series'])
             ->where('webinar_series_id', $webinar->webinar_series_id)
             ->whereNull('notified_at')
             ->get();
 
         foreach ($signups as $signup) {
-            if (! $signup->contact) {
-                continue;
-            }
-
-            $payload = $this->payload($signup, $webinar);
-
-            $this->dispatchMessage(
-                signup: $signup,
-                webinar: $webinar,
-                channel: MessageChannel::Email->value,
-                messageType: 'webinar_waitlist_scheduled',
-                payloadClass: WebinarWaitlistScheduledEmailPayload::class,
-                payload: $payload,
-            );
-
-            $this->dispatchMessage(
-                signup: $signup,
-                webinar: $webinar,
-                channel: MessageChannel::Sms->value,
-                messageType: 'webinar_waitlist_scheduled',
-                payloadClass: WebinarWaitlistScheduledSmsPayload::class,
-                payload: $payload,
-            );
+            $this->dispatchForSignup($signup);
 
             $signup->forceFill([
                 'notified_at' => now(),
@@ -57,53 +34,62 @@ class DispatchWebinarWaitlistMessagesAction
         }
     }
 
-    private function payload(WebinarWaitlistSignup $signup, Webinar $webinar): array
+    private function dispatchForSignup(WebinarWaitlistSignup $signup): void
     {
-        return [
-            'signup_id' => $signup->id,
-            'webinar_id' => $webinar->id,
-            'email' => $signup->contact->email,
-            'phone' => $signup->contact->phone,
-            'webinar_title' => $webinar->webinarSeries?->title ?? 'Upcoming Webinar',
-            'registration_url' => route('webinar.show', $webinar->webinarSeries->slug),
-            'source_ip' => $signup->ip_address,
+        if (! $signup->contact) {
+            return;
+        }
+
+        $payload = [
+            'contact_id' => $signup->contact->id,
+            'contact_first_name' => $signup->contact->first_name ?? 'there',
+            'contact_last_name' => $signup->contact->last_name,
+            'contact_email' => $signup->contact->email,
+            'contact_phone' => $signup->contact->phone,
+            'webinar_series_id' => $signup->webinar_series_id,
+            'webinar_series_title' => $signup->series?->title,
+            'webinar_series_slug' => $signup->series?->slug,
+            'source_page' => $signup->source_page,
         ];
-    }
 
-    private function dispatchMessage(
-        WebinarWaitlistSignup $signup,
-        Webinar $webinar,
-        string $channel,
-        string $messageType,
-        string $payloadClass,
-        array $payload,
-    ): void {
-        $this->dispatchMessageAction->handle(
-            contact: $signup->contact,
-            channel: $channel,
-            messageType: $messageType,
-            purpose: MessagePurpose::Transactional->value,
-            payloadClass: $payloadClass,
-            payload: $payload,
-            sendAt: now(),
-            context: $signup,
-            dedupeKey: $this->dedupeKey($signup, $channel, $messageType),
-            meta: [
-                'queue' => config('webinars.queues.notifications'),
-                'webinar_id' => $webinar->id,
-            ],
-        );
-    }
+        foreach ([MessageChannel::Email, MessageChannel::Sms] as $channel) {
+            $definitions = $this->messageDefinitionResolver->resolve(
+                channel: $channel,
+                scope: self::SCOPE,
+                message: 'scheduled',
+            );
 
-    private function dedupeKey(WebinarWaitlistSignup $signup, string $channel, string $messageType): string
-    {
-        return implode(':', [
-            'scheduled-message',
-            $signup->contact->getKey(),
-            $signup->getMorphClass(),
-            $signup->getKey(),
-            $channel,
-            $messageType,
-        ]);
+            foreach ($definitions as $definition) {
+                $this->dispatchMessageAction->handle(
+                    contact: $signup->contact,
+                    channel: $channel->value,
+                    messageType: $definition['message_type'],
+                    purpose: $definition['purpose'],
+                    scope: $definition['scope'],
+                    payloadClass: $definition['payload_class'],
+                    payload: [
+                        ...$payload,
+                        'message_type' => $definition['message_type'],
+                    ],
+                    sendAt: now(),
+                    context: $signup,
+                    dedupeKey: implode(':', [
+                        'scheduled-message',
+                        $signup->contact->getKey(),
+                        $signup->getMorphClass(),
+                        $signup->getKey(),
+                        $channel->value,
+                        $definition['scope'],
+                        $definition['message_type'],
+                    ]),
+                    meta: [
+                        'queue' => $definition['queue'] ?? null,
+                        'definition_config_path' => $definition['config_path'] ?? null,
+                        'message' => $definition['message'] ?? null,
+                        'variant' => $definition['variant'] ?? null,
+                    ],
+                );
+            }
+        }
     }
 }

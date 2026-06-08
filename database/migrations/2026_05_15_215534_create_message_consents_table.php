@@ -16,6 +16,7 @@ return new class extends Migration
 
             $table->string('channel');
             $table->string('purpose');
+            $table->string('scope');
 
             $table->timestamp('consented_at');
 
@@ -27,11 +28,14 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique([
+                'contact_id',
                 'channel',
                 'purpose',
-            ], 'message_consents_channel_purpose_unique');
+                'scope',
+            ], 'message_consents_contact_channel_purpose_scope_unique');
 
-            $table->index(['channel', 'purpose']);
+            $table->index(['contact_id', 'channel', 'purpose', 'scope'], 'message_consents_lookup_index');
+            $table->index(['channel', 'purpose', 'scope'], 'message_consents_channel_purpose_scope_index');
             $table->index('consented_at');
         });
     }
