@@ -68,4 +68,18 @@ return [
         ],
     ],
 
+    'opt_in' => [
+        'enabled' => true,
+        'scope' => 'webinar',
+        'purpose' => 'transactional',
+        'message_type' => 'webinar_transactional_opt_in',
+        'payload_class' => App\Messaging\Payloads\Marketing\Email\MarketingEmailPayload::class,
+        'queue' => 'confirmation_messages',
+
+        'payload' => [
+            'subject' => 'You’re subscribed to webinar emails',
+            'body' => 'Thanks for subscribing to receive webinar-related emails. You can opt out of these messages using the link in any webinar email.',
+        ],
+    ],
+
 ];

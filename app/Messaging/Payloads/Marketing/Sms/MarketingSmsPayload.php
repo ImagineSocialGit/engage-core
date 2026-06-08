@@ -40,10 +40,7 @@ class MarketingSmsPayload implements SmsMessage
 
     public function message(): string
     {
-        $body = match ($this->messageType) {
-            'marketing_opt_in' => config('messaging.sms.opt-in.marketing.message'),
-            default => null,
-        };
+        $body = config("messaging.sms.general_drip.opt_in.payload.message");
 
         if (! is_string($body) || trim($body) === '') {
             throw new InvalidArgumentException("SMS message body is not configured for [{$this->messageType}].");
