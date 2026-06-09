@@ -4,24 +4,49 @@ namespace App\Support\Caching;
 
 class CacheKey
 {
+    private static function client(): string
+    {
+        return (string) config('client.key', 'default');
+    }
+
     public static function nextUpcomingWebinar(?string $seriesSlug = null): string
     {
-        return 'webinars:next-upcoming:' . ($seriesSlug ?: 'default');
+        return implode(':', [
+            'webinars',
+            self::client(),
+            'next-upcoming',
+            $seriesSlug ?: 'default',
+        ]);
     }
 
     public static function activeWebinarSeries(): string
     {
-        return 'webinars:active-series';
+        return implode(':', [
+            'webinars',
+            self::client(),
+            'active-series',
+        ]);
     }
 
     public static function publicPageConfig(string $page, ?string $seriesSlug = null): string
     {
-        return 'public-pages:' . $page . ':config:' . ($seriesSlug ?: 'default');
+        return implode(':', [
+            'public-pages',
+            self::client(),
+            $page,
+            'config',
+            $seriesSlug ?: 'default',
+        ]);
     }
 
     public static function webinarLandingPage(string $seriesSlug): string
     {
-        return 'public-pages:webinar-registration:response:' . $seriesSlug;
+        return implode(':', [
+            'webinar',
+            self::client(),
+            'landing-page',
+            $seriesSlug,
+        ]);
     }
 
     public static function zoomOAuthToken(string $accountKey = 'default'): string
@@ -29,13 +54,21 @@ class CacheKey
         return 'integrations:zoom:oauth-token:' . $accountKey;
     }
 
-    public static function externalApiResponse(string $provider, string $resource, string $identifier): string
-    {
+    public static function externalApiResponse(
+        string $provider,
+        string $resource,
+        string $identifier
+    ): string {
         return 'external-api:' . $provider . ':' . $resource . ':' . sha1($identifier);
     }
 
     public static function imageManifest(?string $namespace = null): string
     {
-        return 'assets:image-manifest:' . ($namespace ?: 'default');
+        return implode(':', [
+            'assets',
+            self::client(),
+            'image-manifest',
+            $namespace ?: 'default',
+        ]);
     }
 }
