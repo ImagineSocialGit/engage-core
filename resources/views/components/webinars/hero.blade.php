@@ -15,25 +15,28 @@
     <div class="{{ $style['hero']['inner'] ?? 'mx-auto grid w-full max-w-7xl gap-10 px-6 py-14 sm:py-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center' }}">
         <div class="{{ $style['hero']['wrapper'] ?? 'max-w-4xl text-left' }} {{ $style['hero']['align'] ?? 'text-left' }}">
             @if(filled($page['hero']['eyebrow'] ?? null))
-                <p class="{{ $tokens['eyebrow'] ?? 'text-sm font-semibold uppercase tracking-[0.2em]' }}">
+                <p class="{{ $style['hero']['eyebrow'] ?? ($tokens['eyebrow'] ?? 'text-sm font-semibold uppercase tracking-[0.2em]') }}">
                     {{ $page['hero']['eyebrow'] }}
                 </p>
             @endif
 
-            <h2 class="{{ $tokens['hero_title'] ?? 'text-4xl font-bold tracking-tight sm:text-5xl' }} {{ $style['hero']['title'] ?? 'mt-4 flex flex-col gap-4' }}">
-                <span>
+            <h2 class="{{ $tokens['hero_title'] ?? 'text-4xl font-bold tracking-tight sm:text-5xl' }} {{ $style['hero']['title'] ?? 'mt-4' }}">
+
+                <span class="block">
                     {{ $page['hero']['title'] ?? $page['hero']['title_prefix'] ?? 'Register for Webinar' }}
                 </span>
 
                 @if(filled($page['hero']['subtitle'] ?? null))
-                    <span class="text-3xl sm:text-4xl">
+                    <span class="{{ $style['hero']['subtitle'] ?? 'mt-2 block text-[0.92em] text-[#6f9fd9]' }}">
                         {{ $page['hero']['subtitle'] }}
                     </span>
+
                 @elseif(blank($page['hero']['title'] ?? null))
-                    <span>
+                    <span class="block">
                         {{ $series->title }}
                     </span>
                 @endif
+
             </h2>
 
             @if(filled($page['hero']['body'] ?? null))

@@ -51,7 +51,7 @@
                         @if($page['problem']['enabled'] ?? false)
                             <div class="{{ $style['problem']['content_wrapper'] ?? 'space-y-6' }}">
                                 @if(filled($page['problem']['eyebrow'] ?? null))
-                                    <p class="{{ $tokens['eyebrow'] ?? 'text-sm font-semibold uppercase tracking-[0.2em]' }}">
+                                    <p class="{{ $style['problem']['eyebrow'] ?? $tokens['eyebrow'] ?? 'text-sm font-semibold uppercase tracking-[0.2em]' }}">
                                         {{ $page['problem']['eyebrow'] }}
                                     </p>
                                 @endif
@@ -81,7 +81,9 @@
                                 @endforeach
 
                                 @if(filled($page['problem']['bullets'] ?? []))
-                                    <p class="text-2xl font-semibold">{{ $page['problem']['bullets']['intro']}}</p>
+                                    <p class="{{ $style['problem']['bullets_intro'] ?? 'text-2xl font-semibold' }}">
+                                        {{ $page['problem']['bullets']['intro'] }}
+                                    </p>
                                     <ul class="{{ $style['problem']['list'] ?? 'space-y-3' }}">
                                         @foreach($page['problem']['bullets']['list'] as $bullet)
                                             <li class="{{ $style['problem']['list_item'] ?? 'flex gap-3 text-base font-bold' }}">
@@ -116,7 +118,7 @@
 
                                 <div class="{{ $style['instructor']['content_wrapper'] ?? 'mt-8 space-y-4' }}">
                                     @if(filled($page['instructor']['eyebrow'] ?? null))
-                                        <p class="{{ $tokens['eyebrow'] ?? 'text-sm font-semibold uppercase tracking-[0.2em]' }}">
+                                        <p class="{{ $style['instructor']['eyebrow'] ?? $tokens['eyebrow'] ?? 'text-sm font-semibold uppercase tracking-[0.2em]' }}">
                                             {{ $page['instructor']['eyebrow'] }}
                                         </p>
                                     @endif
@@ -263,7 +265,9 @@
 
                         @if(filled($page['final_close']['bullets'] ?? []))
                         <div class="flex flex-col max-w-md mx-auto">
-                            <p class="text-2xl font-semibold text-primary mt-6 mb-2">{{ $page['final_close']['bullets']['intro']}}</p>
+                            <p class="{{ $style['final_close']['bullets_intro'] ?? 'text-2xl font-semibold text-primary mt-6 mb-2' }}">
+                                {{ $page['final_close']['bullets']['intro'] }}
+                            </p>
                             <ul class="{{ $style['final_close']['list'] ?? 'space-y-3 ml-12' }}">
                                 @foreach($page['final_close']['bullets']['list'] as $bullet)
                                     <li class="{{ $style['final_close']['list_item'] ?? 'ml-4 flex gap-3 text-base font-bold' }}">
@@ -276,13 +280,13 @@
                         @endif
 
                         @if(filled($page['final_close']['body'] ?? null))
-                            <p class="mt-8 text-lg leading-8 text-ink">
+                            <p class="{{ $style['final_close']['body'] ?? 'mt-8 text-lg leading-8 text-ink' }}">
                                 {{ $page['final_close']['body'] }}
                             </p>
                         @endif
 
                         @if(filled($page['final_close']['closing_copy'] ?? null))
-                            <p class="text-lg leading-8 text-ink">
+                            <p class="{{ $style['final_close']['closing_copy'] ?? 'text-lg leading-8 text-ink' }}">
                                 {{ $page['final_close']['closing_copy'] }}
                             </p>
                         @endif
