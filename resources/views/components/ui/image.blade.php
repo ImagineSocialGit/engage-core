@@ -13,11 +13,17 @@
         'placeholder' => "{$path}/placeholder.webp",
     ];
 
-    $imagePath = $image['path'];
+    $imagePath = trim($image['path'], '/');
     $widths = $image['sizes'] ?? [320, 640, 960, 1280, 1600];
 
     $cdn = rtrim(config('filesystems.disks.spaces.url'), '/');
-    $base = "{$cdn}/images/{$imagePath}";
+    $clientKey = trim((string) config('app.client_key', env('CLIENT_KEY')), '/');
+
+    if ($clientKey === '') {
+        throw new RuntimeException('CLIENT_KEY is not configured.');
+    }
+
+    $base = "{$cdn}/{$clientKey}/images/{$imagePath}";
 
     $avifSrcset = collect($widths)
         ->map(fn ($width) => "{$base}/{$width}.avif {$width}w")
@@ -31,7 +37,8 @@
         ? 960
         : collect($widths)->max();
 
-    $placeholderUrl = "{$cdn}/images/" . ($image['placeholder'] ?? "{$imagePath}/placeholder.webp");
+    $placeholderPath = trim($image['placeholder'] ?? "{$imagePath}/placeholder.webp", '/');
+    $placeholderUrl = "{$cdn}/{$clientKey}/images/{$placeholderPath}";
 @endphp
 
 <div

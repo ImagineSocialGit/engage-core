@@ -10,7 +10,7 @@ return [
         'purpose' => 'marketing',
         'message_type' => 'general_drip_opt_in',
         'payload_class' => MarketingEmailPayload::class,
-        'queue' => 'confirmation_messages',
+        'queue' => 'opt_in_messages',
 
         'payload' => [
             'subject' => 'You’re subscribed',

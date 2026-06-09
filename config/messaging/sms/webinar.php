@@ -20,7 +20,7 @@ return [
         'message_type' => 'webinar_transactional_opt_in',
         'purpose' => 'transactional',
         'payload_class' => WebinarTransactionalSmsPayload::class,
-        'queue' => 'confirmation_messages',
+        'queue' => 'opt_in_messages',
         'message' => 'Thanks for subscribing to receive webinar-related messages! Reply HELP for help. Message frequency may vary. Msg&data rates may apply. Reply STOP to opt out.',
     ],
 

@@ -74,7 +74,7 @@ return [
         'purpose' => 'transactional',
         'message_type' => 'webinar_transactional_opt_in',
         'payload_class' => App\Messaging\Payloads\Marketing\Email\MarketingEmailPayload::class,
-        'queue' => 'confirmation_messages',
+        'queue' => 'opt_in_messages',
 
         'payload' => [
             'subject' => 'You’re subscribed to webinar emails',

@@ -38,7 +38,7 @@ return [
             'bucket' => env('DO_SPACES_BUCKET'),
             'endpoint' => env('DO_SPACES_ENDPOINT'),
 
-            'url' => env('CDN_URL', env('DO_SPACES_ENDPOINT')),
+            'url' => env('CDN_BASE_URL', env('DO_SPACES_ENDPOINT')),
 
             'use_path_style_endpoint' => false,
         ],
