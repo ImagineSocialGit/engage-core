@@ -11,6 +11,7 @@ class WebinarTransactionalSmsPayload implements SmsMessage
     public function __construct(
         public WebinarMessageData $data,
         public string $messageType,
+        public ?string $body = null,
     ) {}
 
     public static function fromArray(array $payload): self
@@ -24,6 +25,9 @@ class WebinarTransactionalSmsPayload implements SmsMessage
         return new self(
             data: WebinarMessageData::fromArray($payload),
             messageType: $messageType,
+            body: is_string($payload['body'] ?? null)
+                ? $payload['body']
+                : (is_string($payload['message_body'] ?? null) ? $payload['message_body'] : null),
         );
     }
 
@@ -35,7 +39,11 @@ class WebinarTransactionalSmsPayload implements SmsMessage
     public function message(): string
     {
         $body = match ($this->messageType) {
-            'webinar_transactional_opt_in' => config('messaging.sms.opt-in.webinar_transactional.message'),
+            'webinar_transactional_opt_in' => $this->body
+                ?? config('messaging.sms.webinar.transactional_opt_in.message')
+                ?? config('messaging.sms.webinar.opt_in.message')
+                ?? config('messaging.sms.opt-in.webinar_transactional.message'),
+
             default => null,
         };
 

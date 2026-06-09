@@ -3,6 +3,7 @@
 namespace App\Messaging\Payloads\Marketing\Email;
 
 use App\Contracts\Messaging\Email\EmailMessage;
+use Illuminate\Mail\Mailable;
 use InvalidArgumentException;
 
 class MarketingEmailPayload implements EmailMessage
@@ -20,7 +21,7 @@ class MarketingEmailPayload implements EmailMessage
         $to = $payload['to'] ?? $payload['email'] ?? $payload['contact_email'] ?? null;
         $messageType = $payload['message_type'] ?? null;
         $subject = $payload['subject'] ?? null;
-        $body = $payload['body'] ?? $payload['message'] ?? null;
+        $body = $payload['body'] ?? $payload['message_body'] ?? null;
 
         if (! is_string($to) || trim($to) === '') {
             throw new InvalidArgumentException('Marketing email payload requires a destination email address.');
@@ -39,10 +40,10 @@ class MarketingEmailPayload implements EmailMessage
         }
 
         return new self(
-            to: $to,
+            to: trim($to),
             subject: trim($subject),
             body: trim($body),
-            messageType: $messageType,
+            messageType: trim($messageType),
             sourceIp: $payload['source_ip'] ?? $payload['request_ip'] ?? null,
         );
     }
@@ -50,6 +51,23 @@ class MarketingEmailPayload implements EmailMessage
     public function to(): string
     {
         return $this->to;
+    }
+
+    public function mailable(): Mailable
+    {
+        return new class($this->subject(), $this->html()) extends Mailable {
+            public function __construct(
+                private readonly string $emailSubject,
+                private readonly string $htmlBody,
+            ) {}
+
+            public function build(): self
+            {
+                return $this
+                    ->subject($this->emailSubject)
+                    ->html($this->htmlBody);
+            }
+        };
     }
 
     public function subject(): string
