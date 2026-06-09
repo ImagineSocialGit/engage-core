@@ -157,7 +157,7 @@ return [
 
         'cta' => '
             inline-flex min-h-14 items-center justify-center rounded-full
-            bg-primary px-8 text-base font-extrabold uppercase
+            bg-primary px-8 text-base text-balance font-extrabold uppercase
             tracking-[0.16em] text-white transition hover:scale-[1.02]
             animate-pulse motion-safe:animate-pulse cursor-pointer
         ',
