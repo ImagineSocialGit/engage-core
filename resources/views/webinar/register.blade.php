@@ -93,6 +93,25 @@
                                         @endforeach
                                     </ul>
                                 @endif
+
+                                @foreach(($page['problem']['post_body'] ?? []) as $paragraph)
+                                <p class="{{ $style['problem']['paragraph'] ?? 'text-lg leading-8 text-ink' }}">
+                                    @if(is_array($paragraph))
+                                        @foreach($paragraph as $part)
+                                            @if($part['emphasis'] ?? false)
+                                                <strong class="{{ $style['problem']['paragraph_emphasis'] ?? 'font-black text-primary' }}">
+                                                    {{ $part['text'] ?? '' }}
+                                                </strong>
+                                            @else
+                                                <span>{{ $part['text'] ?? '' }}</span>
+                                            @endif
+                                        @endforeach
+                                    @else
+                                        {{ $paragraph }}
+                                    @endif
+                                </p>
+                                @endforeach
+
                             </div>
                         @endif
 
@@ -127,6 +146,11 @@
                                         <h2 class="{{ $tokens['section_title'] ?? 'text-3xl font-bold tracking-tight' }}">
                                             {{ $page['instructor']['heading'] }}
                                         </h2>
+                                        @if(filled($page['instructor']['subheading'] ?? null))
+                                            <h3 class="{{ $style['instructor']['eyebrow'] ?? $tokens['eyebrow'] ?? 'text-3xl font-bold tracking-tight' }}">
+                                                {{ $page['instructor']['subheading'] }}
+                                            </h3>
+                                        @endif
                                     @endif
 
                                     @foreach(($page['instructor']['body'] ?? []) as $paragraph)
