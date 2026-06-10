@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Public;
 
-use App\Actions\Messaging\DispatchOptInMessageAction;
 use App\Actions\Messaging\GrantMessageConsentAction;
 use App\Actions\Webinars\GetActiveWebinarSeriesAction;
 use App\Enums\MessageChannel;
@@ -20,7 +19,6 @@ class WebinarWaitlistSignupController extends Controller
         Request $request,
         string $seriesSlug,
         GrantMessageConsentAction $grantMessageConsentAction,
-        DispatchOptInMessageAction $dispatchOptInMessageAction,
     ): RedirectResponse {
         $series = app(GetActiveWebinarSeriesAction::class)
             ->findBySlug($seriesSlug);
@@ -90,45 +88,45 @@ class WebinarWaitlistSignupController extends Controller
         );
 
         if ($validated['marketing_email_consent']) {
-            $grantMessageConsentAction->handle($contact, [
-                'channel' => MessageChannel::Email->value,
-                'purpose' => MessagePurpose::Marketing->value,
-                'scope' => 'webinar_waitlist',
-                'consented_at' => now(),
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'source' => 'webinar_waitlist',
-            ]);
-
-            $dispatchOptInMessageAction->handle(
-                contact: $contact,
-                channel: MessageChannel::Email,
-                scope: 'webinar_waitlist',
-                payload: [
+            $grantMessageConsentAction->handle(
+                $contact,
+                [
+                    'channel' => MessageChannel::Email->value,
+                    'purpose' => MessagePurpose::Marketing->value,
+                    'scope' => 'webinar_waitlist',
+                    'consented_at' => now(),
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                    'source' => 'webinar_waitlist',
+                ],
+                optInPayload: [
                     'series_slug' => $series->slug,
                     'series_title' => $series->title,
+                ],
+                resolverContext: [
+                    'series_slug' => $series->slug,
                 ],
             );
         }
 
         if ($validated['marketing_sms_consent'] && $phone) {
-            $grantMessageConsentAction->handle($contact, [
-                'channel' => MessageChannel::Sms->value,
-                'purpose' => MessagePurpose::Marketing->value,
-                'scope' => 'webinar_waitlist',
-                'consented_at' => now(),
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'source' => 'webinar_waitlist',
-            ]);
-
-            $dispatchOptInMessageAction->handle(
-                contact: $contact,
-                channel: MessageChannel::Sms,
-                scope: 'webinar_waitlist',
-                payload: [
+            $grantMessageConsentAction->handle(
+                $contact,
+                [
+                    'channel' => MessageChannel::Sms->value,
+                    'purpose' => MessagePurpose::Marketing->value,
+                    'scope' => 'webinar_waitlist',
+                    'consented_at' => now(),
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                    'source' => 'webinar_waitlist',
+                ],
+                optInPayload: [
                     'series_slug' => $series->slug,
                     'series_title' => $series->title,
+                ],
+                resolverContext: [
+                    'series_slug' => $series->slug,
                 ],
             );
         }

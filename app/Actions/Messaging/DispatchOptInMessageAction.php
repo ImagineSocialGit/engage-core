@@ -3,6 +3,7 @@
 namespace App\Actions\Messaging;
 
 use App\Enums\MessageChannel;
+use App\Enums\MessagePurpose;
 use App\Models\Contact;
 use App\Services\Messaging\MessageDefinitionResolver;
 use Illuminate\Database\Eloquent\Model;
@@ -21,6 +22,7 @@ class DispatchOptInMessageAction
     public function handle(
         Contact $contact,
         MessageChannel|string $channel,
+        MessagePurpose|string $purpose,
         string $scope,
         array $payload = [],
         ?Model $context = null,
@@ -30,6 +32,10 @@ class DispatchOptInMessageAction
             ? $channel->value
             : strtolower(trim($channel));
 
+        $purposeValue = $purpose instanceof MessagePurpose
+            ? $purpose->value
+            : strtolower(trim($purpose));
+
         $definitions = $this->messageDefinitionResolver->resolve(
             channel: $channelValue,
             scope: $scope,
@@ -38,6 +44,10 @@ class DispatchOptInMessageAction
         );
 
         foreach ($definitions as $definition) {
+            if (($definition['purpose'] ?? null) !== $purposeValue) {
+                continue;
+            }
+
             $this->dispatchMessageAction->handle(
                 contact: $contact,
                 channel: $channelValue,
@@ -67,7 +77,7 @@ class DispatchOptInMessageAction
                     'opt-in',
                     $contact->getKey(),
                     $channelValue,
-                    $definition['purpose'],
+                    $purposeValue,
                     $definition['scope'],
                 ]),
                 meta: [

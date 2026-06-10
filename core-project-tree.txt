@@ -202,6 +202,7 @@
 │   └── providers.php
 ├── client
 │   ├── rob-the-mortgage-coach
+│   │   ├── client-project-tree.txt
 │   │   ├── config
 │   │   │   ├── brand.php
 │   │   │   ├── client.php
@@ -522,4 +523,4 @@
 │   └── Unit
 └── vite.config.js
 
-183 directories, 340 files
+183 directories, 341 files

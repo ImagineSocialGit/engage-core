@@ -2,7 +2,6 @@
 
 namespace App\Actions\Webinars;
 
-use App\Actions\Messaging\DispatchOptInMessageAction;
 use App\Actions\Messaging\GrantMessageConsentAction;
 use App\Enums\MessageChannel;
 use App\Enums\MessagePurpose;
@@ -20,7 +19,6 @@ class CreateWebinarRegistrationAction
         private readonly AddRegistrantToWebinarProviderAction $addRegistrantToWebinarProviderAction,
         private readonly DispatchWebinarRegistrationMessagesAction $dispatchWebinarRegistrationMessagesAction,
         private readonly GrantMessageConsentAction $grantMessageConsentAction,
-        private readonly DispatchOptInMessageAction $dispatchOptInMessageAction,
     ) {}
 
     public function handle(array $validated, Request $request, string $webinarSlug = 'default'): WebinarRegistration
@@ -138,14 +136,8 @@ class CreateWebinarRegistrationAction
                         'webinar_id' => $registration->webinar_id,
                         'webinar_slug' => $registration->webinar_slug,
                     ],
-                ]
-            );
-
-            $this->dispatchOptInMessageAction->handle(
-                contact: $contact,
-                channel: $consent['channel'],
-                scope: $consent['scope'],
-                payload: [
+                ],
+                optInPayload: [
                     'webinar_registration_id' => $registration->id,
                     'webinar_id' => $registration->webinar_id,
                     'webinar_slug' => $registration->webinar_slug,
