@@ -111,12 +111,6 @@
 │   │   └── Webinars
 │   │       ├── NotifyWebinarWaitlistJob.php
 │   │       └── RoutePostWebinarRegistrationJob.php
-│   ├── Mail
-│   │   └── Webinars
-│   │       ├── WebinarPostFollowUpMail.php
-│   │       ├── WebinarRegistrationConfirmationMail.php
-│   │       ├── WebinarReminderMail.php
-│   │       └── WebinarWaitlistScheduledMail.php
 │   ├── Messaging
 │   │   └── Payloads
 │   │       ├── EmailPayload.php
@@ -327,8 +321,10 @@
 │   ├── database.sqlite
 │   ├── factories
 │   │   ├── ContactFactory.php
+│   │   ├── ScheduledMessageFactory.php
 │   │   ├── UserFactory.php
 │   │   ├── WebinarFactory.php
+│   │   ├── WebinarRegistrationFactory.php
 │   │   ├── WebinarSeriesFactory.php
 │   │   └── WebinarWaitlistSignupFactory.php
 │   ├── migrations
@@ -439,12 +435,6 @@
 │       │   └── webinars
 │       │       └── index.blade.php
 │       ├── email.blade.php
-│       ├── emails
-│       │   └── webinars
-│       │       ├── post-follow-up.blade.php
-│       │       ├── registration-confirmation.blade.php
-│       │       ├── reminder.blade.php
-│       │       └── waitlist-scheduled.blade.php
 │       ├── messaging
 │       │   ├── transactional-opt-out-already-confirmed.blade.php
 │       │   ├── transactional-opt-out-confirmed.blade.php
@@ -484,14 +474,19 @@
 │   │   │       └── Sms
 │   │   │           └── Telnyx
 │   │   ├── Messaging
-│   │   │   ├── Email
-│   │   │   │   └── EmailMessagingServiceTest.php
-│   │   │   ├── EmailConsentRevocationControllerTest.php
+│   │   │   ├── ConsentRevocationControllerTest.php
+│   │   │   ├── DispatchMessageActionTest.php
+│   │   │   ├── EmailMessagingServiceTest.php
+│   │   │   ├── EmailPayloadTest.php
+│   │   │   ├── GrantMessageConsentActionTest.php
+│   │   │   ├── MessageConditionCheckerTest.php
+│   │   │   ├── MessageDefinitionResolverTest.php
 │   │   │   ├── MessageEligibilityGateTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
+│   │   │   ├── SendScheduledMessageJobTest.php
 │   │   │   ├── SmsMessagingServiceTest.php
-│   │   │   ├── SmsSendGuardTest.php
-│   │   │   └── WebinarEmailRenderingTest.php
+│   │   │   ├── SmsPayloadTest.php
+│   │   │   └── SmsSendGuardTest.php
 │   │   ├── tests
 │   │   │   └── Feature
 │   │   │       └── Webinars
@@ -502,9 +497,10 @@
 │   │   │   ├── SmsWebhookControllerTest.php
 │   │   │   └── ZoomWebhookTest.php
 │   │   └── Webinars
+│   │       ├── CreateWebinarRegistrationActionTest.php
 │   │       ├── DispatchWebinarRegistrationMessagesActionTest.php
 │   │       └── DispatchWebinarWaitlistMessagesActionTest.php
 │   └── TestCase.php
 └── vite.config.js
 
-177 directories, 331 files
+172 directories, 332 files

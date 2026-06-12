@@ -12,7 +12,7 @@ return [
 
         'payload' => [
             'subject' => 'You’re subscribed',
-            'body' => 'Thanks for subscribing to receive updates. You can unsubscribe at any time.',
+            'body' => 'Thanks for subscribing to receive marketing messages! You can unsubscribe at any time.',
         ],
     ],
 
