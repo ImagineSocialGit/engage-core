@@ -147,14 +147,14 @@ class EmailPayload implements EmailMessage
         return new class($this->subject(), $this->html()) extends Mailable {
             public function __construct(
                 private readonly string $subjectLine,
-                private readonly string $html,
+                private readonly string $htmlBody,
             ) {}
 
             public function build(): self
             {
                 return $this
                     ->subject($this->subjectLine)
-                    ->html($this->html);
+                    ->html($this->htmlBody);
             }
         };
     }
