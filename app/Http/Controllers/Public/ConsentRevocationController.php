@@ -18,7 +18,6 @@ class ConsentRevocationController extends Controller
         Contact $contact,
         RevokeMessageConsentAction $revokeMessageConsentAction
     ): View {
-
         if (! $request->hasValidSignature()) {
             return view('messaging.unsubscribe-invalid');
         }
@@ -26,8 +25,9 @@ class ConsentRevocationController extends Controller
         $result = $this->revokeEmailConsent(
             request: $request,
             contact: $contact,
-            reason: ConsentRevocation::REASON_UNSUBSCRIBE,
             purpose: MessagePurpose::Marketing,
+            reason: ConsentRevocation::REASON_UNSUBSCRIBE,
+            scope: null,
             revokeMessageConsentAction: $revokeMessageConsentAction,
         );
 
@@ -42,8 +42,13 @@ class ConsentRevocationController extends Controller
         Contact $contact,
         RevokeMessageConsentAction $revokeMessageConsentAction
     ): View {
-
         if (! $request->hasValidSignature()) {
+            return view('messaging.transactional-opt-out-invalid');
+        }
+
+        $scope = trim((string) $request->query('scope', ''));
+
+        if ($scope === '') {
             return view('messaging.transactional-opt-out-invalid');
         }
 
@@ -52,6 +57,7 @@ class ConsentRevocationController extends Controller
             contact: $contact,
             purpose: MessagePurpose::Transactional,
             reason: ConsentRevocation::REASON_OPT_OUT,
+            scope: $scope,
             revokeMessageConsentAction: $revokeMessageConsentAction,
         );
 
@@ -66,17 +72,17 @@ class ConsentRevocationController extends Controller
         Contact $contact,
         MessagePurpose $purpose,
         string $reason,
-        string $scope,
+        ?string $scope,
         RevokeMessageConsentAction $revokeMessageConsentAction
     ): array {
         return $revokeMessageConsentAction->handle($contact, [
             'channel' => MessageChannel::Email->value,
             'purpose' => $purpose->value,
+            'scope' => $scope,
             'reason' => $reason,
             'source' => 'public_email_unsubscribe',
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
-            'scope' => $scope,
             'meta' => [
                 'signed_url' => true,
             ],

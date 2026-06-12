@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature\Messaging\Email;
+namespace Tests\Feature\Messaging;
 
 use App\Contracts\Messaging\Email\EmailMessage;
 use App\Integrations\Messaging\Email\Resend\ResendEmailProvider;

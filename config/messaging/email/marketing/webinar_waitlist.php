@@ -5,6 +5,7 @@ use App\Messaging\Payloads\EmailPayload;
 return [
 
     'webinar_waitlist_scheduled' => [
+        'dispatch_key' => 'webinar_added',
         'timing' => 'immediate',
         'payload_class' => EmailPayload::class,
         'queue' => 'notifications',
@@ -16,6 +17,7 @@ return [
     ],
 
     'webinar_waitlist_opt_in' => [
+        'dispatch_key' => 'consent_granted',
         'timing' => 'immediate',
         'payload_class' => EmailPayload::class,
         'queue' => 'opt_in_messages',

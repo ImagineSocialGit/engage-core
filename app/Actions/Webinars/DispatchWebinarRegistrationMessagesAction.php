@@ -21,7 +21,7 @@ class DispatchWebinarRegistrationMessagesAction
         $registration->loadMissing([
             'contact',
             'webinar',
-            'webinar.series',
+            'webinar.webinarSeries',
         ]);
 
         if (! $registration->contact) {
@@ -43,7 +43,7 @@ class DispatchWebinarRegistrationMessagesAction
                         'contact' => $registration->contact->toArray(),
                         'webinar_registration' => $registration->toArray(),
                         'webinar' => $registration->webinar?->toArray() ?? [],
-                        'webinar_series' => $registration->webinar?->series?->toArray() ?? [],
+                        'webinar_series' => $registration->webinar?->webinarSeries?->toArray() ?? [],
                     ],
                 ],
                 context: $registration,

@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\URL;
 
 class EmailConsentRevocationLinkGenerator
 {
-    public function marketingUnsubscribeUrl(Contact $contact, string $scope): string
+    public function marketingUnsubscribeUrl(Contact $contact): string
     {
         return URL::temporarySignedRoute(
             name: 'messaging.email.unsubscribe',
@@ -16,7 +16,6 @@ class EmailConsentRevocationLinkGenerator
             ),
             parameters: [
                 'contact' => $contact,
-                'scope' => $scope,
             ],
         );
     }

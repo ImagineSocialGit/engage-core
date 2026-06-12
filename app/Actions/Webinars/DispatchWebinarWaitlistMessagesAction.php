@@ -19,10 +19,10 @@ class DispatchWebinarWaitlistMessagesAction
 
     public function handle(Webinar $webinar): void
     {
-        $webinar->loadMissing('series');
+        $webinar->loadMissing('webinarSeries');
 
         $signups = WebinarWaitlistSignup::query()
-            ->with(['contact', 'series'])
+            ->with(['contact', 'webinarSeries'])
             ->where('webinar_series_id', $webinar->webinar_series_id)
             ->whereNull('notified_at')
             ->get();

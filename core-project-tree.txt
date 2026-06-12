@@ -265,7 +265,6 @@
 │           ├── build-image-manifest.php
 │           ├── process-images.sh
 │           └── upload-images.sh
-├── client-project-tree.txt
 ├── composer.json
 ├── composer.lock
 ├── config
@@ -480,12 +479,6 @@
 │   │   │   └── WebinarSyncTest.php
 │   │   ├── Email
 │   │   │   └── HandleInboundEmailWebhookActionTest.php
-│   │   ├── Feature
-│   │   │   ├── Public
-│   │   │   ├── Webhooks
-│   │   │   │   └── SmsWebhookControllerTest.php
-│   │   │   └── Webinars
-│   │   │       └── DispatchWebinarWaitlistMessagesActionTest.php
 │   │   ├── Integrations
 │   │   │   └── Messaging
 │   │   │       └── Sms
@@ -506,11 +499,12 @@
 │   │   ├── Webhooks
 │   │   │   ├── DispatchWebinarOutcomeMessagesActionTest.php
 │   │   │   ├── EmailWebhookControllerTest.php
+│   │   │   ├── SmsWebhookControllerTest.php
 │   │   │   └── ZoomWebhookTest.php
 │   │   └── Webinars
-│   │       └── DispatchWebinarRegistrationMessagesActionTest.php
-│   ├── TestCase.php
-│   └── Unit
+│   │       ├── DispatchWebinarRegistrationMessagesActionTest.php
+│   │       └── DispatchWebinarWaitlistMessagesActionTest.php
+│   └── TestCase.php
 └── vite.config.js
 
-182 directories, 332 files
+177 directories, 331 files

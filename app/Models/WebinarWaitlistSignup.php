@@ -28,8 +28,8 @@ class WebinarWaitlistSignup extends Model
         return $this->belongsTo(Contact::class);
     }
 
-    public function series(): BelongsTo
+    public function webinarSeries(): BelongsTo
     {
-        return $this->belongsTo(WebinarSeries::class, 'webinar_series_id');
+        return $this->belongsTo(WebinarSeries::class);
     }
 }

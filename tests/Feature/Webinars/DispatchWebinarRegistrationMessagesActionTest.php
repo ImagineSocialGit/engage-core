@@ -3,13 +3,18 @@
 namespace Tests\Feature\Webinars;
 
 use App\Actions\Webinars\DispatchWebinarRegistrationMessagesAction;
+use App\Enums\MessageChannel;
+use App\Enums\MessagePurpose;
 use App\Jobs\Messaging\SendScheduledMessageJob;
+use App\Messaging\Payloads\EmailPayload;
+use App\Messaging\Payloads\SmsPayload;
 use App\Models\Contact;
 use App\Models\ScheduledMessage;
 use App\Models\Webinar;
 use App\Models\WebinarRegistration;
 use App\Models\WebinarSeries;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -17,9 +22,11 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_sms_transactional_opt_in_is_only_scheduled_once_per_contact_scope_and_purpose(): void
+    public function test_it_dispatches_registration_created_messages_for_email_and_sms(): void
     {
         Queue::fake();
+
+        $this->configureRegistrationMessages();
 
         $series = WebinarSeries::factory()->create();
 
@@ -29,71 +36,8 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
         ]);
 
         $contact = Contact::factory()->create([
-            'phone' => '6155551212',
-        ]);
-
-        $registrationOne = WebinarRegistration::query()->create([
-            'contact_id' => $contact->id,
-            'webinar_id' => $webinar->id,
-            'webinar_slug' => $webinar->slug,
-            'status' => 'pending',
-            'source' => 'test',
-            'first_name' => $contact->first_name ?? 'Test',
-            'last_name' => $contact->last_name,
-            'email' => $contact->email,
-            'phone' => $contact->phone,
-            'registered_at' => now(),
-            'meta' => [],
-        ]);
-
-        $registrationTwo = WebinarRegistration::query()->create([
-            'contact_id' => $contact->id,
-            'webinar_id' => $webinar->id,
-            'webinar_slug' => $webinar->slug,
-            'status' => 'pending',
-            'source' => 'test',
-            'first_name' => $contact->first_name ?? 'Test',
-            'last_name' => $contact->last_name,
-            'email' => $contact->email,
-            'phone' => $contact->phone,
-            'registered_at' => now(),
-            'meta' => [],
-        ]);
-
-        $action = app(DispatchWebinarRegistrationMessagesAction::class);
-
-        $action->handle($registrationOne);
-        $action->handle($registrationTwo);
-
-        $this->assertEquals(
-            1,
-            ScheduledMessage::query()
-                ->where('channel', 'sms')
-                ->where('scope', 'webinar')
-                ->where('purpose', 'transactional')
-                ->where('message_type', 'webinar_transactional_opt_in')
-                ->count()
-        );
-
-        Queue::assertPushed(SendScheduledMessageJob::class);
-    }
-
-    public function test_webinar_reminder_timing_comes_from_scope_config(): void
-    {
-        Queue::fake();
-
-        config()->set('messaging.sms.webinar.reminders.variants.24_hours.offset_minutes_before_start', 60);
-        config()->set('messaging.email.webinar.reminders.enabled', false);
-
-        $series = WebinarSeries::factory()->create();
-
-        $webinar = Webinar::factory()->create([
-            'webinar_series_id' => $series->id,
-            'starts_at' => now()->addHours(3)->startOfMinute(),
-        ]);
-
-        $contact = Contact::factory()->create([
-            'phone' => '6155551212',
+            'email' => 'jeff@example.com',
+            'phone' => '+15555550123',
         ]);
 
         $registration = WebinarRegistration::query()->create([
@@ -102,8 +46,8 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
             'webinar_slug' => $webinar->slug,
             'status' => 'pending',
             'source' => 'test',
-            'first_name' => $contact->first_name ?? 'Test',
-            'last_name' => $contact->last_name,
+            'first_name' => 'Jeff',
+            'last_name' => 'Yarnall',
             'email' => $contact->email,
             'phone' => $contact->phone,
             'registered_at' => now(),
@@ -113,11 +57,100 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
         app(DispatchWebinarRegistrationMessagesAction::class)->handle($registration);
 
         $this->assertDatabaseHas('scheduled_messages', [
-            'channel' => 'sms',
+            'contact_id' => $contact->id,
+            'context_type' => $registration->getMorphClass(),
+            'context_id' => $registration->id,
+            'channel' => MessageChannel::Email->value,
+            'purpose' => MessagePurpose::Transactional->value,
             'scope' => 'webinar',
-            'purpose' => 'transactional',
-            'message_type' => 'reminder_24h',
-            'send_at' => $webinar->starts_at->copy()->subMinutes(60),
+            'message_type' => 'confirmation',
+            'payload_class' => EmailPayload::class,
+            'status' => 'pending',
+        ]);
+
+        $this->assertDatabaseHas('scheduled_messages', [
+            'contact_id' => $contact->id,
+            'context_type' => $registration->getMorphClass(),
+            'context_id' => $registration->id,
+            'channel' => MessageChannel::Sms->value,
+            'purpose' => MessagePurpose::Transactional->value,
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => SmsPayload::class,
+            'status' => 'pending',
+        ]);
+
+        $this->assertDatabaseHas('scheduled_messages', [
+            'contact_id' => $contact->id,
+            'channel' => MessageChannel::Email->value,
+            'message_type' => 'reminder',
+        ]);
+
+        $this->assertDatabaseHas('scheduled_messages', [
+            'contact_id' => $contact->id,
+            'channel' => MessageChannel::Sms->value,
+            'message_type' => 'reminder',
+        ]);
+
+        $this->assertSame(4, ScheduledMessage::query()->count());
+
+        Queue::assertPushed(SendScheduledMessageJob::class, 4);
+    }
+
+    private function configureRegistrationMessages(): void
+    {
+        Config::set('messaging.email.transactional.webinar', [
+            'confirmation' => [
+                'dispatch_key' => 'registration_created',
+                'timing' => 'immediate',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'confirmation_messages',
+                'payload' => [
+                    'subject' => 'Registered',
+                    'body' => 'You are registered.',
+                ],
+            ],
+
+            'reminder' => [
+                'dispatch_key' => 'registration_created',
+                'timing' => 'scheduled',
+                'schedule' => [
+                    'type' => 'anchored',
+                    'minutes' => -30,
+                ],
+                'payload_class' => EmailPayload::class,
+                'queue' => 'reminders',
+                'payload' => [
+                    'subject' => 'Reminder',
+                    'body' => 'Starts soon.',
+                ],
+            ],
+        ]);
+
+        Config::set('messaging.sms.transactional.webinar', [
+            'confirmation' => [
+                'dispatch_key' => 'registration_created',
+                'timing' => 'immediate',
+                'payload_class' => SmsPayload::class,
+                'queue' => 'confirmation_messages',
+                'payload' => [
+                    'message' => 'You are registered.',
+                ],
+            ],
+
+            'reminder' => [
+                'dispatch_key' => 'registration_created',
+                'timing' => 'scheduled',
+                'schedule' => [
+                    'type' => 'anchored',
+                    'minutes' => -30,
+                ],
+                'payload_class' => SmsPayload::class,
+                'queue' => 'reminders',
+                'payload' => [
+                    'message' => 'Starts soon.',
+                ],
+            ],
         ]);
     }
 }

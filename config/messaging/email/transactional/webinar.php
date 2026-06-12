@@ -4,18 +4,19 @@ use App\Messaging\Payloads\EmailPayload;
 
 return [
 
-    'registration_confirmation' => [
+    'confirmation' => [
+        'dispatch_key' => 'registration_created',
         'timing' => 'immediate',
         'payload_class' => EmailPayload::class,
         'queue' => 'confirmation_messages',
 
         'payload' => [
             'subject' => 'You’re registered: {webinar_title}',
-            'view' => 'emails.webinars.registration-confirmation',
         ],
     ],
 
-    'webinar_transactional_opt_in' => [
+    'opt_in' => [
+        'dispatch_key' => 'consent_granted',
         'timing' => 'immediate',
         'payload_class' => EmailPayload::class,
         'queue' => 'opt_in_messages',
@@ -26,7 +27,8 @@ return [
         ],
     ],
 
-    'reminder_10d' => [
+    'reminder' => [
+        'dispatch_key' => 'registration_created',
         'timing' => 'scheduled',
         'payload_class' => EmailPayload::class,
         'queue' => 'reminders',
@@ -38,11 +40,11 @@ return [
 
         'payload' => [
             'subject' => 'Your webinar is coming up in 10 days',
-            'view' => 'emails.webinars.reminder',
         ],
     ],
 
-    'reminder_7d' => [
+    'reminder' => [
+        'dispatch_key' => 'registration_created',
         'timing' => 'scheduled',
         'payload_class' => EmailPayload::class,
         'queue' => 'reminders',
@@ -54,11 +56,11 @@ return [
 
         'payload' => [
             'subject' => 'Your webinar is one week away',
-            'view' => 'emails.webinars.reminder',
         ],
     ],
 
-    'reminder_24h' => [
+    'reminder' => [
+        'dispatch_key' => 'registration_created',
         'timing' => 'scheduled',
         'payload_class' => EmailPayload::class,
         'queue' => 'reminders',
@@ -70,11 +72,11 @@ return [
 
         'payload' => [
             'subject' => 'Your webinar is tomorrow',
-            'view' => 'emails.webinars.reminder',
         ],
     ],
 
-    'reminder_30m' => [
+    'reminder' => [
+        'dispatch_key' => 'registration_created',
         'timing' => 'scheduled',
         'payload_class' => EmailPayload::class,
         'queue' => 'reminders',
@@ -86,11 +88,11 @@ return [
 
         'payload' => [
             'subject' => 'Your webinar starts in 30 minutes',
-            'view' => 'emails.webinars.reminder',
         ],
     ],
 
-    'reminder_10m' => [
+    'reminder' => [
+        'dispatch_key' => 'registration_created',
         'timing' => 'scheduled',
         'payload_class' => EmailPayload::class,
         'queue' => 'reminders',
@@ -102,11 +104,11 @@ return [
 
         'payload' => [
             'subject' => 'Your webinar starts in 10 minutes',
-            'view' => 'emails.webinars.reminder',
         ],
     ],
 
-    'reminder_live' => [
+    'reminder' => [
+        'dispatch_key' => 'registration_created',
         'timing' => 'scheduled',
         'payload_class' => EmailPayload::class,
         'queue' => 'reminders',
@@ -121,25 +123,31 @@ return [
         ],
     ],
 
-    'webinar_post_replay' => [
+    'post_attended' => [
+        'dispatch_key' => 'webinar_ended',
+        'conditions' => [
+            'webinar_registration.attended_truthy' => true,
+        ],
         'timing' => 'immediate',
         'payload_class' => EmailPayload::class,
         'queue' => 'notifications',
 
         'payload' => [
             'subject' => 'Thanks for joining: {webinar_title}',
-            'view' => 'emails.webinars.post-follow-up',
         ],
     ],
 
-    'webinar_post_missed' => [
+    'post_missed' => [
+        'dispatch_key' => 'webinar_ended',
+        'conditions' => [
+            'webinar_registration.attended_falsy' => true,
+        ],
         'timing' => 'immediate',
         'payload_class' => EmailPayload::class,
         'queue' => 'notifications',
 
         'payload' => [
             'subject' => 'Sorry we missed you: {webinar_title}',
-            'view' => 'emails.webinars.post-follow-up',
         ],
     ],
 

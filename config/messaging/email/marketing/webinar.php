@@ -5,6 +5,7 @@ use App\Messaging\Payloads\EmailPayload;
 return [
 
     'opt_in' => [
+        'dispatch_key' => 'consent_granted',
         'timing' => 'immediate',
         'payload_class' => EmailPayload::class,
         'queue' => 'opt_in_messages',
@@ -16,6 +17,7 @@ return [
     ],
 
     'general_message' => [
+        'dispatch_key' => 'webinar_ended',
         'timing' => 'scheduled',
         'payload_class' => EmailPayload::class,
         'queue' => 'marketing',

@@ -4,7 +4,8 @@ use App\Messaging\Payloads\SmsPayload;
 
 return [
 
-    'webinar_waitlist_scheduled' => [
+    'scheduled' => [
+        'dispatch_key' => 'webinar_added',
         'timing' => 'immediate',
         'payload_class' => SmsPayload::class,
         'queue' => 'notifications',
@@ -14,7 +15,8 @@ return [
         ],
     ],
 
-    'webinar_waitlist_opt_in' => [
+    'opt_in' => [
+        'dispatch_key' => 'consent_granted',
         'timing' => 'immediate',
         'payload_class' => SmsPayload::class,
         'queue' => 'opt_in_messages',

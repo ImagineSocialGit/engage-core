@@ -22,7 +22,7 @@ readonly class WebinarMessageData
 
     public static function fromRegistration(WebinarRegistration $registration): self
     {
-        $registration->loadMissing(['contact', 'webinar', 'webinar.series']);
+        $registration->loadMissing(['contact', 'webinar', 'webinar.webinarSeries']);
 
         return new self(
             contact: $registration->contact,
@@ -37,8 +37,8 @@ readonly class WebinarMessageData
 
     public static function fromWaitlistSignup(WebinarWaitlistSignup $signup, Webinar $webinar): self
     {
-        $signup->loadMissing(['contact', 'series']);
-        $webinar->loadMissing('series');
+        $signup->loadMissing(['contact', 'webinarSeries']);
+        $webinar->loadMissing('webinarSeries');
 
         return new self(
             contact: $signup->contact,
@@ -59,14 +59,14 @@ readonly class WebinarMessageData
         $timezone = $this->webinar->timezone ?: config('app.timezone', 'America/Chicago');
         $startsAt = $this->webinar->starts_at;
         $endsAt = $this->webinar->ends_at;
-        $series = $this->webinar->series;
+        $webinarSeries = $this->webinar->webinarSeries;
 
         return [
             'contact' => $this->contact->toArray(),
             'webinar_registration' => $this->registration?->toArray() ?? [],
             'webinar_waitlist_signup' => $this->waitlistSignup?->toArray() ?? [],
             'webinar' => $this->webinar->toArray(),
-            'webinar_series' => $series?->toArray() ?? [],
+            'webinar_series' => $webinarSeries?->toArray() ?? [],
 
             'registration_id' => $this->registration?->getKey(),
             'waitlist_signup_id' => $this->waitlistSignup?->getKey(),
@@ -103,10 +103,10 @@ readonly class WebinarMessageData
             'webinar_end_time' => $this->formatTime($endsAt, $timezone),
             'webinar_end_datetime' => $this->formatDateTime($endsAt, $timezone),
 
-            'webinar_series_id' => $series?->getKey(),
-            'webinar_series_slug' => $series?->slug,
-            'webinar_series_title' => $series?->title,
-            'webinar_series_status' => $series?->status,
+            'webinar_series_id' => $webinarSeries?->getKey(),
+            'webinar_series_slug' => $webinarSeries?->slug,
+            'webinar_series_title' => $webinarSeries?->title,
+            'webinar_series_status' => $webinarSeries?->status,
 
             'event_id' => $this->webinar->getKey(),
             'event_slug' => $this->webinar->slug,

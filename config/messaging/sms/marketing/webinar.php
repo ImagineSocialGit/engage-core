@@ -5,6 +5,7 @@ use App\Messaging\Payloads\SmsPayload;
 return [
 
     'opt_in' => [
+        'dispatch_key' => 'consent_granted',
         'timing' => 'immediate',
         'payload_class' => SmsPayload::class,
         'queue' => 'opt_in_messages',
@@ -15,7 +16,7 @@ return [
     ],
 
     'message' => [
-        'timing' => 'scheduled',
+        'timing' => 'webinar_ended',
         'payload_class' => SmsPayload::class,
         'queue' => 'marketing',
 

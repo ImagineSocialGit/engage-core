@@ -6,13 +6,14 @@ use App\Actions\Webinars\DispatchWebinarOutcomeMessagesAction;
 use App\Enums\MessageChannel;
 use App\Enums\MessagePurpose;
 use App\Jobs\Messaging\SendScheduledMessageJob;
-use App\Messaging\Payloads\Webinars\Email\WebinarFollowUpEmailPayload;
-use App\Messaging\Payloads\Webinars\Sms\WebinarFollowUpSmsPayload;
+use App\Messaging\Payloads\EmailPayload;
+use App\Messaging\Payloads\SmsPayload;
 use App\Models\Contact;
 use App\Models\ScheduledMessage;
 use App\Models\Webinar;
 use App\Models\WebinarRegistration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -20,11 +21,16 @@ class DispatchWebinarOutcomeMessagesActionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_attended_registration_routes_to_replay_follow_up(): void
+    public function test_attended_registration_dispatches_attended_messages(): void
     {
         Queue::fake();
 
-        $webinar = Webinar::factory()->create();
+        $this->configureOutcomeMessages();
+
+        $webinar = Webinar::factory()->create([
+            'ends_at' => now(),
+        ]);
+
         $contact = $this->createContact();
 
         $registration = WebinarRegistration::query()->create([
@@ -41,30 +47,27 @@ class DispatchWebinarOutcomeMessagesActionTest extends TestCase
 
         app(DispatchWebinarOutcomeMessagesAction::class)->handle($registration);
 
-        $this->assertScheduledFollowUp(
-            registration: $registration,
-            channel: MessageChannel::Email->value,
-            messageType: 'webinar_post_replay',
-            payloadClass: WebinarFollowUpEmailPayload::class,
-            followUpType: 'replay',
-        );
+        $this->assertScheduled($registration, MessageChannel::Email->value, 'attended_follow_up');
+        $this->assertScheduled($registration, MessageChannel::Sms->value, 'attended_follow_up');
 
-        $this->assertScheduledFollowUp(
-            registration: $registration,
-            channel: MessageChannel::Sms->value,
-            messageType: 'webinar_post_replay',
-            payloadClass: WebinarFollowUpSmsPayload::class,
-            followUpType: 'replay',
-        );
+        $this->assertDatabaseMissing('scheduled_messages', [
+            'contact_id' => $contact->id,
+            'message_type' => 'missed_follow_up',
+        ]);
 
         Queue::assertPushed(SendScheduledMessageJob::class, 2);
     }
 
-    public function test_non_attendee_routes_to_missed_follow_up(): void
+    public function test_missed_registration_dispatches_missed_messages(): void
     {
         Queue::fake();
 
-        $webinar = Webinar::factory()->create();
+        $this->configureOutcomeMessages();
+
+        $webinar = Webinar::factory()->create([
+            'ends_at' => now(),
+        ]);
+
         $contact = $this->createContact();
 
         $registration = WebinarRegistration::query()->create([
@@ -81,23 +84,79 @@ class DispatchWebinarOutcomeMessagesActionTest extends TestCase
 
         app(DispatchWebinarOutcomeMessagesAction::class)->handle($registration);
 
-        $this->assertScheduledFollowUp(
-            registration: $registration,
-            channel: MessageChannel::Email->value,
-            messageType: 'webinar_post_missed',
-            payloadClass: WebinarFollowUpEmailPayload::class,
-            followUpType: 'missed',
-        );
+        $this->assertScheduled($registration, MessageChannel::Email->value, 'missed_follow_up');
+        $this->assertScheduled($registration, MessageChannel::Sms->value, 'missed_follow_up');
 
-        $this->assertScheduledFollowUp(
-            registration: $registration,
-            channel: MessageChannel::Sms->value,
-            messageType: 'webinar_post_missed',
-            payloadClass: WebinarFollowUpSmsPayload::class,
-            followUpType: 'missed',
-        );
+        $this->assertDatabaseMissing('scheduled_messages', [
+            'contact_id' => $contact->id,
+            'message_type' => 'attended_follow_up',
+        ]);
 
         Queue::assertPushed(SendScheduledMessageJob::class, 2);
+    }
+
+    private function configureOutcomeMessages(): void
+    {
+        Config::set('messaging.email.transactional.webinar', [
+            'attended_follow_up' => [
+                'dispatch_key' => 'webinar_ended',
+                'timing' => 'immediate',
+                'conditions' => [
+                    'webinar_registration.attended_at_truthy' => true,
+                ],
+                'payload_class' => EmailPayload::class,
+                'queue' => 'notifications',
+                'payload' => [
+                    'subject' => 'Thanks for attending',
+                    'body' => 'Thanks for attending.',
+                ],
+            ],
+
+            'missed_follow_up' => [
+                'dispatch_key' => 'webinar_ended',
+                'timing' => 'immediate',
+                'conditions' => [
+                    'webinar_registration.attended_at_falsy' => true,
+                ],
+                'payload_class' => EmailPayload::class,
+                'queue' => 'notifications',
+                'payload' => [
+                    'subject' => 'Sorry we missed you',
+                    'body' => 'Sorry we missed you.',
+                ],
+            ],
+        ]);
+
+        Config::set('messaging.sms.transactional.webinar', [
+            'attended_follow_up' => [
+                'dispatch_key' => 'webinar_ended',
+                'timing' => 'immediate',
+                'conditions' => [
+                    'webinar_registration.attended_at_truthy' => true,
+                ],
+                'payload_class' => SmsPayload::class,
+                'queue' => 'notifications',
+                'payload' => [
+                    'message' => 'Thanks for attending.',
+                ],
+            ],
+
+            'missed_follow_up' => [
+                'dispatch_key' => 'webinar_ended',
+                'timing' => 'immediate',
+                'conditions' => [
+                    'webinar_registration.attended_at_falsy' => true,
+                ],
+                'payload_class' => SmsPayload::class,
+                'queue' => 'notifications',
+                'payload' => [
+                    'message' => 'Sorry we missed you.',
+                ],
+            ],
+        ]);
+
+        Config::set('messaging.email.marketing.webinar', []);
+        Config::set('messaging.sms.marketing.webinar', []);
     }
 
     private function createContact(): Contact
@@ -113,12 +172,10 @@ class DispatchWebinarOutcomeMessagesActionTest extends TestCase
         ]);
     }
 
-    private function assertScheduledFollowUp(
+    private function assertScheduled(
         WebinarRegistration $registration,
         string $channel,
         string $messageType,
-        string $payloadClass,
-        string $followUpType,
     ): void {
         $scheduledMessage = ScheduledMessage::query()
             ->where('contact_id', $registration->contact->getKey())
@@ -127,11 +184,11 @@ class DispatchWebinarOutcomeMessagesActionTest extends TestCase
             ->where('message_type', $messageType)
             ->where('purpose', MessagePurpose::Transactional->value)
             ->where('scope', 'webinar')
-            ->where('payload_class', $payloadClass)
             ->first();
 
         $this->assertNotNull($scheduledMessage);
         $this->assertSame('pending', $scheduledMessage->status);
-        $this->assertSame($followUpType, $scheduledMessage->payload['follow_up_type']);
+        $this->assertSame(['webinar_ended'], $scheduledMessage->meta['dispatch_keys']);
+        $this->assertArrayHasKey('conditions', $scheduledMessage->meta);
     }
 }

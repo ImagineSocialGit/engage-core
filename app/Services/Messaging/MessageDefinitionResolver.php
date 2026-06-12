@@ -68,12 +68,16 @@ class MessageDefinitionResolver
         string $messageType,
         string $configPath,
     ): array {
+
+        $dispatchKeys = $this->normalizeDispatchKeys($definition);
+
         unset(
             $definition['channel'],
             $definition['purpose'],
             $definition['scope'],
             $definition['message_type'],
             $definition['config_path'],
+            $definition['dispatch_key'],
             $definition['dispatch_keys'],
         );
 
@@ -83,7 +87,7 @@ class MessageDefinitionResolver
             'scope' => $scope,
             'message_type' => $messageType,
             'config_path' => $configPath,
-            'dispatch_keys' => $this->normalizeDispatchKeys($definition),
+            'dispatch_keys' => $dispatchKeys,
         ]);
     }
 
