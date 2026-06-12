@@ -7,18 +7,22 @@ use App\Models\Webinar;
 use App\Models\WebinarRegistration;
 use App\Models\WebinarWaitlistSignup;
 use App\Support\Webinars\WebinarJoinLinkGenerator;
-use Carbon\CarbonInterface;
 
-readonly class WebinarMessageData
+readonly class WebinarMessageData extends MessageData
 {
     public function __construct(
-        public Contact $contact,
+        Contact $contact,
         public Webinar $webinar,
         public ?WebinarRegistration $registration = null,
         public ?WebinarWaitlistSignup $waitlistSignup = null,
         public ?string $webinarJoinUrl = null,
-        public ?string $requestIp = null,
-    ) {}
+        ?string $requestIp = null,
+    ) {
+        parent::__construct(
+            contact: $contact,
+            requestIp: $requestIp,
+        );
+    }
 
     public static function fromRegistration(WebinarRegistration $registration): self
     {
@@ -62,7 +66,8 @@ readonly class WebinarMessageData
         $webinarSeries = $this->webinar->webinarSeries;
 
         return [
-            'contact' => $this->contact->toArray(),
+            ...parent::toArray(),
+
             'webinar_registration' => $this->registration?->toArray() ?? [],
             'webinar_waitlist_signup' => $this->waitlistSignup?->toArray() ?? [],
             'webinar' => $this->webinar->toArray(),
@@ -70,19 +75,6 @@ readonly class WebinarMessageData
 
             'registration_id' => $this->registration?->getKey(),
             'waitlist_signup_id' => $this->waitlistSignup?->getKey(),
-
-            'contact_id' => $this->contact->getKey(),
-            'contact_first_name' => $this->contact->first_name ?? 'there',
-            'contact_last_name' => $this->contact->last_name,
-            'contact_full_name' => $this->contact->name,
-            'contact_email' => $this->contact->email,
-            'contact_phone' => $this->contact->phone,
-
-            'first_name' => $this->contact->first_name ?? 'there',
-            'last_name' => $this->contact->last_name,
-            'full_name' => $this->contact->name,
-            'email' => $this->contact->email,
-            'phone' => $this->contact->phone,
 
             'webinar_id' => $this->webinar->getKey(),
             'webinar_slug' => $this->webinar->slug,
@@ -121,7 +113,6 @@ readonly class WebinarMessageData
 
             'join_url' => $this->webinarJoinUrl,
             'registration_url' => $this->webinar->registration_url,
-            'request_ip' => $this->requestIp,
         ];
     }
 
@@ -149,25 +140,5 @@ readonly class WebinarMessageData
         return $this->webinar->starts_at
             ? $this->webinar->starts_at->copy()->setTimezone($this->webinar->timezone ?: config('app.timezone'))->format($format)
             : '';
-    }
-
-    public function contact(): Contact
-    {
-        return $this->contact;
-    }
-
-    private function formatDate(?CarbonInterface $date, string $timezone): ?string
-    {
-        return $date?->copy()->setTimezone($timezone)->format('F j, Y');
-    }
-
-    private function formatTime(?CarbonInterface $date, string $timezone): ?string
-    {
-        return $date?->copy()->setTimezone($timezone)->format('g:i A T');
-    }
-
-    private function formatDateTime(?CarbonInterface $date, string $timezone): ?string
-    {
-        return $date?->copy()->setTimezone($timezone)->format('F j, Y \a\t g:i A T');
     }
 }

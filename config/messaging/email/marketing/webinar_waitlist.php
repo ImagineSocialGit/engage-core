@@ -24,7 +24,7 @@ return [
 
         'payload' => [
             'subject' => 'You’re on the webinar waitlist',
-            'body' => 'Thanks for joining the webinar waitlist. We’ll let you know when a new session is available.',
+            'body' => 'Thanks for subscribing to get updates for {webinar_series} availability. We’ll let you know when a new session is available.',
         ],
     ],
 
