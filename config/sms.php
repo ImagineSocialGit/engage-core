@@ -4,7 +4,7 @@ return [
 
     'enabled' => env('SMS_ENABLED', true),
 
-    'provider' => env('SMS_PROVIDER', 'twilio'),
+    'provider' => env('SMS_PROVIDER', 'telnyx'),
 
     'managed_by' => env('SMS_MANAGED_BY', 'platform'),
 

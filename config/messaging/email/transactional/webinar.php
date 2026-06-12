@@ -12,6 +12,7 @@ return [
 
         'payload' => [
             'subject' => 'You’re registered: {webinar_title}',
+            'body' => 'Thanks for registering for {webinar_title}! We\'ll be sending you reminders and your join link soon!'
         ],
     ],
 

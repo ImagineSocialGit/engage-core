@@ -15,17 +15,4 @@ return [
         ],
     ],
 
-    'message' => [
-        'timing' => 'webinar_ended',
-        'payload_class' => SmsPayload::class,
-        'queue' => 'marketing',
-
-        'schedule' => [
-            'type' => 'delay',
-            'minutes' => 0,
-        ],
-
-        'payload' => [],
-    ],
-
 ];
