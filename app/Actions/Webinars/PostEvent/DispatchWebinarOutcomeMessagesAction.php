@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Actions\Webinars;
+namespace App\Actions\Webinars\PostEvent;
 
 use App\Actions\Campaigns\EnrollContactInCampaignAction;
 use App\Actions\Messaging\DispatchMessageAction;

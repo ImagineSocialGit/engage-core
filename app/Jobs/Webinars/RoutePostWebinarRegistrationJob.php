@@ -2,7 +2,7 @@
 
 namespace App\Jobs\Webinars;
 
-use App\Actions\Webinars\DispatchWebinarOutcomeMessagesAction;
+use App\Actions\Webinars\PostEvent\DispatchWebinarOutcomeMessagesAction;
 use App\Models\WebinarRegistration;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;

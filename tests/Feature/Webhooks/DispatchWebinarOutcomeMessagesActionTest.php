@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Webinars;
 
-use App\Actions\Webinars\DispatchWebinarOutcomeMessagesAction;
+use App\Actions\Webinars\PostEvent\DispatchWebinarOutcomeMessagesAction;
 use App\Enums\MessageChannel;
 use App\Enums\MessagePurpose;
 use App\Jobs\Messaging\SendScheduledMessageJob;
