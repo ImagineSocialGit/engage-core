@@ -3,6 +3,7 @@
 namespace App\Services\Messaging;
 
 use App\Enums\MessageChannel;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 class MessageDefinitionResolver
@@ -39,18 +40,26 @@ class MessageDefinitionResolver
                 continue;
             }
 
-            if (! ($definition['enabled'] ?? true)) {
-                continue;
-            }
+            $definitionList = array_is_list($definition) ? $definition : [$definition];
 
-            $resolved[] = $this->validateDefinition($this->hydrateDefinitionFromPath(
-                definition: $definition,
-                channel: $channel,
-                purpose: $purpose,
-                scope: $scope,
-                messageType: trim($messageType),
-                configPath: "{$scopeConfigPath}.{$messageType}",
-            ));
+            foreach ($definitionList as $index => $nestedDefinition) {
+                if (! is_array($nestedDefinition)) {
+                    continue;
+                }
+
+                if (! ($nestedDefinition['enabled'] ?? true)) {
+                    continue;
+                }
+
+                $resolved[] = $this->validateDefinition($this->hydrateDefinitionFromPath(
+                    definition: $nestedDefinition,
+                    channel: $channel,
+                    purpose: $purpose,
+                    scope: $scope,
+                    messageType: trim($messageType),
+                    configPath: "{$scopeConfigPath}.{$messageType}".(array_is_list($definition) ? ".{$index}" : ''),
+                ));
+            }
         }
 
         return $resolved;
@@ -68,7 +77,6 @@ class MessageDefinitionResolver
         string $messageType,
         string $configPath,
     ): array {
-
         $dispatchKeys = $this->normalizeDispatchKeys($definition);
 
         unset(
@@ -85,9 +93,16 @@ class MessageDefinitionResolver
             'channel' => $channel,
             'purpose' => $purpose,
             'scope' => $scope,
-            'message_type' => $messageType,
+            'message_type' => Str::singular($this->normalizeSegment($messageType)),
             'config_path' => $configPath,
             'dispatch_keys' => $dispatchKeys,
+
+            'timing' => $definition['timing'] ?? 'immediate',
+
+            'schedule' => [
+                'type' => data_get($definition, 'schedule.type'),
+                'minutes' => data_get($definition, 'schedule.minutes'),
+            ],
         ]);
     }
 

@@ -98,13 +98,17 @@ class DispatchMessageAction
                 anchor: $anchor,
             );
 
+            if (($definition['timing'] ?? 'immediate') === 'scheduled' && $sendAt->lt(now())) {
+                continue;
+            }
+
             $scheduledMessages[] = $this->createScheduledMessage(
                 contact: $contact,
                 definition: $definition,
                 payload: $mergedPayload,
                 sendAt: $sendAt,
                 context: $context,
-                dedupeKey: $this->dedupeKey($contact, $definition, $context),
+                dedupeKey: $this->dedupeKey($contact, $definition, $context, $sendAt),
                 meta: array_replace_recursive(
                     [
                         'queue' => $definition['queue'],
@@ -364,8 +368,14 @@ class DispatchMessageAction
     /**
      * @param  array<string, mixed>  $definition
      */
-    private function dedupeKey(Contact $contact, array $definition, ?Model $context): string
-    {
+    private function dedupeKey(
+        Contact $contact,
+        array $definition,
+        ?Model $context,
+        Carbon $sendAt,
+    ): string {
+        $schedule = $definition['schedule'] ?? [];
+
         return implode(':', array_filter([
             'message',
             $contact->getKey(),
@@ -373,6 +383,12 @@ class DispatchMessageAction
             $definition['purpose'],
             $definition['scope'],
             $definition['message_type'],
+
+            $definition['timing'] ?? null,
+            $definition['schedule']['type'] ?? null,
+            $definition['schedule']['minutes'] ?? null,
+            $sendAt->toISOString(),
+
             $context?->getMorphClass(),
             $context?->getKey(),
         ], fn (mixed $value): bool => $value !== null && $value !== ''));

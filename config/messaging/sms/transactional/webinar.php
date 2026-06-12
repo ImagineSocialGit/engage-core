@@ -4,150 +4,158 @@ use App\Messaging\Payloads\SmsPayload;
 
 return [
 
-    'confirmation' => [
-        'dispatch_key' => 'registration_created',
-        'timing' => 'immediate',
-        'payload_class' => SmsPayload::class,
-        'queue' => 'confirmation_messages',
+    'confirmations' => [
+        [
+            'dispatch_key' => 'registration_created',
+            'timing' => 'immediate',
+            'payload_class' => SmsPayload::class,
+            'queue' => 'confirmation_messages',
 
-        'payload' => [
-            'message' => "You're registered for {webinar_title} on {webinar_starts_at}. Join here: {webinar_join_url}",
-        ],
+            'payload' => [
+                'message' => "You're registered for {webinar_title} on {webinar_starts_at}. Join here: {webinar_join_url}",
+            ],
+        ]
     ],
 
-    'opt_in' => [
-        'dispatch_key' => 'consent_granted',
-        'timing' => 'immediate',
-        'payload_class' => SmsPayload::class,
-        'queue' => 'opt_in_messages',
+    'opt_ins' => [
+        [
+            'dispatch_key' => 'consent_granted',
+            'timing' => 'immediate',
+            'payload_class' => SmsPayload::class,
+            'queue' => 'opt_in_messages',
 
-        'payload' => [
-            'message' => 'Thanks for subscribing to receive webinar-related messages! Reply HELP for help. Message frequency may vary. Msg&data rates may apply. Reply STOP to opt out.',
-        ],
+            'payload' => [
+                'message' => 'Thanks for subscribing to receive webinar-related messages! Reply HELP for help. Message frequency may vary. Msg&data rates may apply. Reply STOP to opt out.',
+            ],
+        ]
     ],
 
-    'reminder' => [
-        'dispatch_key' => 'registration_created',
-        'timing' => 'scheduled',
-        'payload_class' => SmsPayload::class,
-        'queue' => 'reminders',
 
-        'schedule' => [
-            'type' => 'anchored',
-            'minutes' => -14400,
+    'reminders' => [
+        [
+            'dispatch_key' => 'registration_created',
+            'timing' => 'scheduled',
+            'payload_class' => SmsPayload::class,
+            'queue' => 'reminders',
+
+            'schedule' => [
+                'type' => 'anchored',
+                'minutes' => -14400,
+            ],
+
+            'payload' => [
+                'message' => '{webinar_title} is 10 days away on {webinar_starts_at}. Join here: {webinar_join_url}',
+            ],
+        ],
+        [
+            'dispatch_key' => 'registration_created',
+            'timing' => 'scheduled',
+            'payload_class' => SmsPayload::class,
+            'queue' => 'reminders',
+
+            'schedule' => [
+                'type' => 'anchored',
+                'minutes' => -10080,
+            ],
+
+            'payload' => [
+                'message' => '{webinar_title} is 1 week away. It starts {webinar_starts_at}. Join here: {webinar_join_url}',
+            ],
+        ],
+        [
+            'dispatch_key' => 'registration_created',
+            'timing' => 'scheduled',
+            'payload_class' => SmsPayload::class,
+            'queue' => 'reminders',
+
+            'schedule' => [
+                'type' => 'anchored',
+                'minutes' => -1440,
+            ],
+
+            'payload' => [
+                'message' => 'Reminder: {webinar_title} is tomorrow at {webinar_starts_at}. Join here: {webinar_join_url}',
+            ],
         ],
 
-        'payload' => [
-            'message' => '{webinar_title} is 10 days away on {webinar_starts_at}. Join here: {webinar_join_url}',
+        [
+            'dispatch_key' => 'registration_created',
+            'timing' => 'scheduled',
+            'payload_class' => SmsPayload::class,
+            'queue' => 'reminders',
+
+            'schedule' => [
+                'type' => 'anchored',
+                'minutes' => -30,
+            ],
+
+            'payload' => [
+                'message' => '{webinar_title} starts in 30 minutes at {webinar_start_time}. Join here: {webinar_join_url}',
+            ],
         ],
-    ],
+        [
+            'dispatch_key' => 'registration_created',
+            'timing' => 'scheduled',
+            'payload_class' => SmsPayload::class,
+            'queue' => 'reminders',
 
-    'reminder' => [
-        'dispatch_key' => 'registration_created',
-        'timing' => 'scheduled',
-        'payload_class' => SmsPayload::class,
-        'queue' => 'reminders',
+            'schedule' => [
+                'type' => 'anchored',
+                'minutes' => -10,
+            ],
 
-        'schedule' => [
-            'type' => 'anchored',
-            'minutes' => -10080,
-        ],
-
-        'payload' => [
-            'message' => '{webinar_title} is 1 week away. It starts {webinar_starts_at}. Join here: {webinar_join_url}',
-        ],
-    ],
-
-    'reminder' => [
-        'dispatch_key' => 'registration_created',
-        'timing' => 'scheduled',
-        'payload_class' => SmsPayload::class,
-        'queue' => 'reminders',
-
-        'schedule' => [
-            'type' => 'anchored',
-            'minutes' => -1440,
-        ],
-
-        'payload' => [
-            'message' => 'Reminder: {webinar_title} is tomorrow at {webinar_starts_at}. Join here: {webinar_join_url}',
-        ],
-    ],
-
-    'reminder' => [
-        'dispatch_key' => 'registration_created',
-        'timing' => 'scheduled',
-        'payload_class' => SmsPayload::class,
-        'queue' => 'reminders',
-
-        'schedule' => [
-            'type' => 'anchored',
-            'minutes' => -30,
+            'payload' => [
+                'message' => '{webinar_title} starts in 10 minutes. Join here: {webinar_join_url}',
+            ],
         ],
 
-        'payload' => [
-            'message' => '{webinar_title} starts in 30 minutes at {webinar_start_time}. Join here: {webinar_join_url}',
-        ],
-    ],
+        [
+            'dispatch_key' => 'registration_created',
+            'timing' => 'scheduled',
+            'payload_class' => SmsPayload::class,
+            'queue' => 'reminders',
 
-    'reminder' => [
-        'dispatch_key' => 'registration_created',
-        'timing' => 'scheduled',
-        'payload_class' => SmsPayload::class,
-        'queue' => 'reminders',
+            'schedule' => [
+                'type' => 'anchored',
+                'minutes' => 0,
+            ],
 
-        'schedule' => [
-            'type' => 'anchored',
-            'minutes' => -10,
-        ],
-
-        'payload' => [
-            'message' => '{webinar_title} starts in 10 minutes. Join here: {webinar_join_url}',
-        ],
-    ],
-
-    'reminder' => [
-        'dispatch_key' => 'registration_created',
-        'timing' => 'scheduled',
-        'payload_class' => SmsPayload::class,
-        'queue' => 'reminders',
-
-        'schedule' => [
-            'type' => 'anchored',
-            'minutes' => 0,
-        ],
-
-        'payload' => [
-            'message' => '{webinar_title} is live! Join here: {webinar_join_url}',
+            'payload' => [
+                'message' => '{webinar_title} is live! Join here: {webinar_join_url}',
+            ],
         ],
     ],
 
     'post_attended' => [
-        'dispatch_key' => 'webinar_ended',
-        'conditions' => [
-            'webinar_registration.attended_truthy' => true,
-        ],
-        'timing' => 'immediate',
-        'payload_class' => SmsPayload::class,
-        'queue' => 'notifications',
+        [
+            'dispatch_key' => 'webinar_ended',
+            'conditions' => [
+                'webinar_registration.attended_truthy' => true,
+            ],
+            'timing' => 'immediate',
+            'payload_class' => SmsPayload::class,
+            'queue' => 'notifications',
 
-        'payload' => [
-            'message' => "Thanks for joining {webinar_title}. We'll send your replay and next steps soon.",
-        ],
+            'payload' => [
+                'message' => "Thanks for joining {webinar_title}. We'll send your replay and next steps soon.",
+            ],
+        ]
     ],
 
     'post_missed' => [
-        'dispatch_key' => 'webinar_ended',
-        'conditions' => [
-            'webinar_registration.attended_falsy' => true,
-        ],
-        'timing' => 'immediate',
-        'payload_class' => SmsPayload::class,
-        'queue' => 'notifications',
+        [
+            'dispatch_key' => 'webinar_ended',
+            'conditions' => [
+                'webinar_registration.attended_falsy' => true,
+            ],
+            'timing' => 'immediate',
+            'payload_class' => SmsPayload::class,
+            'queue' => 'notifications',
 
-        'payload' => [
-            'message' => "Sorry we missed you for {webinar_title}. We'll follow up with next steps soon.",
-        ],
+            'payload' => [
+                'message' => "Sorry we missed you for {webinar_title}. We'll follow up with next steps soon.",
+            ],
+        ]
     ],
 
 ];
