@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Webhooks;
 
-use App\Jobs\Webinars\ProcessPostWebinarEventJob;
+use App\Jobs\Webinars\PostEvent\ProcessPostWebinarEventJob;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 

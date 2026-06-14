@@ -3,7 +3,7 @@
 namespace App\Actions\Webinars\PostEvent;
 
 use App\Contracts\Webinars\WebinarProvider;
-use App\Jobs\Webinars\RoutePostWebinarRegistrationJob;
+use App\Jobs\Webinars\PostEvent\RoutePostWebinarRegistrationJob;
 use App\Models\Webinar;
 
 class DispatchPostWebinarFollowUpsAction

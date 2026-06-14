@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Jobs\Webinars;
+namespace App\Jobs\Webinars\PostEvent;
 
 use App\Actions\Webinars\PostEvent\DispatchWebinarOutcomeMessagesAction;
 use App\Models\WebinarRegistration;

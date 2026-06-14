@@ -3,7 +3,7 @@
 namespace App\Actions\Webinars\PostEvent;
 
 use App\Data\Webinars\ProviderWebhookEvent;
-use App\Jobs\Webinars\ProcessPostWebinarEventJob;
+use App\Jobs\Webinars\PostEvent\ProcessPostWebinarEventJob;
 
 class HandleWebinarProviderWebhookEventAction
 {
