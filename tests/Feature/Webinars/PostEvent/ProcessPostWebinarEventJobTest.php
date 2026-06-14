@@ -3,12 +3,12 @@
 namespace Tests\Feature\Webinars\PostEvent;
 
 use App\Actions\Webinars\PostEvent\DispatchPostWebinarFollowUpsAction;
-use App\Actions\Webinars\PostEvent\RecordWebinarAttendanceAction;
+use App\Actions\Webinars\PostEvent\RecordWebinarProviderAttendanceAction;
 use App\Actions\Webinars\PostEvent\ResolveWebinarPlaybackAction;
 use App\Contracts\Webinars\WebinarProvider;
 use App\Data\Webinars\ProviderRecordingData;
 use App\Data\Webinars\WebinarAttendanceRecord;
-use App\Jobs\Webinars\PostEvent\ProcessPostWebinarEventJob;
+use App\Jobs\Webinars\PostEvent\ProcessWebinarProviderEventJob;
 use App\Jobs\Webinars\PostEvent\RoutePostWebinarRegistrationJob;
 use App\Models\Contact;
 use App\Models\Webinar;
@@ -25,10 +25,24 @@ class ProcessPostWebinarEventJobTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_records_attendance_by_default_without_optional_post_event_actions(): void
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
+
+    public function test_it_records_attendance_for_configured_webinar_ended_event(): void
     {
         Queue::fake([RoutePostWebinarRegistrationJob::class]);
-        Config::set('webinars.post_event.webinar_ended', []);
+
+        Config::set('webinars.post_event.events', [
+            'webinar.ended' => [
+                RecordWebinarProviderAttendanceAction::class,
+            ],
+        ]);
+
+        Config::set('webinars.post_event.attendance.enabled', true);
 
         Carbon::setTestNow('2026-06-12 12:00:00');
 
@@ -49,12 +63,12 @@ class ProcessPostWebinarEventJobTest extends TestCase
 
         $this->mockProviderManager($provider);
 
-        app(ProcessPostWebinarEventJob::class, [
+        app(ProcessWebinarProviderEventJob::class, [
             'provider' => 'zoom',
             'externalWebinarId' => '123456789',
+            'event' => 'webinar.ended',
         ])->handle(
             webinarProviderManager: app(WebinarProviderManager::class),
-            recordWebinarAttendanceAction: app(RecordWebinarAttendanceAction::class),
         );
 
         $webinar->refresh();
@@ -78,13 +92,50 @@ class ProcessPostWebinarEventJobTest extends TestCase
         Queue::assertNotPushed(RoutePostWebinarRegistrationJob::class);
     }
 
-    public function test_it_runs_configured_post_event_actions_after_attendance(): void
+    public function test_it_runs_configured_post_event_actions_in_order(): void
     {
         Queue::fake([RoutePostWebinarRegistrationJob::class]);
 
-        Config::set('webinars.post_event.webinar_ended', [
-            ResolveWebinarPlaybackAction::class,
-            DispatchPostWebinarFollowUpsAction::class,
+        Config::set('webinars.post_event.events', [
+            'webinar.ended' => [
+                RecordWebinarProviderAttendanceAction::class,
+                ResolveWebinarPlaybackAction::class,
+                DispatchPostWebinarFollowUpsAction::class,
+            ],
+        ]);
+
+        Config::set('webinars.post_event.attendance.enabled', true);
+        Config::set('webinars.post_event.recordings.enabled', true);
+
+        Config::set('webinars.post_event.outcome_messages', [
+            'enabled' => true,
+            'dispatch_key' => 'webinar_ended',
+            'conditions' => [
+                [
+                    'field' => 'webinar.playback_url',
+                    'operator' => 'filled',
+                ],
+            ],
+            'routes' => [
+                'attended' => [
+                    'enabled' => true,
+                    'conditions' => [
+                        [
+                            'field' => 'registration.attended_at',
+                            'operator' => 'filled',
+                        ],
+                    ],
+                ],
+                'missed' => [
+                    'enabled' => true,
+                    'conditions' => [
+                        [
+                            'field' => 'registration.attended_at',
+                            'operator' => 'blank',
+                        ],
+                    ],
+                ],
+            ],
         ]);
 
         Carbon::setTestNow('2026-06-12 12:00:00');
@@ -113,12 +164,12 @@ class ProcessPostWebinarEventJobTest extends TestCase
 
         $this->mockProviderManager($provider);
 
-        app(ProcessPostWebinarEventJob::class, [
+        app(ProcessWebinarProviderEventJob::class, [
             'provider' => 'zoom',
             'externalWebinarId' => '123456789',
+            'event' => 'webinar.ended',
         ])->handle(
             webinarProviderManager: app(WebinarProviderManager::class),
-            recordWebinarAttendanceAction: app(RecordWebinarAttendanceAction::class),
         );
 
         $webinar->refresh();
@@ -130,8 +181,53 @@ class ProcessPostWebinarEventJobTest extends TestCase
         $this->assertNotNull(data_get($webinar->meta, 'normalized.post_event.follow_ups_dispatched_at'));
 
         Queue::assertPushed(RoutePostWebinarRegistrationJob::class, 2);
-        Queue::assertPushed(RoutePostWebinarRegistrationJob::class, fn (RoutePostWebinarRegistrationJob $job) => $job->registrationId === $attendedRegistration->id);
-        Queue::assertPushed(RoutePostWebinarRegistrationJob::class, fn (RoutePostWebinarRegistrationJob $job) => $job->registrationId === $missedRegistration->id);
+
+        Queue::assertPushed(
+            RoutePostWebinarRegistrationJob::class,
+            fn (RoutePostWebinarRegistrationJob $job) => $job->registrationId === $attendedRegistration->id
+                && $job->event === 'webinar.ended'
+        );
+
+        Queue::assertPushed(
+            RoutePostWebinarRegistrationJob::class,
+            fn (RoutePostWebinarRegistrationJob $job) => $job->registrationId === $missedRegistration->id
+                && $job->event === 'webinar.ended'
+        );
+    }
+
+    public function test_it_safely_no_ops_when_event_has_no_configured_actions(): void
+    {
+        Queue::fake([RoutePostWebinarRegistrationJob::class]);
+
+        Config::set('webinars.post_event.events', []);
+
+        Carbon::setTestNow('2026-06-12 12:00:00');
+
+        [$webinar] = $this->makeWebinarWithRegistrations();
+
+        $provider = $this->mock(WebinarProvider::class, function (MockInterface $mock) {
+            $mock->shouldNotReceive('key');
+            $mock->shouldNotReceive('listAttendanceRecords');
+            $mock->shouldNotReceive('getRecording');
+        });
+
+        $this->mockProviderManager($provider, shouldResolve: false);
+
+        app(ProcessWebinarProviderEventJob::class, [
+            'provider' => 'zoom',
+            'externalWebinarId' => '123456789',
+            'event' => 'webinar.started',
+        ])->handle(
+            webinarProviderManager: app(WebinarProviderManager::class),
+        );
+
+        $webinar->refresh();
+
+        $this->assertNull(data_get($webinar->meta, 'normalized.post_event.attendance_recorded_at'));
+        $this->assertNull(data_get($webinar->meta, 'normalized.post_event.playback_resolved_at'));
+        $this->assertNull(data_get($webinar->meta, 'normalized.post_event.follow_ups_dispatched_at'));
+
+        Queue::assertNotPushed(RoutePostWebinarRegistrationJob::class);
     }
 
     private function makeWebinarWithRegistrations(): array
@@ -189,9 +285,15 @@ class ProcessPostWebinarEventJobTest extends TestCase
         return [$webinar, $attendedRegistration, $missedRegistration, $attendanceRecord];
     }
 
-    private function mockProviderManager(WebinarProvider $provider): void
+    private function mockProviderManager(WebinarProvider $provider, bool $shouldResolve = true): void
     {
-        $this->mock(WebinarProviderManager::class, function (MockInterface $mock) use ($provider) {
+        $expectation = $this->mock(WebinarProviderManager::class, function (MockInterface $mock) use ($provider, $shouldResolve) {
+            if (! $shouldResolve) {
+                $mock->shouldNotReceive('provider');
+
+                return;
+            }
+
             $mock->shouldReceive('provider')
                 ->once()
                 ->with('zoom')

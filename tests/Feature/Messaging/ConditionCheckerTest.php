@@ -2,18 +2,18 @@
 
 namespace Tests\Feature\Messaging;
 
-use App\Services\Messaging\MessageConditionChecker;
+use App\Services\ConditionChecker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
 use Tests\TestCase;
 
-class MessageConditionCheckerTest extends TestCase
+class ConditionCheckerTest extends TestCase
 {
     use RefreshDatabase;
 
     public function test_it_returns_true_when_no_conditions_exist(): void
     {
-        $result = app(MessageConditionChecker::class)->passes(
+        $result = app(ConditionChecker::class)->passes(
             conditions: [],
             context: [],
         );
@@ -23,7 +23,7 @@ class MessageConditionCheckerTest extends TestCase
 
     public function test_it_matches_exact_values(): void
     {
-        $result = app(MessageConditionChecker::class)->passes(
+        $result = app(ConditionChecker::class)->passes(
             conditions: [
                 'contact.status' => 'new',
             ],
@@ -39,7 +39,7 @@ class MessageConditionCheckerTest extends TestCase
 
     public function test_it_fails_exact_value_match(): void
     {
-        $result = app(MessageConditionChecker::class)->passes(
+        $result = app(ConditionChecker::class)->passes(
             conditions: [
                 'contact.status' => 'converted',
             ],
@@ -55,7 +55,7 @@ class MessageConditionCheckerTest extends TestCase
 
     public function test_it_supports_not_operator(): void
     {
-        $result = app(MessageConditionChecker::class)->passes(
+        $result = app(ConditionChecker::class)->passes(
             conditions: [
                 'contact.status_not' => 'converted',
             ],
@@ -71,7 +71,7 @@ class MessageConditionCheckerTest extends TestCase
 
     public function test_it_supports_in_operator(): void
     {
-        $result = app(MessageConditionChecker::class)->passes(
+        $result = app(ConditionChecker::class)->passes(
             conditions: [
                 'contact.status_in' => [
                     'new',
@@ -90,7 +90,7 @@ class MessageConditionCheckerTest extends TestCase
 
     public function test_it_supports_not_in_operator(): void
     {
-        $result = app(MessageConditionChecker::class)->passes(
+        $result = app(ConditionChecker::class)->passes(
             conditions: [
                 'contact.status_not_in' => [
                     'converted',
@@ -109,7 +109,7 @@ class MessageConditionCheckerTest extends TestCase
 
     public function test_it_supports_exists_operator(): void
     {
-        $result = app(MessageConditionChecker::class)->passes(
+        $result = app(ConditionChecker::class)->passes(
             conditions: [
                 'webinar_registration.join_token_exists' => true,
             ],
@@ -125,7 +125,7 @@ class MessageConditionCheckerTest extends TestCase
 
     public function test_it_supports_missing_operator(): void
     {
-        $result = app(MessageConditionChecker::class)->passes(
+        $result = app(ConditionChecker::class)->passes(
             conditions: [
                 'webinar_registration.provider_registration_id_missing' => true,
             ],
@@ -141,7 +141,7 @@ class MessageConditionCheckerTest extends TestCase
 
     public function test_it_supports_truthy_operator(): void
     {
-        $result = app(MessageConditionChecker::class)->passes(
+        $result = app(ConditionChecker::class)->passes(
             conditions: [
                 'contact.opted_in_truthy' => true,
             ],
@@ -157,7 +157,7 @@ class MessageConditionCheckerTest extends TestCase
 
     public function test_it_supports_falsy_operator(): void
     {
-        $result = app(MessageConditionChecker::class)->passes(
+        $result = app(ConditionChecker::class)->passes(
             conditions: [
                 'contact.opted_in_falsy' => true,
             ],
@@ -173,7 +173,7 @@ class MessageConditionCheckerTest extends TestCase
 
     public function test_it_supports_greater_than(): void
     {
-        $result = app(MessageConditionChecker::class)->passes(
+        $result = app(ConditionChecker::class)->passes(
             conditions: [
                 'contact.score_gt' => 50,
             ],
@@ -189,7 +189,7 @@ class MessageConditionCheckerTest extends TestCase
 
     public function test_it_supports_greater_than_or_equal(): void
     {
-        $result = app(MessageConditionChecker::class)->passes(
+        $result = app(ConditionChecker::class)->passes(
             conditions: [
                 'contact.score_gte' => 100,
             ],
@@ -205,7 +205,7 @@ class MessageConditionCheckerTest extends TestCase
 
     public function test_it_supports_less_than(): void
     {
-        $result = app(MessageConditionChecker::class)->passes(
+        $result = app(ConditionChecker::class)->passes(
             conditions: [
                 'contact.score_lt' => 10,
             ],
@@ -221,7 +221,7 @@ class MessageConditionCheckerTest extends TestCase
 
     public function test_it_supports_less_than_or_equal(): void
     {
-        $result = app(MessageConditionChecker::class)->passes(
+        $result = app(ConditionChecker::class)->passes(
             conditions: [
                 'contact.score_lte' => 5,
             ],
@@ -237,7 +237,7 @@ class MessageConditionCheckerTest extends TestCase
 
     public function test_it_supports_nested_dot_paths(): void
     {
-        $result = app(MessageConditionChecker::class)->passes(
+        $result = app(ConditionChecker::class)->passes(
             conditions: [
                 'webinar.series.title' => 'Homebuyer',
             ],
@@ -255,7 +255,7 @@ class MessageConditionCheckerTest extends TestCase
 
     public function test_it_returns_false_when_any_condition_fails(): void
     {
-        $result = app(MessageConditionChecker::class)->passes(
+        $result = app(ConditionChecker::class)->passes(
             conditions: [
                 'contact.status' => 'new',
                 'contact.score_gt' => 100,
@@ -275,7 +275,7 @@ class MessageConditionCheckerTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
 
-        app(MessageConditionChecker::class)->passes(
+        app(ConditionChecker::class)->passes(
             conditions: [
                 'contact.status_in' => 'new',
             ],

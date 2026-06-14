@@ -130,7 +130,8 @@ return [
         [
             'dispatch_key' => 'webinar_ended',
             'conditions' => [
-                'webinar_registration.attended_truthy' => true,
+                'field' => 'webinar_registration.attended_at',
+                'operator' => 'filled',
             ],
             'timing' => 'immediate',
             'payload_class' => SmsPayload::class,
@@ -146,7 +147,8 @@ return [
         [
             'dispatch_key' => 'webinar_ended',
             'conditions' => [
-                'webinar_registration.attended_falsy' => true,
+                'field' => 'webinar_registration.attended_at',
+                'operator' => 'blank',
             ],
             'timing' => 'immediate',
             'payload_class' => SmsPayload::class,

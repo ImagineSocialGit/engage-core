@@ -24,10 +24,12 @@
 │   │       ├── GetNextUpcomingWebinarAction.php
 │   │       ├── MarkWebinarRegistrationConvertedAction.php
 │   │       ├── PostEvent
+│   │       │   ├── DispatchPostWebinarCampaignsAction.php
 │   │       │   ├── DispatchPostWebinarFollowUpsAction.php
 │   │       │   ├── DispatchWebinarOutcomeMessagesAction.php
 │   │       │   ├── HandleWebinarProviderWebhookEventAction.php
 │   │       │   ├── RecordWebinarAttendanceAction.php
+│   │       │   ├── RecordWebinarProviderAttendanceAction.php
 │   │       │   └── ResolveWebinarPlaybackAction.php
 │   │       ├── ResolveWebinarJoinUrlAction.php
 │   │       └── SyncWebinarSeriesFromProviderAction.php
@@ -120,8 +122,10 @@
 │   │   ├── TestQueueJob.php
 │   │   └── Webinars
 │   │       ├── NotifyWebinarWaitlistJob.php
-│   │       ├── ProcessPostWebinarEventJob.php
-│   │       └── RoutePostWebinarRegistrationJob.php
+│   │       └── PostEvent
+│   │           ├── ProcessPostWebinarEventJob.php
+│   │           ├── ProcessWebinarProviderEventJob.php
+│   │           └── RoutePostWebinarRegistrationJob.php
 │   ├── Messaging
 │   │   └── Payloads
 │   │       ├── EmailPayload.php
@@ -155,6 +159,7 @@
 │   │       ├── ConsentRevocationRules.php
 │   │       └── MessageConsentRules.php
 │   ├── Services
+│   │   ├── ConditionChecker.php
 │   │   ├── Leads
 │   │   ├── Messaging
 │   │   │   ├── DevMessageSink.php
@@ -163,7 +168,6 @@
 │   │   │   │   ├── EmailProviderManager.php
 │   │   │   │   ├── EmailWebhookHandlerResolver.php
 │   │   │   │   └── EmailWebhookPayload.php
-│   │   │   ├── MessageConditionChecker.php
 │   │   │   ├── MessageDefinitionResolver.php
 │   │   │   ├── MessageEligibilityGate.php
 │   │   │   ├── MessageGate.php
@@ -203,8 +207,6 @@
 │   │   │   ├── generated
 │   │   │   │   └── images.php
 │   │   │   ├── messaging
-│   │   │   │   └── emails
-│   │   │   │       └── webinars.php
 │   │   │   ├── theme.php
 │   │   │   └── webinars
 │   │   │       ├── content.php
@@ -504,12 +506,12 @@
 │   │   │       └── Sms
 │   │   │           └── Telnyx
 │   │   ├── Messaging
+│   │   │   ├── ConditionCheckerTest.php
 │   │   │   ├── ConsentRevocationControllerTest.php
 │   │   │   ├── DispatchMessageActionTest.php
 │   │   │   ├── EmailMessagingServiceTest.php
 │   │   │   ├── EmailPayloadTest.php
 │   │   │   ├── GrantMessageConsentActionTest.php
-│   │   │   ├── MessageConditionCheckerTest.php
 │   │   │   ├── MessageDefinitionResolverTest.php
 │   │   │   ├── MessageEligibilityGateTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
@@ -531,8 +533,9 @@
 │   │       ├── DispatchWebinarRegistrationMessagesActionTest.php
 │   │       ├── DispatchWebinarWaitlistMessagesActionTest.php
 │   │       └── PostEvent
+│   │           ├── DispatchPostWebinarCampaignsActionTest.php
 │   │           └── ProcessPostWebinarEventJobTest.php
 │   └── TestCase.php
 └── vite.config.js
 
-182 directories, 354 files
+182 directories, 357 files

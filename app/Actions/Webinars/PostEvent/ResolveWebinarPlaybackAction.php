@@ -7,8 +7,15 @@ use App\Models\Webinar;
 
 class ResolveWebinarPlaybackAction
 {
-    public function execute(WebinarProvider $provider, Webinar $webinar): bool
-    {
+    public function execute(
+        WebinarProvider $provider,
+        Webinar $webinar,
+        string $event,
+    ): bool {
+        if (! config('webinars.post_event.recordings.enabled', false)) {
+            return true;
+        }
+
         if (filled($webinar->playback_url)) {
             return true;
         }

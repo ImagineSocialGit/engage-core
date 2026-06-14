@@ -9,7 +9,7 @@ use App\Enums\MessageChannel;
 use App\Models\CampaignEnrollment;
 use App\Models\ScheduledMessage;
 use App\Services\Messaging\Email\EmailMessagingService;
-use App\Services\Messaging\MessageConditionChecker;
+use App\Services\ConditionChecker;
 use App\Services\Messaging\MessageEligibilityGate;
 use App\Services\Messaging\Sms\SmsMessagingService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -28,7 +28,7 @@ class SendScheduledMessageJob implements ShouldQueue
     ) {}
 
     public function handle(
-        MessageConditionChecker $messageConditionChecker,
+        ConditionChecker $conditionChecker,
         MessageEligibilityGate $messageEligibilityGate,
         EmailMessagingService $emailMessagingService,
         SmsMessagingService $smsMessagingService,
@@ -50,7 +50,7 @@ class SendScheduledMessageJob implements ShouldQueue
             return;
         }
 
-        if (! $messageConditionChecker->passes(
+        if (! $conditionChecker->passes(
             conditions: $scheduledMessage->meta['conditions'] ?? [],
             context: $this->conditionContext($scheduledMessage),
         )) {

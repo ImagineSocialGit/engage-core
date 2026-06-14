@@ -7,7 +7,7 @@ use App\Enums\MessagePurpose;
 use App\Jobs\Messaging\SendScheduledMessageJob;
 use App\Models\Contact;
 use App\Models\ScheduledMessage;
-use App\Services\Messaging\MessageConditionChecker;
+use App\Services\ConditionChecker;
 use App\Services\Messaging\MessageDefinitionResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -18,7 +18,7 @@ class DispatchMessageAction
 {
     public function __construct(
         private readonly MessageDefinitionResolver $messageDefinitionResolver,
-        private readonly MessageConditionChecker $messageConditionChecker,
+        private readonly ConditionChecker $conditionChecker,
     ) {}
 
         /**
@@ -85,7 +85,7 @@ class DispatchMessageAction
                 payload: $payload,
             );
 
-            if (! $this->messageConditionChecker->passes(
+            if (! $this->conditionChecker->passes(
                 conditions: $definition['conditions'] ?? [],
                 context: $this->conditionContext($contact, $context, $mergedPayload),
             )) {

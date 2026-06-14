@@ -12,6 +12,12 @@ return [
             'base_url' => env('ZOOM_BASE_URL', 'https://api.zoom.us/v2'),
             'oauth_url' => env('ZOOM_OAUTH_URL', 'https://zoom.us/oauth/token'),
             'oauth_token_ttl_seconds' => env('ZOOM_OAUTH_TOKEN_TTL_SECONDS', 3500),
+
+            'webhook_events' => [
+                'webinar.ended' => 'webinar.ended',
+                'webinar.completed' => 'webinar.ended',
+                'recording.completed' => 'webinar.recording_completed',
+            ],
         ],
     ],
 
@@ -24,7 +30,7 @@ return [
         'webhooks' => env('WEBINAR_WEBHOOK_QUEUE', 'webhooks'),
 
         'notifications' => env('WEBINAR_REMINDER_QUEUE', 'notifications'),
-        
+
         'reminders' => env('WEBINAR_REMINDER_QUEUE', 'notifications'),
 
         'confirmation_messages' => env('WEBINAR_CONFIRMATION_MESSAGE_QUEUE', 'notifications'),

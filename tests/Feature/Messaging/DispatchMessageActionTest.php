@@ -95,6 +95,8 @@ class DispatchMessageActionTest extends TestCase
     {
         Queue::fake();
 
+        Carbon::setTestNow('2026-06-11 09:00:00');
+
         Config::set('messaging.email.transactional.webinar', [
             'follow_up' => [
                 'dispatch_key' => 'webinar_ended',
@@ -128,15 +130,21 @@ class DispatchMessageActionTest extends TestCase
             triggeredAt: $triggeredAt,
         );
 
+        $message = ScheduledMessage::first();
+
+        $this->assertNotNull($message);
+
         $this->assertEquals(
             $triggeredAt->copy()->addMinutes(15),
-            ScheduledMessage::first()->send_at,
+            $message->send_at,
         );
     }
 
     public function test_it_creates_anchored_schedule(): void
     {
         Queue::fake();
+
+        Carbon::setTestNow('2026-06-11 14:00:00');
 
         Config::set('messaging.email.transactional.webinar', [
             'reminder' => [
@@ -171,9 +179,13 @@ class DispatchMessageActionTest extends TestCase
             anchor: $anchor,
         );
 
+        $message = ScheduledMessage::first();
+
+        $this->assertNotNull($message);
+
         $this->assertEquals(
             $anchor->copy()->subMinutes(30),
-            ScheduledMessage::first()->send_at,
+            $message->send_at,
         );
     }
 
@@ -425,5 +437,12 @@ class DispatchMessageActionTest extends TestCase
                 'step' => 2,
             ],
         );
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
     }
 }

@@ -15,10 +15,13 @@ class ZoomWebhookHandler
 
     public function parse(Request $request): ProviderWebhookEvent
     {
-        if ($request->input('event') === 'endpoint.url_validation') {
+        $nativeEvent = (string) $request->input('event');
+
+        if ($nativeEvent === 'endpoint.url_validation') {
             return new ProviderWebhookEvent(
                 provider: self::PROVIDER,
                 event: 'endpoint.url_validation',
+                nativeEvent: $nativeEvent,
                 payload: [
                     'response' => $this->verifier->urlValidationResponse($request),
                 ],
@@ -31,14 +34,30 @@ class ZoomWebhookHandler
 
         return new ProviderWebhookEvent(
             provider: self::PROVIDER,
-            event: (string) $request->input('event'),
+            event: $this->normalizeEvent($nativeEvent),
             externalWebinarId: filled($request->input('payload.object.id'))
                 ? (string) $request->input('payload.object.id')
                 : null,
             externalWebinarUuid: filled($request->input('payload.object.uuid'))
                 ? (string) $request->input('payload.object.uuid')
                 : null,
+            nativeEvent: $nativeEvent,
             payload: $request->all(),
         );
+    }
+
+    private function normalizeEvent(string $event): string
+    {
+        $events = config('webinars.providers.zoom.webhook_events', []);
+
+        if (! is_array($events)) {
+            return $event;
+        }
+
+        $normalized = $events[$event] ?? null;
+
+        return is_string($normalized) && $normalized !== ''
+            ? $normalized
+            : $event;
     }
 }

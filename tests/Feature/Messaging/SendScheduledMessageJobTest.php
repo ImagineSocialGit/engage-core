@@ -58,7 +58,7 @@ class SendScheduledMessageJobTest extends TestCase
         app()->instance(EmailMessagingService::class, $emailService);
 
         (new SendScheduledMessageJob($scheduledMessage->id))->handle(
-            messageConditionChecker: app(\App\Services\Messaging\MessageConditionChecker::class),
+            conditionChecker: app(\App\Services\ConditionChecker::class),
             messageEligibilityGate: app(\App\Services\Messaging\MessageEligibilityGate::class),
             emailMessagingService: app(EmailMessagingService::class),
             smsMessagingService: app(SmsMessagingService::class),
@@ -106,7 +106,7 @@ class SendScheduledMessageJobTest extends TestCase
         app()->instance(SmsMessagingService::class, $smsService);
 
         (new SendScheduledMessageJob($scheduledMessage->id))->handle(
-            messageConditionChecker: app(\App\Services\Messaging\MessageConditionChecker::class),
+            conditionChecker: app(\App\Services\ConditionChecker::class),
             messageEligibilityGate: app(\App\Services\Messaging\MessageEligibilityGate::class),
             emailMessagingService: app(EmailMessagingService::class),
             smsMessagingService: app(SmsMessagingService::class),
@@ -155,7 +155,7 @@ class SendScheduledMessageJobTest extends TestCase
         app()->instance(EmailMessagingService::class, $emailService);
 
         (new SendScheduledMessageJob($scheduledMessage->id))->handle(
-            messageConditionChecker: app(\App\Services\Messaging\MessageConditionChecker::class),
+            conditionChecker: app(\App\Services\ConditionChecker::class),
             messageEligibilityGate: app(\App\Services\Messaging\MessageEligibilityGate::class),
             emailMessagingService: app(EmailMessagingService::class),
             smsMessagingService: app(SmsMessagingService::class),
@@ -200,7 +200,7 @@ class SendScheduledMessageJobTest extends TestCase
         app()->instance(EmailMessagingService::class, $emailService);
 
         (new SendScheduledMessageJob($scheduledMessage->id))->handle(
-            messageConditionChecker: app(\App\Services\Messaging\MessageConditionChecker::class),
+            conditionChecker: app(\App\Services\ConditionChecker::class),
             messageEligibilityGate: app(\App\Services\Messaging\MessageEligibilityGate::class),
             emailMessagingService: app(EmailMessagingService::class),
             smsMessagingService: app(SmsMessagingService::class),
@@ -245,7 +245,7 @@ class SendScheduledMessageJobTest extends TestCase
 
         try {
             (new SendScheduledMessageJob($scheduledMessage->id))->handle(
-                messageConditionChecker: app(\App\Services\Messaging\MessageConditionChecker::class),
+                conditionChecker: app(\App\Services\ConditionChecker::class),
                 messageEligibilityGate: app(\App\Services\Messaging\MessageEligibilityGate::class),
                 emailMessagingService: app(EmailMessagingService::class),
                 smsMessagingService: app(SmsMessagingService::class),
@@ -351,7 +351,7 @@ class SendScheduledMessageJobTest extends TestCase
         app()->instance(EmailMessagingService::class, $emailService);
 
         (new SendScheduledMessageJob($message->id))->handle(
-            messageConditionChecker: app(\App\Services\Messaging\MessageConditionChecker::class),
+            conditionChecker: app(\App\Services\ConditionChecker::class),
             messageEligibilityGate: app(\App\Services\Messaging\MessageEligibilityGate::class),
             emailMessagingService: app(EmailMessagingService::class),
             smsMessagingService: app(SmsMessagingService::class),
@@ -374,7 +374,7 @@ class SendScheduledMessageJobTest extends TestCase
         ]);
 
         (new SendScheduledMessageJob($message->id))->handle(
-            messageConditionChecker: app(\App\Services\Messaging\MessageConditionChecker::class),
+            conditionChecker: app(\App\Services\ConditionChecker::class),
             messageEligibilityGate: app(\App\Services\Messaging\MessageEligibilityGate::class),
             emailMessagingService: app(EmailMessagingService::class),
             smsMessagingService: app(SmsMessagingService::class),
@@ -455,7 +455,7 @@ class SendScheduledMessageJobTest extends TestCase
         app()->instance(EmailMessagingService::class, $emailService);
 
         (new SendScheduledMessageJob($message->id))->handle(
-            messageConditionChecker: app(\App\Services\Messaging\MessageConditionChecker::class),
+            conditionChecker: app(\App\Services\ConditionChecker::class),
             messageEligibilityGate: app(\App\Services\Messaging\MessageEligibilityGate::class),
             emailMessagingService: app(EmailMessagingService::class),
             smsMessagingService: app(SmsMessagingService::class),

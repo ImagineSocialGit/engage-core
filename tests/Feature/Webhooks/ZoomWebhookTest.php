@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\Webhooks;
 
-use App\Jobs\Webinars\PostEvent\ProcessPostWebinarEventJob;
+use App\Jobs\Webinars\PostEvent\ProcessWebinarProviderEventJob;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class ZoomWebhookTest extends TestCase
 {
+    private ?string $reusedTimestamp = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -15,6 +17,12 @@ class ZoomWebhookTest extends TestCase
         config([
             'webinars.provider' => 'zoom',
             'services.zoom.webhook_secret' => 'test_zoom_webhook_secret',
+
+            'webinars.providers.zoom.webhook_events' => [
+                'webinar.ended' => 'webinar.ended',
+                'webinar.completed' => 'webinar.ended',
+                'recording.completed' => 'webinar.recording_completed',
+            ],
         ]);
     }
 
@@ -22,7 +30,7 @@ class ZoomWebhookTest extends TestCase
     {
         $plainToken = 'plain-token-from-zoom';
 
-        $response = $this->postJson(route('webhooks.zoom'), [
+        $response = $this->postJson(route('webhooks.webinar', ['provider' => 'zoom']), [
             'event' => 'endpoint.url_validation',
             'payload' => [
                 'plainToken' => $plainToken,
@@ -48,7 +56,7 @@ class ZoomWebhookTest extends TestCase
                 'x-zm-request-timestamp' => (string) time(),
                 'x-zm-signature' => 'v0=invalid-signature',
             ])
-            ->postJson(route('webhooks.zoom'), [
+            ->postJson(route('webhooks.webinar', ['provider' => 'zoom']), [
                 'event' => 'webinar.ended',
                 'payload' => [
                     'object' => [
@@ -60,26 +68,34 @@ class ZoomWebhookTest extends TestCase
         $response->assertUnauthorized();
     }
 
-    public function test_it_ignores_irrelevant_signed_events(): void
+    public function test_it_dispatches_generic_runner_for_signed_events_with_a_webinar_id(): void
     {
         Queue::fake();
+
+        $webinarId = '123456789';
 
         $response = $this->signedZoomPost([
             'event' => 'webinar.started',
             'payload' => [
                 'object' => [
-                    'id' => '123456789',
+                    'id' => $webinarId,
                 ],
             ],
         ]);
 
         $response->assertNoContent();
 
-        Queue::assertNotPushed(ProcessPostWebinarEventJob::class);
+        Queue::assertPushed(ProcessWebinarProviderEventJob::class, function (ProcessWebinarProviderEventJob $job) use ($webinarId) {
+            return $job->provider === 'zoom'
+                && $job->externalWebinarId === $webinarId
+                && $job->event === 'webinar.started';
+        });
     }
 
     public function test_it_ignores_supported_events_without_a_webinar_id(): void
     {
+        Queue::fake();
+
         $response = $this->signedZoomPost([
             'event' => 'webinar.ended',
             'payload' => [
@@ -88,6 +104,8 @@ class ZoomWebhookTest extends TestCase
         ]);
 
         $response->assertNoContent();
+
+        Queue::assertNotPushed(ProcessWebinarProviderEventJob::class);
     }
 
     public function test_it_dispatches_finalize_job_for_webinar_ended_events(): void
@@ -107,9 +125,10 @@ class ZoomWebhookTest extends TestCase
 
         $response->assertNoContent();
 
-        Queue::assertPushed(ProcessPostWebinarEventJob::class, function (ProcessPostWebinarEventJob $job) use ($webinarId) {
+        Queue::assertPushed(ProcessWebinarProviderEventJob::class, function (ProcessWebinarProviderEventJob $job) use ($webinarId) {
             return $job->provider === 'zoom'
-                && $job->externalWebinarId === $webinarId;
+                && $job->externalWebinarId === $webinarId
+                && $job->event === 'webinar.ended';
         });
     }
 
@@ -130,9 +149,10 @@ class ZoomWebhookTest extends TestCase
 
         $response->assertNoContent();
 
-        Queue::assertPushed(ProcessPostWebinarEventJob::class, function (ProcessPostWebinarEventJob $job) use ($webinarId) {
+        Queue::assertPushed(ProcessWebinarProviderEventJob::class, function (ProcessWebinarProviderEventJob $job) use ($webinarId) {
             return $job->provider === 'zoom'
-                && $job->externalWebinarId === $webinarId;
+                && $job->externalWebinarId === $webinarId
+                && $job->event === 'webinar.ended';
         });
     }
 
@@ -150,39 +170,6 @@ class ZoomWebhookTest extends TestCase
         ]);
 
         $response->assertNotFound();
-    }
-
-    private ?string $reusedTimestamp = null;
-
-    private function signedZoomPost(
-        array $payload,
-        bool $reuseTimestamp = false
-    ) {
-        $timestamp = $reuseTimestamp && $this->reusedTimestamp
-            ? $this->reusedTimestamp
-            : (string) time();
-
-        $this->reusedTimestamp = $timestamp;
-
-        $body = json_encode($payload, JSON_UNESCAPED_SLASHES);
-
-        $signature = 'v0='.hash_hmac(
-            'sha256',
-            'v0:'.$timestamp.':'.$body,
-            config('services.zoom.webhook_secret')
-        );
-
-        return $this->call(
-            method: 'POST',
-            uri: route('webhooks.zoom'),
-            server: [
-                'CONTENT_TYPE' => 'application/json',
-                'HTTP_ACCEPT' => 'application/json',
-                'HTTP_X_ZM_REQUEST_TIMESTAMP' => $timestamp,
-                'HTTP_X_ZM_SIGNATURE' => $signature,
-            ],
-            content: $body
-        );
     }
 
     public function test_it_rejects_requests_with_stale_timestamps(): void
@@ -208,7 +195,7 @@ class ZoomWebhookTest extends TestCase
 
         $response = $this->call(
             method: 'POST',
-            uri: route('webhooks.zoom'),
+            uri: route('webhooks.webinar', ['provider' => 'zoom']),
             server: [
                 'CONTENT_TYPE' => 'application/json',
                 'HTTP_ACCEPT' => 'application/json',
@@ -244,26 +231,34 @@ class ZoomWebhookTest extends TestCase
         $secondResponse->assertUnauthorized();
     }
 
-    public function test_it_handles_zoom_url_validation_through_generic_webinar_provider_route(): void
-    {
-        $plainToken = 'plain-token-from-zoom';
+    private function signedZoomPost(
+        array $payload,
+        bool $reuseTimestamp = false
+    ) {
+        $timestamp = $reuseTimestamp && $this->reusedTimestamp
+            ? $this->reusedTimestamp
+            : (string) time();
 
-        $response = $this->postJson(route('webhooks.webinar', ['provider' => 'zoom']), [
-            'event' => 'endpoint.url_validation',
-            'payload' => [
-                'plainToken' => $plainToken,
+        $this->reusedTimestamp = $timestamp;
+
+        $body = json_encode($payload, JSON_UNESCAPED_SLASHES);
+
+        $signature = 'v0='.hash_hmac(
+            'sha256',
+            'v0:'.$timestamp.':'.$body,
+            config('services.zoom.webhook_secret')
+        );
+
+        return $this->call(
+            method: 'POST',
+            uri: route('webhooks.webinar', ['provider' => 'zoom']),
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_ACCEPT' => 'application/json',
+                'HTTP_X_ZM_REQUEST_TIMESTAMP' => $timestamp,
+                'HTTP_X_ZM_SIGNATURE' => $signature,
             ],
-        ]);
-
-        $response->assertOk();
-
-        $response->assertExactJson([
-            'plainToken' => $plainToken,
-            'encryptedToken' => hash_hmac(
-                'sha256',
-                $plainToken,
-                config('services.zoom.webhook_secret')
-            ),
-        ]);
+            content: $body
+        );
     }
 }
