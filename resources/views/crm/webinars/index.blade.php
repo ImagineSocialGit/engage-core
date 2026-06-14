@@ -64,7 +64,7 @@
                 <ul class="mt-2 space-y-1 text-sm">
                     @foreach(session('sync_missing') as $item)
                         <li>
-                            {{ $item['title'] }} ({{ $item['status'] }})
+                            {{ $item['title'] }}
                             @if($item['has_registrations'])
                                 — has registrations
                             @endif

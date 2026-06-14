@@ -13,7 +13,27 @@ class ZoomOAuthService
     {
         $provider = config('webinars.provider');
 
-        $cacheKey = CacheKey::zoomOAuthToken($provider);
+        if (! is_string($provider) || $provider === '') {
+            throw new RuntimeException('No webinar provider is configured.');
+        }
+
+        $accountId = config('services.zoom.account_id');
+        $clientId = config('services.zoom.client_id');
+        $clientSecret = config('services.zoom.client_secret');
+
+        if (! is_string($accountId) || $accountId === '') {
+            throw new RuntimeException('Zoom account ID is not configured.');
+        }
+
+        if (! is_string($clientId) || $clientId === '') {
+            throw new RuntimeException('Zoom client ID is not configured.');
+        }
+
+        if (! is_string($clientSecret) || $clientSecret === '') {
+            throw new RuntimeException('Zoom client secret is not configured.');
+        }
+
+        $cacheKey = CacheKey::zoomOAuthToken($this->cacheIdentity($provider, $accountId, $clientId));
         $ttl = (int) config("webinars.providers.{$provider}.oauth_token_ttl_seconds");
         $oauthUrl = config("webinars.providers.{$provider}.oauth_url");
 
@@ -21,15 +41,12 @@ class ZoomOAuthService
             throw new RuntimeException("OAuth URL is not configured for webinar provider [{$provider}].");
         }
 
-        return Cache::remember($cacheKey, $ttl, function () use ($oauthUrl): string {
+        return Cache::remember($cacheKey, $ttl, function () use ($oauthUrl, $clientId, $clientSecret, $accountId): string {
             $response = Http::asForm()
-                ->withBasicAuth(
-                    config('services.zoom.client_id'),
-                    config('services.zoom.client_secret')
-                )
+                ->withBasicAuth($clientId, $clientSecret)
                 ->post($oauthUrl, [
                     'grant_type' => 'account_credentials',
-                    'account_id' => config('services.zoom.account_id'),
+                    'account_id' => $accountId,
                 ]);
 
             if ($response->failed()) {
@@ -46,5 +63,10 @@ class ZoomOAuthService
 
             return $token;
         });
+    }
+
+    private function cacheIdentity(string $provider, string $accountId, string $clientId): string
+    {
+        return $provider.':'.sha1($accountId.'|'.$clientId);
     }
 }
