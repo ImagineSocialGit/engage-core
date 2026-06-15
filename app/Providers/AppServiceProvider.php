@@ -45,17 +45,66 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         RateLimiter::for('webinar-registration', function (Request $request) {
-            return [
-                Limit::perMinute(
-                    config('webinars.registration.rate_limits.per_ip_per_minute')
-                )->by($request->ip()),
+            $perIpPerMinute = max(
+                1,
+                (int) config('webinars.registration.rate_limits.per_ip_per_minute', 5)
+            );
 
-                Limit::perHour(
-                    config('webinars.registration.rate_limits.per_email_per_hour')
-                )->by(
-                    strtolower((string) $request->input('email'))
-                ),
+            $perEmailPerHour = max(
+                1,
+                (int) config('webinars.registration.rate_limits.per_email_per_hour', 3)
+            );
+
+            $perPhonePerHour = max(
+                1,
+                (int) config('webinars.registration.rate_limits.per_phone_per_hour', $perEmailPerHour)
+            );
+
+            $limits = [
+                Limit::perMinute($perIpPerMinute)
+                    ->by('webinar-registration:ip:'.$request->ip())
+                    ->response($this->webinarRegistrationThrottleResponse(
+                        'email',
+                        'Too many registration attempts. Please wait a moment and try again.'
+                    )),
             ];
+
+            $email = strtolower(trim((string) $request->input('email')));
+
+            if ($email !== '') {
+                $limits[] = Limit::perHour($perEmailPerHour)
+                    ->by('webinar-registration:email:'.$email)
+                    ->response($this->webinarRegistrationThrottleResponse(
+                        'email',
+                        'Too many registration attempts for this email. Please wait a moment and try again.'
+                    ));
+            }
+
+            $phone = preg_replace('/\D+/', '', (string) $request->input('phone'));
+
+            if ($phone !== '') {
+                $limits[] = Limit::perHour($perPhonePerHour)
+                    ->by('webinar-registration:phone:'.$phone)
+                    ->response($this->webinarRegistrationThrottleResponse(
+                        'phone',
+                        'Too many registration attempts for this phone number. Please wait a moment and try again.'
+                    ));
+            }
+
+            return $limits;
         });
+    }
+
+    private function webinarRegistrationThrottleResponse(string $field, string $message): callable
+    {
+        return function (Request $request, array $headers) use ($field, $message) {
+            return redirect()
+                ->back()
+                ->withInput($request->except('_token'))
+                ->withErrors([
+                    $field => $message,
+                ])
+                ->withHeaders($headers);
+        };
     }
 }

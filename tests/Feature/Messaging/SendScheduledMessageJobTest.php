@@ -12,6 +12,7 @@ use App\Models\Contact;
 use App\Models\MessageConsent;
 use App\Models\ScheduledMessage;
 use App\Services\Messaging\Email\EmailMessagingService;
+use App\Services\Messaging\MessageEligibilityGate;
 use App\Services\Messaging\Sms\SmsMessagingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Mail\Mailable;
@@ -59,7 +60,7 @@ class SendScheduledMessageJobTest extends TestCase
 
         (new SendScheduledMessageJob($scheduledMessage->id))->handle(
             conditionChecker: app(\App\Services\ConditionChecker::class),
-            messageEligibilityGate: app(\App\Services\Messaging\MessageEligibilityGate::class),
+            messageEligibilityGate: $this->messageEligibilityGate(),
             emailMessagingService: app(EmailMessagingService::class),
             smsMessagingService: app(SmsMessagingService::class),
             scheduleNextCampaignStepAction: app(ScheduleNextCampaignStepAction::class),
@@ -107,7 +108,7 @@ class SendScheduledMessageJobTest extends TestCase
 
         (new SendScheduledMessageJob($scheduledMessage->id))->handle(
             conditionChecker: app(\App\Services\ConditionChecker::class),
-            messageEligibilityGate: app(\App\Services\Messaging\MessageEligibilityGate::class),
+            messageEligibilityGate: $this->messageEligibilityGate(),
             emailMessagingService: app(EmailMessagingService::class),
             smsMessagingService: app(SmsMessagingService::class),
             scheduleNextCampaignStepAction: app(ScheduleNextCampaignStepAction::class),
@@ -201,7 +202,7 @@ class SendScheduledMessageJobTest extends TestCase
 
         (new SendScheduledMessageJob($scheduledMessage->id))->handle(
             conditionChecker: app(\App\Services\ConditionChecker::class),
-            messageEligibilityGate: app(\App\Services\Messaging\MessageEligibilityGate::class),
+            messageEligibilityGate: $this->messageEligibilityGate(false),
             emailMessagingService: app(EmailMessagingService::class),
             smsMessagingService: app(SmsMessagingService::class),
             scheduleNextCampaignStepAction: app(ScheduleNextCampaignStepAction::class),
@@ -246,7 +247,7 @@ class SendScheduledMessageJobTest extends TestCase
         try {
             (new SendScheduledMessageJob($scheduledMessage->id))->handle(
                 conditionChecker: app(\App\Services\ConditionChecker::class),
-                messageEligibilityGate: app(\App\Services\Messaging\MessageEligibilityGate::class),
+                messageEligibilityGate: $this->messageEligibilityGate(),
                 emailMessagingService: app(EmailMessagingService::class),
                 smsMessagingService: app(SmsMessagingService::class),
                 scheduleNextCampaignStepAction: app(ScheduleNextCampaignStepAction::class),
@@ -478,6 +479,19 @@ class SendScheduledMessageJobTest extends TestCase
             'source' => 'test',
         ]);
     }
+
+    private function messageEligibilityGate(bool $allowed = true): MessageEligibilityGate
+    {
+        $gate = Mockery::mock(MessageEligibilityGate::class);
+
+        $gate
+            ->shouldReceive('allows')
+            ->once()
+            ->andReturn($allowed);
+
+        return $gate;
+    }
+    
 }
 
 class FakeJobEmailPayload implements EmailMessage
@@ -521,6 +535,7 @@ class FakeJobSmsPayload implements SmsMessage
     public function __construct(
         private readonly string $to,
         private readonly string $message,
+        private readonly string $purpose = 'transactional',
     ) {}
 
     public static function fromArray(array $payload): self
@@ -528,6 +543,7 @@ class FakeJobSmsPayload implements SmsMessage
         return new self(
             to: $payload['to'],
             message: $payload['message'],
+            purpose: $payload['purpose'] ?? 'transactional',
         );
     }
 
@@ -546,11 +562,17 @@ class FakeJobSmsPayload implements SmsMessage
         return 'test_sms';
     }
 
+    public function purpose(): string
+    {
+        return $this->purpose;
+    }
+
     public function devPayload(): array
     {
         return [
             'to' => $this->to,
             'message' => $this->message,
+            'purpose' => $this->purpose,
         ];
     }
 

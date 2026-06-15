@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Contact;
+use App\Models\Webinar;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -15,9 +16,8 @@ return new class extends Migration
         Schema::create('webinar_registrations', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignIdFor(Contact::class)->constrained()->cascadeOnDelete();;
-
-            $table->foreignId('webinar_id')->constrained()->cascadeOnDelete();
+            $table->foreignIdFor(Contact::class)->constrained()->cascadeOnDelete();
+            $table->foreignIdFor(Webinar::class)->constrained()->cascadeOnDelete();
 
             $table->string('join_token')->unique();
 
@@ -31,6 +31,11 @@ return new class extends Migration
             $table->timestamp('attended_at')->nullable()->index();
 
             $table->timestamps();
+
+            $table->unique(
+                ['webinar_id', 'contact_id'],
+                'webinar_registrations_webinar_contact_unique'
+            );
         });
     }
 

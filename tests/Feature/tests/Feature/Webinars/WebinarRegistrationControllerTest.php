@@ -3,11 +3,12 @@
 namespace Tests\Feature\Webinars;
 
 use App\Actions\Caching\FlushWebinarCachesAction;
+use App\Models\Contact;
 use App\Models\Webinar;
+use App\Models\WebinarRegistration;
 use App\Models\WebinarSeries;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class WebinarRegistrationControllerTest extends TestCase
@@ -146,5 +147,101 @@ class WebinarRegistrationControllerTest extends TestCase
             ->assertOk()
             ->assertSee(route('webinar.registration.store', $series->slug), false)
             ->assertDontSee(route('webinar.waitlist.store', $series->slug), false);
+    }
+
+    public function test_store_requires_phone_when_transactional_sms_consent_is_checked(): void
+    {
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'homebuyer-basics',
+        ]);
+
+        Webinar::factory()->create([
+            'webinar_series_id' => $series->id,
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $response = $this->from(route('webinar.show', $series->slug))
+            ->post(route('webinar.registration.store', $series->slug), [
+                'first_name' => 'Jeff',
+                'last_name' => 'Yarnall',
+                'email' => 'jeff@example.com',
+                'phone' => null,
+                'transactional_email_consent' => true,
+                'transactional_sms_consent' => true,
+                'marketing_email_consent' => false,
+                'marketing_sms_consent' => false,
+            ]);
+
+        $response->assertRedirect(route('webinar.show', $series->slug));
+        $response->assertSessionHasErrors('phone');
+    }
+
+    public function test_store_requires_phone_when_marketing_sms_consent_is_checked(): void
+    {
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'homebuyer-basics',
+        ]);
+
+        Webinar::factory()->create([
+            'webinar_series_id' => $series->id,
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $response = $this->from(route('webinar.show', $series->slug))
+            ->post(route('webinar.registration.store', $series->slug), [
+                'first_name' => 'Jeff',
+                'last_name' => 'Yarnall',
+                'email' => 'jeff@example.com',
+                'phone' => null,
+                'transactional_email_consent' => true,
+                'transactional_sms_consent' => false,
+                'marketing_email_consent' => false,
+                'marketing_sms_consent' => true,
+            ]);
+
+        $response->assertRedirect(route('webinar.show', $series->slug));
+        $response->assertSessionHasErrors('phone');
+    }
+
+    public function test_store_fails_validation_when_email_already_registered_for_webinar(): void
+    {
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'homebuyer-basics',
+        ]);
+
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->id,
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $contact = Contact::factory()->create([
+            'email' => 'jeff@example.com',
+        ]);
+
+        WebinarRegistration::factory()->create([
+            'contact_id' => $contact->id,
+            'webinar_id' => $webinar->id,
+            'webinar_slug' => $webinar->slug,
+        ]);
+
+        $response = $this->from(route('webinar.show', $series->slug))
+            ->post(route('webinar.registration.store', $series->slug), [
+                'first_name' => 'Jeff',
+                'last_name' => 'Yarnall',
+                'email' => 'JEFF@example.com',
+                'phone' => null,
+                'transactional_email_consent' => true,
+                'transactional_sms_consent' => false,
+                'marketing_email_consent' => false,
+                'marketing_sms_consent' => false,
+            ]);
+
+        $response->assertRedirect(route('webinar.show', $series->slug));
+        $response->assertSessionHasErrors([
+            'email' => 'This email has already been used to register for this webinar.',
+        ]);
     }
 }

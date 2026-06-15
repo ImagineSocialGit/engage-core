@@ -45,6 +45,7 @@ class SmsMessagingServiceTest extends TestCase
         $this->assertSame('Test message', $provider->message);
         $this->assertSame([
             'kind' => 'test_message',
+            'purpose' => 'transactional',
             'source_ip' => null,
         ], $provider->meta);
     }
@@ -108,6 +109,7 @@ class FakeSmsPayload implements SmsMessage
         private readonly string $to,
         private readonly string $message,
         private readonly string $kind,
+        private readonly string $purpose = 'transactional',
         private readonly ?string $sourceIp = null,
     ) {}
 
@@ -117,6 +119,7 @@ class FakeSmsPayload implements SmsMessage
             to: $payload['to'],
             message: $payload['message'],
             kind: $payload['kind'],
+            purpose: $payload['purpose'] ?? 'transactional',
             sourceIp: $payload['source_ip'] ?? null,
         );
     }
@@ -136,12 +139,18 @@ class FakeSmsPayload implements SmsMessage
         return $this->kind;
     }
 
+    public function purpose(): string
+    {
+        return $this->purpose;
+    }
+
     public function devPayload(): array
     {
         return [
             'to' => $this->to,
             'message' => $this->message,
             'kind' => $this->kind,
+            'purpose' => $this->purpose,
             'source_ip' => $this->sourceIp,
         ];
     }

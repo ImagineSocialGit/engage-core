@@ -249,4 +249,74 @@ class EmailPayloadTest extends TestCase
             'message_type' => 'missing_message',
         ])->text();
     }
+
+    public function test_it_resolves_from_sender_by_purpose(): void
+    {
+        Config::set(
+            'messaging.email.transactional.webinar.confirmation.payload.subject',
+            'Transactional Subject'
+        );
+
+        Config::set(
+            'messaging.email.transactional.webinar.confirmation.payload.body',
+            'Transactional Body'
+        );
+
+        Config::set(
+            'messaging.email.marketing.webinar.follow_up.payload.subject',
+            'Marketing Subject'
+        );
+
+        Config::set(
+            'messaging.email.marketing.webinar.follow_up.payload.body',
+            'Marketing Body'
+        );
+
+        $transactional = EmailPayload::fromArray([
+            'email' => 'test@example.com',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+        ]);
+
+        $marketing = EmailPayload::fromArray([
+            'email' => 'test@example.com',
+            'purpose' => 'marketing',
+            'scope' => 'webinar',
+            'message_type' => 'follow_up',
+        ]);
+
+        $this->assertSame(
+            'transactional@example.com',
+            $transactional->devPayload()['from']['address']
+        );
+
+        $this->assertSame(
+            'Transactional Sender',
+            $transactional->devPayload()['from']['name']
+        );
+
+        $this->assertSame(
+            'marketing@example.com',
+            $marketing->devPayload()['from']['address']
+        );
+
+        $this->assertSame(
+            'Marketing Sender',
+            $marketing->devPayload()['from']['name']
+        );
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Config::set('messaging.email.provider', 'resend');
+
+        Config::set('messaging.email.providers.resend.from.transactional.address', 'transactional@example.com');
+        Config::set('messaging.email.providers.resend.from.transactional.name', 'Transactional Sender');
+
+        Config::set('messaging.email.providers.resend.from.marketing.address', 'marketing@example.com');
+        Config::set('messaging.email.providers.resend.from.marketing.name', 'Marketing Sender');
+    }
 }
