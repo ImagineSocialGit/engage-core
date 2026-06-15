@@ -258,8 +258,16 @@ class DispatchMessageAction
             : ScheduledMessage::query()->create($attributes);
 
         if ($scheduledMessage->wasRecentlyCreated) {
-            $dispatch = SendScheduledMessageJob::dispatch($scheduledMessage->id)
-                ->delay($sendAt);
+            $dispatch = SendScheduledMessageJob::dispatch(
+                scheduledMessageId: $scheduledMessage->id,
+                horizon: $this->horizonPayload(
+                    scheduledMessage: $scheduledMessage,
+                    definition: $definition,
+                    sendAt: $sendAt,
+                    context: $context,
+                    meta: $meta,
+                ),
+            )->delay($sendAt);
 
             if ($queue = $meta['queue'] ?? null) {
                 $dispatch->onQueue($queue);
@@ -267,6 +275,36 @@ class DispatchMessageAction
         }
 
         return $scheduledMessage;
+    }
+
+    /**
+     * @param  array<string, mixed>  $definition
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
+     */
+    private function horizonPayload(
+        ScheduledMessage $scheduledMessage,
+        array $definition,
+        Carbon $sendAt,
+        ?Model $context,
+        array $meta,
+    ): array {
+        return array_filter([
+            'scheduled_message_id' => $scheduledMessage->id,
+            'contact_id' => $scheduledMessage->contact_id,
+            'channel' => $scheduledMessage->channel,
+            'purpose' => $scheduledMessage->purpose,
+            'scope' => $scheduledMessage->scope,
+            'message_type' => $scheduledMessage->message_type,
+            'queue' => $meta['queue'] ?? $definition['queue'] ?? null,
+            'send_at' => $sendAt->toDateTimeString(),
+            'context_type' => $context ? class_basename($context) : null,
+            'context_id' => $context?->getKey(),
+            'dispatch_keys' => $definition['dispatch_keys'] ?? null,
+            'definition_config_path' => $definition['config_path'] ?? null,
+            'campaign_key' => $definition['campaign_key'] ?? null,
+            'campaign_step' => $definition['step'] ?? null,
+        ], fn (mixed $value): bool => $value !== null && $value !== []);
     }
 
     /**

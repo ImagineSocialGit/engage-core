@@ -140,7 +140,7 @@ return [
             ],
             'timing' => 'immediate',
             'payload_class' => EmailPayload::class,
-            'queue' => 'notifications',
+            'queue' => 'post_event',
 
             'payload' => [
                 'subject' => 'Thanks for joining: {webinar_title}',
@@ -158,7 +158,7 @@ return [
             ],
             'timing' => 'immediate',
             'payload_class' => EmailPayload::class,
-            'queue' => 'notifications',
+            'queue' => 'post_event',
 
             'payload' => [
                 'subject' => 'Sorry we missed you: {webinar_title}',

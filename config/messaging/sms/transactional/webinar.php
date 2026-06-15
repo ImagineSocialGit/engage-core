@@ -130,12 +130,14 @@ return [
         [
             'dispatch_key' => 'webinar_ended',
             'conditions' => [
-                'field' => 'webinar_registration.attended_at',
-                'operator' => 'filled',
+                [
+                    'field' => 'webinar_registration.attended_at',
+                    'operator' => 'filled',
+                ],
             ],
             'timing' => 'immediate',
             'payload_class' => SmsPayload::class,
-            'queue' => 'notifications',
+            'queue' => 'post_event',
 
             'payload' => [
                 'message' => "Thanks for joining {webinar_title}. We'll send your replay and next steps soon.",
@@ -147,12 +149,14 @@ return [
         [
             'dispatch_key' => 'webinar_ended',
             'conditions' => [
-                'field' => 'webinar_registration.attended_at',
-                'operator' => 'blank',
+                [
+                    'field' => 'webinar_registration.attended_at',
+                    'operator' => 'blank',
+                ],
             ],
             'timing' => 'immediate',
             'payload_class' => SmsPayload::class,
-            'queue' => 'notifications',
+            'queue' => 'post_event',
 
             'payload' => [
                 'message' => "Sorry we missed you for {webinar_title}. We'll follow up with next steps soon.",

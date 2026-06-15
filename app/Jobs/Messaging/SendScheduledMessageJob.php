@@ -25,6 +25,7 @@ class SendScheduledMessageJob implements ShouldQueue
 
     public function __construct(
         public int $scheduledMessageId,
+        public array $horizon = [],
     ) {}
 
     public function handle(
@@ -101,6 +102,18 @@ class SendScheduledMessageJob implements ShouldQueue
 
             throw $exception;
         }
+    }
+
+    public function tags(): array
+    {
+        return array_values(array_filter([
+            'scheduled-message:'.$this->scheduledMessageId,
+            isset($this->horizon['contact_id']) ? 'contact:'.$this->horizon['contact_id'] : null,
+            isset($this->horizon['channel']) ? 'channel:'.$this->horizon['channel'] : null,
+            isset($this->horizon['purpose']) ? 'purpose:'.$this->horizon['purpose'] : null,
+            isset($this->horizon['scope']) ? 'scope:'.$this->horizon['scope'] : null,
+            isset($this->horizon['message_type']) ? 'message-type:'.$this->horizon['message_type'] : null,
+        ]));
     }
 
     private function scheduleNextCampaignStepIfNeeded(
