@@ -86,7 +86,7 @@
 
                         <div class="rounded-xl border border-slate-200 p-3 space-y-2">
                             <p class="font-medium text-slate-900">
-                                {{ $webinar?->title ?? $registration->webinar_slug }}
+                                {{ $webinar?->title ?? $registration->webinar_slug }}@if ($startsAt) : {{ $startsAt->format('M j, Y g:i A') }}@endif
                             </p>
 
                             <div class="space-y-1 text-sm text-slate-500">
@@ -94,13 +94,6 @@
                                     Registered:
                                     {{ $registeredAt?->format('M j, Y g:i A') ?? '—' }}
                                 </p>
-
-                                @if ($startsAt)
-                                    <p>
-                                        Webinar:
-                                        {{ $startsAt->format('M j, Y g:i A') }}
-                                    </p>
-                                @endif
 
                                 @if ($registration->attended_at)
                                     <p>
