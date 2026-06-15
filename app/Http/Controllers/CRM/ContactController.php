@@ -37,7 +37,7 @@ class ContactController extends Controller
             abort(404);
         }
 
-        $registration->update([
+        $contact->update([
             'converted_at' => now(),
         ]);
 

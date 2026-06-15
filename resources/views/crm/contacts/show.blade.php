@@ -38,6 +38,124 @@
                         </p>
                     </div>
                 </x-ui.card>
+                <x-ui.card class="space-y-4">
+                    <div>
+                        <h3 class="text-lg font-semibold tracking-tight">
+                            Message Consents
+                        </h3>
+
+                        <p class="text-sm text-slate-500">
+                            Current channel, purpose, and scope permissions for this {{ config('contacts.labels.singular') }}.
+                        </p>
+                    </div>
+
+                    <div class="space-y-3">
+                        @forelse ($contact->messageConsents as $consent)
+                            <div class="rounded-xl border border-slate-200 p-3">
+                                <div class="flex items-start justify-between gap-4">
+                                    <div>
+                                        <p class="font-medium text-slate-900">
+                                            {{ ucfirst($consent->channel) }}
+                                            <span class="text-slate-400">/</span>
+                                            {{ ucfirst($consent->purpose) }}
+                                        </p>
+
+                                        <p class="mt-1 text-sm text-slate-500">
+                                            Scope:
+                                            <span class="font-medium text-slate-700">
+                                                {{ str($consent->scope)->replace('_', ' ')->title() }}
+                                            </span>
+                                        </p>
+                                    </div>
+
+                                    <span class="rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
+                                        Consented
+                                    </span>
+                                </div>
+
+                                <div class="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
+                                    <p>
+                                        Consented:
+                                        <span class="font-medium text-slate-700">
+                                            {{ $consent->consented_at?->format('M j, Y g:i A') ?? '—' }}
+                                        </span>
+                                    </p>
+
+                                    <p>
+                                        Source:
+                                        <span class="font-medium text-slate-700">
+                                            {{ $consent->source ? str($consent->source)->replace('_', ' ')->title() : '—' }}
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+                        @empty
+                            <p class="text-sm text-slate-500">
+                                No active message consents.
+                            </p>
+                        @endforelse
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-4">
+                        <h4 class="text-sm font-semibold text-slate-900">
+                            Revocation History
+                        </h4>
+
+                        <div class="mt-3 space-y-3">
+                            @forelse ($contact->consentRevocations as $revocation)
+                                <div class="rounded-xl border border-slate-200 p-3">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div>
+                                            <p class="font-medium text-slate-900">
+                                                {{ ucfirst($revocation->channel) }}
+                                                <span class="text-slate-400">/</span>
+                                                {{ ucfirst($revocation->purpose) }}
+                                            </p>
+
+                                            <p class="mt-1 text-sm text-slate-500">
+                                                Scope:
+                                                <span class="font-medium text-slate-700">
+                                                    {{ str($revocation->scope)->replace('_', ' ')->title() }}
+                                                </span>
+                                            </p>
+                                        </div>
+
+                                        <span class="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
+                                            Revoked
+                                        </span>
+                                    </div>
+
+                                    <div class="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-3">
+                                        <p>
+                                            Revoked:
+                                            <span class="font-medium text-slate-700">
+                                                {{ $revocation->revoked_at?->format('M j, Y g:i A') ?? '—' }}
+                                            </span>
+                                        </p>
+
+                                        <p>
+                                            Reason:
+                                            <span class="font-medium text-slate-700">
+                                                {{ $revocation->reason ? str($revocation->reason)->replace('_', ' ')->title() : '—' }}
+                                            </span>
+                                        </p>
+
+                                        <p>
+                                            Source:
+                                            <span class="font-medium text-slate-700">
+                                                {{ $revocation->source ? str($revocation->source)->replace('_', ' ')->title() : '—' }}
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+                            @empty
+                                <p class="text-sm text-slate-500">
+                                    No consent revocations.
+                                </p>
+                            @endforelse
+                        </div>
+                    </div>
+                </x-ui.card>
             </div>
 
             <div>
