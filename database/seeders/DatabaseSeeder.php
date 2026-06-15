@@ -14,9 +14,14 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call([
+        $seeders = [
             UserSeeder::class,
-            WebinarSeeder::class,
-        ]);
+        ];
+
+        if (! app()->environment('production')) {
+            $seeders[] = WebinarSeeder::class;
+        }
+
+        $this->call($seeders);
     }
 }
