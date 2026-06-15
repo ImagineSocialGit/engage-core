@@ -41,7 +41,7 @@ class DispatchPostWebinarFollowUpsAction
                 RoutePostWebinarRegistrationJob::dispatch(
                     registrationId: $registrationId,
                     event: $event,
-                )->onQueue('notifications');
+                )->onQueue('post_event');
             });
 
         $webinar->forceFill([
