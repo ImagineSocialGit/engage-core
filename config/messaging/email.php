@@ -14,10 +14,34 @@ return [
 
     'provider' => env('EMAIL_PROVIDER', 'resend'),
 
+    'from' => [
+        'transactional' => [
+            'address' => env('FROM_EMAIL_TRANSACTIONAL', env('MAIL_FROM_ADDRESS')),
+            'name' => env('FROM_NAME_TRANSACTIONAL', env('MAIL_FROM_NAME')),
+        ],
+
+        'marketing' => [
+            'address' => env('FROM_EMAIL_MARKETING', env('MAIL_FROM_ADDRESS')),
+            'name' => env('FROM_NAME_MARKETING', env('MAIL_FROM_NAME')),
+        ],
+    ],
+
     'providers' => [
 
         'resend' => [
             'provider' => App\Integrations\Messaging\Email\Resend\ResendEmailProvider::class,
+
+            'from' => [
+                'transactional' => [
+                    'address' => env('RESEND_FROM_EMAIL_TRANSACTIONAL', env('FROM_EMAIL_TRANSACTIONAL', env('MAIL_FROM_ADDRESS'))),
+                    'name' => env('RESEND_FROM_NAME_TRANSACTIONAL', env('FROM_NAME_TRANSACTIONAL', env('MAIL_FROM_NAME'))),
+                ],
+
+                'marketing' => [
+                    'address' => env('RESEND_FROM_EMAIL_MARKETING', env('FROM_EMAIL_MARKETING', env('MAIL_FROM_ADDRESS'))),
+                    'name' => env('RESEND_FROM_NAME_MARKETING', env('FROM_NAME_MARKETING', env('MAIL_FROM_NAME'))),
+                ],
+            ],
 
             'webhook_handler' =>
                 App\Integrations\Messaging\Email\Resend\ResendWebhookHandler::class,

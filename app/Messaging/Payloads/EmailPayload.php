@@ -144,15 +144,23 @@ class EmailPayload implements EmailMessage
 
     public function mailable(): Mailable
     {
-        return new class($this->subject(), $this->html()) extends Mailable {
+        return new class(
+            $this->subject(),
+            $this->html(),
+            $this->fromAddress(),
+            $this->fromName(),
+        ) extends Mailable {
             public function __construct(
                 private readonly string $subjectLine,
                 private readonly string $htmlBody,
+                private readonly string $senderAddress,
+                private readonly ?string $senderName,
             ) {}
 
             public function build(): self
             {
                 return $this
+                    ->from($this->senderAddress, $this->senderName)
                     ->subject($this->subjectLine)
                     ->html($this->htmlBody);
             }
@@ -164,10 +172,55 @@ class EmailPayload implements EmailMessage
         return $this->messageType;
     }
 
+    private function fromAddress(): string
+    {
+        $address = $this->fromConfigValue('address');
+
+        if (! is_string($address) || trim($address) === '') {
+            throw new InvalidArgumentException(
+                "Email from address is not configured for purpose [{$this->purpose}]."
+            );
+        }
+
+        return trim($address);
+    }
+
+    private function fromName(): ?string
+    {
+        $name = $this->fromConfigValue('name');
+
+        return is_string($name) && trim($name) !== ''
+            ? trim($name)
+            : null;
+    }
+
+    private function fromConfigValue(string $key): ?string
+    {
+        $provider = config('messaging.email.provider');
+
+        if (is_string($provider) && trim($provider) !== '') {
+            $providerValue = config("messaging.email.providers.{$provider}.from.{$this->purpose}.{$key}");
+
+            if (is_string($providerValue) && trim($providerValue) !== '') {
+                return $providerValue;
+            }
+        }
+
+        $value = config("messaging.email.from.{$this->purpose}.{$key}");
+
+        return is_string($value) && trim($value) !== ''
+            ? $value
+            : null;
+    }
+
     public function devPayload(): array
     {
         return [
             'to' => $this->to,
+            'from' => [
+                'address' => $this->fromAddress(),
+                'name' => $this->fromName(),
+            ],
             'subject' => $this->subject(),
             'text' => $this->text(),
             'view' => $this->view(),
