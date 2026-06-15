@@ -47,32 +47,76 @@
                     </h3>
 
                     @forelse ($contact->registrations as $registration)
+                        @php
+                            $webinar = $registration->webinar;
+                            $timezone = $webinar?->timezone ?? config('app.timezone');
+
+                            $startsAt = $webinar?->starts_at?->setTimezone($timezone);
+                            $endsAt = $webinar?->ends_at?->setTimezone($timezone);
+                            $registeredAt = $registration->registered_at?->setTimezone($timezone);
+
+                            $attendanceStatus = data_get($registration->meta, 'attendance.status');
+
+                            $isConverted = filled($registration->converted_at);
+                            $isFutureWebinar = $startsAt && $startsAt->isFuture();
+                            $isPastWebinar = $endsAt
+                                ? $endsAt->isPast()
+                                : ($startsAt ? $startsAt->isPast() : false);
+
+                            $didAttend = filled($registration->attended_at)
+                                || $attendanceStatus === 'attended';
+
+                            $didMiss = $attendanceStatus === 'missed'
+                                || ($isPastWebinar && ! $didAttend);
+
+                            if ($isConverted) {
+                                $label = 'Converted';
+                                $labelClass = 'text-green-600';
+                            } elseif ($didAttend) {
+                                $label = 'Attended';
+                                $labelClass = 'text-blue-600';
+                            } elseif ($didMiss) {
+                                $label = 'Missed';
+                                $labelClass = 'text-red-600';
+                            } else {
+                                $label = 'Registered';
+                                $labelClass = 'text-slate-500';
+                            }
+                        @endphp
+
                         <div class="rounded-xl border border-slate-200 p-3 space-y-2">
                             <p class="font-medium text-slate-900">
-                                {{ $registration->webinar?->title ?? $registration->webinar_slug }}
+                                {{ $webinar?->title ?? $registration->webinar_slug }}
                             </p>
 
-                            <p class="text-sm text-slate-500">
-                                {{ $registration->registered_at?->setTimezone($registration->webinar->timezone)->format('M j, Y g:i A') }}
-                            </p>
+                            <div class="space-y-1 text-sm text-slate-500">
+                                <p>
+                                    Registered:
+                                    {{ $registeredAt?->format('M j, Y g:i A') ?? '—' }}
+                                </p>
+
+                                @if ($startsAt)
+                                    <p>
+                                        Webinar:
+                                        {{ $startsAt->format('M j, Y g:i A') }}
+                                    </p>
+                                @endif
+
+                                @if ($registration->attended_at)
+                                    <p>
+                                        Attended:
+                                        {{ $registration->attended_at->setTimezone($timezone)->format('M j, Y g:i A') }}
+                                    </p>
+                                @endif
+                            </div>
 
                             <p class="text-sm">
-                                @if ($registration->converted_at)
-                                    <span class="font-medium text-green-600">
-                                        Converted
-                                    </span>
-                                @elseif ($registration->attended_at)
-                                    <span class="font-medium text-blue-600">
-                                        Attended
-                                    </span>
-                                @else
-                                    <span class="text-slate-500">
-                                        Registered
-                                    </span>
-                                @endif
+                                <span class="font-medium {{ $labelClass }}">
+                                    {{ $label }}
+                                </span>
                             </p>
 
-                            @if (! $registration->converted_at)
+                            @if (! $isConverted)
                                 <form
                                     method="POST"
                                     action="{{ route('crm.contacts.registrations.convert', [$contact, $registration]) }}"
@@ -86,7 +130,8 @@
                                 </form>
                             @else
                                 <p class="text-xs text-slate-400">
-                                    {{ $registration->converted_at->format('M j, Y') }}
+                                    Converted:
+                                    {{ $registration->converted_at->setTimezone($timezone)->format('M j, Y') }}
                                 </p>
                             @endif
                         </div>
