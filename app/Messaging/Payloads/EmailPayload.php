@@ -3,6 +3,8 @@
 namespace App\Messaging\Payloads;
 
 use App\Contracts\Messaging\Email\EmailMessage;
+use App\Models\Contact;
+use App\Support\Messaging\EmailConsentRevocationLinkGenerator;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\View;
@@ -19,10 +21,16 @@ class EmailPayload implements EmailMessage
         public readonly string $purpose,
         public readonly string $scope,
         public readonly string $messageType,
+        public readonly ?int $contactId = null,
         public readonly ?string $subject = null,
         public readonly ?string $body = null,
         public readonly ?string $view = null,
         public readonly array $tokens = [],
+        public readonly array $cta = [],
+        public readonly array $secondaryLink = [],
+        public readonly ?string $footer = null,
+        public readonly ?string $unsubscribeUrl = null,
+        public readonly ?string $transactionalOptOutUrl = null,
         public readonly ?string $sourceIp = null,
         public readonly array $meta = [],
     ) {}
@@ -45,6 +53,12 @@ class EmailPayload implements EmailMessage
             scope: trim((string) ($payload['scope'] ?? '')),
             messageType: trim((string) ($payload['message_type'] ?? '')),
 
+            contactId: self::nullableInt(
+                $payload['contact_id']
+                    ?? data_get($payload, 'contact.id')
+                    ?? null
+            ),
+
             subject: self::nullableString($payload['subject'] ?? null),
 
             body: self::nullableString(
@@ -57,6 +71,16 @@ class EmailPayload implements EmailMessage
             view: self::nullableString($payload['view'] ?? null),
 
             tokens: self::resolveTokens($payload),
+
+            cta: self::arrayValue($payload['cta'] ?? null),
+
+            secondaryLink: self::arrayValue($payload['secondary_link'] ?? null),
+
+            footer: self::nullableString($payload['footer'] ?? null),
+
+            unsubscribeUrl: self::nullableString($payload['unsubscribe_url'] ?? null),
+
+            transactionalOptOutUrl: self::nullableString($payload['transactional_opt_out_url'] ?? null),
 
             sourceIp: self::nullableString(
                 $payload['source_ip']
@@ -125,19 +149,15 @@ class EmailPayload implements EmailMessage
 
                 'details' => $this->configArray('details'),
 
-                'cta' => $this->interpolateRecursive(
-                    $this->configArray('cta')
-                ),
+                'cta' => $this->resolvedArray('cta', $this->cta),
 
-                'secondary_link' => $this->interpolateRecursive(
-                    $this->configArray('secondary_link')
-                ),
+                'secondary_link' => $this->resolvedArray('secondary_link', $this->secondaryLink),
 
-                'footer' => $this->configValue('footer'),
+                'footer' => $this->footer ?? $this->configValue('footer'),
 
-                'unsubscribeUrl' => $this->configValue('unsubscribe_url'),
+                'unsubscribeUrl' => $this->marketingUnsubscribeUrl(),
 
-                'transactionalOptOutUrl' => $this->configValue('transactional_opt_out_url'),
+                'transactionalOptOutUrl' => $this->transactionalOptOutUrl(),
             ]
         )->render();
     }
@@ -311,6 +331,64 @@ class EmailPayload implements EmailMessage
     private static function isStringableValue(mixed $value): bool
     {
         return is_scalar($value) || $value instanceof Stringable;
+    }
+
+    private function resolvedArray(string $key, array $value): array
+    {
+        return $this->interpolateRecursive(
+            $value !== [] ? $value : $this->configArray($key)
+        );
+    }
+
+    private function marketingUnsubscribeUrl(): ?string
+    {
+        if ($this->unsubscribeUrl) {
+            return $this->interpolate($this->unsubscribeUrl);
+        }
+
+        if ($this->purpose !== 'marketing') {
+            return $this->configValue('unsubscribe_url');
+        }
+
+        $contact = $this->contact();
+
+        return $contact
+            ? app(EmailConsentRevocationLinkGenerator::class)->marketingUnsubscribeUrl($contact)
+            : $this->configValue('unsubscribe_url');
+    }
+
+    private function transactionalOptOutUrl(): ?string
+    {
+        if ($this->transactionalOptOutUrl) {
+            return $this->interpolate($this->transactionalOptOutUrl);
+        }
+
+        if ($this->purpose !== 'transactional') {
+            return $this->configValue('transactional_opt_out_url');
+        }
+
+        $contact = $this->contact();
+
+        return $contact
+            ? app(EmailConsentRevocationLinkGenerator::class)->transactionalOptOutUrl($contact, $this->scope)
+            : $this->configValue('transactional_opt_out_url');
+    }
+
+    private function contact(): ?Contact
+    {
+        return $this->contactId
+            ? Contact::query()->find($this->contactId)
+            : null;
+    }
+
+    private static function arrayValue(mixed $value): array
+    {
+        return is_array($value) ? $value : [];
+    }
+
+    private static function nullableInt(mixed $value): ?int
+    {
+        return is_numeric($value) ? (int) $value : null;
     }
 
     private static function nullableString(mixed $value): ?string
