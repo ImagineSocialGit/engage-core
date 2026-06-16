@@ -267,7 +267,9 @@ class DispatchMessageAction
                     context: $context,
                     meta: $meta,
                 ),
-            )->delay($sendAt);
+            )
+                ->delay($sendAt)
+                ->afterCommit();
 
             if ($queue = $meta['queue'] ?? null) {
                 $dispatch->onQueue($queue);
