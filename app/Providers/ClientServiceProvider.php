@@ -2,12 +2,12 @@
 
 namespace App\Providers;
 
+use FilesystemIterator;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
-use FilesystemIterator;
 
 class ClientServiceProvider extends ServiceProvider
 {
@@ -21,7 +21,8 @@ class ClientServiceProvider extends ServiceProvider
     {
         $views = config('client.views_path');
 
-        if (is_dir($views)) {
+        if (is_string($views) && is_dir($views)) {
+            View::prependLocation($views);
             View::prependNamespace('client', $views);
         }
     }
@@ -30,7 +31,7 @@ class ClientServiceProvider extends ServiceProvider
     {
         $root = config('client.config_path');
 
-        if (! is_dir($root)) {
+        if (! is_string($root) || ! is_dir($root)) {
             return;
         }
 
