@@ -20,33 +20,6 @@ return [
                 'transactional' => env('TWILIO_FROM_TRANSACTIONAL', env('SMS_FROM_TRANSACTIONAL', env('SMS_FROM', env('TWILIO_FROM')))),
                 'marketing' => env('TWILIO_FROM_MARKETING', env('SMS_FROM_MARKETING', env('SMS_FROM', env('TWILIO_FROM')))),
             ],
-
-            'webhooks' => [
-                'stop_keywords' => [
-                    'stop',
-                    'stopall',
-                    'unsubscribe',
-                    'cancel',
-                    'end',
-                    'quit',
-                    'revoke',
-                    'optout',
-                ],
-
-                'start_keywords' => [
-                    'start',
-                    'yes',
-                    'unstop',
-                ],
-
-                'help_keywords' => [
-                    'help',
-                    'info',
-                ],
-
-                'stop_response' => 'You have been opted out of SMS messages. Reply START to resubscribe.',
-                'help_response' => 'Reply STOP to opt out of SMS messages. Message and data rates may apply.',
-            ],
         ],
 
         'telnyx' => [
@@ -55,31 +28,15 @@ return [
                 'marketing' => env('TELNYX_FROM_MARKETING', env('SMS_FROM_MARKETING', env('TELNYX_FROM', env('SMS_FROM')))),
             ],
 
+            'profile_ids' => [
+                'marketing' => env('MESSAGING_SMS_MARKETING_PROFILE_ID'),
+                'transactional' => env('MESSAGING_SMS_TRANSACTIONAL_PROFILE_ID'),
+            ],
+
             'webhooks' => [
-                'stop_keywords' => [
-                    'stop',
-                    'stopall',
-                    'unsubscribe',
-                    'cancel',
-                    'end',
-                    'quit',
-                    'revoke',
-                    'optout',
+                'inbound_event_types' => [
+                    'message.received',
                 ],
-
-                'start_keywords' => [
-                    'start',
-                    'yes',
-                    'unstop',
-                ],
-
-                'help_keywords' => [
-                    'help',
-                    'info',
-                ],
-
-                'stop_response' => 'You have been opted out of SMS messages. Reply START to resubscribe.',
-                'help_response' => 'Reply STOP to opt out of SMS messages. Message and data rates may apply.',
             ],
         ],
 

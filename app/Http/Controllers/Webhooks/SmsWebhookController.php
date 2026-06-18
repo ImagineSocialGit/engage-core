@@ -22,10 +22,10 @@ class SmsWebhookController extends Controller
             abort(403);
         }
 
-        $message = $handleInboundSmsWebhookAction->handle(
+        $responseMessage = $handleInboundSmsWebhookAction->handle(
             $handler->payloadFrom($request),
         );
 
-        return $handler->response($message);
+        return $handler->response($responseMessage);
     }
 }

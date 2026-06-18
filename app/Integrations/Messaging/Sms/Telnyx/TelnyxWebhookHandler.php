@@ -42,16 +42,21 @@ class TelnyxWebhookHandler implements SmsWebhookHandler
 
     public function payloadFrom(Request $request): SmsWebhookPayload
     {
-        $data = $request->input('data.payload', []);
+        $eventType = $this->stringOrNull($request->input('data.event_type'));
+        $payload = $request->input('data.payload', []);
 
         return SmsWebhookPayload::fromRequest(
             provider: $this->provider(),
             request: $request,
-            providerMessageId: $this->stringOrNull(data_get($data, 'id')),
-            from: $this->stringOrNull(data_get($data, 'from.phone_number')),
-            to: $this->stringOrNull(data_get($data, 'to.0.phone_number')),
-            body: $this->stringOrNull(data_get($data, 'text')),
-            receivedAt: $this->carbonOrNull(data_get($data, 'received_at')),
+            eventType: $eventType,
+            isInboundMessage: $this->isInboundEventType($eventType),
+            providerEventId: $this->stringOrNull($request->input('data.id')),
+            providerMessageId: $this->stringOrNull(data_get($payload, 'id')),
+            providerContextId: $this->stringOrNull(data_get($payload, 'messaging_profile_id')),
+            from: $this->stringOrNull(data_get($payload, 'from.phone_number')),
+            to: $this->stringOrNull(data_get($payload, 'to.0.phone_number')),
+            body: $this->stringOrNull(data_get($payload, 'text')),
+            receivedAt: $this->carbonOrNull(data_get($payload, 'received_at')),
         );
     }
 
@@ -60,10 +65,23 @@ class TelnyxWebhookHandler implements SmsWebhookHandler
         return response()->noContent();
     }
 
+    private function isInboundEventType(?string $eventType): bool
+    {
+        if ($eventType === null) {
+            return false;
+        }
+
+        return in_array(
+            $eventType,
+            config('sms.providers.telnyx.webhooks.inbound_event_types', []),
+            true,
+        );
+    }
+
     private function stringOrNull(mixed $value): ?string
     {
         return is_string($value) && trim($value) !== ''
-            ? $value
+            ? trim($value)
             : null;
     }
 

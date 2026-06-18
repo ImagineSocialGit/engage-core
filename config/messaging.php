@@ -24,4 +24,22 @@ return [
         'dedupe_enabled' => true,
     ],
 
+    'inbound' => [
+        'handlers' => [
+            'sms' => [
+                'consent_revocation' => [
+                    App\Actions\Messaging\Sms\Inbound\RevokeSmsConsentFromInboundMessageAction::class,
+                ],
+
+                'help' => [
+                    App\Actions\Messaging\Sms\Inbound\RespondToSmsHelpInboundMessageAction::class,
+                ],
+
+                'normal_reply' => [
+                    //
+                ],
+            ],
+        ],
+    ],
+
 ];

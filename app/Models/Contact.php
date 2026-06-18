@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Contact extends Model
 {
@@ -79,5 +80,10 @@ class Contact extends Model
     public function campaignEnrollments(): HasMany
     {
         return $this->hasMany(CampaignEnrollment::class);
+    }
+
+    public function inboundMessages(): MorphMany
+    {
+        return $this->morphMany(InboundMessage::class, 'recipient');
     }
 }

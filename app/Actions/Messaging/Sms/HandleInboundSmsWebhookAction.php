@@ -2,125 +2,64 @@
 
 namespace App\Actions\Messaging\Sms;
 
-use App\Actions\Messaging\RevokeMessageConsentAction;
+use App\Actions\Messaging\RecordInboundMessageAction;
 use App\Enums\MessageChannel;
-use App\Enums\MessagePurpose;
-use App\Models\ConsentRevocation;
-use App\Models\Contact;
+use App\Services\Messaging\InboundMessageRouter;
+use App\Services\Messaging\Sms\InboundSmsMessageClassifier;
+use App\Services\Messaging\Sms\InboundSmsPurposeResolver;
+use App\Services\Messaging\Sms\InboundSmsRecipientResolver;
 use App\Services\Messaging\Sms\SmsWebhookPayload;
 
 class HandleInboundSmsWebhookAction
 {
     public function __construct(
-        private readonly RevokeMessageConsentAction $revokeMessageConsentAction,
+        private readonly RecordInboundMessageAction $recordInboundMessageAction,
+        private readonly InboundMessageRouter $inboundMessageRouter,
+        private readonly InboundSmsMessageClassifier $inboundSmsMessageClassifier,
+        private readonly InboundSmsPurposeResolver $inboundSmsPurposeResolver,
+        private readonly InboundSmsRecipientResolver $inboundSmsRecipientResolver,
     ) {}
 
     public function handle(SmsWebhookPayload $payload): ?string
     {
-        $body = $payload->normalizedBody();
-        $from = $payload->normalizedFrom();
-
-        if ($body === null || $from === null) {
+        if (! $payload->isInboundMessage) {
             return null;
         }
 
-        if ($this->isStopKeyword($payload->provider, $body)) {
-            $this->revokeSmsConsent($payload, $from, $body);
+        $from = $this->inboundSmsRecipientResolver->normalizePhone($payload->from);
+        $to = $this->inboundSmsRecipientResolver->normalizePhone($payload->to);
+        $recipient = $this->inboundSmsRecipientResolver->resolve($payload->from);
 
-            return config("sms.providers.{$payload->provider}.webhooks.stop_response");
-        }
-
-        if ($this->isHelpKeyword($payload->provider, $body)) {
-            return config("sms.providers.{$payload->provider}.webhooks.help_response");
-        }
-
-        if ($this->isStartKeyword($payload->provider, $body)) {
-            return null;
-        }
-
-        return null;
-    }
-
-    private function revokeSmsConsent(
-        SmsWebhookPayload $payload,
-        string $from,
-        string $keyword,
-    ): void {
-        $contact = Contact::query()
-            ->where('phone', $from)
-            ->first();
-
-        if (! $contact) {
-            return;
-        }
-
-        $consents = $contact
-            ->messageConsents()
-            ->where('channel', MessageChannel::Sms->value)
-            ->get();
-
-        if ($consents->isEmpty()) {
-            $consents = collect([
-                (object) [
-                    'purpose' => MessagePurpose::Transactional->value,
-                    'scope' => 'webinar',
-                ],
-                (object) [
-                    'purpose' => MessagePurpose::Marketing->value,
-                    'scope' => 'webinar',
-                ],
-            ]);
-        }
-
-        foreach ($consents as $consent) {
-            $this->revokeMessageConsentAction->handle($contact, [
+        $inboundMessage = $this->recordInboundMessageAction->handle(
+            data: [
                 'channel' => MessageChannel::Sms->value,
-                'purpose' => $consent->purpose,
-                'scope' => $consent->scope,
-
-                'reason' => ConsentRevocation::REASON_STOP,
-                'source' => $payload->source,
-
-                'ip_address' => $payload->ipAddress,
-                'user_agent' => $payload->userAgent,
-
+                'provider' => $payload->provider,
+                'provider_event_id' => $payload->providerEventId,
+                'provider_message_id' => $payload->providerMessageId,
+                'provider_context_id' => $payload->providerContextId,
+                'from_type' => 'phone',
+                'from_value' => $from,
+                'to_type' => 'phone',
+                'to_value' => $to,
+                'body' => $payload->trimmedBody(),
+                'classification' => $this->inboundSmsMessageClassifier->classify(
+                    provider: $payload->provider,
+                    body: $payload->normalizedBody(),
+                ),
+                'purpose' => $this->inboundSmsPurposeResolver->resolve($payload),
+                'scope' => null,
+                'received_at' => $payload->receivedAt,
                 'meta' => [
-                    'provider' => $payload->provider,
-                    'provider_message_id' => $payload->providerMessageId,
-                    'from' => $payload->from,
-                    'to' => $payload->to,
-                    'body' => $payload->body,
-                    'keyword' => $keyword,
+                    'event_type' => $payload->eventType,
+                    'source' => $payload->source,
+                    'ip_address' => $payload->ipAddress,
+                    'user_agent' => $payload->userAgent,
                     'raw' => $payload->raw,
                 ],
-            ]);
-        }
-    }
-
-    private function isStopKeyword(string $provider, string $body): bool
-    {
-        return in_array(
-            strtolower($body),
-            config("sms.providers.{$provider}.webhooks.stop_keywords", []),
-            true,
+            ],
+            recipient: $recipient,
         );
-    }
 
-    private function isHelpKeyword(string $provider, string $body): bool
-    {
-        return in_array(
-            strtolower($body),
-            config("sms.providers.{$provider}.webhooks.help_keywords", []),
-            true,
-        );
-    }
-
-    private function isStartKeyword(string $provider, string $body): bool
-    {
-        return in_array(
-            strtolower($body),
-            config("sms.providers.{$provider}.webhooks.start_keywords", []),
-            true,
-        );
+        return $this->inboundMessageRouter->route($inboundMessage);
     }
 }

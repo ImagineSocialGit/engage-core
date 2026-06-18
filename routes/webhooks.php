@@ -10,7 +10,7 @@ Route::post('/webinar/{provider}', WebinarWebhookController::class)
     ->name('webhooks.webinar');
 
 Route::post('/sms/{provider}', SmsWebhookController::class)
-    ->whereIn('provider', ['twilio', 'telnyx'])
+    ->whereIn('provider', ['telnyx'])
     ->name('webhooks.sms');
 
 Route::post('/email/{provider}', EmailWebhookController::class)

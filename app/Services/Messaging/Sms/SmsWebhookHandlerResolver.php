@@ -4,7 +4,6 @@ namespace App\Services\Messaging\Sms;
 
 use App\Contracts\Messaging\Sms\SmsWebhookHandler;
 use App\Integrations\Messaging\Sms\Telnyx\TelnyxWebhookHandler;
-use App\Integrations\Messaging\Sms\Twilio\TwilioWebhookHandler;
 use InvalidArgumentException;
 
 class SmsWebhookHandlerResolver
@@ -19,7 +18,6 @@ class SmsWebhookHandlerResolver
     public static function default(): self
     {
         return new self([
-            'twilio' => app(TwilioWebhookHandler::class),
             'telnyx' => app(TelnyxWebhookHandler::class),
         ]);
     }

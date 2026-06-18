@@ -12,9 +12,13 @@
 │   │   │   ├── Email
 │   │   │   │   └── HandleInboundEmailWebhookAction.php
 │   │   │   ├── GrantMessageConsentAction.php
+│   │   │   ├── RecordInboundMessageAction.php
 │   │   │   ├── RevokeMessageConsentAction.php
 │   │   │   └── Sms
-│   │   │       └── HandleInboundSmsWebhookAction.php
+│   │   │       ├── HandleInboundSmsWebhookAction.php
+│   │   │       └── Inbound
+│   │   │           ├── RespondToSmsHelpInboundMessageAction.php
+│   │   │           └── RevokeSmsConsentFromInboundMessageAction.php
 │   │   └── Webinars
 │   │       ├── AddRegistrantToWebinarProviderAction.php
 │   │       ├── CancelWebinarRegistrationAction.php
@@ -43,6 +47,7 @@
 │   │   │   │   ├── EmailMessage.php
 │   │   │   │   ├── EmailProvider.php
 │   │   │   │   └── EmailWebhookHandler.php
+│   │   │   ├── InboundMessageHandler.php
 │   │   │   └── Sms
 │   │   │       ├── SmsMessage.php
 │   │   │       ├── SmsProvider.php
@@ -143,6 +148,7 @@
 │   │   ├── ContactMortgageProfile.php
 │   │   ├── Contact.php
 │   │   ├── ContactTag.php
+│   │   ├── InboundMessage.php
 │   │   ├── MessageConsent.php
 │   │   ├── MessageSuppression.php
 │   │   ├── MortgageStage.php
@@ -172,12 +178,16 @@
 │   │   │   │   ├── EmailProviderManager.php
 │   │   │   │   ├── EmailWebhookHandlerResolver.php
 │   │   │   │   └── EmailWebhookPayload.php
+│   │   │   ├── InboundMessageRouter.php
 │   │   │   ├── MessageDefinitionResolver.php
 │   │   │   ├── MessageEligibilityGate.php
 │   │   │   ├── MessageGate.php
 │   │   │   ├── MessageSuppressionService.php
 │   │   │   ├── PhoneNumberNormalizer.php
 │   │   │   └── Sms
+│   │   │       ├── InboundSmsMessageClassifier.php
+│   │   │       ├── InboundSmsPurposeResolver.php
+│   │   │       ├── InboundSmsRecipientResolver.php
 │   │   │       ├── SmsMessagingService.php
 │   │   │       ├── SmsProviderManager.php
 │   │   │       ├── SmsSendGuard.php
@@ -378,7 +388,8 @@
 │   │   ├── 2026_06_02_211116_create_contact_mortgage_profiles_table.php
 │   │   ├── 2026_06_12_050337_create_campaign_enrollments_table.php
 │   │   ├── 2026_06_12_065258_create_broadcasts_table.php
-│   │   └── 2026_06_12_065311_create_broadcast_recipients_table.php
+│   │   ├── 2026_06_12_065311_create_broadcast_recipients_table.php
+│   │   └── 2026_06_18_154535_create_inbound_messages_table.php
 │   ├── schema
 │   └── seeders
 │       ├── DatabaseSeeder.php
@@ -394,6 +405,12 @@
 │   ├── images
 │   │   └── processed
 │   │       ├── brand
+│   │       │   ├── dark_logo
+│   │       │   │   ├── 320.avif
+│   │       │   │   ├── 320.webp
+│   │       │   │   ├── 640.avif
+│   │       │   │   ├── 640.webp
+│   │       │   │   └── placeholder.webp
 │   │       │   └── logo
 │   │       │       ├── 320.avif
 │   │       │       ├── 320.webp
@@ -410,13 +427,11 @@
 │   ├── css
 │   │   └── app.css
 │   ├── images
-│   │   ├── manifest.json
 │   │   └── raw
 │   │       ├── brand
-│   │       │   └── logo.png
+│   │       │   └── dark_logo.png
 │   │       └── webinar
 │   │           └── register
-│   │               └── instructor.png
 │   ├── js
 │   │   ├── app.js
 │   │   └── pages
@@ -545,4 +560,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-183 directories, 363 files
+185 directories, 376 files

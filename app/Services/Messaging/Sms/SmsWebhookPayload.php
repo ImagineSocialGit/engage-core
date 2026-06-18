@@ -2,6 +2,7 @@
 
 namespace App\Services\Messaging\Sms;
 
+use App\Enums\MessageChannel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -9,7 +10,11 @@ class SmsWebhookPayload
 {
     public function __construct(
         public readonly string $provider,
+        public readonly ?string $eventType,
+        public readonly bool $isInboundMessage,
+        public readonly ?string $providerEventId,
         public readonly ?string $providerMessageId,
+        public readonly ?string $providerContextId,
         public readonly ?string $from,
         public readonly ?string $to,
         public readonly ?string $body,
@@ -23,7 +28,11 @@ class SmsWebhookPayload
     public static function fromRequest(
         string $provider,
         Request $request,
+        ?string $eventType,
+        bool $isInboundMessage,
+        ?string $providerEventId,
         ?string $providerMessageId,
+        ?string $providerContextId,
         ?string $from,
         ?string $to,
         ?string $body,
@@ -31,7 +40,11 @@ class SmsWebhookPayload
     ): self {
         return new self(
             provider: $provider,
+            eventType: $eventType,
+            isInboundMessage: $isInboundMessage,
+            providerEventId: $providerEventId,
             providerMessageId: $providerMessageId,
+            providerContextId: $providerContextId,
             from: $from,
             to: $to,
             body: $body,
@@ -41,6 +54,11 @@ class SmsWebhookPayload
             userAgent: $request->userAgent(),
             raw: $request->all(),
         );
+    }
+
+    public function channel(): string
+    {
+        return MessageChannel::Sms->value;
     }
 
     public function normalizedBody(): ?string
@@ -54,14 +72,14 @@ class SmsWebhookPayload
         return $body === '' ? null : $body;
     }
 
-    public function normalizedFrom(): ?string
+    public function trimmedBody(): ?string
     {
-        if (! is_string($this->from)) {
+        if (! is_string($this->body)) {
             return null;
         }
 
-        $from = trim($this->from);
+        $body = trim($this->body);
 
-        return $from === '' ? null : $from;
+        return $body === '' ? null : $body;
     }
 }

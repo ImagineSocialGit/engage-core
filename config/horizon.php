@@ -230,7 +230,7 @@ return [
                 'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 3),
                 'queue' => explode(',', env(
                     'HORIZON_SUPERVISOR_1_QUEUES',
-                    'default,notifications,confirmation_messages,reminders,opt_in_messages'
+                    'default,notifications,confirmation_messages,reminders,opt_in_messages,post_event,marketing'
                 )),
             ],
         ],
@@ -240,7 +240,7 @@ return [
                 'maxProcesses' => env('HORIZON_STAGING_MAX_PROCESSES', 3),
                 'queue' => explode(',', env(
                     'HORIZON_SUPERVISOR_1_QUEUES',
-                    'default,notifications,confirmation_messages,reminders,opt_in_messages'
+                    'default,notifications,confirmation_messages,reminders,opt_in_messages,post_event,marketing'
                 )),
             ],
         ],

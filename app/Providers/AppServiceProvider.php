@@ -19,6 +19,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->mergeConfigFrom(config_path('messaging/sms.php'), 'messaging.sms');
+        $this->mergeConfigFrom(config_path('messaging/email.php'), 'messaging.email');
+
         $this->app->singleton(Client::class, function () {
             return new Client(
                 config('services.twilio.sid'),
