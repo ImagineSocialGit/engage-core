@@ -18,7 +18,7 @@
                 @csrf
                 <input class="bg-white border border-black rounded px-2 py-1 text-lg" type="text" name="user" placeholder="Username">
                 <input class="bg-white border border-black rounded px-2 py-1 text-lg" type="password" name="password" id="password">
-                @error('user')
+                @error('login')
                     <p class="bg-red-600 text-white rounded w-fit px-2 py-1">{{$message}}</p>
                 @enderror
                 <button class="w-fit px-2 py-1 border bg-gray-200 text-lg rounded hover:opacity-60 duration-300 cursor-pointer" type="submit">Log In</button>
