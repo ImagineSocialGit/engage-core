@@ -78,6 +78,7 @@
 │   │   │   │   ├── ContactController.php
 │   │   │   │   ├── ContactNoteController.php
 │   │   │   │   ├── ContactTaskController.php
+│   │   │   │   ├── TeamMemberController.php
 │   │   │   │   └── WebinarController.php
 │   │   │   ├── Public
 │   │   │   │   ├── ConsentRevocationController.php
@@ -155,6 +156,8 @@
 │   │   ├── Note.php
 │   │   ├── ScheduledMessage.php
 │   │   ├── Task.php
+│   │   ├── TeamMemberNotificationPreference.php
+│   │   ├── TeamMember.php
 │   │   ├── User.php
 │   │   ├── Webinar.php
 │   │   ├── WebinarRegistration.php
@@ -363,6 +366,8 @@
 │   │   ├── BroadcastRecipientFactory.php
 │   │   ├── ContactFactory.php
 │   │   ├── ScheduledMessageFactory.php
+│   │   ├── TeamMemberFactory.php
+│   │   ├── TeamMemberNotificationPreferenceFactory.php
 │   │   ├── UserFactory.php
 │   │   ├── WebinarFactory.php
 │   │   ├── WebinarRegistrationFactory.php
@@ -389,7 +394,9 @@
 │   │   ├── 2026_06_12_050337_create_campaign_enrollments_table.php
 │   │   ├── 2026_06_12_065258_create_broadcasts_table.php
 │   │   ├── 2026_06_12_065311_create_broadcast_recipients_table.php
-│   │   └── 2026_06_18_154535_create_inbound_messages_table.php
+│   │   ├── 2026_06_18_154535_create_inbound_messages_table.php
+│   │   ├── 2026_06_20_173406_create_team_members_table.php
+│   │   └── 2026_06_20_174215_create_team_member_notification_preferences_table.php
 │   ├── schema
 │   └── seeders
 │       ├── DatabaseSeeder.php
@@ -540,7 +547,8 @@
 │   │   │   ├── SendScheduledMessageJobTest.php
 │   │   │   ├── SmsMessagingServiceTest.php
 │   │   │   ├── SmsPayloadTest.php
-│   │   │   └── SmsSendGuardTest.php
+│   │   │   ├── SmsSendGuardTest.php
+│   │   │   └── TeamMemberNotificationPreferenceTest.php
 │   │   ├── tests
 │   │   │   └── Feature
 │   │   │       └── Webinars
@@ -549,6 +557,7 @@
 │   │   │   ├── DispatchWebinarOutcomeMessagesActionTest.php
 │   │   │   ├── EmailWebhookControllerTest.php
 │   │   │   ├── SmsWebhookControllerTest.php
+│   │   │   ├── TelnyxInboundSmsWebhookTest.php
 │   │   │   └── ZoomWebhookTest.php
 │   │   └── Webinars
 │   │       ├── CreateWebinarRegistrationActionTest.php
@@ -560,4 +569,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-185 directories, 376 files
+185 directories, 385 files
