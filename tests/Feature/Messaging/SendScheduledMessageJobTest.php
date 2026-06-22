@@ -8,6 +8,7 @@ use App\Contracts\Messaging\Sms\SmsMessage;
 use App\Jobs\Messaging\SendScheduledMessageJob;
 use App\Messaging\Payloads\EmailPayload;
 use App\Models\CampaignEnrollment;
+use App\Models\ConsentRevocation;
 use App\Models\Contact;
 use App\Models\MessageConsent;
 use App\Models\ScheduledMessage;
@@ -167,6 +168,59 @@ class SendScheduledMessageJobTest extends TestCase
             'Message conditions no longer pass.',
             $scheduledMessage->failure_reason
         );
+    }
+
+    public function test_it_skips_when_consent_was_revoked_before_send(): void
+    {
+        $contact = Contact::factory()->create([
+            'email' => 'test@example.com',
+        ]);
+
+        $this->grantConsent($contact, 'email', 'marketing');
+
+        ConsentRevocation::query()->create([
+            'contact_id' => $contact->id,
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar',
+            'revoked_at' => now(),
+            'source' => 'test',
+        ]);
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'recipient_type' => Contact::class,
+            'recipient_id' => $contact->id,
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar',
+            'message_type' => 'follow_up',
+            'payload_class' => FakeJobEmailPayload::class,
+            'payload' => [
+                'to' => 'test@example.com',
+            ],
+            'status' => 'pending',
+            'meta' => [
+                'conditions' => [],
+            ],
+        ]);
+
+        $emailService = Mockery::mock(EmailMessagingService::class);
+        $emailService->shouldNotReceive('send');
+
+        app()->instance(EmailMessagingService::class, $emailService);
+
+        (new SendScheduledMessageJob($scheduledMessage->id))->handle(
+            scheduledMessageGate: app(ScheduledMessageGate::class),
+            emailMessagingService: app(EmailMessagingService::class),
+            smsMessagingService: app(SmsMessagingService::class),
+            scheduleNextCampaignStepAction: app(ScheduleNextCampaignStepAction::class),
+        );
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame('skipped', $scheduledMessage->status);
+        $this->assertNotNull($scheduledMessage->failure_reason);
+        $this->assertNull($scheduledMessage->sent_at);
     }
 
     public function test_it_skips_when_gate_denies_send(): void
