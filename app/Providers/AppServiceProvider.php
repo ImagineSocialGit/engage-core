@@ -2,12 +2,19 @@
 
 namespace App\Providers;
 
+use App\Events\Messaging\ScheduledMessageSent;
+use App\Listeners\Campaigns\ScheduleNextCampaignStepAfterScheduledMessageSent;
+use App\Services\CRM\Tasks\AssignedRecipients\TeamMemberTaskAssignedRecipientResolver;
+use App\Services\CRM\Tasks\TaskAssignedRecipientsResolver;
 use App\Services\Messaging\Email\EmailProviderManager;
 use App\Services\Messaging\Email\EmailWebhookHandlerResolver;
+use App\Services\Messaging\InternalNotificationChannelResolver;
+use App\Services\Messaging\InternalNotificationPreferences\TeamMemberInternalNotificationPreferenceResolver;
 use App\Services\Messaging\Sms\SmsProviderManager;
 use App\Services\Messaging\Sms\SmsWebhookHandlerResolver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Twilio\Rest\Client;
@@ -40,6 +47,23 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(EmailProviderManager::class);
 
         $this->app->singleton(EmailWebhookHandlerResolver::class);
+
+        $this->app->tag([
+            TeamMemberTaskAssignedRecipientResolver::class,
+        ], 'crm.tasks.assigned_recipient_resolvers');
+
+        $this->app->when(TaskAssignedRecipientsResolver::class)
+            ->needs('$resolvers')
+            ->giveTagged('crm.tasks.assigned_recipient_resolvers');
+
+        $this->app->tag([
+            TeamMemberInternalNotificationPreferenceResolver::class,
+        ], 'messaging.internal_notification_preference_resolvers');
+
+        $this->app->when(InternalNotificationChannelResolver::class)
+            ->needs('$preferenceResolvers')
+            ->giveTagged('messaging.internal_notification_preference_resolvers');
+            
     }
 
     /**
@@ -96,6 +120,11 @@ class AppServiceProvider extends ServiceProvider
 
             return $limits;
         });
+
+        Event::listen(
+            ScheduledMessageSent::class,
+            ScheduleNextCampaignStepAfterScheduledMessageSent::class,
+        );
     }
 
     private function webinarRegistrationThrottleResponse(string $field, string $message): callable

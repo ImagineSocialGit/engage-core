@@ -2,29 +2,35 @@
 
 namespace App\Actions\Messaging\Inbound;
 
+use App\Actions\Messaging\Internal\ScheduleInternalNotificationAction;
 use App\Contracts\Messaging\InboundMessageHandler;
-use App\Enums\MessageChannel;
-use App\Mail\InboundMessageNotificationMail;
+use App\Models\Contact;
 use App\Models\InboundMessage;
-use App\Models\TeamMember;
-use App\Models\TeamMemberNotificationPreference;
 use App\Services\Messaging\InboundMessageNotificationRecipientResolver;
-use App\Services\Messaging\InternalNotificationChannelResolver;
-use Illuminate\Support\Facades\Mail;
+use App\Services\Messaging\InternalNotificationRecipient;
+use BackedEnum;
+use Illuminate\Support\Str;
 
 class NotifyInternalUsersOfInboundMessageAction implements InboundMessageHandler
 {
     public function __construct(
         private readonly InboundMessageNotificationRecipientResolver $recipientResolver,
-        private readonly InternalNotificationChannelResolver $channelResolver,
+        private readonly ScheduleInternalNotificationAction $scheduleInternalNotification,
     ) {}
 
     public function handle(InboundMessage $inboundMessage): ?string
     {
         $recipient = $this->recipientResolver->resolve($inboundMessage);
 
-        if ($recipient !== null) {
-            $this->notify($inboundMessage, $recipient);
+        if ($recipient instanceof InternalNotificationRecipient) {
+            $this->scheduleInternalNotification->handle(
+                recipient: $recipient,
+                scope: 'inbound_messages',
+                messageType: 'inbound_reply',
+                content: $this->content($inboundMessage),
+                context: $inboundMessage,
+                dedupeKey: $this->dedupeKey($inboundMessage, $recipient),
+            );
         }
 
         $inboundMessage->markProcessed();
@@ -33,47 +39,108 @@ class NotifyInternalUsersOfInboundMessageAction implements InboundMessageHandler
     }
 
     /**
-     * @param array{team_member: ?TeamMember, fallback_email: ?string, source: string} $recipient
+     * @return array<string, mixed>
      */
-    private function notify(InboundMessage $inboundMessage, array $recipient): void
+    private function content(InboundMessage $inboundMessage): array
     {
-        $teamMember = $recipient['team_member'];
-        $fallbackEmail = $recipient['fallback_email'];
+        $contact = $this->contact($inboundMessage);
+        $contactName = $this->contactName($contact);
+        $sender = $inboundMessage->from_value ?: 'Unknown sender';
+        $channelLabel = $this->channelLabel($inboundMessage);
 
-        if ($teamMember instanceof TeamMember) {
-            $this->notifyTeamMember($inboundMessage, $teamMember, $recipient['source']);
-
-            return;
-        }
-
-        if ($fallbackEmail) {
-            Mail::to($fallbackEmail)
-                ->send(new InboundMessageNotificationMail(
-                    inboundMessage: $inboundMessage,
-                    recipientSource: $recipient['source'],
-                ));
-        }
+        return [
+            'subject' => 'New inbound '.$channelLabel.' message from '.$this->subjectSender($contactName, $sender),
+            'headline' => 'New inbound message',
+            'preheader' => 'A new inbound '.$channelLabel.' message was received.',
+            'body' => [
+                $contact
+                    ? 'A contact replied through '.$channelLabel.'.'
+                    : 'An inbound '.$channelLabel.' message was received, but no matching contact was found.',
+            ],
+            'details' => [
+                'Contact' => $contactName ?: 'No matched contact',
+                'Channel' => strtoupper($this->channelValue($inboundMessage)),
+                'Sender' => $sender,
+                'Received' => $this->receivedAt($inboundMessage),
+                'Message' => $inboundMessage->body ?: '(No message body)',
+            ],
+            'cta' => $contact ? [
+                'label' => 'View CRM Contact',
+                'url' => route('crm.contacts.show', $contact),
+            ] : [],
+            'sms_message' => 'New inbound '.$channelLabel.' message from '.$this->subjectSender($contactName, $sender).'.',
+            'meta' => [
+                'inbound_message_id' => $inboundMessage->id,
+                'sender_type' => $inboundMessage->sender_type,
+                'sender_id' => $inboundMessage->sender_id,
+            ],
+        ];
     }
 
-    private function notifyTeamMember(
-        InboundMessage $inboundMessage,
-        TeamMember $teamMember,
-        string $recipientSource,
-    ): void {
-        $channel = $this->channelResolver->resolve(
-            teamMember: $teamMember,
-            notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
-            allowedChannels: [MessageChannel::Email],
-        );
+    private function contact(InboundMessage $inboundMessage): ?Contact
+    {
+        $sender = $inboundMessage->sender;
 
-        if ($channel !== MessageChannel::Email) {
-            return;
+        return $sender instanceof Contact ? $sender : null;
+    }
+
+    private function contactName(?Contact $contact): ?string
+    {
+        if (! $contact) {
+            return null;
         }
 
-        Mail::to($teamMember->email)
-            ->send(new InboundMessageNotificationMail(
-                inboundMessage: $inboundMessage,
-                recipientSource: $recipientSource,
-            ));
+        $name = trim((string) ($contact->name ?: trim(
+            trim((string) $contact->first_name).' '.trim((string) $contact->last_name)
+        )));
+
+        return $name !== '' ? $name : $contact->email;
+    }
+
+    private function channelLabel(InboundMessage $inboundMessage): string
+    {
+        return Str::of($this->channelValue($inboundMessage))
+            ->lower()
+            ->headline()
+            ->toString();
+    }
+
+    private function channelValue(InboundMessage $inboundMessage): string
+    {
+        $channel = $inboundMessage->channel;
+
+        if ($channel instanceof BackedEnum) {
+            return (string) $channel->value;
+        }
+
+        return (string) $channel;
+    }
+
+    private function subjectSender(?string $contactName, string $sender): string
+    {
+        return $contactName ?: $sender;
+    }
+
+    private function receivedAt(InboundMessage $inboundMessage): string
+    {
+        return $inboundMessage->received_at
+            ? $inboundMessage->received_at
+                ->timezone(config('app.timezone'))
+                ->format('M j, Y g:i A T')
+            : 'Unknown';
+    }
+
+    private function dedupeKey(
+        InboundMessage $inboundMessage,
+        InternalNotificationRecipient $recipient,
+    ): string {
+        return implode(':', [
+            'internal_notification',
+            'inbound_reply',
+            $recipient->source->getMorphClass(),
+            $recipient->source->getKey(),
+            $inboundMessage->getMorphClass(),
+            $inboundMessage->getKey(),
+        ]);
     }
 }

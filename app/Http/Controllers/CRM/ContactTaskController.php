@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\CRM;
 
+use App\Actions\CRM\Tasks\NotifyAssignedTaskRecipientsAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CRM\StoreContactTaskRequest;
 use App\Models\Contact;
@@ -11,11 +12,14 @@ use Illuminate\Http\RedirectResponse;
 
 class ContactTaskController extends Controller
 {
-    public function store(StoreContactTaskRequest $request, Contact $contact): RedirectResponse
-    {
+    public function store(
+        StoreContactTaskRequest $request,
+        Contact $contact,
+        NotifyAssignedTaskRecipientsAction $notifyAssignedTaskRecipients,
+    ): RedirectResponse {
         $validated = $request->validated();
 
-        $contact->tasks()->create([
+        $task = $contact->tasks()->create([
             'assigned_to_type' => TeamMember::class,
             'assigned_to_id' => $validated['assigned_to_id'],
             'title' => $validated['title'],
@@ -23,6 +27,10 @@ class ContactTaskController extends Controller
             'due_at' => $validated['due_at'] ?? null,
             'status' => 'open',
         ]);
+
+        if ($request->boolean('notify_assignee')) {
+            $notifyAssignedTaskRecipients->handle($task);
+        }
 
         return redirect()->back();
     }

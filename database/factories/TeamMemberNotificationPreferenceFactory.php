@@ -44,6 +44,34 @@ class TeamMemberNotificationPreferenceFactory extends Factory
         ]);
     }
 
+    public function taskAssigned(): self
+    {
+        return $this->state([
+            'notification_type' => TeamMemberNotificationPreference::TYPE_TASK_ASSIGNED,
+        ]);
+    }
+
+    public function taskDue(): self
+    {
+        return $this->state([
+            'notification_type' => TeamMemberNotificationPreference::TYPE_TASK_DUE,
+        ]);
+    }
+
+    public function dailyDigest(): self
+    {
+        return $this->state([
+            'notification_type' => TeamMemberNotificationPreference::TYPE_DAILY_DIGEST,
+        ]);
+    }
+
+    public function weeklyDigest(): self
+    {
+        return $this->state([
+            'notification_type' => TeamMemberNotificationPreference::TYPE_WEEKLY_DIGEST,
+        ]);
+    }
+
     public function disabled(): self
     {
         return $this->state([

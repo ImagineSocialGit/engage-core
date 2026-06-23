@@ -7,6 +7,11 @@
 │   │   │   ├── EnrollContactInCampaignAction.php
 │   │   │   └── ScheduleNextCampaignStepAction.php
 │   │   ├── Contacts
+│   │   ├── CRM
+│   │   │   └── Tasks
+│   │   │       ├── BuildTaskDigestsAction.php
+│   │   │       ├── NotifyAssignedTaskRecipientsAction.php
+│   │   │       └── SendTaskDigestNotificationsAction.php
 │   │   ├── Messaging
 │   │   │   ├── DispatchMessageAction.php
 │   │   │   ├── Email
@@ -14,8 +19,11 @@
 │   │   │   ├── GrantMessageConsentAction.php
 │   │   │   ├── Inbound
 │   │   │   │   └── NotifyInternalUsersOfInboundMessageAction.php
+│   │   │   ├── Internal
+│   │   │   │   └── ScheduleInternalNotificationAction.php
 │   │   │   ├── RecordInboundMessageAction.php
 │   │   │   ├── RevokeMessageConsentAction.php
+│   │   │   ├── ScheduleMessageAction.php
 │   │   │   └── Sms
 │   │   │       ├── HandleInboundSmsWebhookAction.php
 │   │   │       └── Inbound
@@ -44,12 +52,16 @@
 │   ├── Console
 │   │   └── Commands
 │   ├── Contracts
+│   │   ├── CRM
+│   │   │   └── Tasks
+│   │   │       └── TaskAssignedRecipientResolver.php
 │   │   ├── Messaging
 │   │   │   ├── Email
 │   │   │   │   ├── EmailMessage.php
 │   │   │   │   ├── EmailProvider.php
 │   │   │   │   └── EmailWebhookHandler.php
 │   │   │   ├── InboundMessageHandler.php
+│   │   │   ├── InternalNotificationPreferenceResolver.php
 │   │   │   └── Sms
 │   │   │       ├── SmsMessage.php
 │   │   │       ├── SmsProvider.php
@@ -57,6 +69,9 @@
 │   │   └── Webinars
 │   │       └── WebinarProvider.php
 │   ├── Data
+│   │   ├── CRM
+│   │   │   └── Tasks
+│   │   │       └── TaskDigest.php
 │   │   ├── MessageData.php
 │   │   ├── WebinarMessageData.php
 │   │   └── Webinars
@@ -70,6 +85,9 @@
 │   │   ├── MessagePurpose.php
 │   │   ├── TagType.php
 │   │   └── WebinarTag.php
+│   ├── Events
+│   │   └── Messaging
+│   │       └── ScheduledMessageSent.php
 │   ├── helpers.php
 │   ├── Http
 │   │   ├── Controllers
@@ -138,11 +156,16 @@
 │   │           ├── ProcessPostWebinarEventJob.php
 │   │           ├── ProcessWebinarProviderEventJob.php
 │   │           └── RoutePostWebinarRegistrationJob.php
+│   ├── Listeners
+│   │   └── Campaigns
+│   │       └── ScheduleNextCampaignStepAfterScheduledMessageSent.php
 │   ├── Mail
-│   │   └── InboundMessageNotificationMail.php
 │   ├── Messaging
 │   │   └── Payloads
 │   │       ├── EmailPayload.php
+│   │       ├── Internal
+│   │       │   ├── InternalEmailNotificationPayload.php
+│   │       │   └── InternalSmsNotificationPayload.php
 │   │       ├── SmsPayload.php
 │   │       └── Webinars
 │   ├── Models
@@ -177,7 +200,12 @@
 │   │       └── MessageConsentRules.php
 │   ├── Services
 │   │   ├── ConditionChecker.php
-│   │   ├── Leads
+│   │   ├── CRM
+│   │   │   └── Tasks
+│   │   │       ├── AssignedRecipients
+│   │   │       │   └── TeamMemberTaskAssignedRecipientResolver.php
+│   │   │       ├── TaskAssignedRecipientsResolver.php
+│   │   │       └── TaskRelatedSubjectResolver.php
 │   │   ├── Messaging
 │   │   │   ├── DevMessageSink.php
 │   │   │   ├── Email
@@ -189,6 +217,9 @@
 │   │   │   ├── InboundMessageRouter.php
 │   │   │   ├── InternalNotificationChannelResolver.php
 │   │   │   ├── InternalNotificationGate.php
+│   │   │   ├── InternalNotificationPreferences
+│   │   │   │   └── TeamMemberInternalNotificationPreferenceResolver.php
+│   │   │   ├── InternalNotificationRecipient.php
 │   │   │   ├── MessageDefinitionResolver.php
 │   │   │   ├── MessageEligibilityGate.php
 │   │   │   ├── MessageGate.php
@@ -536,7 +567,8 @@
 │   │   │   └── BroadcastModelTest.php
 │   │   ├── Campaigns
 │   │   │   ├── EnrollContactInCampaignActionTest.php
-│   │   │   └── ScheduleNextCampaignStepActionTest.php
+│   │   │   ├── ScheduleNextCampaignStepActionTest.php
+│   │   │   └── ScheduleNextCampaignStepAfterScheduledMessageSentTest.php
 │   │   ├── CRM
 │   │   │   ├── ContactTaskAssignmentTest.php
 │   │   │   └── WebinarSyncTest.php
@@ -583,4 +615,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-187 directories, 397 files
+202 directories, 414 files

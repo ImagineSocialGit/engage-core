@@ -5,40 +5,27 @@ namespace App\Services\Messaging;
 use App\Models\Contact;
 use App\Models\InboundMessage;
 use App\Models\TeamMember;
+use App\Models\TeamMemberNotificationPreference;
 
 class InboundMessageNotificationRecipientResolver
 {
-    /**
-     * @return array{team_member: ?TeamMember, fallback_email: ?string, source: string}|null
-     */
-    public function resolve(InboundMessage $inboundMessage): ?array
+    public function resolve(InboundMessage $inboundMessage): ?InternalNotificationRecipient
     {
-        $teamMember = $this->resolveFromContact($inboundMessage);
+        $teamMember = $this->resolveFromContact($inboundMessage)
+            ?? $this->resolveDefaultTeamMember();
 
-        if ($teamMember) {
-            return $this->teamMemberRecipient($teamMember, 'contact_owner');
+        if (! $teamMember) {
+            return null;
         }
 
-        $teamMember = $this->resolveDefaultTeamMember();
-
-        if ($teamMember) {
-            return $this->teamMemberRecipient($teamMember, 'default_team_member');
-        }
-
-        $fallbackEmail = trim((string) config(
-            'messaging.internal_notifications.inbound_replies.fallback_admin_email',
-            ''
-        ));
-
-        if ($fallbackEmail !== '') {
-            return [
-                'team_member' => null,
-                'fallback_email' => $fallbackEmail,
-                'source' => 'fallback_admin_email',
-            ];
-        }
-
-        return null;
+        return new InternalNotificationRecipient(
+            source: $teamMember,
+            name: $this->teamMemberName($teamMember),
+            email: $teamMember->email,
+            phone: $teamMember->phone,
+            notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
+            preferenceOwner: $teamMember,
+        );
     }
 
     private function resolveFromContact(InboundMessage $inboundMessage): ?TeamMember
@@ -95,15 +82,10 @@ class InboundMessageNotificationRecipientResolver
             ->first();
     }
 
-    /**
-     * @return array{team_member: TeamMember, fallback_email: null, source: string}
-     */
-    private function teamMemberRecipient(TeamMember $teamMember, string $source): array
+    private function teamMemberName(TeamMember $teamMember): string
     {
-        return [
-            'team_member' => $teamMember,
-            'fallback_email' => null,
-            'source' => $source,
-        ];
+        $name = trim((string) $teamMember->name);
+
+        return $name !== '' ? $name : ($teamMember->email ?: 'Team Member #'.$teamMember->id);
     }
 }

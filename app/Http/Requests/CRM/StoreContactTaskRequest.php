@@ -23,6 +23,7 @@ class StoreContactTaskRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'due_at' => ['nullable', 'date'],
+            'notify_assignee' => ['sometimes', 'boolean'],
         ];
     }
 }

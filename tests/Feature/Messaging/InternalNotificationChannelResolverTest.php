@@ -6,6 +6,7 @@ use App\Enums\MessageChannel;
 use App\Models\TeamMember;
 use App\Models\TeamMemberNotificationPreference;
 use App\Services\Messaging\InternalNotificationChannelResolver;
+use App\Services\Messaging\InternalNotificationRecipient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -13,7 +14,7 @@ class InternalNotificationChannelResolverTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_resolves_email_by_default_when_team_member_can_receive_email(): void
+    public function test_resolves_email_by_default_when_recipient_can_receive_email(): void
     {
         $teamMember = TeamMember::factory()->create([
             'email' => 'admin@example.com',
@@ -21,11 +22,13 @@ class InternalNotificationChannelResolverTest extends TestCase
             'active' => true,
         ]);
 
+        $recipient = $this->recipient($teamMember);
+
         $this->assertSame(
             MessageChannel::Email,
             $this->resolver()->resolve(
-                teamMember: $teamMember,
-                notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
+                recipient: $recipient,
+                notificationType: $recipient->notificationType,
             )
         );
     }
@@ -46,11 +49,13 @@ class InternalNotificationChannelResolverTest extends TestCase
                 'enabled' => true,
             ]);
 
+        $recipient = $this->recipient($teamMember);
+
         $this->assertSame(
             MessageChannel::Sms,
             $this->resolver()->resolve(
-                teamMember: $teamMember,
-                notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
+                recipient: $recipient,
+                notificationType: $recipient->notificationType,
             )
         );
     }
@@ -71,11 +76,13 @@ class InternalNotificationChannelResolverTest extends TestCase
                 'enabled' => true,
             ]);
 
+        $recipient = $this->recipient($teamMember);
+
         $this->assertSame(
             MessageChannel::Sms,
             $this->resolver()->resolve(
-                teamMember: $teamMember,
-                notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
+                recipient: $recipient,
+                notificationType: $recipient->notificationType,
                 allowedChannels: [MessageChannel::Sms, MessageChannel::Email],
             )
         );
@@ -89,10 +96,12 @@ class InternalNotificationChannelResolverTest extends TestCase
             'active' => true,
         ]);
 
+        $recipient = $this->recipient($teamMember);
+
         $this->assertNull(
             $this->resolver()->resolve(
-                teamMember: $teamMember,
-                notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
+                recipient: $recipient,
+                notificationType: $recipient->notificationType,
                 allowedChannels: [MessageChannel::Sms],
             )
         );
@@ -105,10 +114,12 @@ class InternalNotificationChannelResolverTest extends TestCase
             'phone' => '+15551234567',
         ]);
 
+        $recipient = $this->recipient($teamMember);
+
         $this->assertNull(
             $this->resolver()->resolve(
-                teamMember: $teamMember,
-                notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
+                recipient: $recipient,
+                notificationType: $recipient->notificationType,
             )
         );
     }
@@ -120,13 +131,27 @@ class InternalNotificationChannelResolverTest extends TestCase
             'active' => true,
         ]);
 
+        $recipient = $this->recipient($teamMember);
+
         $this->assertSame(
             MessageChannel::Email,
             $this->resolver()->resolve(
-                teamMember: $teamMember,
-                notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
+                recipient: $recipient,
+                notificationType: $recipient->notificationType,
                 allowedChannels: ['fax', 'email'],
             )
+        );
+    }
+
+    private function recipient(TeamMember $teamMember): InternalNotificationRecipient
+    {
+        return new InternalNotificationRecipient(
+            source: $teamMember,
+            name: $teamMember->name,
+            email: $teamMember->email,
+            phone: $teamMember->phone,
+            notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
+            preferenceOwner: $teamMember,
         );
     }
 

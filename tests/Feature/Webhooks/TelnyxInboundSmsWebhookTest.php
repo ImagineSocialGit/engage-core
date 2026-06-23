@@ -6,11 +6,13 @@ use App\Actions\Messaging\Inbound\NotifyInternalUsersOfInboundMessageAction;
 use App\Actions\Messaging\Sms\Inbound\RespondToSmsHelpInboundMessageAction;
 use App\Actions\Messaging\Sms\Inbound\RevokeSmsConsentFromInboundMessageAction;
 use App\Contracts\Messaging\Sms\SmsWebhookHandler;
-use App\Mail\InboundMessageNotificationMail;
+use App\Jobs\Messaging\SendScheduledMessageJob;
+use App\Messaging\Payloads\Internal\InternalEmailNotificationPayload;
 use App\Models\ConsentRevocation;
 use App\Models\Contact;
 use App\Models\InboundMessage;
 use App\Models\MessageConsent;
+use App\Models\ScheduledMessage;
 use App\Models\TeamMember;
 use App\Models\TeamMemberNotificationPreference;
 use App\Services\Messaging\Sms\SmsWebhookHandlerResolver;
@@ -19,7 +21,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class TelnyxInboundSmsWebhookTest extends TestCase
@@ -130,9 +132,9 @@ class TelnyxInboundSmsWebhookTest extends TestCase
         $this->assertDatabaseCount('consent_revocations', 0);
     }
 
-    public function test_telnyx_inbound_normal_reply_stores_inbound_message_and_sends_internal_email_notification(): void
+    public function test_telnyx_inbound_normal_reply_stores_inbound_message_and_schedules_internal_email_notification(): void
     {
-        Mail::fake();
+        Queue::fake();
 
         $teamMember = TeamMember::factory()->create([
             'name' => 'Loan Officer',
@@ -173,16 +175,20 @@ class TelnyxInboundSmsWebhookTest extends TestCase
         $this->assertNotNull($inboundMessage?->processed_at);
         $this->assertDatabaseCount('consent_revocations', 0);
 
-        Mail::assertSent(
-            InboundMessageNotificationMail::class,
-            fn (InboundMessageNotificationMail $mail): bool => $mail->hasTo($teamMember->email)
-                && $mail->inboundMessage->is($inboundMessage)
+        $scheduledMessage = $this->assertInboundNotificationScheduledFor(
+            teamMember: $teamMember,
+            inboundMessage: $inboundMessage,
         );
+
+        Queue::assertPushed(SendScheduledMessageJob::class);
+
+        $this->assertSame($teamMember->email, $scheduledMessage->payload['to']);
+        $this->assertSame('New inbound Sms message from Test Contact', $scheduledMessage->payload['subject']);
     }
 
     public function test_telnyx_inbound_normal_reply_without_contact_falls_back_to_default_team_member(): void
     {
-        Mail::fake();
+        Queue::fake();
 
         $teamMember = TeamMember::factory()->create([
             'email' => 'default@example.com',
@@ -215,16 +221,19 @@ class TelnyxInboundSmsWebhookTest extends TestCase
 
         $this->assertNotNull($inboundMessage?->processed_at);
 
-        Mail::assertSent(
-            InboundMessageNotificationMail::class,
-            fn (InboundMessageNotificationMail $mail): bool => $mail->hasTo($teamMember->email)
-                && $mail->inboundMessage->is($inboundMessage)
+        $scheduledMessage = $this->assertInboundNotificationScheduledFor(
+            teamMember: $teamMember,
+            inboundMessage: $inboundMessage,
         );
+
+        Queue::assertPushed(SendScheduledMessageJob::class);
+
+        $this->assertSame($teamMember->email, $scheduledMessage->payload['to']);
     }
 
     public function test_telnyx_inbound_normal_reply_does_not_notify_inactive_assigned_team_member(): void
     {
-        Mail::fake();
+        Queue::fake();
 
         $inactiveTeamMember = TeamMember::factory()->inactive()->create([
             'email' => 'inactive@example.com',
@@ -249,20 +258,23 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             'body' => 'Please call me',
         ])->assertOk();
 
-        Mail::assertNotSent(
-            InboundMessageNotificationMail::class,
-            fn (InboundMessageNotificationMail $mail): bool => $mail->hasTo($inactiveTeamMember->email)
+        $inboundMessage = InboundMessage::query()->first();
+
+        $this->assertNoInboundNotificationScheduledFor($inactiveTeamMember);
+
+        $scheduledMessage = $this->assertInboundNotificationScheduledFor(
+            teamMember: $defaultTeamMember,
+            inboundMessage: $inboundMessage,
         );
 
-        Mail::assertSent(
-            InboundMessageNotificationMail::class,
-            fn (InboundMessageNotificationMail $mail): bool => $mail->hasTo($defaultTeamMember->email)
-        );
+        Queue::assertPushed(SendScheduledMessageJob::class);
+
+        $this->assertSame($defaultTeamMember->email, $scheduledMessage->payload['to']);
     }
 
     public function test_telnyx_inbound_normal_reply_respects_team_member_email_preference(): void
     {
-        Mail::fake();
+        Queue::fake();
 
         $assignedTeamMember = TeamMember::factory()->create([
             'email' => 'assigned@example.com',
@@ -288,16 +300,14 @@ class TelnyxInboundSmsWebhookTest extends TestCase
         $inboundMessage = InboundMessage::query()->first();
 
         $this->assertNotNull($inboundMessage?->processed_at);
+        $this->assertNoInboundNotificationScheduledFor($assignedTeamMember);
 
-        Mail::assertNotSent(
-            InboundMessageNotificationMail::class,
-            fn (InboundMessageNotificationMail $mail): bool => $mail->hasTo($assignedTeamMember->email)
-        );
+        Queue::assertNotPushed(SendScheduledMessageJob::class);
     }
 
     public function test_telnyx_inbound_normal_reply_assigned_to_string_can_match_active_team_member_name(): void
     {
-        Mail::fake();
+        Queue::fake();
 
         $teamMember = TeamMember::factory()->create([
             'name' => 'Jane Loan Officer',
@@ -314,10 +324,16 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             'body' => 'Sounds good',
         ])->assertOk();
 
-        Mail::assertSent(
-            InboundMessageNotificationMail::class,
-            fn (InboundMessageNotificationMail $mail): bool => $mail->hasTo($teamMember->email)
+        $inboundMessage = InboundMessage::query()->first();
+
+        $scheduledMessage = $this->assertInboundNotificationScheduledFor(
+            teamMember: $teamMember,
+            inboundMessage: $inboundMessage,
         );
+
+        Queue::assertPushed(SendScheduledMessageJob::class);
+
+        $this->assertSame($teamMember->email, $scheduledMessage->payload['to']);
     }
 
     public function test_telnyx_stop_from_marketing_profile_revokes_marketing_sms_only(): void
@@ -480,6 +496,48 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             'body' => 'Hello',
             'received_at' => now()->toIso8601String(),
         ], $payload));
+    }
+
+    private function assertInboundNotificationScheduledFor(
+        TeamMember $teamMember,
+        ?InboundMessage $inboundMessage = null,
+    ): ScheduledMessage {
+        $query = ScheduledMessage::query()
+            ->where('recipient_type', $teamMember->getMorphClass())
+            ->where('recipient_id', $teamMember->id)
+            ->where('channel', 'email')
+            ->where('purpose', 'internal')
+            ->where('scope', 'inbound_messages')
+            ->where('message_type', 'inbound_reply')
+            ->where('payload_class', InternalEmailNotificationPayload::class);
+
+        if ($inboundMessage) {
+            $query
+                ->where('context_type', $inboundMessage->getMorphClass())
+                ->where('context_id', $inboundMessage->id);
+        }
+
+        $scheduledMessage = $query->first();
+
+        $this->assertNotNull($scheduledMessage, 'Expected inbound notification scheduled message was not created.');
+
+        return $scheduledMessage;
+    }
+
+    private function assertNoInboundNotificationScheduledFor(TeamMember $teamMember): void
+    {
+        $this->assertFalse(
+            ScheduledMessage::query()
+                ->where('recipient_type', $teamMember->getMorphClass())
+                ->where('recipient_id', $teamMember->id)
+                ->where('channel', 'email')
+                ->where('purpose', 'internal')
+                ->where('scope', 'inbound_messages')
+                ->where('message_type', 'inbound_reply')
+                ->where('payload_class', InternalEmailNotificationPayload::class)
+                ->exists(),
+            'Unexpected inbound notification scheduled message was created.',
+        );
     }
 }
 

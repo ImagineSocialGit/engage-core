@@ -4,7 +4,6 @@ namespace App\Actions\Messaging;
 
 use App\Enums\MessageChannel;
 use App\Enums\MessagePurpose;
-use App\Jobs\Messaging\SendScheduledMessageJob;
 use App\Models\ScheduledMessage;
 use App\Services\Messaging\MessageDefinitionResolver;
 use App\Services\Messaging\MessagePlanningGate;
@@ -19,13 +18,14 @@ class DispatchMessageAction
         private readonly MessageDefinitionResolver $messageDefinitionResolver,
         private readonly MessageRecipientPayloadResolver $payloadResolver,
         private readonly MessagePlanningGate $planningGate,
+        private readonly ScheduleMessageAction $scheduleMessageAction,
     ) {}
 
     /**
-     * @param  string|array<int, string>  $dispatchKeys
-     * @param  array<string, mixed>  $payload
-     * @param  array<string, mixed>|null  $meta
-     * @param  array<string, mixed>  $criteria
+     * @param string|array<int, string> $dispatchKeys
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed>|null $meta
+     * @param array<string, mixed> $criteria
      * @return array<int, ScheduledMessage>
      */
     public function handle(
@@ -107,29 +107,35 @@ class DispatchMessageAction
                 continue;
             }
 
-            $scheduledMessages[] = $this->createScheduledMessage(
+            $messageMeta = array_replace_recursive(
+                [
+                    'queue' => $definition['queue'],
+                    'definition_config_path' => $definition['config_path'],
+                    'dispatch_keys' => $definition['dispatch_keys'],
+                    'campaign_key' => $definition['campaign_key'] ?? null,
+                    'campaign_step' => $definition['step'] ?? null,
+                    'conditions' => $definition['conditions'] ?? [],
+                    'schedule' => $definition['schedule'] ?? null,
+                    'skip_when_join_clicked' => $definition['skip_when_join_clicked'] ?? false,
+                    'notification_type' => $definition['notification_type'] ?? null,
+                    'triggered_at' => $triggeredAt->toISOString(),
+                    'anchor' => $anchor?->toISOString(),
+                ],
+                $meta ?? [],
+            );
+
+            $scheduledMessages[] = $this->scheduleMessageAction->handle(
                 recipient: $recipient,
-                definition: $definition,
+                channel: $definition['channel'],
+                purpose: $definition['purpose'],
+                scope: $definition['scope'],
+                messageType: $definition['message_type'],
+                payloadClass: $definition['payload_class'],
                 payload: $resolvedPayload,
                 sendAt: $sendAt,
                 context: $context,
                 dedupeKey: $this->dedupeKey($recipient, $definition, $context, $sendAt),
-                meta: array_replace_recursive(
-                    [
-                        'queue' => $definition['queue'],
-                        'definition_config_path' => $definition['config_path'],
-                        'dispatch_keys' => $definition['dispatch_keys'],
-                        'campaign_key' => $definition['campaign_key'] ?? null,
-                        'campaign_step' => $definition['step'] ?? null,
-                        'conditions' => $definition['conditions'] ?? [],
-                        'schedule' => $definition['schedule'] ?? null,
-                        'skip_when_join_clicked' => $definition['skip_when_join_clicked'] ?? false,
-                        'notification_type' => $definition['notification_type'] ?? null,
-                        'triggered_at' => $triggeredAt->toISOString(),
-                        'anchor' => $anchor?->toISOString(),
-                    ],
-                    $meta ?? [],
-                ),
+                meta: $messageMeta,
             );
         }
 
@@ -137,7 +143,7 @@ class DispatchMessageAction
     }
 
     /**
-     * @param  array<string, mixed>  $definition
+     * @param array<string, mixed> $definition
      */
     private function sendAt(array $definition, Carbon $triggeredAt, ?Carbon $anchor): Carbon
     {
@@ -170,101 +176,8 @@ class DispatchMessageAction
     }
 
     /**
-     * @param  array<string, mixed>  $definition
-     * @param  array<string, mixed>  $payload
-     * @param  array<string, mixed>  $meta
-     */
-    private function createScheduledMessage(
-        Model $recipient,
-        array $definition,
-        array $payload,
-        Carbon $sendAt,
-        ?Model $context,
-        ?string $dedupeKey,
-        array $meta,
-    ): ScheduledMessage {
-        $attributes = [
-            'recipient_type' => $recipient->getMorphClass(),
-            'recipient_id' => $recipient->getKey(),
-            'channel' => $definition['channel'],
-            'message_type' => $definition['message_type'],
-            'purpose' => $definition['purpose'],
-            'scope' => $definition['scope'],
-            'payload_class' => $definition['payload_class'],
-            'payload' => $payload,
-            'send_at' => $sendAt,
-            'status' => 'pending',
-            'meta' => $meta,
-        ];
-
-        if ($context) {
-            $attributes['context_type'] = $context->getMorphClass();
-            $attributes['context_id'] = $context->getKey();
-        }
-
-        $scheduledMessage = $dedupeKey
-            ? ScheduledMessage::query()->firstOrCreate(
-                ['dedupe_key' => $dedupeKey],
-                $attributes + ['dedupe_key' => $dedupeKey],
-            )
-            : ScheduledMessage::query()->create($attributes);
-
-        if ($scheduledMessage->wasRecentlyCreated) {
-            $dispatch = SendScheduledMessageJob::dispatch(
-                scheduledMessageId: $scheduledMessage->id,
-                horizon: $this->horizonPayload(
-                    scheduledMessage: $scheduledMessage,
-                    definition: $definition,
-                    sendAt: $sendAt,
-                    context: $context,
-                    meta: $meta,
-                ),
-            )
-                ->delay($sendAt)
-                ->afterCommit();
-
-            if ($queue = $meta['queue'] ?? null) {
-                $dispatch->onQueue($queue);
-            }
-        }
-
-        return $scheduledMessage;
-    }
-
-    /**
-     * @param  array<string, mixed>  $definition
-     * @param  array<string, mixed>  $meta
-     * @return array<string, mixed>
-     */
-    private function horizonPayload(
-        ScheduledMessage $scheduledMessage,
-        array $definition,
-        Carbon $sendAt,
-        ?Model $context,
-        array $meta,
-    ): array {
-        return array_filter([
-            'scheduled_message_id' => $scheduledMessage->id,
-            'recipient_type' => class_basename((string) $scheduledMessage->recipient_type),
-            'recipient_id' => $scheduledMessage->recipient_id,
-            'channel' => $scheduledMessage->channel,
-            'purpose' => $scheduledMessage->purpose,
-            'scope' => $scheduledMessage->scope,
-            'message_type' => $scheduledMessage->message_type,
-            'queue' => $meta['queue'] ?? $definition['queue'] ?? null,
-            'send_at' => $sendAt->toDateTimeString(),
-            'context_type' => $context ? class_basename($context) : null,
-            'context_id' => $context?->getKey(),
-            'dispatch_keys' => $definition['dispatch_keys'] ?? null,
-            'definition_config_path' => $definition['config_path'] ?? null,
-            'campaign_key' => $definition['campaign_key'] ?? null,
-            'campaign_step' => $definition['step'] ?? null,
-        ], fn (mixed $value): bool => $value !== null && $value !== []);
-    }
-
-    /**
-     * @param  array<string, mixed>  $definition
-     * @param  array<int, string>  $dispatchKeys
+     * @param array<string, mixed> $definition
+     * @param array<int, string> $dispatchKeys
      */
     private function definitionMatchesDispatchKeys(array $definition, array $dispatchKeys): bool
     {
@@ -278,8 +191,8 @@ class DispatchMessageAction
     }
 
     /**
-     * @param  array<int, array<string, mixed>>  $definitions
-     * @param  array<string, mixed>  $criteria
+     * @param array<int, array<string, mixed>> $definitions
+     * @param array<string, mixed> $criteria
      */
     private function assertCriteriaMatchesSingleDefinition(array $definitions, array $criteria): void
     {
@@ -295,8 +208,8 @@ class DispatchMessageAction
     }
 
     /**
-     * @param  array<string, mixed>  $definition
-     * @param  array<string, mixed>  $criteria
+     * @param array<string, mixed> $definition
+     * @param array<string, mixed> $criteria
      */
     private function definitionMatchesCriteria(array $definition, array $criteria): bool
     {
@@ -332,7 +245,7 @@ class DispatchMessageAction
     }
 
     /**
-     * @param  array<string, mixed>  $criteria
+     * @param array<string, mixed> $criteria
      * @return array<string, mixed>
      */
     private function normalizeCriteria(array $criteria): array
@@ -359,7 +272,7 @@ class DispatchMessageAction
     }
 
     /**
-     * @param  array<string, mixed>  $definition
+     * @param array<string, mixed> $definition
      */
     private function dedupeKey(
         Model $recipient,
@@ -399,7 +312,7 @@ class DispatchMessageAction
     }
 
     /**
-     * @param  string|array<int, string>  $dispatchKeys
+     * @param string|array<int, string> $dispatchKeys
      * @return array<int, string>
      */
     private function normalizeDispatchKeys(string|array $dispatchKeys): array

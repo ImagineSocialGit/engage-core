@@ -2,35 +2,77 @@
 
 namespace App\Services\Messaging;
 
+use App\Contracts\Messaging\InternalNotificationPreferenceResolver;
 use App\Enums\MessageChannel;
-use App\Models\TeamMember;
 
 class InternalNotificationChannelResolver
 {
+    /**
+     * @param iterable<int, InternalNotificationPreferenceResolver> $preferenceResolvers
+     */
     public function __construct(
-        private readonly InternalNotificationGate $gate,
+        private readonly iterable $preferenceResolvers,
     ) {}
 
     /**
      * @param array<int, MessageChannel|string> $allowedChannels
      */
     public function resolve(
-        TeamMember $teamMember,
+        InternalNotificationRecipient $recipient,
         ?string $notificationType = null,
         array $allowedChannels = [MessageChannel::Email, MessageChannel::Sms],
     ): ?MessageChannel {
+        if (! $recipient->preferenceOwner) {
+            return null;
+        }
+
         foreach ($allowedChannels as $channel) {
             $channel = $this->normalizeChannel($channel);
 
-            if (
-                $channel instanceof MessageChannel
-                && $this->gate->allows($teamMember, $channel, $notificationType)
-            ) {
+            if (! $channel) {
+                continue;
+            }
+
+            if (! $this->recipientHasDestinationForChannel($recipient, $channel)) {
+                continue;
+            }
+
+            if ($this->preferencesAllow($recipient, $channel, $notificationType)) {
                 return $channel;
             }
         }
 
         return null;
+    }
+
+    private function preferencesAllow(
+        InternalNotificationRecipient $recipient,
+        MessageChannel $channel,
+        ?string $notificationType,
+    ): bool {
+        foreach ($this->preferenceResolvers as $resolver) {
+            if (! $resolver->supports($recipient->preferenceOwner)) {
+                continue;
+            }
+
+            return $resolver->allows(
+                preferenceOwner: $recipient->preferenceOwner,
+                channel: $channel,
+                notificationType: $notificationType,
+            );
+        }
+
+        return false;
+    }
+
+    private function recipientHasDestinationForChannel(
+        InternalNotificationRecipient $recipient,
+        MessageChannel $channel,
+    ): bool {
+        return match ($channel) {
+            MessageChannel::Email => filled($recipient->email),
+            MessageChannel::Sms => filled($recipient->phone),
+        };
     }
 
     private function normalizeChannel(MessageChannel|string $channel): ?MessageChannel

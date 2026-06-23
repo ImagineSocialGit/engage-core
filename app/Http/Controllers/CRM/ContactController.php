@@ -41,10 +41,15 @@ class ContactController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
+        $currentTeamMember = TeamMember::query()
+            ->where('user_id', auth()->id())
+            ->first();
+
         return view('crm.contacts.show', compact(
             'contact',
             'scheduledMessages',
             'teamMembers',
+            'currentTeamMember',
         ));
     }
 

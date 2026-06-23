@@ -257,10 +257,30 @@
                     Add Task
                 </h3>
 
+                @php
+                    $initialAssignedToId = (string) old('assigned_to_id', '');
+                    $currentTeamMemberId = $currentTeamMember ? (string) $currentTeamMember->id : null;
+
+                    $initialNotifyAssignee = old('notify_assignee');
+
+                    $shouldInitiallyNotify = $initialNotifyAssignee !== null
+                        ? (bool) $initialNotifyAssignee
+                        : ($initialAssignedToId !== '' && $initialAssignedToId !== $currentTeamMemberId);
+                @endphp
+
                 <form
                     method="POST"
                     action="{{ route('crm.contacts.tasks.store', $contact) }}"
                     class="space-y-4"
+                    x-data="{
+                        assignedToId: @js($initialAssignedToId),
+                        currentTeamMemberId: @js($currentTeamMemberId),
+                        notifyAssignee: @js($shouldInitiallyNotify),
+                        updateNotifyAssigneeDefault() {
+                            this.notifyAssignee = this.assignedToId !== ''
+                                && this.assignedToId !== this.currentTeamMemberId;
+                        },
+                    }"
                 >
                     @csrf
 
@@ -272,6 +292,8 @@
                         <x-ui.form.select
                             id="assigned_to_id"
                             name="assigned_to_id"
+                            x-model="assignedToId"
+                            x-on:change="updateNotifyAssigneeDefault"
                         >
                             <option value="">Select team member...</option>
 
@@ -349,6 +371,32 @@
                             </p>
                         @enderror
                     </div>
+
+                    <input
+                        type="hidden"
+                        name="notify_assignee"
+                        value="0"
+                    >
+
+                    <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-3">
+                        <input
+                            type="checkbox"
+                            name="notify_assignee"
+                            value="1"
+                            x-model="notifyAssignee"
+                            class="mt-1 rounded border-slate-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                        >
+
+                        <span>
+                            <span class="block text-sm font-semibold text-slate-900">
+                                Notify assignee
+                            </span>
+
+                            <span class="block text-sm text-slate-500">
+                                Send an internal task assignment notification based on the assignee’s notification preferences.
+                            </span>
+                        </span>
+                    </label>
 
                     <x-ui.button type="submit">
                         Create Task
