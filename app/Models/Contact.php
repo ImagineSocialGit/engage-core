@@ -47,9 +47,9 @@ class Contact extends Model
         return $this->hasMany(Note::class);
     }
 
-    public function tasks(): HasMany
+    public function tasks(): MorphMany
     {
-        return $this->hasMany(Task::class);
+        return $this->morphMany(Task::class, 'related');
     }
 
     public function tags(): HasMany

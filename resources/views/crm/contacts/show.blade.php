@@ -265,6 +265,37 @@
                     @csrf
 
                     <div>
+                        <x-ui.form.label for="assigned_to_id">
+                            Assigned To
+                        </x-ui.form.label>
+
+                        <x-ui.form.select
+                            id="assigned_to_id"
+                            name="assigned_to_id"
+                        >
+                            <option value="">Select team member...</option>
+
+                            @foreach ($teamMembers as $teamMember)
+                                <option
+                                    value="{{ $teamMember->id }}"
+                                    @selected((string) old('assigned_to_id') === (string) $teamMember->id)
+                                >
+                                    {{ $teamMember->name }}
+                                    @if ($teamMember->email)
+                                        — {{ $teamMember->email }}
+                                    @endif
+                                </option>
+                            @endforeach
+                        </x-ui.form.select>
+
+                        @error('assigned_to_id')
+                            <p class="mt-1 text-sm text-red-600">
+                                {{ $message }}
+                            </p>
+                        @enderror
+                    </div>
+
+                    <div>
                         <x-ui.form.label for="title">
                             Task
                         </x-ui.form.label>
@@ -276,6 +307,24 @@
                         />
 
                         @error('title')
+                            <p class="mt-1 text-sm text-red-600">
+                                {{ $message }}
+                            </p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <x-ui.form.label for="description">
+                            Description
+                        </x-ui.form.label>
+
+                        <x-ui.form.textarea
+                            id="description"
+                            name="description"
+                            rows="3"
+                        >{{ old('description') }}</x-ui.form.textarea>
+
+                        @error('description')
                             <p class="mt-1 text-sm text-red-600">
                                 {{ $message }}
                             </p>
@@ -309,15 +358,32 @@
                 <div class="space-y-3 border-t border-slate-200 pt-4">
                     @forelse ($contact->tasks as $task)
                         <div class="rounded-xl border border-slate-200 p-3">
-                            <p class="font-medium text-slate-900">
-                                {{ $task->title }}
-                            </p>
+                            <div class="flex items-start justify-between gap-4">
+                                <div>
+                                    <p class="font-medium text-slate-900">
+                                        {{ $task->title }}
+                                    </p>
 
-                            <p class="mt-1 text-sm text-slate-500">
-                                {{ ucfirst($task->status) }}
-                            </p>
+                                    <p class="mt-1 text-sm text-slate-500">
+                                        Assigned to:
+                                        <span class="font-medium text-slate-700">
+                                            {{ $task->assignedTo?->name ?? '—' }}
+                                        </span>
+                                    </p>
+                                </div>
 
-                            <p class="mt-1 text-xs text-slate-500">
+                                <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $task->status === 'completed' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700' }}">
+                                    {{ str($task->status)->replace('_', ' ')->title() }}
+                                </span>
+                            </div>
+
+                            @if ($task->description)
+                                <p class="mt-3 text-sm text-slate-700">
+                                    {{ $task->description }}
+                                </p>
+                            @endif
+
+                            <p class="mt-3 text-xs text-slate-500">
                                 Due:
                                 {{ $task->due_at?->format('M j, Y g:i A') ?? '—' }}
                             </p>

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class TeamMember extends Model
 {
@@ -39,6 +40,11 @@ class TeamMember extends Model
     public function notificationPreferences(): HasMany
     {
         return $this->hasMany(TeamMemberNotificationPreference::class);
+    }
+
+    public function assignedTasks(): MorphMany
+    {
+        return $this->morphMany(Task::class, 'assigned_to');
     }
 
     public function scopeActive(Builder $query): Builder

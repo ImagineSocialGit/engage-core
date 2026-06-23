@@ -6,23 +6,30 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\CRM\StoreContactTaskRequest;
 use App\Models\Contact;
 use App\Models\Task;
+use App\Models\TeamMember;
+use Illuminate\Http\RedirectResponse;
 
 class ContactTaskController extends Controller
 {
-    public function store(StoreContactTaskRequest $request, Contact $contact)
+    public function store(StoreContactTaskRequest $request, Contact $contact): RedirectResponse
     {
+        $validated = $request->validated();
+
         $contact->tasks()->create([
-            'title' => $request->validated()['title'],
-            'due_at' => $request->validated()['due_at'] ?? null,
+            'assigned_to_type' => TeamMember::class,
+            'assigned_to_id' => $validated['assigned_to_id'],
+            'title' => $validated['title'],
+            'description' => $validated['description'] ?? null,
+            'due_at' => $validated['due_at'] ?? null,
             'status' => 'open',
         ]);
 
         return redirect()->back();
     }
 
-    public function complete(Contact $contact, Task $task)
+    public function complete(Contact $contact, Task $task): RedirectResponse
     {
-        abort_unless($task->contact_id === $contact->id, 404);
+        abort_unless($this->taskBelongsToContact($task, $contact), 404);
 
         $task->update([
             'status' => 'completed',
@@ -31,14 +38,15 @@ class ContactTaskController extends Controller
 
         $contact->update([
             'last_contacted_at' => now(),
+            'last_activity_at' => now(),
         ]);
 
         return redirect()->back();
     }
 
-    public function reopen(Contact $contact, Task $task)
+    public function reopen(Contact $contact, Task $task): RedirectResponse
     {
-        abort_unless($task->contact_id === $contact->id, 404);
+        abort_unless($this->taskBelongsToContact($task, $contact), 404);
 
         $task->update([
             'status' => 'open',
@@ -46,5 +54,11 @@ class ContactTaskController extends Controller
         ]);
 
         return redirect()->back();
+    }
+
+    private function taskBelongsToContact(Task $task, Contact $contact): bool
+    {
+        return $task->related_type === Contact::class
+            && (int) $task->related_id === $contact->id;
     }
 }

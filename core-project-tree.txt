@@ -187,6 +187,8 @@
 │   │   │   │   └── EmailWebhookPayload.php
 │   │   │   ├── InboundMessageNotificationRecipientResolver.php
 │   │   │   ├── InboundMessageRouter.php
+│   │   │   ├── InternalNotificationChannelResolver.php
+│   │   │   ├── InternalNotificationGate.php
 │   │   │   ├── MessageDefinitionResolver.php
 │   │   │   ├── MessageEligibilityGate.php
 │   │   │   ├── MessageGate.php
@@ -374,6 +376,7 @@
 │   │   ├── BroadcastRecipientFactory.php
 │   │   ├── ContactFactory.php
 │   │   ├── ScheduledMessageFactory.php
+│   │   ├── TaskFactory.php
 │   │   ├── TeamMemberFactory.php
 │   │   ├── TeamMemberNotificationPreferenceFactory.php
 │   │   ├── UserFactory.php
@@ -535,6 +538,7 @@
 │   │   │   ├── EnrollContactInCampaignActionTest.php
 │   │   │   └── ScheduleNextCampaignStepActionTest.php
 │   │   ├── CRM
+│   │   │   ├── ContactTaskAssignmentTest.php
 │   │   │   └── WebinarSyncTest.php
 │   │   ├── Email
 │   │   │   └── HandleInboundEmailWebhookActionTest.php
@@ -549,6 +553,8 @@
 │   │   │   ├── EmailMessagingServiceTest.php
 │   │   │   ├── EmailPayloadTest.php
 │   │   │   ├── GrantMessageConsentActionTest.php
+│   │   │   ├── InternalNotificationChannelResolverTest.php
+│   │   │   ├── InternalNotificationGateTest.php
 │   │   │   ├── MessageDefinitionResolverTest.php
 │   │   │   ├── MessageEligibilityGateTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
@@ -577,4 +583,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-187 directories, 391 files
+187 directories, 397 files
