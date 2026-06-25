@@ -1,0 +1,56 @@
+<x-ui.card class="space-y-4">
+    <div>
+        <h3 class="text-lg font-semibold tracking-tight">
+            {{ $contactPanel->title }}
+        </h3>
+
+        <p class="text-sm text-slate-500">
+            Recent webinar registrations for this {{ config('contacts.labels.singular') }}.
+        </p>
+    </div>
+
+    <div class="space-y-3">
+        @forelse($registrations as $registration)
+            <div class="rounded-xl border border-slate-200 p-3">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="font-medium text-slate-900">
+                            {{ $registration->webinar?->title ?? $registration->webinar_slug ?? 'Webinar' }}
+                        </p>
+
+                        <p class="mt-1 text-sm text-slate-500">
+                            Registered:
+                            <span class="font-medium text-slate-700">
+                                {{ $registration->registered_at?->format('M j, Y g:i A') ?? '—' }}
+                            </span>
+                        </p>
+                    </div>
+
+                    <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        {{ str($registration->status)->replace('_', ' ')->title() }}
+                    </span>
+                </div>
+
+                <div class="mt-3 grid gap-2 text-xs text-slate-500">
+                    <p>
+                        Webinar Date:
+                        <span class="font-medium text-slate-700">
+                            {{ $registration->webinar?->starts_at?->format('M j, Y g:i A') ?? '—' }}
+                        </span>
+                    </p>
+
+                    <p>
+                        Attended:
+                        <span class="font-medium text-slate-700">
+                            {{ $registration->attended_at?->format('M j, Y g:i A') ?? '—' }}
+                        </span>
+                    </p>
+                </div>
+            </div>
+        @empty
+            <p class="text-sm text-slate-500">
+                No webinar history yet.
+            </p>
+        @endforelse
+    </div>
+</x-ui.card>

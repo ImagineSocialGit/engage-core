@@ -4,8 +4,8 @@
     :subheading="config('contacts.labels.singular').' record'"
 >
     <div class="space-y-6">
-        <div class="grid gap-6 {{ module_enabled('webinars') ? 'lg:grid-cols-3' : '' }}">
-            <div class="{{ module_enabled('webinars') ? 'lg:col-span-2' : '' }}">
+        <div class="grid gap-6 {{ $contactPanels->isNotEmpty() ? 'lg:grid-cols-3' : '' }}">
+            <div class="{{ $contactPanels->isNotEmpty() ? 'lg:col-span-2' : '' }}">
                 <x-ui.card class="space-y-4">
                     <div>
                         <p class="text-sm text-slate-500 capitalize">
@@ -34,17 +34,22 @@
                     <div>
                         <p class="text-sm text-slate-500">Status</p>
                         <p class="font-medium text-slate-900">
-                            {{ $contact->workflowProfile?->contactStatus?->name ?? '—' }}
+                            {{ module_enabled('workflow') ? ($contact->workflowProfile?->contactStatus?->name ?? '—') : '—' }}
                         </p>
                     </div>
                 </x-ui.card>
             </div>
-            {{-- 
-                Deferred Webinar panel:
-                - supplied by Webinar module contact-panel provider
-                - rendered only when webinars module is enabled
-                - CRM ContactController should not query WebinarRegistration directly
-            --}}
+
+            @if($contactPanels->isNotEmpty())
+                <div class="space-y-6">
+                    @foreach($contactPanels as $contactPanel)
+                        @include($contactPanel->view, $contactPanel->data + [
+                            'contact' => $contact,
+                            'contactPanel' => $contactPanel,
+                        ])
+                    @endforeach
+                </div>
+            @endif
         </div>
 
         <div
@@ -230,8 +235,6 @@
                 />
             @endif
         </div>
-
-        {{-- Keep messaging section and everything below unchanged --}}
 
         @if(module_enabled('messaging'))
         <div

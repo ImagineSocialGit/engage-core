@@ -16,7 +16,7 @@ return [
         'trim',
         explode(',', env(
             'ENABLED_MODULES',
-            'messaging,inbound_messaging,internal_notifications,campaigns,webinars,integrations,reporting'
+            'tasks,workflow,flow_routes,messaging,inbound_messaging,internal_notifications,campaigns,webinars,integrations,reporting'
         ))
     )),
 
@@ -46,6 +46,16 @@ return [
         'tasks' => [
             'name' => 'Tasks',
             'depends_on' => ['core'],
+        ],
+
+        'workflow' => [
+            'name' => 'Workflow',
+            'depends_on' => ['core'],
+        ],
+
+        'flow_routes' => [
+            'name' => 'Flow Routes',
+            'depends_on' => ['workflow'],
         ],
 
         'campaigns' => [

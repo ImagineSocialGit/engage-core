@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ContactStatus extends Model
 {
@@ -32,11 +31,6 @@ class ContactStatus extends Model
     public function workflowProfiles(): HasMany
     {
         return $this->hasMany(ContactWorkflowProfile::class);
-    }
-
-    public function flowRoute(): HasOne
-    {
-        return $this->hasOne(FlowRoute::class);
     }
 
     public function scopeActive(Builder $query): Builder

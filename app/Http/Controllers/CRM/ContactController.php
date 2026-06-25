@@ -9,6 +9,7 @@ use App\Models\Contact;
 use App\Models\ContactStatus;
 use App\Models\Task;
 use App\Models\TeamMember;
+use App\Support\CRM\Contacts\ContactPanelRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -19,8 +20,13 @@ class ContactController extends Controller
 {
     public function index(): View
     {
-        $contacts = Contact::query()
-            ->with('workflowProfile.contactStatus')
+        $contactsQuery = Contact::query();
+
+        if (module_enabled('workflow')) {
+            $contactsQuery->with('workflowProfile.contactStatus');
+        }
+
+        $contacts = $contactsQuery
             ->latest()
             ->paginate(20);
 
@@ -41,7 +47,7 @@ class ContactController extends Controller
                 ...$request->validated(),
                 'source' => $request->validated('source') ?? 'crm',
             ],
-            statusKey: config('contacts.default_workflow_status_key'),
+            statusKey: module_enabled('workflow') ? config('contacts.default_workflow_status_key') : null,
             statusChangeReason: 'crm_manual_create',
         );
 
@@ -50,46 +56,67 @@ class ContactController extends Controller
             ->with('success', config('contacts.labels.singular').' created.');
     }
 
-    public function show(Contact $contact): View
+    public function show(Contact $contact, ContactPanelRegistry $contactPanelRegistry): View
     {
-        $scheduledMessages = $contact->scheduledMessages()
-            ->where('status', 'sent')
-            ->latest('send_at')
-            ->paginate(10, ['*'], 'messages_page')
-            ->withQueryString();
+        $scheduledMessages = null;
 
-        $contact->load([
-            'workflowProfile.contactStatus',
+        if (module_enabled('messaging')) {
+            $scheduledMessages = $contact->scheduledMessages()
+                ->where('status', 'sent')
+                ->latest('send_at')
+                ->paginate(10, ['*'], 'messages_page')
+                ->withQueryString();
+        }
+
+        $relations = [
             'notes' => fn ($query) => $query->latest(),
-            'messageConsents',
-            'consentRevocations',
-        ]);
+        ];
+
+        if (module_enabled('workflow')) {
+            $relations[] = 'workflowProfile.contactStatus';
+        }
+
+        if (module_enabled('messaging')) {
+            $relations[] = 'messageConsents';
+            $relations[] = 'consentRevocations';
+        }
+
+        $contact->load($relations);
 
         $taskView = request('task_view') === 'archived' ? 'archived' : 'active';
 
-        $tasks = Task::query()
-            ->with('assignedTo')
-            ->where('related_type', $contact->getMorphClass())
-            ->where('related_id', $contact->id)
-            ->unarchived()
-            ->latest()
-            ->get();
+        $tasks = collect();
+        $archivedTasks = collect();
+        $teamMembers = collect();
+        $currentTeamMember = null;
 
-        $archivedTasks = Task::query()
-            ->with('assignedTo')
-            ->where('related_type', $contact->getMorphClass())
-            ->where('related_id', $contact->id)
-            ->archived()
-            ->latest('archived_at')
-            ->get();
+        if (module_enabled('tasks')) {
+            $tasks = Task::query()
+                ->with('assignedTo')
+                ->where('related_type', $contact->getMorphClass())
+                ->where('related_id', $contact->id)
+                ->unarchived()
+                ->latest()
+                ->get();
 
-        $teamMembers = TeamMember::active()
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
+            $archivedTasks = Task::query()
+                ->with('assignedTo')
+                ->where('related_type', $contact->getMorphClass())
+                ->where('related_id', $contact->id)
+                ->archived()
+                ->latest('archived_at')
+                ->get();
 
-        $currentTeamMember = TeamMember::query()
-            ->where('user_id', auth()->id())
-            ->first();
+            $teamMembers = TeamMember::active()
+                ->orderBy('name')
+                ->get(['id', 'name', 'email']);
+
+            $currentTeamMember = TeamMember::query()
+                ->where('user_id', auth()->id())
+                ->first();
+        }
+
+        $contactPanels = $contactPanelRegistry->panelsFor($contact);
 
         return view('crm.contacts.show', compact(
             'contact',
@@ -99,6 +126,7 @@ class ContactController extends Controller
             'taskView',
             'tasks',
             'archivedTasks',
+            'contactPanels',
         ));
     }
 
@@ -250,96 +278,64 @@ class ContactController extends Controller
                 continue;
             }
 
-            $email = strtolower($email);
+            $contactData = [
+                'email' => $email,
+            ];
 
-            $phone = $this->mappedValue($data, $mapping, 'phone');
+            foreach (['first_name', 'last_name', 'name', 'phone', 'source', 'subsource', 'last_contacted_at', 'last_activity_at'] as $field) {
+                $value = $this->mappedValue($data, $mapping, $field);
 
-            if ($phone !== null) {
-                $phoneWarnings += Contact::query()
-                    ->where('phone', $phone)
-                    ->where('email', '!=', $email)
-                    ->exists()
-                        ? 1
-                        : 0;
+                if ($value !== null) {
+                    $contactData[$field] = $value;
+                }
             }
 
-            $existing = Contact::query()
+            if (array_key_exists('phone', $contactData) && $contactData['phone'] === null) {
+                $phoneWarnings++;
+            }
+
+            $wasExisting = Contact::query()
                 ->where('email', $email)
-                ->first();
-
-            $firstName = $this->mappedValue($data, $mapping, 'first_name');
-            $lastName = $this->mappedValue($data, $mapping, 'last_name');
-            $name = $this->mappedValue($data, $mapping, 'name');
-
-            if ($name === null) {
-                $name = trim(collect([$firstName, $lastName])->filter()->implode(' '));
-            }
-
-            if ($name === '') {
-                $name = $email;
-            }
-
-            $source = $this->mappedValue($data, $mapping, 'source') ?? 'import';
-            $subsource = $this->mappedValue($data, $mapping, 'subsource') ?? 'csv';
-
-            $lastContactedAt = $this->mappedDate($data, $mapping, 'last_contacted_at');
-            $lastActivityAt = $this->mappedDate($data, $mapping, 'last_activity_at');
+                ->exists();
 
             $createOrUpdateContact->handle(
-                data: [
-                    'email' => $email,
-                    'first_name' => $firstName,
-                    'last_name' => $lastName,
-                    'name' => $name,
-                    'phone' => $phone,
-                    'source' => $source,
-                    'subsource' => $subsource,
-                    'last_contacted_at' => $lastContactedAt,
-                    'last_activity_at' => $lastActivityAt,
-                ],
-                statusChangeReason: 'csv_import',
+                data: $contactData,
+                statusKey: null,
+                statusChangeReason: 'crm_import',
             );
 
-            $existing ? $updated++ : $created++;
+            $wasExisting ? $updated++ : $created++;
         }
 
         fclose($handle);
 
-        Storage::disk('local')->delete($csvPath);
-
         return redirect()
             ->route('crm.contacts.index')
-            ->with(
-                'success',
-                "{$created} contacts created. {$updated} contacts updated. {$skipped} rows skipped. {$phoneWarnings} phone duplicate warnings."
-            );
+            ->with('success', sprintf(
+                'Import complete. %d created, %d updated, %d skipped%s.',
+                $created,
+                $updated,
+                $skipped,
+                $phoneWarnings > 0 ? ", {$phoneWarnings} phone values were ignored" : ''
+            ));
     }
 
-    private function mappedValue(array $row, array $mapping, string $field): ?string
+    private function mappedValue(array $data, array $mapping, string $field): ?string
     {
-        $column = $mapping[$field] ?? null;
+        $header = $mapping[$field] ?? null;
 
-        if ($column === null || ! array_key_exists($column, $row)) {
+        if ($header === null || $header === '') {
             return null;
         }
 
-        $value = trim((string) $row[$column]);
-
-        return $value !== '' ? $value : null;
-    }
-
-    private function mappedDate(array $row, array $mapping, string $field): ?string
-    {
-        $value = $this->mappedValue($row, $mapping, $field);
+        $value = $data[$header] ?? null;
 
         if ($value === null) {
             return null;
         }
 
-        try {
-            return \Carbon\Carbon::parse($value)->startOfDay()->toDateTimeString();
-        } catch (\Throwable) {
-            return null;
-        }
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
     }
 }

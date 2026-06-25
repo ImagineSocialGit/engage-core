@@ -26,34 +26,35 @@ Route::middleware('auth')->group(function () {
             ->name('crm.webinar-series.destroy');
     });
 
-    Route::prefix('tasks')
+    Route::middleware('module:tasks')
+        ->prefix('tasks')
         ->name('crm.tasks.')
         ->group(function () {
-        Route::post('/', [TaskController::class, 'store'])
-            ->name('store');
+            Route::post('/', [TaskController::class, 'store'])
+                ->name('store');
 
-        Route::patch('/{task}/complete', [TaskController::class, 'complete'])
-            ->name('complete');
+            Route::patch('/{task}/complete', [TaskController::class, 'complete'])
+                ->name('complete');
 
-        Route::patch('/{task}/cancel', [TaskController::class, 'cancel'])
-            ->name('cancel');
+            Route::patch('/{task}/cancel', [TaskController::class, 'cancel'])
+                ->name('cancel');
 
-        Route::patch('/{task}/reopen', [TaskController::class, 'reopen'])
-            ->name('reopen');
+            Route::patch('/{task}/reopen', [TaskController::class, 'reopen'])
+                ->name('reopen');
 
-        Route::patch('/{task}/archive', [TaskController::class, 'archive'])
-            ->name('archive');
+            Route::patch('/{task}/archive', [TaskController::class, 'archive'])
+                ->name('archive');
 
-        Route::patch('/{task}/restore', [TaskController::class, 'restore'])
-            ->name('restore');
-    });
+            Route::patch('/{task}/restore', [TaskController::class, 'restore'])
+                ->name('restore');
+        });
 
     Route::prefix(config('contacts.routes.plural'))
         ->name('crm.contacts.')
         ->group(function () {
             Route::get('/', [ContactController::class, 'index'])
                 ->name('index');
-                
+
             Route::post('/', [ContactController::class, 'store'])
                 ->name('store');
 
