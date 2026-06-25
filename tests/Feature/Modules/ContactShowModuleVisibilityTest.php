@@ -5,10 +5,13 @@ namespace Tests\Feature\Modules;
 use App\Http\Middleware\ForceStagingAccess;
 use App\Models\Contact;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ContactShowModuleVisibilityTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_contact_show_hides_webinar_history_when_webinars_module_is_disabled(): void
     {
         config()->set('modules.enabled', [

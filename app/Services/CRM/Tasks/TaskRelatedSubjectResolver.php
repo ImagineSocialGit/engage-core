@@ -2,11 +2,18 @@
 
 namespace App\Services\CRM\Tasks;
 
-use App\Models\Contact;
+use App\Contracts\CRM\Tasks\TaskRelatedSubjectResolverContract;
 use App\Models\Task;
 
 class TaskRelatedSubjectResolver
 {
+    /**
+     * @param iterable<int, TaskRelatedSubjectResolverContract> $resolvers
+     */
+    public function __construct(
+        private readonly iterable $resolvers,
+    ) {}
+
     /**
      * @return array{
      *     subject: object|null,
@@ -23,20 +30,31 @@ class TaskRelatedSubjectResolver
 
         $related = $task->related;
 
-        if ($related instanceof Contact) {
-            return [
-                'subject' => $related,
-                'type' => Contact::class,
-                'label' => config('contacts.labels.singular', 'Contact'),
-                'name' => $this->contactName($related),
-                'url' => route('crm.contacts.show', $related),
-                'details' => [
-                    'Email' => $related->email ?: '—',
-                    'Phone' => $related->phone ?: '—',
-                ],
-            ];
+        if (! $related) {
+            return $this->fallback();
         }
 
+        foreach ($this->resolvers as $resolver) {
+            if ($resolver->supports($related)) {
+                return $resolver->resolve($related);
+            }
+        }
+
+        return $this->fallback();
+    }
+
+    /**
+     * @return array{
+     *     subject: object|null,
+     *     type: ?string,
+     *     label: string,
+     *     name: string,
+     *     url: ?string,
+     *     details: array<string, string>
+     * }
+     */
+    private function fallback(): array
+    {
         return [
             'subject' => null,
             'type' => null,
@@ -45,14 +63,5 @@ class TaskRelatedSubjectResolver
             'url' => null,
             'details' => [],
         ];
-    }
-
-    private function contactName(Contact $contact): string
-    {
-        $name = trim((string) ($contact->name ?: trim(
-            trim((string) $contact->first_name).' '.trim((string) $contact->last_name)
-        )));
-
-        return $name !== '' ? $name : ($contact->email ?: 'Contact #'.$contact->id);
     }
 }

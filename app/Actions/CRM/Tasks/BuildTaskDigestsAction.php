@@ -67,7 +67,8 @@ class BuildTaskDigestsAction
     ): Collection {
         return Task::query()
             ->with(['assignedTo', 'related'])
-            ->where('status', 'open')
+            ->where('status', Task::STATUS_OPEN)
+            ->unarchived()
             ->when(
                 $frequency === self::FREQUENCY_DAILY,
                 fn (Builder $query) => $this->dailyScope($query, $now),

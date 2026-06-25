@@ -19,7 +19,7 @@ class InternalNotificationChannelResolverTest extends TestCase
         $teamMember = TeamMember::factory()->create([
             'email' => 'admin@example.com',
             'phone' => '+15551234567',
-            'active' => true,
+            'is_active' => true,
         ]);
 
         $recipient = $this->recipient($teamMember);
@@ -38,7 +38,7 @@ class InternalNotificationChannelResolverTest extends TestCase
         $teamMember = TeamMember::factory()->create([
             'email' => null,
             'phone' => '+15551234567',
-            'active' => true,
+            'is_active' => true,
         ]);
 
         TeamMemberNotificationPreference::factory()
@@ -46,8 +46,10 @@ class InternalNotificationChannelResolverTest extends TestCase
             ->sms()
             ->inboundReplies()
             ->create([
-                'enabled' => true,
+                'is_enabled' => true,
             ]);
+
+        $teamMember->refresh()->load('notificationPreferences');
 
         $recipient = $this->recipient($teamMember);
 
@@ -65,7 +67,7 @@ class InternalNotificationChannelResolverTest extends TestCase
         $teamMember = TeamMember::factory()->create([
             'email' => 'admin@example.com',
             'phone' => '+15551234567',
-            'active' => true,
+            'is_active' => true,
         ]);
 
         TeamMemberNotificationPreference::factory()
@@ -73,8 +75,10 @@ class InternalNotificationChannelResolverTest extends TestCase
             ->sms()
             ->inboundReplies()
             ->create([
-                'enabled' => true,
+                'is_enabled' => true,
             ]);
+
+        $teamMember->refresh()->load('notificationPreferences');
 
         $recipient = $this->recipient($teamMember);
 
@@ -83,7 +87,7 @@ class InternalNotificationChannelResolverTest extends TestCase
             $this->resolver()->resolve(
                 recipient: $recipient,
                 notificationType: $recipient->notificationType,
-                allowedChannels: [MessageChannel::Sms, MessageChannel::Email],
+                allowedChannels: ['sms', 'email'],
             )
         );
     }
@@ -93,7 +97,7 @@ class InternalNotificationChannelResolverTest extends TestCase
         $teamMember = TeamMember::factory()->create([
             'email' => 'admin@example.com',
             'phone' => '+15551234567',
-            'active' => true,
+            'is_active' => true,
         ]);
 
         $recipient = $this->recipient($teamMember);
@@ -102,7 +106,7 @@ class InternalNotificationChannelResolverTest extends TestCase
             $this->resolver()->resolve(
                 recipient: $recipient,
                 notificationType: $recipient->notificationType,
-                allowedChannels: [MessageChannel::Sms],
+                allowedChannels: ['sms'],
             )
         );
     }
@@ -128,7 +132,7 @@ class InternalNotificationChannelResolverTest extends TestCase
     {
         $teamMember = TeamMember::factory()->create([
             'email' => 'admin@example.com',
-            'active' => true,
+            'is_active' => true,
         ]);
 
         $recipient = $this->recipient($teamMember);

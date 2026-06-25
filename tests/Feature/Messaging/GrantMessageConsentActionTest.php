@@ -207,7 +207,7 @@ class GrantMessageConsentActionTest extends TestCase
         );
     }
 
-    public function test_granting_marketing_consent_resumes_paused_campaign_enrollments_for_matching_scope(): void
+    public function test_granting_marketing_consent_does_not_mutate_campaign_enrollments(): void
     {
         $contact = Contact::factory()->create();
 
@@ -221,7 +221,10 @@ class GrantMessageConsentActionTest extends TestCase
             'current_step' => 2,
             'started_at' => now()->subDays(2),
             'paused_at' => now()->subDay(),
+            'resumed_at' => null,
         ]);
+
+        $pausedAt = $enrollment->paused_at;
 
         $this->mockDispatchMessageActionOnce();
 
@@ -238,10 +241,10 @@ class GrantMessageConsentActionTest extends TestCase
 
         $enrollment->refresh();
 
-        $this->assertSame(CampaignEnrollment::STATUS_ACTIVE, $enrollment->status);
+        $this->assertSame(CampaignEnrollment::STATUS_PAUSED, $enrollment->status);
         $this->assertSame(2, $enrollment->current_step);
-        $this->assertNull($enrollment->paused_at);
-        $this->assertNotNull($enrollment->resumed_at);
+        $this->assertTrue($enrollment->paused_at->equalTo($pausedAt));
+        $this->assertNull($enrollment->resumed_at);
     }
 
     private function mockDispatchMessageActionOnce(): void

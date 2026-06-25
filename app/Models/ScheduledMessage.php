@@ -10,6 +10,11 @@ class ScheduledMessage extends Model
 {
     use HasFactory;
 
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_SENT = 'sent';
+    public const STATUS_SKIPPED = 'skipped';
+    public const STATUS_FAILED = 'failed';
+
     protected $fillable = [
         'recipient_type',
         'recipient_id',

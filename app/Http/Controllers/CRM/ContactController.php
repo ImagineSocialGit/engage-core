@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\CRM;
 
+use App\Actions\CRM\Contacts\CreateOrUpdateContactAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CRM\StoreContactRequest;
 use App\Models\Contact;
+use App\Models\ContactStatus;
+use App\Models\Task;
 use App\Models\TeamMember;
-use App\Models\WebinarRegistration;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -14,14 +17,40 @@ use Illuminate\View\View;
 
 class ContactController extends Controller
 {
-    public function index()
+    public function index(): View
     {
-        $contacts = Contact::latest()->paginate(20);
+        $contacts = Contact::query()
+            ->with('workflowProfile.contactStatus')
+            ->latest()
+            ->paginate(20);
 
-        return view('crm.contacts.index', compact('contacts'));
+        $contactStatuses = ContactStatus::query()
+            ->active()
+            ->ordered()
+            ->get(['id', 'name']);
+
+        return view('crm.contacts.index', compact('contacts', 'contactStatuses'));
     }
 
-    public function show(Contact $contact)
+    public function store(
+        StoreContactRequest $request,
+        CreateOrUpdateContactAction $createOrUpdateContact,
+    ): RedirectResponse {
+        $contact = $createOrUpdateContact->handle(
+            data: [
+                ...$request->validated(),
+                'source' => $request->validated('source') ?? 'crm',
+            ],
+            statusKey: config('contacts.default_workflow_status_key'),
+            statusChangeReason: 'crm_manual_create',
+        );
+
+        return redirect()
+            ->route('crm.contacts.show', $contact)
+            ->with('success', config('contacts.labels.singular').' created.');
+    }
+
+    public function show(Contact $contact): View
     {
         $scheduledMessages = $contact->scheduledMessages()
             ->where('status', 'sent')
@@ -30,14 +59,29 @@ class ContactController extends Controller
             ->withQueryString();
 
         $contact->load([
-            'registrations.webinar',
+            'workflowProfile.contactStatus',
             'notes' => fn ($query) => $query->latest(),
-            'tasks' => fn ($query) => $query
-                ->with('assignedTo')
-                ->latest(),
             'messageConsents',
             'consentRevocations',
         ]);
+
+        $taskView = request('task_view') === 'archived' ? 'archived' : 'active';
+
+        $tasks = Task::query()
+            ->with('assignedTo')
+            ->where('related_type', $contact->getMorphClass())
+            ->where('related_id', $contact->id)
+            ->unarchived()
+            ->latest()
+            ->get();
+
+        $archivedTasks = Task::query()
+            ->with('assignedTo')
+            ->where('related_type', $contact->getMorphClass())
+            ->where('related_id', $contact->id)
+            ->archived()
+            ->latest('archived_at')
+            ->get();
 
         $teamMembers = TeamMember::active()
             ->orderBy('name')
@@ -52,20 +96,10 @@ class ContactController extends Controller
             'scheduledMessages',
             'teamMembers',
             'currentTeamMember',
+            'taskView',
+            'tasks',
+            'archivedTasks',
         ));
-    }
-
-    public function markConverted(Contact $contact, WebinarRegistration $registration): RedirectResponse
-    {
-        if ($registration->contact_id !== $contact->id) {
-            abort(404);
-        }
-
-        $contact->update([
-            'converted_at' => now(),
-        ]);
-
-        return back();
     }
 
     public function import(): View
@@ -132,8 +166,10 @@ class ContactController extends Controller
         ]);
     }
 
-    public function processImport(Request $request): RedirectResponse
-    {
+    public function processImport(
+        Request $request,
+        CreateOrUpdateContactAction $createOrUpdateContact,
+    ): RedirectResponse {
         $validated = $request->validate([
             'csv_path' => ['required', 'string'],
             'mapping' => ['required', 'array'],
@@ -142,6 +178,22 @@ class ContactController extends Controller
 
         $csvPath = $validated['csv_path'];
         $mapping = collect($validated['mapping'])->filter()->toArray();
+
+        $allowedMappingFields = [
+            'first_name',
+            'last_name',
+            'name',
+            'email',
+            'phone',
+            'source',
+            'subsource',
+            'last_contacted_at',
+            'last_activity_at',
+        ];
+
+        $mapping = collect($mapping)
+            ->only($allowedMappingFields)
+            ->toArray();
 
         if (! Storage::disk('local')->exists($csvPath)) {
             throw ValidationException::withMessages([
@@ -227,24 +279,25 @@ class ContactController extends Controller
                 $name = $email;
             }
 
-            $closedAt = $this->mappedDate($data, $mapping, 'closed_at');
-            $lastContactedAt = $this->mappedDate($data, $mapping, 'last_contacted_at') ?? $closedAt;
+            $source = $this->mappedValue($data, $mapping, 'source') ?? 'import';
+            $subsource = $this->mappedValue($data, $mapping, 'subsource') ?? 'csv';
 
-            Contact::updateOrCreate(
-                ['email' => $email],
-                [
+            $lastContactedAt = $this->mappedDate($data, $mapping, 'last_contacted_at');
+            $lastActivityAt = $this->mappedDate($data, $mapping, 'last_activity_at');
+
+            $createOrUpdateContact->handle(
+                data: [
+                    'email' => $email,
                     'first_name' => $firstName,
                     'last_name' => $lastName,
                     'name' => $name,
                     'phone' => $phone,
-                    'source' => 'import',
-                    'subsource' => 'csv',
-                    'crm_status' => $closedAt ? 'converted' : 'new',
-                    'converted_at' => $closedAt,
-                    'closed_at' => $closedAt,
+                    'source' => $source,
+                    'subsource' => $subsource,
                     'last_contacted_at' => $lastContactedAt,
-                    'last_activity_at' => $lastContactedAt,
+                    'last_activity_at' => $lastActivityAt,
                 ],
+                statusChangeReason: 'csv_import',
             );
 
             $existing ? $updated++ : $created++;

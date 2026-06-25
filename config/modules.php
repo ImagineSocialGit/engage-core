@@ -16,7 +16,7 @@ return [
         'trim',
         explode(',', env(
             'ENABLED_MODULES',
-            'messaging,inbound_messaging,internal_notifications,tasks,campaigns,webinars,integrations,reporting'
+            'messaging,inbound_messaging,internal_notifications,campaigns,webinars,integrations,reporting'
         ))
     )),
 

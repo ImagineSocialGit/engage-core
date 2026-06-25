@@ -15,7 +15,7 @@ class TeamMemberNotificationPreferenceTest extends TestCase
     {
         $teamMember = TeamMember::factory()->create([
             'email' => 'admin@example.com',
-            'active' => true,
+            'is_active' => true,
         ]);
 
         $this->assertTrue(
@@ -42,6 +42,7 @@ class TeamMemberNotificationPreferenceTest extends TestCase
     {
         $teamMember = TeamMember::factory()->create([
             'email' => 'admin@example.com',
+            'is_active' => true,
         ]);
 
         TeamMemberNotificationPreference::factory()
@@ -51,7 +52,7 @@ class TeamMemberNotificationPreferenceTest extends TestCase
             ->disabled()
             ->create();
 
-        $teamMember->load('notificationPreferences');
+        $teamMember->refresh()->load('notificationPreferences');
 
         $this->assertFalse(
             $teamMember->canReceiveEmailNotifications(
@@ -64,6 +65,7 @@ class TeamMemberNotificationPreferenceTest extends TestCase
     {
         $teamMember = TeamMember::factory()->create([
             'phone' => '+15551234567',
+            'is_active' => true,
         ]);
 
         $this->assertFalse(
@@ -77,6 +79,7 @@ class TeamMemberNotificationPreferenceTest extends TestCase
     {
         $teamMember = TeamMember::factory()->create([
             'phone' => '+15551234567',
+            'is_active' => true,
         ]);
 
         TeamMemberNotificationPreference::factory()
@@ -84,10 +87,10 @@ class TeamMemberNotificationPreferenceTest extends TestCase
             ->sms()
             ->inboundReplies()
             ->create([
-                'enabled' => true,
+                'is_enabled' => true,
             ]);
 
-        $teamMember->load('notificationPreferences');
+        $teamMember->refresh()->load('notificationPreferences');
 
         $this->assertTrue(
             $teamMember->canReceiveSmsNotifications(

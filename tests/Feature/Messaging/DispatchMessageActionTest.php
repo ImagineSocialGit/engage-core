@@ -203,7 +203,7 @@ class DispatchMessageActionTest extends TestCase
                 'dispatch_key' => 'registration_created',
 
                 'conditions' => [
-                    'contact.status' => 'converted',
+                    'contact.source' => 'referral',
                 ],
 
                 'timing' => 'immediate',
@@ -221,7 +221,7 @@ class DispatchMessageActionTest extends TestCase
 
         app(DispatchMessageAction::class)->handle(
             recipient: $this->contactWithConsent(attributes: [
-                'status' => 'new',
+                'source' => 'webinar',
             ]),
             channel: 'email',
             purpose: 'transactional',

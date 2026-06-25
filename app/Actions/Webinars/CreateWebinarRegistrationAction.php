@@ -2,6 +2,7 @@
 
 namespace App\Actions\Webinars;
 
+use App\Actions\CRM\Contacts\CreateOrUpdateContactAction;
 use App\Actions\Messaging\GrantMessageConsentAction;
 use App\Enums\MessageChannel;
 use App\Enums\MessagePurpose;
@@ -19,6 +20,7 @@ class CreateWebinarRegistrationAction
         private readonly AddRegistrantToWebinarProviderAction $addRegistrantToWebinarProviderAction,
         private readonly DispatchWebinarRegistrationMessagesAction $dispatchWebinarRegistrationMessagesAction,
         private readonly GrantMessageConsentAction $grantMessageConsentAction,
+        private readonly CreateOrUpdateContactAction $createOrUpdateContact,
     ) {}
 
     public function handle(array $validated, Request $request, string $webinarSlug = 'default'): WebinarRegistration
@@ -32,16 +34,15 @@ class CreateWebinarRegistrationAction
                 $validated['phone'] ?? null
             );
 
-            $contact = Contact::query()->updateOrCreate(
-                ['email' => $validated['email']],
-                [
+            $contact = $this->createOrUpdateContact->handle(
+                data: [
+                    'email' => $validated['email'],
                     'first_name' => $validated['first_name'],
                     'last_name' => $validated['last_name'] ?? null,
                     'phone' => $normalizedPhone,
-                    'status' => 'new',
                     'source' => 'webinar',
                     'subsource' => $webinar->slug,
-                ]
+                ],
             );
 
             $registration = WebinarRegistration::query()

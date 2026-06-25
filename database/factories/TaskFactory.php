@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Contact;
 use App\Models\Task;
 use App\Models\TeamMember;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -18,22 +17,28 @@ class TaskFactory extends Factory
     public function definition(): array
     {
         return [
+            'related_type' => null,
+            'related_id' => null,
             'assigned_to_type' => TeamMember::class,
             'assigned_to_id' => TeamMember::factory(),
-            'related_type' => Contact::class,
-            'related_id' => Contact::factory(),
+            'source' => Task::SOURCE_MANUAL,
             'title' => fake()->sentence(4),
             'description' => fake()->optional()->paragraph(),
-            'status' => 'open',
+            'status' => Task::STATUS_OPEN,
+            'priority' => null,
             'due_at' => fake()->optional()->dateTimeBetween('now', '+14 days'),
             'completed_at' => null,
+            'canceled_at' => null,
+            'canceled_reason' => null,
+            'archived_at' => null,
+            'meta' => null,
         ];
     }
 
     public function assignedTo(Model $model): self
     {
         return $this->state([
-            'assigned_to_type' => $model::class,
+            'assigned_to_type' => $model->getMorphClass(),
             'assigned_to_id' => $model->getKey(),
         ]);
     }
@@ -41,7 +46,7 @@ class TaskFactory extends Factory
     public function relatedTo(?Model $model): self
     {
         return $this->state([
-            'related_type' => $model ? $model::class : null,
+            'related_type' => $model?->getMorphClass(),
             'related_id' => $model?->getKey(),
         ]);
     }
@@ -54,8 +59,27 @@ class TaskFactory extends Factory
     public function completed(): self
     {
         return $this->state([
-            'status' => 'completed',
+            'status' => Task::STATUS_COMPLETED,
             'completed_at' => now(),
+            'canceled_at' => null,
+            'canceled_reason' => null,
+        ]);
+    }
+
+    public function canceled(?string $reason = null): self
+    {
+        return $this->state([
+            'status' => Task::STATUS_CANCELED,
+            'completed_at' => null,
+            'canceled_at' => now(),
+            'canceled_reason' => $reason,
+        ]);
+    }
+
+    public function archived(): self
+    {
+        return $this->state([
+            'archived_at' => now(),
         ]);
     }
 }

@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
-use Database\Factories\TeamMemberNotificationPreferenceFactory;
+use App\Enums\MessageChannel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TeamMemberNotificationPreference extends Model
 {
+    use HasFactory;
+
     public const CHANNEL_EMAIL = 'email';
     public const CHANNEL_SMS = 'sms';
 
@@ -18,32 +20,40 @@ class TeamMemberNotificationPreference extends Model
     public const TYPE_DAILY_DIGEST = 'daily_digest';
     public const TYPE_WEEKLY_DIGEST = 'weekly_digest';
 
-    /** @use HasFactory<TeamMemberNotificationPreferenceFactory> */
-    use HasFactory;
-
     protected $fillable = [
         'team_member_id',
         'channel',
-        'notification_type',
-        'enabled',
+        'purpose',
+        'scope',
+        'is_enabled',
+        'meta',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'team_member_id' => 'integer',
-            'enabled' => 'boolean',
-        ];
-    }
+    protected $casts = [
+        'team_member_id' => 'integer',
+        'is_enabled' => 'boolean',
+        'meta' => 'array',
+    ];
 
     public function teamMember(): BelongsTo
     {
         return $this->belongsTo(TeamMember::class);
     }
 
-    public function matches(string $channel, string $notificationType): bool
+    public function matches(MessageChannel|string $channel, ?string $notificationType = null): bool
     {
-        return $this->channel === $channel
-            && $this->notification_type === $notificationType;
+        $channel = $channel instanceof MessageChannel
+            ? $channel->value
+            : strtolower(trim($channel));
+
+        if ($this->channel !== $channel) {
+            return false;
+        }
+
+        if ($notificationType === null || trim($notificationType) === '') {
+            return true;
+        }
+
+        return $this->purpose === $notificationType;
     }
 }

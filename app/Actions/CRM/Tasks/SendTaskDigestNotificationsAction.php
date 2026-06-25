@@ -64,7 +64,7 @@ class SendTaskDigestNotificationsAction
             'headline' => $label,
             'preheader' => "You have {$count} open ".Str::plural('task', $count).'.',
             'body' => [
-                "You have {$count} open ".Str::plural('task', $count).' in your CRM task list.',
+                "You have {$count} open ".Str::plural('task', $count).' in your task list.',
                 ...$this->taskLines($digest),
             ],
             'details' => [
@@ -72,7 +72,7 @@ class SendTaskDigestNotificationsAction
                 'Digest' => $label,
                 'Open Tasks' => (string) $count,
             ],
-            'sms_message' => "{$label}: {$count} open ".Str::plural('task', $count).'. Check your CRM for details.',
+            'sms_message' => "{$label}: {$count} open ".Str::plural('task', $count).'. Check your task list for details.',
             'meta' => [
                 'frequency' => $digest->frequency,
                 'task_count' => $count,

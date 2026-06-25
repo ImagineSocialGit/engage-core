@@ -2,6 +2,8 @@
 
 return [
 
+    'default_workflow_status_key' => 'new',
+
     'labels' => [
         'singular' => 'lead',
         'plural' => 'leads',

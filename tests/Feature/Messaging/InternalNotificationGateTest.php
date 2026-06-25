@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Messaging;
 
-use App\Enums\MessageChannel;
 use App\Models\TeamMember;
 use App\Models\TeamMemberNotificationPreference;
 use App\Services\Messaging\InternalNotificationGate;
@@ -17,12 +16,12 @@ class InternalNotificationGateTest extends TestCase
     {
         $teamMember = TeamMember::factory()->create([
             'email' => 'admin@example.com',
-            'active' => true,
+            'is_active' => true,
         ]);
 
         $this->assertTrue($this->gate()->allows(
             teamMember: $teamMember,
-            channel: MessageChannel::Email,
+            channel: 'email',
             notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
         ));
     }
@@ -35,7 +34,7 @@ class InternalNotificationGateTest extends TestCase
 
         $this->assertFalse($this->gate()->allows(
             teamMember: $teamMember,
-            channel: MessageChannel::Email,
+            channel: 'email',
             notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
         ));
     }
@@ -44,12 +43,12 @@ class InternalNotificationGateTest extends TestCase
     {
         $teamMember = TeamMember::factory()->create([
             'email' => null,
-            'active' => true,
+            'is_active' => true,
         ]);
 
         $this->assertFalse($this->gate()->allows(
             teamMember: $teamMember,
-            channel: MessageChannel::Email,
+            channel: 'email',
             notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
         ));
     }
@@ -58,7 +57,7 @@ class InternalNotificationGateTest extends TestCase
     {
         $teamMember = TeamMember::factory()->create([
             'email' => 'admin@example.com',
-            'active' => true,
+            'is_active' => true,
         ]);
 
         TeamMemberNotificationPreference::factory()
@@ -68,9 +67,11 @@ class InternalNotificationGateTest extends TestCase
             ->disabled()
             ->create();
 
+        $teamMember->refresh()->load('notificationPreferences');
+
         $this->assertFalse($this->gate()->allows(
             teamMember: $teamMember,
-            channel: MessageChannel::Email,
+            channel: 'email',
             notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
         ));
     }
@@ -79,12 +80,12 @@ class InternalNotificationGateTest extends TestCase
     {
         $teamMember = TeamMember::factory()->create([
             'phone' => '+15551234567',
-            'active' => true,
+            'is_active' => true,
         ]);
 
         $this->assertFalse($this->gate()->allows(
             teamMember: $teamMember,
-            channel: MessageChannel::Sms,
+            channel: 'sms',
             notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
         ));
     }
@@ -93,7 +94,7 @@ class InternalNotificationGateTest extends TestCase
     {
         $teamMember = TeamMember::factory()->create([
             'phone' => '+15551234567',
-            'active' => true,
+            'is_active' => true,
         ]);
 
         TeamMemberNotificationPreference::factory()
@@ -101,12 +102,14 @@ class InternalNotificationGateTest extends TestCase
             ->sms()
             ->inboundReplies()
             ->create([
-                'enabled' => true,
+                'is_enabled' => true,
             ]);
+
+        $teamMember->refresh()->load('notificationPreferences');
 
         $this->assertTrue($this->gate()->allows(
             teamMember: $teamMember,
-            channel: MessageChannel::Sms,
+            channel: 'sms',
             notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
         ));
     }
@@ -115,7 +118,7 @@ class InternalNotificationGateTest extends TestCase
     {
         $teamMember = TeamMember::factory()->create([
             'phone' => null,
-            'active' => true,
+            'is_active' => true,
         ]);
 
         TeamMemberNotificationPreference::factory()
@@ -123,12 +126,14 @@ class InternalNotificationGateTest extends TestCase
             ->sms()
             ->inboundReplies()
             ->create([
-                'enabled' => true,
+                'is_enabled' => true,
             ]);
+
+        $teamMember->refresh()->load('notificationPreferences');
 
         $this->assertFalse($this->gate()->allows(
             teamMember: $teamMember,
-            channel: MessageChannel::Sms,
+            channel: 'sms',
             notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
         ));
     }
@@ -137,7 +142,7 @@ class InternalNotificationGateTest extends TestCase
     {
         $teamMember = TeamMember::factory()->create([
             'email' => 'admin@example.com',
-            'active' => true,
+            'is_active' => true,
         ]);
 
         $this->assertFalse($this->gate()->allows(

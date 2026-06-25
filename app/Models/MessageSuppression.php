@@ -15,6 +15,7 @@ class MessageSuppression extends Model
     public const REASON_REPEATED_FAILURE = 'repeated_failure';
 
     public const PROVIDER_TWILIO = 'twilio';
+    public const PROVIDER_TELNYX = 'telnyx';
     public const PROVIDER_RESEND = 'resend';
 
     protected $fillable = [

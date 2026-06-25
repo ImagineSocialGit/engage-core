@@ -6,10 +6,14 @@
 │   │   ├── Campaigns
 │   │   │   ├── EnrollContactInCampaignAction.php
 │   │   │   └── ScheduleNextCampaignStepAction.php
-│   │   ├── Contacts
 │   │   ├── CRM
+│   │   │   ├── Contacts
+│   │   │   │   ├── CreateOrUpdateContactAction.php
+│   │   │   │   ├── ResolveContactStatusAction.php
+│   │   │   │   └── UpdateContactStatusAction.php
 │   │   │   └── Tasks
 │   │   │       ├── BuildTaskDigestsAction.php
+│   │   │       ├── CreateManualTaskAction.php
 │   │   │       ├── NotifyAssignedTaskRecipientsAction.php
 │   │   │       └── SendTaskDigestNotificationsAction.php
 │   │   ├── Messaging
@@ -24,6 +28,7 @@
 │   │   │   ├── RecordInboundMessageAction.php
 │   │   │   ├── RevokeMessageConsentAction.php
 │   │   │   ├── ScheduleMessageAction.php
+│   │   │   ├── SkipScheduledMessagesAction.php
 │   │   │   └── Sms
 │   │   │       ├── HandleInboundSmsWebhookAction.php
 │   │   │       └── Inbound
@@ -37,7 +42,6 @@
 │   │       ├── DispatchWebinarWaitlistMessagesAction.php
 │   │       ├── GetActiveWebinarSeriesAction.php
 │   │       ├── GetNextUpcomingWebinarAction.php
-│   │       ├── MarkWebinarRegistrationConvertedAction.php
 │   │       ├── PostEvent
 │   │       │   ├── DispatchPostWebinarCampaignsAction.php
 │   │       │   ├── DispatchPostWebinarFollowUpsAction.php
@@ -54,7 +58,8 @@
 │   ├── Contracts
 │   │   ├── CRM
 │   │   │   └── Tasks
-│   │   │       └── TaskAssignedRecipientResolver.php
+│   │   │       ├── TaskAssignedRecipientResolver.php
+│   │   │       └── TaskRelatedSubjectResolverContract.php
 │   │   ├── Messaging
 │   │   │   ├── Email
 │   │   │   │   ├── EmailMessage.php
@@ -87,6 +92,8 @@
 │   │   └── WebinarTag.php
 │   ├── Events
 │   │   └── Messaging
+│   │       ├── MessageConsentGranted.php
+│   │       ├── MessageConsentRevoked.php
 │   │       └── ScheduledMessageSent.php
 │   ├── helpers.php
 │   ├── Http
@@ -97,7 +104,7 @@
 │   │   │   ├── CRM
 │   │   │   │   ├── ContactController.php
 │   │   │   │   ├── ContactNoteController.php
-│   │   │   │   ├── ContactTaskController.php
+│   │   │   │   ├── TaskController.php
 │   │   │   │   ├── TeamMemberController.php
 │   │   │   │   └── WebinarController.php
 │   │   │   ├── Public
@@ -112,11 +119,13 @@
 │   │   │       ├── SmsWebhookController.php
 │   │   │       └── WebinarWebhookController.php
 │   │   ├── Middleware
+│   │   │   ├── EnsureModuleEnabled.php
 │   │   │   └── ForceStagingAccess.php
 │   │   └── Requests
 │   │       ├── CRM
 │   │       │   ├── StoreContactNoteRequest.php
-│   │       │   ├── StoreContactTaskRequest.php
+│   │       │   ├── StoreContactRequest.php
+│   │       │   ├── StoreTaskRequest.php
 │   │       │   ├── StoreWebinarSeriesRequest.php
 │   │       │   └── SyncWebinarSeriesRequest.php
 │   │       └── Public
@@ -175,12 +184,17 @@
 │   │   ├── ConsentRevocation.php
 │   │   ├── ContactMortgageProfile.php
 │   │   ├── Contact.php
+│   │   ├── ContactStatus.php
 │   │   ├── ContactTag.php
+│   │   ├── ContactWorkflowProfile.php
+│   │   ├── FlowRoute.php
+│   │   ├── FlowRoutePoint.php
 │   │   ├── InboundMessage.php
 │   │   ├── MessageConsent.php
 │   │   ├── MessageSuppression.php
 │   │   ├── MortgageStage.php
 │   │   ├── Note.php
+│   │   ├── Point.php
 │   │   ├── ScheduledMessage.php
 │   │   ├── Task.php
 │   │   ├── TeamMemberNotificationPreference.php
@@ -204,8 +218,11 @@
 │   │   │   └── Tasks
 │   │   │       ├── AssignedRecipients
 │   │   │       │   └── TeamMemberTaskAssignedRecipientResolver.php
+│   │   │       ├── RelatedSubjects
+│   │   │       │   └── ContactTaskRelatedSubjectResolver.php
 │   │   │       ├── TaskAssignedRecipientsResolver.php
-│   │   │       └── TaskRelatedSubjectResolver.php
+│   │   │       ├── TaskRelatedSubjectResolver.php
+│   │   │       └── TaskRelatedTypeResolver.php
 │   │   ├── Messaging
 │   │   │   ├── DevMessageSink.php
 │   │   │   ├── Email
@@ -246,6 +263,8 @@
 │       │   └── ViewResolver.php
 │       ├── Messaging
 │       │   └── EmailConsentRevocationLinkGenerator.php
+│       ├── Modules
+│       │   └── ModuleManager.php
 │       └── Webinars
 │           ├── WebinarJoinLinkGenerator.php
 │           ├── WebinarPlaybackLinkGenerator.php
@@ -373,6 +392,7 @@
 │   │   │       └── webinar.php
 │   │   └── sms.php
 │   ├── messaging.php
+│   ├── modules.php
 │   ├── queue.php
 │   ├── reminders.php
 │   ├── security.php
@@ -381,6 +401,7 @@
 │   ├── setup.php
 │   ├── sms.php
 │   ├── staging.php
+│   ├── tasks.php
 │   ├── theme
 │   ├── webinars
 │   │   ├── content.php
@@ -419,32 +440,39 @@
 │   │   ├── 0001_01_01_000000_create_users_table.php
 │   │   ├── 0001_01_01_000001_create_cache_table.php
 │   │   ├── 0001_01_01_000002_create_jobs_table.php
+│   │   ├── 2026_04_10_173406_create_team_members_table.php
+│   │   ├── 2026_04_11_174215_create_team_member_notification_preferences_table.php
+│   │   ├── 2026_04_15_195800_create_contact_statuses_table.php
 │   │   ├── 2026_04_15_195850_create_contacts_table.php
 │   │   ├── 2026_04_15_195851_create_contact_tags_table.php
+│   │   ├── 2026_04_15_195900_create_contact_workflow_profiles_table.php
+│   │   ├── 2026_04_15_203500_create_flow_routes_table.php
+│   │   ├── 2026_04_15_203510_create_points_table.php
+│   │   ├── 2026_04_15_203520_create_flow_route_points_table.php
 │   │   ├── 2026_04_15_203545_create_tasks_table.php
 │   │   ├── 2026_04_15_203546_create_notes_table.php
-│   │   ├── 2026_04_15_203547_create_webinar_series_table.php
-│   │   ├── 2026_04_15_203548_create_webinars_table.php
-│   │   ├── 2026_04_15_203549_create_webinar_registrations_table.php
-│   │   ├── 2026_05_12_155410_create_webinar_waitlist_signups_table.php
 │   │   ├── 2026_05_15_215534_create_message_consents_table.php
 │   │   ├── 2026_05_15_215834_create_consent_revocations_table.php
+│   │   ├── 2026_05_19_154535_create_inbound_messages_table.php
+│   │   ├── 2026_05_19_211538_create_scheduled_messages_table.php
 │   │   ├── 2026_05_19_221010_create_message_suppressions_table.php
-│   │   ├── 2026_05_26_211538_create_scheduled_messages_table.php
 │   │   ├── 2026_06_02_211108_create_mortgage_stages_table.php
 │   │   ├── 2026_06_02_211116_create_contact_mortgage_profiles_table.php
 │   │   ├── 2026_06_12_050337_create_campaign_enrollments_table.php
 │   │   ├── 2026_06_12_065258_create_broadcasts_table.php
 │   │   ├── 2026_06_12_065311_create_broadcast_recipients_table.php
-│   │   ├── 2026_06_18_154535_create_inbound_messages_table.php
-│   │   ├── 2026_06_20_173406_create_team_members_table.php
-│   │   └── 2026_06_20_174215_create_team_member_notification_preferences_table.php
+│   │   ├── 2026_06_18_203547_create_webinar_series_table.php
+│   │   ├── 2026_06_19_203548_create_webinars_table.php
+│   │   ├── 2026_06_19_203549_create_webinar_registrations_table.php
+│   │   └── 2026_06_20_155410_create_webinar_waitlist_signups_table.php
 │   ├── schema
 │   └── seeders
 │       ├── DatabaseSeeder.php
 │       ├── TagSeeder.php
 │       ├── UserSeeder.php
 │       └── WebinarSeeder.php
+├── docs
+│   └── module-boundaries.md
 ├── package.json
 ├── package-lock.json
 ├── phpunit.xml
@@ -489,6 +517,10 @@
 │       ├── auth
 │       │   └── login.blade.php
 │       ├── components
+│       │   ├── crm
+│       │   │   └── contacts
+│       │   │       ├── create-task-modal.blade.php
+│       │   │       └── task-list.blade.php
 │       │   ├── head.blade.php
 │       │   ├── hero.blade.php
 │       │   ├── layouts
@@ -571,6 +603,8 @@
 │   │   │   └── ScheduleNextCampaignStepAfterScheduledMessageSentTest.php
 │   │   ├── CRM
 │   │   │   ├── ContactTaskAssignmentTest.php
+│   │   │   ├── PlaySystemDataModelTest.php
+│   │   │   ├── UpdateContactStatusActionTest.php
 │   │   │   └── WebinarSyncTest.php
 │   │   ├── Email
 │   │   │   └── HandleInboundEmailWebhookActionTest.php
@@ -595,6 +629,11 @@
 │   │   │   ├── SmsPayloadTest.php
 │   │   │   ├── SmsSendGuardTest.php
 │   │   │   └── TeamMemberNotificationPreferenceTest.php
+│   │   ├── Modules
+│   │   │   ├── ContactShowModuleVisibilityTest.php
+│   │   │   ├── ModuleManagerTest.php
+│   │   │   ├── ModuleNavigationTest.php
+│   │   │   └── ModuleRouteMiddlewareTest.php
 │   │   ├── tests
 │   │   │   └── Feature
 │   │   │       └── Webinars
@@ -615,4 +654,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-202 directories, 414 files
+208 directories, 447 files

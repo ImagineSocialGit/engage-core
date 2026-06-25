@@ -5,7 +5,6 @@ namespace App\Services\Messaging;
 use App\Models\Contact;
 use App\Models\InboundMessage;
 use App\Models\TeamMember;
-use App\Models\TeamMemberNotificationPreference;
 
 class InboundMessageNotificationRecipientResolver
 {
@@ -23,7 +22,7 @@ class InboundMessageNotificationRecipientResolver
             name: $this->teamMemberName($teamMember),
             email: $teamMember->email,
             phone: $teamMember->phone,
-            notificationType: TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
+            notificationType: 'inbound_replies',
             preferenceOwner: $teamMember,
         );
     }
@@ -36,32 +35,19 @@ class InboundMessageNotificationRecipientResolver
             return null;
         }
 
-        $assignedTo = trim((string) $sender->assigned_to);
+        $sender->loadMissing('workflowProfile.assignedTo');
 
-        if ($assignedTo === '') {
+        $assignedTo = $sender->workflowProfile?->assignedTo;
+
+        if (! $assignedTo instanceof TeamMember) {
             return null;
         }
 
-        return $this->resolveAssignableTeamMember($assignedTo);
-    }
-
-    private function resolveAssignableTeamMember(string $assignedTo): ?TeamMember
-    {
-        $teamMember = TeamMember::query()
-            ->with('notificationPreferences')
-            ->active()
-            ->whereRaw('LOWER(email) = ?', [mb_strtolower($assignedTo)])
-            ->first();
-
-        if ($teamMember) {
-            return $teamMember;
+        if (! $assignedTo->is_active) {
+            return null;
         }
 
-        return TeamMember::query()
-            ->with('notificationPreferences')
-            ->active()
-            ->whereRaw('LOWER(name) = ?', [mb_strtolower($assignedTo)])
-            ->first();
+        return $assignedTo->loadMissing('notificationPreferences');
     }
 
     private function resolveDefaultTeamMember(): ?TeamMember

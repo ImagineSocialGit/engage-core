@@ -5,7 +5,9 @@ namespace App\Providers;
 use App\Events\Messaging\ScheduledMessageSent;
 use App\Listeners\Campaigns\ScheduleNextCampaignStepAfterScheduledMessageSent;
 use App\Services\CRM\Tasks\AssignedRecipients\TeamMemberTaskAssignedRecipientResolver;
+use App\Services\CRM\Tasks\RelatedSubjects\ContactTaskRelatedSubjectResolver;
 use App\Services\CRM\Tasks\TaskAssignedRecipientsResolver;
+use App\Services\CRM\Tasks\TaskRelatedSubjectResolver;
 use App\Services\Messaging\Email\EmailProviderManager;
 use App\Services\Messaging\Email\EmailWebhookHandlerResolver;
 use App\Services\Messaging\InternalNotificationChannelResolver;
@@ -66,7 +68,14 @@ class AppServiceProvider extends ServiceProvider
         $this->app->when(InternalNotificationChannelResolver::class)
             ->needs('$preferenceResolvers')
             ->giveTagged('messaging.internal_notification_preference_resolvers');
-            
+
+        $this->app->tag([
+            ContactTaskRelatedSubjectResolver::class,
+        ], 'crm.task_related_subject_resolvers');
+
+        $this->app->when(TaskRelatedSubjectResolver::class)
+            ->needs('$resolvers')
+            ->giveTagged('crm.task_related_subject_resolvers');
     }
 
     /**

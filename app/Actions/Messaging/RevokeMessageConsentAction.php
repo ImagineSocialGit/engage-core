@@ -2,7 +2,7 @@
 
 namespace App\Actions\Messaging;
 
-use App\Models\CampaignEnrollment;
+use App\Events\Messaging\MessageConsentRevoked;
 use App\Models\ConsentRevocation;
 use App\Models\Contact;
 use App\Models\MessageConsent;
@@ -28,6 +28,14 @@ class RevokeMessageConsentAction
 
             if ($scope !== null) {
                 $result = $this->revokeScope($contact, $validated, $scope);
+
+                $this->dispatchRevokedEventAfterCommit(
+                    contact: $contact,
+                    revocation: $result['revocation'],
+                    created: $result['created'],
+                    validated: $validated,
+                    scope: $scope,
+                );
 
                 return [
                     'revocations' => new Collection([$result['revocation']]),
@@ -55,6 +63,14 @@ class RevokeMessageConsentAction
                 if ($result['created']) {
                     $created = true;
                 }
+
+                $this->dispatchRevokedEventAfterCommit(
+                    contact: $contact,
+                    revocation: $result['revocation'],
+                    created: $result['created'],
+                    validated: $validated,
+                    scope: $scope,
+                );
             }
 
             return [
@@ -65,7 +81,7 @@ class RevokeMessageConsentAction
     }
 
     /**
-     * @param  array<string, mixed>  $validated
+     * @param array<string, mixed> $validated
      * @return array{revocation: ConsentRevocation, created: bool}
      */
     private function revokeScope(Contact $contact, array $validated, string $scope): array
@@ -99,13 +115,6 @@ class RevokeMessageConsentAction
             ];
         }
 
-        $this->pauseCampaignEnrollments(
-            contact: $contact,
-            channel: $validated['channel'],
-            purpose: $validated['purpose'],
-            scope: $scope,
-        );
-
         return [
             'revocation' => ConsentRevocation::query()->create([
                 'contact_id' => $contact->getKey(),
@@ -124,25 +133,35 @@ class RevokeMessageConsentAction
         ];
     }
 
-    private function pauseCampaignEnrollments(
+    /**
+     * @param array<string, mixed> $validated
+     */
+    private function dispatchRevokedEventAfterCommit(
         Contact $contact,
-        string $channel,
-        string $purpose,
+        ConsentRevocation $revocation,
+        bool $created,
+        array $validated,
         string $scope,
     ): void {
-        if ($purpose !== 'marketing') {
+        if (! $created) {
             return;
         }
 
-        CampaignEnrollment::query()
-            ->where('contact_id', $contact->getKey())
-            ->where('channel', $channel)
-            ->where('purpose', $purpose)
-            ->where('scope', $scope)
-            ->where('status', CampaignEnrollment::STATUS_ACTIVE)
-            ->update([
-                'status' => CampaignEnrollment::STATUS_PAUSED,
-                'paused_at' => now(),
-            ]);
+        DB::afterCommit(function () use ($contact, $revocation, $validated, $scope): void {
+            MessageConsentRevoked::dispatch(
+                contact: $contact,
+                consentRevocation: $revocation,
+                channel: $validated['channel'],
+                purpose: $validated['purpose'],
+                scope: $scope,
+                data: [
+                    'reason' => $validated['reason'],
+                    'source' => $validated['source'] ?? null,
+                    'ip_address' => $validated['ip_address'] ?? null,
+                    'user_agent' => $validated['user_agent'] ?? null,
+                    'meta' => $validated['meta'] ?? null,
+                ],
+            );
+        });
     }
 }

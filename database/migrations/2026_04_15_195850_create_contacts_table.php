@@ -6,9 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('contacts', function (Blueprint $table) {
@@ -18,31 +15,24 @@ return new class extends Migration
             $table->string('last_name')->nullable();
             $table->string('name')->nullable();
 
-            $table->string('email')->unique();
+            $table->string('email')->nullable()->unique();
             $table->string('phone')->nullable()->index();
 
-            $table->string('status')->default('new')->index();
-            $table->string('source')->default('webinar')->index();
+            $table->string('source')->nullable()->index();
             $table->string('subsource')->nullable()->index();
-
-            $table->string('crm_status')->default('new')->index();
-            $table->timestamp('converted_at')->nullable()->index();
-            $table->timestamp('closed_at')->nullable()->index();
 
             $table->timestamp('last_contacted_at')->nullable()->index();
             $table->timestamp('last_activity_at')->nullable()->index();
 
-            $table->string('assigned_to')->nullable()->index();
-
             $table->json('meta')->nullable();
 
             $table->timestamps();
+
+            $table->index(['source', 'subsource']);
+            $table->index(['last_activity_at', 'last_contacted_at']);
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('contacts');

@@ -57,9 +57,9 @@ class NotifyAssignedTaskRecipientsAction
         return [
             'subject' => 'New task assigned: '.$task->title,
             'headline' => 'New task assigned',
-            'preheader' => 'A new CRM task has been assigned to you.',
+            'preheader' => 'A new task has been assigned to you.',
             'body' => [
-                'A new CRM task has been assigned to you.',
+                'A new task has been assigned to you.',
             ],
             'details' => [
                 'Assigned To' => $recipient->name,
@@ -83,7 +83,7 @@ class NotifyAssignedTaskRecipientsAction
 
     private function smsMessage(Task $task, array $relatedSubject): string
     {
-        $message = 'New CRM task assigned: '.$task->title;
+        $message = 'New task assigned: '.$task->title;
 
         if ($relatedSubject['name'] !== '—') {
             $message .= ' for '.$relatedSubject['name'];

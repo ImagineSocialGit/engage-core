@@ -2,7 +2,7 @@
 
 namespace App\Actions\Webinars;
 
-use App\Models\ScheduledMessage;
+use App\Actions\Messaging\SkipScheduledMessagesAction;
 use App\Models\WebinarRegistration;
 use App\Services\Webinars\WebinarProviderManager;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +12,7 @@ class CancelWebinarRegistrationAction
 {
     public function __construct(
         private readonly WebinarProviderManager $webinarProviderManager,
+        private readonly SkipScheduledMessagesAction $skipScheduledMessagesAction,
     ) {}
 
     public function handle(WebinarRegistration $registration, string $source = 'email_link'): WebinarRegistration
@@ -38,7 +39,10 @@ class CancelWebinarRegistrationAction
                 'meta' => $meta,
             ])->save();
 
-            $this->skipPendingMessages($registration);
+            $this->skipScheduledMessagesAction->forContext(
+                context: $registration,
+                reason: 'Webinar registration cancelled.',
+            );
 
             return $registration->refresh();
         });
@@ -59,18 +63,5 @@ class CancelWebinarRegistrationAction
         } catch (Throwable $exception) {
             report($exception);
         }
-    }
-
-    private function skipPendingMessages(WebinarRegistration $registration): void
-    {
-        ScheduledMessage::query()
-            ->where('context_type', $registration->getMorphClass())
-            ->where('context_id', $registration->getKey())
-            ->where('status', 'pending')
-            ->update([
-                'status' => 'skipped',
-                'skipped_at' => now(),
-                'failure_reason' => 'Webinar registration cancelled.',
-            ]);
     }
 }

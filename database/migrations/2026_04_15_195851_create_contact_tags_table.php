@@ -7,15 +7,14 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('contact_tags', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignIdFor(Contact::class)->constrained()->cascadeOnDelete();
+            $table->foreignIdFor(Contact::class)
+                ->constrained()
+                ->cascadeOnDelete();
 
             $table->string('tag')->index();
 
@@ -25,9 +24,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('contact_tags');

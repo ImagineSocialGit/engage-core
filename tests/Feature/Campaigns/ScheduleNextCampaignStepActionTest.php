@@ -168,69 +168,10 @@ class ScheduleNextCampaignStepActionTest extends TestCase
         $this->assertNull($enrollment->last_scheduled_message_id);
     }
 
-    public function test_it_completes_campaign_when_contact_is_converted(): void
-    {
-        Queue::fake();
-
-        Config::set('messaging.email.marketing.webinar', [
-            'step_2' => [
-                'dispatch_key' => 'marketing_message_sent',
-                'campaign_key' => 'webinar_attended',
-                'step' => 2,
-                'timing' => 'scheduled',
-                'schedule' => [
-                    'type' => 'delay',
-                    'minutes' => 720,
-                ],
-                'payload_class' => EmailPayload::class,
-                'queue' => 'marketing',
-                'payload' => [
-                    'subject' => 'Step 2',
-                    'body' => 'Second message',
-                ],
-            ],
-        ]);
-
-        $contact = $this->contactWithMarketingEmailConsent([
-            'converted_at' => now(),
-        ]);
-
-        $enrollment = CampaignEnrollment::create([
-            'contact_id' => $contact->id,
-            'campaign_key' => 'webinar_attended',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
-            'status' => CampaignEnrollment::STATUS_ACTIVE,
-            'current_step' => 1,
-            'started_at' => now(),
-        ]);
-
-        $scheduledMessage = app(ScheduleNextCampaignStepAction::class)->handle(
-            enrollment: $enrollment,
-        );
-
-        $this->assertNull($scheduledMessage);
-
-        $enrollment->refresh();
-
-        $this->assertSame(
-            CampaignEnrollment::STATUS_COMPLETED,
-            $enrollment->status,
-        );
-
-        $this->assertSame(1, $enrollment->current_step);
-
-        $this->assertNotNull($enrollment->completed_at);
-
-        $this->assertDatabaseCount('scheduled_messages', 0);
-    }
-
-    private function contactWithMarketingEmailConsent(array $attributes = []): Contact
+    private function contactWithMarketingEmailConsent(): Contact
     {
         $contact = Contact::factory()->create([
             'email' => 'person@example.com',
-            ...$attributes,
         ]);
 
         MessageConsent::query()->create([

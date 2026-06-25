@@ -112,6 +112,19 @@ class CreateWebinarRegistrationActionTest extends TestCase
 
         $this->assertNotNull($contact);
 
+        $this->assertDatabaseHas('contacts', [
+            'id' => $contact->id,
+            'email' => 'jeff@example.com',
+            'first_name' => 'Jeff',
+            'last_name' => 'Yarnall',
+            'source' => 'webinar',
+            'subsource' => $webinar->slug,
+        ]);
+
+        $this->assertDatabaseMissing('contact_workflow_profiles', [
+            'contact_id' => $contact->id,
+        ]);
+
         $this->assertDatabaseHas('webinar_registrations', [
             'id' => $registration->id,
             'contact_id' => $contact->id,
@@ -158,7 +171,6 @@ class CreateWebinarRegistrationActionTest extends TestCase
 
     public function test_it_returns_existing_registration_without_duplicate(): void
     {
-
         Queue::fake();
 
         $webinar = Webinar::factory()->create([

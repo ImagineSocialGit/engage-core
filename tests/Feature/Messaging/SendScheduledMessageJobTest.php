@@ -134,7 +134,7 @@ class SendScheduledMessageJobTest extends TestCase
         Event::fake([ScheduledMessageSent::class]);
 
         $contact = Contact::factory()->create([
-            'status' => 'converted',
+            'source' => 'webinar',
             'email' => 'test@example.com',
         ]);
 
@@ -154,8 +154,8 @@ class SendScheduledMessageJobTest extends TestCase
             'status' => 'pending',
             'meta' => [
                 'conditions' => [
-                    'contact.status_not_in' => [
-                        'converted',
+                    'contact.source_not_in' => [
+                        'webinar',
                     ],
                 ],
             ],

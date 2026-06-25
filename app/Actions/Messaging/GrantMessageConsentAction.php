@@ -2,7 +2,7 @@
 
 namespace App\Actions\Messaging;
 
-use App\Models\CampaignEnrollment;
+use App\Events\Messaging\MessageConsentGranted;
 use App\Models\ConsentRevocation;
 use App\Models\Contact;
 use App\Models\MessageConsent;
@@ -19,9 +19,9 @@ class GrantMessageConsentAction
     ) {}
 
     /**
-     * @param  array<string, mixed>  $data
-     * @param  array<string, mixed>  $optInPayload
-     * @param  array<string, mixed>  $resolverContext
+     * @param array<string, mixed> $data
+     * @param array<string, mixed> $optInPayload
+     * @param array<string, mixed> $resolverContext
      *
      * @throws ValidationException
      */
@@ -34,68 +34,77 @@ class GrantMessageConsentAction
     ): MessageConsent {
         $validated = Validator::make($data, MessageConsentRules::rules())->validate();
 
-        $channel = $validated['channel'];
-        $purpose = $validated['purpose'];
-        $scope = $validated['scope'];
-        $consentedAt = $validated['consented_at'] ?? now();
+        return DB::transaction(function () use ($contact, $validated, $optInPayload, $context, $resolverContext): MessageConsent {
+            $channel = $validated['channel'];
+            $purpose = $validated['purpose'];
+            $scope = $validated['scope'];
+            $consentedAt = $validated['consented_at'] ?? now();
 
-        $wasActivelyConsented = $this->wasActivelyConsented(
-            contact: $contact,
-            channel: $channel,
-            purpose: $purpose,
-            scope: $scope,
-        );
-
-        $willBeActivelyConsented = $this->willBeActivelyConsented(
-            contact: $contact,
-            channel: $channel,
-            purpose: $purpose,
-            scope: $scope,
-            consentedAt: $consentedAt,
-        );
-
-        $consent = MessageConsent::query()->updateOrCreate(
-            [
-                'contact_id' => $contact->getKey(),
-                'channel' => $channel,
-                'purpose' => $purpose,
-                'scope' => $scope,
-            ],
-            [
-                'consented_at' => $consentedAt,
-                'ip_address' => $validated['ip_address'] ?? null,
-                'user_agent' => $validated['user_agent'] ?? null,
-                'source' => $validated['source'] ?? null,
-                'meta' => $validated['meta'] ?? null,
-            ]
-        );
-
-        if (! $wasActivelyConsented && $willBeActivelyConsented) {
-
-            $this->resumeCampaignEnrollments(
+            $wasActivelyConsented = $this->wasActivelyConsented(
                 contact: $contact,
                 channel: $channel,
                 purpose: $purpose,
                 scope: $scope,
             );
 
-            DB::afterCommit(function () use ($contact, $channel, $purpose, $scope, $optInPayload, $context, $resolverContext): void {
-                $this->dispatchMessageAction->handle(
-                    recipient: $contact,
-                    channel: $channel,
-                    purpose: $purpose,
-                    scope: $scope,
-                    dispatchKeys: 'consent_granted',
-                    payload: $optInPayload,
-                    context: $context,
-                    meta: [
-                        'resolver_context' => $resolverContext,
-                    ],
-                );
-            });
-        }
+            $willBeActivelyConsented = $this->willBeActivelyConsented(
+                contact: $contact,
+                channel: $channel,
+                purpose: $purpose,
+                scope: $scope,
+                consentedAt: $consentedAt,
+            );
 
-        return $consent;
+            $consent = MessageConsent::query()->updateOrCreate(
+                [
+                    'contact_id' => $contact->getKey(),
+                    'channel' => $channel,
+                    'purpose' => $purpose,
+                    'scope' => $scope,
+                ],
+                [
+                    'consented_at' => $consentedAt,
+                    'ip_address' => $validated['ip_address'] ?? null,
+                    'user_agent' => $validated['user_agent'] ?? null,
+                    'source' => $validated['source'] ?? null,
+                    'meta' => $validated['meta'] ?? null,
+                ],
+            );
+
+            if (! $wasActivelyConsented && $willBeActivelyConsented) {
+                DB::afterCommit(function () use ($contact, $consent, $channel, $purpose, $scope, $optInPayload, $context, $resolverContext, $validated): void {
+                    MessageConsentGranted::dispatch(
+                        contact: $contact,
+                        messageConsent: $consent,
+                        channel: $channel,
+                        purpose: $purpose,
+                        scope: $scope,
+                        context: $context,
+                        data: [
+                            'source' => $validated['source'] ?? null,
+                            'ip_address' => $validated['ip_address'] ?? null,
+                            'user_agent' => $validated['user_agent'] ?? null,
+                            'meta' => $validated['meta'] ?? null,
+                        ],
+                    );
+
+                    $this->dispatchMessageAction->handle(
+                        recipient: $contact,
+                        channel: $channel,
+                        purpose: $purpose,
+                        scope: $scope,
+                        dispatchKeys: 'consent_granted',
+                        payload: $optInPayload,
+                        context: $context,
+                        meta: [
+                            'resolver_context' => $resolverContext,
+                        ],
+                    );
+                });
+            }
+
+            return $consent;
+        });
     }
 
     private function wasActivelyConsented(
@@ -138,28 +147,5 @@ class GrantMessageConsentAction
             ->where('scope', $scope)
             ->where('revoked_at', '>=', $consentedAt)
             ->exists();
-    }
-
-    private function resumeCampaignEnrollments(
-        Contact $contact,
-        string $channel,
-        string $purpose,
-        string $scope,
-    ): void {
-        if ($purpose !== 'marketing') {
-            return;
-        }
-
-        CampaignEnrollment::query()
-            ->where('contact_id', $contact->getKey())
-            ->where('channel', $channel)
-            ->where('purpose', $purpose)
-            ->where('scope', $scope)
-            ->where('status', CampaignEnrollment::STATUS_PAUSED)
-            ->update([
-                'status' => CampaignEnrollment::STATUS_ACTIVE,
-                'paused_at' => null,
-                'resumed_at' => now(),
-            ]);
     }
 }

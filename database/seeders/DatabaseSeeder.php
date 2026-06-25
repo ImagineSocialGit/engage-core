@@ -9,19 +9,10 @@ class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        $seeders = [
+        $this->call([
             UserSeeder::class,
-        ];
-
-        if (! app()->environment('production')) {
-            $seeders[] = WebinarSeeder::class;
-        }
-
-        $this->call($seeders);
+        ]);
     }
 }

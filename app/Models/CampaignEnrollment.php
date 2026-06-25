@@ -16,6 +16,9 @@ class CampaignEnrollment extends Model
     public const STATUS_CANCELLED = 'cancelled';
     public const STATUS_COMPLETED = 'completed';
 
+    public const EXIT_REASON_CONDITION_MATCHED = 'condition_matched';
+    public const EXIT_REASON_NO_NEXT_STEP = 'no_next_step';
+
     protected $fillable = [
         'contact_id',
         'source_type',
@@ -26,6 +29,10 @@ class CampaignEnrollment extends Model
         'scope',
         'status',
         'current_step',
+        'start_context',
+        'exit_conditions',
+        'exited_at',
+        'exit_reason',
         'last_scheduled_message_id',
         'dedupe_key',
         'started_at',
@@ -42,7 +49,10 @@ class CampaignEnrollment extends Model
             'contact_id' => 'integer',
             'source_id' => 'integer',
             'current_step' => 'integer',
+            'start_context' => 'array',
+            'exit_conditions' => 'array',
             'last_scheduled_message_id' => 'integer',
+            'exited_at' => 'datetime',
             'started_at' => 'datetime',
             'paused_at' => 'datetime',
             'resumed_at' => 'datetime',

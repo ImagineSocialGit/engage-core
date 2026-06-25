@@ -2,17 +2,15 @@
 
 namespace App\Models;
 
-use Database\Factories\TeamMemberFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TeamMember extends Model
 {
-    /** @use HasFactory<TeamMemberFactory> */
     use HasFactory;
 
     protected $fillable = [
@@ -21,16 +19,15 @@ class TeamMember extends Model
         'email',
         'phone',
         'role',
-        'active',
+        'is_active',
+        'meta',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'user_id' => 'integer',
-            'active' => 'boolean',
-        ];
-    }
+    protected $casts = [
+        'user_id' => 'integer',
+        'is_active' => 'boolean',
+        'meta' => 'array',
+    ];
 
     public function user(): BelongsTo
     {
@@ -42,6 +39,11 @@ class TeamMember extends Model
         return $this->hasMany(TeamMemberNotificationPreference::class);
     }
 
+    public function assignedWorkflowProfiles(): MorphMany
+    {
+        return $this->morphMany(ContactWorkflowProfile::class, 'assigned_to');
+    }
+
     public function assignedTasks(): MorphMany
     {
         return $this->morphMany(Task::class, 'assigned_to');
@@ -49,50 +51,24 @@ class TeamMember extends Model
 
     public function scopeActive(Builder $query): Builder
     {
-        return $query->where('active', true);
+        return $query->where('is_active', true);
     }
 
     public function canReceiveEmailNotifications(?string $notificationType = null): bool
     {
-        if (! $this->active || ! $this->email) {
-            return false;
-        }
-
-        return $this->notificationEnabled(
+        return app(\App\Services\Messaging\InternalNotificationGate::class)->allows(
+            teamMember: $this,
             channel: 'email',
             notificationType: $notificationType,
-            default: true,
         );
     }
 
     public function canReceiveSmsNotifications(?string $notificationType = null): bool
     {
-        if (! $this->active || ! $this->phone) {
-            return false;
-        }
-
-        return $this->notificationEnabled(
+        return app(\App\Services\Messaging\InternalNotificationGate::class)->allows(
+            teamMember: $this,
             channel: 'sms',
             notificationType: $notificationType,
-            default: false,
         );
-    }
-
-    private function notificationEnabled(
-        string $channel,
-        ?string $notificationType,
-        bool $default,
-    ): bool {
-        if ($notificationType === null) {
-            return $default;
-        }
-
-        $preference = $this->notificationPreferences
-            ->first(fn (TeamMemberNotificationPreference $preference): bool => $preference->matches(
-                channel: $channel,
-                notificationType: $notificationType,
-            ));
-
-        return $preference?->enabled ?? $default;
     }
 }

@@ -20,8 +20,6 @@ return new class extends Migration
             $table->string('source_type', 120)->nullable();
             $table->unsignedBigInteger('source_id')->nullable();
 
-            $table->index(['source_type', 'source_id']);
-
             $table->string('campaign_key', 120)->index();
 
             $table->string('channel', 32)->index();
@@ -29,17 +27,20 @@ return new class extends Migration
             $table->string('scope', 120)->index();
 
             $table->string('status', 32)->default('active')->index();
-
             $table->unsignedInteger('current_step')->nullable();
+
+            $table->json('start_context')->nullable();
+            $table->json('exit_conditions')->nullable();
+
+            $table->timestamp('exited_at')->nullable()->index();
+            $table->string('exit_reason')->nullable()->index();
 
             $table->foreignIdFor(ScheduledMessage::class, 'last_scheduled_message_id')
                 ->nullable()
                 ->constrained('scheduled_messages')
                 ->nullOnDelete();
 
-            $table->string('dedupe_key', 191)
-                ->nullable()
-                ->unique();
+            $table->string('dedupe_key', 191)->nullable()->unique();
 
             $table->timestamp('started_at')->nullable()->index();
             $table->timestamp('paused_at')->nullable()->index();
@@ -50,6 +51,8 @@ return new class extends Migration
             $table->json('meta')->nullable();
 
             $table->timestamps();
+
+            $table->index(['source_type', 'source_id']);
 
             $table->index([
                 'contact_id',

@@ -2,7 +2,7 @@
 
 use App\Http\Controllers\CRM\ContactController;
 use App\Http\Controllers\CRM\ContactNoteController;
-use App\Http\Controllers\CRM\ContactTaskController;
+use App\Http\Controllers\CRM\TaskController;
 use App\Http\Controllers\CRM\WebinarController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,11 +26,36 @@ Route::middleware('auth')->group(function () {
             ->name('crm.webinar-series.destroy');
     });
 
+    Route::prefix('tasks')
+        ->name('crm.tasks.')
+        ->group(function () {
+        Route::post('/', [TaskController::class, 'store'])
+            ->name('store');
+
+        Route::patch('/{task}/complete', [TaskController::class, 'complete'])
+            ->name('complete');
+
+        Route::patch('/{task}/cancel', [TaskController::class, 'cancel'])
+            ->name('cancel');
+
+        Route::patch('/{task}/reopen', [TaskController::class, 'reopen'])
+            ->name('reopen');
+
+        Route::patch('/{task}/archive', [TaskController::class, 'archive'])
+            ->name('archive');
+
+        Route::patch('/{task}/restore', [TaskController::class, 'restore'])
+            ->name('restore');
+    });
+
     Route::prefix(config('contacts.routes.plural'))
         ->name('crm.contacts.')
         ->group(function () {
             Route::get('/', [ContactController::class, 'index'])
                 ->name('index');
+                
+            Route::post('/', [ContactController::class, 'store'])
+                ->name('store');
 
             Route::get('/import', [ContactController::class, 'import'])
                 ->name('import');
@@ -47,32 +72,10 @@ Route::middleware('auth')->group(function () {
             Route::post('/{contact}/notes', [ContactNoteController::class, 'store'])
                 ->name('notes.store');
 
-            Route::middleware('module:tasks')->group(function () {
-                Route::post('/{contact}/tasks', [ContactTaskController::class, 'store'])
-                    ->name('tasks.store');
-
-                Route::patch(
-                    '/{contact}/tasks/{task}/complete',
-                    [ContactTaskController::class, 'complete']
-                )->name('tasks.complete');
-
-                Route::patch(
-                    '/{contact}/tasks/{task}/reopen',
-                    [ContactTaskController::class, 'reopen']
-                )->name('tasks.reopen');
-            });
-
             Route::patch('/{contact}/notes/{note}', [ContactNoteController::class, 'update'])
                 ->name('notes.update');
 
             Route::delete('/{contact}/notes/{note}', [ContactNoteController::class, 'destroy'])
                 ->name('notes.destroy');
-
-            Route::middleware('module:webinars')->group(function () {
-                Route::patch(
-                    '/{contact}/registrations/{registration}/convert',
-                    [ContactController::class, 'markConverted']
-                )->name('registrations.convert');
-            });
         });
 });

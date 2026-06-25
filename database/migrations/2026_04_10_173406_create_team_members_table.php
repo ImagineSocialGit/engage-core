@@ -20,16 +20,16 @@ return new class extends Migration
             $table->string('name');
             $table->string('email')->nullable()->index();
             $table->string('phone')->nullable()->index();
+
             $table->string('role')->nullable()->index();
 
-            $table->boolean('active')
-                ->default(true)
-                ->index();
+            $table->boolean('is_active')->default(true)->index();
+
+            $table->json('meta')->nullable();
 
             $table->timestamps();
 
-            $table->index(['active', 'email']);
-            $table->index(['active', 'phone']);
+            $table->index(['is_active', 'role']);
         });
     }
 

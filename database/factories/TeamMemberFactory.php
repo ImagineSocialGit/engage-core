@@ -26,14 +26,14 @@ class TeamMemberFactory extends Factory
                 'processor',
                 'assistant',
             ]),
-            'active' => true,
+            'is_active' => true,
         ];
     }
 
     public function inactive(): self
     {
         return $this->state([
-            'active' => false,
+            'is_active' => false,
         ]);
     }
 

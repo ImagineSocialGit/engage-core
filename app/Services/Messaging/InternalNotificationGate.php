@@ -24,7 +24,7 @@ class InternalNotificationGate
 
     private function allowsEmail(TeamMember $teamMember, ?string $notificationType): bool
     {
-        if (! $teamMember->active || ! $teamMember->email) {
+        if (! $teamMember->is_active || ! $teamMember->email) {
             return false;
         }
 
@@ -38,7 +38,7 @@ class InternalNotificationGate
 
     private function allowsSms(TeamMember $teamMember, ?string $notificationType): bool
     {
-        if (! $teamMember->active || ! $teamMember->phone) {
+        if (! $teamMember->is_active || ! $teamMember->phone) {
             return false;
         }
 
@@ -68,7 +68,7 @@ class InternalNotificationGate
                 notificationType: $notificationType,
             ));
 
-        return $preference?->enabled ?? $default;
+        return $preference?->is_enabled ?? $default;
     }
 
     private function normalizeChannel(MessageChannel|string $channel): string

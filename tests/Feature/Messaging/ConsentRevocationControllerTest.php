@@ -220,7 +220,7 @@ class ConsentRevocationControllerTest extends TestCase
         );
     }
 
-    public function test_marketing_unsubscribe_pauses_active_campaign_enrollments_for_matching_scope(): void
+    public function test_marketing_unsubscribe_does_not_mutate_campaign_enrollments(): void
     {
         $contact = $this->createContact();
 
@@ -243,9 +243,9 @@ class ConsentRevocationControllerTest extends TestCase
 
         $enrollment->refresh();
 
-        $this->assertSame(CampaignEnrollment::STATUS_PAUSED, $enrollment->status);
+        $this->assertSame(CampaignEnrollment::STATUS_ACTIVE, $enrollment->status);
         $this->assertSame(2, $enrollment->current_step);
-        $this->assertNotNull($enrollment->paused_at);
+        $this->assertNull($enrollment->paused_at);
     }
 
     private function createContact(): Contact

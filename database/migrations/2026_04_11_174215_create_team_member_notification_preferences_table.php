@@ -17,22 +17,18 @@ return new class extends Migration
                 ->cascadeOnDelete();
 
             $table->string('channel')->index();
-            $table->string('notification_type')->index();
+            $table->string('purpose')->index();
+            $table->string('scope')->nullable()->index();
 
-            $table->boolean('enabled')
-                ->default(true)
-                ->index();
+            $table->boolean('is_enabled')->default(true)->index();
+
+            $table->json('meta')->nullable();
 
             $table->timestamps();
 
             $table->unique(
-                ['team_member_id', 'channel', 'notification_type'],
+                ['team_member_id', 'channel', 'purpose', 'scope'],
                 'team_member_notification_preference_unique'
-            );
-
-            $table->index(
-                ['channel', 'notification_type', 'enabled'],
-                'team_member_notification_preference_lookup_index'
             );
         });
     }

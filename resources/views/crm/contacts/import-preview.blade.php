@@ -1,7 +1,7 @@
 <x-layouts.crm
     :title="'Map CSV Fields'"
     :heading="'Map CSV Fields'"
-    :subheading="'Choose which CSV columns map to contact fields'"
+    :subheading="'Choose which CSV columns map to primary contact fields'"
 >
     <div class="max-w-6xl space-y-6">
         <x-ui.card class="space-y-6">
@@ -11,7 +11,7 @@
                 </h2>
 
                 <p class="mt-1 text-sm text-slate-500">
-                    Select the CSV column for each CRM field. Email is required for import.
+                    Select the CSV column for each contact field. Email is required for import.
                 </p>
             </div>
 
@@ -43,8 +43,10 @@
                         'name' => 'Full Name',
                         'email' => 'Email',
                         'phone' => 'Phone',
-                        'closed_at' => 'Closed At',
+                        'source' => 'Source',
+                        'subsource' => 'Subsource',
                         'last_contacted_at' => 'Last Contacted At',
+                        'last_activity_at' => 'Last Activity At',
                     ];
                 @endphp
 

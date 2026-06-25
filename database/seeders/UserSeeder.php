@@ -39,7 +39,7 @@ class UserSeeder extends Seeder
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => 'site_admin',
-                'active' => true,
+                'is_active' => true,
             ]
         );
     }

@@ -48,7 +48,7 @@ class WebinarRegistration extends Model
 
     public function scheduledMessages(): MorphMany
     {
-        return $this->morphMany(ScheduledMessage::class, 'remindable');
+        return $this->morphMany(ScheduledMessage::class, 'context');
     }
 
     protected static function booted(): void

@@ -45,7 +45,7 @@ class ScheduleMessageAction
             'payload_class' => $payloadClass,
             'payload' => $payload,
             'send_at' => $sendAt,
-            'status' => 'pending',
+            'status' => ScheduledMessage::STATUS_PENDING,
             'meta' => $meta,
         ];
 

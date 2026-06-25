@@ -16,8 +16,10 @@ class EnrollContactInCampaignAction
     ) {}
 
     /**
-     * @param  array<string, mixed>  $payload
-     * @param  array<string, mixed>|null  $meta
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed>|null $meta
+     * @param array<string, mixed>|null $startContext
+     * @param array<string, mixed>|null $exitConditions
      */
     public function handle(
         Contact $contact,
@@ -29,6 +31,8 @@ class EnrollContactInCampaignAction
         ?Model $source = null,
         array $payload = [],
         ?array $meta = null,
+        ?array $startContext = null,
+        ?array $exitConditions = null,
     ): CampaignEnrollment {
         $enrollment = CampaignEnrollment::query()
             ->where('contact_id', $contact->id)
@@ -56,6 +60,8 @@ class EnrollContactInCampaignAction
             'scope' => $scope,
             'status' => CampaignEnrollment::STATUS_ACTIVE,
             'current_step' => 0,
+            'start_context' => $startContext,
+            'exit_conditions' => $exitConditions,
             'started_at' => Carbon::now(),
             'meta' => $meta,
         ]);
@@ -70,10 +76,10 @@ class EnrollContactInCampaignAction
         );
 
         if (! $scheduledMessage instanceof ScheduledMessage) {
-            $enrollment->forceFill([
-                'status' => CampaignEnrollment::STATUS_COMPLETED,
-                'completed_at' => Carbon::now(),
-            ])->save();
+            $this->completeEnrollment(
+                enrollment: $enrollment,
+                reason: CampaignEnrollment::EXIT_REASON_NO_NEXT_STEP,
+            );
 
             return $enrollment;
         }
@@ -87,8 +93,8 @@ class EnrollContactInCampaignAction
     }
 
     /**
-     * @param  array<string, mixed>  $payload
-     * @param  array<string, mixed>|null  $meta
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed>|null $meta
      */
     private function scheduleFirstStep(
         CampaignEnrollment $enrollment,
@@ -118,5 +124,17 @@ class EnrollContactInCampaignAction
         );
 
         return $scheduledMessages[0] ?? null;
+    }
+
+    private function completeEnrollment(CampaignEnrollment $enrollment, string $reason): void
+    {
+        $now = Carbon::now();
+
+        $enrollment->forceFill([
+            'status' => CampaignEnrollment::STATUS_COMPLETED,
+            'completed_at' => $enrollment->completed_at ?? $now,
+            'exited_at' => $enrollment->exited_at ?? $now,
+            'exit_reason' => $enrollment->exit_reason ?? $reason,
+        ])->save();
     }
 }

@@ -10,6 +10,7 @@ use App\Jobs\Messaging\SendScheduledMessageJob;
 use App\Messaging\Payloads\Internal\InternalEmailNotificationPayload;
 use App\Models\ConsentRevocation;
 use App\Models\Contact;
+use App\Models\ContactWorkflowProfile;
 use App\Models\InboundMessage;
 use App\Models\MessageConsent;
 use App\Models\ScheduledMessage;
@@ -145,8 +146,9 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             'first_name' => 'Test',
             'last_name' => 'Contact',
             'phone' => '+15551234567',
-            'assigned_to' => $teamMember->email,
         ]);
+
+        $this->assignContactToTeamMember($contact, $teamMember);
 
         $this->postTelnyxWebhook([
             'provider_context_id' => self::MARKETING_PROFILE_ID,
@@ -248,10 +250,11 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             $defaultTeamMember->email,
         );
 
-        Contact::factory()->create([
+        $contact = Contact::factory()->create([
             'phone' => '+15551234567',
-            'assigned_to' => $inactiveTeamMember->email,
         ]);
+
+        $this->assignContactToTeamMember($contact, $inactiveTeamMember);
 
         $this->postTelnyxWebhook([
             'from' => '+15551234567',
@@ -287,10 +290,11 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             ->disabled()
             ->create();
 
-        Contact::factory()->create([
+        $contact = Contact::factory()->create([
             'phone' => '+15551234567',
-            'assigned_to' => $assignedTeamMember->email,
         ]);
+
+        $this->assignContactToTeamMember($contact, $assignedTeamMember);
 
         $this->postTelnyxWebhook([
             'from' => '+15551234567',
@@ -303,37 +307,6 @@ class TelnyxInboundSmsWebhookTest extends TestCase
         $this->assertNoInboundNotificationScheduledFor($assignedTeamMember);
 
         Queue::assertNotPushed(SendScheduledMessageJob::class);
-    }
-
-    public function test_telnyx_inbound_normal_reply_assigned_to_string_can_match_active_team_member_name(): void
-    {
-        Queue::fake();
-
-        $teamMember = TeamMember::factory()->create([
-            'name' => 'Jane Loan Officer',
-            'email' => 'jane@example.com',
-        ]);
-
-        Contact::factory()->create([
-            'phone' => '+15551234567',
-            'assigned_to' => 'Jane Loan Officer',
-        ]);
-
-        $this->postTelnyxWebhook([
-            'from' => '+15551234567',
-            'body' => 'Sounds good',
-        ])->assertOk();
-
-        $inboundMessage = InboundMessage::query()->first();
-
-        $scheduledMessage = $this->assertInboundNotificationScheduledFor(
-            teamMember: $teamMember,
-            inboundMessage: $inboundMessage,
-        );
-
-        Queue::assertPushed(SendScheduledMessageJob::class);
-
-        $this->assertSame($teamMember->email, $scheduledMessage->payload['to']);
     }
 
     public function test_telnyx_stop_from_marketing_profile_revokes_marketing_sms_only(): void
@@ -537,6 +510,20 @@ class TelnyxInboundSmsWebhookTest extends TestCase
                 ->where('payload_class', InternalEmailNotificationPayload::class)
                 ->exists(),
             'Unexpected inbound notification scheduled message was created.',
+        );
+    }
+
+    private function assignContactToTeamMember(Contact $contact, TeamMember $teamMember): ContactWorkflowProfile
+    {
+        return ContactWorkflowProfile::query()->updateOrCreate(
+            [
+                'contact_id' => $contact->id,
+            ],
+            [
+                'assigned_to_type' => $teamMember->getMorphClass(),
+                'assigned_to_id' => $teamMember->id,
+                'last_status_changed_at' => now(),
+            ],
         );
     }
 }

@@ -18,8 +18,10 @@ class TeamMemberNotificationPreferenceFactory extends Factory
         return [
             'team_member_id' => TeamMember::factory(),
             'channel' => TeamMemberNotificationPreference::CHANNEL_EMAIL,
-            'notification_type' => TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
-            'enabled' => true,
+            'purpose' => TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
+            'scope' => null,
+            'is_enabled' => true,
+            'meta' => null,
         ];
     }
 
@@ -40,42 +42,42 @@ class TeamMemberNotificationPreferenceFactory extends Factory
     public function inboundReplies(): self
     {
         return $this->state([
-            'notification_type' => TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
+            'purpose' => TeamMemberNotificationPreference::TYPE_INBOUND_REPLIES,
         ]);
     }
 
     public function taskAssigned(): self
     {
         return $this->state([
-            'notification_type' => TeamMemberNotificationPreference::TYPE_TASK_ASSIGNED,
+            'purpose' => TeamMemberNotificationPreference::TYPE_TASK_ASSIGNED,
         ]);
     }
 
     public function taskDue(): self
     {
         return $this->state([
-            'notification_type' => TeamMemberNotificationPreference::TYPE_TASK_DUE,
+            'purpose' => TeamMemberNotificationPreference::TYPE_TASK_DUE,
         ]);
     }
 
     public function dailyDigest(): self
     {
         return $this->state([
-            'notification_type' => TeamMemberNotificationPreference::TYPE_DAILY_DIGEST,
+            'purpose' => TeamMemberNotificationPreference::TYPE_DAILY_DIGEST,
         ]);
     }
 
     public function weeklyDigest(): self
     {
         return $this->state([
-            'notification_type' => TeamMemberNotificationPreference::TYPE_WEEKLY_DIGEST,
+            'purpose' => TeamMemberNotificationPreference::TYPE_WEEKLY_DIGEST,
         ]);
     }
 
     public function disabled(): self
     {
         return $this->state([
-            'enabled' => false,
+            'is_enabled' => false,
         ]);
     }
 }

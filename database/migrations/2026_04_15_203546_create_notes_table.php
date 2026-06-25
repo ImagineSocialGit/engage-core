@@ -7,25 +7,28 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('notes', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignIdFor(Contact::class)->constrained()->cascadeOnDelete();
+            $table->foreignIdFor(Contact::class)
+                ->nullable()
+                ->constrained()
+                ->nullOnDelete();
 
-            $table->text('content');
+            $table->nullableMorphs('related');
+
+            $table->text('body');
+
+            $table->json('meta')->nullable();
 
             $table->timestamps();
+
+            $table->index(['contact_id', 'created_at']);
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('notes');
