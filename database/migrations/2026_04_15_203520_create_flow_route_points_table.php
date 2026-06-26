@@ -21,21 +21,19 @@ return new class extends Migration
                 ->constrained()
                 ->cascadeOnDelete();
 
-            $table->unsignedSmallInteger('sort_order')->default(0)->index();
+            $table->unsignedSmallInteger('sort_order')->default(0);
             $table->boolean('is_active')->default(true)->index();
 
-            $table->integer('due_offset_days')->nullable();
-
-            $table->string('assignment_strategy')->nullable();
-            $table->nullableMorphs('assigned_to');
-
+            $table->json('definition')->nullable();
+            $table->json('settings')->nullable();
             $table->json('cancel_conditions')->nullable();
             $table->json('meta')->nullable();
 
             $table->timestamps();
 
-            $table->unique(['flow_route_id', 'point_id']);
+            $table->unique(['flow_route_id', 'sort_order']);
             $table->index(['flow_route_id', 'is_active', 'sort_order']);
+            $table->index(['point_id', 'is_active']);
         });
     }
 

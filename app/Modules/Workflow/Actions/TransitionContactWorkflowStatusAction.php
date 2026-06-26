@@ -18,7 +18,7 @@ class TransitionContactWorkflowStatusAction
      */
     public function handle(
         Contact $contact,
-        ContactStatus $status,
+        ContactStatus $toStatus,
         ?string $reason = null,
         ?string $source = null,
         ?Model $actor = null,
@@ -29,7 +29,7 @@ class TransitionContactWorkflowStatusAction
 
         $profile = DB::transaction(function () use (
             $contact,
-            $status,
+            $toStatus,
             $reason,
             $source,
             $actor,
@@ -54,7 +54,7 @@ class TransitionContactWorkflowStatusAction
                 ? (int) $profile->contact_status_id
                 : null;
 
-            $toStatusId = (int) $status->getKey();
+            $toStatusId = (int) $toStatus->getKey();
 
             if (! $force && $fromStatusId === $toStatusId) {
                 return $profile->exists
@@ -78,7 +78,7 @@ class TransitionContactWorkflowStatusAction
                             'contact_id' => $contact->getKey(),
                         ]),
                         fromStatus: $fromStatus,
-                        toStatus: $status,
+                        toStatus: $toStatus,
                         reason: $reason,
                         source: $source,
                         actor: $actor,
@@ -94,7 +94,7 @@ class TransitionContactWorkflowStatusAction
                 contact: $contact,
                 profile: $profile,
                 fromStatus: $fromStatus,
-                toStatus: $status,
+                toStatus: $toStatus,
                 reason: $reason,
                 source: $source,
                 actor: $actor,

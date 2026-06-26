@@ -2,13 +2,11 @@
 
 namespace App\Modules\FlowRoutes\Models;
 
-use App\Modules\Tasks\Models\Task;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class FlowRoutePoint extends Model
 {
@@ -19,10 +17,8 @@ class FlowRoutePoint extends Model
         'point_id',
         'sort_order',
         'is_active',
-        'due_offset_days',
-        'assignment_strategy',
-        'assigned_to_type',
-        'assigned_to_id',
+        'definition',
+        'settings',
         'cancel_conditions',
         'meta',
     ];
@@ -32,8 +28,8 @@ class FlowRoutePoint extends Model
         'point_id' => 'integer',
         'sort_order' => 'integer',
         'is_active' => 'boolean',
-        'due_offset_days' => 'integer',
-        'assigned_to_id' => 'integer',
+        'definition' => 'array',
+        'settings' => 'array',
         'cancel_conditions' => 'array',
         'meta' => 'array',
     ];
@@ -48,18 +44,28 @@ class FlowRoutePoint extends Model
         return $this->belongsTo(Point::class);
     }
 
-    public function assignedTo(): MorphTo
+    public function contactFlowRouteProgress(): HasMany
     {
-        return $this->morphTo();
-    }
-
-    public function generatedTasks(): HasMany
-    {
-        return $this->hasMany(Task::class);
+        return $this->hasMany(ContactFlowRouteProgress::class, 'current_flow_route_point_id');
     }
 
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeInactive(Builder $query): Builder
+    {
+        return $query->where('is_active', false);
+    }
+
+    public function scopeOrdered(Builder $query): Builder
+    {
+        return $query->orderBy('sort_order');
+    }
+
+    public function scopeForPointType(Builder $query, string $type): Builder
+    {
+        return $query->whereHas('point', fn (Builder $pointQuery) => $pointQuery->where('type', $type));
     }
 }

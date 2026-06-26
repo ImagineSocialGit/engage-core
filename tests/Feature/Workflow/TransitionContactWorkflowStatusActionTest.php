@@ -32,7 +32,7 @@ class TransitionContactWorkflowStatusActionTest extends TestCase
 
         $profile = app(TransitionContactWorkflowStatusAction::class)->handle(
             contact: $contact,
-            status: $status,
+            toStatus: $status,
             reason: 'Manual update',
             source: 'crm',
         );
@@ -83,7 +83,7 @@ class TransitionContactWorkflowStatusActionTest extends TestCase
 
         $profile = app(TransitionContactWorkflowStatusAction::class)->handle(
             contact: $contact,
-            status: $newStatus,
+            toStatus: $newStatus,
             reason: 'Qualified by intake',
             source: 'workflow_test',
         );
@@ -123,7 +123,7 @@ class TransitionContactWorkflowStatusActionTest extends TestCase
 
         app(TransitionContactWorkflowStatusAction::class)->handle(
             contact: $contact,
-            status: $status,
+            toStatus: $status,
             reason: 'No-op',
             source: 'workflow_test',
         );

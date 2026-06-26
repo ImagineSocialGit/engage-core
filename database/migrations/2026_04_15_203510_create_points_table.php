@@ -12,24 +12,28 @@ return new class extends Migration
             $table->id();
 
             $table->string('key')->nullable()->unique();
+            $table->string('type')->index();
+
             $table->string('name');
             $table->text('description')->nullable();
 
-            $table->string('task_title_template');
-            $table->text('task_description_template')->nullable();
-
-            $table->integer('default_due_offset_days')->nullable();
-
-            $table->string('default_assignment_strategy')->nullable();
-            $table->nullableMorphs('default_assigned_to');
-
-            $table->json('default_cancel_conditions')->nullable();
+            $table->json('default_definition')->nullable();
+            $table->json('default_settings')->nullable();
 
             $table->boolean('is_active')->default(true)->index();
+
+            $table->string('preset_key')->nullable()->index();
+            $table->string('source_version')->nullable();
+
+            $table->boolean('is_customized')->default(false)->index();
+            $table->timestamp('customized_at')->nullable();
 
             $table->json('meta')->nullable();
 
             $table->timestamps();
+
+            $table->index(['type', 'is_active']);
+            $table->index(['preset_key', 'source_version']);
         });
     }
 

@@ -28,7 +28,7 @@ class WorkflowContactStatusUpdater implements UpdatesContactStatus
     ): Contact {
         $this->transitionContactWorkflowStatus->handle(
             contact: $contact,
-            status: $status,
+            toStatus: $status,
             reason: $reason,
             source: $source,
             actor: $actor,
