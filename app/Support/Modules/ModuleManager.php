@@ -54,4 +54,52 @@ class ModuleManager
     {
         return array_key_exists($key, config('modules.modules', []));
     }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    public function definitions(): array
+    {
+        $definitions = config('modules.modules', []);
+
+        return is_array($definitions) ? $definitions : [];
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    public function enabledDefinitions(): array
+    {
+        return array_intersect_key(
+            $this->definitions(),
+            array_flip($this->enabledKeys()),
+        );
+    }
+
+    /**
+     * @return array<class-string>
+     */
+    public function providers(string $key): array
+    {
+        return array_values(array_filter(
+            Arr::wrap(config("modules.modules.{$key}.providers", [])),
+            fn (mixed $provider): bool => is_string($provider) && $provider !== '',
+        ));
+    }
+
+    /**
+     * @return array<class-string>
+     */
+    public function enabledProviders(): array
+    {
+        $providers = [];
+
+        foreach (array_keys($this->enabledDefinitions()) as $key) {
+            foreach ($this->providers($key) as $provider) {
+                $providers[] = $provider;
+            }
+        }
+
+        return array_values(array_unique($providers));
+    }
 }

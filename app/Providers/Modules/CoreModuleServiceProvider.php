@@ -1,0 +1,89 @@
+<?php
+
+namespace App\Providers\Modules;
+
+use App\Data\CRM\Contacts\ContactImportField;
+use App\Support\CRM\Contacts\ContactImportRegistry;
+use App\Support\CRM\Contacts\ContactPanelRegistry;
+use Illuminate\Support\ServiceProvider;
+
+class CoreModuleServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->app->singleton(ContactPanelRegistry::class);
+
+        $this->app->singleton(ContactImportRegistry::class, function (): ContactImportRegistry {
+            return (new ContactImportRegistry)->registerFields([
+                ContactImportField::make(
+                    key: 'first_name',
+                    label: 'First Name',
+                    contactAttribute: 'first_name',
+                    sort: 10,
+                ),
+
+                ContactImportField::make(
+                    key: 'last_name',
+                    label: 'Last Name',
+                    contactAttribute: 'last_name',
+                    sort: 20,
+                ),
+
+                ContactImportField::make(
+                    key: 'name',
+                    label: 'Full Name',
+                    contactAttribute: 'name',
+                    sort: 30,
+                ),
+
+                ContactImportField::make(
+                    key: 'email',
+                    label: 'Email',
+                    required: true,
+                    contactAttribute: 'email',
+                    sort: 40,
+                ),
+
+                ContactImportField::make(
+                    key: 'phone',
+                    label: 'Phone',
+                    contactAttribute: 'phone',
+                    sort: 50,
+                ),
+
+                ContactImportField::make(
+                    key: 'source',
+                    label: 'Source',
+                    contactAttribute: 'source',
+                    sort: 60,
+                ),
+
+                ContactImportField::make(
+                    key: 'subsource',
+                    label: 'Subsource',
+                    contactAttribute: 'subsource',
+                    sort: 70,
+                ),
+
+                ContactImportField::make(
+                    key: 'last_contacted_at',
+                    label: 'Last Contacted At',
+                    contactAttribute: 'last_contacted_at',
+                    sort: 80,
+                ),
+
+                ContactImportField::make(
+                    key: 'last_activity_at',
+                    label: 'Last Activity At',
+                    contactAttribute: 'last_activity_at',
+                    sort: 90,
+                ),
+            ]);
+        });
+    }
+
+    public function boot(): void
+    {
+        //
+    }
+}

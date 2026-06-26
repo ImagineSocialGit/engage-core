@@ -58,6 +58,7 @@
 │   ├── Contracts
 │   │   ├── CRM
 │   │   │   ├── Contacts
+│   │   │   │   ├── ContactImportHandler.php
 │   │   │   │   └── ContactPanelProvider.php
 │   │   │   └── Tasks
 │   │   │       ├── TaskAssignedRecipientResolver.php
@@ -78,6 +79,7 @@
 │   ├── Data
 │   │   ├── CRM
 │   │   │   ├── Contacts
+│   │   │   │   ├── ContactImportField.php
 │   │   │   │   └── ContactPanel.php
 │   │   │   └── Tasks
 │   │   │       └── TaskDigest.php
@@ -211,7 +213,20 @@
 │   ├── Providers
 │   │   ├── AppServiceProvider.php
 │   │   ├── ClientServiceProvider.php
-│   │   └── HorizonServiceProvider.php
+│   │   ├── HorizonServiceProvider.php
+│   │   ├── ModuleBootstrapServiceProvider.php
+│   │   └── Modules
+│   │       ├── CampaignsModuleServiceProvider.php
+│   │       ├── CoreModuleServiceProvider.php
+│   │       ├── FlowRoutesModuleServiceProvider.php
+│   │       ├── InboundMessagingModuleServiceProvider.php
+│   │       ├── IntegrationsModuleServiceProvider.php
+│   │       ├── InternalNotificationsModuleServiceProvider.php
+│   │       ├── MessagingModuleServiceProvider.php
+│   │       ├── ReportingModuleServiceProvider.php
+│   │       ├── TasksModuleServiceProvider.php
+│   │       ├── WebinarsModuleServiceProvider.php
+│   │       └── WorkflowModuleServiceProvider.php
 │   ├── Rules
 │   │   └── Messaging
 │   │       ├── ConsentRevocationRules.php
@@ -270,6 +285,7 @@
 │       │   └── ViewResolver.php
 │       ├── CRM
 │       │   └── Contacts
+│       │       ├── ContactImportRegistry.php
 │       │       └── ContactPanelRegistry.php
 │       ├── Messaging
 │       │   └── EmailConsentRevocationLinkGenerator.php
@@ -403,6 +419,7 @@
 │   │   └── sms.php
 │   ├── messaging.php
 │   ├── modules.php
+│   ├── presets.php
 │   ├── queue.php
 │   ├── reminders.php
 │   ├── security.php
@@ -665,4 +682,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-217 directories, 449 files
+218 directories, 465 files

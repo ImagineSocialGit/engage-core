@@ -1,17 +1,17 @@
 <x-layouts.crm
     :title="'Map CSV Fields'"
     :heading="'Map CSV Fields'"
-    :subheading="'Choose which CSV columns map to primary contact fields'"
+    :subheading="'Choose which CSV columns map to import fields'"
 >
     <div class="max-w-6xl space-y-6">
         <x-ui.card class="space-y-6">
             <div>
                 <h2 class="text-lg font-semibold tracking-tight">
-                    Contact Fields
+                    Import Fields
                 </h2>
 
                 <p class="mt-1 text-sm text-slate-500">
-                    Select the CSV column for each contact field. Email is required for import.
+                    Select the CSV column for each field. Required fields are marked.
                 </p>
             </div>
 
@@ -36,57 +36,59 @@
                     value="{{ $csvPath }}"
                 >
 
-                @php
-                    $fields = [
-                        'first_name' => 'First Name',
-                        'last_name' => 'Last Name',
-                        'name' => 'Full Name',
-                        'email' => 'Email',
-                        'phone' => 'Phone',
-                        'source' => 'Source',
-                        'subsource' => 'Subsource',
-                        'last_contacted_at' => 'Last Contacted At',
-                        'last_activity_at' => 'Last Activity At',
-                    ];
-                @endphp
-
-                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    @foreach ($fields as $field => $label)
+                @foreach ($importSections as $section)
+                    <div class="@if (! $loop->first) border-t border-slate-200 pt-6 @endif space-y-4">
                         <div>
-                            <x-ui.form.label for="mapping_{{ $field }}">
-                                {{ $label }}
-
-                                @if ($field === 'email')
-                                    <span class="text-red-600">*</span>
-                                @endif
-                            </x-ui.form.label>
-
-                            <select
-                                id="mapping_{{ $field }}"
-                                name="mapping[{{ $field }}]"
-                                @required($field === 'email')
-                                class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            >
-                                <option value="">Do not import</option>
-
-                                @foreach ($headers as $header)
-                                    <option
-                                        value="{{ $header }}"
-                                        @selected(old("mapping.$field") === $header)
-                                    >
-                                        {{ $header }}
-                                    </option>
-                                @endforeach
-                            </select>
-
-                            @error("mapping.$field")
-                                <p class="mt-1 text-sm text-red-600">
-                                    {{ $message }}
-                                </p>
-                            @enderror
+                            <h3 class="text-base font-semibold tracking-tight">
+                                {{ $section['label'] }}
+                            </h3>
                         </div>
-                    @endforeach
-                </div>
+
+                        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            @foreach ($section['fields'] as $field)
+                                <div>
+                                    <x-ui.form.label for="mapping_{{ $field->key }}">
+                                        {{ $field->label }}
+
+                                        @if ($field->required)
+                                            <span class="text-red-600">*</span>
+                                        @endif
+                                    </x-ui.form.label>
+
+                                    @if ($field->description)
+                                        <p class="mt-1 text-xs text-slate-500">
+                                            {{ $field->description }}
+                                        </p>
+                                    @endif
+
+                                    <select
+                                        id="mapping_{{ $field->key }}"
+                                        name="mapping[{{ $field->key }}]"
+                                        @required($field->required)
+                                        class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                    >
+                                        <option value="">Do not import</option>
+
+                                        @foreach ($headers as $header)
+                                            <option
+                                                value="{{ $header }}"
+                                                @selected(old("mapping.{$field->key}") === $header)
+                                            >
+                                                {{ $header }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+
+                                    @error("mapping.{$field->key}")
+                                        <p class="mt-1 text-sm text-red-600">
+                                            {{ $message }}
+                                        </p>
+                                    @enderror
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
 
                 @if (! empty($rows))
                     <div class="space-y-3 border-t border-slate-200 pt-6">

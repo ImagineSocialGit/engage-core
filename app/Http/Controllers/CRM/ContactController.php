@@ -9,6 +9,7 @@ use App\Models\Contact;
 use App\Models\ContactStatus;
 use App\Models\Task;
 use App\Models\TeamMember;
+use App\Support\CRM\Contacts\ContactImportRegistry;
 use App\Support\CRM\Contacts\ContactPanelRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -135,8 +136,10 @@ class ContactController extends Controller
         return view('crm.contacts.import');
     }
 
-    public function previewImport(Request $request): View|RedirectResponse
-    {
+    public function previewImport(
+        Request $request,
+        ContactImportRegistry $contactImportRegistry,
+    ): View|RedirectResponse {
         $validated = $request->validate([
             'csv' => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
         ]);
@@ -191,36 +194,31 @@ class ContactController extends Controller
             'headers' => $headers,
             'rows' => $rows,
             'csvPath' => $storedPath,
+            'importSections' => $contactImportRegistry->sections(),
         ]);
     }
 
     public function processImport(
         Request $request,
         CreateOrUpdateContactAction $createOrUpdateContact,
+        ContactImportRegistry $contactImportRegistry,
     ): RedirectResponse {
-        $validated = $request->validate([
+        $rules = [
             'csv_path' => ['required', 'string'],
             'mapping' => ['required', 'array'],
-            'mapping.email' => ['required', 'string'],
-        ]);
-
-        $csvPath = $validated['csv_path'];
-        $mapping = collect($validated['mapping'])->filter()->toArray();
-
-        $allowedMappingFields = [
-            'first_name',
-            'last_name',
-            'name',
-            'email',
-            'phone',
-            'source',
-            'subsource',
-            'last_contacted_at',
-            'last_activity_at',
         ];
 
-        $mapping = collect($mapping)
-            ->only($allowedMappingFields)
+        foreach ($contactImportRegistry->requiredFieldKeys() as $field) {
+            $rules["mapping.{$field}"] = ['required', 'string'];
+        }
+
+        $validated = $request->validate($rules);
+
+        $csvPath = $validated['csv_path'];
+
+        $mapping = collect($validated['mapping'])
+            ->filter()
+            ->only($contactImportRegistry->fieldKeys())
             ->toArray();
 
         if (! Storage::disk('local')->exists($csvPath)) {
@@ -268,26 +266,30 @@ class ContactController extends Controller
 
             if (! is_array($data)) {
                 $skipped++;
+
                 continue;
             }
 
-            $email = $this->mappedValue($data, $mapping, 'email');
+            $contactData = [];
+
+            foreach ($contactImportRegistry->contactAttributeFields() as $field) {
+                $value = $contactImportRegistry->mappedValue(
+                    row: $data,
+                    mapping: $mapping,
+                    field: $field->key,
+                );
+
+                if ($value !== null) {
+                    $contactData[$field->contactAttribute] = $value;
+                }
+            }
+
+            $email = $contactData['email'] ?? null;
 
             if ($email === null) {
                 $skipped++;
+
                 continue;
-            }
-
-            $contactData = [
-                'email' => $email,
-            ];
-
-            foreach (['first_name', 'last_name', 'name', 'phone', 'source', 'subsource', 'last_contacted_at', 'last_activity_at'] as $field) {
-                $value = $this->mappedValue($data, $mapping, $field);
-
-                if ($value !== null) {
-                    $contactData[$field] = $value;
-                }
             }
 
             if (array_key_exists('phone', $contactData) && $contactData['phone'] === null) {
@@ -298,10 +300,16 @@ class ContactController extends Controller
                 ->where('email', $email)
                 ->exists();
 
-            $createOrUpdateContact->handle(
+            $contact = $createOrUpdateContact->handle(
                 data: $contactData,
                 statusKey: null,
                 statusChangeReason: 'crm_import',
+            );
+
+            $contactImportRegistry->handleModuleImports(
+                contact: $contact,
+                row: $data,
+                mapping: $mapping,
             );
 
             $wasExisting ? $updated++ : $created++;
@@ -318,24 +326,5 @@ class ContactController extends Controller
                 $skipped,
                 $phoneWarnings > 0 ? ", {$phoneWarnings} phone values were ignored" : ''
             ));
-    }
-
-    private function mappedValue(array $data, array $mapping, string $field): ?string
-    {
-        $header = $mapping[$field] ?? null;
-
-        if ($header === null || $header === '') {
-            return null;
-        }
-
-        $value = $data[$header] ?? null;
-
-        if ($value === null) {
-            return null;
-        }
-
-        $value = trim((string) $value);
-
-        return $value === '' ? null : $value;
     }
 }
