@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\InboundMessaging\Services;
+namespace App\Modules\InternalNotifications\Services\InboundMessaging;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\InboundMessaging\Models\InboundMessage;

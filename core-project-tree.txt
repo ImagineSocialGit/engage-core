@@ -107,7 +107,6 @@
 │   │   │   ├── Actions
 │   │   │   │   ├── Email
 │   │   │   │   │   └── HandleInboundEmailWebhookAction.php
-│   │   │   │   ├── NotifyInternalUsersOfInboundMessageAction.php
 │   │   │   │   ├── RecordInboundMessageAction.php
 │   │   │   │   └── Sms
 │   │   │   │       ├── HandleInboundSmsWebhookAction.php
@@ -123,6 +122,8 @@
 │   │   │   │       ├── EmailWebhookController.php
 │   │   │   │       └── SmsWebhookController.php
 │   │   │   ├── Data
+│   │   │   ├── Events
+│   │   │   │   └── InboundMessageReceived.php
 │   │   │   ├── Models
 │   │   │   │   └── InboundMessage.php
 │   │   │   ├── Providers
@@ -132,7 +133,6 @@
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailWebhookHandlerResolver.php
 │   │   │   │   │   └── EmailWebhookPayload.php
-│   │   │   │   ├── InboundMessageNotificationRecipientResolver.php
 │   │   │   │   ├── InboundMessageRouter.php
 │   │   │   │   └── Sms
 │   │   │   │       ├── InboundSmsMessageClassifier.php
@@ -149,6 +149,8 @@
 │   │   │   ├── Controllers
 │   │   │   │   └── TeamMemberController.php
 │   │   │   ├── Data
+│   │   │   ├── Listeners
+│   │   │   │   └── ScheduleInboundMessageInternalNotification.php
 │   │   │   ├── Models
 │   │   │   │   ├── TeamMemberNotificationPreference.php
 │   │   │   │   └── TeamMember.php
@@ -156,11 +158,15 @@
 │   │   │   │   └── InternalNotificationsModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
+│   │   │   │   ├── InboundMessaging
+│   │   │   │   │   └── InboundMessageNotificationRecipientResolver.php
 │   │   │   │   ├── InternalNotificationChannelResolver.php
 │   │   │   │   ├── InternalNotificationGate.php
 │   │   │   │   ├── InternalNotificationPreferences
 │   │   │   │   │   └── TeamMemberInternalNotificationPreferenceResolver.php
-│   │   │   │   └── InternalNotificationRecipient.php
+│   │   │   │   ├── InternalNotificationRecipient.php
+│   │   │   │   └── Messaging
+│   │   │   │       └── TeamMemberMessageRecipientGate.php
 │   │   │   └── Support
 │   │   ├── Messaging
 │   │   │   ├── Actions
@@ -173,6 +179,7 @@
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailMessage.php
 │   │   │   │   │   └── EmailProvider.php
+│   │   │   │   ├── MessageRecipientGate.php
 │   │   │   │   └── Sms
 │   │   │   │       ├── SmsMessage.php
 │   │   │   │       └── SmsProvider.php
@@ -217,6 +224,7 @@
 │   │   │   │   ├── MessageEligibilityGate.php
 │   │   │   │   ├── MessageGate.php
 │   │   │   │   ├── MessagePlanningGate.php
+│   │   │   │   ├── MessageRecipientGateRegistry.php
 │   │   │   │   ├── MessageRecipientPayloadResolver.php
 │   │   │   │   ├── MessageSuppressionService.php
 │   │   │   │   ├── PhoneNumberNormalizer.php
@@ -756,4 +764,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-294 directories, 463 files
+298 directories, 467 files

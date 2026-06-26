@@ -2,6 +2,7 @@
 
 namespace App\Modules\InboundMessaging\Actions;
 
+use App\Modules\InboundMessaging\Events\InboundMessageReceived;
 use App\Modules\InboundMessaging\Models\InboundMessage;
 use Illuminate\Database\Eloquent\Model;
 
@@ -43,6 +44,8 @@ class RecordInboundMessageAction
         }
 
         $inboundMessage->save();
+
+        event(new InboundMessageReceived($inboundMessage));
 
         return $inboundMessage;
     }

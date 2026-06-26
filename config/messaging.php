@@ -51,9 +51,7 @@ return [
                     App\Modules\InboundMessaging\Actions\Sms\Inbound\RespondToSmsHelpInboundMessageAction::class,
                 ],
 
-                'normal_reply' => [
-                    App\Modules\InboundMessaging\Actions\NotifyInternalUsersOfInboundMessageAction::class,
-                ],
+                'normal_reply' => [],
             ],
         ],
     ],

@@ -3,9 +3,6 @@
 namespace App\Modules\Messaging\Services;
 
 use App\Modules\Core\Models\Contact;
-use App\Modules\InternalNotifications\Models\TeamMember;
-use App\Modules\InternalNotifications\Services\InternalNotificationGate;
-use App\Modules\Messaging\Services\ConditionChecker;
 use Illuminate\Database\Eloquent\Model;
 
 class MessagePlanningGate
@@ -14,7 +11,7 @@ class MessagePlanningGate
         private readonly ConditionChecker $conditionChecker,
         private readonly MessageEligibilityGate $messageEligibilityGate,
         private readonly MessageRecipientPayloadResolver $payloadResolver,
-        private readonly InternalNotificationGate $internalNotificationGate,
+        private readonly MessageRecipientGateRegistry $recipientGateRegistry,
     ) {}
 
     /**
@@ -56,15 +53,18 @@ class MessagePlanningGate
             );
         }
 
-        if ($recipient instanceof TeamMember) {
-            return $this->internalNotificationGate->allows(
-                teamMember: $recipient,
-                channel: $channel,
-                notificationType: $this->notificationType($definition),
-            );
-        }
-
-        return true;
+        return $this->recipientGateRegistry->allows(
+            recipient: $recipient,
+            channel: $channel,
+            type: $this->recipientGateType($definition),
+            context: [
+                'purpose' => $purpose,
+                'scope' => $scope,
+                'definition' => $definition,
+                'payload' => $payload,
+                'context' => $context,
+            ],
+        );
     }
 
     /**
@@ -87,14 +87,14 @@ class MessagePlanningGate
     /**
      * @param  array<string, mixed>  $definition
      */
-    private function notificationType(array $definition): ?string
+    private function recipientGateType(array $definition): ?string
     {
-        $notificationType = $definition['notification_type']
+        $type = $definition['notification_type']
             ?? $definition['message_type']
             ?? null;
 
-        return is_string($notificationType) && trim($notificationType) !== ''
-            ? trim($notificationType)
+        return is_string($type) && trim($type) !== ''
+            ? trim($type)
             : null;
     }
 }

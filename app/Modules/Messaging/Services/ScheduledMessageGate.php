@@ -3,10 +3,7 @@
 namespace App\Modules\Messaging\Services;
 
 use App\Modules\Core\Models\Contact;
-use App\Modules\InternalNotifications\Models\TeamMember;
-use App\Modules\InternalNotifications\Services\InternalNotificationGate;
 use App\Modules\Messaging\Models\ScheduledMessage;
-use App\Modules\Messaging\Services\ConditionChecker;
 
 class ScheduledMessageGate
 {
@@ -14,7 +11,7 @@ class ScheduledMessageGate
         private readonly ConditionChecker $conditionChecker,
         private readonly MessageEligibilityGate $messageEligibilityGate,
         private readonly MessageRecipientPayloadResolver $payloadResolver,
-        private readonly InternalNotificationGate $internalNotificationGate,
+        private readonly MessageRecipientGateRegistry $recipientGateRegistry,
     ) {}
 
     public function denialReason(ScheduledMessage $scheduledMessage): ?string
@@ -61,19 +58,19 @@ class ScheduledMessageGate
             return null;
         }
 
-        if ($recipient instanceof TeamMember) {
-            if (! $this->internalNotificationGate->allows(
-                teamMember: $recipient,
-                channel: $scheduledMessage->channel,
-                notificationType: $this->notificationType($scheduledMessage),
-            )) {
-                return 'Team member notification preference denied send.';
-            }
-
-            return null;
-        }
-
-        return null;
+        return $this->recipientGateRegistry->denialReason(
+            recipient: $recipient,
+            channel: $scheduledMessage->channel,
+            type: $this->recipientGateType($scheduledMessage),
+            context: [
+                'purpose' => $scheduledMessage->purpose,
+                'scope' => $scheduledMessage->scope,
+                'message_type' => $scheduledMessage->message_type,
+                'payload' => $payload,
+                'meta' => $scheduledMessage->meta ?? [],
+                'scheduled_message' => $scheduledMessage,
+            ],
+        );
     }
 
     private function definitionStillEnabled(ScheduledMessage $scheduledMessage): bool
@@ -102,13 +99,13 @@ class ScheduledMessageGate
             && trim($payload['to']) !== '';
     }
 
-    private function notificationType(ScheduledMessage $scheduledMessage): ?string
+    private function recipientGateType(ScheduledMessage $scheduledMessage): ?string
     {
-        $notificationType = $scheduledMessage->meta['notification_type']
+        $type = $scheduledMessage->meta['notification_type']
             ?? $scheduledMessage->message_type;
 
-        return is_string($notificationType) && trim($notificationType) !== ''
-            ? trim($notificationType)
+        return is_string($type) && trim($type) !== ''
+            ? trim($type)
             : null;
     }
 }

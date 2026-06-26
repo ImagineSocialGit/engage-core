@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Webhooks;
 
-use App\Modules\InboundMessaging\Actions\NotifyInternalUsersOfInboundMessageAction;
 use App\Modules\InboundMessaging\Actions\Sms\Inbound\RespondToSmsHelpInboundMessageAction;
 use App\Modules\InboundMessaging\Actions\Sms\Inbound\RevokeSmsConsentFromInboundMessageAction;
 use App\Modules\InboundMessaging\Contracts\Sms\SmsWebhookHandler;
@@ -45,9 +44,7 @@ class TelnyxInboundSmsWebhookTest extends TestCase
             InboundMessage::CLASSIFICATION_HELP => [
                 RespondToSmsHelpInboundMessageAction::class,
             ],
-            InboundMessage::CLASSIFICATION_NORMAL_REPLY => [
-                NotifyInternalUsersOfInboundMessageAction::class,
-            ],
+            InboundMessage::CLASSIFICATION_NORMAL_REPLY => [],
         ]);
 
         config()->set('messaging.internal_notifications.inbound_replies', [

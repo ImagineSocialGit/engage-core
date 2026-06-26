@@ -3,9 +3,8 @@
 namespace App\Modules\Messaging\Providers;
 
 use App\Modules\Messaging\Services\Email\EmailProviderManager;
-use App\Modules\InboundMessaging\Services\Email\EmailWebhookHandlerResolver;
+use App\Modules\Messaging\Services\MessageRecipientGateRegistry;
 use App\Modules\Messaging\Services\Sms\SmsProviderManager;
-use App\Modules\InboundMessaging\Services\Sms\SmsWebhookHandlerResolver;
 use Illuminate\Support\ServiceProvider;
 use Twilio\Rest\Client;
 
@@ -23,17 +22,17 @@ class MessagingModuleServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->singleton(SmsWebhookHandlerResolver::class, function () {
-            return SmsWebhookHandlerResolver::default();
-        });
-
         $this->app->singleton(SmsProviderManager::class, function () {
             return SmsProviderManager::default();
         });
 
         $this->app->singleton(EmailProviderManager::class);
 
-        $this->app->singleton(EmailWebhookHandlerResolver::class);
+        $this->app->singleton(MessageRecipientGateRegistry::class, function ($app) {
+            return new MessageRecipientGateRegistry(
+                gates: $app->tagged('messaging.message_recipient_gates'),
+            );
+        });
     }
 
     public function boot(): void

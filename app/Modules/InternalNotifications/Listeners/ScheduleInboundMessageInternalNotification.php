@@ -1,25 +1,31 @@
 <?php
 
-namespace App\Modules\InboundMessaging\Actions;
+namespace App\Modules\InternalNotifications\Listeners;
 
-use App\Modules\InternalNotifications\Actions\ScheduleInternalNotificationAction;
-use App\Modules\InboundMessaging\Contracts\InboundMessageHandler;
 use App\Modules\Core\Models\Contact;
+use App\Modules\InboundMessaging\Events\InboundMessageReceived;
 use App\Modules\InboundMessaging\Models\InboundMessage;
-use App\Modules\InboundMessaging\Services\InboundMessageNotificationRecipientResolver;
+use App\Modules\InternalNotifications\Actions\ScheduleInternalNotificationAction;
+use App\Modules\InternalNotifications\Services\InboundMessaging\InboundMessageNotificationRecipientResolver;
 use App\Modules\InternalNotifications\Services\InternalNotificationRecipient;
 use BackedEnum;
 use Illuminate\Support\Str;
 
-class NotifyInternalUsersOfInboundMessageAction implements InboundMessageHandler
+class ScheduleInboundMessageInternalNotification
 {
     public function __construct(
         private readonly InboundMessageNotificationRecipientResolver $recipientResolver,
         private readonly ScheduleInternalNotificationAction $scheduleInternalNotification,
     ) {}
 
-    public function handle(InboundMessage $inboundMessage): ?string
+    public function handle(InboundMessageReceived $event): void
     {
+        $inboundMessage = $event->inboundMessage;
+
+        if ($this->classificationValue($inboundMessage) !== 'normal_reply') {
+            return;
+        }
+
         $recipient = $this->recipientResolver->resolve($inboundMessage);
 
         if ($recipient instanceof InternalNotificationRecipient) {
@@ -34,8 +40,6 @@ class NotifyInternalUsersOfInboundMessageAction implements InboundMessageHandler
         }
 
         $inboundMessage->markProcessed();
-
-        return null;
     }
 
     /**
@@ -95,6 +99,17 @@ class NotifyInternalUsersOfInboundMessageAction implements InboundMessageHandler
         )));
 
         return $name !== '' ? $name : $contact->email;
+    }
+
+    private function classificationValue(InboundMessage $inboundMessage): ?string
+    {
+        $classification = $inboundMessage->classification;
+
+        if ($classification instanceof BackedEnum) {
+            return (string) $classification->value;
+        }
+
+        return is_string($classification) ? $classification : null;
     }
 
     private function channelLabel(InboundMessage $inboundMessage): string
