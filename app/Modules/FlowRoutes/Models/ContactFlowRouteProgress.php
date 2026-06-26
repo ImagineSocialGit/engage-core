@@ -2,6 +2,8 @@
 
 namespace App\Modules\FlowRoutes\Models;
 
+use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -57,6 +59,16 @@ class ContactFlowRouteProgress extends Model
         'meta' => 'array',
     ];
 
+    public function contact(): BelongsTo
+    {
+        return $this->belongsTo(Contact::class);
+    }
+
+    public function contactStatus(): BelongsTo
+    {
+        return $this->belongsTo(ContactStatus::class);
+    }
+
     public function contactWorkflowProfile(): BelongsTo
     {
         return $this->belongsTo(ContactWorkflowProfile::class);
@@ -97,6 +109,16 @@ class ContactFlowRouteProgress extends Model
         return $query->where('status', self::STATUS_FAILED);
     }
 
+    public function scopeTerminal(Builder $query): Builder
+    {
+        return $query->whereIn('status', [
+            self::STATUS_COMPLETED,
+            self::STATUS_CANCELLED,
+            self::STATUS_SUPERSEDED,
+            self::STATUS_FAILED,
+        ]);
+    }
+
     public function scopeForContact(Builder $query, int $contactId): Builder
     {
         return $query->where('contact_id', $contactId);
@@ -115,5 +137,15 @@ class ContactFlowRouteProgress extends Model
     public function isActive(): bool
     {
         return $this->status === self::STATUS_ACTIVE;
+    }
+
+    public function isTerminal(): bool
+    {
+        return in_array($this->status, [
+            self::STATUS_COMPLETED,
+            self::STATUS_CANCELLED,
+            self::STATUS_SUPERSEDED,
+            self::STATUS_FAILED,
+        ], true);
     }
 }

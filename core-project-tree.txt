@@ -95,12 +95,18 @@
 │   │   │           └── ContactShowDataRegistry.php
 │   │   ├── FlowRoutes
 │   │   │   ├── Actions
+│   │   │   │   ├── AdvanceContactFlowRouteProgressAction.php
 │   │   │   │   ├── CancelActiveFlowRouteProgressAction.php
+│   │   │   │   ├── CompleteContactFlowRouteProgressAction.php
+│   │   │   │   ├── ExecuteCurrentFlowRoutePointAction.php
 │   │   │   │   ├── HandleContactWorkflowStatusChangedAction.php
 │   │   │   │   └── StartFlowRouteProgressAction.php
 │   │   │   ├── Contracts
+│   │   │   │   └── PointHandler.php
 │   │   │   ├── Controllers
 │   │   │   ├── Data
+│   │   │   │   ├── PointExecutionContext.php
+│   │   │   │   └── PointExecutionResult.php
 │   │   │   ├── Listeners
 │   │   │   │   └── HandleContactWorkflowStatusChanged.php
 │   │   │   ├── Models
@@ -108,9 +114,14 @@
 │   │   │   │   ├── FlowRoute.php
 │   │   │   │   ├── FlowRoutePoint.php
 │   │   │   │   └── Point.php
+│   │   │   ├── PointHandlers
+│   │   │   │   ├── NoopPointHandler.php
+│   │   │   │   └── WaitPointHandler.php
 │   │   │   ├── Providers
 │   │   │   │   └── FlowRoutesModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   ├── Services
+│   │   │   │   └── PointHandlerRegistry.php
 │   │   │   └── Support
 │   │   ├── InboundMessaging
 │   │   │   ├── Actions
@@ -786,6 +797,7 @@
 │   │   ├── Email
 │   │   │   └── HandleInboundEmailWebhookActionTest.php
 │   │   ├── FlowRoutes
+│   │   │   ├── FlowRoutePointExecutionFoundationTest.php
 │   │   │   ├── FlowRoutesModelSchemaTest.php
 │   │   │   └── HandleContactWorkflowStatusChangedTest.php
 │   │   ├── Integrations
@@ -835,4 +847,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-303 directories, 533 files
+305 directories, 543 files

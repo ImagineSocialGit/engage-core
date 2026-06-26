@@ -11,6 +11,7 @@ class Point extends Model
 {
     use HasFactory;
 
+    public const TYPE_NOOP = 'noop';
     public const TYPE_WAIT = 'wait';
     public const TYPE_CONDITION = 'condition';
     public const TYPE_CHANGE_STATUS = 'change_status';
@@ -22,6 +23,7 @@ class Point extends Model
     public const TYPE_BRANCH_EVALUATE = 'branch_evaluate';
 
     public const TYPES = [
+        self::TYPE_NOOP,
         self::TYPE_WAIT,
         self::TYPE_CONDITION,
         self::TYPE_CHANGE_STATUS,
