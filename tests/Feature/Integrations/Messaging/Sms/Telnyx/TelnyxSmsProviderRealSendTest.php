@@ -21,7 +21,7 @@ class TelnyxSmsProviderRealSendTest extends TestCase
 
         app(TelnyxSmsProvider::class)->send(
             to: $to,
-            message: 'LeadFlow Telnyx real send test.',
+            message: 'Engage Core Telnyx real send test.',
             meta: [
                 'kind' => 'real_send_test',
             ],

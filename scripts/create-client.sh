@@ -11,7 +11,7 @@ fi
 
 CORE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROOT_DIR="$(cd "$CORE_DIR/.." && pwd)"
-CLIENTS_DIR="$ROOT_DIR/leadflow-clients"
+CLIENTS_DIR="$ROOT_DIR/engage-core-clients"
 CLIENT_DIR="$CLIENTS_DIR/$CLIENT_KEY"
 
 if [[ -e "$CLIENT_DIR" ]]; then
@@ -124,9 +124,9 @@ CDN_BASE_URL=
 EOF
 
 cat > "$CLIENT_DIR/README.md" <<EOF
-# $CLIENT_NAME LeadFlow Client
+# $CLIENT_NAME Engage Core Client
 
-Private client configuration, branding, content, views, and runtime config for LeadFlow.
+Private client configuration, branding, content, views, and runtime config for Engage Core.
 EOF
 
 echo "Created client: $CLIENT_DIR"

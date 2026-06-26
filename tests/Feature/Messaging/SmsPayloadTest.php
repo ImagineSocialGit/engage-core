@@ -147,7 +147,7 @@ class SmsPayloadTest extends TestCase
 
     public function test_it_supports_brand_prefix(): void
     {
-        Config::set('brand.name', 'LeadFlow');
+        Config::set('brand.name', 'Engage Core');
 
         Config::set(
             'messaging.sms.transactional.webinar.confirmation.payload.message',
@@ -167,7 +167,7 @@ class SmsPayloadTest extends TestCase
         ]);
 
         $this->assertSame(
-            'LeadFlow: Welcome',
+            'Engage Core: Welcome',
             $payload->message()
         );
     }
