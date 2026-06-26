@@ -22,7 +22,8 @@ class AdvanceContactFlowRouteProgressAction
             return $progress;
         }
 
-        $nextFlowRoutePoint = $this->nextActiveFlowRoutePoint($fromFlowRoutePoint);
+        $nextFlowRoutePoint = $this->requestedNextFlowRoutePoint($fromFlowRoutePoint, $result)
+            ?? $this->nextActiveFlowRoutePoint($fromFlowRoutePoint);
 
         if (! $nextFlowRoutePoint) {
             return $this->completeContactFlowRouteProgress->handle($progress, $result);
@@ -43,6 +44,40 @@ class AdvanceContactFlowRouteProgressAction
         ])->save();
 
         return $progress->refresh();
+    }
+
+    private function requestedNextFlowRoutePoint(
+        FlowRoutePoint $fromFlowRoutePoint,
+        ?PointExecutionResult $result,
+    ): ?FlowRoutePoint {
+        if (! $result) {
+            return null;
+        }
+
+        $targetFlowRoutePointId = $this->nullableInteger($result->meta['advance_to_flow_route_point_id'] ?? null);
+        $targetSortOrder = $this->nullableInteger($result->meta['advance_to_sort_order'] ?? null);
+
+        if (! $targetFlowRoutePointId && $targetSortOrder === null) {
+            return null;
+        }
+
+        $query = FlowRoutePoint::query()
+            ->with('point')
+            ->where('flow_route_id', $fromFlowRoutePoint->flow_route_id)
+            ->active()
+            ->whereHas('point', fn ($pointQuery) => $pointQuery->active());
+
+        if ($targetFlowRoutePointId) {
+            return $query
+                ->whereKey($targetFlowRoutePointId)
+                ->whereKeyNot($fromFlowRoutePoint->getKey())
+                ->first();
+        }
+
+        return $query
+            ->where('sort_order', $targetSortOrder)
+            ->whereKeyNot($fromFlowRoutePoint->getKey())
+            ->first();
     }
 
     private function nextActiveFlowRoutePoint(FlowRoutePoint $fromFlowRoutePoint): ?FlowRoutePoint
@@ -89,5 +124,10 @@ class AdvanceContactFlowRouteProgressAction
         $meta['advancement_history'] = array_slice($history, -50);
 
         return $meta;
+    }
+
+    private function nullableInteger(mixed $value): ?int
+    {
+        return is_numeric($value) ? (int) $value : null;
     }
 }
