@@ -66,7 +66,8 @@
 │   │   │   ├── Contracts
 │   │   │   │   └── Contacts
 │   │   │   │       ├── ContactImportHandler.php
-│   │   │   │       └── ContactPanelProvider.php
+│   │   │   │       ├── ContactPanelProvider.php
+│   │   │   │       └── ContactShowDataProvider.php
 │   │   │   ├── Controllers
 │   │   │   │   ├── ContactController.php
 │   │   │   │   └── ContactNoteController.php
@@ -89,7 +90,8 @@
 │   │   │   └── Support
 │   │   │       └── Contacts
 │   │   │           ├── ContactImportRegistry.php
-│   │   │           └── ContactPanelRegistry.php
+│   │   │           ├── ContactPanelRegistry.php
+│   │   │           └── ContactShowDataRegistry.php
 │   │   ├── FlowRoutes
 │   │   │   ├── Actions
 │   │   │   ├── Contracts
@@ -111,6 +113,8 @@
 │   │   │   │   └── Sms
 │   │   │   │       ├── HandleInboundSmsWebhookAction.php
 │   │   │   │       └── Inbound
+│   │   │   │           ├── RespondToSmsHelpInboundMessageAction.php
+│   │   │   │           └── RevokeSmsConsentFromInboundMessageAction.php
 │   │   │   ├── Contracts
 │   │   │   │   ├── Email
 │   │   │   │   │   └── EmailWebhookHandler.php
@@ -166,7 +170,8 @@
 │   │   │   │   │   └── TeamMemberInternalNotificationPreferenceResolver.php
 │   │   │   │   ├── InternalNotificationRecipient.php
 │   │   │   │   └── Messaging
-│   │   │   │       └── TeamMemberMessageRecipientGate.php
+│   │   │   │       ├── TeamMemberMessageRecipientGate.php
+│   │   │   │       └── TeamMemberMessageRecipientPayloadProvider.php
 │   │   │   └── Support
 │   │   ├── Messaging
 │   │   │   ├── Actions
@@ -180,6 +185,7 @@
 │   │   │   │   │   ├── EmailMessage.php
 │   │   │   │   │   └── EmailProvider.php
 │   │   │   │   ├── MessageRecipientGate.php
+│   │   │   │   ├── MessageRecipientPayloadProvider.php
 │   │   │   │   └── Sms
 │   │   │   │       ├── SmsMessage.php
 │   │   │   │       └── SmsProvider.php
@@ -216,6 +222,8 @@
 │   │   │   │   └── MessageConsentRules.php
 │   │   │   ├── Services
 │   │   │   │   ├── ConditionChecker.php
+│   │   │   │   ├── ContactShow
+│   │   │   │   │   └── ContactMessagingShowDataProvider.php
 │   │   │   │   ├── DevMessageSink.php
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailMessagingService.php
@@ -225,6 +233,7 @@
 │   │   │   │   ├── MessageGate.php
 │   │   │   │   ├── MessagePlanningGate.php
 │   │   │   │   ├── MessageRecipientGateRegistry.php
+│   │   │   │   ├── MessageRecipientPayloadProviderRegistry.php
 │   │   │   │   ├── MessageRecipientPayloadResolver.php
 │   │   │   │   ├── MessageSuppressionService.php
 │   │   │   │   ├── PhoneNumberNormalizer.php
@@ -278,6 +287,8 @@
 │   │   │   ├── Services
 │   │   │   │   ├── AssignedRecipients
 │   │   │   │   │   └── TeamMemberTaskAssignedRecipientResolver.php
+│   │   │   │   ├── ContactShow
+│   │   │   │   │   └── ContactTasksShowDataProvider.php
 │   │   │   │   ├── RelatedSubjects
 │   │   │   │   │   └── ContactTaskRelatedSubjectResolver.php
 │   │   │   │   ├── TaskAssignedRecipientsResolver.php
@@ -415,6 +426,10 @@
 │   │       └── views
 │   │           └── emails
 │   │               └── webinars
+│   │                   ├── post-follow-up.blade.php
+│   │                   ├── registration-confirmation.blade.php
+│   │                   ├── reminder.blade.php
+│   │                   └── waitlist-scheduled.blade.php
 │   └── slam-dunk-crm
 │       ├── client-project-tree.txt
 │       ├── config
@@ -425,10 +440,16 @@
 │       │   ├── messaging
 │       │   │   ├── email
 │       │   │   │   ├── marketing
+│       │   │   │   │   ├── webinar.php
+│       │   │   │   │   └── webinar_waitlist.php
 │       │   │   │   └── transactional
+│       │   │   │       └── webinar.php
 │       │   │   └── sms
 │       │   │       ├── marketing
+│       │   │       │   ├── webinar.php
+│       │   │       │   └── webinar_waitlist.php
 │       │   │       └── transactional
+│       │   │           └── webinar.php
 │       │   ├── theme.php
 │       │   └── webinars
 │       │       ├── content.php
@@ -442,6 +463,8 @@
 │       │       ├── register
 │       │       │   ├── content.php
 │       │       │   ├── homebuyer-game-plan
+│       │       │   │   ├── content.php
+│       │       │   │   └── style.php
 │       │       │   ├── style.php
 │       │       │   └── va-homebuyer-game-plan
 │       │       ├── style.php
@@ -452,8 +475,27 @@
 │       │   └── images
 │       │       └── processed
 │       │           ├── dark_logo
+│       │           │   ├── 320.avif
+│       │           │   ├── 320.webp
+│       │           │   ├── 640.avif
+│       │           │   ├── 640.webp
+│       │           │   └── placeholder.webp
 │       │           ├── instructor
+│       │           │   ├── 320.avif
+│       │           │   ├── 320.webp
+│       │           │   ├── 640.avif
+│       │           │   ├── 640.webp
+│       │           │   ├── 960.avif
+│       │           │   ├── 960.webp
+│       │           │   └── placeholder.webp
 │       │           └── logo
+│       │               ├── 320.avif
+│       │               ├── 320.webp
+│       │               ├── 640.avif
+│       │               ├── 640.webp
+│       │               ├── 960.avif
+│       │               ├── 960.webp
+│       │               └── placeholder.webp
 │       ├── README.md
 │       ├── resources
 │       │   ├── images
@@ -464,6 +506,10 @@
 │       │       ├── email.blade.php
 │       │       └── emails
 │       │           └── webinars
+│       │               ├── post-follow-up.blade.php
+│       │               ├── registration-confirmation.blade.php
+│       │               ├── reminder.blade.php
+│       │               └── waitlist-scheduled.blade.php
 │       └── scripts
 │           ├── build-image-manifest.php
 │           ├── process-images.sh
@@ -607,6 +653,13 @@
 │   │       └── webinar
 │   │           └── register
 │   │               └── instructor
+│   │                   ├── 320.avif
+│   │                   ├── 320.webp
+│   │                   ├── 640.avif
+│   │                   ├── 640.webp
+│   │                   ├── 960.avif
+│   │                   ├── 960.webp
+│   │                   └── placeholder.webp
 │   ├── index.php
 │   └── robots.txt
 ├── README.md
@@ -722,6 +775,7 @@
 │   │   │   └── Messaging
 │   │   │       └── Sms
 │   │   │           └── Telnyx
+│   │   │               └── TelnyxSmsProviderRealSendTest.php
 │   │   ├── Messaging
 │   │   │   ├── ConditionCheckerTest.php
 │   │   │   ├── ConsentRevocationControllerTest.php
@@ -741,13 +795,10 @@
 │   │   │   └── TeamMemberNotificationPreferenceTest.php
 │   │   ├── Modules
 │   │   │   ├── ContactShowModuleVisibilityTest.php
+│   │   │   ├── ModuleDependencyBoundaryTest.php
 │   │   │   ├── ModuleManagerTest.php
 │   │   │   ├── ModuleNavigationTest.php
 │   │   │   └── ModuleRouteMiddlewareTest.php
-│   │   ├── tests
-│   │   │   └── Feature
-│   │   │       └── Webinars
-│   │   │           └── WebinarRegistrationControllerTest.php
 │   │   ├── Webhooks
 │   │   │   ├── DispatchWebinarOutcomeMessagesActionTest.php
 │   │   │   ├── EmailWebhookControllerTest.php
@@ -758,10 +809,11 @@
 │   │       ├── CreateWebinarRegistrationActionTest.php
 │   │       ├── DispatchWebinarRegistrationMessagesActionTest.php
 │   │       ├── DispatchWebinarWaitlistMessagesActionTest.php
-│   │       └── PostEvent
-│   │           ├── DispatchPostWebinarCampaignsActionTest.php
-│   │           └── ProcessPostWebinarEventJobTest.php
+│   │       ├── PostEvent
+│   │       │   ├── DispatchPostWebinarCampaignsActionTest.php
+│   │       │   └── ProcessPostWebinarEventJobTest.php
+│   │       └── WebinarRegistrationControllerTest.php
 │   └── TestCase.php
 └── vite.config.js
 
-298 directories, 467 files
+297 directories, 520 files
