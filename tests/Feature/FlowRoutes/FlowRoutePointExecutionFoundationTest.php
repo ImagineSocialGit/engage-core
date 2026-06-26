@@ -4,6 +4,7 @@ namespace Tests\Feature\FlowRoutes;
 
 use App\Modules\FlowRoutes\Actions\ExecuteCurrentFlowRoutePointAction;
 use App\Modules\FlowRoutes\Data\PointExecutionResult;
+use App\Modules\FlowRoutes\Jobs\ResumeFlowRouteProgressJob;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
@@ -14,6 +15,7 @@ use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class FlowRoutePointExecutionFoundationTest extends TestCase
@@ -70,10 +72,18 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
     public function test_wait_point_returns_waiting_and_does_not_advance(): void
     {
+        Queue::fake();
+
         $setup = $this->createProgressWithPoints([
             Point::TYPE_WAIT,
             Point::TYPE_NOOP,
         ]);
+
+        $setup['flow_route_points'][0]->forceFill([
+            'definition' => [
+                'duration_seconds' => 300,
+            ],
+        ])->save();
 
         $result = app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']);
 
@@ -81,8 +91,12 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
         $setup['progress']->refresh();
 
-        $this->assertSame(ContactFlowRouteProgress::STATUS_ACTIVE, $setup['progress']->status);
+        $this->assertSame(ContactFlowRouteProgress::STATUS_WAITING, $setup['progress']->status);
         $this->assertSame($setup['flow_route_points'][0]->getKey(), $setup['progress']->current_flow_route_point_id);
+        $this->assertSame($setup['flow_route_points'][0]->getKey(), $setup['progress']->waitingFlowRoutePointId());
+        $this->assertNotNull($setup['progress']->waitingResumeAt());
+
+        Queue::assertPushed(ResumeFlowRouteProgressJob::class);
     }
 
     public function test_unknown_point_type_fails_progress(): void

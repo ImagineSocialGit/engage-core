@@ -34,6 +34,8 @@ class CompleteContactFlowRouteProgressAction
     ): array {
         $meta = $progress->meta ?? [];
 
+        unset($meta['waiting']);
+
         $meta['completed'] = [
             'completed_at' => $completedAt->toISOString(),
             'result' => $result?->toMetaPayload(),

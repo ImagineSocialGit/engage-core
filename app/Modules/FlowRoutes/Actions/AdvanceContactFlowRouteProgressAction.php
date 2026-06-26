@@ -18,7 +18,7 @@ class AdvanceContactFlowRouteProgressAction
         FlowRoutePoint $fromFlowRoutePoint,
         ?PointExecutionResult $result = null,
     ): ContactFlowRouteProgress {
-        if (! $progress->isActive()) {
+        if (! $progress->isRunnable()) {
             return $progress;
         }
 
@@ -31,6 +31,7 @@ class AdvanceContactFlowRouteProgressAction
         $advancedAt = Carbon::now();
 
         $progress->forceFill([
+            'status' => ContactFlowRouteProgress::STATUS_ACTIVE,
             'current_flow_route_point_id' => $nextFlowRoutePoint->getKey(),
             'meta' => $this->mergedMeta(
                 progress: $progress,
@@ -67,6 +68,8 @@ class AdvanceContactFlowRouteProgressAction
         Carbon $advancedAt,
     ): array {
         $meta = $progress->meta ?? [];
+
+        unset($meta['waiting']);
 
         $meta['last_advanced'] = [
             'advanced_at' => $advancedAt->toISOString(),

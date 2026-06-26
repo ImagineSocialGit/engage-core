@@ -16,6 +16,7 @@ class ExecuteCurrentFlowRoutePointAction
     public function __construct(
         private readonly PointHandlerRegistry $pointHandlerRegistry,
         private readonly AdvanceContactFlowRouteProgressAction $advanceContactFlowRouteProgress,
+        private readonly MarkFlowRouteProgressWaitingAction $markFlowRouteProgressWaiting,
     ) {}
 
     public function handle(ContactFlowRouteProgress $progress): PointExecutionResult
@@ -135,10 +136,20 @@ class ExecuteCurrentFlowRoutePointAction
                 return $result;
             }
 
-            $this->recordExecutionResult($progress, $flowRoutePoint, $result);
-
             if ($result->isFailed()) {
                 $this->failProgress($progress, $flowRoutePoint, $result);
+
+                return $result;
+            }
+
+            $this->recordExecutionResult($progress, $flowRoutePoint, $result);
+
+            if ($result->isWaiting()) {
+                $this->markFlowRouteProgressWaiting->handle(
+                    progress: $progress,
+                    flowRoutePoint: $flowRoutePoint,
+                    result: $result,
+                );
 
                 return $result;
             }
@@ -174,6 +185,7 @@ class ExecuteCurrentFlowRoutePointAction
             ),
             meta: [
                 'started_from_workflow_transition' => $progress->meta['started_from_workflow_transition'] ?? null,
+                'waiting' => $progress->waitingState(),
             ],
         );
     }
@@ -196,6 +208,7 @@ class ExecuteCurrentFlowRoutePointAction
             'status' => ContactFlowRouteProgress::STATUS_COMPLETED,
             'completed_at' => $completedAt,
             'meta' => array_replace_recursive($progress->meta ?? [], [
+                'waiting' => null,
                 'completed' => [
                     'completed_at' => $completedAt->toISOString(),
                     'reason' => 'no_current_flow_route_point',
@@ -251,6 +264,7 @@ class ExecuteCurrentFlowRoutePointAction
             'failed_at' => $failedAt,
             'failure_reason' => $result->reason,
             'meta' => array_replace_recursive($progress->meta ?? [], [
+                'waiting' => null,
                 'failed' => [
                     'failed_at' => $failedAt->toISOString(),
                     'flow_route_point_id' => $flowRoutePoint->getKey(),
