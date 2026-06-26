@@ -633,7 +633,6 @@
 ├── package-lock.json
 ├── phpunit.xml
 ├── public
-│   ├── client -> ../../engage-clients/slam-dunk-home-loans/public
 │   ├── favicon.ico
 │   ├── images
 │   │   └── processed
@@ -816,4 +815,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-297 directories, 520 files
+297 directories, 519 files
