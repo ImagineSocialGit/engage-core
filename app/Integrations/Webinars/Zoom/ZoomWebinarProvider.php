@@ -2,14 +2,14 @@
 
 namespace App\Integrations\Webinars\Zoom;
 
-use App\Contracts\Webinars\WebinarProvider;
-use App\Data\Webinars\ProviderRecordingData;
-use App\Data\Webinars\ProviderRegistrationData;
-use App\Data\Webinars\ProviderWebhookEvent;
-use App\Data\Webinars\WebinarAttendanceRecord;
+use App\Modules\Webinars\Contracts\WebinarProvider;
+use App\Modules\Webinars\Data\ProviderRecordingData;
+use App\Modules\Webinars\Data\ProviderRegistrationData;
+use App\Modules\Webinars\Data\ProviderWebhookEvent;
+use App\Modules\Webinars\Data\WebinarAttendanceRecord;
 use App\Integrations\Webinars\Zoom\Mappers\ZoomAttendanceMapper;
-use App\Models\Webinar;
-use App\Models\WebinarRegistration;
+use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Models\WebinarRegistration;
 use Illuminate\Http\Request;
 
 class ZoomWebinarProvider implements WebinarProvider

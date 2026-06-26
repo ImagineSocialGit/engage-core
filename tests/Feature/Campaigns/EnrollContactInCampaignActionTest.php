@@ -2,13 +2,13 @@
 
 namespace Tests\Feature\Campaigns;
 
-use App\Actions\Campaigns\EnrollContactInCampaignAction;
-use App\Messaging\Payloads\EmailPayload;
-use App\Models\CampaignEnrollment;
-use App\Models\Contact;
-use App\Models\MessageConsent;
-use App\Models\ScheduledMessage;
-use App\Models\WebinarRegistration;
+use App\Modules\Campaigns\Actions\EnrollContactInCampaignAction;
+use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\MessageConsent;
+use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Webinars\Models\WebinarRegistration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;

@@ -3,7 +3,7 @@
 namespace Tests\Feature\Modules;
 
 use App\Http\Middleware\ForceStagingAccess;
-use App\Models\Contact;
+use App\Modules\Core\Models\Contact;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;

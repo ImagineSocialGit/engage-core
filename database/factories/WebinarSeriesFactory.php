@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\WebinarSeries;
+use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 

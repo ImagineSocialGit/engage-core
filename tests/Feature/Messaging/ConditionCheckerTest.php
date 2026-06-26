@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Messaging;
 
-use App\Services\ConditionChecker;
+use App\Modules\Messaging\Services\ConditionChecker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
 use Tests\TestCase;

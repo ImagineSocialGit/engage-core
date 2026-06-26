@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Messaging;
 
-use App\Enums\MessageChannel;
-use App\Models\MessageSuppression;
-use App\Services\Messaging\MessageSuppressionService;
+use App\Modules\Messaging\Enums\MessageChannel;
+use App\Modules\Messaging\Models\MessageSuppression;
+use App\Modules\Messaging\Services\MessageSuppressionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

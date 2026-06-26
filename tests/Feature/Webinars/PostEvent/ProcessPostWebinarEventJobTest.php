@@ -2,18 +2,18 @@
 
 namespace Tests\Feature\Webinars\PostEvent;
 
-use App\Actions\Webinars\PostEvent\DispatchPostWebinarFollowUpsAction;
-use App\Actions\Webinars\PostEvent\RecordWebinarProviderAttendanceAction;
-use App\Actions\Webinars\PostEvent\ResolveWebinarPlaybackAction;
-use App\Contracts\Webinars\WebinarProvider;
-use App\Data\Webinars\ProviderRecordingData;
-use App\Data\Webinars\WebinarAttendanceRecord;
-use App\Jobs\Webinars\PostEvent\ProcessWebinarProviderEventJob;
-use App\Jobs\Webinars\PostEvent\RoutePostWebinarRegistrationJob;
-use App\Models\Contact;
-use App\Models\Webinar;
-use App\Models\WebinarRegistration;
-use App\Services\Webinars\WebinarProviderManager;
+use App\Modules\Webinars\Actions\PostEvent\DispatchPostWebinarFollowUpsAction;
+use App\Modules\Webinars\Actions\PostEvent\RecordWebinarProviderAttendanceAction;
+use App\Modules\Webinars\Actions\PostEvent\ResolveWebinarPlaybackAction;
+use App\Modules\Webinars\Contracts\WebinarProvider;
+use App\Modules\Webinars\Data\ProviderRecordingData;
+use App\Modules\Webinars\Data\WebinarAttendanceRecord;
+use App\Modules\Webinars\Jobs\PostEvent\ProcessWebinarProviderEventJob;
+use App\Modules\Webinars\Jobs\PostEvent\RoutePostWebinarRegistrationJob;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Services\WebinarProviderManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;

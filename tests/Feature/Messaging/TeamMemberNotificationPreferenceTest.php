@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Messaging;
 
-use App\Models\TeamMember;
-use App\Models\TeamMemberNotificationPreference;
+use App\Modules\InternalNotifications\Models\TeamMember;
+use App\Modules\InternalNotifications\Models\TeamMemberNotificationPreference;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

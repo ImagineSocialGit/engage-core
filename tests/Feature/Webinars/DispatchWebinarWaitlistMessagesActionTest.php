@@ -2,18 +2,18 @@
 
 namespace Tests\Feature\Webinars;
 
-use App\Actions\Webinars\DispatchWebinarWaitlistMessagesAction;
-use App\Enums\MessageChannel;
-use App\Enums\MessagePurpose;
-use App\Jobs\Messaging\SendScheduledMessageJob;
-use App\Messaging\Payloads\EmailPayload;
-use App\Messaging\Payloads\SmsPayload;
-use App\Models\Contact;
-use App\Models\MessageConsent;
-use App\Models\ScheduledMessage;
-use App\Models\Webinar;
-use App\Models\WebinarSeries;
-use App\Models\WebinarWaitlistSignup;
+use App\Modules\Webinars\Actions\DispatchWebinarWaitlistMessagesAction;
+use App\Modules\Messaging\Enums\MessageChannel;
+use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
+use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Messaging\Payloads\SmsPayload;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\MessageConsent;
+use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Queue;

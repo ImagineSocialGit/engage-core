@@ -2,10 +2,10 @@
 
 namespace Tests\Feature\Broadcasts;
 
-use App\Models\Broadcast;
-use App\Models\BroadcastRecipient;
-use App\Models\Contact;
-use App\Models\ScheduledMessage;
+use App\Modules\Campaigns\Models\Broadcast;
+use App\Modules\Campaigns\Models\BroadcastRecipient;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;

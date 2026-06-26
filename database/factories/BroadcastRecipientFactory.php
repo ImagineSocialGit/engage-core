@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
-use App\Models\Broadcast;
-use App\Models\BroadcastRecipient;
-use App\Models\Contact;
+use App\Modules\Campaigns\Models\Broadcast;
+use App\Modules\Campaigns\Models\BroadcastRecipient;
+use App\Modules\Core\Models\Contact;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

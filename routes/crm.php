@@ -1,9 +1,9 @@
 <?php
 
-use App\Http\Controllers\CRM\ContactController;
-use App\Http\Controllers\CRM\ContactNoteController;
-use App\Http\Controllers\CRM\TaskController;
-use App\Http\Controllers\CRM\WebinarController;
+use App\Modules\Core\Controllers\ContactController;
+use App\Modules\Core\Controllers\ContactNoteController;
+use App\Modules\Tasks\Controllers\TaskController;
+use App\Modules\Webinars\Controllers\CRM\WebinarController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {

@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Messaging;
 
-use App\Contracts\Messaging\Email\EmailMessage;
+use App\Modules\Messaging\Contracts\Email\EmailMessage;
 use App\Integrations\Messaging\Email\Resend\ResendEmailProvider;
-use App\Services\Messaging\Email\EmailMessagingService;
+use App\Modules\Messaging\Services\Email\EmailMessagingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Mail;

@@ -2,10 +2,10 @@
 
 namespace Tests\Feature\CRM;
 
-use App\Actions\CRM\Contacts\UpdateContactStatusAction;
-use App\Models\Contact;
-use App\Models\ContactStatus;
-use App\Models\ContactWorkflowProfile;
+use App\Modules\Core\Actions\Contacts\UpdateContactStatusAction;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Models\ContactStatus;
+use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

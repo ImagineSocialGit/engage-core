@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Messaging;
 
-use App\Messaging\Payloads\EmailPayload;
-use App\Services\Messaging\MessageDefinitionResolver;
+use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Messaging\Services\MessageDefinitionResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;

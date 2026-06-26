@@ -2,14 +2,14 @@
 
 namespace Tests\Feature\Webinars;
 
-use App\Actions\Messaging\DispatchMessageAction;
-use App\Actions\Webinars\AddRegistrantToWebinarProviderAction;
-use App\Actions\Webinars\CreateWebinarRegistrationAction;
-use App\Actions\Webinars\DispatchWebinarRegistrationMessagesAction;
-use App\Models\Contact;
-use App\Models\MessageConsent;
-use App\Models\Webinar;
-use App\Models\WebinarRegistration;
+use App\Modules\Messaging\Actions\DispatchMessageAction;
+use App\Modules\Webinars\Actions\AddRegistrantToWebinarProviderAction;
+use App\Modules\Webinars\Actions\CreateWebinarRegistrationAction;
+use App\Modules\Webinars\Actions\DispatchWebinarRegistrationMessagesAction;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\MessageConsent;
+use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Models\WebinarRegistration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Queue;

@@ -1,8 +1,8 @@
 <?php
 
-use App\Http\Controllers\Webhooks\EmailWebhookController;
-use App\Http\Controllers\Webhooks\SmsWebhookController;
-use App\Http\Controllers\Webhooks\WebinarWebhookController;
+use App\Modules\InboundMessaging\Controllers\Webhooks\EmailWebhookController;
+use App\Modules\InboundMessaging\Controllers\Webhooks\SmsWebhookController;
+use App\Modules\Webinars\Controllers\Webhooks\WebinarWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('module:webinars')->group(function () {

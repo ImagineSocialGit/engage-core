@@ -2,8 +2,8 @@
 
 namespace App\Integrations\Messaging\Email\Resend;
 
-use App\Contracts\Messaging\Email\EmailMessage;
-use App\Contracts\Messaging\Email\EmailProvider;
+use App\Modules\Messaging\Contracts\Email\EmailMessage;
+use App\Modules\Messaging\Contracts\Email\EmailProvider;
 use Illuminate\Support\Facades\Mail;
 
 class ResendEmailProvider implements EmailProvider

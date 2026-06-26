@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Messaging;
 
-use App\Enums\MessageChannel;
-use App\Models\TeamMember;
-use App\Models\TeamMemberNotificationPreference;
-use App\Services\Messaging\InternalNotificationChannelResolver;
-use App\Services\Messaging\InternalNotificationRecipient;
+use App\Modules\Messaging\Enums\MessageChannel;
+use App\Modules\InternalNotifications\Models\TeamMember;
+use App\Modules\InternalNotifications\Models\TeamMemberNotificationPreference;
+use App\Modules\InternalNotifications\Services\InternalNotificationChannelResolver;
+use App\Modules\InternalNotifications\Services\InternalNotificationRecipient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

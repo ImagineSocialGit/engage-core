@@ -2,14 +2,14 @@
 
 namespace Tests\Feature\Messaging;
 
-use App\Actions\Messaging\DispatchMessageAction;
-use App\Actions\Messaging\GrantMessageConsentAction;
-use App\Enums\MessageChannel;
-use App\Enums\MessagePurpose;
-use App\Models\CampaignEnrollment;
-use App\Models\ConsentRevocation;
-use App\Models\Contact;
-use App\Models\MessageConsent;
+use App\Modules\Messaging\Actions\DispatchMessageAction;
+use App\Modules\Messaging\Actions\GrantMessageConsentAction;
+use App\Modules\Messaging\Enums\MessageChannel;
+use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Messaging\Models\ConsentRevocation;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\MessageConsent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;

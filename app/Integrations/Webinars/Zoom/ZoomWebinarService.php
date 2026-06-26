@@ -2,8 +2,8 @@
 
 namespace App\Integrations\Webinars\Zoom;
 
-use App\Data\Webinars\ProviderRecordingData;
-use App\Data\Webinars\ProviderWebinarData;
+use App\Modules\Webinars\Data\ProviderRecordingData;
+use App\Modules\Webinars\Data\ProviderWebinarData;
 use App\Support\Caching\CacheKey;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;

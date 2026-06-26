@@ -2,17 +2,17 @@
 
 namespace Tests\Feature\Messaging;
 
-use App\Contracts\Messaging\Email\EmailMessage;
-use App\Contracts\Messaging\Sms\SmsMessage;
-use App\Events\Messaging\ScheduledMessageSent;
-use App\Jobs\Messaging\SendScheduledMessageJob;
-use App\Models\ConsentRevocation;
-use App\Models\Contact;
-use App\Models\MessageConsent;
-use App\Models\ScheduledMessage;
-use App\Services\Messaging\Email\EmailMessagingService;
-use App\Services\Messaging\ScheduledMessageGate;
-use App\Services\Messaging\Sms\SmsMessagingService;
+use App\Modules\Messaging\Contracts\Email\EmailMessage;
+use App\Modules\Messaging\Contracts\Sms\SmsMessage;
+use App\Modules\Messaging\Events\ScheduledMessageSent;
+use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
+use App\Modules\Messaging\Models\ConsentRevocation;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\MessageConsent;
+use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Services\Email\EmailMessagingService;
+use App\Modules\Messaging\Services\ScheduledMessageGate;
+use App\Modules\Messaging\Services\Sms\SmsMessagingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Event;

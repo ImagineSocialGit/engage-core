@@ -2,7 +2,7 @@
 
 namespace App\Integrations\Messaging\Sms\Telnyx;
 
-use App\Contracts\Messaging\Sms\SmsProvider;
+use App\Modules\Messaging\Contracts\Sms\SmsProvider;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 

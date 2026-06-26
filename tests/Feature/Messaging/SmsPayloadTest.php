@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Messaging;
 
-use App\Contracts\Messaging\Sms\SmsMessage;
-use App\Messaging\Payloads\SmsPayload;
+use App\Modules\Messaging\Contracts\Sms\SmsMessage;
+use App\Modules\Messaging\Payloads\SmsPayload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;

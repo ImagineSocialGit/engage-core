@@ -2,7 +2,7 @@
 
 namespace App\Integrations\Messaging\Sms\Twilio;
 
-use App\Contracts\Messaging\Sms\SmsProvider;
+use App\Modules\Messaging\Contracts\Sms\SmsProvider;
 use RuntimeException;
 use Twilio\Rest\Client;
 

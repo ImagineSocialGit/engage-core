@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
-use App\Models\Contact;
-use App\Models\WebinarSeries;
-use App\Models\WebinarWaitlistSignup;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

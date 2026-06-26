@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Messaging;
 
-use App\Messaging\Payloads\EmailPayload;
+use App\Modules\Messaging\Payloads\EmailPayload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;
@@ -216,7 +216,7 @@ class EmailPayloadTest extends TestCase
         ]);
 
         $this->assertInstanceOf(
-            \App\Contracts\Messaging\Email\EmailMessage::class,
+            \App\Modules\Messaging\Contracts\Email\EmailMessage::class,
             $payload
         );
     }

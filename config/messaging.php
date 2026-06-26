@@ -9,7 +9,7 @@ return [
     */
 
     'recipient_models' => [
-        App\Models\Contact::class,
+        App\Modules\Core\Models\Contact::class,
     ],
 
     'consent' => [
@@ -44,15 +44,15 @@ return [
         'handlers' => [
             'sms' => [
                 'consent_revocation' => [
-                    App\Actions\Messaging\Sms\Inbound\RevokeSmsConsentFromInboundMessageAction::class,
+                    App\Modules\InboundMessaging\Actions\Sms\Inbound\RevokeSmsConsentFromInboundMessageAction::class,
                 ],
 
                 'help' => [
-                    App\Actions\Messaging\Sms\Inbound\RespondToSmsHelpInboundMessageAction::class,
+                    App\Modules\InboundMessaging\Actions\Sms\Inbound\RespondToSmsHelpInboundMessageAction::class,
                 ],
 
                 'normal_reply' => [
-                    App\Actions\Messaging\Inbound\NotifyInternalUsersOfInboundMessageAction::class,
+                    App\Modules\InboundMessaging\Actions\NotifyInternalUsersOfInboundMessageAction::class,
                 ],
             ],
         ],

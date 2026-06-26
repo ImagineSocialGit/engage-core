@@ -1,16 +1,16 @@
 <?php
 
-use App\Providers\Modules\CampaignsModuleServiceProvider;
-use App\Providers\Modules\CoreModuleServiceProvider;
-use App\Providers\Modules\FlowRoutesModuleServiceProvider;
-use App\Providers\Modules\InboundMessagingModuleServiceProvider;
+use App\Modules\Campaigns\Providers\CampaignsModuleServiceProvider;
+use App\Modules\Core\Providers\CoreModuleServiceProvider;
+use App\Modules\FlowRoutes\Providers\FlowRoutesModuleServiceProvider;
+use App\Modules\InboundMessaging\Providers\InboundMessagingModuleServiceProvider;
+use App\Modules\InternalNotifications\Providers\InternalNotificationsModuleServiceProvider;
+use App\Modules\Messaging\Providers\MessagingModuleServiceProvider;
+use App\Modules\Reporting\Providers\ReportingModuleServiceProvider;
+use App\Modules\Tasks\Providers\TasksModuleServiceProvider;
+use App\Modules\Webinars\Providers\WebinarsModuleServiceProvider;
+use App\Modules\Workflow\Providers\WorkflowModuleServiceProvider;
 use App\Providers\Modules\IntegrationsModuleServiceProvider;
-use App\Providers\Modules\InternalNotificationsModuleServiceProvider;
-use App\Providers\Modules\MessagingModuleServiceProvider;
-use App\Providers\Modules\ReportingModuleServiceProvider;
-use App\Providers\Modules\TasksModuleServiceProvider;
-use App\Providers\Modules\WebinarsModuleServiceProvider;
-use App\Providers\Modules\WorkflowModuleServiceProvider;
 
 return [
 

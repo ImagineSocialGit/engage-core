@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
-use App\Models\Task;
-use App\Models\TeamMember;
+use App\Modules\Tasks\Models\Task;
+use App\Modules\InternalNotifications\Models\TeamMember;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 

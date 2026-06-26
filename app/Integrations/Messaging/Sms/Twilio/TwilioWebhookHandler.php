@@ -2,8 +2,8 @@
 
 namespace App\Integrations\Messaging\Sms\Twilio;
 
-use App\Contracts\Messaging\Sms\SmsWebhookHandler;
-use App\Services\Messaging\Sms\SmsWebhookPayload;
+use App\Modules\InboundMessaging\Contracts\Sms\SmsWebhookHandler;
+use App\Modules\InboundMessaging\Services\Sms\SmsWebhookPayload;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 

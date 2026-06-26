@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\TeamMember;
+use App\Modules\InternalNotifications\Models\TeamMember;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;

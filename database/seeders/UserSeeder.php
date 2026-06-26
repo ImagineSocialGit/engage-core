@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\TeamMember;
+use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;

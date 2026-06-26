@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\FlowRoute;
-use App\Models\Point;
+use App\Modules\FlowRoutes\Models\FlowRoute;
+use App\Modules\FlowRoutes\Models\Point;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;

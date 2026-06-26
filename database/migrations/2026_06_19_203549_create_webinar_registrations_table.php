@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\Contact;
-use App\Models\Webinar;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Webinars\Models\Webinar;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;

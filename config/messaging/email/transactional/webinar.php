@@ -1,6 +1,6 @@
 <?php
 
-use App\Messaging\Payloads\EmailPayload;
+use App\Modules\Messaging\Payloads\EmailPayload;
 
 return [
 

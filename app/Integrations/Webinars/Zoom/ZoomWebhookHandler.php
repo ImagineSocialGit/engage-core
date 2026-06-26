@@ -2,7 +2,7 @@
 
 namespace App\Integrations\Webinars\Zoom;
 
-use App\Data\Webinars\ProviderWebhookEvent;
+use App\Modules\Webinars\Data\ProviderWebhookEvent;
 use Illuminate\Http\Request;
 
 class ZoomWebhookHandler

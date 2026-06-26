@@ -2,12 +2,12 @@
 
 namespace Tests\Feature\Messaging;
 
-use App\Actions\Messaging\DispatchMessageAction;
-use App\Jobs\Messaging\SendScheduledMessageJob;
-use App\Messaging\Payloads\EmailPayload;
-use App\Models\Contact;
-use App\Models\MessageConsent;
-use App\Models\ScheduledMessage;
+use App\Modules\Messaging\Actions\DispatchMessageAction;
+use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
+use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\MessageConsent;
+use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;

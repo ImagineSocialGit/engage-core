@@ -2,7 +2,7 @@
 
 namespace App\Integrations\Webinars\Zoom\Mappers;
 
-use App\Data\Webinars\WebinarAttendanceRecord;
+use App\Modules\Webinars\Data\WebinarAttendanceRecord;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 

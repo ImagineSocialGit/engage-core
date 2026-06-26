@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Webinars;
 
-use App\Actions\Caching\FlushWebinarCachesAction;
-use App\Models\Contact;
-use App\Models\Webinar;
-use App\Models\WebinarRegistration;
-use App\Models\WebinarSeries;
+use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;

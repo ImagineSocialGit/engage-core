@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\TeamMember;
+use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 

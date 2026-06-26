@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
-use App\Models\TeamMember;
-use App\Models\TeamMemberNotificationPreference;
+use App\Modules\InternalNotifications\Models\TeamMember;
+use App\Modules\InternalNotifications\Models\TeamMemberNotificationPreference;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

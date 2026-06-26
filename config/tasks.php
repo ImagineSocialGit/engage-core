@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\Contact;
+use App\Modules\Core\Models\Contact;
 
 return [
     'related_types' => [

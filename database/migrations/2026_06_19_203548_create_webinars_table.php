@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\WebinarSeries;
+use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;

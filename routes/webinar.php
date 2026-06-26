@@ -1,11 +1,11 @@
 <?php
 
-use App\Http\Controllers\Public\ConsentRevocationController;
-use App\Http\Controllers\Public\WebinarJoinRedirectController;
-use App\Http\Controllers\Public\WebinarPlaybackRedirectController;
-use App\Http\Controllers\Public\WebinarRegistrationCancellationController;
-use App\Http\Controllers\Public\WebinarRegistrationController;
-use App\Http\Controllers\Public\WebinarWaitlistSignupController;
+use App\Modules\Messaging\Controllers\Public\ConsentRevocationController;
+use App\Modules\Webinars\Controllers\Public\WebinarJoinRedirectController;
+use App\Modules\Webinars\Controllers\Public\WebinarPlaybackRedirectController;
+use App\Modules\Webinars\Controllers\Public\WebinarRegistrationCancellationController;
+use App\Modules\Webinars\Controllers\Public\WebinarRegistrationController;
+use App\Modules\Webinars\Controllers\Public\WebinarWaitlistSignupController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('module:webinars')->group(function () {

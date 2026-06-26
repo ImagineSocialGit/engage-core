@@ -2,14 +2,14 @@
 
 namespace Tests\Feature\CRM;
 
-use App\Actions\Caching\FlushWebinarCachesAction;
-use App\Data\Webinars\ProviderWebinarData;
+use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
+use App\Modules\Webinars\Data\ProviderWebinarData;
 use App\Integrations\Webinars\Zoom\ZoomWebinarService;
-use App\Jobs\Webinars\NotifyWebinarWaitlistJob;
-use App\Models\Contact;
+use App\Modules\Webinars\Jobs\NotifyWebinarWaitlistJob;
+use App\Modules\Core\Models\Contact;
 use App\Models\User;
-use App\Models\Webinar;
-use App\Models\WebinarSeries;
+use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Models\WebinarSeries;
 use App\Support\Caching\CacheKey;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;

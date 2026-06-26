@@ -2,12 +2,12 @@
 
 namespace Tests\Feature\Messaging;
 
-use App\Enums\MessageChannel;
-use App\Enums\MessagePurpose;
-use App\Models\CampaignEnrollment;
-use App\Models\ConsentRevocation;
-use App\Models\Contact;
-use App\Services\Messaging\MessageEligibilityGate;
+use App\Modules\Messaging\Enums\MessageChannel;
+use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Messaging\Models\ConsentRevocation;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Services\MessageEligibilityGate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;

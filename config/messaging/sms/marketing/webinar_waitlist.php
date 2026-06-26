@@ -1,6 +1,6 @@
 <?php
 
-use App\Messaging\Payloads\SmsPayload;
+use App\Modules\Messaging\Payloads\SmsPayload;
 
 return [
 

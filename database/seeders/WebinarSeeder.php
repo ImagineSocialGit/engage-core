@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\WebinarSeries;
+use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Database\Seeder;
 
 class WebinarSeeder extends Seeder

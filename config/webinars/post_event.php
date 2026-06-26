@@ -1,7 +1,7 @@
 <?php
 
-use App\Actions\Webinars\PostEvent\DispatchPostWebinarFollowUpsAction;
-use App\Actions\Webinars\PostEvent\RecordWebinarProviderAttendanceAction;
+use App\Modules\Webinars\Actions\PostEvent\DispatchPostWebinarFollowUpsAction;
+use App\Modules\Webinars\Actions\PostEvent\RecordWebinarProviderAttendanceAction;
 
 return [
     'events' => [

@@ -2,12 +2,12 @@
 
 namespace Tests\Feature\Email;
 
-use App\Actions\Messaging\Email\HandleInboundEmailWebhookAction;
-use App\Enums\MessageChannel;
-use App\Enums\MessagePurpose;
-use App\Models\ConsentRevocation;
-use App\Models\Contact;
-use App\Models\MessageSuppression;
+use App\Modules\InboundMessaging\Actions\Email\HandleInboundEmailWebhookAction;
+use App\Modules\Messaging\Enums\MessageChannel;
+use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Models\ConsentRevocation;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\MessageSuppression;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

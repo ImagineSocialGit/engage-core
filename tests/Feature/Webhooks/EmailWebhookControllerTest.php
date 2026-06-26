@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Webhooks;
 
-use App\Enums\MessageChannel;
-use App\Models\MessageSuppression;
+use App\Modules\Messaging\Enums\MessageChannel;
+use App\Modules\Messaging\Models\MessageSuppression;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;

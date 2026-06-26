@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
-use App\Models\Contact;
-use App\Models\Webinar;
-use App\Models\WebinarRegistration;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Models\WebinarRegistration;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 

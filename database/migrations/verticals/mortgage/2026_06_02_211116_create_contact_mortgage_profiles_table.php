@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\Contact;
-use App\Models\MortgageStage;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Mortgage\Models\MortgageStage;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;

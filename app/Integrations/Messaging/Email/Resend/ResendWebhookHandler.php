@@ -2,10 +2,10 @@
 
 namespace App\Integrations\Messaging\Email\Resend;
 
-use App\Actions\Messaging\Email\HandleInboundEmailWebhookAction;
-use App\Contracts\Messaging\Email\EmailWebhookHandler;
-use App\Models\MessageSuppression;
-use App\Services\Messaging\Email\EmailWebhookPayload;
+use App\Modules\InboundMessaging\Actions\Email\HandleInboundEmailWebhookAction;
+use App\Modules\InboundMessaging\Contracts\Email\EmailWebhookHandler;
+use App\Modules\Messaging\Models\MessageSuppression;
+use App\Modules\InboundMessaging\Services\Email\EmailWebhookPayload;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
 class ResendWebhookHandler implements EmailWebhookHandler

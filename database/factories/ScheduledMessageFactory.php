@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
-use App\Models\Contact;
-use App\Models\ScheduledMessage;
-use App\Models\TeamMember;
+use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\InternalNotifications\Models\TeamMember;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -29,7 +29,7 @@ class ScheduledMessageFactory extends Factory
 
             'message_type' => 'message',
 
-            'payload_class' => \App\Messaging\Payloads\EmailPayload::class,
+            'payload_class' => \App\Modules\Messaging\Payloads\EmailPayload::class,
 
             'payload' => [
                 'to' => $this->faker->safeEmail(),
@@ -73,7 +73,7 @@ class ScheduledMessageFactory extends Factory
     {
         return $this->state(fn () => [
             'channel' => 'email',
-            'payload_class' => \App\Messaging\Payloads\EmailPayload::class,
+            'payload_class' => \App\Modules\Messaging\Payloads\EmailPayload::class,
         ]);
     }
 
@@ -81,7 +81,7 @@ class ScheduledMessageFactory extends Factory
     {
         return $this->state(fn () => [
             'channel' => 'sms',
-            'payload_class' => \App\Messaging\Payloads\SmsPayload::class,
+            'payload_class' => \App\Modules\Messaging\Payloads\SmsPayload::class,
         ]);
     }
 

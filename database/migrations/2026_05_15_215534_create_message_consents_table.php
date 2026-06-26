@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\Contact;
+use App\Modules\Core\Models\Contact;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
