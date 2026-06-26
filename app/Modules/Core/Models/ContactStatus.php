@@ -2,11 +2,9 @@
 
 namespace App\Modules\Core\Models;
 
-use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ContactStatus extends Model
 {
@@ -28,11 +26,6 @@ class ContactStatus extends Model
         'sort_order' => 'integer',
         'meta' => 'array',
     ];
-
-    public function workflowProfiles(): HasMany
-    {
-        return $this->hasMany(ContactWorkflowProfile::class);
-    }
 
     public function scopeActive(Builder $query): Builder
     {

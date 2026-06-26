@@ -67,7 +67,8 @@
 │   │   │   │   └── Contacts
 │   │   │   │       ├── ContactImportHandler.php
 │   │   │   │       ├── ContactPanelProvider.php
-│   │   │   │       └── ContactShowDataProvider.php
+│   │   │   │       ├── ContactShowDataProvider.php
+│   │   │   │       └── UpdatesContactStatus.php
 │   │   │   ├── Controllers
 │   │   │   │   ├── ContactController.php
 │   │   │   │   └── ContactNoteController.php
@@ -366,14 +367,21 @@
 │   │   │       └── WebinarRegistrationCancelLinkGenerator.php
 │   │   └── Workflow
 │   │       ├── Actions
+│   │       │   └── TransitionContactWorkflowStatusAction.php
 │   │       ├── Contracts
 │   │       ├── Controllers
 │   │       ├── Data
+│   │       │   └── ContactWorkflowStatusTransition.php
+│   │       ├── Events
+│   │       │   └── ContactWorkflowStatusChanged.php
 │   │       ├── Models
 │   │       │   └── ContactWorkflowProfile.php
 │   │       ├── Providers
 │   │       │   └── WorkflowModuleServiceProvider.php
 │   │       ├── Requests
+│   │       ├── Services
+│   │       │   └── Contacts
+│   │       │       └── WorkflowContactStatusUpdater.php
 │   │       └── Support
 │   ├── Providers
 │   │   ├── AppServiceProvider.php
@@ -804,15 +812,17 @@
 │   │   │   ├── SmsWebhookControllerTest.php
 │   │   │   ├── TelnyxInboundSmsWebhookTest.php
 │   │   │   └── ZoomWebhookTest.php
-│   │   └── Webinars
-│   │       ├── CreateWebinarRegistrationActionTest.php
-│   │       ├── DispatchWebinarRegistrationMessagesActionTest.php
-│   │       ├── DispatchWebinarWaitlistMessagesActionTest.php
-│   │       ├── PostEvent
-│   │       │   ├── DispatchPostWebinarCampaignsActionTest.php
-│   │       │   └── ProcessPostWebinarEventJobTest.php
-│   │       └── WebinarRegistrationControllerTest.php
+│   │   ├── Webinars
+│   │   │   ├── CreateWebinarRegistrationActionTest.php
+│   │   │   ├── DispatchWebinarRegistrationMessagesActionTest.php
+│   │   │   ├── DispatchWebinarWaitlistMessagesActionTest.php
+│   │   │   ├── PostEvent
+│   │   │   │   ├── DispatchPostWebinarCampaignsActionTest.php
+│   │   │   │   └── ProcessPostWebinarEventJobTest.php
+│   │   │   └── WebinarRegistrationControllerTest.php
+│   │   └── Workflow
+│   │       └── TransitionContactWorkflowStatusActionTest.php
 │   └── TestCase.php
 └── vite.config.js
 
-297 directories, 519 files
+301 directories, 525 files

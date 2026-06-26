@@ -1,15 +1,19 @@
 <?php
 
-namespace App\Modules\Core\Actions\Contacts;
+namespace App\Modules\Workflow\Services\Contacts;
 
 use App\Modules\Core\Contracts\Contacts\UpdatesContactStatus;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactStatus;
+use App\Modules\Workflow\Actions\TransitionContactWorkflowStatusAction;
 use Illuminate\Database\Eloquent\Model;
-use LogicException;
 
-class UpdateContactStatusAction
+class WorkflowContactStatusUpdater implements UpdatesContactStatus
 {
+    public function __construct(
+        private readonly TransitionContactWorkflowStatusAction $transitionContactWorkflowStatus,
+    ) {}
+
     /**
      * @param array<string, mixed> $meta
      */
@@ -22,13 +26,7 @@ class UpdateContactStatusAction
         array $meta = [],
         bool $force = false,
     ): Contact {
-        if (! app()->bound(UpdatesContactStatus::class)) {
-            throw new LogicException(
-                'No contact status updater is bound. Enable the Workflow module or bind '.UpdatesContactStatus::class.'.'
-            );
-        }
-
-        return app(UpdatesContactStatus::class)->handle(
+        $this->transitionContactWorkflowStatus->handle(
             contact: $contact,
             status: $status,
             reason: $reason,
@@ -37,5 +35,7 @@ class UpdateContactStatusAction
             meta: $meta,
             force: $force,
         );
+
+        return $contact->refresh()->load('workflowProfile.contactStatus');
     }
 }

@@ -2,12 +2,10 @@
 
 namespace App\Modules\Core\Models;
 
-use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use Database\Factories\ContactFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Contact extends Model
 {
@@ -45,10 +43,5 @@ class Contact extends Model
     public function tags(): HasMany
     {
         return $this->hasMany(ContactTag::class);
-    }
-
-    public function workflowProfile(): HasOne
-    {
-        return $this->hasOne(ContactWorkflowProfile::class);
     }
 }
