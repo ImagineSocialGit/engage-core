@@ -7,6 +7,7 @@ use App\Modules\FlowRoutes\Listeners\HandleContactWorkflowStatusChanged;
 use App\Modules\FlowRoutes\Listeners\ResumeFlowRouteProgressWhenTaskCompleted;
 use App\Modules\FlowRoutes\PointHandlers\BranchEvaluatePointHandler;
 use App\Modules\FlowRoutes\PointHandlers\ConditionPointHandler;
+use App\Modules\FlowRoutes\PointHandlers\CreateTaskPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\EventWaitPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\NoopPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\WaitPointHandler;
@@ -20,15 +21,11 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
 {
     private const TASK_COMPLETED_EVENT = 'App\\Modules\\Tasks\\Events\\TaskCompleted';
 
+    private const CREATE_TASK_ACTION = 'App\\Modules\\Tasks\\Actions\\CreateTaskAction';
+
     public function register(): void
     {
-        $this->app->tag([
-            NoopPointHandler::class,
-            WaitPointHandler::class,
-            EventWaitPointHandler::class,
-            ConditionPointHandler::class,
-            BranchEvaluatePointHandler::class,
-        ], 'flow_routes.point_handlers');
+        $this->app->tag($this->pointHandlers(), 'flow_routes.point_handlers');
 
         $this->app->singleton(PointHandlerRegistry::class, function ($app) {
             return new PointHandlerRegistry(
@@ -57,9 +54,29 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
         $this->registerOptionalTaskListeners();
     }
 
+    /**
+     * @return array<int, class-string>
+     */
+    private function pointHandlers(): array
+    {
+        $handlers = [
+            NoopPointHandler::class,
+            WaitPointHandler::class,
+            EventWaitPointHandler::class,
+            ConditionPointHandler::class,
+            BranchEvaluatePointHandler::class,
+        ];
+
+        if ($this->tasksAvailable()) {
+            $handlers[] = CreateTaskPointHandler::class;
+        }
+
+        return $handlers;
+    }
+
     private function registerOptionalTaskListeners(): void
     {
-        if (function_exists('module_enabled') && ! module_enabled('tasks')) {
+        if (! $this->tasksAvailable()) {
             return;
         }
 
@@ -71,5 +88,14 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
             self::TASK_COMPLETED_EVENT,
             ResumeFlowRouteProgressWhenTaskCompleted::class,
         );
+    }
+
+    private function tasksAvailable(): bool
+    {
+        if (function_exists('module_enabled') && ! module_enabled('tasks')) {
+            return false;
+        }
+
+        return class_exists(self::CREATE_TASK_ACTION);
     }
 }

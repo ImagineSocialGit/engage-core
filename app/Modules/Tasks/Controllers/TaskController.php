@@ -4,7 +4,7 @@ namespace App\Modules\Tasks\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Models\Contact;
-use App\Modules\Tasks\Actions\CreateManualTaskAction;
+use App\Modules\Tasks\Actions\CreateTaskAction;
 use App\Modules\Tasks\Actions\NotifyAssignedTaskRecipientsAction;
 use App\Modules\Tasks\Events\TaskCompleted;
 use App\Modules\Tasks\Models\Task;
@@ -16,11 +16,13 @@ class TaskController extends Controller
 {
     public function store(
         StoreTaskRequest $request,
-        CreateManualTaskAction $createManualTask,
+        CreateTaskAction $createTask,
         NotifyAssignedTaskRecipientsAction $notifyAssignedTaskRecipients,
     ): RedirectResponse {
-        $task = $createManualTask->handle(
-            data: $request->validated(),
+        $task = $createTask->handle(
+            data: array_replace($request->validated(), [
+                'source' => Task::SOURCE_MANUAL,
+            ]),
         );
 
         if ($request->boolean('notify_assignee')) {
