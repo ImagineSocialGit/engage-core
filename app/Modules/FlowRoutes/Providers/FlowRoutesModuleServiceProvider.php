@@ -6,6 +6,7 @@ use App\Modules\FlowRoutes\ConditionEvaluators\FlowRouteDataConditionEvaluator;
 use App\Modules\FlowRoutes\Listeners\HandleContactWorkflowStatusChanged;
 use App\Modules\FlowRoutes\Listeners\ResumeFlowRouteProgressWhenTaskCompleted;
 use App\Modules\FlowRoutes\PointHandlers\BranchEvaluatePointHandler;
+use App\Modules\FlowRoutes\PointHandlers\CancelCampaignPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\ChangeStatusPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\ConditionPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\CreateTaskPointHandler;
@@ -29,6 +30,8 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
     private const DISPATCH_MESSAGE_ACTION = 'App\\Modules\\Messaging\\Actions\\DispatchMessageAction';
 
     private const ENROLL_CONTACT_IN_CAMPAIGN_ACTION = 'App\\Modules\\Campaigns\\Actions\\EnrollContactInCampaignAction';
+
+    private const CANCEL_CAMPAIGN_ENROLLMENT_ACTION = 'App\\Modules\\Campaigns\\Actions\\CancelCampaignEnrollmentAction';
 
     public function register(): void
     {
@@ -83,8 +86,12 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
             $handlers[] = SendMessagePointHandler::class;
         }
 
-        if ($this->campaignsAvailable()) {
+        if ($this->campaignEnrollmentAvailable()) {
             $handlers[] = EnrollCampaignPointHandler::class;
+        }
+
+        if ($this->campaignCancellationAvailable()) {
+            $handlers[] = CancelCampaignPointHandler::class;
         }
 
         return $handlers;
@@ -124,12 +131,26 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
         return class_exists(self::DISPATCH_MESSAGE_ACTION);
     }
 
-    private function campaignsAvailable(): bool
+    private function campaignsModuleEnabled(): bool
     {
-        if (function_exists('module_enabled') && ! module_enabled('campaigns')) {
+        return ! function_exists('module_enabled') || module_enabled('campaigns');
+    }
+
+    private function campaignEnrollmentAvailable(): bool
+    {
+        if (! $this->campaignsModuleEnabled()) {
             return false;
         }
 
         return class_exists(self::ENROLL_CONTACT_IN_CAMPAIGN_ACTION);
+    }
+
+    private function campaignCancellationAvailable(): bool
+    {
+        if (! $this->campaignsModuleEnabled()) {
+            return false;
+        }
+
+        return class_exists(self::CANCEL_CAMPAIGN_ENROLLMENT_ACTION);
     }
 }

@@ -19,4 +19,22 @@ class SkipScheduledMessagesAction
                 'failure_reason' => $reason,
             ]);
     }
+
+    public function forMetaValue(string $key, mixed $value, ?string $reason = null): int
+    {
+        $key = trim($key);
+
+        if ($key === '') {
+            return 0;
+        }
+
+        return ScheduledMessage::query()
+            ->where('meta->'.$key, $value)
+            ->where('status', ScheduledMessage::STATUS_PENDING)
+            ->update([
+                'status' => ScheduledMessage::STATUS_SKIPPED,
+                'skipped_at' => now(),
+                'failure_reason' => $reason,
+            ]);
+    }
 }
