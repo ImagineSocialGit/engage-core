@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Broadcasts;
 
-use App\Modules\Campaigns\Models\Broadcast;
-use App\Modules\Campaigns\Models\BroadcastRecipient;
+use App\Modules\Broadcasts\Models\Broadcast;
+use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Models\User;

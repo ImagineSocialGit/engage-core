@@ -1,6 +1,6 @@
 <?php
 
-use App\Modules\Campaigns\Models\Broadcast;
+use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Core\Models\Contact;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;

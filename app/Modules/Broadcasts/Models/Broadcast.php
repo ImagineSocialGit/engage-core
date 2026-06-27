@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Campaigns\Models;
+namespace App\Modules\Broadcasts\Models;
 
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Database\Factories\BroadcastFactory;

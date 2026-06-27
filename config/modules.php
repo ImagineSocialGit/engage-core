@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Broadcasts\Providers\BroadcastsModuleServiceProvider;
 use App\Modules\Campaigns\Providers\CampaignsModuleServiceProvider;
 use App\Modules\Core\Providers\CoreModuleServiceProvider;
 use App\Modules\FlowRoutes\Providers\FlowRoutesModuleServiceProvider;
@@ -28,7 +29,7 @@ return [
         'trim',
         explode(',', env(
             'ENABLED_MODULES',
-            'tasks,workflow,flow_routes,messaging,inbound_messaging,internal_notifications,campaigns,webinars,integrations,reporting'
+            'tasks,workflow,flow_routes,messaging,inbound_messaging,internal_notifications,campaigns,broadcasts,webinars,integrations,reporting'
         ))
     )),
 
@@ -96,6 +97,14 @@ return [
             'depends_on' => ['messaging'],
             'providers' => [
                 CampaignsModuleServiceProvider::class,
+            ],
+        ],
+
+        'broadcasts' => [
+            'name' => 'Broadcasts',
+            'depends_on' => ['messaging'],
+            'providers' => [
+                BroadcastsModuleServiceProvider::class,
             ],
         ],
 
