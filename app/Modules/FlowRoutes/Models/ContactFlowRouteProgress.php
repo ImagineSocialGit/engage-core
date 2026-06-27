@@ -197,6 +197,29 @@ class ContactFlowRouteProgress extends Model
         return is_numeric($flowRoutePointId) ? (int) $flowRoutePointId : null;
     }
 
+    public function waitingExpectedEvent(): ?string
+    {
+        $expectedEvent = $this->waitingState()['expected_event'] ?? null;
+
+        if (! is_string($expectedEvent)) {
+            return null;
+        }
+
+        $expectedEvent = trim($expectedEvent);
+
+        return $expectedEvent !== '' ? $expectedEvent : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function waitingCorrelation(): array
+    {
+        $correlation = $this->waitingState()['correlation'] ?? [];
+
+        return is_array($correlation) ? $correlation : [];
+    }
+
     public function waitingResumeAt(): ?CarbonImmutable
     {
         $resumeAt = $this->waitingState()['resume_at'] ?? null;

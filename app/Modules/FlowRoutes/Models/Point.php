@@ -13,6 +13,7 @@ class Point extends Model
 
     public const TYPE_NOOP = 'noop';
     public const TYPE_WAIT = 'wait';
+    public const TYPE_EVENT_WAIT = 'event_wait';
     public const TYPE_CONDITION = 'condition';
     public const TYPE_CHANGE_STATUS = 'change_status';
     public const TYPE_CREATE_TASK = 'create_task';
@@ -25,6 +26,7 @@ class Point extends Model
     public const TYPES = [
         self::TYPE_NOOP,
         self::TYPE_WAIT,
+        self::TYPE_EVENT_WAIT,
         self::TYPE_CONDITION,
         self::TYPE_CHANGE_STATUS,
         self::TYPE_CREATE_TASK,
