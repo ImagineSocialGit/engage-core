@@ -2,8 +2,8 @@
 
 namespace App\Modules\FlowRoutes\Contracts;
 
-use App\Modules\FlowRoutes\Data\PointExecutionContext;
-use App\Modules\FlowRoutes\Data\PointExecutionResult;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 
 interface PointHandler
 {

@@ -4,7 +4,7 @@ namespace App\Modules\FlowRoutes\ConditionEvaluators;
 
 use App\Modules\FlowRoutes\Contracts\FlowRouteConditionEvaluator;
 use App\Modules\FlowRoutes\Data\FlowRouteConditionEvaluation;
-use App\Modules\FlowRoutes\Data\PointExecutionContext;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;

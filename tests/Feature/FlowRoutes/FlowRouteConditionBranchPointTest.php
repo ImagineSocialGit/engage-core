@@ -5,7 +5,7 @@ namespace Tests\Feature\FlowRoutes;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\FlowRoutes\Actions\ExecuteCurrentFlowRoutePointAction;
-use App\Modules\FlowRoutes\Data\PointExecutionResult;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\FlowRoutes\Data;
+namespace App\Modules\FlowRoutes\Data\Events;
 
 class FlowRouteExternalEventResumeResult
 {

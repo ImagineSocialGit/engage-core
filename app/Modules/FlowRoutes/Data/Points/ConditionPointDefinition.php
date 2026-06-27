@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Modules\FlowRoutes\Data;
+namespace App\Modules\FlowRoutes\Data\Points;
 
-use App\Modules\FlowRoutes\Data\PointExecutionResult;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 
 class ConditionPointDefinition
 {

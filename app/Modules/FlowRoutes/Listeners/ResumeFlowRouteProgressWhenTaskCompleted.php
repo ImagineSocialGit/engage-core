@@ -4,7 +4,7 @@ namespace App\Modules\FlowRoutes\Listeners;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\FlowRoutes\Actions\ResumeFlowRouteProgressFromEventAction;
-use App\Modules\FlowRoutes\Data\FlowRouteExternalEvent;
+use App\Modules\FlowRoutes\Data\Events\FlowRouteExternalEvent;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 

@@ -3,8 +3,8 @@
 namespace App\Modules\FlowRoutes\PointHandlers;
 
 use App\Modules\FlowRoutes\Contracts\PointHandler;
-use App\Modules\FlowRoutes\Data\PointExecutionContext;
-use App\Modules\FlowRoutes\Data\PointExecutionResult;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Models\Point;
 
 class NoopPointHandler implements PointHandler

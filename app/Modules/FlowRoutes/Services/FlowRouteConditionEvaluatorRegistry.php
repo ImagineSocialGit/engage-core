@@ -3,9 +3,9 @@
 namespace App\Modules\FlowRoutes\Services;
 
 use App\Modules\FlowRoutes\Contracts\FlowRouteConditionEvaluator;
-use App\Modules\FlowRoutes\Data\ConditionPointDefinition;
+use App\Modules\FlowRoutes\Data\Points\ConditionPointDefinition;
 use App\Modules\FlowRoutes\Data\FlowRouteConditionEvaluation;
-use App\Modules\FlowRoutes\Data\PointExecutionContext;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
 
 class FlowRouteConditionEvaluatorRegistry
 {

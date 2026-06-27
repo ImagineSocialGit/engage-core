@@ -2,8 +2,8 @@
 
 namespace App\Modules\FlowRoutes\Actions;
 
-use App\Modules\FlowRoutes\Data\PointExecutionContext;
-use App\Modules\FlowRoutes\Data\PointExecutionResult;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;

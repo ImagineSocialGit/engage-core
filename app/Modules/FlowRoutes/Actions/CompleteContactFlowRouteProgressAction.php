@@ -2,7 +2,7 @@
 
 namespace App\Modules\FlowRoutes\Actions;
 
-use App\Modules\FlowRoutes\Data\PointExecutionResult;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use Illuminate\Support\Carbon;
 

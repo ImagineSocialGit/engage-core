@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\FlowRoutes\Data;
+namespace App\Modules\FlowRoutes\Data\Events;
 
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;

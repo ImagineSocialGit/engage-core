@@ -4,9 +4,9 @@ namespace App\Modules\FlowRoutes\PointHandlers;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\FlowRoutes\Contracts\PointHandler;
-use App\Modules\FlowRoutes\Data\CreateTaskPointDefinition;
-use App\Modules\FlowRoutes\Data\PointExecutionContext;
-use App\Modules\FlowRoutes\Data\PointExecutionResult;
+use App\Modules\FlowRoutes\Data\Points\CreateTaskPointDefinition;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Models\Point;
 use App\Modules\Tasks\Actions\CreateTaskAction;
 use App\Modules\Tasks\Models\Task;

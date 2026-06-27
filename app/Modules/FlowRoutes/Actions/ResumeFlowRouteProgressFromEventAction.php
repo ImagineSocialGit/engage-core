@@ -2,9 +2,9 @@
 
 namespace App\Modules\FlowRoutes\Actions;
 
-use App\Modules\FlowRoutes\Data\FlowRouteExternalEvent;
-use App\Modules\FlowRoutes\Data\FlowRouteExternalEventResumeResult;
-use App\Modules\FlowRoutes\Data\PointExecutionResult;
+use App\Modules\FlowRoutes\Data\Events\FlowRouteExternalEvent;
+use App\Modules\FlowRoutes\Data\Events\FlowRouteExternalEventResumeResult;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use Illuminate\Support\Facades\DB;
 
