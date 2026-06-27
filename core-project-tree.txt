@@ -327,6 +327,7 @@
 │   │   │   │   ├── ContactMortgageProfile.php
 │   │   │   │   └── MortgageStage.php
 │   │   │   ├── Providers
+│   │   │   │   └── MortgageModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   └── Support
 │   │   ├── Reporting
@@ -906,4 +907,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-320 directories, 587 files
+320 directories, 588 files

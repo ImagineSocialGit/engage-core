@@ -28,8 +28,6 @@ class WebinarRegistration extends Model
         'webinar_slug',
         'status',
         'source',
-        'ip_address',
-        'user_agent',
         'meta',
         'registered_at',
         'attended_at',

@@ -34,9 +34,28 @@ class ModuleDependencyBoundaryTest extends TestCase
         );
     }
 
+    public function test_installed_modules_are_registered_in_module_config(): void
+    {
+        $registered = array_keys(config('modules.modules', []));
+
+        $this->assertContains('core', $registered);
+        $this->assertContains('messaging', $registered);
+        $this->assertContains('inbound_messaging', $registered);
+        $this->assertContains('internal_notifications', $registered);
+        $this->assertContains('tasks', $registered);
+        $this->assertContains('workflow', $registered);
+        $this->assertContains('flow_routes', $registered);
+        $this->assertContains('campaigns', $registered);
+        $this->assertContains('broadcasts', $registered);
+        $this->assertContains('webinars', $registered);
+        $this->assertContains('mortgage', $registered);
+        $this->assertContains('reporting', $registered);
+    }
+
     public function test_messaging_module_does_not_import_feature_modules(): void
     {
         $this->assertModuleDoesNotImport('Messaging', [
+            'Broadcasts',
             'Campaigns',
             'FlowRoutes',
             'InboundMessaging',
@@ -59,6 +78,7 @@ class ModuleDependencyBoundaryTest extends TestCase
     public function test_core_module_does_not_import_feature_modules(): void
     {
         $this->assertModuleDoesNotImport('Core', [
+            'Broadcasts',
             'Campaigns',
             'FlowRoutes',
             'InboundMessaging',
@@ -68,6 +88,44 @@ class ModuleDependencyBoundaryTest extends TestCase
             'Reporting',
             'Tasks',
             'Webinars',
+            'Workflow',
+        ]);
+    }
+
+    public function test_workflow_module_does_not_import_flow_routes(): void
+    {
+        $this->assertModuleDoesNotImport('Workflow', [
+            'FlowRoutes',
+        ]);
+    }
+
+    public function test_campaigns_and_broadcasts_remain_separate(): void
+    {
+        $this->assertModuleDoesNotImport('Campaigns', [
+            'Broadcasts',
+            'FlowRoutes',
+            'Mortgage',
+            'Webinars',
+            'Workflow',
+        ]);
+
+        $this->assertModuleDoesNotImport('Broadcasts', [
+            'Campaigns',
+            'FlowRoutes',
+            'Mortgage',
+            'Webinars',
+            'Workflow',
+        ]);
+    }
+
+    public function test_webinars_does_not_own_route_or_campaign_orchestration(): void
+    {
+        $this->assertModuleDoesNotImport('Webinars', [
+            'Broadcasts',
+            'Campaigns',
+            'FlowRoutes',
+            'Mortgage',
+            'Workflow',
         ]);
     }
 

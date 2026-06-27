@@ -7,6 +7,7 @@ use App\Modules\FlowRoutes\Providers\FlowRoutesModuleServiceProvider;
 use App\Modules\InboundMessaging\Providers\InboundMessagingModuleServiceProvider;
 use App\Modules\InternalNotifications\Providers\InternalNotificationsModuleServiceProvider;
 use App\Modules\Messaging\Providers\MessagingModuleServiceProvider;
+use App\Modules\Mortgage\Providers\MortgageModuleServiceProvider;
 use App\Modules\Reporting\Providers\ReportingModuleServiceProvider;
 use App\Modules\Tasks\Providers\TasksModuleServiceProvider;
 use App\Modules\Webinars\Providers\WebinarsModuleServiceProvider;
@@ -54,7 +55,7 @@ return [
 
         'inbound_messaging' => [
             'name' => 'Inbound Messaging',
-            'depends_on' => ['messaging'],
+            'depends_on' => ['core', 'messaging'],
             'providers' => [
                 InboundMessagingModuleServiceProvider::class,
             ],
@@ -94,7 +95,7 @@ return [
 
         'campaigns' => [
             'name' => 'Campaigns',
-            'depends_on' => ['messaging'],
+            'depends_on' => ['core', 'messaging'],
             'providers' => [
                 CampaignsModuleServiceProvider::class,
             ],
@@ -102,7 +103,7 @@ return [
 
         'broadcasts' => [
             'name' => 'Broadcasts',
-            'depends_on' => ['messaging'],
+            'depends_on' => ['core', 'messaging'],
             'providers' => [
                 BroadcastsModuleServiceProvider::class,
             ],
@@ -113,6 +114,14 @@ return [
             'depends_on' => ['core', 'messaging'],
             'providers' => [
                 WebinarsModuleServiceProvider::class,
+            ],
+        ],
+
+        'mortgage' => [
+            'name' => 'Mortgage',
+            'depends_on' => ['core'],
+            'providers' => [
+                MortgageModuleServiceProvider::class,
             ],
         ],
 

@@ -131,6 +131,7 @@ return [
                     'campaigns',
                     'broadcasts',
                     'webinars',
+                    'mortgage',
                     'integrations',
                     'reporting',
                 ],

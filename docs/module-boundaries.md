@@ -98,6 +98,63 @@ Vertical setup:
 
 Vertical migrations should only run when that vertical is explicitly installed.
 
+## Schema Ownership Freeze
+
+Before client rollout, each existing table should have exactly one owning layer.
+
+Current ownership:
+
+| Table | Owner |
+| --- | --- |
+| users | App-global auth |
+| cache | App-global infrastructure |
+| jobs | App-global infrastructure |
+| contacts | Core |
+| contact_statuses | Core |
+| contact_tags | Core |
+| notes | Core |
+| team_members | InternalNotifications |
+| team_member_notification_preferences | InternalNotifications |
+| contact_workflow_profiles | Workflow |
+| flow_routes | FlowRoutes |
+| points | FlowRoutes |
+| flow_route_points | FlowRoutes |
+| contact_flow_route_progress | FlowRoutes |
+| tasks | Tasks |
+| message_consents | Messaging |
+| consent_revocations | Messaging |
+| scheduled_messages | Messaging |
+| message_suppressions | Messaging |
+| inbound_messages | InboundMessaging |
+| campaigns | Campaigns |
+| campaign_steps | Campaigns |
+| campaign_enrollments | Campaigns |
+| broadcasts | Broadcasts |
+| broadcast_recipients | Broadcasts |
+| webinar_series | Webinars |
+| webinars | Webinars |
+| webinar_registrations | Webinars |
+| webinar_waitlist_signups | Webinars |
+| mortgage_stages | Mortgage |
+| contact_mortgage_profiles | Mortgage |
+
+Core schema freeze target:
+
+- contacts
+- contact_statuses
+- contact_tags
+- notes
+
+App-global schema:
+
+- users
+- cache
+- jobs
+
+Everything else belongs to a first-party module, vertical module, or app-global infrastructure.
+
+A table should not move ownership after client rollout unless there is a clear architectural mistake.
+
 ## Current Module Layout
 
 Primary application modules live under:
@@ -162,6 +219,9 @@ Accepted dependency direction:
 - InternalNotifications -> Messaging
 - InternalNotifications may conditionally integrate with InboundMessaging through events/listeners
 - Mortgage may consume Core, Workflow, FlowRoutes, Tasks, Messaging, Campaigns, Broadcasts, Webinars, Reporting, and Integrations as needed
+- Messaging may use Integrations through provider contracts/managers
+- Webinars may use Integrations through provider contracts/managers
+- Mortgage may use Integrations through provider contracts/managers
 
 Avoid:
 
@@ -191,6 +251,7 @@ Avoid:
 - Webinars -> FlowRoutes unless through public events/listeners or explicitly documented integration
 - lower-level shared modules importing higher-level feature modules
 - circular dependencies
+- Integrations -> feature modules
 
 ## Core Module
 
@@ -317,6 +378,16 @@ Current Messaging extension points include:
 - `MessageRecipientPayloadProvider`
 - `MessageRecipientPayloadProviderRegistry`
 
+Messaging consent records are currently Contact-scoped.
+
+That is intentional for external contact messaging consent.
+
+Internal team notification preferences belong to InternalNotifications, not Messaging.
+
+Generic recipient support for scheduled delivery lives in `scheduled_messages.recipient_type` / `scheduled_messages.recipient_id`.
+
+Messaging may schedule messages for non-Contact recipients through recipient payload/gate extension points, but it should not own those recipient models or their preferences.
+
 ## InboundMessaging Module
 
 InboundMessaging is a reusable capability module.
@@ -357,6 +428,12 @@ Instead:
 3. InternalNotifications may conditionally listen to that event and schedule internal alerts.
 
 InboundMessaging must not import InternalNotifications.
+
+InboundMessaging may use Messaging-owned channel and purpose concepts when classifying inbound messages.
+
+That dependency is acceptable because InboundMessaging depends on Messaging.
+
+Inbound message records should remain generic and should not store internal notification routing state.
 
 ## InternalNotifications Module
 
@@ -583,6 +660,17 @@ Bad:
     ScheduledMessage::create(...)
     CampaignEnrollment::create(...)
 
+`contact_flow_route_progress` may store denormalized `contact_id` and `contact_status_id` values for query/runtime convenience.
+
+Those fields do not make FlowRoutes the owner of Contact or ContactStatus.
+
+Canonical ownership remains:
+
+- Contact belongs to Core.
+- ContactStatus belongs to Core.
+- ContactWorkflowProfile belongs to Workflow.
+- ContactFlowRouteProgress belongs to FlowRoutes.
+
 ## Campaigns Module
 
 Campaigns is optional.
@@ -687,6 +775,18 @@ Bad:
     FlowRoutes mutates CampaignEnrollment internals directly
     Webinars creates CampaignEnrollment records directly
 
+Campaign enrollments may reference Messaging-owned `scheduled_messages` through `last_scheduled_message_id`.
+
+That reference is acceptable because Campaigns depends on Messaging.
+
+Campaigns still should schedule/skip delivery through Messaging public actions instead of directly mutating scheduled message lifecycle internals.
+
+`campaign_enrollments.source_type` / `source_id` may point to another module as enrollment context.
+
+That does not make Campaigns depend on the source module.
+
+Campaigns should treat source morphs as context unless an explicit public integration is introduced.
+
 ## Broadcasts Module
 
 Broadcasts is optional.
@@ -739,6 +839,14 @@ Broadcasts should not depend on Campaigns.
 
 Campaigns should not depend on Broadcasts.
 
+Broadcasts may reference Messaging-owned scheduled messages for bookkeeping and visibility.
+
+That reference is acceptable because Broadcasts depends on Messaging.
+
+Broadcasts should still send or schedule through Messaging public actions/services.
+
+`broadcast_recipients.scheduled_message_ids` is broadcast bookkeeping, not ownership of scheduled delivery infrastructure.
+
 ## Webinars Module
 
 Webinars is optional.
@@ -789,6 +897,14 @@ Bad:
     CampaignEnrollment::create(...)
     ScheduledMessage::create(...)
     Webinars directly deciding Campaign route orchestration
+
+Webinar registration records should store webinar participation state, registration source, join token, and webinar-specific metadata.
+
+Consent audit details such as IP address, user agent, opt-in language, and opt-in timestamp belong to Messaging consent records, not Webinar registration records.
+
+Webinar outcome fields such as `registered_at`, `attended_at`, and `cancelled_at` belong to Webinars.
+
+Those outcome fields should later be mapped into FlowRoutes external events, but Webinars should not decide Campaign, Workflow, task, or FlowRoute orchestration directly.
 
 ## Reporting Module
 
@@ -984,19 +1100,99 @@ A whitelist should only be used for a deliberate, documented exception.
 
 ## Current Implementation Direction
 
-The current architecture is approaching client-rollout schema freeze.
+The current architecture is entering client-rollout schema freeze.
 
 Recommended next implementation order:
 
-1. Complete schema/module freeze pass.
-2. Confirm Core remains minimal and owns only universal CRM primitives.
-3. Confirm each existing table/model has one clear owning module.
-4. Keep Broadcasts separate from Campaigns.
-5. Wire webinar outcomes into FlowRoutes external events.
-6. Add default MVP presets for webinar registration, attended, missed/no-show, nurture Campaigns, and internal follow-up tasks.
-7. Verify task creation and task digest behavior from real FlowRoute-created tasks.
-8. Add minimal contact visibility/debug surfaces for current status, FlowRoute progress, Campaign enrollments, scheduled messages, and tasks.
+1. Phase 17 — Schema/module freeze pass
+2. Phase 18 — Webinar outcome to FlowRoutes external events
+3. Phase 19 — Default MVP presets
+4. Phase 20 — Tasks and digest verification
+5. Phase 21 — Minimal contact visibility/debug
+6. Phase 22 — Client MVP smoke test
 
-Do not add builders/editors until the preset-driven MVP path works end-to-end.
+### Phase 17 — Schema/module freeze pass
 
-The goal is to keep Core stable, module schemas owned, and future client/vertical work additive instead of foundational.
+Confirm Core stays minimal.
+
+Confirm every existing table belongs clearly to one owner:
+
+- Core
+- app-global auth/infrastructure
+- reusable first-party module
+- vertical module
+
+Confirm model namespaces match table ownership.
+
+Confirm `config/modules.php` dependency direction is final enough for rollout.
+
+Confirm `config/presets.php` module selections align with ownership.
+
+Update boundary docs and boundary tests only where they protect final dependency direction.
+
+Do not add product features, admin UI, or migrations unless the audit reveals a clear ownership mistake.
+
+### Phase 18 — Webinar outcome to FlowRoutes external events
+
+Map webinar registered, attended, missed, and cancelled outcomes into `FlowRouteExternalEvent`.
+
+Remove any remaining direct Webinars to Campaigns or Workflow-style orchestration.
+
+Webinars should record webinar state and expose/emit outcome events.
+
+FlowRoutes should decide reactions through:
+
+- `event_wait`
+- `enroll_campaign`
+- `cancel_campaign`
+- `create_task`
+- `change_status`
+- `send_message`
+
+### Phase 19 — Default MVP presets
+
+Add MVP preset definitions for:
+
+- webinar registration/default follow-up path
+- attended path
+- missed/no-show path
+- long-term nurture Campaign
+- internal follow-up task path
+
+Runtime behavior should remain DB-driven through preset sync.
+
+Preset config should only create/update DB-owned definitions.
+
+### Phase 20 — Tasks and digest verification
+
+Confirm FlowRoutes-created tasks are assigned correctly.
+
+Confirm daily and weekly digests include those tasks.
+
+Confirm TeamMember notification preferences and gates work.
+
+Confirm the email digest path works end-to-end.
+
+### Phase 21 — Minimal contact visibility/debug
+
+Add read-only contact visibility for:
+
+- current status/workflow profile
+- active/recent FlowRoute progress
+- Campaign enrollments
+- scheduled messages
+- tasks
+
+Do not add builders or editors.
+
+### Phase 22 — Client MVP smoke test
+
+Verify the real MVP path:
+
+1. Register for webinar.
+2. Simulate provider attendance or missed outcome.
+3. Confirm status/event routing.
+4. Confirm FlowRoute progress.
+5. Confirm Campaign enrollment/cancellation.
+6. Confirm scheduled messages.
+7. Confirm task creation/digest.
