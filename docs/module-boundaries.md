@@ -114,6 +114,7 @@ Current modules include:
 - `Workflow`
 - `FlowRoutes`
 - `Campaigns`
+- `Broadcasts`
 - `Webinars`
 - `Reporting`
 - `Mortgage`
@@ -147,15 +148,20 @@ Accepted dependency direction:
 - Webinars -> Messaging
 - Campaigns -> Core
 - Campaigns -> Messaging
+- Broadcasts -> Core
+- Broadcasts -> Messaging
 - Tasks -> Core
+- Tasks may use InternalNotifications and Messaging through public actions/services/contracts
 - Workflow -> Core
 - FlowRoutes -> Workflow
-- FlowRoutes may later use Tasks through public task-facing contracts/services
+- FlowRoutes may optionally use Tasks through public task actions/services when Tasks is enabled
+- FlowRoutes may optionally use Messaging through public message actions/services when Messaging is enabled
+- FlowRoutes may optionally use Campaigns through public campaign actions/services when Campaigns is enabled
 - InboundMessaging -> Core
 - InboundMessaging -> Messaging
 - InternalNotifications -> Messaging
 - InternalNotifications may conditionally integrate with InboundMessaging through events/listeners
-- Mortgage may consume Core, Workflow, FlowRoutes, Tasks, Messaging, Campaigns, Webinars, and Integrations as needed
+- Mortgage may consume Core, Workflow, FlowRoutes, Tasks, Messaging, Campaigns, Broadcasts, Webinars, Reporting, and Integrations as needed
 
 Avoid:
 
@@ -166,16 +172,23 @@ Avoid:
 - Core -> Tasks
 - Core -> Webinars
 - Core -> Campaigns
+- Core -> Broadcasts
 - Core -> FlowRoutes
 - Core -> Mortgage
 - Messaging -> InternalNotifications
 - Messaging -> InboundMessaging
 - Messaging -> Webinars
 - Messaging -> Campaigns
+- Messaging -> Broadcasts
 - Messaging -> FlowRoutes
 - Messaging -> Tasks
 - InboundMessaging -> InternalNotifications
 - Workflow -> FlowRoutes
+- Campaigns -> FlowRoutes
+- Campaigns -> Webinars
+- Campaigns -> Broadcasts
+- Broadcasts -> Campaigns
+- Webinars -> FlowRoutes unless through public events/listeners or explicitly documented integration
 - lower-level shared modules importing higher-level feature modules
 - circular dependencies
 
@@ -482,18 +495,23 @@ FlowRoutes owns:
 - `FlowRoute`
 - `FlowRoutePoint`
 - `Point`
+- `ContactFlowRouteProgress`
 - route/point automation behavior
-- active route execution state later
-- route cancellation behavior later
-- point execution behavior later
+- active route execution state
+- route cancellation/superseding behavior
+- point execution behavior
+- wait/resume behavior
+- condition/branch evaluation behavior
+- external event wait/resume behavior
+- FlowRoute preset sync
 
 FlowRoutes depends on Workflow.
 
-FlowRoutes should react to Workflow status/profile events.
+FlowRoutes reacts to Workflow status/profile events.
 
 Core should not call FlowRoutes.
 
-Workflow should not call FlowRoutes.
+Workflow should not call FlowRoutes directly.
 
 Expected direction:
 
@@ -501,7 +519,7 @@ Expected direction:
 2. Workflow records the change.
 3. Workflow emits an event.
 4. FlowRoutes listens/reacts.
-5. FlowRoutes cancels active route progress if needed.
+5. FlowRoutes supersedes active route progress if needed.
 6. FlowRoutes evaluates whether the new ContactStatus has a FlowRoute.
 7. FlowRoutes starts or advances route execution if appropriate.
 
@@ -510,12 +528,14 @@ Current tables/models:
     flow_routes
     points
     flow_route_points
+    contact_flow_route_progress
 
 Current models:
 
     FlowRoute
     Point
     FlowRoutePoint
+    ContactFlowRouteProgress
 
 A `ContactStatus` may have at most one active FlowRoute.
 
@@ -524,44 +544,112 @@ Runtime meaning:
     ContactStatus has one FlowRoute
     FlowRoute has many FlowRoutePoints
     FlowRoutePoint belongs to Point
+    ContactFlowRouteProgress records active/waiting/completed/cancelled execution state
 
-Generated tasks or scheduled work should snapshot relevant cancellation/condition rules so later route/point edits do not mutate history.
+FlowRoutes runtime behavior should read DB-owned route/point definitions.
 
-FlowRoutes may later use Tasks through public task-facing services/contracts.
+Preset config may create/update DB-owned FlowRoute definitions, but runtime execution should not depend directly on config definitions.
 
-FlowRoutes may later use Messaging through public Messaging actions/services if route points send messages.
+Current point handler capabilities include:
+
+- noop
+- wait
+- condition
+- branch_evaluate
+- event_wait
+- create_task
+- send_message
+- change_status
+- enroll_campaign
+- cancel_campaign
+
+FlowRoutes may use Tasks only through public task-facing services/actions.
+
+FlowRoutes may use Messaging only through public Messaging actions/services.
+
+FlowRoutes may use Campaigns only through public Campaigns actions/services.
+
+Good:
+
+    CreateTaskAction
+    DispatchMessageAction
+    TransitionContactWorkflowStatusAction
+    EnrollContactInCampaignAction
+    CancelCampaignEnrollmentAction
+
+Bad:
+
+    Task::create(...)
+    ScheduledMessage::create(...)
+    CampaignEnrollment::create(...)
 
 ## Campaigns Module
 
 Campaigns is optional.
 
+Campaigns owns enrolled, multi-step campaign journeys.
+
 Campaigns owns:
+
+- campaigns
+- campaign steps
+- campaign enrollments
+- campaign enrollment lifecycle
+- campaign progression
+- campaign cancellation/exit behavior
+- campaign preset sync
+- campaign step scheduling behavior
+- campaign listeners
+- campaign-specific metadata
+- campaign conditions/segments later
+
+Campaigns does not own:
 
 - broadcasts
 - broadcast recipients
-- campaigns
-- campaign enrollments
-- campaign step scheduling behavior
-- campaign listeners
-- segments/conditions later
-- newsletters later
-- announcement-style sends later
+- one-time/batch sends
+- outbound delivery infrastructure
+- scheduled message infrastructure
+- webinar registrations
+- FlowRoutes
+- Workflow status/profile state
+
+Broadcasts belong to the Broadcasts module.
+
+Messaging owns scheduled/outbound message infrastructure.
 
 Campaigns may depend on:
 
 - Core
 - Messaging
 
-Campaigns may use Messaging to send messages.
+Campaigns may schedule messages through Messaging public actions.
 
-Campaigns should not directly depend on Workflow status, Webinar conversion, or Mortgage stages unless those relationships are introduced through explicit public APIs/events/resolvers.
+Campaigns should not directly depend on Workflow status, Webinar outcomes, FlowRoute progress, Mortgage stages, or Broadcast behavior unless those relationships are introduced through explicit public APIs/events/resolvers.
 
-Use generic fields such as:
+Runtime Campaign behavior should read DB-owned Campaign and CampaignStep definitions.
+
+Preset config may create/update DB-owned Campaign definitions, but runtime Campaign execution should not depend directly on config definitions.
+
+Current tables/models:
+
+    campaigns
+    campaign_steps
+    campaign_enrollments
+
+Current models:
+
+    Campaign
+    CampaignStep
+    CampaignEnrollment
+
+Use generic lifecycle fields such as:
 
     start_context
     exit_conditions
     exited_at
     exit_reason
+    meta
 
 Example start context:
 
@@ -583,9 +671,73 @@ Future condition checks should move behind a resolver such as:
 
 Good:
 
+    DispatchMessageAction
     ScheduleMessageAction
+    SkipScheduledMessagesAction
 
 Avoid direct ScheduledMessage creation from Campaigns unless explicitly documented.
+
+Good:
+
+    Campaigns owns CancelCampaignEnrollmentAction
+    FlowRoutes calls CancelCampaignEnrollmentAction
+
+Bad:
+
+    FlowRoutes mutates CampaignEnrollment internals directly
+    Webinars creates CampaignEnrollment records directly
+
+## Broadcasts Module
+
+Broadcasts is optional.
+
+Broadcasts owns one-time and batch audience sends.
+
+Broadcasts owns:
+
+- broadcasts
+- broadcast recipients
+- broadcast audience metadata
+- broadcast recipient state
+- broadcast scheduling/orchestration behavior later
+- broadcast-specific metadata
+
+Broadcasts does not own:
+
+- enrolled multi-step campaign journeys
+- campaign definitions
+- campaign steps
+- campaign enrollments
+- message delivery infrastructure
+- message consent/suppression infrastructure
+
+Campaigns and Broadcasts are separate concepts.
+
+Campaigns are enrolled, multi-step journeys with lifecycle/progression.
+
+Broadcasts are one-time or batch sends to an audience.
+
+Messaging owns scheduled/outbound message infrastructure.
+
+Broadcasts may depend on:
+
+- Core
+- Messaging
+
+Broadcasts should use Messaging public actions/services to schedule or send messages.
+
+Good:
+
+    DispatchMessageAction
+    ScheduleMessageAction
+
+Bad:
+
+    ScheduledMessage::query()->create(...)
+
+Broadcasts should not depend on Campaigns.
+
+Campaigns should not depend on Broadcasts.
 
 ## Webinars Module
 
@@ -612,24 +764,31 @@ Webinars may depend on:
 
 - Core
 - Messaging
-- Campaigns, through public Campaigns actions if post-webinar campaigns are enabled
 
 Webinars may use Messaging to send reminders/follow-ups.
 
-Webinars may trigger Campaign enrollment through public Campaigns actions.
+Webinars should not directly own Campaign enrollment routing.
+
+Preferred long-term direction:
+
+1. Webinars records webinar registration/attendance/outcome state.
+2. Webinars emits or exposes public webinar outcome events/data.
+3. FlowRoutes may listen/map those outcomes into normalized FlowRoute external events.
+4. FlowRoutes decides whether to create tasks, change status, enroll Campaigns, cancel Campaigns, or send messages.
+5. Campaigns owns Campaign enrollment/progression.
+6. Messaging owns delivery/scheduling.
 
 Good:
 
-    EnrollContactInCampaignAction
     DispatchMessageAction
     ScheduleMessageAction
+    public webinar outcome event/data object
 
 Bad:
 
     CampaignEnrollment::create(...)
     ScheduledMessage::create(...)
-
-Webinars can contribute contact page UI through Core’s contact panel extension point.
+    Webinars directly deciding Campaign route orchestration
 
 ## Reporting Module
 
@@ -825,15 +984,19 @@ A whitelist should only be used for a deliberate, documented exception.
 
 ## Current Implementation Direction
 
-The current architecture is ready for Workflow and FlowRoutes buildout.
+The current architecture is approaching client-rollout schema freeze.
 
 Recommended next implementation order:
 
-1. Strengthen Workflow-owned status/profile transition path.
-2. Emit Workflow events after profile/status changes.
-3. Keep Core independent from Workflow/FlowRoutes internals.
-4. Let FlowRoutes react to Workflow events.
-5. Add FlowRoutes route evaluation/cancellation/progression incrementally.
-6. Add task/message route point behavior only through public Tasks/Messaging APIs.
+1. Complete schema/module freeze pass.
+2. Confirm Core remains minimal and owns only universal CRM primitives.
+3. Confirm each existing table/model has one clear owning module.
+4. Keep Broadcasts separate from Campaigns.
+5. Wire webinar outcomes into FlowRoutes external events.
+6. Add default MVP presets for webinar registration, attended, missed/no-show, nurture Campaigns, and internal follow-up tasks.
+7. Verify task creation and task digest behavior from real FlowRoute-created tasks.
+8. Add minimal contact visibility/debug surfaces for current status, FlowRoute progress, Campaign enrollments, scheduled messages, and tasks.
 
-The goal is to keep module dependencies intentional, one-way, and future-proof before adding new automation behavior.
+Do not add builders/editors until the preset-driven MVP path works end-to-end.
+
+The goal is to keep Core stable, module schemas owned, and future client/vertical work additive instead of foundational.
