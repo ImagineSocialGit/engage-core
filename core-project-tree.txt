@@ -122,6 +122,7 @@
 │   │   │   │   │   ├── ChangeStatusPointDefinition.php
 │   │   │   │   │   ├── ConditionPointDefinition.php
 │   │   │   │   │   ├── CreateTaskPointDefinition.php
+│   │   │   │   │   ├── EnrollCampaignPointDefinition.php
 │   │   │   │   │   ├── EventWaitPointDefinition.php
 │   │   │   │   │   ├── PointExecutionContext.php
 │   │   │   │   │   ├── PointExecutionResult.php
@@ -147,6 +148,7 @@
 │   │   │   │   ├── ChangeStatusPointHandler.php
 │   │   │   │   ├── ConditionPointHandler.php
 │   │   │   │   ├── CreateTaskPointHandler.php
+│   │   │   │   ├── EnrollCampaignPointHandler.php
 │   │   │   │   ├── EventWaitPointHandler.php
 │   │   │   │   ├── NoopPointHandler.php
 │   │   │   │   ├── SendMessagePointHandler.php
@@ -885,4 +887,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-311 directories, 575 files
+311 directories, 577 files

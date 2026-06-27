@@ -9,6 +9,7 @@ use App\Modules\FlowRoutes\PointHandlers\BranchEvaluatePointHandler;
 use App\Modules\FlowRoutes\PointHandlers\ChangeStatusPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\ConditionPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\CreateTaskPointHandler;
+use App\Modules\FlowRoutes\PointHandlers\EnrollCampaignPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\EventWaitPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\NoopPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\SendMessagePointHandler;
@@ -26,6 +27,8 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
     private const CREATE_TASK_ACTION = 'App\\Modules\\Tasks\\Actions\\CreateTaskAction';
 
     private const DISPATCH_MESSAGE_ACTION = 'App\\Modules\\Messaging\\Actions\\DispatchMessageAction';
+
+    private const ENROLL_CONTACT_IN_CAMPAIGN_ACTION = 'App\\Modules\\Campaigns\\Actions\\EnrollContactInCampaignAction';
 
     public function register(): void
     {
@@ -80,6 +83,10 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
             $handlers[] = SendMessagePointHandler::class;
         }
 
+        if ($this->campaignsAvailable()) {
+            $handlers[] = EnrollCampaignPointHandler::class;
+        }
+
         return $handlers;
     }
 
@@ -115,5 +122,14 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
         }
 
         return class_exists(self::DISPATCH_MESSAGE_ACTION);
+    }
+
+    private function campaignsAvailable(): bool
+    {
+        if (function_exists('module_enabled') && ! module_enabled('campaigns')) {
+            return false;
+        }
+
+        return class_exists(self::ENROLL_CONTACT_IN_CAMPAIGN_ACTION);
     }
 }

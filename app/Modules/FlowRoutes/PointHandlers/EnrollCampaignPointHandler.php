@@ -1,0 +1,285 @@
+<?php
+
+namespace App\Modules\FlowRoutes\PointHandlers;
+
+use App\Modules\Campaigns\Actions\EnrollContactInCampaignAction;
+use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Core\Models\Contact;
+use App\Modules\FlowRoutes\Contracts\PointHandler;
+use App\Modules\FlowRoutes\Data\Points\EnrollCampaignPointDefinition;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
+use App\Modules\FlowRoutes\Models\Point;
+use Throwable;
+
+class EnrollCampaignPointHandler implements PointHandler
+{
+    public function __construct(
+        private readonly EnrollContactInCampaignAction $enrollContactInCampaign,
+    ) {}
+
+    public function type(): string
+    {
+        return Point::TYPE_ENROLL_CAMPAIGN;
+    }
+
+    public function handle(PointExecutionContext $context): PointExecutionResult
+    {
+        $definition = EnrollCampaignPointDefinition::from(
+            definition: $context->definition,
+            settings: $context->settings,
+        );
+
+        if (! $definition->isValid()) {
+            return PointExecutionResult::failed(
+                reason: $definition->invalidReason ?? 'invalid_enroll_campaign_point_definition',
+                meta: [
+                    'enroll_campaign_definition' => $definition->toMetaPayload(),
+                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    'point_id' => $context->flowRoutePoint->point_id,
+                ],
+            );
+        }
+
+        $contact = Contact::query()->find($context->progress->contact_id);
+
+        if (! $contact) {
+            return PointExecutionResult::failed(
+                reason: 'enroll_campaign_contact_not_found',
+                meta: [
+                    'contact_id' => $context->progress->contact_id,
+                    'flow_route_progress_id' => $context->progress->getKey(),
+                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                ],
+            );
+        }
+
+        $existingEnrollment = $this->existingEnrollment($contact, $definition);
+
+        if ($existingEnrollment instanceof CampaignEnrollment) {
+            return $this->alreadyEnrolledResult(
+                enrollment: $existingEnrollment,
+                definition: $definition,
+                context: $context,
+            );
+        }
+
+        try {
+            $enrollment = $this->enrollContactInCampaign->handle(
+                contact: $contact,
+                campaignKey: $definition->campaignKey,
+                channel: $definition->channel,
+                purpose: $definition->purpose,
+                scope: $definition->scope,
+                dispatchKey: $definition->dispatchKey,
+                source: $context->progress,
+                payload: $this->payload($definition, $context),
+                meta: $this->meta($definition, $context),
+                startContext: $this->startContext($definition, $context),
+                exitConditions: $this->exitConditions($definition, $context),
+            );
+        } catch (Throwable $exception) {
+            return PointExecutionResult::failed(
+                reason: 'enroll_campaign_failed',
+                meta: [
+                    'error' => $exception->getMessage(),
+                    'enroll_campaign_definition' => $definition->toMetaPayload(),
+                    'flow_route_progress_id' => $context->progress->getKey(),
+                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                ],
+            );
+        }
+
+        return PointExecutionResult::completed(
+            reason: 'campaign_enrolled',
+            meta: [
+                'campaign_enrollment' => $this->enrollmentMeta($enrollment),
+                'enroll_campaign_definition' => $definition->toMetaPayload(),
+            ],
+        );
+    }
+
+    private function existingEnrollment(
+        Contact $contact,
+        EnrollCampaignPointDefinition $definition,
+    ): ?CampaignEnrollment {
+        return CampaignEnrollment::query()
+            ->where('contact_id', $contact->id)
+            ->where('campaign_key', $definition->campaignKey)
+            ->where('channel', $definition->channel)
+            ->where('purpose', $definition->purpose)
+            ->where('scope', $definition->scope)
+            ->whereIn('status', [
+                CampaignEnrollment::STATUS_ACTIVE,
+                CampaignEnrollment::STATUS_PAUSED,
+            ])
+            ->first();
+    }
+
+    private function alreadyEnrolledResult(
+        CampaignEnrollment $enrollment,
+        EnrollCampaignPointDefinition $definition,
+        PointExecutionContext $context,
+    ): PointExecutionResult {
+        $meta = [
+            'campaign_enrollment' => $this->enrollmentMeta($enrollment),
+            'enroll_campaign_definition' => $definition->toMetaPayload(),
+            'flow_route_progress_id' => $context->progress->getKey(),
+            'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+        ];
+
+        return match ($definition->onAlreadyEnrolled) {
+            EnrollCampaignPointDefinition::ON_ALREADY_ENROLLED_COMPLETED => PointExecutionResult::completed(
+                reason: 'campaign_already_enrolled',
+                meta: $meta,
+            ),
+
+            EnrollCampaignPointDefinition::ON_ALREADY_ENROLLED_BLOCKED => PointExecutionResult::blocked(
+                reason: 'campaign_already_enrolled',
+                meta: $meta,
+            ),
+
+            EnrollCampaignPointDefinition::ON_ALREADY_ENROLLED_FAILED => PointExecutionResult::failed(
+                reason: 'campaign_already_enrolled',
+                meta: $meta,
+            ),
+
+            default => PointExecutionResult::skipped(
+                reason: 'campaign_already_enrolled',
+                meta: $meta,
+            ),
+        };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function payload(
+        EnrollCampaignPointDefinition $definition,
+        PointExecutionContext $context,
+    ): array {
+        return array_replace_recursive(
+            $this->renderArray($definition->payload, $context),
+            [
+                'runtime_context' => [
+                    'flow_route_progress_id' => $context->progress->getKey(),
+                    'flow_route_id' => $context->progress->flow_route_id,
+                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    'point_id' => $context->flowRoutePoint->point_id,
+                    'contact_id' => $context->progress->contact_id,
+                    'contact_status_id' => $context->progress->contact_status_id,
+                    'workflow_profile_id' => $context->progress->contact_workflow_profile_id,
+                ],
+            ],
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function meta(
+        EnrollCampaignPointDefinition $definition,
+        PointExecutionContext $context,
+    ): array {
+        return array_replace_recursive(
+            [
+                'source' => 'flow_routes',
+                'flow_route' => [
+                    'flow_route_progress_id' => $context->progress->getKey(),
+                    'flow_route_id' => $context->progress->flow_route_id,
+                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    'point_id' => $context->flowRoutePoint->point_id,
+                ],
+            ],
+            $this->renderArray($definition->meta, $context),
+        );
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function startContext(
+        EnrollCampaignPointDefinition $definition,
+        PointExecutionContext $context,
+    ): ?array {
+        if ($definition->startContext === null) {
+            return null;
+        }
+
+        return array_replace_recursive(
+            [
+                'flow_route_progress_id' => $context->progress->getKey(),
+                'flow_route_id' => $context->progress->flow_route_id,
+                'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                'point_id' => $context->flowRoutePoint->point_id,
+            ],
+            $this->renderArray($definition->startContext, $context),
+        );
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function exitConditions(
+        EnrollCampaignPointDefinition $definition,
+        PointExecutionContext $context,
+    ): ?array {
+        if ($definition->exitConditions === null) {
+            return null;
+        }
+
+        return $this->renderArray($definition->exitConditions, $context);
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @return array<string, mixed>
+     */
+    private function renderArray(array $values, PointExecutionContext $context): array
+    {
+        $rendered = [];
+
+        foreach ($values as $key => $value) {
+            $rendered[$key] = match (true) {
+                is_string($value) => $this->renderText($value, $context),
+                is_array($value) => $this->renderArray($value, $context),
+                default => $value,
+            };
+        }
+
+        return $rendered;
+    }
+
+    private function renderText(string $value, PointExecutionContext $context): string
+    {
+        return strtr($value, [
+            '{contact.id}' => (string) $context->progress->contact_id,
+            '{contact_status.id}' => (string) $context->progress->contact_status_id,
+            '{workflow_profile.id}' => (string) $context->progress->contact_workflow_profile_id,
+            '{flow_route.id}' => (string) $context->progress->flow_route_id,
+            '{flow_route_point.id}' => (string) $context->flowRoutePoint->getKey(),
+            '{point.id}' => (string) $context->flowRoutePoint->point_id,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function enrollmentMeta(CampaignEnrollment $enrollment): array
+    {
+        return [
+            'id' => $enrollment->getKey(),
+            'contact_id' => $enrollment->contact_id,
+            'campaign_key' => $enrollment->campaign_key,
+            'channel' => $enrollment->channel,
+            'purpose' => $enrollment->purpose,
+            'scope' => $enrollment->scope,
+            'status' => $enrollment->status,
+            'current_step' => $enrollment->current_step,
+            'last_scheduled_message_id' => $enrollment->last_scheduled_message_id,
+            'started_at' => $enrollment->started_at?->toISOString(),
+            'exited_at' => $enrollment->exited_at?->toISOString(),
+            'exit_reason' => $enrollment->exit_reason,
+        ];
+    }
+}
