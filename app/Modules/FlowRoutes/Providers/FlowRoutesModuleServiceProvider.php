@@ -4,6 +4,7 @@ namespace App\Modules\FlowRoutes\Providers;
 
 use App\Modules\FlowRoutes\ConditionEvaluators\FlowRouteDataConditionEvaluator;
 use App\Modules\FlowRoutes\Listeners\HandleContactWorkflowStatusChanged;
+use App\Modules\FlowRoutes\Listeners\ResumeFlowRouteProgressWhenTaskCompleted;
 use App\Modules\FlowRoutes\PointHandlers\BranchEvaluatePointHandler;
 use App\Modules\FlowRoutes\PointHandlers\ConditionPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\EventWaitPointHandler;
@@ -17,6 +18,8 @@ use Illuminate\Support\ServiceProvider;
 
 class FlowRoutesModuleServiceProvider extends ServiceProvider
 {
+    private const TASK_COMPLETED_EVENT = 'App\\Modules\\Tasks\\Events\\TaskCompleted';
+
     public function register(): void
     {
         $this->app->tag([
@@ -49,6 +52,24 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
         Event::listen(
             ContactWorkflowStatusChanged::class,
             HandleContactWorkflowStatusChanged::class,
+        );
+
+        $this->registerOptionalTaskListeners();
+    }
+
+    private function registerOptionalTaskListeners(): void
+    {
+        if (function_exists('module_enabled') && ! module_enabled('tasks')) {
+            return;
+        }
+
+        if (! class_exists(self::TASK_COMPLETED_EVENT)) {
+            return;
+        }
+
+        Event::listen(
+            self::TASK_COMPLETED_EVENT,
+            ResumeFlowRouteProgressWhenTaskCompleted::class,
         );
     }
 }
