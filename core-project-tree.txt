@@ -129,7 +129,8 @@
 │   │   │   ├── Jobs
 │   │   │   │   └── ResumeFlowRouteProgressJob.php
 │   │   │   ├── Listeners
-│   │   │   │   └── HandleContactWorkflowStatusChanged.php
+│   │   │   │   ├── HandleContactWorkflowStatusChanged.php
+│   │   │   │   └── ResumeFlowRouteProgressWhenTaskCompleted.php
 │   │   │   ├── Models
 │   │   │   │   ├── ContactFlowRouteProgress.php
 │   │   │   │   ├── FlowRoute.php
@@ -321,6 +322,8 @@
 │   │   │   │   └── TaskController.php
 │   │   │   ├── Data
 │   │   │   │   └── TaskDigest.php
+│   │   │   ├── Events
+│   │   │   │   └── TaskCompleted.php
 │   │   │   ├── Models
 │   │   │   │   └── Task.php
 │   │   │   ├── Providers
@@ -873,4 +876,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-307 directories, 567 files
+308 directories, 569 files
