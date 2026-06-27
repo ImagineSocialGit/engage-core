@@ -20,6 +20,10 @@ class FlowRoutePoint extends Model
         'definition',
         'settings',
         'cancel_conditions',
+        'preset_key',
+        'source_version',
+        'is_customized',
+        'customized_at',
         'meta',
     ];
 
@@ -31,6 +35,8 @@ class FlowRoutePoint extends Model
         'definition' => 'array',
         'settings' => 'array',
         'cancel_conditions' => 'array',
+        'is_customized' => 'boolean',
+        'customized_at' => 'datetime',
         'meta' => 'array',
     ];
 
@@ -67,5 +73,20 @@ class FlowRoutePoint extends Model
     public function scopeForPointType(Builder $query, string $type): Builder
     {
         return $query->whereHas('point', fn (Builder $pointQuery) => $pointQuery->where('type', $type));
+    }
+
+    public function scopePreset(Builder $query, string $presetKey): Builder
+    {
+        return $query->where('preset_key', $presetKey);
+    }
+
+    public function scopeCustomized(Builder $query): Builder
+    {
+        return $query->where('is_customized', true);
+    }
+
+    public function scopeNotCustomized(Builder $query): Builder
+    {
+        return $query->where('is_customized', false);
     }
 }

@@ -27,6 +27,13 @@ return new class extends Migration
             $table->json('definition')->nullable();
             $table->json('settings')->nullable();
             $table->json('cancel_conditions')->nullable();
+
+            $table->string('preset_key')->nullable()->index();
+            $table->string('source_version')->nullable();
+
+            $table->boolean('is_customized')->default(false)->index();
+            $table->timestamp('customized_at')->nullable();
+
             $table->json('meta')->nullable();
 
             $table->timestamps();
@@ -34,6 +41,7 @@ return new class extends Migration
             $table->unique(['flow_route_id', 'sort_order']);
             $table->index(['flow_route_id', 'is_active', 'sort_order']);
             $table->index(['point_id', 'is_active']);
+            $table->index(['preset_key', 'source_version']);
         });
     }
 

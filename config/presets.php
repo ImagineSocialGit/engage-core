@@ -42,6 +42,8 @@ return [
                     'plural' => 'contacts',
                 ],
             ],
+
+            'flow_routes' => [],
         ],
 
         'lightweight_task_workspace' => [
@@ -63,6 +65,8 @@ return [
                     'plural' => 'contacts',
                 ],
             ],
+
+            'flow_routes' => [],
         ],
 
         'webinar_funnel' => [
@@ -103,6 +107,8 @@ return [
                     ],
                 ],
             ],
+
+            'flow_routes' => [],
         ],
 
         'mortgage' => [
@@ -161,6 +167,8 @@ return [
                     ],
                 ],
             ],
+
+            'flow_routes' => [],
         ],
 
         'dog_training' => [
@@ -197,6 +205,8 @@ return [
                     ],
                 ],
             ],
+
+            'flow_routes' => [],
         ],
 
         'musician_fan_engagement' => [
@@ -240,6 +250,8 @@ return [
                     ],
                 ],
             ],
+
+            'flow_routes' => [],
         ],
 
     ],
