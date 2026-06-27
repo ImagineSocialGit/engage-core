@@ -10,6 +10,7 @@ use App\Modules\FlowRoutes\PointHandlers\ConditionPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\CreateTaskPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\EventWaitPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\NoopPointHandler;
+use App\Modules\FlowRoutes\PointHandlers\SendMessagePointHandler;
 use App\Modules\FlowRoutes\PointHandlers\WaitPointHandler;
 use App\Modules\FlowRoutes\Services\FlowRouteConditionEvaluatorRegistry;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
@@ -22,6 +23,8 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
     private const TASK_COMPLETED_EVENT = 'App\\Modules\\Tasks\\Events\\TaskCompleted';
 
     private const CREATE_TASK_ACTION = 'App\\Modules\\Tasks\\Actions\\CreateTaskAction';
+
+    private const DISPATCH_MESSAGE_ACTION = 'App\\Modules\\Messaging\\Actions\\DispatchMessageAction';
 
     public function register(): void
     {
@@ -71,6 +74,10 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
             $handlers[] = CreateTaskPointHandler::class;
         }
 
+        if ($this->messagingAvailable()) {
+            $handlers[] = SendMessagePointHandler::class;
+        }
+
         return $handlers;
     }
 
@@ -97,5 +104,14 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
         }
 
         return class_exists(self::CREATE_TASK_ACTION);
+    }
+
+    private function messagingAvailable(): bool
+    {
+        if (function_exists('module_enabled') && ! module_enabled('messaging')) {
+            return false;
+        }
+
+        return class_exists(self::DISPATCH_MESSAGE_ACTION);
     }
 }

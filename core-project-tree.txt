@@ -115,6 +115,7 @@
 │   │   │   ├── Data
 │   │   │   │   ├── BranchEvaluatePointDefinition.php
 │   │   │   │   ├── ConditionPointDefinition.php
+│   │   │   │   ├── CreateTaskPointDefinition.php
 │   │   │   │   ├── EventWaitPointDefinition.php
 │   │   │   │   ├── FlowRouteConditionEvaluation.php
 │   │   │   │   ├── FlowRouteExternalEvent.php
@@ -125,6 +126,7 @@
 │   │   │   │   ├── PointExecutionContext.php
 │   │   │   │   ├── PointExecutionResult.php
 │   │   │   │   ├── PointPresetDefinition.php
+│   │   │   │   ├── SendMessagePointDefinition.php
 │   │   │   │   └── WaitPointDefinition.php
 │   │   │   ├── Jobs
 │   │   │   │   └── ResumeFlowRouteProgressJob.php
@@ -139,8 +141,10 @@
 │   │   │   ├── PointHandlers
 │   │   │   │   ├── BranchEvaluatePointHandler.php
 │   │   │   │   ├── ConditionPointHandler.php
+│   │   │   │   ├── CreateTaskPointHandler.php
 │   │   │   │   ├── EventWaitPointHandler.php
 │   │   │   │   ├── NoopPointHandler.php
+│   │   │   │   ├── SendMessagePointHandler.php
 │   │   │   │   └── WaitPointHandler.php
 │   │   │   ├── Providers
 │   │   │   │   └── FlowRoutesModuleServiceProvider.php
@@ -312,7 +316,7 @@
 │   │   ├── Tasks
 │   │   │   ├── Actions
 │   │   │   │   ├── BuildTaskDigestsAction.php
-│   │   │   │   ├── CreateManualTaskAction.php
+│   │   │   │   ├── CreateTaskAction.php
 │   │   │   │   ├── NotifyAssignedTaskRecipientsAction.php
 │   │   │   │   └── SendTaskDigestNotificationsAction.php
 │   │   │   ├── Contracts
@@ -876,4 +880,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-308 directories, 569 files
+308 directories, 573 files
