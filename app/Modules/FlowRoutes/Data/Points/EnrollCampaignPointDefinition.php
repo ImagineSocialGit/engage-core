@@ -24,10 +24,6 @@ class EnrollCampaignPointDefinition
      */
     public function __construct(
         public readonly ?string $campaignKey,
-        public readonly ?string $channel,
-        public readonly ?string $purpose,
-        public readonly ?string $scope,
-        public readonly ?string $dispatchKey,
         public readonly string $onAlreadyEnrolled = self::ON_ALREADY_ENROLLED_SKIPPED,
         public readonly array $payload = [],
         public readonly array $meta = [],
@@ -45,10 +41,6 @@ class EnrollCampaignPointDefinition
         $values = array_replace_recursive($definition, $settings);
 
         $campaignKey = self::nullableString($values['campaign_key'] ?? null);
-        $channel = self::nullableString($values['channel'] ?? null);
-        $purpose = self::nullableString($values['purpose'] ?? null);
-        $scope = self::nullableString($values['scope'] ?? null);
-        $dispatchKey = self::nullableString($values['dispatch_key'] ?? null);
 
         $onAlreadyEnrolled = self::nullableString($values['on_already_enrolled'] ?? null)
             ?? self::ON_ALREADY_ENROLLED_SKIPPED;
@@ -71,10 +63,6 @@ class EnrollCampaignPointDefinition
 
         return new self(
             campaignKey: $campaignKey,
-            channel: $channel,
-            purpose: $purpose,
-            scope: $scope,
-            dispatchKey: $dispatchKey,
             onAlreadyEnrolled: $onAlreadyEnrolled,
             payload: $payload,
             meta: $meta,
@@ -82,10 +70,6 @@ class EnrollCampaignPointDefinition
             exitConditions: $exitConditions,
             invalidReason: self::invalidReason(
                 campaignKey: $campaignKey,
-                channel: $channel,
-                purpose: $purpose,
-                scope: $scope,
-                dispatchKey: $dispatchKey,
                 onAlreadyEnrolled: $onAlreadyEnrolled,
             ),
         );
@@ -103,10 +87,6 @@ class EnrollCampaignPointDefinition
     {
         return [
             'campaign_key' => $this->campaignKey,
-            'channel' => $this->channel,
-            'purpose' => $this->purpose,
-            'scope' => $this->scope,
-            'dispatch_key' => $this->dispatchKey,
             'on_already_enrolled' => $this->onAlreadyEnrolled,
             'payload' => $this->payload,
             'meta' => $this->meta,
@@ -129,30 +109,10 @@ class EnrollCampaignPointDefinition
 
     private static function invalidReason(
         ?string $campaignKey,
-        ?string $channel,
-        ?string $purpose,
-        ?string $scope,
-        ?string $dispatchKey,
         string $onAlreadyEnrolled,
     ): ?string {
         if ($campaignKey === null) {
             return 'enroll_campaign_missing_campaign_key';
-        }
-
-        if ($channel === null) {
-            return 'enroll_campaign_missing_channel';
-        }
-
-        if ($purpose === null) {
-            return 'enroll_campaign_missing_purpose';
-        }
-
-        if ($scope === null) {
-            return 'enroll_campaign_missing_scope';
-        }
-
-        if ($dispatchKey === null) {
-            return 'enroll_campaign_missing_dispatch_key';
         }
 
         if (! in_array($onAlreadyEnrolled, self::ON_ALREADY_ENROLLED_OPTIONS, true)) {

@@ -3,11 +3,13 @@
 namespace Tests\Feature\Campaigns;
 
 use App\Modules\Campaigns\Actions\ScheduleNextCampaignStepAction;
-use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -25,24 +27,9 @@ class ScheduleNextCampaignStepActionTest extends TestCase
 
         Carbon::setTestNow('2026-06-12 12:00:00');
 
-        Config::set('messaging.email.marketing.webinar', [
-            'step_2' => [
-                'dispatch_key' => 'marketing_message_sent',
-                'campaign_key' => 'webinar_attended',
-                'step' => 2,
-                'timing' => 'scheduled',
-                'schedule' => [
-                    'type' => 'delay',
-                    'minutes' => 720,
-                ],
-                'payload_class' => EmailPayload::class,
-                'queue' => 'marketing',
-                'payload' => [
-                    'subject' => 'Step 2',
-                    'body' => 'Second message',
-                ],
-            ],
-        ]);
+        $campaign = $this->createCampaignWithSteps();
+
+        $this->setMessageDefinitions();
 
         $contact = $this->contactWithMarketingEmailConsent();
 
@@ -52,6 +39,7 @@ class ScheduleNextCampaignStepActionTest extends TestCase
 
         $enrollment = CampaignEnrollment::create([
             'contact_id' => $contact->id,
+            'campaign_id' => $campaign->id,
             'source_type' => $registration->getMorphClass(),
             'source_id' => $registration->id,
             'campaign_key' => 'webinar_attended',
@@ -60,6 +48,7 @@ class ScheduleNextCampaignStepActionTest extends TestCase
             'scope' => 'webinar',
             'status' => CampaignEnrollment::STATUS_ACTIVE,
             'current_step' => 1,
+            'current_campaign_step_id' => $campaign->steps()->where('step_number', 1)->first()->id,
             'started_at' => Carbon::now(),
         ]);
 
@@ -74,6 +63,7 @@ class ScheduleNextCampaignStepActionTest extends TestCase
         $this->assertSame('email', $scheduledMessage->channel);
         $this->assertSame('marketing', $scheduledMessage->purpose);
         $this->assertSame('webinar', $scheduledMessage->scope);
+        $this->assertSame($campaign->id, $scheduledMessage->meta['campaign_id']);
         $this->assertSame('webinar_attended', $scheduledMessage->meta['campaign_key']);
         $this->assertSame(2, $scheduledMessage->meta['campaign_step']);
         $this->assertSame($enrollment->id, $scheduledMessage->meta['campaign_enrollment_id']);
@@ -83,6 +73,7 @@ class ScheduleNextCampaignStepActionTest extends TestCase
 
         $this->assertSame(CampaignEnrollment::STATUS_ACTIVE, $enrollment->status);
         $this->assertSame(2, $enrollment->current_step);
+        $this->assertSame($campaign->steps()->where('step_number', 2)->first()->id, $enrollment->current_campaign_step_id);
         $this->assertSame($scheduledMessage->id, $enrollment->last_scheduled_message_id);
     }
 
@@ -92,18 +83,25 @@ class ScheduleNextCampaignStepActionTest extends TestCase
 
         Carbon::setTestNow('2026-06-12 12:00:00');
 
-        Config::set('messaging.email.marketing.webinar', []);
+        $campaign = $this->createCampaignWithStep(
+            stepNumber: 1,
+            dispatchKey: 'webinar_ended',
+        );
+
+        $this->setMessageDefinitions([]);
 
         $contact = $this->contactWithMarketingEmailConsent();
 
         $enrollment = CampaignEnrollment::create([
             'contact_id' => $contact->id,
+            'campaign_id' => $campaign->id,
             'campaign_key' => 'webinar_attended',
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar',
             'status' => CampaignEnrollment::STATUS_ACTIVE,
             'current_step' => 1,
+            'current_campaign_step_id' => $campaign->steps()->where('step_number', 1)->first()->id,
             'started_at' => Carbon::now(),
         ]);
 
@@ -123,7 +121,96 @@ class ScheduleNextCampaignStepActionTest extends TestCase
     {
         Queue::fake();
 
-        Config::set('messaging.email.marketing.webinar', [
+        $campaign = $this->createCampaignWithSteps();
+
+        $this->setMessageDefinitions();
+
+        $contact = $this->contactWithMarketingEmailConsent();
+
+        $enrollment = CampaignEnrollment::create([
+            'contact_id' => $contact->id,
+            'campaign_id' => $campaign->id,
+            'campaign_key' => 'webinar_attended',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar',
+            'status' => CampaignEnrollment::STATUS_PAUSED,
+            'current_step' => 1,
+            'current_campaign_step_id' => $campaign->steps()->where('step_number', 1)->first()->id,
+            'started_at' => now(),
+            'paused_at' => now(),
+        ]);
+
+        $scheduledMessage = app(ScheduleNextCampaignStepAction::class)->handle($enrollment);
+
+        $this->assertNull($scheduledMessage);
+        $this->assertDatabaseCount('scheduled_messages', 0);
+
+        $enrollment->refresh();
+
+        $this->assertSame(CampaignEnrollment::STATUS_PAUSED, $enrollment->status);
+        $this->assertSame(1, $enrollment->current_step);
+        $this->assertNull($enrollment->last_scheduled_message_id);
+    }
+
+    private function createCampaignWithSteps(): Campaign
+    {
+        $campaign = $this->createCampaignWithStep(
+            stepNumber: 1,
+            dispatchKey: 'webinar_ended',
+        );
+
+        CampaignStep::create([
+            'campaign_id' => $campaign->id,
+            'step_number' => 2,
+            'name' => 'Step 2',
+            'dispatch_key' => 'marketing_message_sent',
+            'is_active' => true,
+            'criteria' => [],
+            'payload' => [],
+            'meta' => [],
+        ]);
+
+        return $campaign->refresh();
+    }
+
+    private function createCampaignWithStep(
+        int $stepNumber,
+        string $dispatchKey,
+    ): Campaign {
+        $campaign = Campaign::query()->firstOrCreate(
+            ['key' => 'webinar_attended'],
+            [
+                'name' => 'Webinar Attended',
+                'channel' => 'email',
+                'purpose' => 'marketing',
+                'scope' => 'webinar',
+                'status' => Campaign::STATUS_ACTIVE,
+                'is_active' => true,
+                'meta' => [],
+            ],
+        );
+
+        CampaignStep::create([
+            'campaign_id' => $campaign->id,
+            'step_number' => $stepNumber,
+            'name' => 'Step '.$stepNumber,
+            'dispatch_key' => $dispatchKey,
+            'is_active' => true,
+            'criteria' => [],
+            'payload' => [],
+            'meta' => [],
+        ]);
+
+        return $campaign->refresh();
+    }
+
+    /**
+     * @param array<string, mixed>|null $definitions
+     */
+    private function setMessageDefinitions(?array $definitions = null): void
+    {
+        Config::set('messaging.email.marketing.webinar', $definitions ?? [
             'step_2' => [
                 'dispatch_key' => 'marketing_message_sent',
                 'campaign_key' => 'webinar_attended',
@@ -141,31 +228,6 @@ class ScheduleNextCampaignStepActionTest extends TestCase
                 ],
             ],
         ]);
-
-        $contact = $this->contactWithMarketingEmailConsent();
-
-        $enrollment = CampaignEnrollment::create([
-            'contact_id' => $contact->id,
-            'campaign_key' => 'webinar_attended',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
-            'status' => CampaignEnrollment::STATUS_PAUSED,
-            'current_step' => 1,
-            'started_at' => now(),
-            'paused_at' => now(),
-        ]);
-
-        $scheduledMessage = app(ScheduleNextCampaignStepAction::class)->handle($enrollment);
-
-        $this->assertNull($scheduledMessage);
-        $this->assertDatabaseCount('scheduled_messages', 0);
-
-        $enrollment->refresh();
-
-        $this->assertSame(CampaignEnrollment::STATUS_PAUSED, $enrollment->status);
-        $this->assertSame(1, $enrollment->current_step);
-        $this->assertNull($enrollment->last_scheduled_message_id);
     }
 
     private function contactWithMarketingEmailConsent(): Contact

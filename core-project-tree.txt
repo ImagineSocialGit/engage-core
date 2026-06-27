@@ -43,16 +43,22 @@
 │   │   ├── Campaigns
 │   │   │   ├── Actions
 │   │   │   │   ├── EnrollContactInCampaignAction.php
-│   │   │   │   └── ScheduleNextCampaignStepAction.php
+│   │   │   │   ├── ScheduleNextCampaignStepAction.php
+│   │   │   │   └── SyncCampaignPresetsAction.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   ├── Data
+│   │   │   │   ├── CampaignPresetDefinition.php
+│   │   │   │   ├── CampaignPresetSyncResult.php
+│   │   │   │   └── CampaignStepPresetDefinition.php
 │   │   │   ├── Listeners
 │   │   │   │   └── ScheduleNextCampaignStepAfterScheduledMessageSent.php
 │   │   │   ├── Models
 │   │   │   │   ├── Broadcast.php
 │   │   │   │   ├── BroadcastRecipient.php
-│   │   │   │   └── CampaignEnrollment.php
+│   │   │   │   ├── CampaignEnrollment.php
+│   │   │   │   ├── Campaign.php
+│   │   │   │   └── CampaignStep.php
 │   │   │   ├── Providers
 │   │   │   │   └── CampaignsModuleServiceProvider.php
 │   │   │   ├── Requests
@@ -363,7 +369,6 @@
 │   │   │   │   ├── GetActiveWebinarSeriesAction.php
 │   │   │   │   ├── GetNextUpcomingWebinarAction.php
 │   │   │   │   ├── PostEvent
-│   │   │   │   │   ├── DispatchPostWebinarCampaignsAction.php
 │   │   │   │   │   ├── DispatchPostWebinarFollowUpsAction.php
 │   │   │   │   │   ├── DispatchWebinarOutcomeMessagesAction.php
 │   │   │   │   │   ├── HandleWebinarProviderWebhookEventAction.php
@@ -676,7 +681,9 @@
 │   │   ├── 2026_05_19_154535_create_inbound_messages_table.php
 │   │   ├── 2026_05_19_211538_create_scheduled_messages_table.php
 │   │   ├── 2026_05_19_221010_create_message_suppressions_table.php
-│   │   ├── 2026_06_12_050337_create_campaign_enrollments_table.php
+│   │   ├── 2026_06_12_050337_create_campaigns_table.php
+│   │   ├── 2026_06_12_050338_create_campaign_steps_table.php
+│   │   ├── 2026_06_12_050339_create_campaign_enrollments_table.php
 │   │   ├── 2026_06_12_065258_create_broadcasts_table.php
 │   │   ├── 2026_06_12_065311_create_broadcast_recipients_table.php
 │   │   ├── 2026_06_18_203547_create_webinar_series_table.php
@@ -879,7 +886,6 @@
 │   │   │   ├── DispatchWebinarRegistrationMessagesActionTest.php
 │   │   │   ├── DispatchWebinarWaitlistMessagesActionTest.php
 │   │   │   ├── PostEvent
-│   │   │   │   ├── DispatchPostWebinarCampaignsActionTest.php
 │   │   │   │   └── ProcessPostWebinarEventJobTest.php
 │   │   │   └── WebinarRegistrationControllerTest.php
 │   │   └── Workflow
@@ -887,4 +893,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-311 directories, 577 files
+311 directories, 583 files

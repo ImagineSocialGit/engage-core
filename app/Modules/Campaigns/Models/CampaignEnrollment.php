@@ -23,6 +23,7 @@ class CampaignEnrollment extends Model
 
     protected $fillable = [
         'contact_id',
+        'campaign_id',
         'source_type',
         'source_id',
         'campaign_key',
@@ -31,6 +32,7 @@ class CampaignEnrollment extends Model
         'scope',
         'status',
         'current_step',
+        'current_campaign_step_id',
         'start_context',
         'exit_conditions',
         'exited_at',
@@ -49,8 +51,10 @@ class CampaignEnrollment extends Model
     {
         return [
             'contact_id' => 'integer',
+            'campaign_id' => 'integer',
             'source_id' => 'integer',
             'current_step' => 'integer',
+            'current_campaign_step_id' => 'integer',
             'start_context' => 'array',
             'exit_conditions' => 'array',
             'last_scheduled_message_id' => 'integer',
@@ -67,6 +71,16 @@ class CampaignEnrollment extends Model
     public function contact(): BelongsTo
     {
         return $this->belongsTo(Contact::class);
+    }
+
+    public function campaign(): BelongsTo
+    {
+        return $this->belongsTo(Campaign::class);
+    }
+
+    public function currentCampaignStep(): BelongsTo
+    {
+        return $this->belongsTo(CampaignStep::class, 'current_campaign_step_id');
     }
 
     public function source(): MorphTo

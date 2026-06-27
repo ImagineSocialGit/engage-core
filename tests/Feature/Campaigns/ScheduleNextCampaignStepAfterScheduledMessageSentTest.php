@@ -2,13 +2,15 @@
 
 namespace Tests\Feature\Campaigns;
 
-use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Campaigns\Listeners\ScheduleNextCampaignStepAfterScheduledMessageSent;
-use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Payloads\EmailPayload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
@@ -25,24 +27,9 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
 
         Carbon::setTestNow('2026-06-12 12:00:00');
 
-        Config::set('messaging.email.marketing.webinar', [
-            'step_2' => [
-                'dispatch_key' => 'marketing_message_sent',
-                'campaign_key' => 'webinar_attended',
-                'step' => 2,
-                'timing' => 'scheduled',
-                'schedule' => [
-                    'type' => 'delay',
-                    'minutes' => 720,
-                ],
-                'payload_class' => EmailPayload::class,
-                'queue' => 'marketing',
-                'payload' => [
-                    'subject' => 'Step 2',
-                    'body' => 'Second message',
-                ],
-            ],
-        ]);
+        $campaign = $this->createCampaignWithSteps();
+
+        $this->setMessageDefinitions();
 
         $contact = Contact::factory()->create([
             'email' => 'person@example.com',
@@ -59,12 +46,14 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
 
         $enrollment = CampaignEnrollment::create([
             'contact_id' => $contact->id,
+            'campaign_id' => $campaign->id,
             'campaign_key' => 'webinar_attended',
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar',
             'status' => CampaignEnrollment::STATUS_ACTIVE,
             'current_step' => 1,
+            'current_campaign_step_id' => $campaign->steps()->where('step_number', 1)->first()->id,
             'started_at' => now(),
         ]);
 
@@ -79,7 +68,9 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             'sent_at' => now(),
             'meta' => [
                 'campaign_enrollment_id' => $enrollment->id,
+                'campaign_id' => $campaign->id,
                 'campaign_key' => 'webinar_attended',
+                'campaign_step_id' => $campaign->steps()->where('step_number', 1)->first()->id,
                 'campaign_step' => 1,
             ],
         ]);
@@ -92,6 +83,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
 
         $this->assertSame(CampaignEnrollment::STATUS_ACTIVE, $enrollment->status);
         $this->assertSame(2, $enrollment->current_step);
+        $this->assertSame($campaign->steps()->where('step_number', 2)->first()->id, $enrollment->current_campaign_step_id);
         $this->assertNotNull($enrollment->last_scheduled_message_id);
         $this->assertNotSame($sentMessage->id, $enrollment->last_scheduled_message_id);
 
@@ -101,6 +93,8 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
 
         $this->assertSame('step_2', $nextMessage->message_type);
         $this->assertSame($enrollment->id, $nextMessage->meta['campaign_enrollment_id']);
+        $this->assertSame($campaign->id, $nextMessage->meta['campaign_id']);
+        $this->assertSame($campaign->steps()->where('step_number', 2)->first()->id, $nextMessage->meta['campaign_step_id']);
         $this->assertSame($sentMessage->id, $nextMessage->meta['previous_scheduled_message_id']);
     }
 
@@ -130,6 +124,66 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
 
         $this->assertDatabaseCount('campaign_enrollments', 0);
         $this->assertDatabaseCount('scheduled_messages', 1);
+    }
+
+    private function createCampaignWithSteps(): Campaign
+    {
+        $campaign = Campaign::create([
+            'key' => 'webinar_attended',
+            'name' => 'Webinar Attended',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar',
+            'status' => Campaign::STATUS_ACTIVE,
+            'is_active' => true,
+            'meta' => [],
+        ]);
+
+        CampaignStep::create([
+            'campaign_id' => $campaign->id,
+            'step_number' => 1,
+            'name' => 'Step 1',
+            'dispatch_key' => 'webinar_ended',
+            'is_active' => true,
+            'criteria' => [],
+            'payload' => [],
+            'meta' => [],
+        ]);
+
+        CampaignStep::create([
+            'campaign_id' => $campaign->id,
+            'step_number' => 2,
+            'name' => 'Step 2',
+            'dispatch_key' => 'marketing_message_sent',
+            'is_active' => true,
+            'criteria' => [],
+            'payload' => [],
+            'meta' => [],
+        ]);
+
+        return $campaign->refresh();
+    }
+
+    private function setMessageDefinitions(): void
+    {
+        Config::set('messaging.email.marketing.webinar', [
+            'step_2' => [
+                'dispatch_key' => 'marketing_message_sent',
+                'campaign_key' => 'webinar_attended',
+                'step' => 2,
+                'timing' => 'scheduled',
+                'schedule' => [
+                    'type' => 'delay',
+                    'minutes' => 720,
+                ],
+                'payload_class' => EmailPayload::class,
+                'queue' => 'marketing',
+                'payload' => [
+                    'subject' => 'Step 2',
+                    'body' => 'Second message',
+                ],
+            ],
+        ]);
     }
 
     protected function tearDown(): void

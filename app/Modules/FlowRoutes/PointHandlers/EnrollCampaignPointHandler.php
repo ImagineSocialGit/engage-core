@@ -68,10 +68,6 @@ class EnrollCampaignPointHandler implements PointHandler
             $enrollment = $this->enrollContactInCampaign->handle(
                 contact: $contact,
                 campaignKey: $definition->campaignKey,
-                channel: $definition->channel,
-                purpose: $definition->purpose,
-                scope: $definition->scope,
-                dispatchKey: $definition->dispatchKey,
                 source: $context->progress,
                 payload: $this->payload($definition, $context),
                 meta: $this->meta($definition, $context),
@@ -106,9 +102,6 @@ class EnrollCampaignPointHandler implements PointHandler
         return CampaignEnrollment::query()
             ->where('contact_id', $contact->id)
             ->where('campaign_key', $definition->campaignKey)
-            ->where('channel', $definition->channel)
-            ->where('purpose', $definition->purpose)
-            ->where('scope', $definition->scope)
             ->whereIn('status', [
                 CampaignEnrollment::STATUS_ACTIVE,
                 CampaignEnrollment::STATUS_PAUSED,

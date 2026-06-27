@@ -1,5 +1,7 @@
 <?php
 
+use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Database\Migrations\Migration;
@@ -17,6 +19,11 @@ return new class extends Migration
                 ->constrained()
                 ->cascadeOnDelete();
 
+            $table->foreignIdFor(Campaign::class)
+                ->nullable()
+                ->constrained()
+                ->nullOnDelete();
+
             $table->string('source_type', 120)->nullable();
             $table->unsignedBigInteger('source_id')->nullable();
 
@@ -28,6 +35,11 @@ return new class extends Migration
 
             $table->string('status', 32)->default('active')->index();
             $table->unsignedInteger('current_step')->nullable();
+
+            $table->foreignIdFor(CampaignStep::class, 'current_campaign_step_id')
+                ->nullable()
+                ->constrained('campaign_steps')
+                ->nullOnDelete();
 
             $table->json('start_context')->nullable();
             $table->json('exit_conditions')->nullable();
@@ -53,6 +65,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['source_type', 'source_id']);
+            $table->index(['campaign_id', 'status']);
+            $table->index(['contact_id', 'campaign_id', 'status']);
 
             $table->index([
                 'contact_id',

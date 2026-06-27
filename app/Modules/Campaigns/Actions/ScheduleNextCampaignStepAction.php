@@ -2,8 +2,10 @@
 
 namespace App\Modules\Campaigns\Actions;
 
-use App\Modules\Messaging\Actions\DispatchMessageAction;
+use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Campaigns\Models\CampaignStep;
+use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -20,7 +22,7 @@ class ScheduleNextCampaignStepAction
      */
     public function handle(
         CampaignEnrollment $enrollment,
-        string $dispatchKey = 'marketing_message_sent',
+        ?string $dispatchKey = null,
         ?Model $context = null,
         array $payload = [],
         ?array $meta = null,
@@ -29,7 +31,10 @@ class ScheduleNextCampaignStepAction
             return null;
         }
 
-        $enrollment->loadMissing('contact');
+        $enrollment->loadMissing([
+            'campaign.activeSteps',
+            'contact',
+        ]);
 
         if (! $enrollment->contact) {
             $this->completeEnrollment(
@@ -40,28 +45,9 @@ class ScheduleNextCampaignStepAction
             return null;
         }
 
-        $nextStep = ((int) $enrollment->current_step) + 1;
+        $campaign = $enrollment->campaign;
 
-        $scheduledMessages = $this->dispatchMessageAction->handle(
-            recipient: $enrollment->contact,
-            channel: $enrollment->channel,
-            purpose: $enrollment->purpose,
-            scope: $enrollment->scope,
-            dispatchKeys: $dispatchKey,
-            payload: $payload,
-            context: $context,
-            meta: array_merge([
-                'campaign_enrollment_id' => $enrollment->id,
-                'campaign_key' => $enrollment->campaign_key,
-                'campaign_step' => $nextStep,
-            ], $meta ?? []),
-            criteria: [
-                'campaign_key' => $enrollment->campaign_key,
-                'step' => $nextStep,
-            ],
-        );
-
-        if ($scheduledMessages === []) {
+        if (! $campaign instanceof Campaign || ! $campaign->isActive()) {
             $this->completeEnrollment(
                 enrollment: $enrollment,
                 reason: CampaignEnrollment::EXIT_REASON_NO_NEXT_STEP,
@@ -70,14 +56,94 @@ class ScheduleNextCampaignStepAction
             return null;
         }
 
-        $scheduledMessage = $scheduledMessages[0];
+        $nextStep = $this->nextStep($campaign, $enrollment, $dispatchKey);
+
+        if (! $nextStep instanceof CampaignStep) {
+            $this->completeEnrollment(
+                enrollment: $enrollment,
+                reason: CampaignEnrollment::EXIT_REASON_NO_NEXT_STEP,
+            );
+
+            return null;
+        }
+
+        $scheduledMessage = $this->scheduleStep(
+            enrollment: $enrollment,
+            campaign: $campaign,
+            step: $nextStep,
+            context: $context,
+            payload: $payload,
+            meta: $meta,
+        );
+
+        if (! $scheduledMessage instanceof ScheduledMessage) {
+            $this->completeEnrollment(
+                enrollment: $enrollment,
+                reason: CampaignEnrollment::EXIT_REASON_NO_NEXT_STEP,
+            );
+
+            return null;
+        }
 
         $enrollment->forceFill([
-            'current_step' => $nextStep,
+            'current_step' => $nextStep->step_number,
+            'current_campaign_step_id' => $nextStep->id,
             'last_scheduled_message_id' => $scheduledMessage->id,
         ])->save();
 
         return $scheduledMessage;
+    }
+
+    private function nextStep(
+        Campaign $campaign,
+        CampaignEnrollment $enrollment,
+        ?string $dispatchKey,
+    ): ?CampaignStep {
+        $query = $campaign->activeSteps()
+            ->where('step_number', '>', (int) $enrollment->current_step)
+            ->orderBy('step_number');
+
+        if ($dispatchKey !== null) {
+            $query->where('dispatch_key', $dispatchKey);
+        }
+
+        return $query->first();
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed>|null $meta
+     */
+    private function scheduleStep(
+        CampaignEnrollment $enrollment,
+        Campaign $campaign,
+        CampaignStep $step,
+        ?Model $context,
+        array $payload,
+        ?array $meta,
+    ): ?ScheduledMessage {
+        $scheduledMessages = $this->dispatchMessageAction->handle(
+            recipient: $enrollment->contact,
+            channel: $campaign->channel,
+            purpose: $campaign->purpose,
+            scope: $campaign->scope,
+            dispatchKeys: $step->dispatch_key,
+            payload: array_replace_recursive($step->payload ?? [], $payload),
+            context: $context,
+            meta: array_replace_recursive([
+                'campaign_enrollment_id' => $enrollment->id,
+                'campaign_id' => $campaign->id,
+                'campaign_key' => $campaign->key,
+                'campaign_step_id' => $step->id,
+                'campaign_step' => $step->step_number,
+            ], $step->meta ?? [], $meta ?? []),
+            criteria: array_replace_recursive([
+                'campaign_key' => $campaign->key,
+                'step' => $step->step_number,
+            ], $step->criteria ?? []),
+        );
+
+        return $scheduledMessages[0] ?? null;
     }
 
     private function completeEnrollment(CampaignEnrollment $enrollment, string $reason): void

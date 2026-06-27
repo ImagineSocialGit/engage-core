@@ -13,6 +13,9 @@ return [
     | Final precedence:
     | system config -> selected preset defaults -> explicit client config
     |
+    | Runtime systems must read DB-owned definitions. Preset definitions are only
+    | starter/default definitions that sync into editable database records.
+    |
     */
 
     'default' => env('CLIENT_PRESET'),
@@ -44,6 +47,7 @@ return [
             ],
 
             'flow_routes' => [],
+            'campaigns' => [],
         ],
 
         'lightweight_task_workspace' => [
@@ -67,6 +71,7 @@ return [
             ],
 
             'flow_routes' => [],
+            'campaigns' => [],
         ],
 
         'webinar_funnel' => [
@@ -109,6 +114,7 @@ return [
             ],
 
             'flow_routes' => [],
+            'campaigns' => [],
         ],
 
         'mortgage' => [
@@ -169,6 +175,7 @@ return [
             ],
 
             'flow_routes' => [],
+            'campaigns' => [],
         ],
 
         'dog_training' => [
@@ -207,6 +214,7 @@ return [
             ],
 
             'flow_routes' => [],
+            'campaigns' => [],
         ],
 
         'musician_fan_engagement' => [
@@ -252,6 +260,7 @@ return [
             ],
 
             'flow_routes' => [],
+            'campaigns' => [],
         ],
 
     ],
