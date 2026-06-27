@@ -114,6 +114,7 @@
 │   │   │   ├── Controllers
 │   │   │   ├── Data
 │   │   │   │   ├── BranchEvaluatePointDefinition.php
+│   │   │   │   ├── ChangeStatusPointDefinition.php
 │   │   │   │   ├── ConditionPointDefinition.php
 │   │   │   │   ├── CreateTaskPointDefinition.php
 │   │   │   │   ├── EventWaitPointDefinition.php
@@ -140,6 +141,7 @@
 │   │   │   │   └── Point.php
 │   │   │   ├── PointHandlers
 │   │   │   │   ├── BranchEvaluatePointHandler.php
+│   │   │   │   ├── ChangeStatusPointHandler.php
 │   │   │   │   ├── ConditionPointHandler.php
 │   │   │   │   ├── CreateTaskPointHandler.php
 │   │   │   │   ├── EventWaitPointHandler.php
@@ -880,4 +882,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-308 directories, 573 files
+308 directories, 575 files

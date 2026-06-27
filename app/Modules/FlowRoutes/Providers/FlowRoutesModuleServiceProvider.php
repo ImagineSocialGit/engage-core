@@ -6,6 +6,7 @@ use App\Modules\FlowRoutes\ConditionEvaluators\FlowRouteDataConditionEvaluator;
 use App\Modules\FlowRoutes\Listeners\HandleContactWorkflowStatusChanged;
 use App\Modules\FlowRoutes\Listeners\ResumeFlowRouteProgressWhenTaskCompleted;
 use App\Modules\FlowRoutes\PointHandlers\BranchEvaluatePointHandler;
+use App\Modules\FlowRoutes\PointHandlers\ChangeStatusPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\ConditionPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\CreateTaskPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\EventWaitPointHandler;
@@ -68,6 +69,7 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
             EventWaitPointHandler::class,
             ConditionPointHandler::class,
             BranchEvaluatePointHandler::class,
+            ChangeStatusPointHandler::class,
         ];
 
         if ($this->tasksAvailable()) {
