@@ -10,7 +10,6 @@ use App\Modules\Webinars\Contracts\WebinarProvider;
 use App\Modules\Webinars\Data\ProviderRecordingData;
 use App\Modules\Webinars\Data\WebinarAttendanceRecord;
 use App\Modules\Webinars\Jobs\PostEvent\ProcessWebinarProviderEventJob;
-use App\Modules\Webinars\Jobs\PostEvent\RoutePostWebinarRegistrationJob;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Services\WebinarProviderManager;
@@ -34,7 +33,7 @@ class ProcessPostWebinarEventJobTest extends TestCase
 
     public function test_it_records_attendance_for_configured_webinar_ended_event(): void
     {
-        Queue::fake([RoutePostWebinarRegistrationJob::class]);
+        Queue::fake();
 
         Config::set('webinars.post_event.events', [
             'webinar.ended' => [
@@ -89,12 +88,11 @@ class ProcessPostWebinarEventJobTest extends TestCase
         $this->assertSame('missed', data_get($missedRegistration->meta, 'attendance.status'));
         $this->assertSame('zoom', data_get($missedRegistration->meta, 'attendance.provider'));
 
-        Queue::assertNotPushed(RoutePostWebinarRegistrationJob::class);
     }
 
     public function test_it_runs_configured_post_event_actions_in_order(): void
     {
-        Queue::fake([RoutePostWebinarRegistrationJob::class]);
+        Queue::fake();
 
         Config::set('webinars.post_event.events', [
             'webinar.ended' => [
@@ -169,12 +167,11 @@ class ProcessPostWebinarEventJobTest extends TestCase
         $this->assertNull($missedRegistration->attended_at);
         $this->assertSame('missed', data_get($missedRegistration->meta, 'attendance.status'));
 
-        Queue::assertNotPushed(RoutePostWebinarRegistrationJob::class);
     }
 
     public function test_it_safely_no_ops_when_event_has_no_configured_actions(): void
     {
-        Queue::fake([RoutePostWebinarRegistrationJob::class]);
+        Queue::fake();
 
         Config::set('webinars.post_event.events', []);
 
@@ -204,7 +201,6 @@ class ProcessPostWebinarEventJobTest extends TestCase
         $this->assertNull(data_get($webinar->meta, 'normalized.post_event.playback_resolved_at'));
         $this->assertNull(data_get($webinar->meta, 'automation_events.webinar_ended_recorded_at'));
 
-        Queue::assertNotPushed(RoutePostWebinarRegistrationJob::class);
     }
 
     private function makeWebinarWithRegistrations(): array

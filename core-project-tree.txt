@@ -155,7 +155,7 @@
 │   │   │   │   └── ResumeFlowRouteProgressJob.php
 │   │   │   ├── Listeners
 │   │   │   │   ├── HandleContactWorkflowStatusChanged.php
-│   │   │   │   └── ResumeFlowRouteProgressWhenTaskCompleted.php
+│   │   │   │   └── ResumeFlowRoutesFromAutomationEvent.php
 │   │   │   ├── Models
 │   │   │   │   ├── ContactFlowRouteProgress.php
 │   │   │   │   ├── FlowRoute.php
@@ -355,6 +355,8 @@
 │   │   │   │   └── TaskDigest.php
 │   │   │   ├── Events
 │   │   │   │   └── TaskCompleted.php
+│   │   │   ├── Listeners
+│   │   │   │   └── EmitTaskCompletedAutomationEvent.php
 │   │   │   ├── Models
 │   │   │   │   └── Task.php
 │   │   │   ├── Providers
@@ -379,12 +381,12 @@
 │   │   │   │   ├── CreateWebinarRegistrationAction.php
 │   │   │   │   ├── DispatchWebinarRegistrationMessagesAction.php
 │   │   │   │   ├── DispatchWebinarWaitlistMessagesAction.php
+│   │   │   │   ├── EmitWebinarAutomationEventAction.php
 │   │   │   │   ├── FlushWebinarCachesAction.php
 │   │   │   │   ├── GetActiveWebinarSeriesAction.php
 │   │   │   │   ├── GetNextUpcomingWebinarAction.php
 │   │   │   │   ├── PostEvent
 │   │   │   │   │   ├── DispatchPostWebinarFollowUpsAction.php
-│   │   │   │   │   ├── DispatchWebinarOutcomeMessagesAction.php
 │   │   │   │   │   ├── HandleWebinarProviderWebhookEventAction.php
 │   │   │   │   │   ├── RecordWebinarAttendanceAction.php
 │   │   │   │   │   ├── RecordWebinarProviderAttendanceAction.php
@@ -418,8 +420,7 @@
 │   │   │   │   ├── NotifyWebinarWaitlistJob.php
 │   │   │   │   └── PostEvent
 │   │   │   │       ├── ProcessPostWebinarEventJob.php
-│   │   │   │       ├── ProcessWebinarProviderEventJob.php
-│   │   │   │       └── RoutePostWebinarRegistrationJob.php
+│   │   │   │       └── ProcessWebinarProviderEventJob.php
 │   │   │   ├── Models
 │   │   │   │   ├── Webinar.php
 │   │   │   │   ├── WebinarRegistration.php
@@ -466,6 +467,11 @@
 │   │   └── Modules
 │   │       └── IntegrationsModuleServiceProvider.php
 │   └── Support
+│       ├── AutomationEvents
+│       │   ├── Data
+│       │   │   └── AutomationEventData.php
+│       │   └── Events
+│       │       └── AutomationEventRecorded.php
 │       ├── Caching
 │       │   └── CacheKey.php
 │       ├── Clients
@@ -890,7 +896,6 @@
 │   │   │   ├── ModuleNavigationTest.php
 │   │   │   └── ModuleRouteMiddlewareTest.php
 │   │   ├── Webhooks
-│   │   │   ├── DispatchWebinarOutcomeMessagesActionTest.php
 │   │   │   ├── EmailWebhookControllerTest.php
 │   │   │   ├── SmsWebhookControllerTest.php
 │   │   │   ├── TelnyxInboundSmsWebhookTest.php
@@ -907,4 +912,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-320 directories, 588 files
+324 directories, 589 files

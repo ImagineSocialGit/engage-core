@@ -4,7 +4,6 @@ namespace App\Modules\FlowRoutes\Providers;
 
 use App\Modules\FlowRoutes\ConditionEvaluators\FlowRouteDataConditionEvaluator;
 use App\Modules\FlowRoutes\Listeners\HandleContactWorkflowStatusChanged;
-use App\Modules\FlowRoutes\Listeners\ResumeFlowRouteProgressWhenTaskCompleted;
 use App\Modules\FlowRoutes\Listeners\ResumeFlowRoutesFromAutomationEvent;
 use App\Modules\FlowRoutes\PointHandlers\BranchEvaluatePointHandler;
 use App\Modules\FlowRoutes\PointHandlers\CancelCampaignPointHandler;
@@ -25,8 +24,6 @@ use Illuminate\Support\ServiceProvider;
 
 class FlowRoutesModuleServiceProvider extends ServiceProvider
 {
-    private const TASK_COMPLETED_EVENT = 'App\\Modules\\Tasks\\Events\\TaskCompleted';
-
     private const CREATE_TASK_ACTION = 'App\\Modules\\Tasks\\Actions\\CreateTaskAction';
 
     private const DISPATCH_MESSAGE_ACTION = 'App\\Modules\\Messaging\\Actions\\DispatchMessageAction';
@@ -67,8 +64,6 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
             AutomationEventRecorded::class,
             ResumeFlowRoutesFromAutomationEvent::class,
         );
-
-        $this->registerOptionalTaskListeners();
     }
 
     /**
@@ -102,22 +97,6 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
         }
 
         return $handlers;
-    }
-
-    private function registerOptionalTaskListeners(): void
-    {
-        if (! $this->tasksAvailable()) {
-            return;
-        }
-
-        if (! class_exists(self::TASK_COMPLETED_EVENT)) {
-            return;
-        }
-
-        Event::listen(
-            self::TASK_COMPLETED_EVENT,
-            ResumeFlowRouteProgressWhenTaskCompleted::class,
-        );
     }
 
     private function tasksAvailable(): bool
