@@ -253,6 +253,90 @@ Avoid:
 - circular dependencies
 - Integrations -> feature modules
 
+## Automation Event Seam
+
+Some module outcomes should be exposed through the app-level automation event seam instead of consumer modules listening to every producer-specific event.
+
+Current seam:
+
+    App\Support\AutomationEvents\Data\AutomationEventData
+    App\Support\AutomationEvents\Events\AutomationEventRecorded
+
+This seam is intentionally app-level support infrastructure, not a feature module.
+
+It exists to prevent FlowRoutes, Tasks, Campaigns, InternalNotifications, or future vertical modules from accumulating producer-specific listeners for every module outcome.
+
+Preferred shape:
+
+    Producer module records its own domain state
+    Producer module emits AutomationEventRecorded
+    FlowRoutes listens to AutomationEventRecorded
+    FlowRoutes maps the generic event into its own FlowRouteExternalEvent internally
+    FlowRoutes resumes matching event_wait points if configured
+
+Producer modules should not import FlowRoutes.
+
+Producer modules should not call `FlowRouteExternalEvent::make`.
+
+FlowRoutes should not add producer-specific listeners such as:
+
+    WebinarOutcomeRecorded -> FlowRoutes
+    TaskCompleted -> FlowRoutes
+    MortgageStageChanged -> FlowRoutes
+
+Good:
+
+    Webinars -> AutomationEventRecorded(webinar.attended)
+    Tasks -> AutomationEventRecorded(task.completed)
+    FlowRoutes -> AutomationEventRecorded listener
+
+Bad:
+
+    Webinars -> FlowRoutes
+    Tasks -> FlowRoutes task-specific listener
+    Mortgage -> FlowRoutes
+    Producer module -> FlowRouteExternalEvent
+
+Automation events should be contact-aware, not contact-required.
+
+Shape:
+
+    event_key
+    contact_id nullable
+    subject_type nullable
+    subject_id nullable
+    occurred_at
+    payload
+    meta
+
+Examples:
+
+    webinar.registered
+    webinar.cancelled
+    webinar.attended
+    webinar.missed
+    webinar.ended
+    task.completed
+
+Contact-specific events can resume contact FlowRoute progress.
+
+Contactless events, such as `webinar.ended`, may be useful for future team/admin automation, but current FlowRoutes contact progress should ignore them unless a matching contact context exists.
+
+The automation event seam is for cross-module automation decisions.
+
+It is not required for every module-to-module call.
+
+Direct public action/service calls are still correct when a module is using another module as a capability.
+
+Good direct calls:
+
+    Webinars -> Messaging registration/reminder messages
+    FlowRoutes -> CreateTaskAction
+    FlowRoutes -> EnrollContactInCampaignAction
+    Campaigns -> Messaging schedule/send actions
+
+Do not route everything through automation events just for purity.
+
 ## Core Module
 
 Core is required for every install.
@@ -510,6 +594,20 @@ Core should not import Tasks.
 
 Tasks can contribute contact page data through Core’s `ContactShowDataProvider`.
 
+Tasks emits generic automation events for automation-worthy task lifecycle outcomes.
+
+Current event:
+
+    task.completed
+
+Expected shape:
+
+    TaskCompleted -> Tasks listener -> AutomationEventRecorded(task.completed)
+
+FlowRoutes should not listen directly to `TaskCompleted`.
+
+FlowRoutes should resume task-related `event_wait` points through its generic `AutomationEventRecorded` listener.
+
 ## Workflow Module
 
 Workflow is optional.
@@ -586,6 +684,19 @@ FlowRoutes depends on Workflow.
 
 FlowRoutes reacts to Workflow status/profile events.
 
+FlowRoutes also listens to the generic `AutomationEventRecorded` seam for external event waits.
+
+FlowRoutes should have exactly these broad listener categories:
+
+1. Workflow lifecycle events, such as `ContactWorkflowStatusChanged`.
+2. Generic automation events, such as `AutomationEventRecorded`.
+
+Workflow lifecycle events are allowed to stay direct because they start, supersede, and evaluate route progress based on ContactStatus.
+
+Automation-worthy producer outcomes should go through `AutomationEventRecorded`.
+
+FlowRoutes should not add producer-specific listeners for Webinars, Tasks, Mortgage, Campaigns, Broadcasts, or other vertical modules.
+
 Core should not call FlowRoutes.
 
 Workflow should not call FlowRoutes directly.
@@ -659,6 +770,12 @@ Bad:
     Task::create(...)
     ScheduledMessage::create(...)
     CampaignEnrollment::create(...)
+
+Also bad:
+
+    Webinars imports FlowRoutes
+    Tasks completion listener inside FlowRoutes
+    Producer modules call FlowRouteExternalEvent::make(...)
 
 `contact_flow_route_progress` may store denormalized `contact_id` and `contact_status_id` values for query/runtime convenience.
 
@@ -877,20 +994,34 @@ Webinars may use Messaging to send reminders/follow-ups.
 
 Webinars should not directly own Campaign enrollment routing.
 
-Preferred long-term direction:
+Current outcome direction:
 
 1. Webinars records webinar registration/attendance/outcome state.
-2. Webinars emits or exposes public webinar outcome events/data.
-3. FlowRoutes may listen/map those outcomes into normalized FlowRoute external events.
-4. FlowRoutes decides whether to create tasks, change status, enroll Campaigns, cancel Campaigns, or send messages.
-5. Campaigns owns Campaign enrollment/progression.
-6. Messaging owns delivery/scheduling.
+2. Webinars emits `AutomationEventRecorded` for automation-worthy outcomes.
+3. FlowRoutes listens to the generic automation event seam.
+4. FlowRoutes maps generic automation events into `FlowRouteExternalEvent` internally.
+5. FlowRoutes decides whether to create tasks, change status, enroll Campaigns, cancel Campaigns, or send messages.
+6. Campaigns owns Campaign enrollment/progression.
+7. Messaging owns delivery/scheduling.
+
+Current webinar automation events:
+
+    webinar.registered
+    webinar.cancelled
+    webinar.attended
+    webinar.missed
+    webinar.ended
+
+`webinar.ended` may be contactless.
+
+Contactless automation events should not force contact FlowRoute progress to resume unless a contact context exists.
 
 Good:
 
     DispatchMessageAction
     ScheduleMessageAction
-    public webinar outcome event/data object
+    AutomationEventRecorded
+    AutomationEventData
 
 Bad:
 
@@ -904,7 +1035,9 @@ Consent audit details such as IP address, user agent, opt-in language, and opt-i
 
 Webinar outcome fields such as `registered_at`, `attended_at`, and `cancelled_at` belong to Webinars.
 
-Those outcome fields should later be mapped into FlowRoutes external events, but Webinars should not decide Campaign, Workflow, task, or FlowRoute orchestration directly.
+Those outcome fields are emitted through `AutomationEventRecorded`, then FlowRoutes maps them into `FlowRouteExternalEvent` internally when needed.
+
+Webinars should not decide Campaign, Workflow, task, or FlowRoute orchestration directly.
 
 ## Reporting Module
 
@@ -1093,6 +1226,10 @@ Current guardrails should ensure:
 - InboundMessaging does not import InternalNotifications.
 - Provider dependency expansion does not accidentally change explicit module visibility.
 - Contact show module visibility respects enabled modules.
+- Producer modules do not import FlowRoutes.
+- `FlowRouteExternalEvent::make(...)` is only called from FlowRoutes-owned code.
+- FlowRoutes does not listen directly to producer-specific events such as TaskCompleted or Webinar-specific outcomes.
+- Automation-worthy producer outcomes use `AutomationEventRecorded`.
 
 When a boundary test fails, prefer improving the architecture over whitelisting the violation.
 
@@ -1105,11 +1242,12 @@ The current architecture is entering client-rollout schema freeze.
 Recommended next implementation order:
 
 1. Phase 17 — Schema/module freeze pass
-2. Phase 18 — Webinar outcome to FlowRoutes external events
-3. Phase 19 — Default MVP presets
-4. Phase 20 — Tasks and digest verification
-5. Phase 21 — Minimal contact visibility/debug
-6. Phase 22 — Client MVP smoke test
+2. Phase 18 — Generic automation event seam for external resumes
+3. Phase 18.5 — Automation boundary audit and cleanup
+4. Phase 19 — Default MVP presets
+5. Phase 20 — Tasks and digest verification
+6. Phase 21 — Minimal contact visibility/debug
+7. Phase 22 — Client MVP smoke test
 
 ### Phase 17 — Schema/module freeze pass
 
@@ -1132,13 +1270,32 @@ Update boundary docs and boundary tests only where they protect final dependency
 
 Do not add product features, admin UI, or migrations unless the audit reveals a clear ownership mistake.
 
-### Phase 18 — Webinar outcome to FlowRoutes external events
+### Phase 18 — Generic automation event seam for external resumes
 
-Map webinar registered, attended, missed, and cancelled outcomes into `FlowRouteExternalEvent`.
+Add the generic automation event seam:
 
-Remove any remaining direct Webinars to Campaigns or Workflow-style orchestration.
+    AutomationEventData
+    AutomationEventRecorded
 
-Webinars should record webinar state and expose/emit outcome events.
+Producer modules emit generic automation events after recording their own domain state.
+
+FlowRoutes listens to `AutomationEventRecorded` and maps those events into `FlowRouteExternalEvent` internally.
+
+Webinars emits:
+
+- `webinar.registered`
+- `webinar.cancelled`
+- `webinar.attended`
+- `webinar.missed`
+- `webinar.ended`
+
+Tasks emits:
+
+- `task.completed`
+
+Remove direct producer-specific FlowRoutes listeners where the outcome is an external event wait/resume trigger.
+
+Keep Workflow status changes direct because they are FlowRoute lifecycle behavior, not generic event_wait behavior.
 
 FlowRoutes should decide reactions through:
 
@@ -1148,6 +1305,27 @@ FlowRoutes should decide reactions through:
 - `create_task`
 - `change_status`
 - `send_message`
+
+### Phase 18.5 — Automation boundary audit and cleanup
+
+Audit event/listener boundaries before adding MVP presets.
+
+Confirmed direction:
+
+- FlowRoutes listens to `ContactWorkflowStatusChanged` for Workflow lifecycle behavior.
+- FlowRoutes listens to `AutomationEventRecorded` for generic external event waits.
+- Tasks emits `task.completed` through `AutomationEventRecorded`.
+- Webinars emits webinar outcomes through `AutomationEventRecorded`.
+- Campaigns may listen to `ScheduledMessageSent` for campaign step progression because that is Campaign-owned lifecycle bookkeeping.
+- InternalNotifications may listen to `InboundMessageReceived` because inbound reply notification is an InternalNotifications feature.
+- Messaging consent and scheduled-message events remain Messaging domain events.
+
+Guardrails:
+
+- Do not add producer-specific listeners to FlowRoutes.
+- Do not make producer modules import FlowRoutes.
+- Do not route ordinary capability calls through automation events unnecessarily.
+- Do not use the automation bus as a replacement for public actions/services.
 
 ### Phase 19 — Default MVP presets
 
