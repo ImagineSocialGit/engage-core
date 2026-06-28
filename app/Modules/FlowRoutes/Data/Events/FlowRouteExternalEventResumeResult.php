@@ -2,6 +2,8 @@
 
 namespace App\Modules\FlowRoutes\Data\Events;
 
+use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
+
 class FlowRouteExternalEventResumeResult
 {
     /**

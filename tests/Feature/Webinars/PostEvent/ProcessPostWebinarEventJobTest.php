@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Webinars\PostEvent;
 
+use App\Modules\Core\Models\Contact;
 use App\Modules\Webinars\Actions\PostEvent\DispatchPostWebinarFollowUpsAction;
 use App\Modules\Webinars\Actions\PostEvent\RecordWebinarProviderAttendanceAction;
 use App\Modules\Webinars\Actions\PostEvent\ResolveWebinarPlaybackAction;
@@ -10,7 +11,6 @@ use App\Modules\Webinars\Data\ProviderRecordingData;
 use App\Modules\Webinars\Data\WebinarAttendanceRecord;
 use App\Modules\Webinars\Jobs\PostEvent\ProcessWebinarProviderEventJob;
 use App\Modules\Webinars\Jobs\PostEvent\RoutePostWebinarRegistrationJob;
-use App\Modules\Core\Models\Contact;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Services\WebinarProviderManager;
@@ -48,9 +48,9 @@ class ProcessPostWebinarEventJobTest extends TestCase
 
         [$webinar, $attendedRegistration, $missedRegistration, $attendanceRecord] = $this->makeWebinarWithRegistrations();
 
-        $provider = $this->mock(WebinarProvider::class, function (MockInterface $mock) use ($webinar, $attendanceRecord) {
+        $provider = $this->mock(WebinarProvider::class, function (MockInterface $mock) use ($webinar, $attendanceRecord): void {
             $mock->shouldReceive('key')
-                ->once()
+                ->zeroOrMoreTimes()
                 ->andReturn('zoom');
 
             $mock->shouldReceive('listAttendanceRecords')
@@ -116,35 +116,15 @@ class ProcessPostWebinarEventJobTest extends TestCase
                     'operator' => 'filled',
                 ],
             ],
-            'routes' => [
-                'attended' => [
-                    'enabled' => true,
-                    'conditions' => [
-                        [
-                            'field' => 'registration.attended_at',
-                            'operator' => 'filled',
-                        ],
-                    ],
-                ],
-                'missed' => [
-                    'enabled' => true,
-                    'conditions' => [
-                        [
-                            'field' => 'registration.attended_at',
-                            'operator' => 'blank',
-                        ],
-                    ],
-                ],
-            ],
         ]);
 
         Carbon::setTestNow('2026-06-12 12:00:00');
 
         [$webinar, $attendedRegistration, $missedRegistration, $attendanceRecord] = $this->makeWebinarWithRegistrations();
 
-        $provider = $this->mock(WebinarProvider::class, function (MockInterface $mock) use ($webinar, $attendanceRecord) {
+        $provider = $this->mock(WebinarProvider::class, function (MockInterface $mock) use ($webinar, $attendanceRecord): void {
             $mock->shouldReceive('key')
-                ->twice()
+                ->zeroOrMoreTimes()
                 ->andReturn('zoom');
 
             $mock->shouldReceive('listAttendanceRecords')
@@ -178,21 +158,18 @@ class ProcessPostWebinarEventJobTest extends TestCase
         $this->assertSame('pass123', $webinar->playback_passcode);
         $this->assertNotNull(data_get($webinar->meta, 'normalized.post_event.playback_resolved_at'));
         $this->assertNotNull(data_get($webinar->meta, 'normalized.post_event.attendance_recorded_at'));
-        $this->assertNotNull(data_get($webinar->meta, 'normalized.post_event.follow_ups_dispatched_at'));
+        $this->assertNotNull(data_get($webinar->meta, 'automation_events.webinar_ended_recorded_at'));
 
-        Queue::assertPushed(RoutePostWebinarRegistrationJob::class, 2);
+        $attendedRegistration->refresh();
+        $missedRegistration->refresh();
 
-        Queue::assertPushed(
-            RoutePostWebinarRegistrationJob::class,
-            fn (RoutePostWebinarRegistrationJob $job) => $job->registrationId === $attendedRegistration->id
-                && $job->event === 'webinar.ended'
-        );
+        $this->assertNotNull($attendedRegistration->attended_at);
+        $this->assertSame('attended', data_get($attendedRegistration->meta, 'attendance.status'));
 
-        Queue::assertPushed(
-            RoutePostWebinarRegistrationJob::class,
-            fn (RoutePostWebinarRegistrationJob $job) => $job->registrationId === $missedRegistration->id
-                && $job->event === 'webinar.ended'
-        );
+        $this->assertNull($missedRegistration->attended_at);
+        $this->assertSame('missed', data_get($missedRegistration->meta, 'attendance.status'));
+
+        Queue::assertNotPushed(RoutePostWebinarRegistrationJob::class);
     }
 
     public function test_it_safely_no_ops_when_event_has_no_configured_actions(): void
@@ -205,7 +182,7 @@ class ProcessPostWebinarEventJobTest extends TestCase
 
         [$webinar] = $this->makeWebinarWithRegistrations();
 
-        $provider = $this->mock(WebinarProvider::class, function (MockInterface $mock) {
+        $provider = $this->mock(WebinarProvider::class, function (MockInterface $mock): void {
             $mock->shouldNotReceive('key');
             $mock->shouldNotReceive('listAttendanceRecords');
             $mock->shouldNotReceive('getRecording');
@@ -225,7 +202,7 @@ class ProcessPostWebinarEventJobTest extends TestCase
 
         $this->assertNull(data_get($webinar->meta, 'normalized.post_event.attendance_recorded_at'));
         $this->assertNull(data_get($webinar->meta, 'normalized.post_event.playback_resolved_at'));
-        $this->assertNull(data_get($webinar->meta, 'normalized.post_event.follow_ups_dispatched_at'));
+        $this->assertNull(data_get($webinar->meta, 'automation_events.webinar_ended_recorded_at'));
 
         Queue::assertNotPushed(RoutePostWebinarRegistrationJob::class);
     }
@@ -287,7 +264,7 @@ class ProcessPostWebinarEventJobTest extends TestCase
 
     private function mockProviderManager(WebinarProvider $provider, bool $shouldResolve = true): void
     {
-        $expectation = $this->mock(WebinarProviderManager::class, function (MockInterface $mock) use ($provider, $shouldResolve) {
+        $this->mock(WebinarProviderManager::class, function (MockInterface $mock) use ($provider, $shouldResolve): void {
             if (! $shouldResolve) {
                 $mock->shouldNotReceive('provider');
 

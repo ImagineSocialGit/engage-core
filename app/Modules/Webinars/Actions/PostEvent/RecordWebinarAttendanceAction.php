@@ -2,20 +2,26 @@
 
 namespace App\Modules\Webinars\Actions\PostEvent;
 
+use App\Modules\Webinars\Actions\EmitWebinarAutomationEventAction;
 use App\Modules\Webinars\Data\WebinarAttendanceRecord;
 use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Models\WebinarRegistration;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class RecordWebinarAttendanceAction
 {
+    public function __construct(
+        private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
+    ) {}
+
     public function execute(
         Webinar $webinar,
         string $provider,
         Collection $attendanceRecords,
     ): void {
-
         $attendanceRecords = $attendanceRecords
             ->map(fn (WebinarAttendanceRecord|array $record) => $record instanceof WebinarAttendanceRecord
                 ? $record
@@ -24,7 +30,8 @@ class RecordWebinarAttendanceAction
             ->values();
 
         $registrations = $webinar->registrations()
-            ->with('contact')
+            ->with(['contact', 'webinar', 'webinar.webinarSeries'])
+            ->where('status', '!=', 'cancelled')
             ->get();
 
         $matchedRegistrationIds = [];
@@ -49,44 +56,135 @@ class RecordWebinarAttendanceAction
                 continue;
             }
 
+            $matchedRegistrationIds[] = $registration->id;
+
+            $this->recordAttendedRegistration(
+                registration: $registration,
+                provider: $provider,
+                match: $match,
+            );
+        }
+
+        $registrations
+            ->reject(fn (WebinarRegistration $registration) => in_array($registration->id, $matchedRegistrationIds, true))
+            ->each(function (WebinarRegistration $registration) use ($provider): void {
+                $this->recordMissedRegistration(
+                    registration: $registration,
+                    provider: $provider,
+                );
+            });
+    }
+
+    private function recordAttendedRegistration(
+        WebinarRegistration $registration,
+        string $provider,
+        WebinarAttendanceRecord $match,
+    ): void {
+        if ($registration->attended_at !== null) {
+            return;
+        }
+
+        DB::transaction(function () use ($registration, $provider, $match): void {
+            $recordedAt = now();
+            $attendedAt = $this->attendedAt($match->joinTime);
+
             $meta = $registration->meta ?? [];
 
             $meta['attendance'] = [
                 'provider' => $provider,
-                'status' => $match->status,
+                'status' => $match->status ?: 'attended',
                 'duration' => $match->duration,
                 'join_time' => $this->dateTimeString($match->joinTime),
                 'leave_time' => $this->dateTimeString($match->leaveTime),
-                'recorded_at' => now()->toIso8601String(),
+                'recorded_at' => $recordedAt->toIso8601String(),
                 'raw' => $match->raw,
             ];
 
             $registration->forceFill([
-                'attended_at' => $registration->attended_at
-                    ?? $this->attendedAt($match->joinTime),
+                'attended_at' => $attendedAt,
                 'meta' => $meta,
             ])->save();
 
-            $matchedRegistrationIds[] = $registration->id;
+            DB::afterCommit(function () use ($registration, $provider, $match, $attendedAt): void {
+                $registration = $registration->fresh([
+                    'contact',
+                    'webinar',
+                    'webinar.webinarSeries',
+                ]);
+
+                if (! $registration) {
+                    return;
+                }
+
+                $this->emitWebinarAutomationEvent->forRegistration(
+                    eventKey: 'webinar.attended',
+                    registration: $registration,
+                    occurredAt: $attendedAt,
+                    payload: [
+                        'attendance' => [
+                            'provider' => $provider,
+                            'status' => $match->status ?: 'attended',
+                            'duration' => $match->duration,
+                            'join_time' => $this->dateTimeString($match->joinTime),
+                            'leave_time' => $this->dateTimeString($match->leaveTime),
+                        ],
+                    ],
+                );
+            });
+        });
+    }
+
+    private function recordMissedRegistration(
+        WebinarRegistration $registration,
+        string $provider,
+    ): void {
+        if ($registration->attended_at !== null) {
+            return;
         }
 
-        $webinar->registrations()
-            ->whereNotIn('id', $matchedRegistrationIds)
-            ->whereNull('attended_at')
-            ->get()
-            ->each(function ($registration) use ($provider) {
-                $meta = $registration->meta ?? [];
+        if (data_get($registration->meta, 'attendance.status') === 'missed') {
+            return;
+        }
 
-                $meta['attendance'] = [
-                    'provider' => $provider,
-                    'status' => 'missed',
-                    'recorded_at' => now()->toIso8601String(),
-                ];
+        DB::transaction(function () use ($registration, $provider): void {
+            $recordedAt = now();
 
-                $registration->forceFill([
-                    'meta' => $meta,
-                ])->save();
+            $meta = $registration->meta ?? [];
+
+            $meta['attendance'] = [
+                'provider' => $provider,
+                'status' => 'missed',
+                'recorded_at' => $recordedAt->toIso8601String(),
+            ];
+
+            $registration->forceFill([
+                'meta' => $meta,
+            ])->save();
+
+            DB::afterCommit(function () use ($registration, $provider, $recordedAt): void {
+                $registration = $registration->fresh([
+                    'contact',
+                    'webinar',
+                    'webinar.webinarSeries',
+                ]);
+
+                if (! $registration) {
+                    return;
+                }
+
+                $this->emitWebinarAutomationEvent->forRegistration(
+                    eventKey: 'webinar.missed',
+                    registration: $registration,
+                    occurredAt: $recordedAt,
+                    payload: [
+                        'attendance' => [
+                            'provider' => $provider,
+                            'status' => 'missed',
+                        ],
+                    ],
+                );
             });
+        });
     }
 
     protected function matchesRegistration(
@@ -95,11 +193,11 @@ class RecordWebinarAttendanceAction
         WebinarAttendanceRecord $attendanceRecord,
     ): bool {
         if (filled($registrationRegistrantId) && filled($attendanceRecord->registrantId)) {
-            return (string) $attendanceRecord->registrantId === (string) $registrationRegistrantId;
+            return (string) $registrationRegistrantId === (string) $attendanceRecord->registrantId;
         }
 
         if (filled($registrationEmail) && filled($attendanceRecord->email)) {
-            return $attendanceRecord->email === $registrationEmail;
+            return mb_strtolower(trim($attendanceRecord->email)) === $registrationEmail;
         }
 
         return false;

@@ -13,11 +13,12 @@ class CancelWebinarRegistrationAction
     public function __construct(
         private readonly WebinarProviderManager $webinarProviderManager,
         private readonly SkipScheduledMessagesAction $skipScheduledMessagesAction,
+        private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
     ) {}
 
     public function handle(WebinarRegistration $registration, string $source = 'email_link'): WebinarRegistration
     {
-        $registration->loadMissing(['contact', 'webinar']);
+        $registration->loadMissing(['contact', 'webinar', 'webinar.webinarSeries']);
 
         if ($registration->status === 'cancelled') {
             return $registration;
@@ -26,16 +27,18 @@ class CancelWebinarRegistrationAction
         $this->cancelWithProvider($registration);
 
         return DB::transaction(function () use ($registration, $source) {
+            $cancelledAt = now();
+
             $meta = $registration->meta ?? [];
 
             $meta['cancellation'] = [
                 'source' => $source,
-                'cancelled_at' => now()->toISOString(),
+                'cancelled_at' => $cancelledAt->toISOString(),
             ];
 
             $registration->forceFill([
                 'status' => 'cancelled',
-                'cancelled_at' => now(),
+                'cancelled_at' => $cancelledAt,
                 'meta' => $meta,
             ])->save();
 
@@ -43,6 +46,29 @@ class CancelWebinarRegistrationAction
                 context: $registration,
                 reason: 'Webinar registration cancelled.',
             );
+
+            DB::afterCommit(function () use ($registration, $cancelledAt, $source) {
+                $registration = $registration->fresh([
+                    'contact',
+                    'webinar',
+                    'webinar.webinarSeries',
+                ]);
+
+                if (! $registration) {
+                    return;
+                }
+
+                $this->emitWebinarAutomationEvent->forRegistration(
+                    eventKey: 'webinar.cancelled',
+                    registration: $registration,
+                    occurredAt: $registration->cancelled_at ?? $cancelledAt,
+                    payload: [
+                        'cancellation' => [
+                            'source' => $source,
+                        ],
+                    ],
+                );
+            });
 
             return $registration->refresh();
         });

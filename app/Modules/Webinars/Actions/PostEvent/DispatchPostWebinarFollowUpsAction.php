@@ -2,15 +2,16 @@
 
 namespace App\Modules\Webinars\Actions\PostEvent;
 
-use App\Modules\Webinars\Contracts\WebinarProvider;
-use App\Modules\Webinars\Jobs\PostEvent\RoutePostWebinarRegistrationJob;
-use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Messaging\Services\ConditionChecker;
+use App\Modules\Webinars\Actions\EmitWebinarAutomationEventAction;
+use App\Modules\Webinars\Contracts\WebinarProvider;
+use App\Modules\Webinars\Models\Webinar;
 
 class DispatchPostWebinarFollowUpsAction
 {
     public function __construct(
         private readonly ConditionChecker $conditionChecker,
+        private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
     ) {}
 
     public function execute(
@@ -18,10 +19,6 @@ class DispatchPostWebinarFollowUpsAction
         Webinar $webinar,
         string $event,
     ): bool {
-        if (! config('webinars.post_event.outcome_messages.enabled', true)) {
-            return true;
-        }
-
         $conditions = config('webinars.post_event.outcome_messages.conditions', []);
 
         if (
@@ -31,25 +28,30 @@ class DispatchPostWebinarFollowUpsAction
             return false;
         }
 
-        if (data_get($webinar->meta, 'normalized.post_event.follow_ups_dispatched_at')) {
+        if (data_get($webinar->meta, 'automation_events.webinar_ended_recorded_at')) {
             return true;
         }
 
-        $webinar->registrations()
-            ->pluck('id')
-            ->each(function ($registrationId) use ($event) {
-                RoutePostWebinarRegistrationJob::dispatch(
-                    registrationId: $registrationId,
-                    event: $event,
-                )->onQueue('post_event');
-            });
+        $this->emitWebinarAutomationEvent->forWebinar(
+            eventKey: 'webinar.ended',
+            webinar: $webinar,
+            occurredAt: $webinar->ends_at ?? now(),
+            payload: [
+                'provider' => [
+                    'key' => $provider->key(),
+                ],
+                'post_event' => [
+                    'event' => $event,
+                ],
+            ],
+        );
 
-        $webinar->forceFill([
-            'meta' => array_replace_recursive($webinar->fresh()->meta ?? [], [
-                'normalized' => [
-                    'post_event' => [
-                        'follow_ups_dispatched_at' => now()->toIso8601String(),
-                    ],
+        $freshWebinar = $webinar->fresh();
+
+        $freshWebinar?->forceFill([
+            'meta' => array_replace_recursive($freshWebinar->meta ?? [], [
+                'automation_events' => [
+                    'webinar_ended_recorded_at' => now()->toIso8601String(),
                 ],
             ]),
         ])->save();

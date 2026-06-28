@@ -3,13 +3,13 @@
 namespace App\Modules\Webinars\Actions;
 
 use App\Modules\Core\Actions\Contacts\CreateOrUpdateContactAction;
+use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\GrantMessageConsentAction;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
-use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Services\PhoneNumberNormalizer;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
-use App\Modules\Messaging\Services\PhoneNumberNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -21,6 +21,7 @@ class CreateWebinarRegistrationAction
         private readonly DispatchWebinarRegistrationMessagesAction $dispatchWebinarRegistrationMessagesAction,
         private readonly GrantMessageConsentAction $grantMessageConsentAction,
         private readonly CreateOrUpdateContactAction $createOrUpdateContact,
+        private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
     ) {}
 
     public function handle(array $validated, Request $request, string $webinarSlug = 'default'): WebinarRegistration
@@ -70,11 +71,27 @@ class CreateWebinarRegistrationAction
 
             $this->storeMessageConsents($validated, $request, $contact, $registration, $now);
 
-            $registration->load(['contact', 'webinar']);
+            $registration->load(['contact', 'webinar', 'webinar.webinarSeries']);
 
             $this->syncRegistrationToWebinarPlatform($registration, $webinar);
 
-            DB::afterCommit(function () use ($registration) {
+            DB::afterCommit(function () use ($registration, $now) {
+                $registration = $registration->fresh([
+                    'contact',
+                    'webinar',
+                    'webinar.webinarSeries',
+                ]);
+
+                if (! $registration) {
+                    return;
+                }
+
+                $this->emitWebinarAutomationEvent->forRegistration(
+                    eventKey: 'webinar.registered',
+                    registration: $registration,
+                    occurredAt: $registration->registered_at ?? $now,
+                );
+
                 $this->dispatchWebinarRegistrationMessagesAction->handle($registration);
             });
 

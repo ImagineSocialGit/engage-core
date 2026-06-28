@@ -18,15 +18,9 @@ class RoutePostWebinarRegistrationJob implements ShouldQueue
 
     public function handle(DispatchWebinarOutcomeMessagesAction $dispatchWebinarOutcomeMessagesAction): void
     {
-        $registration = WebinarRegistration::query()
-            ->with([
-                'contact',
-                'webinar',
-                'webinar.webinarSeries',
-            ])
-            ->find($this->registrationId);
+        $registration = WebinarRegistration::query()->find($this->registrationId);
 
-        if (! $registration || ! $registration->webinar) {
+        if (! $registration) {
             return;
         }
 

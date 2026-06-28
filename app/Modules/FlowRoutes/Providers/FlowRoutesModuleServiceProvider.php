@@ -5,6 +5,7 @@ namespace App\Modules\FlowRoutes\Providers;
 use App\Modules\FlowRoutes\ConditionEvaluators\FlowRouteDataConditionEvaluator;
 use App\Modules\FlowRoutes\Listeners\HandleContactWorkflowStatusChanged;
 use App\Modules\FlowRoutes\Listeners\ResumeFlowRouteProgressWhenTaskCompleted;
+use App\Modules\FlowRoutes\Listeners\ResumeFlowRoutesFromAutomationEvent;
 use App\Modules\FlowRoutes\PointHandlers\BranchEvaluatePointHandler;
 use App\Modules\FlowRoutes\PointHandlers\CancelCampaignPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\ChangeStatusPointHandler;
@@ -18,6 +19,7 @@ use App\Modules\FlowRoutes\PointHandlers\WaitPointHandler;
 use App\Modules\FlowRoutes\Services\FlowRouteConditionEvaluatorRegistry;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
+use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -59,6 +61,11 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
         Event::listen(
             ContactWorkflowStatusChanged::class,
             HandleContactWorkflowStatusChanged::class,
+        );
+
+        Event::listen(
+            AutomationEventRecorded::class,
+            ResumeFlowRoutesFromAutomationEvent::class,
         );
 
         $this->registerOptionalTaskListeners();
