@@ -357,6 +357,8 @@ Core owns:
 - contact show extension registries
 - module-safe contact-facing extension points
 
+ContactStatus preset sync may be run directly through Core tooling, but normal new-project setup should be orchestrated by the app-level `presets:sync` command.
+
 Core contacts must remain generic.
 
 Core contacts should answer:
@@ -802,6 +804,8 @@ FlowRoutes owns:
 - condition/branch evaluation behavior
 - external event wait/resume behavior
 - FlowRoute preset sync
+
+FlowRoute preset sync assumes required ContactStatus and Campaign definitions already exist. Normal setup should use the app-level `presets:sync` command so those dependencies are created first.
 
 FlowRoutes depends on Workflow.
 
@@ -1483,6 +1487,20 @@ Runtime behavior should remain DB-driven.
 Preset config should not become runtime business logic.
 
 Default presets should stay small, understandable, and client-safe.
+
+The normal setup path should use the app-level preset sync command:
+
+    php artisan presets:sync
+
+That command should prompt for or accept a preset package key, inspect the selected preset, and run the required module preset syncs in dependency-safe order.
+
+Current dependency-safe order:
+
+1. ContactStatus presets
+2. Campaign presets
+3. FlowRoute presets
+
+Module-specific sync commands may remain available as lower-level operator/debugging tools, but new project setup should use `presets:sync`.
 
 Do not add large workflow builders or admin editors in this phase.
 
