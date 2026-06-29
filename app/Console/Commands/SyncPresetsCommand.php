@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Modules\Campaigns\Actions\SyncCampaignPresetsAction;
 use App\Modules\Core\Actions\ContactStatuses\SyncContactStatusPresetsAction;
 use App\Modules\FlowRoutes\Actions\SyncFlowRoutePresetsAction;
+use App\Modules\Tasks\Actions\SyncTaskPresetsAction;
 use Illuminate\Console\Command;
 use Throwable;
 
@@ -18,6 +19,7 @@ class SyncPresetsCommand extends Command
 
     public function handle(
         SyncContactStatusPresetsAction $syncContactStatusPresets,
+        SyncTaskPresetsAction $syncTaskPresets,
         SyncCampaignPresetsAction $syncCampaignPresets,
         SyncFlowRoutePresetsAction $syncFlowRoutePresets,
     ): int {
@@ -47,6 +49,15 @@ class SyncPresetsCommand extends Command
             } else {
                 $this->line('');
                 $this->warn('Contact statuses: no groups configured; skipped.');
+            }
+
+            if ($this->hasConfiguredGroups($preset, 'tasks')) {
+                $this->renderTaskResult(
+                    $syncTaskPresets->handle($presetKey),
+                );
+            } else {
+                $this->line('');
+                $this->warn('Task templates: no groups configured; skipped.');
             }
 
             if ($this->hasConfiguredGroups($preset, 'campaigns')) {
@@ -146,6 +157,29 @@ class SyncPresetsCommand extends Command
         );
 
         foreach ($result['errors'] as $error) {
+            $this->error($error);
+        }
+    }
+
+    private function renderTaskResult(object $result): void
+    {
+        $this->line('');
+        $this->info('Task templates');
+
+        $this->table(
+            ['Item', 'Count'],
+            [
+                ['Created', $result->created],
+                ['Updated', $result->updated],
+                ['Skipped', $result->skipped],
+            ],
+        );
+
+        foreach ($result->warnings as $warning) {
+            $this->warn($warning);
+        }
+
+        foreach ($result->errors as $error) {
             $this->error($error);
         }
     }

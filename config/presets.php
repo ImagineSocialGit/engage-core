@@ -53,6 +53,12 @@ return [
                 ],
             ],
 
+            'tasks' => [
+                'groups' => [
+                    'general_default',
+                ],
+            ],
+
             'flow_routes' => [
                 'groups' => [],
             ],
@@ -85,6 +91,12 @@ return [
             'contact_statuses' => [
                 'groups' => [
                     'general_default',
+                ],
+            ],
+
+            'tasks' => [
+                'groups' => [
+                    'task_workspace_default',
                 ],
             ],
 
@@ -141,6 +153,13 @@ return [
 
             'contact_statuses' => [
                 'groups' => [
+                    'webinar_default',
+                ],
+            ],
+
+            'tasks' => [
+                'groups' => [
+                    'general_default',
                     'webinar_default',
                 ],
             ],
@@ -223,6 +242,13 @@ return [
                 ],
             ],
 
+            'tasks' => [
+                'groups' => [
+                    'general_default',
+                    'mortgage_default',
+                ],
+            ],
+
             'flow_routes' => [
                 'groups' => [
                     'mortgage_default',
@@ -275,6 +301,12 @@ return [
             'contact_statuses' => [
                 'groups' => [
                     'pet_service_default',
+                ],
+            ],
+
+            'tasks' => [
+                'groups' => [
+                    'general_default',
                 ],
             ],
 
@@ -333,6 +365,12 @@ return [
             'contact_statuses' => [
                 'groups' => [
                     'musician_fan_default',
+                ],
+            ],
+
+            'tasks' => [
+                'groups' => [
+                    'general_default',
                 ],
             ],
 
