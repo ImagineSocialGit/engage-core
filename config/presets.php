@@ -197,12 +197,12 @@ return [
 
             'contacts' => [
                 'labels' => [
-                    'singular' => 'borrower',
-                    'plural' => 'borrowers',
+                    'singular' => 'lead',
+                    'plural' => 'leads',
                 ],
 
                 'routes' => [
-                    'plural' => 'borrowers',
+                    'plural' => 'leads',
                 ],
 
                 'sources' => [

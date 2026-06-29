@@ -2,9 +2,10 @@
 
 namespace App\Modules\Messaging\Payloads;
 
-use App\Modules\Messaging\Contracts\Email\EmailMessage;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Contracts\Email\EmailMessage;
 use App\Modules\Messaging\Support\EmailConsentRevocationLinkGenerator;
+use App\Support\Clients\ViewResolver;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\View;
@@ -130,7 +131,7 @@ class EmailPayload implements EmailMessage
     public function html(): string
     {
         return View::make(
-            $this->view(),
+            ViewResolver::resolve($this->view()),
             [
                 ...$this->tokens,
 

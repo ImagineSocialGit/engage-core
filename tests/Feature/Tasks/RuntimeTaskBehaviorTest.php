@@ -45,7 +45,7 @@ class RuntimeTaskBehaviorTest extends TestCase
             'related_type' => Contact::class,
             'related_id' => $contact->id,
             'responsible_party' => Task::RESPONSIBLE_PARTY_CONTACT,
-            'title' => 'Borrower needs to upload bank statements',
+            'title' => 'Lead needs to upload bank statements',
         ]);
 
         $this->assertSame($contact->getMorphClass(), $task->related_type);
@@ -65,7 +65,7 @@ class RuntimeTaskBehaviorTest extends TestCase
             'related_id' => $contact->id,
             'assigned_to_id' => $teamMember->id,
             'responsible_party' => Task::RESPONSIBLE_PARTY_CONTACT,
-            'title' => 'Borrower needs to sign disclosures',
+            'title' => 'Lead needs to sign disclosures',
         ]);
 
         $this->assertSame($teamMember->getMorphClass(), $task->assigned_to_type);

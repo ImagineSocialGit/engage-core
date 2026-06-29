@@ -120,10 +120,10 @@ return [
         'mortgage_default' => [
             'templates' => [
                 [
-                    'key' => 'mortgage.call_borrower',
-                    'name' => 'Call borrower',
-                    'title' => 'Call borrower',
-                    'description' => 'Call the borrower for next-step follow-up.',
+                    'key' => 'mortgage.call_lead',
+                    'name' => 'Call lead',
+                    'title' => 'Call lead',
+                    'description' => 'Call the lead for next-step follow-up.',
                     'task_description' => null,
                     'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
                     'priority' => null,
@@ -131,10 +131,10 @@ return [
                 ],
 
                 [
-                    'key' => 'mortgage.borrower_documents',
-                    'name' => 'Borrower documents',
-                    'title' => 'Borrower needs to provide documents',
-                    'description' => 'Track documents or information needed from the borrower.',
+                    'key' => 'mortgage.lead_documents',
+                    'name' => 'Lead documents',
+                    'title' => 'Lead needs to provide documents',
+                    'description' => 'Track documents or information needed from the lead.',
                     'task_description' => null,
                     'responsible_party' => Task::RESPONSIBLE_PARTY_CONTACT,
                     'priority' => 'high',
@@ -144,8 +144,8 @@ return [
                 [
                     'key' => 'mortgage.review_application',
                     'name' => 'Review application',
-                    'title' => 'Review borrower application',
-                    'description' => 'Review borrower application details.',
+                    'title' => 'Review lead application',
+                    'description' => 'Review lead application details.',
                     'task_description' => null,
                     'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
                     'priority' => null,
