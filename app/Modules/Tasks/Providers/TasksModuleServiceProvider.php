@@ -6,6 +6,7 @@ use App\Modules\Tasks\Events\TaskCompleted;
 use App\Modules\Tasks\Listeners\EmitTaskCompletedAutomationEvent;
 use App\Modules\Tasks\Services\AssignedRecipients\TeamMemberTaskAssignedRecipientResolver;
 use App\Modules\Tasks\Services\ContactShow\ContactTasksShowDataProvider;
+use App\Modules\Tasks\Services\ContactShow\ContactTaskVisibilityDataProvider;
 use App\Modules\Tasks\Services\RelatedSubjects\ContactTaskRelatedSubjectResolver;
 use App\Modules\Tasks\Services\TaskAssignedRecipientsResolver;
 use App\Modules\Tasks\Services\TaskRelatedSubjectResolver;
@@ -34,6 +35,7 @@ class TasksModuleServiceProvider extends ServiceProvider
 
         $this->app->tag([
             ContactTasksShowDataProvider::class,
+            ContactTaskVisibilityDataProvider::class,
         ], 'core.contact_show_data_providers');
     }
 

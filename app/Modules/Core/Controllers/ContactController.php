@@ -77,6 +77,8 @@ class ContactController extends Controller
             'contact' => $contact,
             'contactPanels' => $contactPanels,
 
+            'contactVisibilitySections' => [],
+
             'scheduledMessages' => null,
             'messageConsents' => collect(),
             'consentRevocations' => collect(),

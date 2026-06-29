@@ -7,6 +7,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use App\Modules\Workflow\Services\Contacts\WorkflowContactStatusUpdater;
+use App\Modules\Workflow\Services\ContactShow\ContactWorkflowVisibilityDataProvider;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\ServiceProvider;
@@ -19,6 +20,10 @@ class WorkflowModuleServiceProvider extends ServiceProvider
             UpdatesContactStatus::class,
             WorkflowContactStatusUpdater::class,
         );
+
+        $this->app->tag([
+            ContactWorkflowVisibilityDataProvider::class,
+        ], 'core.contact_show_data_providers');
     }
 
     public function boot(): void

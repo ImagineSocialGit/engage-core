@@ -52,6 +52,8 @@
             @endif
         </div>
 
+        <x-crm.contact-visibility :sections="$contactVisibilitySections" />
+
         <div
             class="grid gap-6"
             x-data="{

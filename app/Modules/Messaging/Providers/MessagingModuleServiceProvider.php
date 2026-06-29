@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Providers;
 
 use App\Modules\Messaging\Services\ContactShow\ContactMessagingShowDataProvider;
+use App\Modules\Messaging\Services\ContactShow\ContactScheduledMessagesVisibilityDataProvider;
 use App\Modules\Messaging\Services\Email\EmailProviderManager;
 use App\Modules\Messaging\Services\MessageRecipientGateRegistry;
 use App\Modules\Messaging\Services\MessageRecipientPayloadProviderRegistry;
@@ -44,6 +45,7 @@ class MessagingModuleServiceProvider extends ServiceProvider
 
         $this->app->tag([
             ContactMessagingShowDataProvider::class,
+            ContactScheduledMessagesVisibilityDataProvider::class,
         ], 'core.contact_show_data_providers');
     }
 

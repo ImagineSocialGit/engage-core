@@ -16,6 +16,7 @@ use App\Modules\FlowRoutes\PointHandlers\EventWaitPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\NoopPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\SendMessagePointHandler;
 use App\Modules\FlowRoutes\PointHandlers\WaitPointHandler;
+use App\Modules\FlowRoutes\Services\ContactShow\ContactRoutesVisibilityDataProvider;
 use App\Modules\FlowRoutes\Services\FlowRouteConditionEvaluatorRegistry;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
@@ -52,6 +53,10 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
                 evaluators: $app->tagged('flow_routes.condition_evaluators'),
             );
         });
+
+        $this->app->tag([
+            ContactRoutesVisibilityDataProvider::class,
+        ], 'core.contact_show_data_providers');
     }
 
     public function boot(): void
