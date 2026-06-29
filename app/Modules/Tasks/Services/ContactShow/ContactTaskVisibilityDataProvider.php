@@ -87,6 +87,6 @@ class ContactTaskVisibilityDataProvider implements ContactShowDataProvider
 
     private function date(mixed $date): ?string
     {
-        return $date?->timezone(config('app.timezone'))->format('M j, Y g:i A');
+        return $date?->timezone(config('client.timezone', config('app.timezone', 'UTC')))->format('M j, Y g:i A');
     }
 }

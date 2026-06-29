@@ -109,7 +109,7 @@ class SendTaskDigestNotificationsAction
 
         if ($task->due_at) {
             $line .= ' — due '.$task->due_at
-                ->timezone(config('app.timezone'))
+                ->timezone(config('client.timezone', config('app.timezone', 'UTC')))
                 ->format('M j, g:i A');
         }
 

@@ -140,7 +140,7 @@ class ScheduleInboundMessageInternalNotification
     {
         return $inboundMessage->received_at
             ? $inboundMessage->received_at
-                ->timezone(config('app.timezone'))
+                ->timezone(config('client.timezone', config('app.timezone', 'UTC')))
                 ->format('M j, Y g:i A T')
             : 'Unknown';
     }

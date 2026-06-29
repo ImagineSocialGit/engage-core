@@ -39,6 +39,7 @@ class ScheduledMessage extends Model
         'failed_at',
         'dedupe_key',
         'failure_reason',
+        'skip_reason',
         'meta',
     ];
 

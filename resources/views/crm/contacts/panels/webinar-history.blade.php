@@ -1,3 +1,11 @@
+@php
+    $clientTimezone = config('client.timezone', config('app.timezone', 'UTC'));
+
+    $formatDate = fn ($date) => $date
+        ?->timezone($clientTimezone)
+        ->format('M j, Y g:i A');
+@endphp
+
 <x-ui.card class="space-y-4">
     <div>
         <h3 class="text-lg font-semibold tracking-tight">
@@ -21,7 +29,7 @@
                         <p class="mt-1 text-sm text-slate-500">
                             Registered:
                             <span class="font-medium text-slate-700">
-                                {{ $registration->registered_at?->format('M j, Y g:i A') ?? '—' }}
+                                {{ $formatDate($registration->registered_at) ?? '—' }}
                             </span>
                         </p>
                     </div>
@@ -35,14 +43,14 @@
                     <p>
                         Webinar Date:
                         <span class="font-medium text-slate-700">
-                            {{ $registration->webinar?->starts_at?->format('M j, Y g:i A') ?? '—' }}
+                            {{ $formatDate($registration->webinar?->starts_at) ?? '—' }}
                         </span>
                     </p>
 
                     <p>
                         Attended:
                         <span class="font-medium text-slate-700">
-                            {{ $registration->attended_at?->format('M j, Y g:i A') ?? '—' }}
+                            {{ $formatDate($registration->attended_at) ?? '—' }}
                         </span>
                     </p>
                 </div>

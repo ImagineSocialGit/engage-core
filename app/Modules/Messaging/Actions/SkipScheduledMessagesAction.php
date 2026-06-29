@@ -16,7 +16,7 @@ class SkipScheduledMessagesAction
             ->update([
                 'status' => ScheduledMessage::STATUS_SKIPPED,
                 'skipped_at' => now(),
-                'failure_reason' => $reason,
+                'skip_reason' => $reason,
             ]);
     }
 
@@ -34,7 +34,7 @@ class SkipScheduledMessagesAction
             ->update([
                 'status' => ScheduledMessage::STATUS_SKIPPED,
                 'skipped_at' => now(),
-                'failure_reason' => $reason,
+                'skip_reason' => $reason,
             ]);
     }
 }

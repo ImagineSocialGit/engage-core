@@ -144,9 +144,10 @@ class SendScheduledMessageJob implements ShouldQueue
     private function markSkipped(ScheduledMessage $scheduledMessage, string $reason): void
     {
         $scheduledMessage->forceFill([
-            'status' => 'skipped',
+            'status' => ScheduledMessage::STATUS_SKIPPED,
             'skipped_at' => now(),
-            'failure_reason' => $reason,
+            'skip_reason' => $reason,
+            'failure_reason' => null,
         ])->save();
     }
 }

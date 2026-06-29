@@ -39,6 +39,7 @@ return new class extends Migration
                 ->unique();
 
             $table->text('failure_reason')->nullable();
+            $table->text('skip_reason')->nullable();
 
             $table->json('meta')->nullable();
 

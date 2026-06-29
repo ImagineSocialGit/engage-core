@@ -177,8 +177,9 @@ class SendScheduledMessageJobTest extends TestCase
         $this->assertSame('skipped', $scheduledMessage->status);
         $this->assertSame(
             'Message conditions no longer pass.',
-            $scheduledMessage->failure_reason
+            $scheduledMessage->skip_reason
         );
+        $this->assertNull($scheduledMessage->failure_reason);
 
         Event::assertNotDispatched(ScheduledMessageSent::class);
     }
@@ -233,7 +234,8 @@ class SendScheduledMessageJobTest extends TestCase
         $scheduledMessage->refresh();
 
         $this->assertSame('skipped', $scheduledMessage->status);
-        $this->assertNotNull($scheduledMessage->failure_reason);
+        $this->assertNotNull($scheduledMessage->skip_reason);
+        $this->assertNull($scheduledMessage->failure_reason);
         $this->assertNull($scheduledMessage->sent_at);
 
         Event::assertNotDispatched(ScheduledMessageSent::class);
@@ -280,8 +282,9 @@ class SendScheduledMessageJobTest extends TestCase
         $this->assertSame('skipped', $scheduledMessage->status);
         $this->assertSame(
             'Message eligibility gate denied send.',
-            $scheduledMessage->failure_reason
+            $scheduledMessage->skip_reason
         );
+        $this->assertNull($scheduledMessage->failure_reason);
 
         Event::assertNotDispatched(ScheduledMessageSent::class);
     }

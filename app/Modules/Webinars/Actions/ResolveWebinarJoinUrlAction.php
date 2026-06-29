@@ -49,7 +49,8 @@ class ResolveWebinarJoinUrlAction
                 $message->forceFill([
                     'status' => 'skipped',
                     'skipped_at' => now(),
-                    'failure_reason' => 'Registrant clicked join link before live reminder.',
+                    'skip_reason' => 'Registrant clicked join link before live reminder.',
+                    'failure_reason' => null,
                 ])->save();
             });
     }

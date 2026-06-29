@@ -107,7 +107,8 @@ class ScheduledMessageFactory extends Factory
         return $this->state(fn () => [
             'status' => 'skipped',
             'skipped_at' => now(),
-            'failure_reason' => $reason,
+            'skip_reason' => $reason,
+            'failure_reason' => null,
         ]);
     }
 }

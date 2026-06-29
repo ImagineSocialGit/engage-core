@@ -95,7 +95,7 @@ class NotifyAssignedTaskRecipientsAction
 
         if ($task->due_at) {
             $message .= '. Due '.$task->due_at
-                ->timezone(config('app.timezone'))
+                ->timezone(config('client.timezone', config('app.timezone', 'UTC')))
                 ->format('M j, g:i A');
         }
 
@@ -106,7 +106,7 @@ class NotifyAssignedTaskRecipientsAction
     {
         return $task->due_at
             ? $task->due_at
-                ->timezone(config('app.timezone'))
+                ->timezone(config('client.timezone', config('app.timezone', 'UTC')))
                 ->format('M j, Y g:i A T')
             : '—';
     }
