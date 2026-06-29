@@ -7,6 +7,13 @@
 @php
     $showingArchived = $taskView === 'archived';
     $visibleTasks = $showingArchived ? $archivedTasks : $tasks;
+
+    $responsiblePartyLabels = [
+        'internal' => 'Internal team',
+        'contact' => 'Contact',
+        'third_party' => 'Third party',
+        'unknown' => 'Unknown',
+    ];
 @endphp
 
 <div class="flex items-center justify-between gap-4">
@@ -40,12 +47,21 @@
                         {{ $task->title }}
                     </p>
 
-                    <p class="mt-1 text-sm text-slate-500">
-                        Assigned to:
-                        <span class="font-medium text-slate-700">
-                            {{ $task->assignedTo?->name ?? '—' }}
-                        </span>
-                    </p>
+                    <div class="mt-1 space-y-1 text-sm text-slate-500">
+                        <p>
+                            Assigned to:
+                            <span class="font-medium text-slate-700">
+                                {{ $task->assignedTo?->name ?? 'Unassigned' }}
+                            </span>
+                        </p>
+
+                        <p>
+                            Responsible party:
+                            <span class="font-medium text-slate-700">
+                                {{ $responsiblePartyLabels[$task->responsible_party] ?? str((string) $task->responsible_party)->replace('_', ' ')->title() }}
+                            </span>
+                        </p>
+                    </div>
                 </div>
 
                 <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $task->status === 'completed' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700' }}">

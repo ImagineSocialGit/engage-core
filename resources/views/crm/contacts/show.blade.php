@@ -218,7 +218,7 @@
                             </x-ui.button>
                         </div>
 
-                        <x-crm.contacts.task-list
+                        <x-tasks.task-list
                             :tasks="$tasks"
                             :archived-tasks="$archivedTasks"
                             :task-view="$taskView"
@@ -228,8 +228,9 @@
             </x-ui.card>
 
             @if(module_enabled('tasks'))
-                <x-crm.contacts.create-task-modal
-                    :contact="$contact"
+                <x-tasks.create-task-modal
+                    :related="$contact"
+                    related-label="{{ config('contacts.labels.singular') }}"
                     :team-members="$teamMembers"
                     :current-team-member="$currentTeamMember"
                 />
