@@ -2,11 +2,9 @@
 
 return [
 
-    'enabled' => env('SMS_ENABLED', true),
+    'enabled' => config('client.modules.messaging', env('SMS_ENABLED', true)),
 
     'provider' => env('SMS_PROVIDER', 'telnyx'),
-
-    'managed_by' => env('SMS_MANAGED_BY', 'platform'),
 
     'from' => [
         'transactional' => env('SMS_FROM_TRANSACTIONAL', env('SMS_FROM', env('TWILIO_FROM', env('TELNYX_FROM')))),

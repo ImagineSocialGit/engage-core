@@ -77,6 +77,9 @@
 │   │   │   ├── Providers
 │   │   │   │   └── CampaignsModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   ├── Services
+│   │   │   │   └── ContactShow
+│   │   │   │       └── ContactCampaignsVisibilityDataProvider.php
 │   │   │   └── Support
 │   │   ├── Core
 │   │   │   ├── Actions
@@ -188,6 +191,8 @@
 │   │   │   │   └── FlowRoutesModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
+│   │   │   │   ├── ContactShow
+│   │   │   │   │   └── ContactRoutesVisibilityDataProvider.php
 │   │   │   │   ├── FlowRouteConditionEvaluatorRegistry.php
 │   │   │   │   └── PointHandlerRegistry.php
 │   │   │   └── Support
@@ -309,7 +314,8 @@
 │   │   │   ├── Services
 │   │   │   │   ├── ConditionChecker.php
 │   │   │   │   ├── ContactShow
-│   │   │   │   │   └── ContactMessagingShowDataProvider.php
+│   │   │   │   │   ├── ContactMessagingShowDataProvider.php
+│   │   │   │   │   └── ContactScheduledMessagesVisibilityDataProvider.php
 │   │   │   │   ├── DevMessageSink.php
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailMessagingService.php
@@ -383,7 +389,8 @@
 │   │   │   │   ├── AssignedRecipients
 │   │   │   │   │   └── TeamMemberTaskAssignedRecipientResolver.php
 │   │   │   │   ├── ContactShow
-│   │   │   │   │   └── ContactTasksShowDataProvider.php
+│   │   │   │   │   ├── ContactTasksShowDataProvider.php
+│   │   │   │   │   └── ContactTaskVisibilityDataProvider.php
 │   │   │   │   ├── RelatedSubjects
 │   │   │   │   │   └── ContactTaskRelatedSubjectResolver.php
 │   │   │   │   ├── TaskAssignedRecipientsResolver.php
@@ -472,8 +479,10 @@
 │   │       │   └── WorkflowModuleServiceProvider.php
 │   │       ├── Requests
 │   │       ├── Services
-│   │       │   └── Contacts
-│   │       │       └── WorkflowContactStatusUpdater.php
+│   │       │   ├── Contacts
+│   │       │   │   └── WorkflowContactStatusUpdater.php
+│   │       │   └── ContactShow
+│   │       │       └── ContactWorkflowVisibilityDataProvider.php
 │   │       └── Support
 │   ├── Providers
 │   │   ├── AppServiceProvider.php
@@ -795,6 +804,7 @@
 │       │   └── login.blade.php
 │       ├── components
 │       │   ├── crm
+│       │   │   └── contact-visibility.blade.php
 │       │   ├── head.blade.php
 │       │   ├── hero.blade.php
 │       │   ├── layouts
@@ -937,4 +947,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-333 directories, 605 files
+337 directories, 611 files

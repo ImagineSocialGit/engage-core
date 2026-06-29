@@ -2,7 +2,7 @@
 
 return [
 
-    'enabled' => env('WEBINARS_ENABLED', true),
+    'enabled' => config('client.webinars.enabled', env('WEBINARS_ENABLED', true)),
 
     'provider' => env('WEBINAR_PROVIDER', 'zoom'),
 
@@ -20,8 +20,6 @@ return [
             ],
         ],
     ],
-
-    'managed_by' => env('WEBINAR_MANAGED_BY', 'client'),
 
     'queues' => [
 

@@ -39,7 +39,10 @@ class SyncPresetsCommand extends Command
             return self::FAILURE;
         }
 
+        $enabledModules = $this->enabledModules($preset);
+
         $this->info("Syncing preset package [{$presetKey}]...");
+        $this->line('Enabled modules: '.implode(', ', $enabledModules));
 
         try {
             if ($this->hasConfiguredGroups($preset, 'contact_statuses')) {
@@ -51,25 +54,25 @@ class SyncPresetsCommand extends Command
                 $this->warn('Contact statuses: no groups configured; skipped.');
             }
 
-            if ($this->hasConfiguredGroups($preset, 'tasks')) {
+            if ($this->shouldSyncSection($preset, 'tasks', 'tasks', $enabledModules)) {
                 $this->renderTaskResult(
                     $syncTaskPresets->handle($presetKey),
                 );
             } else {
                 $this->line('');
-                $this->warn('Task templates: no groups configured; skipped.');
+                $this->warn('Task templates: module disabled or no groups configured; skipped.');
             }
 
-            if ($this->hasConfiguredGroups($preset, 'campaigns')) {
+            if ($this->shouldSyncSection($preset, 'campaigns', 'campaigns', $enabledModules)) {
                 $this->renderCampaignResult(
                     $syncCampaignPresets->handle($presetKey),
                 );
             } else {
                 $this->line('');
-                $this->warn('Campaigns: no groups configured; skipped.');
+                $this->warn('Campaigns: module disabled or no groups configured; skipped.');
             }
 
-            if ($this->hasConfiguredGroups($preset, 'flow_routes')) {
+            if ($this->shouldSyncSection($preset, 'flow_routes', 'flow_routes', $enabledModules)) {
                 $this->renderFlowRouteResult(
                     $syncFlowRoutePresets->handle(
                         presetKey: $presetKey,
@@ -78,7 +81,7 @@ class SyncPresetsCommand extends Command
                 );
             } else {
                 $this->line('');
-                $this->warn('FlowRoutes: no groups configured; skipped.');
+                $this->warn('FlowRoutes: module disabled or no groups configured; skipped.');
             }
         } catch (Throwable $exception) {
             $this->error($exception->getMessage());
@@ -100,6 +103,18 @@ class SyncPresetsCommand extends Command
             return trim($argumentPreset);
         }
 
+        $clientPreset = config('client.preset');
+
+        if (is_string($clientPreset) && trim($clientPreset) !== '') {
+            return trim($clientPreset);
+        }
+
+        $defaultPreset = config('presets.default');
+
+        if (is_string($defaultPreset) && trim($defaultPreset) !== '') {
+            return trim($defaultPreset);
+        }
+
         $presetKeys = array_keys(config('presets.presets', []));
 
         $presetKeys = array_values(array_filter(
@@ -107,21 +122,40 @@ class SyncPresetsCommand extends Command
             fn (mixed $key): bool => is_string($key) && trim($key) !== '',
         ));
 
-        if ($presetKeys === []) {
-            return null;
-        }
+        return $presetKeys[0] ?? null;
+    }
 
-        $defaultPreset = config('presets.default');
+    /**
+     * @param array<string, mixed> $preset
+     * @return array<int, string>
+     */
+    private function enabledModules(array $preset): array
+    {
+        $packageModules = $this->stringList(data_get($preset, 'modules.enabled', []));
+        $addedModules = $this->stringList(config('client.modules.add', []));
+        $removedModules = $this->stringList(config('client.modules.remove', []));
 
-        $default = is_string($defaultPreset) && in_array($defaultPreset, $presetKeys, true)
-            ? $defaultPreset
-            : $presetKeys[0];
+        $modules = array_values(array_unique([
+            'core',
+            ...$packageModules,
+            ...$addedModules,
+        ]));
 
-        return $this->choice(
-            question: 'Which preset package should be synced?',
-            choices: $presetKeys,
-            default: $default,
-        );
+        return array_values(array_diff($modules, $removedModules));
+    }
+
+    /**
+     * @param array<string, mixed> $preset
+     * @param array<int, string> $enabledModules
+     */
+    private function shouldSyncSection(
+        array $preset,
+        string $section,
+        string $module,
+        array $enabledModules,
+    ): bool {
+        return in_array($module, $enabledModules, true)
+            && $this->hasConfiguredGroups($preset, $section);
     }
 
     /**
@@ -132,6 +166,24 @@ class SyncPresetsCommand extends Command
         $groups = $preset[$section]['groups'] ?? null;
 
         return is_array($groups) && $groups !== [];
+    }
+
+    /**
+     * @param mixed $values
+     * @return array<int, string>
+     */
+    private function stringList(mixed $values): array
+    {
+        if (! is_array($values)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(array_map(
+            fn (mixed $value): ?string => is_string($value) && trim($value) !== ''
+                ? trim($value)
+                : null,
+            $values,
+        ))));
     }
 
     /**
