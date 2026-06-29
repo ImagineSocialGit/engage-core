@@ -43,7 +43,14 @@ class CreateTaskPointHandler implements PointHandler
         $task = $this->createTask->handle([
             'related_type' => Contact::class,
             'related_id' => $context->progress->contact_id,
+
+            'assigned_to_type' => $definition->assignedToType,
             'assigned_to_id' => $definition->assignedToId,
+
+            'responsible_party' => $definition->responsibleParty,
+            'responsible_type' => $this->responsibleType($definition, $context),
+            'responsible_id' => $this->responsibleId($definition, $context),
+
             'source' => Task::SOURCE_MODULE,
             'title' => $this->renderText($definition->title, $context),
             'description' => $this->renderText($definition->description, $context),
@@ -70,6 +77,9 @@ class CreateTaskPointHandler implements PointHandler
                     'related_id' => $task->related_id,
                     'assigned_to_type' => $task->assigned_to_type,
                     'assigned_to_id' => $task->assigned_to_id,
+                    'responsible_party' => $task->responsible_party,
+                    'responsible_type' => $task->responsible_type,
+                    'responsible_id' => $task->responsible_id,
                     'source' => $task->source,
                     'title' => $task->title,
                     'status' => $task->status,
@@ -77,6 +87,36 @@ class CreateTaskPointHandler implements PointHandler
                 ],
             ],
         );
+    }
+
+    private function responsibleType(
+        CreateTaskPointDefinition $definition,
+        PointExecutionContext $context,
+    ): ?string {
+        if ($definition->responsibleType !== null) {
+            return $definition->responsibleType;
+        }
+
+        if ($definition->responsibleParty === Task::RESPONSIBLE_PARTY_CONTACT) {
+            return Contact::class;
+        }
+
+        return null;
+    }
+
+    private function responsibleId(
+        CreateTaskPointDefinition $definition,
+        PointExecutionContext $context,
+    ): ?int {
+        if ($definition->responsibleId !== null) {
+            return $definition->responsibleId;
+        }
+
+        if ($definition->responsibleParty === Task::RESPONSIBLE_PARTY_CONTACT) {
+            return (int) $context->progress->contact_id;
+        }
+
+        return null;
     }
 
     private function renderText(?string $value, PointExecutionContext $context): ?string

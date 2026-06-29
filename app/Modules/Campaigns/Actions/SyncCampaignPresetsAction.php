@@ -8,6 +8,7 @@ use App\Modules\Campaigns\Data\CampaignStepPresetDefinition;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignStep;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 class SyncCampaignPresetsAction
 {
@@ -52,26 +53,93 @@ class SyncCampaignPresetsAction
             return [];
         }
 
-        $campaigns = config('presets.presets.'.$presetKey.'.campaigns', []);
+        $campaignGroups = $this->campaignGroupsForPreset($presetKey);
 
-        if (! is_array($campaigns)) {
+        if ($campaignGroups === []) {
+            return [];
+        }
+
+        $campaignKeys = $this->campaignKeysForGroups($campaignGroups);
+
+        if ($campaignKeys === []) {
             return [];
         }
 
         $definitions = [];
 
-        foreach ($campaigns as $campaign) {
-            if (! is_array($campaign)) {
-                continue;
-            }
-
+        foreach ($campaignKeys as $campaignKey) {
             $definitions[] = CampaignPresetDefinition::fromArray(
-                data: $campaign,
+                data: $this->campaignDefinition($campaignKey),
                 presetKey: $presetKey,
             );
         }
 
         return $definitions;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function campaignGroupsForPreset(string $presetKey): array
+    {
+        $groups = config('presets.presets.'.$presetKey.'.campaigns.groups', []);
+
+        if (! is_array($groups)) {
+            throw new InvalidArgumentException('Campaign preset groups for preset ['.$presetKey.'] must be an array.');
+        }
+
+        return $this->normalizeStringList($groups);
+    }
+
+    /**
+     * @param array<int, string> $groups
+     * @return array<int, string>
+     */
+    private function campaignKeysForGroups(array $groups): array
+    {
+        $campaignKeys = [];
+
+        foreach ($groups as $group) {
+            $groupCampaignKeys = config('presets.campaigns.groups.'.$group);
+
+            if (! is_array($groupCampaignKeys)) {
+                throw new InvalidArgumentException('Campaign preset group ['.$group.'] does not exist.');
+            }
+
+            foreach ($this->normalizeStringList($groupCampaignKeys) as $campaignKey) {
+                $campaignKeys[] = $campaignKey;
+            }
+        }
+
+        return array_values(array_unique($campaignKeys));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function campaignDefinition(string $campaignKey): array
+    {
+        $definition = config('presets.campaigns.definitions.'.$campaignKey);
+
+        if (! is_array($definition)) {
+            throw new InvalidArgumentException('Campaign preset definition ['.$campaignKey.'] does not exist.');
+        }
+
+        return $definition;
+    }
+
+    /**
+     * @param array<mixed> $values
+     * @return array<int, string>
+     */
+    private function normalizeStringList(array $values): array
+    {
+        return array_values(array_unique(array_filter(array_map(
+            fn (mixed $value): ?string => is_string($value) && trim($value) !== ''
+                ? trim($value)
+                : null,
+            $values,
+        ))));
     }
 
     private function syncCampaign(

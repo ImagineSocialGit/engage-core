@@ -1,0 +1,219 @@
+<?php
+
+namespace App\Modules\Core\Actions\ContactStatuses;
+
+use App\Modules\Core\Models\ContactStatus;
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+
+class SyncContactStatusPresetsAction
+{
+    /**
+     * @return array{
+     *     created: int,
+     *     updated: int,
+     *     skipped: int,
+     *     errors: array<int, string>,
+     * }
+     */
+    public function handle(?string $presetKey = null): array
+    {
+        $presetKey = $this->normalizePresetKey($presetKey);
+
+        if ($presetKey === null) {
+            return [
+                'created' => 0,
+                'updated' => 0,
+                'skipped' => 0,
+                'errors' => ['No preset key was provided and config[presets.default] is empty.'],
+            ];
+        }
+
+        $preset = config("presets.presets.{$presetKey}");
+
+        if (! is_array($preset)) {
+            return [
+                'created' => 0,
+                'updated' => 0,
+                'skipped' => 0,
+                'errors' => ["Preset [{$presetKey}] does not exist."],
+            ];
+        }
+
+        $statusDefinitions = $this->statusDefinitions($presetKey);
+
+        return DB::transaction(function () use ($statusDefinitions) {
+            $result = [
+                'created' => 0,
+                'updated' => 0,
+                'skipped' => 0,
+                'errors' => [],
+            ];
+
+            foreach ($statusDefinitions as $definition) {
+                $status = ContactStatus::query()
+                    ->where('key', $definition['key'])
+                    ->first();
+
+                if (! $status instanceof ContactStatus) {
+                    ContactStatus::create($this->attributes($definition));
+
+                    $result['created']++;
+
+                    continue;
+                }
+
+                $status->forceFill($this->attributes($definition))->save();
+
+                $result['updated']++;
+            }
+
+            return $result;
+        });
+    }
+
+    private function normalizePresetKey(?string $presetKey): ?string
+    {
+        $presetKey ??= config('presets.default');
+
+        if (! is_string($presetKey)) {
+            return null;
+        }
+
+        $presetKey = trim($presetKey);
+
+        return $presetKey !== '' ? $presetKey : null;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function statusDefinitions(string $presetKey): array
+    {
+        $groups = config("presets.presets.{$presetKey}.contact_statuses.groups", []);
+
+        if (! is_array($groups)) {
+            throw new InvalidArgumentException("Preset [{$presetKey}] contact_statuses.groups must be an array.");
+        }
+
+        $groups = $this->normalizeStringList($groups);
+
+        if ($groups === []) {
+            return [];
+        }
+
+        $statusKeys = [];
+
+        foreach ($groups as $group) {
+            $groupStatusKeys = config("presets.contact-statuses.groups.{$group}");
+
+            if (! is_array($groupStatusKeys)) {
+                throw new InvalidArgumentException("ContactStatus preset group [{$group}] does not exist.");
+            }
+
+            foreach ($this->normalizeStringList($groupStatusKeys) as $statusKey) {
+                $statusKeys[] = $statusKey;
+            }
+        }
+
+        $statusKeys = array_values(array_unique($statusKeys));
+
+        $definitions = [];
+
+        foreach ($statusKeys as $statusKey) {
+            $definition = config("presets.contact-statuses.definitions.{$statusKey}");
+
+            if (! is_array($definition)) {
+                throw new InvalidArgumentException("ContactStatus preset definition [{$statusKey}] does not exist.");
+            }
+
+            $definitions[] = $this->normalizeDefinition($statusKey, $definition);
+        }
+
+        return $definitions;
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     * @return array<string, mixed>
+     */
+    private function normalizeDefinition(string $statusKey, array $definition): array
+    {
+        $key = $this->requiredString($definition['key'] ?? null, "ContactStatus [{$statusKey}] key");
+        $name = $this->requiredString($definition['name'] ?? null, "ContactStatus [{$statusKey}] name");
+
+        if ($key !== $statusKey) {
+            throw new InvalidArgumentException("ContactStatus definition [{$statusKey}] key must match its definition key.");
+        }
+
+        $meta = is_array($definition['meta'] ?? null)
+            ? $definition['meta']
+            : [];
+
+        if (is_string($definition['description'] ?? null) && trim($definition['description']) !== '') {
+            $meta['description'] = trim($definition['description']);
+        }
+
+        return [
+            'key' => $key,
+            'name' => $name,
+            'category' => $this->nullableString($definition['category'] ?? null)
+                ?? $this->nullableString($meta['category'] ?? null),
+            'is_core' => (bool) ($definition['is_core'] ?? true),
+            'is_active' => (bool) ($definition['is_active'] ?? true),
+            'sort_order' => (int) ($definition['sort_order'] ?? 0),
+            'meta' => $meta,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     * @return array<string, mixed>
+     */
+    private function attributes(array $definition): array
+    {
+        return [
+            'key' => $definition['key'],
+            'name' => $definition['name'],
+            'category' => $definition['category'],
+            'is_core' => $definition['is_core'],
+            'is_active' => $definition['is_active'],
+            'sort_order' => $definition['sort_order'],
+            'meta' => $definition['meta'],
+        ];
+    }
+
+    /**
+     * @param array<mixed> $values
+     * @return array<int, string>
+     */
+    private function normalizeStringList(array $values): array
+    {
+        return array_values(array_unique(array_filter(array_map(
+            fn (mixed $value): ?string => is_string($value) && trim($value) !== ''
+                ? trim($value)
+                : null,
+            $values,
+        ))));
+    }
+
+    private function requiredString(mixed $value, string $field): string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            throw new InvalidArgumentException("Missing required {$field}.");
+        }
+
+        return trim($value);
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
+    }
+}

@@ -3,6 +3,7 @@
 namespace App\Modules\FlowRoutes\Providers;
 
 use App\Modules\FlowRoutes\ConditionEvaluators\FlowRouteDataConditionEvaluator;
+use App\Modules\FlowRoutes\Console\Commands\SyncFlowRoutePresetsCommand;
 use App\Modules\FlowRoutes\Listeners\HandleContactWorkflowStatusChanged;
 use App\Modules\FlowRoutes\Listeners\ResumeFlowRoutesFromAutomationEvent;
 use App\Modules\FlowRoutes\PointHandlers\BranchEvaluatePointHandler;
@@ -64,6 +65,12 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
             AutomationEventRecorded::class,
             ResumeFlowRoutesFromAutomationEvent::class,
         );
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                SyncFlowRoutePresetsCommand::class,
+            ]);
+        }
     }
 
     /**

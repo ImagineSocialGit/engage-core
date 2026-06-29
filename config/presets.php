@@ -47,8 +47,19 @@ return [
                 ],
             ],
 
-            'flow_routes' => [],
-            'campaigns' => [],
+            'contact_statuses' => [
+                'groups' => [
+                    'general_default',
+                ],
+            ],
+
+            'flow_routes' => [
+                'groups' => [],
+            ],
+
+            'campaigns' => [
+                'groups' => [],
+            ],
         ],
 
         'lightweight_task_workspace' => [
@@ -71,14 +82,27 @@ return [
                 ],
             ],
 
-            'flow_routes' => [],
-            'campaigns' => [],
+            'contact_statuses' => [
+                'groups' => [
+                    'general_default',
+                ],
+            ],
+
+            'flow_routes' => [
+                'groups' => [],
+            ],
+
+            'campaigns' => [
+                'groups' => [],
+            ],
         ],
 
         'webinar_funnel' => [
             'modules' => [
                 'enabled' => [
                     'tasks',
+                    'workflow',
+                    'flow_routes',
                     'messaging',
                     'inbound_messaging',
                     'internal_notifications',
@@ -115,8 +139,23 @@ return [
                 ],
             ],
 
-            'flow_routes' => [],
-            'campaigns' => [],
+            'contact_statuses' => [
+                'groups' => [
+                    'webinar_default',
+                ],
+            ],
+
+            'flow_routes' => [
+                'groups' => [
+                    'webinar_default',
+                ],
+            ],
+
+            'campaigns' => [
+                'groups' => [
+                    'webinar_default',
+                ],
+            ],
         ],
 
         'mortgage' => [
@@ -178,11 +217,26 @@ return [
                 ],
             ],
 
-            'flow_routes' => [],
-            'campaigns' => [],
+            'contact_statuses' => [
+                'groups' => [
+                    'mortgage_default',
+                ],
+            ],
+
+            'flow_routes' => [
+                'groups' => [
+                    'mortgage_default',
+                ],
+            ],
+
+            'campaigns' => [
+                'groups' => [
+                    'mortgage_default',
+                ],
+            ],
         ],
 
-        'dog_training' => [
+        'pet_service' => [
             'modules' => [
                 'enabled' => [
                     'tasks',
@@ -218,8 +272,19 @@ return [
                 ],
             ],
 
-            'flow_routes' => [],
-            'campaigns' => [],
+            'contact_statuses' => [
+                'groups' => [
+                    'pet_service_default',
+                ],
+            ],
+
+            'flow_routes' => [
+                'groups' => [],
+            ],
+
+            'campaigns' => [
+                'groups' => [],
+            ],
         ],
 
         'musician_fan_engagement' => [
@@ -265,8 +330,19 @@ return [
                 ],
             ],
 
-            'flow_routes' => [],
-            'campaigns' => [],
+            'contact_statuses' => [
+                'groups' => [
+                    'musician_fan_default',
+                ],
+            ],
+
+            'flow_routes' => [
+                'groups' => [],
+            ],
+
+            'campaigns' => [
+                'groups' => [],
+            ],
         ],
 
     ],

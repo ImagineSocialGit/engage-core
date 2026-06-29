@@ -2,6 +2,7 @@
 
 namespace App\Modules\Tasks\Requests;
 
+use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Services\TaskRelatedTypeResolver;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -33,14 +34,21 @@ class StoreTaskRequest extends FormRequest
             ],
 
             'assigned_to_id' => [
-                'required',
+                'nullable',
                 'integer',
                 Rule::exists('team_members', 'id')->where('is_active', true),
+            ],
+
+            'responsible_party' => [
+                'nullable',
+                'string',
+                Rule::in(Task::RESPONSIBLE_PARTY_OPTIONS),
             ],
 
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'due_at' => ['nullable', 'date'],
+            'priority' => ['nullable', 'string', 'max:50'],
             'notify_assignee' => ['sometimes', 'boolean'],
         ];
     }
@@ -51,6 +59,10 @@ class StoreTaskRequest extends FormRequest
 
         if ($key !== null) {
             return $validated;
+        }
+
+        if (! isset($validated['responsible_party'])) {
+            $validated['responsible_party'] = Task::RESPONSIBLE_PARTY_INTERNAL;
         }
 
         if (! isset($validated['related_type'], $validated['related_id'])) {

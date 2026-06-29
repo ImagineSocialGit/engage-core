@@ -13,7 +13,6 @@ use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -29,8 +28,6 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
 
         $campaign = $this->createCampaignWithSteps();
 
-        $this->setMessageDefinitions();
-
         $contact = Contact::factory()->create([
             'email' => 'person@example.com',
         ]);
@@ -44,6 +41,9 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             'source' => 'test',
         ]);
 
+        $stepOne = $campaign->steps()->where('step_number', 1)->firstOrFail();
+        $stepTwo = $campaign->steps()->where('step_number', 2)->firstOrFail();
+
         $enrollment = CampaignEnrollment::create([
             'contact_id' => $contact->id,
             'campaign_id' => $campaign->id,
@@ -53,7 +53,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             'scope' => 'webinar',
             'status' => CampaignEnrollment::STATUS_ACTIVE,
             'current_step' => 1,
-            'current_campaign_step_id' => $campaign->steps()->where('step_number', 1)->first()->id,
+            'current_campaign_step_id' => $stepOne->id,
             'started_at' => now(),
         ]);
 
@@ -70,7 +70,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
                 'campaign_enrollment_id' => $enrollment->id,
                 'campaign_id' => $campaign->id,
                 'campaign_key' => 'webinar_attended',
-                'campaign_step_id' => $campaign->steps()->where('step_number', 1)->first()->id,
+                'campaign_step_id' => $stepOne->id,
                 'campaign_step' => 1,
             ],
         ]);
@@ -83,7 +83,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
 
         $this->assertSame(CampaignEnrollment::STATUS_ACTIVE, $enrollment->status);
         $this->assertSame(2, $enrollment->current_step);
-        $this->assertSame($campaign->steps()->where('step_number', 2)->first()->id, $enrollment->current_campaign_step_id);
+        $this->assertSame($stepTwo->id, $enrollment->current_campaign_step_id);
         $this->assertNotNull($enrollment->last_scheduled_message_id);
         $this->assertNotSame($sentMessage->id, $enrollment->last_scheduled_message_id);
 
@@ -94,8 +94,9 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
         $this->assertSame('step_2', $nextMessage->message_type);
         $this->assertSame($enrollment->id, $nextMessage->meta['campaign_enrollment_id']);
         $this->assertSame($campaign->id, $nextMessage->meta['campaign_id']);
-        $this->assertSame($campaign->steps()->where('step_number', 2)->first()->id, $nextMessage->meta['campaign_step_id']);
+        $this->assertSame($stepTwo->id, $nextMessage->meta['campaign_step_id']);
         $this->assertSame($sentMessage->id, $nextMessage->meta['previous_scheduled_message_id']);
+        $this->assertNull($nextMessage->meta['definition_config_path']);
     }
 
     public function test_it_does_nothing_when_sent_message_has_no_campaign_metadata(): void
@@ -145,9 +146,28 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             'name' => 'Step 1',
             'dispatch_key' => 'webinar_ended',
             'is_active' => true,
-            'criteria' => [],
-            'payload' => [],
-            'meta' => [],
+            'criteria' => [
+                'timing' => [
+                    'type' => 'delay',
+                    'minutes' => 720,
+                ],
+            ],
+            'payload' => [
+                'to' => '{email}',
+                'subject' => 'Step 1',
+                'body' => 'First message',
+            ],
+            'meta' => [
+                'type' => 'message',
+                'message' => [
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar',
+                    'message_type' => 'step_1',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'marketing',
+                ],
+            ],
         ]);
 
         CampaignStep::create([
@@ -156,34 +176,31 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             'name' => 'Step 2',
             'dispatch_key' => 'marketing_message_sent',
             'is_active' => true,
-            'criteria' => [],
-            'payload' => [],
-            'meta' => [],
-        ]);
-
-        return $campaign->refresh();
-    }
-
-    private function setMessageDefinitions(): void
-    {
-        Config::set('messaging.email.marketing.webinar', [
-            'step_2' => [
-                'dispatch_key' => 'marketing_message_sent',
-                'campaign_key' => 'webinar_attended',
-                'step' => 2,
-                'timing' => 'scheduled',
-                'schedule' => [
+            'criteria' => [
+                'timing' => [
                     'type' => 'delay',
                     'minutes' => 720,
                 ],
-                'payload_class' => EmailPayload::class,
-                'queue' => 'marketing',
-                'payload' => [
-                    'subject' => 'Step 2',
-                    'body' => 'Second message',
+            ],
+            'payload' => [
+                'to' => '{email}',
+                'subject' => 'Step 2',
+                'body' => 'Second message',
+            ],
+            'meta' => [
+                'type' => 'message',
+                'message' => [
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar',
+                    'message_type' => 'step_2',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'marketing',
                 ],
             ],
         ]);
+
+        return $campaign->refresh();
     }
 
     protected function tearDown(): void

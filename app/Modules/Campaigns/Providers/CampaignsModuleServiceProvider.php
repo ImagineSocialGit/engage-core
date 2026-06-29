@@ -2,8 +2,9 @@
 
 namespace App\Modules\Campaigns\Providers;
 
-use App\Modules\Messaging\Events\ScheduledMessageSent;
+use App\Modules\Campaigns\Console\Commands\SyncCampaignPresetsCommand;
 use App\Modules\Campaigns\Listeners\ScheduleNextCampaignStepAfterScheduledMessageSent;
+use App\Modules\Messaging\Events\ScheduledMessageSent;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -20,5 +21,11 @@ class CampaignsModuleServiceProvider extends ServiceProvider
             ScheduledMessageSent::class,
             ScheduleNextCampaignStepAfterScheduledMessageSent::class,
         );
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                SyncCampaignPresetsCommand::class,
+            ]);
+        }
     }
 }

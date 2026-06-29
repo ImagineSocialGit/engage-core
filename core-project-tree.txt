@@ -2,6 +2,7 @@
 ├── app
 │   ├── Console
 │   │   └── Commands
+│   │       └── SyncPresetsCommand.php
 │   ├── helpers.php
 │   ├── Http
 │   │   ├── Controllers
@@ -58,6 +59,9 @@
 │   │   │   │   ├── EnrollContactInCampaignAction.php
 │   │   │   │   ├── ScheduleNextCampaignStepAction.php
 │   │   │   │   └── SyncCampaignPresetsAction.php
+│   │   │   ├── Console
+│   │   │   │   └── Commands
+│   │   │   │       └── SyncCampaignPresetsCommand.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   ├── Data
@@ -76,10 +80,15 @@
 │   │   │   └── Support
 │   │   ├── Core
 │   │   │   ├── Actions
-│   │   │   │   └── Contacts
-│   │   │   │       ├── CreateOrUpdateContactAction.php
-│   │   │   │       ├── ResolveContactStatusAction.php
-│   │   │   │       └── UpdateContactStatusAction.php
+│   │   │   │   ├── Contacts
+│   │   │   │   │   ├── CreateOrUpdateContactAction.php
+│   │   │   │   │   ├── ResolveContactStatusAction.php
+│   │   │   │   │   └── UpdateContactStatusAction.php
+│   │   │   │   └── ContactStatuses
+│   │   │   │       └── SyncContactStatusPresetsAction.php
+│   │   │   ├── Console
+│   │   │   │   └── Commands
+│   │   │   │       └── SyncContactStatusPresetsCommand.php
 │   │   │   ├── Contracts
 │   │   │   │   └── Contacts
 │   │   │   │       ├── ContactImportHandler.php
@@ -125,6 +134,9 @@
 │   │   │   │   └── SyncFlowRoutePresetsAction.php
 │   │   │   ├── ConditionEvaluators
 │   │   │   │   └── FlowRouteDataConditionEvaluator.php
+│   │   │   ├── Console
+│   │   │   │   └── Commands
+│   │   │   │       └── SyncFlowRoutePresetsCommand.php
 │   │   │   ├── Contracts
 │   │   │   │   ├── FlowRouteConditionEvaluator.php
 │   │   │   │   └── PointHandler.php
@@ -636,6 +648,10 @@
 │   │   └── sms.php
 │   ├── messaging.php
 │   ├── modules.php
+│   ├── presets
+│   │   ├── campaigns.php
+│   │   ├── contact-statuses.php
+│   │   └── flow-routes.php
 │   ├── presets.php
 │   ├── queue.php
 │   ├── reminders.php
@@ -912,4 +928,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-324 directories, 589 files
+332 directories, 597 files

@@ -2,6 +2,8 @@
 
 namespace App\Modules\FlowRoutes\Data\Points;
 
+use App\Modules\Tasks\Models\Task;
+
 class CreateTaskPointDefinition
 {
     /**
@@ -9,7 +11,11 @@ class CreateTaskPointDefinition
      */
     public function __construct(
         public readonly ?string $title,
-        public readonly ?int $assignedToId,
+        public readonly ?int $assignedToId = null,
+        public readonly ?string $assignedToType = null,
+        public readonly ?string $responsibleParty = null,
+        public readonly ?string $responsibleType = null,
+        public readonly ?int $responsibleId = null,
         public readonly ?string $description = null,
         public readonly mixed $dueAt = null,
         public readonly ?string $priority = null,
@@ -26,33 +32,45 @@ class CreateTaskPointDefinition
         $source = array_replace_recursive($definition, $settings);
 
         $title = self::string($source, 'title');
+        $responsibleParty = self::string($source, 'responsible_party')
+            ?? Task::RESPONSIBLE_PARTY_INTERNAL;
 
         if ($title === null) {
             return new self(
                 title: null,
                 assignedToId: self::int($source, 'assigned_to_id'),
+                assignedToType: self::string($source, 'assigned_to_type'),
+                responsibleParty: $responsibleParty,
+                responsibleType: self::string($source, 'responsible_type'),
+                responsibleId: self::int($source, 'responsible_id'),
                 invalidReason: 'create_task_missing_title',
                 meta: self::meta($source),
             );
         }
 
-        $assignedToId = self::int($source, 'assigned_to_id');
-
-        if ($assignedToId === null) {
+        if (! in_array($responsibleParty, Task::RESPONSIBLE_PARTY_OPTIONS, true)) {
             return new self(
                 title: $title,
-                assignedToId: null,
+                assignedToId: self::int($source, 'assigned_to_id'),
+                assignedToType: self::string($source, 'assigned_to_type'),
+                responsibleParty: $responsibleParty,
+                responsibleType: self::string($source, 'responsible_type'),
+                responsibleId: self::int($source, 'responsible_id'),
                 description: self::string($source, 'description'),
                 dueAt: $source['due_at'] ?? null,
                 priority: self::string($source, 'priority'),
-                invalidReason: 'create_task_missing_assigned_to_id',
+                invalidReason: 'create_task_invalid_responsible_party',
                 meta: self::meta($source),
             );
         }
 
         return new self(
             title: $title,
-            assignedToId: $assignedToId,
+            assignedToId: self::int($source, 'assigned_to_id'),
+            assignedToType: self::string($source, 'assigned_to_type'),
+            responsibleParty: $responsibleParty,
+            responsibleType: self::string($source, 'responsible_type'),
+            responsibleId: self::int($source, 'responsible_id'),
             description: self::string($source, 'description'),
             dueAt: $source['due_at'] ?? null,
             priority: self::string($source, 'priority'),
@@ -64,8 +82,7 @@ class CreateTaskPointDefinition
     {
         return $this->invalidReason === null
             && is_string($this->title)
-            && trim($this->title) !== ''
-            && $this->assignedToId !== null;
+            && trim($this->title) !== '';
     }
 
     /**
@@ -76,6 +93,10 @@ class CreateTaskPointDefinition
         return [
             'title' => $this->title,
             'assigned_to_id' => $this->assignedToId,
+            'assigned_to_type' => $this->assignedToType,
+            'responsible_party' => $this->responsibleParty,
+            'responsible_type' => $this->responsibleType,
+            'responsible_id' => $this->responsibleId,
             'description' => $this->description,
             'due_at' => $this->dueAt,
             'priority' => $this->priority,

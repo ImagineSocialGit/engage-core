@@ -25,7 +25,7 @@ class TaskController extends Controller
             ]),
         );
 
-        if ($request->boolean('notify_assignee')) {
+        if ($request->boolean('notify_assignee') && $task->isAssigned()) {
             $notifyAssignedTaskRecipients->handle($task);
         }
 

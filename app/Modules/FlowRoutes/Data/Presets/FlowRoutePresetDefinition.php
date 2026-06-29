@@ -2,6 +2,7 @@
 
 namespace App\Modules\FlowRoutes\Data\Presets;
 
+use App\Modules\FlowRoutes\Data\Points\PointPresetDefinition;
 use InvalidArgumentException;
 
 class FlowRoutePresetDefinition

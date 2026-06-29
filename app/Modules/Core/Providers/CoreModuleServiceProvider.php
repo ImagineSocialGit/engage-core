@@ -2,6 +2,7 @@
 
 namespace App\Modules\Core\Providers;
 
+use App\Modules\Core\Console\Commands\SyncContactStatusPresetsCommand;
 use App\Modules\Core\Data\Contacts\ContactImportField;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
@@ -91,6 +92,10 @@ class CoreModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        //
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                SyncContactStatusPresetsCommand::class,
+            ]);
+        }
     }
 }

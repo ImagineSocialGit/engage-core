@@ -3,10 +3,10 @@
 namespace App\Modules\FlowRoutes\Actions;
 
 use App\Modules\Core\Models\ContactStatus;
+use App\Modules\FlowRoutes\Data\Points\PointPresetDefinition;
 use App\Modules\FlowRoutes\Data\Presets\FlowRoutePointPresetDefinition;
 use App\Modules\FlowRoutes\Data\Presets\FlowRoutePresetDefinition;
 use App\Modules\FlowRoutes\Data\Presets\FlowRoutePresetSyncResult;
-use App\Modules\FlowRoutes\Data\Points\PointPresetDefinition;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\Point;
@@ -19,11 +19,11 @@ class SyncFlowRoutePresetsAction
         ?string $presetKey = null,
         bool $force = false,
     ): FlowRoutePresetSyncResult {
-        $presetKey = $presetKey ?: (string) config('presets.default');
+        $presetKey = $this->normalizePresetKey($presetKey);
 
         $result = new FlowRoutePresetSyncResult();
 
-        if (trim($presetKey) === '') {
+        if ($presetKey === null) {
             $result->warn('No preset key was provided and config[presets.default] is empty.');
 
             return $result;
@@ -37,21 +37,14 @@ class SyncFlowRoutePresetsAction
             return $result;
         }
 
-        $flowRoutePresets = $preset['flow_routes'] ?? [];
+        $flowRouteDefinitions = $this->flowRouteDefinitions(
+            presetKey: $presetKey,
+            result: $result,
+        );
 
-        if (! is_array($flowRoutePresets) || $flowRoutePresets === []) {
-            return $result;
-        }
-
-        foreach (array_values($flowRoutePresets) as $index => $flowRoutePreset) {
-            if (! is_array($flowRoutePreset)) {
-                $result->warn("Preset [{$presetKey}] FlowRoute at index [{$index}] is not an array.");
-
-                continue;
-            }
-
+        foreach ($flowRouteDefinitions as $index => $flowRouteDefinition) {
             try {
-                $definition = FlowRoutePresetDefinition::fromArray($presetKey, $flowRoutePreset);
+                $definition = FlowRoutePresetDefinition::fromArray($presetKey, $flowRouteDefinition);
             } catch (Throwable $exception) {
                 $result->error("Preset [{$presetKey}] FlowRoute at index [{$index}] is invalid: {$exception->getMessage()}");
 
@@ -62,6 +55,93 @@ class SyncFlowRoutePresetsAction
         }
 
         return $result;
+    }
+
+    private function normalizePresetKey(?string $presetKey): ?string
+    {
+        $presetKey ??= config('presets.default');
+
+        if (! is_string($presetKey)) {
+            return null;
+        }
+
+        $presetKey = trim($presetKey);
+
+        return $presetKey !== '' ? $presetKey : null;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function flowRouteDefinitions(
+        string $presetKey,
+        FlowRoutePresetSyncResult $result,
+    ): array {
+        $groups = config("presets.presets.{$presetKey}.flow_routes.groups", []);
+
+        if (! is_array($groups)) {
+            $result->error("Preset [{$presetKey}] flow_routes.groups must be an array.");
+
+            return [];
+        }
+
+        $groups = $this->normalizeStringList($groups);
+
+        if ($groups === []) {
+            return [];
+        }
+
+        $flowRouteKeys = [];
+
+        foreach ($groups as $group) {
+            $groupFlowRouteKeys = config("presets.flow-routes.groups.{$group}");
+
+            if (! is_array($groupFlowRouteKeys)) {
+                $result->error("FlowRoute preset group [{$group}] does not exist.");
+
+                continue;
+            }
+
+            foreach ($this->normalizeStringList($groupFlowRouteKeys) as $flowRouteKey) {
+                $flowRouteKeys[] = $flowRouteKey;
+            }
+        }
+
+        $flowRouteKeys = array_values(array_unique($flowRouteKeys));
+
+        if ($flowRouteKeys === []) {
+            return [];
+        }
+
+        $definitions = [];
+
+        foreach ($flowRouteKeys as $flowRouteKey) {
+            $definition = config("presets.flow-routes.definitions.{$flowRouteKey}");
+
+            if (! is_array($definition)) {
+                $result->error("FlowRoute preset definition [{$flowRouteKey}] does not exist.");
+
+                continue;
+            }
+
+            $definitions[] = $definition;
+        }
+
+        return $definitions;
+    }
+
+    /**
+     * @param array<mixed> $values
+     * @return array<int, string>
+     */
+    private function normalizeStringList(array $values): array
+    {
+        return array_values(array_unique(array_filter(array_map(
+            fn (mixed $value): ?string => is_string($value) && trim($value) !== ''
+                ? trim($value)
+                : null,
+            $values,
+        ))));
     }
 
     private function syncFlowRoutePreset(

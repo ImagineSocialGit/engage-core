@@ -25,11 +25,26 @@ class Task extends Model
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_CANCELED = 'canceled';
 
+    public const RESPONSIBLE_PARTY_INTERNAL = 'internal';
+    public const RESPONSIBLE_PARTY_CONTACT = 'contact';
+    public const RESPONSIBLE_PARTY_THIRD_PARTY = 'third_party';
+    public const RESPONSIBLE_PARTY_UNKNOWN = 'unknown';
+
+    public const RESPONSIBLE_PARTY_OPTIONS = [
+        self::RESPONSIBLE_PARTY_INTERNAL,
+        self::RESPONSIBLE_PARTY_CONTACT,
+        self::RESPONSIBLE_PARTY_THIRD_PARTY,
+        self::RESPONSIBLE_PARTY_UNKNOWN,
+    ];
+
     protected $fillable = [
         'related_type',
         'related_id',
         'assigned_to_type',
         'assigned_to_id',
+        'responsible_party',
+        'responsible_type',
+        'responsible_id',
         'source',
         'title',
         'description',
@@ -46,6 +61,7 @@ class Task extends Model
     protected $casts = [
         'related_id' => 'integer',
         'assigned_to_id' => 'integer',
+        'responsible_id' => 'integer',
         'due_at' => 'datetime',
         'completed_at' => 'datetime',
         'canceled_at' => 'datetime',
@@ -59,6 +75,11 @@ class Task extends Model
     }
 
     public function assignedTo(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    public function responsible(): MorphTo
     {
         return $this->morphTo();
     }
@@ -88,6 +109,23 @@ class Task extends Model
         return $query->whereNotNull('archived_at');
     }
 
+    public function scopeAssigned(Builder $query): Builder
+    {
+        return $query->whereNotNull('assigned_to_type')
+            ->whereNotNull('assigned_to_id');
+    }
+
+    public function scopeUnassigned(Builder $query): Builder
+    {
+        return $query->whereNull('assigned_to_type')
+            ->whereNull('assigned_to_id');
+    }
+
+    public function scopeResponsibleParty(Builder $query, string $responsibleParty): Builder
+    {
+        return $query->where('responsible_party', $responsibleParty);
+    }
+
     public function isOpen(): bool
     {
         return $this->status === self::STATUS_OPEN;
@@ -106,5 +144,16 @@ class Task extends Model
     public function isArchived(): bool
     {
         return $this->archived_at !== null;
+    }
+
+    public function isAssigned(): bool
+    {
+        return $this->assigned_to_type !== null
+            && $this->assigned_to_id !== null;
+    }
+
+    public function isResponsibleParty(string $responsibleParty): bool
+    {
+        return $this->responsible_party === $responsibleParty;
     }
 }

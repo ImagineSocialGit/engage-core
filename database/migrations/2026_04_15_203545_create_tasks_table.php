@@ -15,6 +15,9 @@ return new class extends Migration
 
             $table->nullableMorphs('assigned_to');
 
+            $table->string('responsible_party')->default('internal')->index();
+            $table->nullableMorphs('responsible');
+
             $table->string('source')->default('manual')->index();
 
             $table->string('title');
@@ -37,6 +40,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['assigned_to_type', 'assigned_to_id', 'status'], 'tasks_assigned_to_status_index');
+            $table->index(['responsible_party', 'status', 'archived_at'], 'tasks_responsible_party_status_index');
             $table->index(['related_type', 'related_id', 'status', 'archived_at'], 'tasks_related_status_archived_index');
             $table->index(['status', 'archived_at', 'due_at'], 'tasks_status_archived_due_index');
         });
