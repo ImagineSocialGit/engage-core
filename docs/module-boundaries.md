@@ -125,6 +125,7 @@ Current ownership:
 | flow_route_points | FlowRoutes |
 | contact_flow_route_progress | FlowRoutes |
 | tasks | Tasks |
+| task_templates | Tasks |
 | message_consents | Messaging |
 | consent_revocations | Messaging |
 | scheduled_messages | Messaging |
@@ -212,7 +213,8 @@ Accepted dependency direction:
 - Broadcasts -> Core
 - Broadcasts -> Messaging
 - Tasks -> Core
-- Tasks may use InternalNotifications and Messaging through public actions/services/contracts
+- Tasks -> Core
+- Tasks may optionally use InternalNotifications and Messaging through public actions/services/contracts when those modules are enabled
 - Workflow -> Core
 - FlowRoutes -> Workflow
 - FlowRoutes may optionally use Tasks through public task actions/services when Tasks is enabled
@@ -614,6 +616,8 @@ Tasks owns:
 - task controllers
 - task contact show data provider
 - task lifecycle events
+- task templates
+- task template preset sync
 
 Current `tasks` responsibility shape:
 
@@ -662,6 +666,18 @@ Examples:
     responsible_party = third_party
     responsible = null until a third-party/vendor model exists
 
+Task templates are DB-owned default task definitions.
+
+Task templates are not live tasks.
+
+Task preset sync may create/update `task_templates`, but it must not create live `tasks`.
+
+Runtime task creation should continue to use task-facing actions such as:
+
+    CreateTaskAction
+
+Task templates may later be used by admin UI, FlowRoutes, vertical modules, or standalone task creation screens to prefill task fields, but runtime behavior should remain DB/action-driven.
+
 Task assignment is optional.
 
 Unassigned tasks are valid when the system needs to track a manual dependency before a clear internal owner exists.
@@ -674,11 +690,22 @@ Task responsibility should not imply that the responsible party can log in, rece
 
 Those behaviors require separate feature work.
 
-Tasks may depend on:
+Tasks depends on:
 
-- Core, for contact-related tasks and contact-responsible tasks
-- InternalNotifications, for TeamMember assignment/notification behavior if needed
-- Messaging, for sending task notifications/digests if needed
+- Core, for contact-related tasks, contact-responsible tasks, and contact show extension points
+
+Tasks may optionally use, when enabled:
+
+- InternalNotifications, for TeamMember assignment notification and digest recipient behavior
+- Messaging, indirectly through InternalNotifications notification delivery behavior
+
+Tasks must remain useful with only Core enabled.
+
+Task creation, completion, templates, and basic task visibility must not require InternalNotifications or Messaging.
+
+Task assignment may exist as data even when notification delivery is unavailable.
+
+Task digests and assignment notifications should no-op or be unavailable unless InternalNotifications is enabled.
 
 Tasks should remain independently enableable.
 
@@ -693,6 +720,19 @@ FlowRoutes may create Tasks through public task-facing actions/services.
 Core should not import Tasks.
 
 Tasks can contribute contact page data through Core’s `ContactShowDataProvider`.
+
+Reusable task Blade components should live under:
+
+    resources/views/components/tasks
+
+Contact pages may include those components with contact context.
+
+Standalone task pages may later include those components without contact context.
+
+Task UI should avoid exposing raw morph internals to users. Admin-facing labels should keep the mental model simple:
+
+    Assigned To = internal tracker/follow-up owner
+    Responsible Party = who needs to do the manual thing
 
 FlowRoutes-created tasks should use:
 
@@ -1477,6 +1517,7 @@ Guardrails:
 Add default preset definitions and sync tooling for:
 
 - ContactStatus presets
+- Task template presets
 - Campaign presets
 - FlowRoute presets
 
@@ -1497,8 +1538,9 @@ That command should prompt for or accept a preset package key, inspect the selec
 Current dependency-safe order:
 
 1. ContactStatus presets
-2. Campaign presets
-3. FlowRoute presets
+2. Task template presets
+3. Campaign presets
+4. FlowRoute presets
 
 Module-specific sync commands may remain available as lower-level operator/debugging tools, but new project setup should use `presets:sync`.
 
@@ -1508,15 +1550,27 @@ Do not add large workflow builders or admin editors in this phase.
 
 Confirm manually-created and FlowRoutes-created tasks behave correctly.
 
-Confirm assigned and unassigned tasks are visible where needed.
+Confirm Tasks remain standalone-capable.
 
-Confirm responsible_party is displayed clearly enough for mortgage/manual dependency tracking.
+Confirm tasks may be contact-related but are not contact-required.
 
-Confirm daily and weekly digests include assigned tasks.
+Confirm assigned and unassigned tasks are valid.
 
-Confirm TeamMember notification preferences and gates work.
+Confirm `assigned_to` and `responsible_party` remain separate concepts.
 
-Confirm the email digest path works end-to-end.
+Confirm `responsible_party` is displayed clearly enough for mortgage/manual dependency tracking.
+
+Confirm task templates are DB-owned definitions only and preset sync does not create live tasks.
+
+Confirm FlowRoutes-created tasks use `CreateTaskAction`.
+
+Confirm `task.completed` is emitted through `AutomationEventRecorded`, not direct FlowRoutes listeners.
+
+Confirm daily and weekly digests are assignment-driven.
+
+Confirm task digest and assignment notification behavior is gated behind InternalNotifications.
+
+Confirm reusable task components live under the Tasks component namespace and can be attached to contact pages without becoming contact-specific.
 
 ### Phase 21 — Minimal contact visibility/debug
 

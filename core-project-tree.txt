@@ -357,20 +357,24 @@
 │   │   │   │   ├── BuildTaskDigestsAction.php
 │   │   │   │   ├── CreateTaskAction.php
 │   │   │   │   ├── NotifyAssignedTaskRecipientsAction.php
-│   │   │   │   └── SendTaskDigestNotificationsAction.php
+│   │   │   │   ├── SendTaskDigestNotificationsAction.php
+│   │   │   │   └── SyncTaskPresetsAction.php
 │   │   │   ├── Contracts
 │   │   │   │   ├── TaskAssignedRecipientResolver.php
 │   │   │   │   └── TaskRelatedSubjectResolverContract.php
 │   │   │   ├── Controllers
 │   │   │   │   └── TaskController.php
 │   │   │   ├── Data
-│   │   │   │   └── TaskDigest.php
+│   │   │   │   ├── TaskDigest.php
+│   │   │   │   ├── TaskPresetDefinition.php
+│   │   │   │   └── TaskPresetSyncResult.php
 │   │   │   ├── Events
 │   │   │   │   └── TaskCompleted.php
 │   │   │   ├── Listeners
 │   │   │   │   └── EmitTaskCompletedAutomationEvent.php
 │   │   │   ├── Models
-│   │   │   │   └── Task.php
+│   │   │   │   ├── Task.php
+│   │   │   │   └── TaskTemplate.php
 │   │   │   ├── Providers
 │   │   │   │   └── TasksModuleServiceProvider.php
 │   │   │   ├── Requests
@@ -651,7 +655,8 @@
 │   ├── presets
 │   │   ├── campaigns.php
 │   │   ├── contact-statuses.php
-│   │   └── flow-routes.php
+│   │   ├── flow-routes.php
+│   │   └── tasks.php
 │   ├── presets.php
 │   ├── queue.php
 │   ├── reminders.php
@@ -689,6 +694,7 @@
 │   │   ├── ContactFactory.php
 │   │   ├── ScheduledMessageFactory.php
 │   │   ├── TaskFactory.php
+│   │   ├── TaskTemplateFactory.php
 │   │   ├── TeamMemberFactory.php
 │   │   ├── TeamMemberNotificationPreferenceFactory.php
 │   │   ├── UserFactory.php
@@ -726,6 +732,7 @@
 │   │   ├── 2026_06_19_203548_create_webinars_table.php
 │   │   ├── 2026_06_19_203549_create_webinar_registrations_table.php
 │   │   ├── 2026_06_20_155410_create_webinar_waitlist_signups_table.php
+│   │   ├── 2026_06_29_000000_create_task_templates_table.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -788,9 +795,6 @@
 │       │   └── login.blade.php
 │       ├── components
 │       │   ├── crm
-│       │   │   └── contacts
-│       │   │       ├── create-task-modal.blade.php
-│       │   │       └── task-list.blade.php
 │       │   ├── head.blade.php
 │       │   ├── hero.blade.php
 │       │   ├── layouts
@@ -799,6 +803,9 @@
 │       │   │   ├── favicons.blade.php
 │       │   │   └── public.blade.php
 │       │   ├── section.blade.php
+│       │   ├── tasks
+│       │   │   ├── create-task-modal.blade.php
+│       │   │   └── task-list.blade.php
 │       │   ├── ui
 │       │   │   ├── button.blade.php
 │       │   │   ├── card.blade.php
@@ -911,6 +918,8 @@
 │   │   │   ├── ModuleManagerTest.php
 │   │   │   ├── ModuleNavigationTest.php
 │   │   │   └── ModuleRouteMiddlewareTest.php
+│   │   ├── Tasks
+│   │   │   └── RuntimeTaskBehaviorTest.php
 │   │   ├── Webhooks
 │   │   │   ├── EmailWebhookControllerTest.php
 │   │   │   ├── SmsWebhookControllerTest.php
@@ -928,4 +937,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-332 directories, 597 files
+333 directories, 605 files
