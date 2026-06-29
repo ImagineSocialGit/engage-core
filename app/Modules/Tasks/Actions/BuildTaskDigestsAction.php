@@ -2,10 +2,10 @@
 
 namespace App\Modules\Tasks\Actions;
 
+use App\Modules\InternalNotifications\Services\InternalNotificationRecipient;
 use App\Modules\Tasks\Data\TaskDigest;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Services\TaskAssignedRecipientsResolver;
-use App\Modules\InternalNotifications\Services\InternalNotificationRecipient;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -28,6 +28,12 @@ class BuildTaskDigestsAction
         string $frequency,
         ?CarbonInterface $now = null,
     ): Collection {
+        $this->validateFrequency($frequency);
+
+        if (! $this->internalNotificationsEnabled()) {
+            return collect();
+        }
+
         $now ??= now();
 
         $tasks = $this->tasksForFrequency($frequency, $now);
@@ -77,13 +83,6 @@ class BuildTaskDigestsAction
                 $frequency === self::FREQUENCY_WEEKLY,
                 fn (Builder $query) => $this->weeklyScope($query, $now),
             )
-            ->when(
-                ! in_array($frequency, [
-                    self::FREQUENCY_DAILY,
-                    self::FREQUENCY_WEEKLY,
-                ], true),
-                fn () => throw new InvalidArgumentException("Unsupported task digest frequency [{$frequency}]."),
-            )
             ->orderByRaw('due_at IS NULL')
             ->orderBy('due_at')
             ->orderBy('created_at')
@@ -112,5 +111,21 @@ class BuildTaskDigestsAction
     private function modelKey(Model $model): string
     {
         return $model::class.':'.$model->getKey();
+    }
+
+    private function validateFrequency(string $frequency): void
+    {
+        if (! in_array($frequency, [
+            self::FREQUENCY_DAILY,
+            self::FREQUENCY_WEEKLY,
+        ], true)) {
+            throw new InvalidArgumentException("Unsupported task digest frequency [{$frequency}].");
+        }
+    }
+
+    private function internalNotificationsEnabled(): bool
+    {
+        return ! function_exists('module_enabled')
+            || module_enabled('internal_notifications');
     }
 }

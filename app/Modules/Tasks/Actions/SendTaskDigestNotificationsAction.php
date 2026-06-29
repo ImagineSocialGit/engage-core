@@ -3,24 +3,28 @@
 namespace App\Modules\Tasks\Actions;
 
 use App\Modules\InternalNotifications\Actions\ScheduleInternalNotificationAction;
+use App\Modules\InternalNotifications\Models\TeamMemberNotificationPreference;
 use App\Modules\Tasks\Data\TaskDigest;
 use App\Modules\Tasks\Models\Task;
-use App\Modules\InternalNotifications\Models\TeamMemberNotificationPreference;
 use Illuminate\Support\Str;
 
 class SendTaskDigestNotificationsAction
 {
     public function __construct(
         private readonly BuildTaskDigestsAction $buildTaskDigests,
-        private readonly ScheduleInternalNotificationAction $scheduleInternalNotification,
     ) {}
 
     public function handle(string $frequency): int
     {
+        if (! $this->internalNotificationsEnabled()) {
+            return 0;
+        }
+
         $scheduled = 0;
+        $scheduleInternalNotification = app(ScheduleInternalNotificationAction::class);
 
         foreach ($this->buildTaskDigests->handle($frequency) as $digest) {
-            if ($this->scheduleDigest($digest)) {
+            if ($this->scheduleDigest($digest, $scheduleInternalNotification)) {
                 $scheduled++;
             }
         }
@@ -28,13 +32,15 @@ class SendTaskDigestNotificationsAction
         return $scheduled;
     }
 
-    private function scheduleDigest(TaskDigest $digest): bool
-    {
+    private function scheduleDigest(
+        TaskDigest $digest,
+        ScheduleInternalNotificationAction $scheduleInternalNotification,
+    ): bool {
         if (! $digest->hasTasks()) {
             return false;
         }
 
-        $this->scheduleInternalNotification->handle(
+        $scheduleInternalNotification->handle(
             recipient: $digest->recipient,
             scope: 'crm_tasks',
             messageType: $digest->frequency,
@@ -129,5 +135,11 @@ class SendTaskDigestNotificationsAction
             $digest->recipient->source->getKey(),
             now()->timezone(config('app.timezone'))->toDateString(),
         ]);
+    }
+
+    private function internalNotificationsEnabled(): bool
+    {
+        return ! function_exists('module_enabled')
+            || module_enabled('internal_notifications');
     }
 }

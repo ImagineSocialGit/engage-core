@@ -2,10 +2,10 @@
 
 namespace App\Modules\Tasks\Services\AssignedRecipients;
 
-use App\Modules\Tasks\Contracts\TaskAssignedRecipientResolver;
 use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\InternalNotifications\Models\TeamMemberNotificationPreference;
 use App\Modules\InternalNotifications\Services\InternalNotificationRecipient;
+use App\Modules\Tasks\Contracts\TaskAssignedRecipientResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
@@ -13,12 +13,13 @@ class TeamMemberTaskAssignedRecipientResolver implements TaskAssignedRecipientRe
 {
     public function supports(Model $assignedTo): bool
     {
-        return $assignedTo instanceof TeamMember;
+        return $this->internalNotificationsEnabled()
+            && $assignedTo instanceof TeamMember;
     }
 
     public function resolve(Model $assignedTo): Collection
     {
-        if (! $assignedTo instanceof TeamMember) {
+        if (! $this->supports($assignedTo)) {
             return collect();
         }
 
@@ -39,5 +40,11 @@ class TeamMemberTaskAssignedRecipientResolver implements TaskAssignedRecipientRe
         $name = trim((string) $teamMember->name);
 
         return $name !== '' ? $name : ($teamMember->email ?: 'Team Member #'.$teamMember->id);
+    }
+
+    private function internalNotificationsEnabled(): bool
+    {
+        return ! function_exists('module_enabled')
+            || module_enabled('internal_notifications');
     }
 }

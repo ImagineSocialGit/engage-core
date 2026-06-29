@@ -3,21 +3,24 @@
 namespace App\Modules\Tasks\Actions;
 
 use App\Modules\InternalNotifications\Actions\ScheduleInternalNotificationAction;
+use App\Modules\InternalNotifications\Services\InternalNotificationRecipient;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Services\TaskAssignedRecipientsResolver;
 use App\Modules\Tasks\Services\TaskRelatedSubjectResolver;
-use App\Modules\InternalNotifications\Services\InternalNotificationRecipient;
 
 class NotifyAssignedTaskRecipientsAction
 {
     public function __construct(
         private readonly TaskAssignedRecipientsResolver $assignedRecipientsResolver,
         private readonly TaskRelatedSubjectResolver $relatedSubjectResolver,
-        private readonly ScheduleInternalNotificationAction $scheduleInternalNotification,
     ) {}
 
     public function handle(Task $task): void
     {
+        if (! $this->internalNotificationsEnabled()) {
+            return;
+        }
+
         $recipients = $this->assignedRecipientsResolver->resolve($task);
 
         if ($recipients->isEmpty()) {
@@ -25,9 +28,10 @@ class NotifyAssignedTaskRecipientsAction
         }
 
         $relatedSubject = $this->relatedSubjectResolver->resolve($task);
+        $scheduleInternalNotification = app(ScheduleInternalNotificationAction::class);
 
         foreach ($recipients as $recipient) {
-            $this->scheduleInternalNotification->handle(
+            $scheduleInternalNotification->handle(
                 recipient: $recipient,
                 scope: 'crm_tasks',
                 messageType: 'task_assigned',
@@ -117,5 +121,11 @@ class NotifyAssignedTaskRecipientsAction
             $task->getMorphClass(),
             $task->getKey(),
         ]);
+    }
+
+    private function internalNotificationsEnabled(): bool
+    {
+        return ! function_exists('module_enabled')
+            || module_enabled('internal_notifications');
     }
 }
