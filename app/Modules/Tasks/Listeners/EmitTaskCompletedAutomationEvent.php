@@ -34,10 +34,17 @@ class EmitTaskCompletedAutomationEvent
                         'priority' => $task->priority,
                         'due_at' => $task->due_at?->toISOString(),
                         'completed_at' => $task->completed_at?->toISOString(),
+
                         'related_type' => $task->related_type,
                         'related_id' => $task->related_id,
+
                         'assigned_to_type' => $task->assigned_to_type,
                         'assigned_to_id' => $task->assigned_to_id,
+
+                        'responsible_party' => $task->responsible_party,
+                        'responsible_type' => $task->responsible_type,
+                        'responsible_id' => $task->responsible_id,
+
                         'meta' => $task->meta ?? [],
                     ],
                 ],
@@ -51,16 +58,26 @@ class EmitTaskCompletedAutomationEvent
 
     private function contactId(Task $task): ?int
     {
-        if (! $task->related_type || ! $task->related_id) {
-            return null;
+        if ($this->isContactMorph($task->related_type) && $task->related_id) {
+            return (int) $task->related_id;
         }
 
-        $contactMorphClass = (new Contact())->getMorphClass();
-
-        if (! in_array($task->related_type, [Contact::class, $contactMorphClass], true)) {
-            return null;
+        if ($this->isContactMorph($task->responsible_type) && $task->responsible_id) {
+            return (int) $task->responsible_id;
         }
 
-        return (int) $task->related_id;
+        return null;
+    }
+
+    private function isContactMorph(?string $type): bool
+    {
+        if (! $type) {
+            return false;
+        }
+
+        return in_array($type, array_unique([
+            Contact::class,
+            (new Contact())->getMorphClass(),
+        ]), true);
     }
 }

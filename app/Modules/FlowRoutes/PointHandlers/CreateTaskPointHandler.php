@@ -48,8 +48,8 @@ class CreateTaskPointHandler implements PointHandler
             'assigned_to_id' => $definition->assignedToId,
 
             'responsible_party' => $definition->responsibleParty,
-            'responsible_type' => $this->responsibleType($definition, $context),
-            'responsible_id' => $this->responsibleId($definition, $context),
+            'responsible_type' => $definition->responsibleType,
+            'responsible_id' => $definition->responsibleId,
 
             'source' => Task::SOURCE_MODULE,
             'title' => $this->renderText($definition->title, $context),
@@ -87,36 +87,6 @@ class CreateTaskPointHandler implements PointHandler
                 ],
             ],
         );
-    }
-
-    private function responsibleType(
-        CreateTaskPointDefinition $definition,
-        PointExecutionContext $context,
-    ): ?string {
-        if ($definition->responsibleType !== null) {
-            return $definition->responsibleType;
-        }
-
-        if ($definition->responsibleParty === Task::RESPONSIBLE_PARTY_CONTACT) {
-            return Contact::class;
-        }
-
-        return null;
-    }
-
-    private function responsibleId(
-        CreateTaskPointDefinition $definition,
-        PointExecutionContext $context,
-    ): ?int {
-        if ($definition->responsibleId !== null) {
-            return $definition->responsibleId;
-        }
-
-        if ($definition->responsibleParty === Task::RESPONSIBLE_PARTY_CONTACT) {
-            return (int) $context->progress->contact_id;
-        }
-
-        return null;
     }
 
     private function renderText(?string $value, PointExecutionContext $context): ?string

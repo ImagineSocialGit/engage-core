@@ -45,6 +45,19 @@ class StoreTaskRequest extends FormRequest
                 Rule::in(Task::RESPONSIBLE_PARTY_OPTIONS),
             ],
 
+            'responsible_type' => [
+                'nullable',
+                'string',
+                'required_with:responsible_id',
+                Rule::in($relatedTypeResolver->allowedTypeKeys()),
+            ],
+
+            'responsible_id' => [
+                'nullable',
+                'integer',
+                'required_with:responsible_type',
+            ],
+
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'due_at' => ['nullable', 'date'],
@@ -61,29 +74,54 @@ class StoreTaskRequest extends FormRequest
             return $validated;
         }
 
-        if (! isset($validated['responsible_party'])) {
-            $validated['responsible_party'] = Task::RESPONSIBLE_PARTY_INTERNAL;
-        }
-
-        if (! isset($validated['related_type'], $validated['related_id'])) {
-            return $validated;
-        }
+        $validated['responsible_party'] ??= Task::RESPONSIBLE_PARTY_INTERNAL;
 
         $relatedTypeResolver = app(TaskRelatedTypeResolver::class);
 
-        $validated['related_type'] = $relatedTypeResolver->normalize(
-            $validated['related_type'],
+        $this->normalizeExistingMorph(
+            validated: $validated,
+            typeKey: 'related_type',
+            idKey: 'related_id',
+            invalidIdField: 'related_id',
+            relatedTypeResolver: $relatedTypeResolver,
+        );
+
+        $this->normalizeExistingMorph(
+            validated: $validated,
+            typeKey: 'responsible_type',
+            idKey: 'responsible_id',
+            invalidIdField: 'responsible_id',
+            relatedTypeResolver: $relatedTypeResolver,
+        );
+
+        return $validated;
+    }
+
+    /**
+     * @param array<string, mixed> $validated
+     */
+    private function normalizeExistingMorph(
+        array &$validated,
+        string $typeKey,
+        string $idKey,
+        string $invalidIdField,
+        TaskRelatedTypeResolver $relatedTypeResolver,
+    ): void {
+        if (! isset($validated[$typeKey], $validated[$idKey])) {
+            return;
+        }
+
+        $validated[$typeKey] = $relatedTypeResolver->normalize(
+            $validated[$typeKey],
         );
 
         if (! $relatedTypeResolver->exists(
-            type: $validated['related_type'],
-            id: $validated['related_id'],
+            type: $validated[$typeKey],
+            id: $validated[$idKey],
         )) {
             throw ValidationException::withMessages([
-                'related_id' => 'The selected related record is invalid.',
+                $invalidIdField => 'The selected record is invalid.',
             ]);
         }
-
-        return $validated;
     }
 }
