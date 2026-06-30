@@ -22,7 +22,6 @@ return new class extends Migration
 
             $table->boolean('is_active')->default(true)->index();
 
-            $table->string('preset_key')->nullable()->index();
             $table->string('source_version')->nullable();
 
             $table->boolean('is_customized')->default(false)->index();
@@ -33,7 +32,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['type', 'is_active']);
-            $table->index(['preset_key', 'source_version']);
+            $table->index(['key', 'source_version']);
         });
     }
 

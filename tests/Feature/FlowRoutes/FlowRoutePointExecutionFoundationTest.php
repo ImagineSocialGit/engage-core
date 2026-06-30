@@ -67,6 +67,8 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
         $this->assertSame(ContactFlowRouteProgress::STATUS_COMPLETED, $setup['progress']->status);
         $this->assertNull($setup['progress']->current_flow_route_point_id);
+        $this->assertNull($setup['progress']->resume_at);
+        $this->assertNull($setup['progress']->waiting_event_key);
         $this->assertNotNull($setup['progress']->completed_at);
     }
 
@@ -81,7 +83,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
         $setup['flow_route_points'][0]->forceFill([
             'definition' => [
-                'duration_seconds' => 300,
+                'seconds' => 300,
             ],
         ])->save();
 
@@ -94,7 +96,9 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertSame(ContactFlowRouteProgress::STATUS_WAITING, $setup['progress']->status);
         $this->assertSame($setup['flow_route_points'][0]->getKey(), $setup['progress']->current_flow_route_point_id);
         $this->assertSame($setup['flow_route_points'][0]->getKey(), $setup['progress']->waitingFlowRoutePointId());
+        $this->assertNotNull($setup['progress']->resume_at);
         $this->assertNotNull($setup['progress']->waitingResumeAt());
+        $this->assertNull($setup['progress']->waiting_event_key);
 
         Queue::assertPushed(ResumeFlowRouteProgressJob::class);
     }
@@ -113,6 +117,8 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $setup['progress']->refresh();
 
         $this->assertSame(ContactFlowRouteProgress::STATUS_FAILED, $setup['progress']->status);
+        $this->assertNull($setup['progress']->resume_at);
+        $this->assertNull($setup['progress']->waiting_event_key);
         $this->assertSame('point_handler_not_registered', $setup['progress']->failure_reason);
         $this->assertNotNull($setup['progress']->failed_at);
     }
@@ -145,10 +151,13 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $contactStatusId = DB::table('contact_statuses')->insertGetId([
             'key' => 'testing-'.uniqid(),
             'name' => 'Testing',
+            'description' => null,
             'category' => null,
+            'color' => null,
             'is_core' => false,
             'is_active' => true,
             'sort_order' => 1,
+            'source_version' => null,
             'meta' => null,
             'created_at' => now(),
             'updated_at' => now(),
@@ -162,11 +171,14 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         ]);
 
         $flowRoute = FlowRoute::query()->create([
+            'key' => 'testing-flow-route-'.uniqid(),
             'contact_status_id' => $contactStatusId,
             'name' => 'Testing FlowRoute',
+            'description' => null,
             'version' => 1,
+            'trigger_type' => FlowRoute::TRIGGER_CONTACT_STATUS,
+            'trigger_key' => null,
             'is_active' => true,
-            'preset_key' => null,
             'source_version' => null,
             'is_customized' => false,
             'customized_at' => null,
@@ -184,7 +196,6 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
                 'default_definition' => [],
                 'default_settings' => [],
                 'is_active' => true,
-                'preset_key' => null,
                 'source_version' => null,
                 'is_customized' => false,
                 'customized_at' => null,
@@ -194,13 +205,27 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             $flowRoutePoints[] = FlowRoutePoint::query()->create([
                 'flow_route_id' => $flowRoute->getKey(),
                 'point_id' => $point->getKey(),
-                'sort_order' => $index + 1,
+                'key' => 'route-point-'.$index.'-'.uniqid(),
+                'sort_order' => ($index + 1) * 10,
+                'is_start' => $index === 0,
                 'is_active' => true,
+                'next_flow_route_point_id' => null,
                 'definition' => [],
                 'settings' => [],
                 'cancel_conditions' => [],
+                'source_version' => null,
+                'is_customized' => false,
+                'customized_at' => null,
                 'meta' => [],
             ]);
+        }
+
+        foreach ($flowRoutePoints as $index => $flowRoutePoint) {
+            $nextFlowRoutePoint = $flowRoutePoints[$index + 1] ?? null;
+
+            $flowRoutePoint->forceFill([
+                'next_flow_route_point_id' => $nextFlowRoutePoint?->getKey(),
+            ])->save();
         }
 
         $progress = ContactFlowRouteProgress::query()->create([
@@ -214,6 +239,8 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             'completed_at' => null,
             'cancelled_at' => null,
             'failed_at' => null,
+            'resume_at' => null,
+            'waiting_event_key' => null,
             'cancellation_reason' => null,
             'failure_reason' => null,
             'meta' => [],

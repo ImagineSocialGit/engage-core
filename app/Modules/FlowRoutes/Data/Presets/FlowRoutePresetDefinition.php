@@ -3,6 +3,7 @@
 namespace App\Modules\FlowRoutes\Data\Presets;
 
 use App\Modules\FlowRoutes\Data\Points\PointPresetDefinition;
+use App\Modules\FlowRoutes\Models\FlowRoute;
 use InvalidArgumentException;
 
 class FlowRoutePresetDefinition
@@ -10,6 +11,7 @@ class FlowRoutePresetDefinition
     /**
      * @param array<int, PointPresetDefinition> $points
      * @param array<int, FlowRoutePointPresetDefinition> $flowRoutePoints
+     * @param array<string, mixed> $trigger
      * @param array<string, mixed> $meta
      */
     public function __construct(
@@ -17,6 +19,7 @@ class FlowRoutePresetDefinition
         public readonly string $key,
         public readonly ?string $contactStatusKey,
         public readonly string $name,
+        public readonly ?string $description = null,
         public readonly int $version = 1,
         public readonly bool $isActive = true,
         public readonly ?string $sourceVersion = null,
@@ -31,12 +34,7 @@ class FlowRoutePresetDefinition
      */
     public static function fromArray(string $presetKey, array $data): self
     {
-        $sourceVersion = self::string($data, 'source_version')
-            ?? self::string($data, 'version_key');
-
-        $points = [];
-        $flowRoutePoints = [];
-
+        $sourceVersion = self::string($data, 'source_version');
         $contactStatusKey = self::string($data, 'contact_status_key');
         $trigger = self::array($data, 'trigger');
 
@@ -44,27 +42,19 @@ class FlowRoutePresetDefinition
             throw new InvalidArgumentException('Preset FlowRoute must define either [contact_status_key] or [trigger].');
         }
 
+        $points = [];
+        $flowRoutePoints = [];
+
         foreach (self::arrayList($data, 'points') as $index => $pointData) {
             if (! is_array($pointData)) {
                 continue;
             }
 
             $points[] = PointPresetDefinition::fromArray($pointData, $sourceVersion);
+
             $flowRoutePoints[] = FlowRoutePointPresetDefinition::fromEmbeddedPointArray(
                 pointData: $pointData,
-                fallbackSortOrder: $index + 1,
-                fallbackSourceVersion: $sourceVersion,
-            );
-        }
-
-        foreach (self::arrayList($data, 'flow_route_points') as $index => $flowRoutePointData) {
-            if (! is_array($flowRoutePointData)) {
-                continue;
-            }
-
-            $flowRoutePoints[] = FlowRoutePointPresetDefinition::fromArray(
-                data: $flowRoutePointData,
-                fallbackSortOrder: count($flowRoutePoints) + $index + 1,
+                fallbackSortOrder: (($index + 1) * 10),
                 fallbackSourceVersion: $sourceVersion,
             );
         }
@@ -74,6 +64,7 @@ class FlowRoutePresetDefinition
             key: self::requiredString($data, 'key'),
             contactStatusKey: $contactStatusKey,
             name: self::requiredString($data, 'name'),
+            description: self::string($data, 'description'),
             version: self::int($data, 'version') ?? 1,
             isActive: (bool) ($data['is_active'] ?? true),
             sourceVersion: $sourceVersion,
@@ -82,6 +73,38 @@ class FlowRoutePresetDefinition
             flowRoutePoints: $flowRoutePoints,
             meta: self::array($data, 'meta'),
         );
+    }
+
+    public function triggerType(): string
+    {
+        $triggerType = $this->trigger['type'] ?? null;
+
+        if (is_string($triggerType) && trim($triggerType) !== '') {
+            return trim($triggerType);
+        }
+
+        if ($this->contactStatusKey !== null) {
+            return FlowRoute::TRIGGER_CONTACT_STATUS;
+        }
+
+        return FlowRoute::TRIGGER_MANUAL;
+    }
+
+    public function triggerKey(): ?string
+    {
+        if ($this->triggerType() === FlowRoute::TRIGGER_CONTACT_STATUS) {
+            return $this->contactStatusKey;
+        }
+
+        $triggerKey = $this->trigger['event_key'] ?? null;
+
+        if (! is_string($triggerKey)) {
+            return null;
+        }
+
+        $triggerKey = trim($triggerKey);
+
+        return $triggerKey !== '' ? $triggerKey : null;
     }
 
     /**

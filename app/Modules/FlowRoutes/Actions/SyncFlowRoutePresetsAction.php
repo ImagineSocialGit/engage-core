@@ -24,15 +24,15 @@ class SyncFlowRoutePresetsAction
         $result = new FlowRoutePresetSyncResult();
 
         if ($presetKey === null) {
-            $result->warn('No preset key was provided and config[presets.default] is empty.');
+            $result->warn('No preset package key was provided and config[presets.default_package] is empty.');
 
             return $result;
         }
 
-        $preset = config("presets.presets.{$presetKey}");
+        $preset = config("presets.packages.{$presetKey}");
 
         if (! is_array($preset)) {
-            $result->error("Preset [{$presetKey}] does not exist.");
+            $result->error("Preset package [{$presetKey}] does not exist.");
 
             return $result;
         }
@@ -46,7 +46,7 @@ class SyncFlowRoutePresetsAction
             try {
                 $definition = FlowRoutePresetDefinition::fromArray($presetKey, $flowRouteDefinition);
             } catch (Throwable $exception) {
-                $result->error("Preset [{$presetKey}] FlowRoute at index [{$index}] is invalid: {$exception->getMessage()}");
+                $result->error("Preset package [{$presetKey}] FlowRoute at index [{$index}] is invalid: {$exception->getMessage()}");
 
                 continue;
             }
@@ -59,7 +59,7 @@ class SyncFlowRoutePresetsAction
 
     private function normalizePresetKey(?string $presetKey): ?string
     {
-        $presetKey ??= config('presets.default');
+        $presetKey ??= config('presets.default_package');
 
         if (! is_string($presetKey)) {
             return null;
@@ -77,37 +77,23 @@ class SyncFlowRoutePresetsAction
         string $presetKey,
         FlowRoutePresetSyncResult $result,
     ): array {
-        $groups = config("presets.presets.{$presetKey}.flow_routes.groups", []);
+        $group = config("presets.packages.{$presetKey}.groups.flow_routes");
 
-        if (! is_array($groups)) {
-            $result->error("Preset [{$presetKey}] flow_routes.groups must be an array.");
+        if (! is_string($group) || trim($group) === '') {
+            return [];
+        }
+
+        $group = trim($group);
+
+        $flowRouteKeys = config("presets.flow-routes.groups.{$group}");
+
+        if (! is_array($flowRouteKeys)) {
+            $result->error("FlowRoute preset group [{$group}] does not exist.");
 
             return [];
         }
 
-        $groups = $this->normalizeStringList($groups);
-
-        if ($groups === []) {
-            return [];
-        }
-
-        $flowRouteKeys = [];
-
-        foreach ($groups as $group) {
-            $groupFlowRouteKeys = config("presets.flow-routes.groups.{$group}");
-
-            if (! is_array($groupFlowRouteKeys)) {
-                $result->error("FlowRoute preset group [{$group}] does not exist.");
-
-                continue;
-            }
-
-            foreach ($this->normalizeStringList($groupFlowRouteKeys) as $flowRouteKey) {
-                $flowRouteKeys[] = $flowRouteKey;
-            }
-        }
-
-        $flowRouteKeys = array_values(array_unique($flowRouteKeys));
+        $flowRouteKeys = $this->normalizeStringList($flowRouteKeys);
 
         if ($flowRouteKeys === []) {
             return [];
@@ -162,17 +148,12 @@ class SyncFlowRoutePresetsAction
 
                     return;
                 }
-
-                $flowRoute = FlowRoute::query()->firstOrNew([
-                    'contact_status_id' => $contactStatus->getKey(),
-                    'version' => $definition->version,
-                ]);
-            } else {
-                $flowRoute = FlowRoute::query()->firstOrNew([
-                    'preset_key' => $definition->presetKey.'.'.$definition->key,
-                    'version' => $definition->version,
-                ]);
             }
+
+            $flowRoute = FlowRoute::query()->firstOrNew([
+                'key' => $definition->key,
+                'version' => $definition->version,
+            ]);
 
             $flowRouteWasRecentlyCreated = ! $flowRoute->exists;
 
@@ -180,11 +161,14 @@ class SyncFlowRoutePresetsAction
                 $result->recordSkipped('flow_routes');
             } else {
                 $flowRoute->forceFill([
+                    'key' => $definition->key,
                     'contact_status_id' => $contactStatus?->getKey(),
                     'name' => $definition->name,
+                    'description' => $definition->description,
                     'version' => $definition->version,
+                    'trigger_type' => $definition->triggerType(),
+                    'trigger_key' => $definition->triggerKey(),
                     'is_active' => $definition->isActive,
-                    'preset_key' => $definition->presetKey.'.'.$definition->key,
                     'source_version' => $definition->sourceVersion,
                     'is_customized' => $force ? false : (bool) $flowRoute->is_customized,
                     'customized_at' => $force ? null : $flowRoute->customized_at,
@@ -212,6 +196,8 @@ class SyncFlowRoutePresetsAction
                 }
             }
 
+            $flowRoutePointsByKey = [];
+
             foreach ($definition->flowRoutePoints as $flowRoutePointDefinition) {
                 $point = $pointsByKey[$flowRoutePointDefinition->pointKey]
                     ?? Point::query()->where('key', $flowRoutePointDefinition->pointKey)->first();
@@ -222,7 +208,7 @@ class SyncFlowRoutePresetsAction
                     continue;
                 }
 
-                $this->syncFlowRoutePoint(
+                $flowRoutePoint = $this->syncFlowRoutePoint(
                     flowRoute: $flowRoute,
                     point: $point,
                     routeDefinition: $definition,
@@ -230,7 +216,17 @@ class SyncFlowRoutePresetsAction
                     result: $result,
                     force: $force,
                 );
+
+                if ($flowRoutePoint instanceof FlowRoutePoint) {
+                    $flowRoutePointsByKey[$flowRoutePointDefinition->key] = $flowRoutePoint;
+                }
             }
+
+            $this->syncNextFlowRoutePoints(
+                flowRoutePointsByKey: $flowRoutePointsByKey,
+                pointDefinitions: $definition->flowRoutePoints,
+                result: $result,
+            );
         });
     }
 
@@ -260,7 +256,6 @@ class SyncFlowRoutePresetsAction
             'default_definition' => $definition->defaultDefinition,
             'default_settings' => $definition->defaultSettings,
             'is_active' => $definition->isActive,
-            'preset_key' => $routeDefinition->presetKey.'.points.'.$definition->key,
             'source_version' => $definition->sourceVersion,
             'is_customized' => $force ? false : (bool) $point->is_customized,
             'customized_at' => $force ? null : $point->customized_at,
@@ -286,10 +281,10 @@ class SyncFlowRoutePresetsAction
         FlowRoutePointPresetDefinition $pointDefinition,
         FlowRoutePresetSyncResult $result,
         bool $force,
-    ): void {
+    ): ?FlowRoutePoint {
         $flowRoutePoint = FlowRoutePoint::query()->firstOrNew([
             'flow_route_id' => $flowRoute->getKey(),
-            'sort_order' => $pointDefinition->sortOrder,
+            'key' => $pointDefinition->key,
         ]);
 
         $wasRecentlyCreated = ! $flowRoutePoint->exists;
@@ -297,18 +292,22 @@ class SyncFlowRoutePresetsAction
         if ($flowRoutePoint->exists && $flowRoutePoint->is_customized && ! $force) {
             $result->recordSkipped('flow_route_points');
 
-            return;
+            return $flowRoutePoint;
         }
 
         $flowRoutePoint->forceFill([
             'flow_route_id' => $flowRoute->getKey(),
             'point_id' => $point->getKey(),
+            'key' => $pointDefinition->key,
             'sort_order' => $pointDefinition->sortOrder,
+            'is_start' => $pointDefinition->isStart,
             'is_active' => $pointDefinition->isActive,
-            'definition' => $pointDefinition->definition,
+            'next_flow_route_point_id' => null,
+            'definition' => array_replace_recursive($pointDefinition->definition, [
+                'conditions' => $pointDefinition->conditions,
+            ]),
             'settings' => $pointDefinition->settings,
             'cancel_conditions' => $pointDefinition->cancelConditions,
-            'preset_key' => $routeDefinition->presetKey.'.'.$routeDefinition->key.'.'.$pointDefinition->pointKey.'.'.$pointDefinition->sortOrder,
             'source_version' => $pointDefinition->sourceVersion,
             'is_customized' => $force ? false : (bool) $flowRoutePoint->is_customized,
             'customized_at' => $force ? null : $flowRoutePoint->customized_at,
@@ -316,13 +315,56 @@ class SyncFlowRoutePresetsAction
                 'preset' => [
                     'client_preset_key' => $routeDefinition->presetKey,
                     'flow_route_key' => $routeDefinition->key,
+                    'flow_route_point_key' => $pointDefinition->key,
                     'point_key' => $pointDefinition->pointKey,
                     'sort_order' => $pointDefinition->sortOrder,
+                    'next_point_key' => $pointDefinition->nextPointKey,
                 ],
                 'definition' => $pointDefinition->meta,
             ]),
         ])->save();
 
         $result->{$wasRecentlyCreated ? 'recordCreated' : 'recordUpdated'}('flow_route_points');
+
+        return $flowRoutePoint;
+    }
+
+    /**
+     * @param array<string, FlowRoutePoint> $flowRoutePointsByKey
+     * @param array<int, FlowRoutePointPresetDefinition> $pointDefinitions
+     */
+    private function syncNextFlowRoutePoints(
+        array $flowRoutePointsByKey,
+        array $pointDefinitions,
+        FlowRoutePresetSyncResult $result,
+    ): void {
+        foreach ($pointDefinitions as $pointDefinition) {
+            if ($pointDefinition->nextPointKey === null) {
+                continue;
+            }
+
+            $flowRoutePoint = $flowRoutePointsByKey[$pointDefinition->key] ?? null;
+            $nextFlowRoutePoint = $flowRoutePointsByKey[$pointDefinition->nextPointKey] ?? null;
+
+            if (! $flowRoutePoint instanceof FlowRoutePoint) {
+                continue;
+            }
+
+            if (! $nextFlowRoutePoint instanceof FlowRoutePoint) {
+                $result->warn("FlowRoutePoint [{$pointDefinition->key}] references missing next point [{$pointDefinition->nextPointKey}].");
+
+                continue;
+            }
+
+            if ((int) $flowRoutePoint->next_flow_route_point_id === (int) $nextFlowRoutePoint->getKey()) {
+                continue;
+            }
+
+            $flowRoutePoint->forceFill([
+                'next_flow_route_point_id' => $nextFlowRoutePoint->getKey(),
+            ])->save();
+
+            $result->recordUpdated('flow_route_points');
+        }
     }
 }

@@ -9,38 +9,24 @@ class FlowRoutePointPresetDefinition
     /**
      * @param array<string, mixed> $definition
      * @param array<string, mixed> $settings
-     * @param array<string, mixed> $cancelConditions
+     * @param array<int, array<string, mixed>> $conditions
+     * @param array<int, array<string, mixed>> $cancelConditions
      * @param array<string, mixed> $meta
      */
     public function __construct(
+        public readonly string $key,
         public readonly string $pointKey,
         public readonly int $sortOrder,
+        public readonly bool $isStart = false,
         public readonly bool $isActive = true,
+        public readonly ?string $nextPointKey = null,
         public readonly array $definition = [],
         public readonly array $settings = [],
+        public readonly array $conditions = [],
         public readonly array $cancelConditions = [],
         public readonly ?string $sourceVersion = null,
         public readonly array $meta = [],
     ) {}
-
-    /**
-     * @param array<string, mixed> $data
-     */
-    public static function fromArray(array $data, int $fallbackSortOrder, ?string $fallbackSourceVersion = null): self
-    {
-        $pointKey = self::requiredString($data, 'point_key');
-
-        return new self(
-            pointKey: $pointKey,
-            sortOrder: self::int($data, 'sort_order') ?? $fallbackSortOrder,
-            isActive: (bool) ($data['is_active'] ?? true),
-            definition: self::array($data, 'definition'),
-            settings: self::array($data, 'settings'),
-            cancelConditions: self::array($data, 'cancel_conditions'),
-            sourceVersion: self::string($data, 'source_version') ?: $fallbackSourceVersion,
-            meta: self::array($data, 'meta'),
-        );
-    }
 
     /**
      * @param array<string, mixed> $pointData
@@ -50,20 +36,33 @@ class FlowRoutePointPresetDefinition
         int $fallbackSortOrder,
         ?string $fallbackSourceVersion = null,
     ): self {
-        $routePoint = $pointData['route_point']
-            ?? $pointData['route']
-            ?? [];
+        $pointKey = self::requiredString($pointData, 'key');
 
-        if (! is_array($routePoint)) {
-            $routePoint = [];
+        $definition = $pointData['default_definition'] ?? [];
+
+        if (! is_array($definition)) {
+            $definition = [];
         }
 
-        $routePoint['point_key'] = $pointData['key'] ?? null;
+        $settings = $pointData['default_settings'] ?? [];
 
-        return self::fromArray(
-            data: $routePoint,
-            fallbackSortOrder: $fallbackSortOrder,
-            fallbackSourceVersion: $fallbackSourceVersion,
+        if (! is_array($settings)) {
+            $settings = [];
+        }
+
+        return new self(
+            key: $pointKey,
+            pointKey: $pointKey,
+            sortOrder: self::int($pointData, 'sort_order') ?? $fallbackSortOrder,
+            isStart: (bool) ($pointData['is_start'] ?? false),
+            isActive: (bool) ($pointData['is_active'] ?? true),
+            nextPointKey: self::string($pointData, 'next_point_key'),
+            definition: $definition,
+            settings: $settings,
+            conditions: self::arrayList($pointData, 'conditions'),
+            cancelConditions: self::arrayList($pointData, 'cancel_conditions'),
+            sourceVersion: self::string($pointData, 'source_version') ?: $fallbackSourceVersion,
+            meta: self::array($pointData, 'meta'),
         );
     }
 
@@ -116,5 +115,23 @@ class FlowRoutePointPresetDefinition
         $value = $data[$key] ?? [];
 
         return is_array($value) ? $value : [];
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<int, array<string, mixed>>
+     */
+    private static function arrayList(array $data, string $key): array
+    {
+        $value = $data[$key] ?? [];
+
+        if (! is_array($value)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $value,
+            fn (mixed $item): bool => is_array($item),
+        ));
     }
 }

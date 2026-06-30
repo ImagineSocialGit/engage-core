@@ -13,12 +13,25 @@ class FlowRoute extends Model
 {
     use HasFactory;
 
+    public const TRIGGER_MANUAL = 'manual';
+    public const TRIGGER_CONTACT_STATUS = 'contact_status';
+    public const TRIGGER_AUTOMATION_EVENT = 'automation_event';
+
+    public const TRIGGERS = [
+        self::TRIGGER_MANUAL,
+        self::TRIGGER_CONTACT_STATUS,
+        self::TRIGGER_AUTOMATION_EVENT,
+    ];
+
     protected $fillable = [
+        'key',
         'contact_status_id',
         'name',
+        'description',
         'version',
+        'trigger_type',
+        'trigger_key',
         'is_active',
-        'preset_key',
         'source_version',
         'is_customized',
         'customized_at',
@@ -69,6 +82,11 @@ class FlowRoute extends Model
         return $query->where('is_active', false);
     }
 
+    public function scopeForKey(Builder $query, string $key): Builder
+    {
+        return $query->where('key', $key);
+    }
+
     public function scopeForContactStatus(Builder $query, ContactStatus|int $contactStatus): Builder
     {
         return $query->where(
@@ -77,9 +95,20 @@ class FlowRoute extends Model
         );
     }
 
-    public function scopePreset(Builder $query, string $presetKey): Builder
+    public function scopeForTrigger(Builder $query, string $triggerType, ?string $triggerKey = null): Builder
     {
-        return $query->where('preset_key', $presetKey);
+        $query->where('trigger_type', $triggerType);
+
+        if ($triggerKey !== null) {
+            $query->where('trigger_key', $triggerKey);
+        }
+
+        return $query;
+    }
+
+    public function scopeForAutomationEvent(Builder $query, string $eventKey): Builder
+    {
+        return $query->forTrigger(self::TRIGGER_AUTOMATION_EVENT, $eventKey);
     }
 
     public function scopeCustomized(Builder $query): Builder
@@ -90,12 +119,5 @@ class FlowRoute extends Model
     public function scopeNotCustomized(Builder $query): Builder
     {
         return $query->where('is_customized', false);
-    }
-
-    public function scopeForAutomationEvent(Builder $query, string $eventKey): Builder
-    {
-        return $query
-            ->where('meta->preset->trigger->type', 'automation_event')
-            ->where('meta->preset->trigger->event_key', $eventKey);
     }
 }

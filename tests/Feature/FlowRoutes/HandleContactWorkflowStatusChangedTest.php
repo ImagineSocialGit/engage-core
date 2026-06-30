@@ -26,10 +26,18 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
         ]);
 
         $flowRoute = FlowRoute::query()->create([
+            'key' => 'new_lead_route',
             'contact_status_id' => $status->id,
             'name' => 'New Lead Route',
+            'description' => null,
             'version' => 1,
+            'trigger_type' => FlowRoute::TRIGGER_CONTACT_STATUS,
+            'trigger_key' => $status->key,
             'is_active' => true,
+            'source_version' => null,
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
         ]);
 
         $point = Point::query()->create([
@@ -41,8 +49,18 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
         $flowRoutePoint = FlowRoutePoint::query()->create([
             'flow_route_id' => $flowRoute->id,
             'point_id' => $point->id,
+            'key' => 'wait_one_day',
             'sort_order' => 10,
+            'is_start' => true,
             'is_active' => true,
+            'next_flow_route_point_id' => null,
+            'definition' => [],
+            'settings' => [],
+            'cancel_conditions' => [],
+            'source_version' => null,
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
         ]);
 
         app(TransitionContactWorkflowStatusAction::class)->handle(
@@ -79,17 +97,79 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
         ]);
 
         $oldRoute = FlowRoute::query()->create([
+            'key' => 'new_lead_route',
             'contact_status_id' => $oldStatus->id,
             'name' => 'New Lead Route',
+            'description' => null,
             'version' => 1,
+            'trigger_type' => FlowRoute::TRIGGER_CONTACT_STATUS,
+            'trigger_key' => $oldStatus->key,
             'is_active' => true,
+            'source_version' => null,
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
         ]);
 
         $newRoute = FlowRoute::query()->create([
+            'key' => 'consultation_scheduled_route',
             'contact_status_id' => $newStatus->id,
             'name' => 'Consultation Scheduled Route',
+            'description' => null,
             'version' => 1,
+            'trigger_type' => FlowRoute::TRIGGER_CONTACT_STATUS,
+            'trigger_key' => $newStatus->key,
             'is_active' => true,
+            'source_version' => null,
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        $oldPoint = Point::query()->create([
+            'key' => 'old_noop',
+            'type' => Point::TYPE_NOOP,
+            'name' => 'Old Noop',
+        ]);
+
+        FlowRoutePoint::query()->create([
+            'flow_route_id' => $oldRoute->id,
+            'point_id' => $oldPoint->id,
+            'key' => 'old_noop',
+            'sort_order' => 10,
+            'is_start' => true,
+            'is_active' => true,
+            'next_flow_route_point_id' => null,
+            'definition' => [],
+            'settings' => [],
+            'cancel_conditions' => [],
+            'source_version' => null,
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        $newPoint = Point::query()->create([
+            'key' => 'new_noop',
+            'type' => Point::TYPE_NOOP,
+            'name' => 'New Noop',
+        ]);
+
+        FlowRoutePoint::query()->create([
+            'flow_route_id' => $newRoute->id,
+            'point_id' => $newPoint->id,
+            'key' => 'new_noop',
+            'sort_order' => 10,
+            'is_start' => true,
+            'is_active' => true,
+            'next_flow_route_point_id' => null,
+            'definition' => [],
+            'settings' => [],
+            'cancel_conditions' => [],
+            'source_version' => null,
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
         ]);
 
         app(TransitionContactWorkflowStatusAction::class)->handle(
@@ -114,8 +194,13 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
             ->where('flow_route_id', $newRoute->id)
             ->first();
 
+        $this->assertNotNull($oldProgress);
+        $this->assertNotNull($newProgress);
+
         $this->assertSame(ContactFlowRouteProgress::STATUS_SUPERSEDED, $oldProgress->status);
         $this->assertSame('workflow_status_changed', $oldProgress->cancellation_reason);
+        $this->assertNull($oldProgress->resume_at);
+        $this->assertNull($oldProgress->waiting_event_key);
         $this->assertNotNull($oldProgress->cancelled_at);
 
         $this->assertSame(ContactFlowRouteProgress::STATUS_ACTIVE, $newProgress->status);
@@ -136,11 +221,42 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
             'name' => 'Closed Lost',
         ]);
 
-        FlowRoute::query()->create([
+        $route = FlowRoute::query()->create([
+            'key' => 'new_lead_route',
             'contact_status_id' => $oldStatus->id,
             'name' => 'New Lead Route',
+            'description' => null,
             'version' => 1,
+            'trigger_type' => FlowRoute::TRIGGER_CONTACT_STATUS,
+            'trigger_key' => $oldStatus->key,
             'is_active' => true,
+            'source_version' => null,
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        $point = Point::query()->create([
+            'key' => 'noop',
+            'type' => Point::TYPE_NOOP,
+            'name' => 'Noop',
+        ]);
+
+        FlowRoutePoint::query()->create([
+            'flow_route_id' => $route->id,
+            'point_id' => $point->id,
+            'key' => 'noop',
+            'sort_order' => 10,
+            'is_start' => true,
+            'is_active' => true,
+            'next_flow_route_point_id' => null,
+            'definition' => [],
+            'settings' => [],
+            'cancel_conditions' => [],
+            'source_version' => null,
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
         ]);
 
         app(TransitionContactWorkflowStatusAction::class)->handle(
@@ -171,10 +287,18 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
         ]);
 
         FlowRoute::query()->create([
+            'key' => 'inactive_new_lead_route',
             'contact_status_id' => $status->id,
             'name' => 'Inactive New Lead Route',
+            'description' => null,
             'version' => 1,
+            'trigger_type' => FlowRoute::TRIGGER_CONTACT_STATUS,
+            'trigger_key' => $status->key,
             'is_active' => false,
+            'source_version' => null,
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
         ]);
 
         app(TransitionContactWorkflowStatusAction::class)->handle(

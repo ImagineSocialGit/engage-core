@@ -2,9 +2,6 @@
 
 namespace App\Modules\FlowRoutes\Data\Points;
 
-use App\Modules\FlowRoutes\Data\Points\ConditionPointDefinition;
-use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
-
 class BranchEvaluatePointDefinition
 {
     public const ON_NO_MATCH_BLOCKED = PointExecutionResult::STATUS_BLOCKED;
@@ -26,8 +23,7 @@ class BranchEvaluatePointDefinition
         public readonly array $branches,
         public readonly string $mode,
         public readonly string $onNoMatch,
-        public readonly ?int $defaultTargetFlowRoutePointId = null,
-        public readonly ?int $defaultTargetSortOrder = null,
+        public readonly ?string $defaultTargetFlowRoutePointKey = null,
         public readonly ?string $invalidReason = null,
     ) {}
 
@@ -40,29 +36,24 @@ class BranchEvaluatePointDefinition
         $branches = $definition['branches'] ?? $settings['branches'] ?? [];
 
         $branches = is_array($branches)
-            ? array_values(array_filter($branches, fn ($branch) => is_array($branch)))
+            ? array_values(array_filter($branches, fn (mixed $branch): bool => is_array($branch)))
             : [];
 
         $mode = self::normalizedMode($definition['mode'] ?? $settings['mode'] ?? ConditionPointDefinition::MODE_ALL);
+
         $onNoMatch = self::normalizedNoMatchAction(
             $definition['on_no_match']
                 ?? $settings['on_no_match']
                 ?? self::ON_NO_MATCH_BLOCKED
         );
 
-        $defaultTargetFlowRoutePointId = self::nullableInteger(
-            $definition['default_target_flow_route_point_id']
-                ?? $settings['default_target_flow_route_point_id']
+        $defaultTargetFlowRoutePointKey = self::nullableString(
+            $definition['default_target_flow_route_point_key']
+                ?? $settings['default_target_flow_route_point_key']
                 ?? null
         );
 
-        $defaultTargetSortOrder = self::nullableInteger(
-            $definition['default_target_sort_order']
-                ?? $settings['default_target_sort_order']
-                ?? null
-        );
-
-        if ($branches === [] && ! $defaultTargetFlowRoutePointId && ! $defaultTargetSortOrder) {
+        if ($branches === [] && $defaultTargetFlowRoutePointKey === null) {
             return new self(
                 branches: [],
                 mode: $mode,
@@ -71,12 +62,23 @@ class BranchEvaluatePointDefinition
             );
         }
 
+        foreach ($branches as $branch) {
+            if (! self::branchHasTarget($branch)) {
+                return new self(
+                    branches: $branches,
+                    mode: $mode,
+                    onNoMatch: $onNoMatch,
+                    defaultTargetFlowRoutePointKey: $defaultTargetFlowRoutePointKey,
+                    invalidReason: 'branch_evaluate_point_branch_missing_target_flow_route_point_key',
+                );
+            }
+        }
+
         return new self(
             branches: $branches,
             mode: $mode,
             onNoMatch: $onNoMatch,
-            defaultTargetFlowRoutePointId: $defaultTargetFlowRoutePointId,
-            defaultTargetSortOrder: $defaultTargetSortOrder,
+            defaultTargetFlowRoutePointKey: $defaultTargetFlowRoutePointKey,
         );
     }
 
@@ -94,10 +96,17 @@ class BranchEvaluatePointDefinition
             'branches' => $this->branches,
             'mode' => $this->mode,
             'on_no_match' => $this->onNoMatch,
-            'default_target_flow_route_point_id' => $this->defaultTargetFlowRoutePointId,
-            'default_target_sort_order' => $this->defaultTargetSortOrder,
+            'default_target_flow_route_point_key' => $this->defaultTargetFlowRoutePointKey,
             'invalid_reason' => $this->invalidReason,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $branch
+     */
+    private static function branchHasTarget(array $branch): bool
+    {
+        return self::nullableString($branch['target_flow_route_point_key'] ?? null) !== null;
     }
 
     private static function normalizedMode(mixed $mode): string
@@ -118,8 +127,14 @@ class BranchEvaluatePointDefinition
             : self::ON_NO_MATCH_BLOCKED;
     }
 
-    private static function nullableInteger(mixed $value): ?int
+    private static function nullableString(mixed $value): ?string
     {
-        return is_numeric($value) ? (int) $value : null;
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
     }
 }

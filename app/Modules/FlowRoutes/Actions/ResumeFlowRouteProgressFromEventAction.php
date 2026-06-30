@@ -23,7 +23,7 @@ class ResumeFlowRouteProgressFromEventAction
         }
 
         $query = ContactFlowRouteProgress::query()
-            ->waiting()
+            ->waitingForEvent($event->name)
             ->with('currentFlowRoutePoint.point');
 
         if ($event->contactId !== null) {
@@ -134,13 +134,7 @@ class ResumeFlowRouteProgressFromEventAction
         ContactFlowRouteProgress $progress,
         FlowRouteExternalEvent $event,
     ): bool {
-        $waiting = $progress->waitingState();
-
-        $expectedEvent = $waiting['expected_event'] ?? null;
-
-        if (! is_string($expectedEvent) || trim($expectedEvent) === '') {
-            return false;
-        }
+        $expectedEvent = $progress->waitingExpectedEvent();
 
         if ($expectedEvent !== $event->name) {
             return false;
@@ -163,9 +157,9 @@ class ResumeFlowRouteProgressFromEventAction
             return false;
         }
 
-        $correlation = $waiting['correlation'] ?? [];
+        $correlation = $progress->waitingCorrelation();
 
-        if (! is_array($correlation) || $correlation === []) {
+        if ($correlation === []) {
             return $event->contactId !== null
                 && (int) $progress->contact_id === $event->contactId;
         }
@@ -223,10 +217,16 @@ class ResumeFlowRouteProgressFromEventAction
     ): mixed {
         return match ($expectedValue) {
             '{contact.id}' => (int) $progress->contact_id,
-            '{contact_status.id}' => (int) $progress->contact_status_id,
-            '{workflow_profile.id}' => (int) $progress->contact_workflow_profile_id,
+            '{contact_status.id}' => $progress->contact_status_id !== null
+                ? (int) $progress->contact_status_id
+                : null,
+            '{workflow_profile.id}' => $progress->contact_workflow_profile_id !== null
+                ? (int) $progress->contact_workflow_profile_id
+                : null,
             '{flow_route.id}' => (int) $progress->flow_route_id,
-            '{flow_route_point.id}' => (int) $progress->current_flow_route_point_id,
+            '{flow_route_point.id}' => $progress->current_flow_route_point_id !== null
+                ? (int) $progress->current_flow_route_point_id
+                : null,
             default => $expectedValue,
         };
     }

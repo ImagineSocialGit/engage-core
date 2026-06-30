@@ -5,6 +5,7 @@ namespace App\Modules\FlowRoutes\Actions;
 use App\Modules\FlowRoutes\Data\Events\FlowRouteExternalEvent;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoute;
+use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use Illuminate\Support\Facades\DB;
 
 class StartFlowRoutesFromAutomationEventAction
@@ -50,9 +51,7 @@ class StartFlowRoutesFromAutomationEventAction
                 return $existingProgress;
             }
 
-            $currentFlowRoutePoint = $flowRoute->activeFlowRoutePoints()
-                ->ordered()
-                ->first();
+            $currentFlowRoutePoint = $this->startingFlowRoutePoint($flowRoute);
 
             return ContactFlowRouteProgress::query()->create([
                 'contact_id' => $event->contactId,
@@ -67,5 +66,21 @@ class StartFlowRoutesFromAutomationEventAction
                 ],
             ]);
         });
+    }
+
+    private function startingFlowRoutePoint(FlowRoute $flowRoute): ?FlowRoutePoint
+    {
+        $startPoint = $flowRoute->activeFlowRoutePoints()
+            ->start()
+            ->ordered()
+            ->first();
+
+        if ($startPoint instanceof FlowRoutePoint) {
+            return $startPoint;
+        }
+
+        return $flowRoute->activeFlowRoutePoints()
+            ->ordered()
+            ->first();
     }
 }

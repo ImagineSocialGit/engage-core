@@ -15,26 +15,24 @@ class Point extends Model
     public const TYPE_WAIT = 'wait';
     public const TYPE_EVENT_WAIT = 'event_wait';
     public const TYPE_CONDITION = 'condition';
+    public const TYPE_BRANCH_EVALUATE = 'branch_evaluate';
     public const TYPE_CHANGE_STATUS = 'change_status';
     public const TYPE_CREATE_TASK = 'create_task';
     public const TYPE_SEND_MESSAGE = 'send_message';
     public const TYPE_ENROLL_CAMPAIGN = 'enroll_campaign';
     public const TYPE_CANCEL_CAMPAIGN = 'cancel_campaign';
-    public const TYPE_WEBHOOK_ACTION = 'webhook_action';
-    public const TYPE_BRANCH_EVALUATE = 'branch_evaluate';
 
     public const TYPES = [
         self::TYPE_NOOP,
         self::TYPE_WAIT,
         self::TYPE_EVENT_WAIT,
         self::TYPE_CONDITION,
+        self::TYPE_BRANCH_EVALUATE,
         self::TYPE_CHANGE_STATUS,
         self::TYPE_CREATE_TASK,
         self::TYPE_SEND_MESSAGE,
         self::TYPE_ENROLL_CAMPAIGN,
         self::TYPE_CANCEL_CAMPAIGN,
-        self::TYPE_WEBHOOK_ACTION,
-        self::TYPE_BRANCH_EVALUATE,
     ];
 
     protected $fillable = [
@@ -45,7 +43,6 @@ class Point extends Model
         'default_definition',
         'default_settings',
         'is_active',
-        'preset_key',
         'source_version',
         'is_customized',
         'customized_at',
@@ -81,9 +78,9 @@ class Point extends Model
         return $query->where('type', $type);
     }
 
-    public function scopePreset(Builder $query, string $presetKey): Builder
+    public function scopeForKey(Builder $query, string $key): Builder
     {
-        return $query->where('preset_key', $presetKey);
+        return $query->where('key', $key);
     }
 
     public function scopeCustomized(Builder $query): Builder

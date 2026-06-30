@@ -47,7 +47,9 @@ class EventWaitPointHandler implements PointHandler
                 meta: [
                     'event_wait_definition' => $definition->toMetaPayload(),
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    'flow_route_point_key' => $context->flowRoutePoint->key,
                     'point_id' => $context->flowRoutePoint->point_id,
+                    'point_key' => $context->flowRoutePoint->point?->key,
                 ],
             );
         }
@@ -57,10 +59,12 @@ class EventWaitPointHandler implements PointHandler
             meta: [
                 'wait' => [
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    'flow_route_point_key' => $context->flowRoutePoint->key,
                     'point_id' => $context->flowRoutePoint->point_id,
+                    'point_key' => $context->flowRoutePoint->point?->key,
                     'point_type' => Point::TYPE_EVENT_WAIT,
                     'started_waiting_at' => $now->toISOString(),
-                    'expected_event' => $definition->expectedEvent,
+                    'expected_event' => $definition->eventKey,
                     'correlation' => $definition->correlation,
                     'definition' => $definition->toMetaPayload(),
                 ],

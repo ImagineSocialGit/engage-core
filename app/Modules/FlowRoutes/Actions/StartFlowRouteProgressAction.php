@@ -4,6 +4,7 @@ namespace App\Modules\FlowRoutes\Actions;
 
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoute;
+use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\Workflow\Data\ContactWorkflowStatusTransition;
 
 class StartFlowRouteProgressAction
@@ -26,9 +27,7 @@ class StartFlowRouteProgressAction
             return $existingProgress;
         }
 
-        $currentFlowRoutePoint = $flowRoute->activeFlowRoutePoints()
-            ->ordered()
-            ->first();
+        $currentFlowRoutePoint = $this->startingFlowRoutePoint($flowRoute);
 
         return ContactFlowRouteProgress::query()->create([
             'contact_id' => $transition->contactId,
@@ -48,8 +47,25 @@ class StartFlowRouteProgressAction
     {
         return FlowRoute::query()
             ->active()
+            ->forTrigger(FlowRoute::TRIGGER_CONTACT_STATUS)
             ->forContactStatus($transition->toContactStatusId)
             ->orderByDesc('version')
+            ->first();
+    }
+
+    private function startingFlowRoutePoint(FlowRoute $flowRoute): ?FlowRoutePoint
+    {
+        $startPoint = $flowRoute->activeFlowRoutePoints()
+            ->start()
+            ->ordered()
+            ->first();
+
+        if ($startPoint instanceof FlowRoutePoint) {
+            return $startPoint;
+        }
+
+        return $flowRoute->activeFlowRoutePoints()
+            ->ordered()
             ->first();
     }
 }

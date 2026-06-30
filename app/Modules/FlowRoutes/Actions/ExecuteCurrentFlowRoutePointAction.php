@@ -62,6 +62,7 @@ class ExecuteCurrentFlowRoutePointAction
                     meta: [
                         'progress_id' => $progress->getKey(),
                         'flow_route_point_id' => $flowRoutePoint->getKey(),
+                        'flow_route_point_key' => $flowRoutePoint->key,
                     ],
                 );
 
@@ -82,6 +83,7 @@ class ExecuteCurrentFlowRoutePointAction
                     meta: [
                         'progress_id' => $progress->getKey(),
                         'flow_route_point_id' => $flowRoutePoint->getKey(),
+                        'flow_route_point_key' => $flowRoutePoint->key,
                         'point_id' => $flowRoutePoint->point_id,
                     ],
                 );
@@ -106,6 +108,7 @@ class ExecuteCurrentFlowRoutePointAction
                     meta: [
                         'progress_id' => $progress->getKey(),
                         'flow_route_point_id' => $flowRoutePoint->getKey(),
+                        'flow_route_point_key' => $flowRoutePoint->key,
                         'point_id' => $flowRoutePoint->point_id,
                         'point_type' => $pointType,
                     ],
@@ -124,6 +127,7 @@ class ExecuteCurrentFlowRoutePointAction
                     meta: [
                         'progress_id' => $progress->getKey(),
                         'flow_route_point_id' => $flowRoutePoint->getKey(),
+                        'flow_route_point_key' => $flowRoutePoint->key,
                         'point_id' => $flowRoutePoint->point_id,
                         'point_type' => $pointType,
                         'exception_class' => $exception::class,
@@ -185,6 +189,7 @@ class ExecuteCurrentFlowRoutePointAction
             ),
             meta: [
                 'started_from_workflow_transition' => $progress->meta['started_from_workflow_transition'] ?? null,
+                'started_from_automation_event' => $progress->meta['started_from_automation_event'] ?? null,
                 'waiting' => $progress->waitingState(),
             ],
         );
@@ -207,6 +212,8 @@ class ExecuteCurrentFlowRoutePointAction
         $progress->forceFill([
             'status' => ContactFlowRouteProgress::STATUS_COMPLETED,
             'completed_at' => $completedAt,
+            'resume_at' => null,
+            'waiting_event_key' => null,
             'meta' => array_replace_recursive($progress->meta ?? [], [
                 'waiting' => null,
                 'completed' => [
@@ -228,7 +235,9 @@ class ExecuteCurrentFlowRoutePointAction
         $payload = [
             'executed_at' => $executedAt->toISOString(),
             'flow_route_point_id' => $flowRoutePoint->getKey(),
+            'flow_route_point_key' => $flowRoutePoint->key,
             'point_id' => $flowRoutePoint->point_id,
+            'point_key' => $flowRoutePoint->point?->key,
             'point_type' => $flowRoutePoint->point?->type,
             'result' => $result->toMetaPayload(),
         ];
@@ -262,13 +271,17 @@ class ExecuteCurrentFlowRoutePointAction
         $progress->forceFill([
             'status' => ContactFlowRouteProgress::STATUS_FAILED,
             'failed_at' => $failedAt,
+            'resume_at' => null,
+            'waiting_event_key' => null,
             'failure_reason' => $result->reason,
             'meta' => array_replace_recursive($progress->meta ?? [], [
                 'waiting' => null,
                 'failed' => [
                     'failed_at' => $failedAt->toISOString(),
                     'flow_route_point_id' => $flowRoutePoint->getKey(),
+                    'flow_route_point_key' => $flowRoutePoint->key,
                     'point_id' => $flowRoutePoint->point_id,
+                    'point_key' => $flowRoutePoint->point?->key,
                     'result' => $result->toMetaPayload(),
                 ],
             ]),

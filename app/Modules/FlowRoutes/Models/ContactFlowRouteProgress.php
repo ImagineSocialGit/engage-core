@@ -46,6 +46,8 @@ class ContactFlowRouteProgress extends Model
         'completed_at',
         'cancelled_at',
         'failed_at',
+        'resume_at',
+        'waiting_event_key',
         'cancellation_reason',
         'failure_reason',
         'meta',
@@ -61,6 +63,7 @@ class ContactFlowRouteProgress extends Model
         'completed_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'failed_at' => 'datetime',
+        'resume_at' => 'datetime',
         'meta' => 'array',
     ];
 
@@ -152,6 +155,25 @@ class ContactFlowRouteProgress extends Model
         return $query->where('contact_status_id', $contactStatusId);
     }
 
+    public function scopeWaitingForEvent(Builder $query, string $eventKey): Builder
+    {
+        return $query
+            ->waiting()
+            ->where('waiting_event_key', $eventKey);
+    }
+
+    public function scopeDueToResume(Builder $query, ?CarbonInterface $now = null): Builder
+    {
+        $now = $now
+            ? CarbonImmutable::instance($now)->utc()
+            : CarbonImmutable::now('UTC');
+
+        return $query
+            ->waiting()
+            ->whereNotNull('resume_at')
+            ->where('resume_at', '<=', $now);
+    }
+
     public function isActive(): bool
     {
         return $this->status === self::STATUS_ACTIVE;
@@ -199,6 +221,10 @@ class ContactFlowRouteProgress extends Model
 
     public function waitingExpectedEvent(): ?string
     {
+        if (is_string($this->waiting_event_key) && trim($this->waiting_event_key) !== '') {
+            return trim($this->waiting_event_key);
+        }
+
         $expectedEvent = $this->waitingState()['expected_event'] ?? null;
 
         if (! is_string($expectedEvent)) {
@@ -222,6 +248,10 @@ class ContactFlowRouteProgress extends Model
 
     public function waitingResumeAt(): ?CarbonImmutable
     {
+        if ($this->resume_at instanceof CarbonInterface) {
+            return CarbonImmutable::instance($this->resume_at)->utc();
+        }
+
         $resumeAt = $this->waitingState()['resume_at'] ?? null;
 
         if (! is_string($resumeAt) || trim($resumeAt) === '') {

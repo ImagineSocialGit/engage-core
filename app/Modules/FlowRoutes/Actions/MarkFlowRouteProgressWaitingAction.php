@@ -25,18 +25,26 @@ class MarkFlowRouteProgressWaitingAction
         }
 
         $resumeAt = $this->resumeAt($resultWait);
+        $waitingEventKey = $this->waitingEventKey($resultWait);
 
         $waitingState = array_replace_recursive([
             'flow_route_point_id' => $flowRoutePoint->getKey(),
+            'flow_route_point_key' => $flowRoutePoint->key,
             'point_id' => $flowRoutePoint->point_id,
+            'point_key' => $flowRoutePoint->point?->key,
             'waiting_at' => $waitingAt->toISOString(),
             'resume_at' => $resumeAt?->toISOString(),
+            'expected_event' => $waitingEventKey,
             'reason' => $result->reason,
-            'resume_job_dispatched_at' => $waitingAt->toISOString(),
+            'resume_job_dispatched_at' => $resumeAt instanceof CarbonImmutable
+                ? $waitingAt->toISOString()
+                : null,
         ], $resultWait);
 
         $progress->forceFill([
             'status' => ContactFlowRouteProgress::STATUS_WAITING,
+            'resume_at' => $resumeAt,
+            'waiting_event_key' => $waitingEventKey,
             'meta' => array_replace_recursive($progress->meta ?? [], [
                 'waiting' => $waitingState,
             ]),
@@ -67,5 +75,21 @@ class MarkFlowRouteProgressWaitingAction
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /**
+     * @param array<string, mixed> $waitingState
+     */
+    private function waitingEventKey(array $waitingState): ?string
+    {
+        $eventKey = $waitingState['expected_event'] ?? null;
+
+        if (! is_string($eventKey)) {
+            return null;
+        }
+
+        $eventKey = trim($eventKey);
+
+        return $eventKey !== '' ? $eventKey : null;
     }
 }

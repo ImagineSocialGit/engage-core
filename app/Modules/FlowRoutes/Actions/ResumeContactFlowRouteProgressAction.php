@@ -78,6 +78,7 @@ class ResumeContactFlowRouteProgressAction
                     reason: 'flow_route_progress_wait_not_due',
                     meta: [
                         'progress_id' => $progress->getKey(),
+                        'resume_at' => $progress->resume_at?->toISOString(),
                         'waiting' => $progress->waitingState(),
                         'checked_at' => $now->toISOString(),
                     ],
@@ -93,6 +94,7 @@ class ResumeContactFlowRouteProgressAction
 
             $resumeAttempts[] = [
                 'attempted_at' => $now->toISOString(),
+                'resume_at' => $progress->resume_at?->toISOString(),
                 'waiting' => $progress->waitingState(),
             ];
 

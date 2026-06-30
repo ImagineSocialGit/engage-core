@@ -13,18 +13,23 @@ return new class extends Migration
 
             $table->string('key')->unique();
             $table->string('name');
+            $table->text('description')->nullable();
+
             $table->string('category')->nullable()->index();
+            $table->string('color')->nullable();
 
             $table->boolean('is_core')->default(false)->index();
             $table->boolean('is_active')->default(true)->index();
 
             $table->unsignedSmallInteger('sort_order')->default(0)->index();
+            $table->string('source_version')->nullable();
 
             $table->json('meta')->nullable();
 
             $table->timestamps();
 
             $table->index(['is_active', 'sort_order']);
+            $table->index(['category', 'is_active']);
         });
     }
 

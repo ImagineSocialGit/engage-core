@@ -35,31 +35,29 @@ class WaitPointDefinition
         $timezone = self::stringValue($definition, $settings, 'timezone')
             ?? (string) config('app.timezone', 'UTC');
 
-        $until = self::stringValue($definition, $settings, 'resume_at')
-            ?? self::stringValue($definition, $settings, 'wait_until')
-            ?? self::stringValue($definition, $settings, 'until');
+        $resumeAt = self::stringValue($definition, $settings, 'resume_at');
 
-        if ($until !== null) {
+        if ($resumeAt !== null) {
             try {
                 return new self(
-                    resumeAt: CarbonImmutable::parse($until, $timezone)->utc(),
-                    mode: 'until',
+                    resumeAt: CarbonImmutable::parse($resumeAt, $timezone)->utc(),
+                    mode: 'resume_at',
                     timezone: $timezone,
                     source: [
-                        'field' => 'until',
-                        'value' => $until,
+                        'field' => 'resume_at',
+                        'value' => $resumeAt,
                     ],
                 );
             } catch (Throwable) {
                 return new self(
                     resumeAt: null,
-                    mode: 'until',
+                    mode: 'resume_at',
                     timezone: $timezone,
                     source: [
-                        'field' => 'until',
-                        'value' => $until,
+                        'field' => 'resume_at',
+                        'value' => $resumeAt,
                     ],
-                    invalidReason: 'invalid_wait_until_datetime',
+                    invalidReason: 'invalid_wait_resume_at_datetime',
                 );
             }
         }
@@ -72,7 +70,7 @@ class WaitPointDefinition
                 mode: 'duration',
                 timezone: $timezone,
                 source: [],
-                invalidReason: 'missing_wait_duration_or_until',
+                invalidReason: 'missing_wait_duration_or_resume_at',
             );
         }
 
@@ -153,53 +151,31 @@ class WaitPointDefinition
      */
     private static function durationSeconds(array $definition, array $settings): ?int
     {
-        $duration = $definition['duration'] ?? $settings['duration'] ?? null;
-
-        if (is_numeric($duration)) {
-            return (int) $duration;
-        }
-
-        if (is_array($duration)) {
-            $value = $duration['value'] ?? null;
-            $unit = $duration['unit'] ?? 'seconds';
-
-            if (! is_numeric($value) || ! is_string($unit)) {
-                return null;
-            }
-
-            return self::secondsFor((int) $value, $unit);
-        }
-
-        $seconds = self::numericValue($definition, $settings, 'duration_seconds')
-            ?? self::numericValue($definition, $settings, 'seconds');
+        $seconds = self::numericValue($definition, $settings, 'seconds');
 
         if ($seconds !== null) {
             return $seconds;
         }
 
-        $minutes = self::numericValue($definition, $settings, 'duration_minutes')
-            ?? self::numericValue($definition, $settings, 'minutes');
+        $minutes = self::numericValue($definition, $settings, 'minutes');
 
         if ($minutes !== null) {
             return $minutes * 60;
         }
 
-        $hours = self::numericValue($definition, $settings, 'duration_hours')
-            ?? self::numericValue($definition, $settings, 'hours');
+        $hours = self::numericValue($definition, $settings, 'hours');
 
         if ($hours !== null) {
             return $hours * 60 * 60;
         }
 
-        $days = self::numericValue($definition, $settings, 'duration_days')
-            ?? self::numericValue($definition, $settings, 'days');
+        $days = self::numericValue($definition, $settings, 'days');
 
         if ($days !== null) {
             return $days * 24 * 60 * 60;
         }
 
-        $weeks = self::numericValue($definition, $settings, 'duration_weeks')
-            ?? self::numericValue($definition, $settings, 'weeks');
+        $weeks = self::numericValue($definition, $settings, 'weeks');
 
         return $weeks !== null ? $weeks * 7 * 24 * 60 * 60 : null;
     }
@@ -213,17 +189,5 @@ class WaitPointDefinition
         $value = $definition[$key] ?? $settings[$key] ?? null;
 
         return is_numeric($value) ? (int) $value : null;
-    }
-
-    private static function secondsFor(int $value, string $unit): ?int
-    {
-        return match (strtolower(trim($unit))) {
-            'second', 'seconds', 'sec', 'secs' => $value,
-            'minute', 'minutes', 'min', 'mins' => $value * 60,
-            'hour', 'hours', 'hr', 'hrs' => $value * 60 * 60,
-            'day', 'days' => $value * 24 * 60 * 60,
-            'week', 'weeks' => $value * 7 * 24 * 60 * 60,
-            default => null,
-        };
     }
 }

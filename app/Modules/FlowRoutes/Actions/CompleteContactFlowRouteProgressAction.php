@@ -18,6 +18,8 @@ class CompleteContactFlowRouteProgressAction
             'status' => ContactFlowRouteProgress::STATUS_COMPLETED,
             'completed_at' => $completedAt,
             'current_flow_route_point_id' => null,
+            'resume_at' => null,
+            'waiting_event_key' => null,
             'meta' => $this->mergedMeta($progress, $result, $completedAt),
         ])->save();
 

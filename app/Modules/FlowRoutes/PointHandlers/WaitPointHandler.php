@@ -60,7 +60,9 @@ class WaitPointHandler implements PointHandler
                 meta: [
                     'wait_definition' => $definition->toMetaPayload(),
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    'flow_route_point_key' => $context->flowRoutePoint->key,
                     'point_id' => $context->flowRoutePoint->point_id,
+                    'point_key' => $context->flowRoutePoint->point?->key,
                 ],
             );
         }
@@ -71,7 +73,9 @@ class WaitPointHandler implements PointHandler
                 meta: [
                     'wait_definition' => $definition->toMetaPayload(),
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    'flow_route_point_key' => $context->flowRoutePoint->key,
                     'point_id' => $context->flowRoutePoint->point_id,
+                    'point_key' => $context->flowRoutePoint->point?->key,
                 ],
             );
         }
@@ -81,7 +85,9 @@ class WaitPointHandler implements PointHandler
             meta: [
                 'wait' => [
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    'flow_route_point_key' => $context->flowRoutePoint->key,
                     'point_id' => $context->flowRoutePoint->point_id,
+                    'point_key' => $context->flowRoutePoint->point?->key,
                     'point_type' => Point::TYPE_WAIT,
                     'started_waiting_at' => $now->toISOString(),
                     'resume_at' => $definition->resumeAt?->toISOString(),

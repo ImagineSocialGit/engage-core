@@ -13,10 +13,13 @@ class ContactStatus extends Model
     protected $fillable = [
         'key',
         'name',
+        'description',
         'category',
+        'color',
         'is_core',
         'is_active',
         'sort_order',
+        'source_version',
         'meta',
     ];
 
@@ -40,5 +43,10 @@ class ContactStatus extends Model
     public function scopeOrdered(Builder $query): Builder
     {
         return $query->orderBy('sort_order')->orderBy('name');
+    }
+
+    public function scopeForKey(Builder $query, string $key): Builder
+    {
+        return $query->where('key', $key);
     }
 }

@@ -42,8 +42,8 @@ class ResumeDueFlowRouteProgressAction
 
         $query = ContactFlowRouteProgress::query()
             ->with('currentFlowRoutePoint.point')
-            ->waiting()
-            ->oldest('updated_at')
+            ->dueToResume($now)
+            ->oldest('resume_at')
             ->oldest('id');
 
         if ($limit !== null && $limit > 0) {
@@ -51,10 +51,6 @@ class ResumeDueFlowRouteProgressAction
         }
 
         foreach ($query->cursor() as $progress) {
-            if (! $progress->isDueToResume($now)) {
-                continue;
-            }
-
             $summary['checked']++;
 
             $result = $this->resumeContactFlowRouteProgress->handle($progress, $now);

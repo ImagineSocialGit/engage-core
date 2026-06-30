@@ -15,12 +15,14 @@ class FlowRoutePoint extends Model
     protected $fillable = [
         'flow_route_id',
         'point_id',
+        'key',
         'sort_order',
+        'is_start',
         'is_active',
+        'next_flow_route_point_id',
         'definition',
         'settings',
         'cancel_conditions',
-        'preset_key',
         'source_version',
         'is_customized',
         'customized_at',
@@ -31,7 +33,9 @@ class FlowRoutePoint extends Model
         'flow_route_id' => 'integer',
         'point_id' => 'integer',
         'sort_order' => 'integer',
+        'is_start' => 'boolean',
         'is_active' => 'boolean',
+        'next_flow_route_point_id' => 'integer',
         'definition' => 'array',
         'settings' => 'array',
         'cancel_conditions' => 'array',
@@ -50,6 +54,16 @@ class FlowRoutePoint extends Model
         return $this->belongsTo(Point::class);
     }
 
+    public function nextFlowRoutePoint(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'next_flow_route_point_id');
+    }
+
+    public function previousFlowRoutePoints(): HasMany
+    {
+        return $this->hasMany(self::class, 'next_flow_route_point_id');
+    }
+
     public function contactFlowRouteProgress(): HasMany
     {
         return $this->hasMany(ContactFlowRouteProgress::class, 'current_flow_route_point_id');
@@ -65,19 +79,24 @@ class FlowRoutePoint extends Model
         return $query->where('is_active', false);
     }
 
+    public function scopeStart(Builder $query): Builder
+    {
+        return $query->where('is_start', true);
+    }
+
     public function scopeOrdered(Builder $query): Builder
     {
         return $query->orderBy('sort_order');
     }
 
+    public function scopeForKey(Builder $query, string $key): Builder
+    {
+        return $query->where('key', $key);
+    }
+
     public function scopeForPointType(Builder $query, string $type): Builder
     {
         return $query->whereHas('point', fn (Builder $pointQuery) => $pointQuery->where('type', $type));
-    }
-
-    public function scopePreset(Builder $query, string $presetKey): Builder
-    {
-        return $query->where('preset_key', $presetKey);
     }
 
     public function scopeCustomized(Builder $query): Builder

@@ -25,7 +25,9 @@ class FlowRouteConditionBranchPointTest extends TestCase
         $conditionPoint = $this->routePoint(
             flowRoute: $scenario['flow_route'],
             type: Point::TYPE_CONDITION,
-            sortOrder: 1,
+            sortOrder: 10,
+            key: 'condition',
+            isStart: true,
             definition: [
                 'conditions' => [
                     [
@@ -43,8 +45,13 @@ class FlowRouteConditionBranchPointTest extends TestCase
         $nextPoint = $this->routePoint(
             flowRoute: $scenario['flow_route'],
             type: Point::TYPE_NOOP,
-            sortOrder: 2,
+            sortOrder: 20,
+            key: 'next',
         );
+
+        $conditionPoint->forceFill([
+            'next_flow_route_point_id' => $nextPoint->getKey(),
+        ])->save();
 
         $progress = $this->progress($scenario, $conditionPoint);
 
@@ -66,7 +73,9 @@ class FlowRouteConditionBranchPointTest extends TestCase
         $conditionPoint = $this->routePoint(
             flowRoute: $scenario['flow_route'],
             type: Point::TYPE_CONDITION,
-            sortOrder: 1,
+            sortOrder: 10,
+            key: 'condition',
+            isStart: true,
             definition: [
                 'conditions' => [
                     [
@@ -81,11 +90,16 @@ class FlowRouteConditionBranchPointTest extends TestCase
             ],
         );
 
-        $this->routePoint(
+        $nextPoint = $this->routePoint(
             flowRoute: $scenario['flow_route'],
             type: Point::TYPE_NOOP,
-            sortOrder: 2,
+            sortOrder: 20,
+            key: 'next',
         );
+
+        $conditionPoint->forceFill([
+            'next_flow_route_point_id' => $nextPoint->getKey(),
+        ])->save();
 
         $progress = $this->progress($scenario, $conditionPoint);
 
@@ -107,7 +121,9 @@ class FlowRouteConditionBranchPointTest extends TestCase
         $conditionPoint = $this->routePoint(
             flowRoute: $scenario['flow_route'],
             type: Point::TYPE_CONDITION,
-            sortOrder: 1,
+            sortOrder: 10,
+            key: 'condition',
+            isStart: true,
             definition: [
                 'conditions' => [
                     [
@@ -125,8 +141,13 @@ class FlowRouteConditionBranchPointTest extends TestCase
         $nextPoint = $this->routePoint(
             flowRoute: $scenario['flow_route'],
             type: Point::TYPE_NOOP,
-            sortOrder: 2,
+            sortOrder: 20,
+            key: 'next',
         );
+
+        $conditionPoint->forceFill([
+            'next_flow_route_point_id' => $nextPoint->getKey(),
+        ])->save();
 
         $progress = $this->progress($scenario, $conditionPoint);
 
@@ -141,14 +162,16 @@ class FlowRouteConditionBranchPointTest extends TestCase
         $this->assertSame($nextPoint->id, $progress->current_flow_route_point_id);
     }
 
-    public function test_branch_evaluate_point_jumps_to_matching_target_sort_order(): void
+    public function test_branch_evaluate_point_jumps_to_matching_target_flow_route_point_key(): void
     {
         $scenario = $this->scenario();
 
         $branchPoint = $this->routePoint(
             flowRoute: $scenario['flow_route'],
             type: Point::TYPE_BRANCH_EVALUATE,
-            sortOrder: 1,
+            sortOrder: 10,
+            key: 'branch',
+            isStart: true,
             definition: [
                 'branches' => [
                     [
@@ -160,7 +183,7 @@ class FlowRouteConditionBranchPointTest extends TestCase
                                 'value' => 'branch-test@example.com',
                             ],
                         ],
-                        'target_sort_order' => 3,
+                        'target_flow_route_point_key' => 'target',
                     ],
                 ],
                 'on_no_match' => PointExecutionResult::STATUS_BLOCKED,
@@ -170,13 +193,15 @@ class FlowRouteConditionBranchPointTest extends TestCase
         $this->routePoint(
             flowRoute: $scenario['flow_route'],
             type: Point::TYPE_NOOP,
-            sortOrder: 2,
+            sortOrder: 20,
+            key: 'non_target',
         );
 
         $targetPoint = $this->routePoint(
             flowRoute: $scenario['flow_route'],
             type: Point::TYPE_NOOP,
-            sortOrder: 3,
+            sortOrder: 30,
+            key: 'target',
         );
 
         $progress = $this->progress($scenario, $branchPoint);
@@ -199,7 +224,9 @@ class FlowRouteConditionBranchPointTest extends TestCase
         $branchPoint = $this->routePoint(
             flowRoute: $scenario['flow_route'],
             type: Point::TYPE_BRANCH_EVALUATE,
-            sortOrder: 1,
+            sortOrder: 10,
+            key: 'branch',
+            isStart: true,
             definition: [
                 'branches' => [
                     [
@@ -211,10 +238,10 @@ class FlowRouteConditionBranchPointTest extends TestCase
                                 'value' => 'does-not-match@example.com',
                             ],
                         ],
-                        'target_sort_order' => 2,
+                        'target_flow_route_point_key' => 'non_target',
                     ],
                 ],
-                'default_target_sort_order' => 3,
+                'default_target_flow_route_point_key' => 'default_target',
                 'on_no_match' => PointExecutionResult::STATUS_BLOCKED,
             ],
         );
@@ -222,13 +249,15 @@ class FlowRouteConditionBranchPointTest extends TestCase
         $this->routePoint(
             flowRoute: $scenario['flow_route'],
             type: Point::TYPE_NOOP,
-            sortOrder: 2,
+            sortOrder: 20,
+            key: 'non_target',
         );
 
         $defaultTargetPoint = $this->routePoint(
             flowRoute: $scenario['flow_route'],
             type: Point::TYPE_NOOP,
-            sortOrder: 3,
+            sortOrder: 30,
+            key: 'default_target',
         );
 
         $progress = $this->progress($scenario, $branchPoint);
@@ -251,7 +280,9 @@ class FlowRouteConditionBranchPointTest extends TestCase
         $branchPoint = $this->routePoint(
             flowRoute: $scenario['flow_route'],
             type: Point::TYPE_BRANCH_EVALUATE,
-            sortOrder: 1,
+            sortOrder: 10,
+            key: 'branch',
+            isStart: true,
             definition: [
                 'branches' => [
                     [
@@ -263,7 +294,7 @@ class FlowRouteConditionBranchPointTest extends TestCase
                                 'value' => 'does-not-match@example.com',
                             ],
                         ],
-                        'target_sort_order' => 2,
+                        'target_flow_route_point_key' => 'non_target',
                     ],
                 ],
                 'on_no_match' => PointExecutionResult::STATUS_BLOCKED,
@@ -273,7 +304,8 @@ class FlowRouteConditionBranchPointTest extends TestCase
         $this->routePoint(
             flowRoute: $scenario['flow_route'],
             type: Point::TYPE_NOOP,
-            sortOrder: 2,
+            sortOrder: 20,
+            key: 'non_target',
         );
 
         $progress = $this->progress($scenario, $branchPoint);
@@ -296,7 +328,9 @@ class FlowRouteConditionBranchPointTest extends TestCase
         $conditionPoint = $this->routePoint(
             flowRoute: $scenario['flow_route'],
             type: Point::TYPE_CONDITION,
-            sortOrder: 1,
+            sortOrder: 10,
+            key: 'condition',
+            isStart: true,
             definition: [
                 'conditions' => [
                     [
@@ -321,6 +355,8 @@ class FlowRouteConditionBranchPointTest extends TestCase
         $progress->refresh();
 
         $this->assertSame(ContactFlowRouteProgress::STATUS_FAILED, $progress->status);
+        $this->assertNull($progress->resume_at);
+        $this->assertNull($progress->waiting_event_key);
         $this->assertSame('condition_point_failed', $progress->failure_reason);
     }
 
@@ -337,10 +373,14 @@ class FlowRouteConditionBranchPointTest extends TestCase
         $contactStatus = ContactStatus::query()->create([
             'key' => 'lead',
             'name' => 'Lead',
+            'description' => null,
             'category' => 'sales',
+            'color' => null,
             'is_core' => true,
             'is_active' => true,
             'sort_order' => 1,
+            'source_version' => null,
+            'meta' => [],
         ]);
 
         $contact = Contact::query()->create([
@@ -350,6 +390,10 @@ class FlowRouteConditionBranchPointTest extends TestCase
             'email' => 'branch-test@example.com',
             'phone' => '15555550123',
             'source' => 'test',
+            'subsource' => null,
+            'last_contacted_at' => null,
+            'last_activity_at' => now(),
+            'meta' => [],
         ]);
 
         $workflowProfile = ContactWorkflowProfile::query()->create([
@@ -362,11 +406,17 @@ class FlowRouteConditionBranchPointTest extends TestCase
         ]);
 
         $flowRoute = FlowRoute::query()->create([
+            'key' => 'lead_route',
             'contact_status_id' => $contactStatus->id,
             'name' => 'Lead Route',
+            'description' => null,
             'version' => 1,
+            'trigger_type' => FlowRoute::TRIGGER_CONTACT_STATUS,
+            'trigger_key' => $contactStatus->key,
             'is_active' => true,
+            'source_version' => null,
             'is_customized' => false,
+            'customized_at' => null,
             'meta' => [],
         ]);
 
@@ -386,6 +436,8 @@ class FlowRouteConditionBranchPointTest extends TestCase
         FlowRoute $flowRoute,
         string $type,
         int $sortOrder,
+        string $key,
+        bool $isStart = false,
         array $definition = [],
         array $settings = [],
     ): FlowRoutePoint {
@@ -397,18 +449,26 @@ class FlowRouteConditionBranchPointTest extends TestCase
             'default_definition' => [],
             'default_settings' => [],
             'is_active' => true,
+            'source_version' => null,
             'is_customized' => false,
+            'customized_at' => null,
             'meta' => [],
         ]);
 
         return FlowRoutePoint::query()->create([
             'flow_route_id' => $flowRoute->id,
             'point_id' => $point->id,
+            'key' => $key,
             'sort_order' => $sortOrder,
+            'is_start' => $isStart,
             'is_active' => true,
+            'next_flow_route_point_id' => null,
             'definition' => $definition,
             'settings' => $settings,
             'cancel_conditions' => [],
+            'source_version' => null,
+            'is_customized' => false,
+            'customized_at' => null,
             'meta' => [],
         ]);
     }
@@ -431,6 +491,13 @@ class FlowRouteConditionBranchPointTest extends TestCase
             'current_flow_route_point_id' => $currentPoint->id,
             'status' => ContactFlowRouteProgress::STATUS_ACTIVE,
             'started_at' => now(),
+            'completed_at' => null,
+            'cancelled_at' => null,
+            'failed_at' => null,
+            'resume_at' => null,
+            'waiting_event_key' => null,
+            'cancellation_reason' => null,
+            'failure_reason' => null,
             'meta' => [],
         ]);
     }

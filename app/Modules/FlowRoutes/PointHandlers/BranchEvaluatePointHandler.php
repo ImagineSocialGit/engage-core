@@ -34,20 +34,22 @@ class BranchEvaluatePointHandler implements PointHandler
                 meta: [
                     'branch_definition' => $definition->toMetaPayload(),
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    'flow_route_point_key' => $context->flowRoutePoint->key,
                     'point_id' => $context->flowRoutePoint->point_id,
+                    'point_key' => $context->flowRoutePoint->point?->key,
                 ],
             );
         }
 
         foreach ($definition->branches as $index => $branch) {
-            $conditions = $branch['conditions'] ?? $branch['condition'] ?? [];
+            $conditions = $branch['conditions'] ?? [];
 
             if ($this->isAssociativeArray($conditions)) {
                 $conditions = [$conditions];
             }
 
             $conditions = is_array($conditions)
-                ? array_values(array_filter($conditions, fn ($condition) => is_array($condition)))
+                ? array_values(array_filter($conditions, fn (mixed $condition): bool => is_array($condition)))
                 : [];
 
             $mode = is_string($branch['mode'] ?? null)
@@ -64,7 +66,8 @@ class BranchEvaluatePointHandler implements PointHandler
                 continue;
             }
 
-            $target = $this->resolveTarget($context, $branch);
+            $targetFlowRoutePointKey = $this->nullableString($branch['target_flow_route_point_key'] ?? null);
+            $target = $this->resolveTargetByKey($context, $targetFlowRoutePointKey);
 
             if (! $target) {
                 return PointExecutionResult::failed(
@@ -74,6 +77,7 @@ class BranchEvaluatePointHandler implements PointHandler
                         'matched_branch_index' => $index,
                         'matched_branch' => $branch,
                         'condition_evaluation' => $evaluation->toMetaPayload(),
+                        'target_flow_route_point_key' => $targetFlowRoutePointKey,
                     ],
                 );
             }
@@ -86,12 +90,15 @@ class BranchEvaluatePointHandler implements PointHandler
                     'matched_branch' => $branch,
                     'condition_evaluation' => $evaluation->toMetaPayload(),
                     'advance_to_flow_route_point_id' => $target->getKey(),
-                    'advance_to_sort_order' => $target->sort_order,
+                    'advance_to_flow_route_point_key' => $target->key,
                 ],
             );
         }
 
-        $defaultTarget = $this->resolveDefaultTarget($context, $definition);
+        $defaultTarget = $this->resolveTargetByKey(
+            context: $context,
+            targetFlowRoutePointKey: $definition->defaultTargetFlowRoutePointKey,
+        );
 
         if ($defaultTarget) {
             return PointExecutionResult::completed(
@@ -99,7 +106,7 @@ class BranchEvaluatePointHandler implements PointHandler
                 meta: [
                     'branch_definition' => $definition->toMetaPayload(),
                     'advance_to_flow_route_point_id' => $defaultTarget->getKey(),
-                    'advance_to_sort_order' => $defaultTarget->sort_order,
+                    'advance_to_flow_route_point_key' => $defaultTarget->key,
                 ],
             );
         }
@@ -112,56 +119,21 @@ class BranchEvaluatePointHandler implements PointHandler
         );
     }
 
-    /**
-     * @param array<string, mixed> $branch
-     */
-    private function resolveTarget(PointExecutionContext $context, array $branch): ?FlowRoutePoint
-    {
-        $targetFlowRoutePointId = $this->nullableInteger($branch['target_flow_route_point_id'] ?? null);
-        $targetSortOrder = $this->nullableInteger($branch['target_sort_order'] ?? null);
-
-        return $this->resolveTargetByIdentifiers(
-            context: $context,
-            targetFlowRoutePointId: $targetFlowRoutePointId,
-            targetSortOrder: $targetSortOrder,
-        );
-    }
-
-    private function resolveDefaultTarget(
+    private function resolveTargetByKey(
         PointExecutionContext $context,
-        BranchEvaluatePointDefinition $definition,
+        ?string $targetFlowRoutePointKey,
     ): ?FlowRoutePoint {
-        return $this->resolveTargetByIdentifiers(
-            context: $context,
-            targetFlowRoutePointId: $definition->defaultTargetFlowRoutePointId,
-            targetSortOrder: $definition->defaultTargetSortOrder,
-        );
-    }
+        if ($targetFlowRoutePointKey === null) {
+            return null;
+        }
 
-    private function resolveTargetByIdentifiers(
-        PointExecutionContext $context,
-        ?int $targetFlowRoutePointId,
-        ?int $targetSortOrder,
-    ): ?FlowRoutePoint {
-        $query = FlowRoutePoint::query()
+        return FlowRoutePoint::query()
             ->with('point')
             ->where('flow_route_id', $context->flowRoutePoint->flow_route_id)
+            ->forKey($targetFlowRoutePointKey)
             ->active()
-            ->whereHas('point', fn ($pointQuery) => $pointQuery->active());
-
-        if ($targetFlowRoutePointId) {
-            return $query
-                ->whereKey($targetFlowRoutePointId)
-                ->first();
-        }
-
-        if ($targetSortOrder !== null) {
-            return $query
-                ->where('sort_order', $targetSortOrder)
-                ->first();
-        }
-
-        return null;
+            ->whereHas('point', fn ($pointQuery) => $pointQuery->active())
+            ->first();
     }
 
     /**
@@ -177,16 +149,21 @@ class BranchEvaluatePointHandler implements PointHandler
         };
     }
 
-    private function nullableInteger(mixed $value): ?int
+    private function nullableString(mixed $value): ?string
     {
-        return is_numeric($value) ? (int) $value : null;
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
     }
 
-    /**
-     * @param array<mixed> $value
-     */
-    private function isAssociativeArray(array $value): bool
+    private function isAssociativeArray(mixed $value): bool
     {
-        return array_keys($value) !== range(0, count($value) - 1);
+        return is_array($value)
+            && $value !== []
+            && array_keys($value) !== range(0, count($value) - 1);
     }
 }

@@ -23,7 +23,7 @@ class AdvanceContactFlowRouteProgressAction
         }
 
         $nextFlowRoutePoint = $this->requestedNextFlowRoutePoint($fromFlowRoutePoint, $result)
-            ?? $this->nextActiveFlowRoutePoint($fromFlowRoutePoint);
+            ?? $this->configuredNextFlowRoutePoint($fromFlowRoutePoint);
 
         if (! $nextFlowRoutePoint) {
             return $this->completeContactFlowRouteProgress->handle($progress, $result);
@@ -34,6 +34,8 @@ class AdvanceContactFlowRouteProgressAction
         $progress->forceFill([
             'status' => ContactFlowRouteProgress::STATUS_ACTIVE,
             'current_flow_route_point_id' => $nextFlowRoutePoint->getKey(),
+            'resume_at' => null,
+            'waiting_event_key' => null,
             'meta' => $this->mergedMeta(
                 progress: $progress,
                 fromFlowRoutePoint: $fromFlowRoutePoint,
@@ -55,9 +57,9 @@ class AdvanceContactFlowRouteProgressAction
         }
 
         $targetFlowRoutePointId = $this->nullableInteger($result->meta['advance_to_flow_route_point_id'] ?? null);
-        $targetSortOrder = $this->nullableInteger($result->meta['advance_to_sort_order'] ?? null);
+        $targetFlowRoutePointKey = $this->nullableString($result->meta['advance_to_flow_route_point_key'] ?? null);
 
-        if (! $targetFlowRoutePointId && $targetSortOrder === null) {
+        if (! $targetFlowRoutePointId && $targetFlowRoutePointKey === null) {
             return null;
         }
 
@@ -65,30 +67,34 @@ class AdvanceContactFlowRouteProgressAction
             ->with('point')
             ->where('flow_route_id', $fromFlowRoutePoint->flow_route_id)
             ->active()
+            ->whereKeyNot($fromFlowRoutePoint->getKey())
             ->whereHas('point', fn ($pointQuery) => $pointQuery->active());
 
         if ($targetFlowRoutePointId) {
             return $query
                 ->whereKey($targetFlowRoutePointId)
-                ->whereKeyNot($fromFlowRoutePoint->getKey())
                 ->first();
         }
 
         return $query
-            ->where('sort_order', $targetSortOrder)
-            ->whereKeyNot($fromFlowRoutePoint->getKey())
+            ->forKey($targetFlowRoutePointKey)
             ->first();
     }
 
-    private function nextActiveFlowRoutePoint(FlowRoutePoint $fromFlowRoutePoint): ?FlowRoutePoint
+    private function configuredNextFlowRoutePoint(FlowRoutePoint $fromFlowRoutePoint): ?FlowRoutePoint
     {
+        $nextFlowRoutePointId = $this->nullableInteger($fromFlowRoutePoint->next_flow_route_point_id);
+
+        if (! $nextFlowRoutePointId) {
+            return null;
+        }
+
         return FlowRoutePoint::query()
             ->with('point')
             ->where('flow_route_id', $fromFlowRoutePoint->flow_route_id)
-            ->where('sort_order', '>', $fromFlowRoutePoint->sort_order)
+            ->whereKey($nextFlowRoutePointId)
             ->active()
             ->whereHas('point', fn ($query) => $query->active())
-            ->ordered()
             ->first();
     }
 
@@ -109,7 +115,9 @@ class AdvanceContactFlowRouteProgressAction
         $meta['last_advanced'] = [
             'advanced_at' => $advancedAt->toISOString(),
             'from_flow_route_point_id' => $fromFlowRoutePoint->getKey(),
+            'from_flow_route_point_key' => $fromFlowRoutePoint->key,
             'to_flow_route_point_id' => $nextFlowRoutePoint->getKey(),
+            'to_flow_route_point_key' => $nextFlowRoutePoint->key,
             'result' => $result?->toMetaPayload(),
         ];
 
@@ -129,5 +137,16 @@ class AdvanceContactFlowRouteProgressAction
     private function nullableInteger(mixed $value): ?int
     {
         return is_numeric($value) ? (int) $value : null;
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
     }
 }

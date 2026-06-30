@@ -1,5 +1,7 @@
 <?php
 
+use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Models\ContactStatus;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
@@ -14,8 +16,14 @@ return new class extends Migration
         Schema::create('contact_flow_route_progress', function (Blueprint $table) {
             $table->id();
 
-            $table->unsignedBigInteger('contact_id')->index('cfrp_contact_id_idx');
-            $table->unsignedBigInteger('contact_status_id')->nullable()->index('cfrp_status_id_idx');
+            $table->foreignIdFor(Contact::class)
+                ->constrained()
+                ->cascadeOnDelete();
+
+            $table->foreignIdFor(ContactStatus::class)
+                ->nullable()
+                ->constrained()
+                ->nullOnDelete();
 
             $table->foreignIdFor(ContactWorkflowProfile::class)
                 ->nullable()
@@ -38,6 +46,9 @@ return new class extends Migration
             $table->timestamp('cancelled_at')->nullable();
             $table->timestamp('failed_at')->nullable();
 
+            $table->timestamp('resume_at')->nullable()->index('cfrp_resume_at_idx');
+            $table->string('waiting_event_key')->nullable()->index('cfrp_waiting_event_key_idx');
+
             $table->string('cancellation_reason')->nullable();
             $table->string('failure_reason')->nullable();
 
@@ -49,6 +60,8 @@ return new class extends Migration
             $table->index(['contact_workflow_profile_id', 'status'], 'cfrp_profile_status_idx');
             $table->index(['contact_status_id', 'status'], 'cfrp_contact_status_status_idx');
             $table->index(['flow_route_id', 'status'], 'cfrp_route_status_idx');
+            $table->index(['status', 'resume_at'], 'cfrp_status_resume_idx');
+            $table->index(['contact_id', 'status', 'waiting_event_key'], 'cfrp_contact_waiting_event_idx');
         });
     }
 

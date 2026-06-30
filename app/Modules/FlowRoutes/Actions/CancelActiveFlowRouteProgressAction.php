@@ -15,11 +15,13 @@ class CancelActiveFlowRouteProgressAction
         $cancelledAt = $transition->occurredAt;
 
         return ContactFlowRouteProgress::query()
-            ->active()
+            ->runnable()
             ->forWorkflowProfile($transition->contactWorkflowProfileId)
             ->update([
                 'status' => $status,
                 'cancelled_at' => $cancelledAt,
+                'resume_at' => null,
+                'waiting_event_key' => null,
                 'cancellation_reason' => $reason,
                 'updated_at' => $cancelledAt,
             ]);
