@@ -17,6 +17,13 @@ class BroadcastRecipient extends Model
         return BroadcastRecipientFactory::new();
     }
 
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_SCHEDULED = 'scheduled';
+    public const STATUS_SENT = 'sent';
+    public const STATUS_SKIPPED = 'skipped';
+    public const STATUS_FAILED = 'failed';
+    public const STATUS_CANCELLED = 'cancelled';
+
     protected $fillable = [
         'broadcast_id',
         'contact_id',

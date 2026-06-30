@@ -1238,8 +1238,10 @@ Broadcasts owns:
 - broadcast recipients
 - broadcast audience metadata
 - broadcast recipient state
+- ad hoc one-time message payload/copy
 - broadcast scheduling/orchestration behavior later
 - broadcast-specific metadata
+- broadcast delivery bookkeeping
 
 Broadcasts does not own:
 
@@ -1247,8 +1249,11 @@ Broadcasts does not own:
 - campaign definitions
 - campaign steps
 - campaign enrollments
-- message delivery infrastructure
+- reusable message templates
+- scheduled message delivery infrastructure
 - message consent/suppression infrastructure
+- message gates
+- send jobs
 
 Campaigns and Broadcasts are separate concepts.
 
@@ -1256,12 +1261,21 @@ Campaigns are enrolled, multi-step journeys with lifecycle/progression.
 
 Broadcasts are one-time or batch sends to an audience.
 
-Messaging owns scheduled/outbound message infrastructure.
+Broadcasts may store ad hoc payload/copy because broadcasts are not reusable Campaign journeys.
+
+Messaging owns reusable delivery infrastructure, scheduled messages, consent, suppression, gates, payload classes, queues, and send jobs.
 
 Broadcasts may depend on:
 
 - Core
 - Messaging
+
+Broadcast delivery metadata should be first-class on `broadcasts`:
+
+    dispatch_key
+    message_type
+    payload_class
+    queue
 
 Broadcasts should use Messaging public actions/services to schedule or send messages.
 
@@ -1285,6 +1299,24 @@ That reference is acceptable because Broadcasts depends on Messaging.
 Broadcasts should still send or schedule through Messaging public actions/services.
 
 `broadcast_recipients.scheduled_message_ids` is broadcast bookkeeping, not ownership of scheduled delivery infrastructure.
+
+BroadcastRecipient records are Broadcast bookkeeping.
+
+BroadcastRecipient records may store scheduled message IDs for visibility/audit, but they do not own the scheduled delivery lifecycle.
+
+Expected future runtime direction:
+
+    Broadcast UI/action creates Broadcast
+    Broadcast audience resolver creates BroadcastRecipients
+    Broadcast send/schedule action calls Messaging public action/service
+    Messaging creates ScheduledMessages
+    BroadcastRecipient stores resulting scheduled_message_ids/status bookkeeping
+
+Broadcasts should remain simpler than Campaigns.
+
+Do not add multi-step progression, enrollment lifecycle, or journey logic to Broadcasts.
+
+If a send needs multiple sequenced steps, it belongs in Campaigns, not Broadcasts.
 
 ## Webinars Module
 

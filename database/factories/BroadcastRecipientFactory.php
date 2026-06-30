@@ -19,10 +19,33 @@ class BroadcastRecipientFactory extends Factory
         return [
             'broadcast_id' => Broadcast::factory(),
             'contact_id' => Contact::factory(),
-            'status' => 'pending',
+            'status' => BroadcastRecipient::STATUS_PENDING,
             'scheduled_message_ids' => null,
             'skip_reason' => null,
             'meta' => [],
         ];
+    }
+
+    public function scheduled(array $scheduledMessageIds = [1]): static
+    {
+        return $this->state(fn (): array => [
+            'status' => BroadcastRecipient::STATUS_SCHEDULED,
+            'scheduled_message_ids' => $scheduledMessageIds,
+        ]);
+    }
+
+    public function skipped(?string $reason = 'not_eligible'): static
+    {
+        return $this->state(fn (): array => [
+            'status' => BroadcastRecipient::STATUS_SKIPPED,
+            'skip_reason' => $reason,
+        ]);
+    }
+
+    public function failed(): static
+    {
+        return $this->state(fn (): array => [
+            'status' => BroadcastRecipient::STATUS_FAILED,
+        ]);
     }
 }

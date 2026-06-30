@@ -2,11 +2,12 @@
 
 namespace Tests\Feature\Broadcasts;
 
+use App\Models\User;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\ScheduledMessage;
-use App\Models\User;
+use App\Modules\Messaging\Payloads\EmailPayload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -24,6 +25,10 @@ class BroadcastModelTest extends TestCase
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'broadcast',
+            'dispatch_key' => 'broadcast_send',
+            'message_type' => 'broadcast',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'marketing',
             'payload' => [
                 'subject' => 'Market update',
                 'body' => 'Here is the latest market update.',
@@ -40,6 +45,13 @@ class BroadcastModelTest extends TestCase
         ]);
 
         $this->assertSame('June newsletter', $broadcast->name);
+        $this->assertSame('email', $broadcast->channel);
+        $this->assertSame('marketing', $broadcast->purpose);
+        $this->assertSame('broadcast', $broadcast->scope);
+        $this->assertSame('broadcast_send', $broadcast->dispatch_key);
+        $this->assertSame('broadcast', $broadcast->message_type);
+        $this->assertSame(EmailPayload::class, $broadcast->payload_class);
+        $this->assertSame('marketing', $broadcast->queue);
         $this->assertSame(Broadcast::STATUS_DRAFT, $broadcast->status);
         $this->assertSame('Market update', $broadcast->payload['subject']);
         $this->assertSame(['homebuyer'], $broadcast->audience['tags']);
@@ -63,12 +75,11 @@ class BroadcastModelTest extends TestCase
 
     public function test_broadcast_recipient_stores_scheduled_message_ids(): void
     {
-        $recipient = BroadcastRecipient::factory()->create([
-            'status' => 'scheduled',
-            'scheduled_message_ids' => [10, 11],
-        ]);
+        $recipient = BroadcastRecipient::factory()
+            ->scheduled([10, 11])
+            ->create();
 
-        $this->assertSame('scheduled', $recipient->status);
+        $this->assertSame(BroadcastRecipient::STATUS_SCHEDULED, $recipient->status);
         $this->assertSame([10, 11], $recipient->scheduled_message_ids);
     }
 

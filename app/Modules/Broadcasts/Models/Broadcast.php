@@ -24,12 +24,19 @@ class Broadcast extends Model
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_CANCELLED = 'cancelled';
 
+    public const DEFAULT_DISPATCH_KEY = 'broadcast_send';
+    public const DEFAULT_MESSAGE_TYPE = 'broadcast';
+
     protected $fillable = [
         'user_id',
         'name',
         'channel',
         'purpose',
         'scope',
+        'dispatch_key',
+        'message_type',
+        'payload_class',
+        'queue',
         'status',
         'send_at',
         'payload',

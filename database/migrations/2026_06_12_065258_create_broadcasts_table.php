@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Modules\Messaging\Payloads\EmailPayload;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -16,6 +17,10 @@ return new class extends Migration
             $table->string('channel');
             $table->string('purpose');
             $table->string('scope');
+            $table->string('dispatch_key')->default('broadcast_send');
+            $table->string('message_type')->default('broadcast');
+            $table->string('payload_class')->default(EmailPayload::class);
+            $table->string('queue')->nullable();
             $table->string('status')->default('draft');
             $table->timestamp('send_at')->nullable();
             $table->json('payload')->nullable();
@@ -29,6 +34,7 @@ return new class extends Migration
 
             $table->index(['status', 'send_at']);
             $table->index(['channel', 'purpose', 'scope']);
+            $table->index('dispatch_key');
         });
     }
 

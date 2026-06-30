@@ -2,8 +2,9 @@
 
 namespace Database\Factories;
 
-use App\Modules\Broadcasts\Models\Broadcast;
 use App\Models\User;
+use App\Modules\Broadcasts\Models\Broadcast;
+use App\Modules\Messaging\Payloads\EmailPayload;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -21,6 +22,10 @@ class BroadcastFactory extends Factory
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'broadcast',
+            'dispatch_key' => Broadcast::DEFAULT_DISPATCH_KEY,
+            'message_type' => Broadcast::DEFAULT_MESSAGE_TYPE,
+            'payload_class' => EmailPayload::class,
+            'queue' => 'marketing',
             'status' => Broadcast::STATUS_DRAFT,
             'send_at' => null,
             'payload' => [
