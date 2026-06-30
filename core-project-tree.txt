@@ -322,13 +322,17 @@
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailMessagingService.php
 │   │   │   │   │   └── EmailProviderManager.php
+│   │   │   │   ├── MessageDedupeKeyBuilder.php
 │   │   │   │   ├── MessageDefinitionResolver.php
+│   │   │   │   ├── MessageDispatchDefinitionMatcher.php
+│   │   │   │   ├── MessageDispatchDefinitionNormalizer.php
 │   │   │   │   ├── MessageEligibilityGate.php
 │   │   │   │   ├── MessageGate.php
 │   │   │   │   ├── MessagePlanningGate.php
 │   │   │   │   ├── MessageRecipientGateRegistry.php
 │   │   │   │   ├── MessageRecipientPayloadProviderRegistry.php
 │   │   │   │   ├── MessageRecipientPayloadResolver.php
+│   │   │   │   ├── MessageSendTimeResolver.php
 │   │   │   │   ├── MessageSuppressionService.php
 │   │   │   │   ├── PhoneNumberNormalizer.php
 │   │   │   │   ├── ScheduledMessageGate.php
@@ -969,4 +973,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-340 directories, 630 files
+340 directories, 634 files
