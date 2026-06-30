@@ -1101,12 +1101,20 @@ The matching Messaging config path is:
 
     messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
 
-Campaign preset steps should reference the message template context only:
+Campaign preset steps should reference the message template context only through first-class step fields:
 
     dispatch_key
     channel
     purpose
     scope
+
+Do not use `meta.message` as the canonical CampaignStep message reference.
+
+`campaign_steps.channel`, `campaign_steps.purpose`, and `campaign_steps.scope` are first-class template-reference fields.
+
+`campaign_steps.meta` may keep non-routing/debug metadata such as:
+
+    type = message
 
 The campaign key and step number come from the Campaign/CampaignStep definition.
 
@@ -1765,6 +1773,7 @@ Current cleanup target:
 - keep transactional webinar follow-ups separate from marketing nurture campaigns
 - make post-webinar transactional follow-ups dispatch through Messaging definitions
 - make campaign steps resolve Messaging templates by campaign key and step number
+- keep CampaignStep message template references in first-class `channel`, `purpose`, and `scope` fields, not `meta.message`
 - keep Campaign presets focused on journey orchestration, not reusable message copy
 - prevent Campaign presets from defining or overriding payloads
 - keep default webinar copy vertical-neutral
@@ -1805,15 +1814,22 @@ Implementation direction:
 5. Campaign message templates should resolve from Messaging using:
        messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
 
-6. Campaign step timing may be authored in days/hours/minutes but must normalize before Messaging dispatch.
+6. Campaign preset steps should store template references as first-class fields:
+       channel
+       purpose
+       scope
 
-7. Messaging should own the canonical delivery template shape, payload/copy, and delivery gating.
+   New configs should not use `meta.message` for CampaignStep template references.
 
-8. Registration consent should clearly distinguish:
+7. Campaign step timing may be authored in days/hours/minutes but must normalize before Messaging dispatch.
+
+8. Messaging should own the canonical delivery template shape, payload/copy, and delivery gating.
+
+9. Registration consent should clearly distinguish:
        transactional:webinar
        marketing:webinar_nurture
 
-9. Mortgage-specific long-term nurture should use:
+10. Mortgage-specific long-term nurture should use:
        marketing:mortgage_homebuyer_nurture
 
 Do not collapse `webinar_nurture` into `webinar` unless the product decision is that all webinar-related marketing uses a single broad consent scope.

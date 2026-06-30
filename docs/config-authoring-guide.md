@@ -393,6 +393,16 @@ Campaign presets must not define reusable message copy.
 
 Campaign presets must not define or override payloads.
 
+Campaign preset steps reference Messaging templates with first-class step keys:
+
+```text
+channel
+purpose
+scope
+```
+
+Do not use `meta.message` for new Campaign preset step message references.
+
 Campaign messages resolve by:
 
 ```text
@@ -406,6 +416,9 @@ Example:
     'step_number' => 1,
     'name' => 'Attended thank-you and next step',
     'dispatch_key' => 'campaign_step_due',
+    'channel' => 'email',
+    'purpose' => 'marketing',
+    'scope' => 'webinar_nurture',
     'is_active' => true,
 
     'criteria' => [
@@ -417,11 +430,6 @@ Example:
 
     'meta' => [
         'type' => 'message',
-        'message' => [
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar_nurture',
-        ],
     ],
 ]
 ```
@@ -504,6 +512,8 @@ Marketing nurture after attendance/missed outcomes should happen separately thro
 - [ ] Does every token exist in the token registry or client token registry?
 - [ ] Are Campaign presets free of reusable subject/body/CTA copy?
 - [ ] Are Campaign presets free of payload overrides?
+- [ ] Are Campaign preset step message references first-class `channel`, `purpose`, and `scope` keys?
+- [ ] Are new Campaign preset steps free of `meta.message` references?
 - [ ] Are Campaign Messaging templates under `campaigns.{campaign_key}.steps.{step_number}`?
 - [ ] Are normal message configs using the canonical definition shape?
 - [ ] Are webinar transactional configs using `confirmations`, `opt_ins`, `reminders`, `post_attended`, and `post_missed`?
@@ -531,6 +541,8 @@ Rules:
 - Messaging configs own reusable message copy.
 - Campaign presets own journeys/timing/template references.
 - Campaign presets must not own or override payloads.
+- Campaign preset steps reference Messaging templates with first-class channel/purpose/scope keys.
+- Do not use meta.message for new Campaign preset step message references.
 - Campaign message templates resolve by campaign_key + step_number.
 - FlowRoute presets own automation/control flow.
 - Webinar post-event config owns provider orchestration, not message copy.

@@ -28,6 +28,13 @@ return [
     | Campaign presets must not own reusable subject/body copy.
     | Campaign presets must not define or override payloads.
     |
+    | Campaign preset steps reference Messaging templates with first-class:
+    | - channel
+    | - purpose
+    | - scope
+    |
+    | Do not use meta.message for new Campaign preset step message references.
+    |
     | Campaign message templates resolve by:
     |
     | messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
@@ -67,6 +74,9 @@ return [
                     'step_number' => 1,
                     'name' => 'Attended thank-you and next step',
                     'dispatch_key' => 'campaign_step_due',
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture',
                     'is_active' => true,
 
                     'criteria' => [
@@ -78,11 +88,6 @@ return [
 
                     'meta' => [
                         'type' => 'message',
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
                     ],
                 ],
 
@@ -90,6 +95,9 @@ return [
                     'step_number' => 2,
                     'name' => 'Common next-step questions',
                     'dispatch_key' => 'campaign_step_due',
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture',
                     'is_active' => true,
 
                     'criteria' => [
@@ -101,11 +109,6 @@ return [
 
                     'meta' => [
                         'type' => 'message',
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
                     ],
                 ],
             ],
@@ -130,6 +133,9 @@ return [
                     'step_number' => 1,
                     'name' => 'Missed webinar next step',
                     'dispatch_key' => 'campaign_step_due',
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture',
                     'is_active' => true,
 
                     'criteria' => [
@@ -141,11 +147,6 @@ return [
 
                     'meta' => [
                         'type' => 'message',
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
                     ],
                 ],
             ],
@@ -170,6 +171,9 @@ return [
                     'step_number' => 1,
                     'name' => 'Preparation basics',
                     'dispatch_key' => 'campaign_step_due',
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'mortgage_homebuyer_nurture',
                     'is_active' => true,
 
                     'criteria' => [
@@ -181,11 +185,6 @@ return [
 
                     'meta' => [
                         'type' => 'message',
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'mortgage_homebuyer_nurture',
-                        ],
                     ],
                 ],
             ],

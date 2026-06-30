@@ -7,14 +7,16 @@ Use these rules when converting a client request into config:
 1. Messaging configs own reusable delivery templates and message copy.
 2. Campaign presets own journeys, step order, timing, and message template references.
 3. Campaign presets do not own payload/copy and do not override payload/copy.
-4. Campaign message templates resolve by `campaign_key + step_number` under:
+4. Campaign preset steps reference Messaging templates with first-class `channel`, `purpose`, and `scope` keys.
+5. Campaign message templates resolve by `campaign_key + step_number` under:
    `messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}`.
-5. FlowRoute presets own automation/control-flow routing and point definitions.
-6. Webinar post-event config owns provider event orchestration, not message copy.
-7. Root `config/presets.php` owns preset package composition and sync order.
-8. `config/modules.php` owns enabled modules and dependency visibility.
-9. Use `lead/leads` in CRM/client-facing text unless explicitly told otherwise.
-10. Default webinar configs should be vertical-neutral. Vertical-specific copy belongs in vertical-specific scopes.
+6. Do not use `meta.message` for new Campaign preset step message references.
+7. FlowRoute presets own automation/control-flow routing and point definitions.
+8. Webinar post-event config owns provider event orchestration, not message copy.
+9. Root `config/presets.php` owns preset package composition and sync order.
+10. `config/modules.php` owns enabled modules and dependency visibility.
+11. Use `lead/leads` in CRM/client-facing text unless explicitly told otherwise.
+12. Default webinar configs should be vertical-neutral. Vertical-specific copy belongs in vertical-specific scopes.
 
 ## Preferred purpose/scope pairs
 

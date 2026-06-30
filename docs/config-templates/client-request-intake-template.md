@@ -15,6 +15,8 @@ Rules:
 - Messaging configs own reusable message copy and delivery templates.
 - Campaign presets own journey/order/timing/template references.
 - Campaign presets do not own payload/copy and do not override payload/copy.
+- Campaign preset steps reference Messaging templates with first-class channel, purpose, and scope keys.
+- Do not use meta.message for new Campaign preset step message references.
 - Campaign messages resolve by:
   messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
 - FlowRoute presets own automation/control-flow routing.
