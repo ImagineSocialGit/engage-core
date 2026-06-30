@@ -201,6 +201,35 @@ class SyncCampaignPresetsAction
         CampaignPresetDefinition $definition,
         CampaignPresetSyncResult $result,
     ): void {
+        if ($campaign->is_customized) {
+            foreach ($definition->steps as $stepDefinition) {
+                $this->syncStep(
+                    campaign: $campaign,
+                    definition: $stepDefinition,
+                    result: $result,
+                );
+            }
+
+            return;
+        }
+
+        $activeStepNumbers = array_values(array_unique(array_map(
+            fn (CampaignStepPresetDefinition $stepDefinition): int => $stepDefinition->stepNumber,
+            $definition->steps,
+        )));
+
+        CampaignStep::query()
+            ->where('campaign_id', $campaign->id)
+            ->when(
+                $activeStepNumbers !== [],
+                fn ($query) => $query->whereNotIn('step_number', $activeStepNumbers),
+            )
+            ->when(
+                $activeStepNumbers === [],
+                fn ($query) => $query,
+            )
+            ->delete();
+
         foreach ($definition->steps as $stepDefinition) {
             $this->syncStep(
                 campaign: $campaign,

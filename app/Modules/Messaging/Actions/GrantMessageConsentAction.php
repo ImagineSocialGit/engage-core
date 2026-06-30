@@ -2,9 +2,9 @@
 
 namespace App\Modules\Messaging\Actions;
 
+use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Events\MessageConsentGranted;
 use App\Modules\Messaging\Models\ConsentRevocation;
-use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Rules\MessageConsentRules;
 use Illuminate\Database\Eloquent\Model;
@@ -31,10 +31,15 @@ class GrantMessageConsentAction
         array $optInPayload = [],
         ?Model $context = null,
         array $resolverContext = [],
+        bool $dispatchOptInMessage = true,
     ): MessageConsent {
         $validated = Validator::make($data, MessageConsentRules::rules())->validate();
 
-        return DB::transaction(function () use ($contact, $validated, $optInPayload, $context, $resolverContext): MessageConsent {
+        $validated['channel'] = $this->normalizeSegment($validated['channel']);
+        $validated['purpose'] = $this->normalizeSegment($validated['purpose']);
+        $validated['scope'] = $this->normalizeSegment($validated['scope']);
+
+        return DB::transaction(function () use ($contact, $validated, $optInPayload, $context, $resolverContext, $dispatchOptInMessage): MessageConsent {
             $channel = $validated['channel'];
             $purpose = $validated['purpose'];
             $scope = $validated['scope'];
@@ -72,7 +77,7 @@ class GrantMessageConsentAction
             );
 
             if (! $wasActivelyConsented && $willBeActivelyConsented) {
-                DB::afterCommit(function () use ($contact, $consent, $channel, $purpose, $scope, $optInPayload, $context, $resolverContext, $validated): void {
+                DB::afterCommit(function () use ($contact, $consent, $channel, $purpose, $scope, $optInPayload, $context, $resolverContext, $validated, $dispatchOptInMessage): void {
                     MessageConsentGranted::dispatch(
                         contact: $contact,
                         messageConsent: $consent,
@@ -87,6 +92,10 @@ class GrantMessageConsentAction
                             'meta' => $validated['meta'] ?? null,
                         ],
                     );
+
+                    if (! $dispatchOptInMessage) {
+                        return;
+                    }
 
                     $this->dispatchMessageAction->handle(
                         recipient: $contact,
@@ -115,9 +124,9 @@ class GrantMessageConsentAction
     ): bool {
         $consent = MessageConsent::query()
             ->where('contact_id', $contact->getKey())
-            ->where('channel', $channel)
-            ->where('purpose', $purpose)
-            ->where('scope', $scope)
+            ->where('channel', $this->normalizeSegment($channel))
+            ->where('purpose', $this->normalizeSegment($purpose))
+            ->where('scope', $this->normalizeSegment($scope))
             ->first();
 
         if (! $consent) {
@@ -126,9 +135,9 @@ class GrantMessageConsentAction
 
         return ! ConsentRevocation::query()
             ->where('contact_id', $contact->getKey())
-            ->where('channel', $channel)
-            ->where('purpose', $purpose)
-            ->where('scope', $scope)
+            ->where('channel', $this->normalizeSegment($channel))
+            ->where('purpose', $this->normalizeSegment($purpose))
+            ->where('scope', $this->normalizeSegment($scope))
             ->where('revoked_at', '>=', $consent->consented_at)
             ->exists();
     }
@@ -142,10 +151,15 @@ class GrantMessageConsentAction
     ): bool {
         return ! ConsentRevocation::query()
             ->where('contact_id', $contact->getKey())
-            ->where('channel', $channel)
-            ->where('purpose', $purpose)
-            ->where('scope', $scope)
+            ->where('channel', $this->normalizeSegment($channel))
+            ->where('purpose', $this->normalizeSegment($purpose))
+            ->where('scope', $this->normalizeSegment($scope))
             ->where('revoked_at', '>=', $consentedAt)
             ->exists();
+    }
+
+    private function normalizeSegment(string $value): string
+    {
+        return str_replace('-', '_', strtolower(trim($value)));
     }
 }

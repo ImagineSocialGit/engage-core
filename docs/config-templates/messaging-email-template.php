@@ -6,20 +6,39 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Transactional Webinar Email Templates
+    | Email Messaging Template
     |--------------------------------------------------------------------------
     |
-    | These messages belong to the Webinar process.
+    | File path pattern:
+    | config/messaging/email/{purpose}/{scope}.php
+    | client/{client-key}/config/messaging/email/{purpose}/{scope}.php
     |
-    | They are not Campaigns.
-    | They are not marketing nurture.
+    | Create one file per purpose/scope pair.
     |
-    | Purpose/scope:
+    | Examples:
+    | config/messaging/email/transactional/webinar.php
+    | config/messaging/email/marketing/webinar_nurture.php
+    | config/messaging/email/marketing/mortgage_homebuyer_nurture.php
+    | config/messaging/email/marketing/webinar_waitlist.php
     |
-    | transactional:webinar
+    | Non-campaign top-level keys are message types. They become
+    | message_type at runtime.
     |
-    | Keep this default copy vertical-neutral.
+    | Campaign message templates live under:
     |
+    | campaigns.{campaign_key}.steps.{step_number}
+    |
+    | Campaign templates do not own timing/schedule. Campaign presets own
+    | campaign step timing and overlay timing before dispatching.
+    |
+    | Keep default webinar copy vertical-neutral.
+    | Put vertical-specific copy in vertical-specific scopes.
+    */
+
+    /*
+    |--------------------------------------------------------------------------
+    | transactional:webinar example shape
+    |--------------------------------------------------------------------------
     */
 
     'confirmations' => [
@@ -47,14 +66,25 @@ return [
             ],
 
             'payload' => [
-                'subject' => 'You’re registered: {webinar_title}',
-                'body' => 'Thanks for registering for {webinar_title}! We’ll send reminders and your join link before the webinar starts.',
+                'subject' => 'You’re registered for {webinar_title}',
+                'body' => <<<'TEXT'
+Hi {first_name},
+
+You’re registered for {webinar_title}.
+
+Date: {webinar_start_date}
+Time: {webinar_start_time}
+
+{cta}
+
+We’ll send reminders as the event gets closer.
+TEXT,
                 'cta' => [
                     'label' => 'Join Webinar',
                     'url' => '{webinar_join_url}',
                 ],
                 'secondary_link' => [
-                    'label' => 'Need to cancel your registration?',
+                    'label' => 'Need to cancel?',
                     'url' => '{cancel_registration_url}',
                 ],
             ],
@@ -74,62 +104,12 @@ return [
 
             'payload' => [
                 'subject' => 'You’re subscribed to webinar emails',
-                'body' => 'Thanks for subscribing to receive webinar-related emails. You can opt out of these messages using the link in any webinar email.',
+                'body' => 'Thanks for subscribing to receive webinar-related emails. You can opt out using the link in any webinar email.',
             ],
         ],
     ],
 
     'reminders' => [
-        [
-            'dispatch_key' => 'registration_created',
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-
-            'timing' => 'scheduled',
-            'payload_class' => EmailPayload::class,
-            'queue' => 'reminders',
-
-            'schedule' => [
-                'type' => 'anchored',
-                'minutes' => -14400,
-            ],
-
-            'payload' => [
-                'subject' => 'Your webinar is coming up in 10 days',
-                'body' => 'Hi {first_name}, your webinar is coming up in 10 days. We’ll send your join link again as the event gets closer.',
-                'cta' => [
-                    'label' => 'Join Webinar',
-                    'url' => '{webinar_join_url}',
-                ],
-            ],
-        ],
-
-        [
-            'dispatch_key' => 'registration_created',
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-
-            'timing' => 'scheduled',
-            'payload_class' => EmailPayload::class,
-            'queue' => 'reminders',
-
-            'schedule' => [
-                'type' => 'anchored',
-                'minutes' => -10080,
-            ],
-
-            'payload' => [
-                'subject' => 'Your webinar is one week away',
-                'body' => 'Hi {first_name}, your webinar is one week away. Save the date and use the link below when it is time to join.',
-                'cta' => [
-                    'label' => 'Join Webinar',
-                    'url' => '{webinar_join_url}',
-                ],
-            ],
-        ],
-
         [
             'dispatch_key' => 'registration_created',
             'channel' => 'email',
@@ -148,56 +128,6 @@ return [
             'payload' => [
                 'subject' => 'Your webinar is tomorrow',
                 'body' => 'Hi {first_name}, your webinar is tomorrow. Use the link below when it is time to join.',
-                'cta' => [
-                    'label' => 'Join Webinar',
-                    'url' => '{webinar_join_url}',
-                ],
-            ],
-        ],
-
-        [
-            'dispatch_key' => 'registration_created',
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-
-            'timing' => 'scheduled',
-            'payload_class' => EmailPayload::class,
-            'queue' => 'reminders',
-
-            'schedule' => [
-                'type' => 'anchored',
-                'minutes' => -30,
-            ],
-
-            'payload' => [
-                'subject' => 'Your webinar starts in 30 minutes',
-                'body' => 'Hi {first_name}, your webinar starts in 30 minutes. Use the link below to join.',
-                'cta' => [
-                    'label' => 'Join Webinar',
-                    'url' => '{webinar_join_url}',
-                ],
-            ],
-        ],
-
-        [
-            'dispatch_key' => 'registration_created',
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-
-            'timing' => 'scheduled',
-            'payload_class' => EmailPayload::class,
-            'queue' => 'reminders',
-
-            'schedule' => [
-                'type' => 'anchored',
-                'minutes' => -10,
-            ],
-
-            'payload' => [
-                'subject' => 'Your webinar starts in 10 minutes',
-                'body' => 'Hi {first_name}, your webinar starts in 10 minutes. Use the link below to join.',
                 'cta' => [
                     'label' => 'Join Webinar',
                     'url' => '{webinar_join_url}',
@@ -251,8 +181,8 @@ return [
             'queue' => 'post_event',
 
             'payload' => [
-                'subject' => 'Thanks for joining: {webinar_title}',
-                'body' => 'Hi {first_name}, thanks for joining {webinar_title}. If you want to review anything we covered, you can use the replay link below.',
+                'subject' => 'Thanks for joining {webinar_title}',
+                'body' => 'Hi {first_name}, thanks for joining {webinar_title}. You can watch the replay using the link below.',
                 'cta' => [
                     'label' => 'Watch Replay',
                     'url' => '{webinar_playback_url}',
@@ -280,11 +210,61 @@ return [
             'queue' => 'post_event',
 
             'payload' => [
-                'subject' => 'Sorry we missed you: {webinar_title}',
+                'subject' => 'Sorry we missed you — here’s the replay',
                 'body' => 'Hi {first_name}, sorry we missed you at {webinar_title}. You can still watch the replay using the link below.',
                 'cta' => [
                     'label' => 'Watch Replay',
                     'url' => '{webinar_playback_url}',
+                ],
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | marketing:webinar_nurture campaign template example
+    |--------------------------------------------------------------------------
+    |
+    | In a real config file, keep only the sections that belong to that
+    | purpose/scope. Do not mix transactional and marketing definitions in one
+    | deployed config file unless that file truly represents that purpose/scope.
+    */
+
+    'campaigns' => [
+        'webinar_attended_nurture' => [
+            'steps' => [
+                1 => [
+                    'dispatch_key' => 'campaign_step_due',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'marketing',
+
+                    'payload' => [
+                        'subject' => 'Thanks for joining — here are a few next steps',
+                        'body' => 'Hi {first_name}, thanks for joining the webinar. Reply with your biggest question or use the link below to continue.',
+                        'cta' => [
+                            'label' => 'Continue',
+                            'url' => '{next_step_url}',
+                        ],
+                    ],
+                ],
+            ],
+        ],
+
+        'webinar_missed_nurture' => [
+            'steps' => [
+                1 => [
+                    'dispatch_key' => 'campaign_step_due',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'marketing',
+
+                    'payload' => [
+                        'subject' => 'Sorry we missed you',
+                        'body' => 'Hi {first_name}, sorry we missed you at the webinar. Reply with your biggest question or use the link below to continue.',
+                        'cta' => [
+                            'label' => 'Continue',
+                            'url' => '{next_step_url}',
+                        ],
+                    ],
                 ],
             ],
         ],

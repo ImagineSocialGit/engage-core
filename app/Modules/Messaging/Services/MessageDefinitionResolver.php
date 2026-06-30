@@ -9,7 +9,9 @@ use InvalidArgumentException;
 class MessageDefinitionResolver
 {
     /**
-     * Resolve all enabled message definitions for a channel/purpose/scope config route.
+     * Resolve all enabled non-campaign message definitions for a channel/purpose/scope config route.
+     *
+     * Campaign step templates are resolved separately through resolveCampaignStep().
      *
      * @return array<int, array<string, mixed>>
      */
@@ -36,6 +38,10 @@ class MessageDefinitionResolver
         $resolved = [];
 
         foreach ($definitions as $messageType => $definition) {
+            if ($messageType === 'campaigns') {
+                continue;
+            }
+
             if (! is_string($messageType) || trim($messageType) === '' || ! is_array($definition)) {
                 continue;
             }
@@ -63,6 +69,66 @@ class MessageDefinitionResolver
         }
 
         return $resolved;
+    }
+
+    /**
+     * Resolve a Campaign-owned step template from the Messaging template library.
+     *
+     * Config path:
+     * messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
+     *
+     * @return array<string, mixed>|null
+     */
+    public function resolveCampaignStep(
+        MessageChannel|string $channel,
+        string $purpose,
+        string $scope,
+        string $campaignKey,
+        int $stepNumber,
+        string $dispatchKey,
+    ): ?array {
+        $channel = $this->normalizeChannel($channel);
+        $purpose = $this->normalizeSegment($purpose);
+        $scope = $this->normalizeSegment($scope);
+        $campaignKey = $this->normalizeSegment($campaignKey);
+        $dispatchKey = $this->normalizeSegment($dispatchKey);
+
+        if ($channel === '' || $purpose === '' || $scope === '' || $campaignKey === '' || $stepNumber < 1 || $dispatchKey === '') {
+            return null;
+        }
+
+        $configPath = "messaging.{$channel}.{$purpose}.{$scope}.campaigns.{$campaignKey}.steps.{$stepNumber}";
+        $definition = config($configPath);
+
+        if (! is_array($definition)) {
+            return null;
+        }
+
+        if (! ($definition['enabled'] ?? true)) {
+            return null;
+        }
+
+        if (! array_key_exists('dispatch_key', $definition) && ! array_key_exists('dispatch_keys', $definition)) {
+            $definition['dispatch_key'] = $dispatchKey;
+        }
+
+        $hydrated = $this->hydrateDefinitionFromPath(
+            definition: $definition,
+            channel: $channel,
+            purpose: $purpose,
+            scope: $scope,
+            messageType: "{$campaignKey}_step_{$stepNumber}",
+            configPath: $configPath,
+        );
+
+        $hydrated['meta'] = array_replace_recursive($hydrated['meta'] ?? [], [
+            'campaign_template' => [
+                'campaign_key' => $campaignKey,
+                'step_number' => $stepNumber,
+            ],
+        ]);
+
+        return $this->validateCampaignStepDefinition($hydrated);
     }
 
     /**
@@ -148,6 +214,50 @@ class MessageDefinitionResolver
 
         if ($definition['timing'] === 'scheduled') {
             $this->validateSchedule($definition);
+        }
+
+        return $definition;
+    }
+
+    /**
+     * Campaign step templates are reusable message payload templates.
+     *
+     * Campaigns own the actual step timing/schedule and overlay it before
+     * dispatching through Messaging.
+     *
+     * @param  array<string, mixed>  $definition
+     * @return array<string, mixed>
+     */
+    private function validateCampaignStepDefinition(array $definition): array
+    {
+        foreach (['payload_class', 'queue', 'payload', 'dispatch_keys'] as $requiredKey) {
+            if (! array_key_exists($requiredKey, $definition)) {
+                throw new InvalidArgumentException("Campaign message definition [{$definition['config_path']}] is missing [{$requiredKey}].");
+            }
+        }
+
+        foreach (['payload_class', 'queue'] as $requiredStringKey) {
+            if (! is_string($definition[$requiredStringKey]) || trim($definition[$requiredStringKey]) === '') {
+                throw new InvalidArgumentException("Campaign message definition [{$definition['config_path']}] has invalid [{$requiredStringKey}].");
+            }
+        }
+
+        if (! is_array($definition['payload'])) {
+            throw new InvalidArgumentException("Campaign message definition [{$definition['config_path']}] has invalid [payload].");
+        }
+
+        if (array_key_exists('conditions', $definition) && ! is_array($definition['conditions'])) {
+            throw new InvalidArgumentException("Campaign message definition [{$definition['config_path']}] has invalid [conditions].");
+        }
+
+        if (! is_array($definition['dispatch_keys']) || $definition['dispatch_keys'] === []) {
+            throw new InvalidArgumentException("Campaign message definition [{$definition['config_path']}] has invalid [dispatch_keys].");
+        }
+
+        foreach ($definition['dispatch_keys'] as $dispatchKey) {
+            if (! is_string($dispatchKey) || trim($dispatchKey) === '') {
+                throw new InvalidArgumentException("Campaign message definition [{$definition['config_path']}] has invalid [dispatch_keys].");
+            }
         }
 
         return $definition;

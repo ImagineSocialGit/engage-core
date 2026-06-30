@@ -78,6 +78,7 @@
 │   │   │   │   └── CampaignsModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
+│   │   │   │   ├── CampaignMessageDefinitionResolver.php
 │   │   │   │   └── ContactShow
 │   │   │   │       └── ContactCampaignsVisibilityDataProvider.php
 │   │   │   └── Support
@@ -555,7 +556,7 @@
 │       │   ├── messaging
 │       │   │   ├── email
 │       │   │   │   ├── marketing
-│       │   │   │   │   ├── webinar.php
+│       │   │   │   │   ├── webinar_nurture.php
 │       │   │   │   │   └── webinar_waitlist.php
 │       │   │   │   └── transactional
 │       │   │   │       └── webinar.php
@@ -565,6 +566,8 @@
 │       │   │       │   └── webinar_waitlist.php
 │       │   │       └── transactional
 │       │   │           └── webinar.php
+│       │   ├── presets
+│       │   │   └── campaigns.php
 │       │   ├── theme.php
 │       │   └── webinars
 │       │       ├── content.php
@@ -648,7 +651,8 @@
 │   ├── messaging
 │   │   ├── email
 │   │   │   ├── marketing
-│   │   │   │   ├── webinar.php
+│   │   │   │   ├── mortgage_homebuyer_nurture.php
+│   │   │   │   ├── webinar_nurture.php
 │   │   │   │   └── webinar_waitlist.php
 │   │   │   └── transactional
 │   │   │       └── webinar.php
@@ -669,6 +673,9 @@
 │   │   └── tasks.php
 │   ├── presets.php
 │   ├── queue.php
+│   ├── reference
+│   │   ├── keys.php
+│   │   └── tokens.php
 │   ├── reminders.php
 │   ├── security.php
 │   ├── services.php
@@ -753,6 +760,20 @@
 │       ├── UserSeeder.php
 │       └── WebinarSeeder.php
 ├── docs
+│   ├── config-authoring-guide.md
+│   ├── config-templates
+│   │   ├── campaign-presets-template.php
+│   │   ├── client-request-intake-template.md
+│   │   ├── contact-status-presets-template.php
+│   │   ├── flow-routes-template.php
+│   │   ├── messaging-email-template.php
+│   │   ├── messaging-sms-template.php
+│   │   ├── modules-template.php
+│   │   ├── presets-root-template.php
+│   │   ├── README.md
+│   │   ├── task-presets-template.php
+│   │   ├── TOKEN_REFERENCE.md
+│   │   └── webinar-post-event-template.php
 │   └── module-boundaries.md
 ├── package.json
 ├── package-lock.json
@@ -948,4 +969,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-337 directories, 612 files
+340 directories, 630 files

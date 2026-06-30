@@ -278,7 +278,8 @@ Preferred shape:
     Producer module emits AutomationEventRecorded
     FlowRoutes listens to AutomationEventRecorded
     FlowRoutes maps the generic event into its own FlowRouteExternalEvent internally
-    FlowRoutes resumes matching event_wait points if configured
+    FlowRoutes may start matching event-triggered routes
+    FlowRoutes may resume matching event_wait points on already-started routes
 
 Producer modules should not import FlowRoutes.
 
@@ -324,9 +325,9 @@ Examples:
     webinar.ended
     task.completed
 
-Contact-specific events can resume contact FlowRoute progress.
+Contact-specific events may start contact FlowRoutes or resume contact FlowRoute progress.
 
-Contactless events, such as `webinar.ended`, may be useful for future team/admin automation, but current FlowRoutes contact progress should ignore them unless a matching contact context exists.
+Contactless events, such as `webinar.ended`, may be useful for future team/admin automation, but current contact FlowRoute progress should ignore them unless a matching contact context exists.
 
 The automation event seam is for cross-module automation decisions.
 
@@ -336,7 +337,7 @@ Direct public action/service calls are still correct when a module is using anot
 
 Good direct calls:
 
-    Webinars -> Messaging registration/reminder messages
+    Webinars -> Messaging registration/reminder/post-webinar transactional messages
     FlowRoutes -> CreateTaskAction
     FlowRoutes -> EnrollContactInCampaignAction
     Campaigns -> Messaging schedule/send actions
@@ -441,6 +442,48 @@ Messaging does not own:
 - task assignment
 
 Other modules may use Messaging through public actions/services/contracts.
+
+Messaging definitions should use a consistent canonical definition shape across config files and DB-adapted inline definitions.
+
+Canonical message definition shape:
+
+    dispatch_key
+    message_type
+    channel
+    purpose
+    scope
+    timing
+    queue
+    payload_class
+    conditions
+    schedule
+    payload
+    meta
+
+A definition may omit fields that are inferable from caller context, but adapters should normalize into this shape before calling Messaging runtime actions.
+
+Messaging definitions are reusable templates.
+
+Messaging owns reusable message copy and delivery templates, including subject/body/CTA payloads.
+
+Campaign-owned message templates live inside Messaging configs under:
+
+    campaigns.{campaign_key}.steps.{step_number}
+
+Those campaign message templates are resolved by:
+
+    channel + purpose + scope + campaign_key + step_number
+
+Campaign presets should not duplicate reusable message copy.
+
+Campaign presets should not define or override payloads.
+
+Campaign presets own journey identity, step order, and step timing.
+
+Messaging owns the delivery template for the campaign step.
+
+Post-webinar transactional follow-ups should use the same Messaging definition shape as confirmations, reminders, opt-ins, and campaign message templates.
+
 
 Good:
 
@@ -842,16 +885,19 @@ FlowRoutes owns:
 - point execution behavior
 - wait/resume behavior
 - condition/branch evaluation behavior
+- external event start behavior
 - external event wait/resume behavior
 - FlowRoute preset sync
 
-FlowRoute preset sync assumes required ContactStatus and Campaign definitions already exist. Normal setup should use the app-level `presets:sync` command so those dependencies are created first.
+FlowRoute preset sync assumes required Campaign definitions already exist when a route uses campaign points.
 
-FlowRoutes depends on Workflow.
+Status-triggered FlowRoutes also assume required ContactStatus definitions already exist.
 
-FlowRoutes reacts to Workflow status/profile events.
+Normal setup should use the app-level `presets:sync` command so dependencies are created first.
 
-FlowRoutes also listens to the generic `AutomationEventRecorded` seam for external event waits.
+FlowRoutes depends on Workflow for status-triggered route behavior.
+
+FlowRoutes also listens to the generic `AutomationEventRecorded` seam for automation-event-triggered routes and event waits.
 
 FlowRoutes should have exactly these broad listener categories:
 
@@ -868,7 +914,7 @@ Core should not call FlowRoutes.
 
 Workflow should not call FlowRoutes directly.
 
-Expected direction:
+Expected status-triggered direction:
 
 1. Contact status/profile changes through Workflow.
 2. Workflow records the change.
@@ -877,6 +923,21 @@ Expected direction:
 5. FlowRoutes supersedes active route progress if needed.
 6. FlowRoutes evaluates whether the new ContactStatus has a FlowRoute.
 7. FlowRoutes starts or advances route execution if appropriate.
+
+Expected automation-event-triggered direction:
+
+1. Producer module records its own domain state.
+2. Producer module emits `AutomationEventRecorded`.
+3. FlowRoutes maps that event to `FlowRouteExternalEvent`.
+4. FlowRoutes starts matching active routes whose preset trigger is the automation event.
+5. FlowRoutes also resumes any existing progress waiting at matching `event_wait` points.
+6. FlowRoutes executes route points through DB-owned definitions.
+
+Examples:
+
+    webinar.attended -> FlowRoutes event-triggered route -> enroll_campaign(webinar_attended_nurture)
+    webinar.missed -> FlowRoutes event-triggered route -> enroll_campaign(webinar_missed_nurture)
+    task.completed -> FlowRoutes event_wait resume, if configured
 
 Current tables/models:
 
@@ -892,11 +953,14 @@ Current models:
     FlowRoutePoint
     ContactFlowRouteProgress
 
-A `ContactStatus` may have at most one active FlowRoute.
+A `ContactStatus` may have at most one active status-triggered FlowRoute.
+
+Automation-event-triggered FlowRoutes do not require `contact_status_id`.
 
 Runtime meaning:
 
-    ContactStatus has one FlowRoute
+    ContactStatus may have one status-triggered FlowRoute
+    Automation event keys may trigger active event-triggered FlowRoutes
     FlowRoute has many FlowRoutePoints
     FlowRoutePoint belongs to Point
     ContactFlowRouteProgress records active/waiting/completed/cancelled execution state
@@ -948,7 +1012,7 @@ Also bad:
     Tasks completion listener inside FlowRoutes
     Producer modules call FlowRouteExternalEvent::make(...)
 
-`contact_flow_route_progress` may store denormalized `contact_id` and `contact_status_id` values for query/runtime convenience.
+`contact_flow_route_progress` may store denormalized `contact_id` and nullable `contact_status_id` values for query/runtime convenience.
 
 Those fields do not make FlowRoutes the owner of Contact or ContactStatus.
 
@@ -958,6 +1022,12 @@ Canonical ownership remains:
 - ContactStatus belongs to Core.
 - ContactWorkflowProfile belongs to Workflow.
 - ContactFlowRouteProgress belongs to FlowRoutes.
+
+For automation-event-started routes, `contact_status_id` and `contact_workflow_profile_id` may be null on `contact_flow_route_progress`.
+
+That is expected.
+
+It means the route started from an automation event rather than a Workflow status transition.
 
 ## Campaigns Module
 
@@ -1014,6 +1084,65 @@ Campaigns may depend on:
 - Messaging
 
 Campaigns may schedule messages through Messaging public actions.
+
+Campaign presets define journeys: campaign identity, step order, timing, channel/purpose/scope, and message template references.
+
+Messaging definitions define message copy and delivery templates.
+
+Campaign presets must not be the primary home for reusable email/SMS copy.
+
+Campaign presets must not define or override message payloads.
+
+Campaign message templates are resolved from Messaging by:
+
+    channel + purpose + scope + campaign_key + step_number
+
+The matching Messaging config path is:
+
+    messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
+
+Campaign preset steps should reference the message template context only:
+
+    dispatch_key
+    channel
+    purpose
+    scope
+
+The campaign key and step number come from the Campaign/CampaignStep definition.
+
+Do not require authors to invent per-step `message_type` names for campaign journey steps.
+
+Messaging may derive runtime `message_type` values such as:
+
+    webinar_attended_nurture_step_1
+
+Those derived values are runtime/debug identifiers, not author-facing lookup keys.
+
+Campaign step timing may be author-friendly:
+
+    minutes
+    hours
+    days
+
+Before calling Messaging runtime actions, Campaigns should normalize timing into the canonical Messaging schedule shape.
+
+Example:
+
+    criteria.timing.days = 3
+
+normalizes to:
+
+    schedule.type = delay
+    schedule.minutes = 4320
+
+If a referenced Messaging template is missing, fail loudly because the config is broken.
+
+If a referenced Messaging template exists but has no usable payload, skip scheduling safely with debug metadata instead of crashing runtime delivery.
+
+Preset sync is authoritative for non-customized Campaign definitions.
+
+If a client preset replaces a default campaign with fewer steps, stale non-customized DB steps should be removed rather than inherited accidentally.
+
 
 Campaigns should not directly depend on Workflow status, Webinar outcomes, FlowRoute progress, Mortgage stages, or Broadcast behavior unless those relationships are introduced through explicit public APIs/events/resolvers.
 
@@ -1175,19 +1304,42 @@ Webinars may depend on:
 - Core
 - Messaging
 
-Webinars may use Messaging to send reminders/follow-ups.
+Webinars may use Messaging to send registration confirmations, reminders, opt-ins, and post-webinar transactional follow-ups.
+
+Post-webinar transactional follow-ups are not campaign nurture.
+
+They may contain replay/recording links and should use:
+
+    purpose = transactional
+    scope = webinar
+    dispatch_key = webinar_ended
+
+Post-webinar nurture campaigns are marketing journeys and should be handled through Campaigns after FlowRoutes enrollment.
+
+They should use:
+
+    purpose = marketing
+    scope = webinar_nurture
+
 
 Webinars should not directly own Campaign enrollment routing.
+
+Webinars should not directly create CampaignEnrollment records.
+
+Webinars should not transition Workflow status solely to trigger Campaign enrollment.
+
 
 Current outcome direction:
 
 1. Webinars records webinar registration/attendance/outcome state.
-2. Webinars emits `AutomationEventRecorded` for automation-worthy outcomes.
-3. FlowRoutes listens to the generic automation event seam.
-4. FlowRoutes maps generic automation events into `FlowRouteExternalEvent` internally.
-5. FlowRoutes decides whether to create tasks, change status, enroll Campaigns, cancel Campaigns, or send messages.
-6. Campaigns owns Campaign enrollment/progression.
-7. Messaging owns delivery/scheduling.
+2. Webinars uses Messaging for webinar-owned transactional messages such as confirmations, reminders, and replay follow-ups.
+3. Webinars emits `AutomationEventRecorded` for automation-worthy outcomes.
+4. FlowRoutes listens to the generic automation event seam.
+5. FlowRoutes maps generic automation events into `FlowRouteExternalEvent` internally.
+6. FlowRoutes starts matching event-triggered routes or resumes matching `event_wait` points.
+7. FlowRoutes decides whether to create tasks, change status, enroll Campaigns, cancel Campaigns, or send messages.
+8. Campaigns owns Campaign enrollment/progression.
+9. Messaging owns delivery/scheduling.
 
 Current webinar automation events:
 
@@ -1433,6 +1585,7 @@ Recommended next implementation order:
 5. Phase 20 — Tasks and digest verification
 6. Phase 21 — Minimal contact visibility/debug
 7. Phase 22 — Client MVP smoke test
+8. Phase 22.5 — Canonical message config and post-webinar follow-up cleanup
 
 ### Phase 17 — Schema/module freeze pass
 
@@ -1466,6 +1619,11 @@ Producer modules emit generic automation events after recording their own domain
 
 FlowRoutes listens to `AutomationEventRecorded` and maps those events into `FlowRouteExternalEvent` internally.
 
+FlowRoutes may:
+
+- start matching event-triggered routes
+- resume matching existing `event_wait` progress
+
 Webinars emits:
 
 - `webinar.registered`
@@ -1478,12 +1636,13 @@ Tasks emits:
 
 - `task.completed`
 
-Remove direct producer-specific FlowRoutes listeners where the outcome is an external event wait/resume trigger.
+Remove direct producer-specific FlowRoutes listeners where the outcome is an external event wait/resume/start trigger.
 
-Keep Workflow status changes direct because they are FlowRoute lifecycle behavior, not generic event_wait behavior.
+Keep Workflow status changes direct because they are FlowRoute lifecycle behavior, not generic producer outcomes.
 
 FlowRoutes should decide reactions through:
 
+- automation-event route triggers
 - `event_wait`
 - `enroll_campaign`
 - `cancel_campaign`
@@ -1498,7 +1657,7 @@ Audit event/listener boundaries before adding MVP presets.
 Confirmed direction:
 
 - FlowRoutes listens to `ContactWorkflowStatusChanged` for Workflow lifecycle behavior.
-- FlowRoutes listens to `AutomationEventRecorded` for generic external event waits.
+- FlowRoutes listens to `AutomationEventRecorded` for generic automation-event route starts and external event waits.
 - Tasks emits `task.completed` through `AutomationEventRecorded`.
 - Webinars emits webinar outcomes through `AutomationEventRecorded`.
 - Campaigns may listen to `ScheduledMessageSent` for campaign step progression because that is Campaign-owned lifecycle bookkeeping.
@@ -1590,8 +1749,71 @@ Verify the real MVP path:
 
 1. Register for webinar.
 2. Simulate provider attendance or missed outcome.
-3. Confirm status/event routing.
-4. Confirm FlowRoute progress.
-5. Confirm Campaign enrollment/cancellation.
-6. Confirm scheduled messages.
-7. Confirm task creation/digest.
+3. Confirm Webinars records attendance/playback.
+4. Confirm webinar-owned transactional post-event follow-ups are scheduled/sent.
+5. Confirm Webinars emits automation events.
+6. Confirm FlowRoutes starts event-triggered routes from `AutomationEventRecorded`.
+7. Confirm Campaign enrollment/cancellation.
+8. Confirm scheduled campaign messages.
+9. Confirm task creation/digest when configured.
+
+### Phase 22.5 — Canonical message config and post-webinar follow-up cleanup
+
+Current cleanup target:
+
+- make message configs use one consistent canonical definition shape
+- keep transactional webinar follow-ups separate from marketing nurture campaigns
+- make post-webinar transactional follow-ups dispatch through Messaging definitions
+- make campaign steps resolve Messaging templates by campaign key and step number
+- keep Campaign presets focused on journey orchestration, not reusable message copy
+- prevent Campaign presets from defining or overriding payloads
+- keep default webinar copy vertical-neutral
+- keep mortgage-specific copy in mortgage-specific scopes such as `mortgage_homebuyer_nurture`
+- grant/check consent using the correct purpose/scope pair
+
+Purpose/scope decisions:
+
+    transactional:webinar
+        confirmations
+        reminders
+        live join reminders
+        replay/recording follow-ups
+
+    marketing:webinar_nurture
+        attended nurture campaign
+        missed nurture campaign
+        long-term post-webinar nurture
+
+Implementation direction:
+
+1. Webinars post-event action should dispatch transactional follow-ups with:
+       dispatch_key = webinar_ended
+       purpose = transactional
+       scope = webinar
+
+2. Webinars should emit automation events after recording domain state:
+       webinar.attended
+       webinar.missed
+       webinar.ended
+
+3. FlowRoutes should start event-triggered routes from contact-scoped automation events:
+       webinar.attended -> webinar_attended_nurture campaign
+       webinar.missed -> webinar_missed_nurture campaign
+
+4. Campaigns should schedule nurture steps through Messaging public actions.
+
+5. Campaign message templates should resolve from Messaging using:
+       messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
+
+6. Campaign step timing may be authored in days/hours/minutes but must normalize before Messaging dispatch.
+
+7. Messaging should own the canonical delivery template shape, payload/copy, and delivery gating.
+
+8. Registration consent should clearly distinguish:
+       transactional:webinar
+       marketing:webinar_nurture
+
+9. Mortgage-specific long-term nurture should use:
+       marketing:mortgage_homebuyer_nurture
+
+Do not collapse `webinar_nurture` into `webinar` unless the product decision is that all webinar-related marketing uses a single broad consent scope.

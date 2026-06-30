@@ -110,61 +110,58 @@ class CreateWebinarRegistrationAction
 
         $consents = [
             'transactional_email_consent' => [
-                'channel' => MessageChannel::Email,
-                'purpose' => MessagePurpose::Transactional,
-                'scope' => 'webinar',
-            ],
-
-            'transactional_sms_consent' => [
-                'channel' => MessageChannel::Sms,
-                'purpose' => MessagePurpose::Transactional,
-                'scope' => 'webinar',
+                [
+                    'channel' => MessageChannel::Email,
+                    'purpose' => MessagePurpose::Transactional,
+                    'scope' => 'webinar',
+                    'dispatch_opt_in_message' => false,
+                ],
             ],
 
             'marketing_email_consent' => [
-                'channel' => MessageChannel::Email,
-                'purpose' => MessagePurpose::Marketing,
-                'scope' => 'webinar',
-            ],
-
-            'marketing_sms_consent' => [
-                'channel' => MessageChannel::Sms,
-                'purpose' => MessagePurpose::Marketing,
-                'scope' => 'webinar',
+                [
+                    'channel' => MessageChannel::Email,
+                    'purpose' => MessagePurpose::Marketing,
+                    'scope' => 'webinar_nurture',
+                    'dispatch_opt_in_message' => true,
+                ],
             ],
         ];
 
-        foreach ($consents as $field => $consent) {
+        foreach ($consents as $field => $consentDefinitions) {
             if (! ($validated[$field] ?? false)) {
                 continue;
             }
 
-            $this->grantMessageConsentAction->handle(
-                $contact,
-                [
-                    'channel' => $consent['channel']->value,
-                    'purpose' => $consent['purpose']->value,
-                    'scope' => $consent['scope'],
-                    'consented_at' => $now,
-                    'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent(),
-                    'source' => 'webinar_registration',
-                    'meta' => [
+            foreach ($consentDefinitions as $consent) {
+                $this->grantMessageConsentAction->handle(
+                    contact: $contact,
+                    data: [
+                        'channel' => $consent['channel']->value,
+                        'purpose' => $consent['purpose']->value,
+                        'scope' => $consent['scope'],
+                        'consented_at' => $now,
+                        'ip_address' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                        'source' => 'webinar_registration',
+                        'meta' => [
+                            'webinar_registration_id' => $registration->id,
+                            'webinar_id' => $registration->webinar_id,
+                            'webinar_slug' => $registration->webinar_slug,
+                        ],
+                    ],
+                    optInPayload: [
                         'webinar_registration_id' => $registration->id,
                         'webinar_id' => $registration->webinar_id,
                         'webinar_slug' => $registration->webinar_slug,
                     ],
-                ],
-                optInPayload: [
-                    'webinar_registration_id' => $registration->id,
-                    'webinar_id' => $registration->webinar_id,
-                    'webinar_slug' => $registration->webinar_slug,
-                ],
-                context: $registration,
-                resolverContext: [
-                    'webinar_slug' => $registration->webinar_slug,
-                ],
-            );
+                    context: $registration,
+                    resolverContext: [
+                        'webinar_slug' => $registration->webinar_slug,
+                    ],
+                    dispatchOptInMessage: (bool) $consent['dispatch_opt_in_message'],
+                );
+            }
         }
     }
 
