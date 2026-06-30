@@ -75,30 +75,13 @@ class CampaignMessageDefinitionResolver
      */
     public function reference(Campaign $campaign, CampaignStep $step): array
     {
-        $message = $this->messageReference($step);
-
         return [
-            'dispatch_key' => $this->normalizeSegment($this->stringOrDefault(
-                value: $message['dispatch_key'] ?? null,
-                default: $step->dispatch_key,
-            )),
-            'campaign_key' => $this->normalizeSegment($this->stringOrDefault(
-                value: $message['campaign_key'] ?? null,
-                default: $campaign->key,
-            )),
-            'step_number' => (int) ($message['step_number'] ?? $step->step_number),
-            'channel' => $this->normalizeSegment($this->stringOrDefault(
-                value: $message['channel'] ?? null,
-                default: $campaign->channel,
-            )),
-            'purpose' => $this->normalizeSegment($this->stringOrDefault(
-                value: $message['purpose'] ?? null,
-                default: $campaign->purpose,
-            )),
-            'scope' => $this->normalizeSegment($this->stringOrDefault(
-                value: $message['scope'] ?? null,
-                default: $campaign->scope,
-            )),
+            'dispatch_key' => $this->normalizeSegment($step->dispatch_key),
+            'campaign_key' => $this->normalizeSegment($campaign->key),
+            'step_number' => (int) $step->step_number,
+            'channel' => $this->normalizeSegment($step->channel),
+            'purpose' => $this->normalizeSegment($step->purpose),
+            'scope' => $this->normalizeSegment($step->scope),
         ];
     }
 
@@ -140,20 +123,6 @@ class CampaignMessageDefinitionResolver
             ]).
             '].'
         );
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function messageReference(CampaignStep $step): array
-    {
-        $message = data_get($step->meta ?? [], 'message');
-
-        if (! is_array($message)) {
-            throw new InvalidArgumentException('Campaign step ['.$step->id.'] is missing meta.message.');
-        }
-
-        return $message;
     }
 
     /**
@@ -257,13 +226,6 @@ class CampaignMessageDefinitionResolver
         $conditions = data_get($step->criteria ?? [], 'conditions', []);
 
         return is_array($conditions) ? $conditions : [];
-    }
-
-    private function stringOrDefault(mixed $value, string $default): string
-    {
-        return is_string($value) && trim($value) !== ''
-            ? trim($value)
-            : $default;
     }
 
     private function normalizeSegment(string $value): string

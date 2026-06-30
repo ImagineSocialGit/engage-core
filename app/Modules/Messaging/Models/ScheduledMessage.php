@@ -31,6 +31,9 @@ class ScheduledMessage extends Model
         'purpose',
         'scope',
         'payload_class',
+        'queue',
+        'dispatch_keys',
+        'definition_config_path',
         'payload',
         'send_at',
         'status',
@@ -48,6 +51,7 @@ class ScheduledMessage extends Model
         return [
             'recipient_id' => 'integer',
             'context_id' => 'integer',
+            'dispatch_keys' => 'array',
             'payload' => 'array',
             'send_at' => 'datetime',
             'sent_at' => 'datetime',
@@ -65,5 +69,16 @@ class ScheduledMessage extends Model
     public function context(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function dispatchKeys(): array
+    {
+        return array_values(array_filter(
+            $this->dispatch_keys ?? [],
+            fn (mixed $dispatchKey): bool => is_string($dispatchKey) && trim($dispatchKey) !== '',
+        ));
     }
 }

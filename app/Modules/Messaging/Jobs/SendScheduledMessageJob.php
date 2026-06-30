@@ -36,7 +36,7 @@ class SendScheduledMessageJob implements ShouldQueue
             ->with(['recipient', 'context'])
             ->find($this->scheduledMessageId);
 
-        if (! $scheduledMessage || $scheduledMessage->status !== 'pending') {
+        if (! $scheduledMessage || $scheduledMessage->status !== ScheduledMessage::STATUS_PENDING) {
             return;
         }
 
@@ -56,7 +56,7 @@ class SendScheduledMessageJob implements ShouldQueue
             };
 
             $scheduledMessage->forceFill([
-                'status' => 'sent',
+                'status' => ScheduledMessage::STATUS_SENT,
                 'sent_at' => now(),
                 'failure_reason' => null,
             ])->save();
@@ -64,7 +64,7 @@ class SendScheduledMessageJob implements ShouldQueue
             ScheduledMessageSent::dispatch($scheduledMessage);
         } catch (Throwable $exception) {
             $scheduledMessage->forceFill([
-                'status' => 'failed',
+                'status' => ScheduledMessage::STATUS_FAILED,
                 'failed_at' => now(),
                 'failure_reason' => $exception->getMessage(),
             ])->save();
@@ -87,6 +87,7 @@ class SendScheduledMessageJob implements ShouldQueue
             isset($this->horizon['purpose']) ? 'purpose:'.$this->horizon['purpose'] : null,
             isset($this->horizon['scope']) ? 'scope:'.$this->horizon['scope'] : null,
             isset($this->horizon['message_type']) ? 'message-type:'.$this->horizon['message_type'] : null,
+            isset($this->horizon['queue']) ? 'queue:'.$this->horizon['queue'] : null,
         ]));
     }
 

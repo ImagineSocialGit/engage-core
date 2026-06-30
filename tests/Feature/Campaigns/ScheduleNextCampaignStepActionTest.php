@@ -56,19 +56,28 @@ class ScheduleNextCampaignStepActionTest extends TestCase
 
         $this->assertInstanceOf(ScheduledMessage::class, $scheduledMessage);
 
-        $this->assertSame('step_2', $scheduledMessage->message_type);
+        $this->assertSame('webinar_attended_step_2', $scheduledMessage->message_type);
         $this->assertSame(Contact::class, $scheduledMessage->recipient_type);
         $this->assertSame($contact->id, $scheduledMessage->recipient_id);
         $this->assertTrue($scheduledMessage->recipient->is($contact));
         $this->assertSame('email', $scheduledMessage->channel);
         $this->assertSame('marketing', $scheduledMessage->purpose);
         $this->assertSame('webinar', $scheduledMessage->scope);
+        $this->assertSame('marketing', $scheduledMessage->queue);
+        $this->assertSame(['campaign_step_due'], $scheduledMessage->dispatch_keys);
+        $this->assertSame(
+            'messaging.email.marketing.webinar.campaigns.webinar_attended.steps.2',
+            $scheduledMessage->definition_config_path,
+        );
         $this->assertSame($campaign->id, $scheduledMessage->meta['campaign_id']);
         $this->assertSame('webinar_attended', $scheduledMessage->meta['campaign_key']);
         $this->assertSame(2, $scheduledMessage->meta['campaign_step']);
         $this->assertSame($stepTwo->id, $scheduledMessage->meta['campaign_step_id']);
         $this->assertSame($enrollment->id, $scheduledMessage->meta['campaign_enrollment_id']);
-        $this->assertNull($scheduledMessage->meta['definition_config_path']);
+        $this->assertSame(
+            'messaging.email.marketing.webinar.campaigns.webinar_attended.steps.2',
+            $scheduledMessage->meta['definition_config_path'],
+        );
         $this->assertTrue($scheduledMessage->send_at->equalTo(Carbon::now()->addMinutes(720)));
 
         $enrollment->refresh();
@@ -87,8 +96,6 @@ class ScheduleNextCampaignStepActionTest extends TestCase
 
         $campaign = $this->createCampaignWithStep(
             stepNumber: 1,
-            dispatchKey: 'webinar_ended',
-            messageType: 'step_1',
         );
 
         $contact = $this->contactWithMarketingEmailConsent();
@@ -158,15 +165,22 @@ class ScheduleNextCampaignStepActionTest extends TestCase
     {
         $campaign = $this->createCampaignWithStep(
             stepNumber: 1,
-            dispatchKey: 'webinar_ended',
-            messageType: 'step_1',
+        );
+
+        $this->defineCampaignStepMessageTemplate(
+            campaignKey: 'webinar_attended',
+            stepNumber: 2,
+            body: 'Second message',
         );
 
         CampaignStep::create([
             'campaign_id' => $campaign->id,
             'step_number' => 2,
             'name' => 'Step 2',
-            'dispatch_key' => 'marketing_message_sent',
+            'dispatch_key' => 'campaign_step_due',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar',
             'is_active' => true,
             'criteria' => [
                 'timing' => [
@@ -174,21 +188,8 @@ class ScheduleNextCampaignStepActionTest extends TestCase
                     'minutes' => 720,
                 ],
             ],
-            'payload' => [
-                'to' => '{email}',
-                'subject' => 'Step 2',
-                'body' => 'Second message',
-            ],
             'meta' => [
                 'type' => 'message',
-                'message' => [
-                    'channel' => 'email',
-                    'purpose' => 'marketing',
-                    'scope' => 'webinar',
-                    'message_type' => 'step_2',
-                    'payload_class' => EmailPayload::class,
-                    'queue' => 'marketing',
-                ],
             ],
         ]);
 
@@ -197,9 +198,13 @@ class ScheduleNextCampaignStepActionTest extends TestCase
 
     private function createCampaignWithStep(
         int $stepNumber,
-        string $dispatchKey,
-        string $messageType,
     ): Campaign {
+        $this->defineCampaignStepMessageTemplate(
+            campaignKey: 'webinar_attended',
+            stepNumber: $stepNumber,
+            body: 'Message '.$stepNumber,
+        );
+
         $campaign = Campaign::query()->firstOrCreate(
             ['key' => 'webinar_attended'],
             [
@@ -217,7 +222,10 @@ class ScheduleNextCampaignStepActionTest extends TestCase
             'campaign_id' => $campaign->id,
             'step_number' => $stepNumber,
             'name' => 'Step '.$stepNumber,
-            'dispatch_key' => $dispatchKey,
+            'dispatch_key' => 'campaign_step_due',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar',
             'is_active' => true,
             'criteria' => [
                 'timing' => [
@@ -225,25 +233,32 @@ class ScheduleNextCampaignStepActionTest extends TestCase
                     'minutes' => 720,
                 ],
             ],
-            'payload' => [
-                'to' => '{email}',
-                'subject' => 'Step '.$stepNumber,
-                'body' => 'Message '.$stepNumber,
-            ],
             'meta' => [
                 'type' => 'message',
-                'message' => [
-                    'channel' => 'email',
-                    'purpose' => 'marketing',
-                    'scope' => 'webinar',
-                    'message_type' => $messageType,
-                    'payload_class' => EmailPayload::class,
-                    'queue' => 'marketing',
-                ],
             ],
         ]);
 
         return $campaign->refresh();
+    }
+
+    private function defineCampaignStepMessageTemplate(
+        string $campaignKey,
+        int $stepNumber,
+        string $body,
+    ): void {
+        config()->set(
+            "messaging.email.marketing.webinar.campaigns.{$campaignKey}.steps.{$stepNumber}",
+            [
+                'dispatch_key' => 'campaign_step_due',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'marketing',
+                'payload' => [
+                    'to' => '{email}',
+                    'subject' => 'Step '.$stepNumber,
+                    'body' => $body,
+                ],
+            ],
+        );
     }
 
     private function contactWithMarketingEmailConsent(): Contact

@@ -35,6 +35,10 @@ class ScheduleMessageAction
         $sendAt = $sendAt ? Carbon::parse($sendAt) : now();
         $meta ??= [];
 
+        $queue = $this->nullableString($meta['queue'] ?? null);
+        $definitionConfigPath = $this->nullableString($meta['definition_config_path'] ?? null);
+        $dispatchKeys = $this->normalizeDispatchKeys($meta['dispatch_keys'] ?? []);
+
         $attributes = [
             'recipient_type' => $recipient->getMorphClass(),
             'recipient_id' => $recipient->getKey(),
@@ -43,6 +47,9 @@ class ScheduleMessageAction
             'purpose' => $purpose,
             'scope' => $scope,
             'payload_class' => $payloadClass,
+            'queue' => $queue,
+            'dispatch_keys' => $dispatchKeys,
+            'definition_config_path' => $definitionConfigPath,
             'payload' => $payload,
             'send_at' => $sendAt,
             'status' => ScheduledMessage::STATUS_PENDING,
@@ -68,13 +75,12 @@ class ScheduleMessageAction
                     scheduledMessage: $scheduledMessage,
                     sendAt: $sendAt,
                     context: $context,
-                    meta: $meta,
                 ),
             )
                 ->delay($sendAt)
                 ->afterCommit();
 
-            if ($queue = $meta['queue'] ?? null) {
+            if ($queue !== null) {
                 $dispatch->onQueue($queue);
             }
         }
@@ -83,14 +89,12 @@ class ScheduleMessageAction
     }
 
     /**
-     * @param array<string, mixed> $meta
      * @return array<string, mixed>
      */
     private function horizonPayload(
         ScheduledMessage $scheduledMessage,
         Carbon $sendAt,
         ?Model $context,
-        array $meta,
     ): array {
         return array_filter([
             'scheduled_message_id' => $scheduledMessage->id,
@@ -100,15 +104,32 @@ class ScheduleMessageAction
             'purpose' => $scheduledMessage->purpose,
             'scope' => $scheduledMessage->scope,
             'message_type' => $scheduledMessage->message_type,
-            'queue' => $meta['queue'] ?? null,
+            'queue' => $scheduledMessage->queue,
             'send_at' => $sendAt->toDateTimeString(),
             'context_type' => $context ? class_basename($context) : null,
             'context_id' => $context?->getKey(),
-            'dispatch_keys' => $meta['dispatch_keys'] ?? null,
-            'definition_config_path' => $meta['definition_config_path'] ?? null,
-            'campaign_key' => $meta['campaign_key'] ?? null,
-            'campaign_step' => $meta['campaign_step'] ?? null,
+            'dispatch_keys' => $scheduledMessage->dispatch_keys,
+            'definition_config_path' => $scheduledMessage->definition_config_path,
+            'campaign_key' => $scheduledMessage->meta['campaign_key'] ?? null,
+            'campaign_step' => $scheduledMessage->meta['campaign_step'] ?? null,
         ], fn (mixed $value): bool => $value !== null && $value !== []);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function normalizeDispatchKeys(mixed $dispatchKeys): array
+    {
+        if (! is_array($dispatchKeys)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(array_map(
+            fn (mixed $dispatchKey): ?string => is_string($dispatchKey) && trim($dispatchKey) !== ''
+                ? $this->normalizeSegment($dispatchKey)
+                : null,
+            $dispatchKeys,
+        ))));
     }
 
     private function normalizeEnumValue(MessageChannel|MessagePurpose|string $value): string
@@ -121,5 +142,16 @@ class ScheduleMessageAction
     private function normalizeSegment(string $value): string
     {
         return str_replace('-', '_', strtolower(trim($value)));
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
     }
 }

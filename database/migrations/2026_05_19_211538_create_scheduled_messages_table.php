@@ -12,7 +12,6 @@ return new class extends Migration
             $table->id();
 
             $table->morphs('recipient');
-
             $table->nullableMorphs('context');
 
             $table->string('channel')->index();
@@ -22,6 +21,11 @@ return new class extends Migration
             $table->string('scope')->index();
 
             $table->string('payload_class');
+            $table->string('queue')->nullable()->index();
+
+            $table->json('dispatch_keys')->nullable();
+            $table->string('definition_config_path')->nullable()->index();
+
             $table->json('payload');
 
             $table->timestamp('send_at')->index();
@@ -62,6 +66,12 @@ return new class extends Migration
                 'status',
                 'send_at',
             ], 'scheduled_messages_status_send_at_index');
+
+            $table->index([
+                'queue',
+                'status',
+                'send_at',
+            ], 'scheduled_messages_queue_status_send_at_index');
         });
     }
 

@@ -37,7 +37,7 @@ class SyncCampaignPresetsAction
 
     private function defaultPresetKey(): ?string
     {
-        $presetKey = config('presets.default');
+        $presetKey = config('presets.default_package');
 
         return is_string($presetKey) && trim($presetKey) !== ''
             ? trim($presetKey)
@@ -53,65 +53,27 @@ class SyncCampaignPresetsAction
             return [];
         }
 
-        $campaignGroups = $this->campaignGroupsForPreset($presetKey);
+        $campaignGroup = config("presets.packages.{$presetKey}.groups.campaigns");
 
-        if ($campaignGroups === []) {
+        if (! is_string($campaignGroup) || trim($campaignGroup) === '') {
             return [];
         }
 
-        $campaignKeys = $this->campaignKeysForGroups($campaignGroups);
+        $campaignKeys = config('presets.campaigns.groups.'.trim($campaignGroup));
 
-        if ($campaignKeys === []) {
-            return [];
+        if (! is_array($campaignKeys)) {
+            throw new InvalidArgumentException('Campaign preset group ['.trim($campaignGroup).'] does not exist.');
         }
 
         $definitions = [];
 
-        foreach ($campaignKeys as $campaignKey) {
+        foreach ($this->normalizeStringList($campaignKeys) as $campaignKey) {
             $definitions[] = CampaignPresetDefinition::fromArray(
                 data: $this->campaignDefinition($campaignKey),
-                presetKey: $presetKey,
             );
         }
 
         return $definitions;
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function campaignGroupsForPreset(string $presetKey): array
-    {
-        $groups = config('presets.presets.'.$presetKey.'.campaigns.groups', []);
-
-        if (! is_array($groups)) {
-            throw new InvalidArgumentException('Campaign preset groups for preset ['.$presetKey.'] must be an array.');
-        }
-
-        return $this->normalizeStringList($groups);
-    }
-
-    /**
-     * @param array<int, string> $groups
-     * @return array<int, string>
-     */
-    private function campaignKeysForGroups(array $groups): array
-    {
-        $campaignKeys = [];
-
-        foreach ($groups as $group) {
-            $groupCampaignKeys = config('presets.campaigns.groups.'.$group);
-
-            if (! is_array($groupCampaignKeys)) {
-                throw new InvalidArgumentException('Campaign preset group ['.$group.'] does not exist.');
-            }
-
-            foreach ($this->normalizeStringList($groupCampaignKeys) as $campaignKey) {
-                $campaignKeys[] = $campaignKey;
-            }
-        }
-
-        return array_values(array_unique($campaignKeys));
     }
 
     /**
@@ -155,12 +117,11 @@ class SyncCampaignPresetsAction
                 'key' => $definition->key,
                 'name' => $definition->name,
                 'description' => $definition->description,
-                'channel' => $definition->channel,
-                'purpose' => $definition->purpose,
-                'scope' => $definition->scope,
+                'channel' => $this->normalizeSegment($definition->channel),
+                'purpose' => $this->normalizeSegment($definition->purpose),
+                'scope' => $this->normalizeSegment($definition->scope),
                 'status' => $definition->status,
                 'is_active' => $definition->isActive,
-                'preset_key' => $definition->presetKey,
                 'source_version' => $definition->sourceVersion,
                 'is_customized' => false,
                 'customized_at' => null,
@@ -181,12 +142,11 @@ class SyncCampaignPresetsAction
         $campaign->forceFill([
             'name' => $definition->name,
             'description' => $definition->description,
-            'channel' => $definition->channel,
-            'purpose' => $definition->purpose,
-            'scope' => $definition->scope,
+            'channel' => $this->normalizeSegment($definition->channel),
+            'purpose' => $this->normalizeSegment($definition->purpose),
+            'scope' => $this->normalizeSegment($definition->scope),
             'status' => $definition->status,
             'is_active' => $definition->isActive,
-            'preset_key' => $definition->presetKey,
             'source_version' => $definition->sourceVersion,
             'meta' => $definition->meta,
         ])->save();
@@ -224,10 +184,6 @@ class SyncCampaignPresetsAction
                 $activeStepNumbers !== [],
                 fn ($query) => $query->whereNotIn('step_number', $activeStepNumbers),
             )
-            ->when(
-                $activeStepNumbers === [],
-                fn ($query) => $query,
-            )
             ->delete();
 
         foreach ($definition->steps as $stepDefinition) {
@@ -249,15 +205,25 @@ class SyncCampaignPresetsAction
             ->where('step_number', $definition->stepNumber)
             ->first();
 
+        $message = $this->messageReference(
+            campaign: $campaign,
+            definition: $definition,
+        );
+
         if (! $step instanceof CampaignStep) {
             $step = CampaignStep::create([
                 'campaign_id' => $campaign->id,
                 'step_number' => $definition->stepNumber,
                 'name' => $definition->name,
-                'dispatch_key' => $definition->dispatchKey,
+                'dispatch_key' => $this->normalizeSegment($definition->dispatchKey),
+                'channel' => $message['channel'],
+                'purpose' => $message['purpose'],
+                'scope' => $message['scope'],
                 'is_active' => $definition->isActive,
                 'criteria' => $definition->criteria,
-                'payload' => $definition->payload,
+                'source_version' => $definition->sourceVersion,
+                'is_customized' => false,
+                'customized_at' => null,
                 'meta' => $definition->meta,
             ]);
 
@@ -266,7 +232,7 @@ class SyncCampaignPresetsAction
             return $step;
         }
 
-        if ($campaign->is_customized) {
+        if ($step->is_customized || $campaign->is_customized) {
             $result->recordStepSkipped();
 
             return $step;
@@ -274,15 +240,37 @@ class SyncCampaignPresetsAction
 
         $step->forceFill([
             'name' => $definition->name,
-            'dispatch_key' => $definition->dispatchKey,
+            'dispatch_key' => $this->normalizeSegment($definition->dispatchKey),
+            'channel' => $message['channel'],
+            'purpose' => $message['purpose'],
+            'scope' => $message['scope'],
             'is_active' => $definition->isActive,
             'criteria' => $definition->criteria,
-            'payload' => $definition->payload,
+            'source_version' => $definition->sourceVersion,
             'meta' => $definition->meta,
         ])->save();
 
         $result->recordStepUpdated();
 
         return $step;
+    }
+
+    /**
+     * @return array{channel: string, purpose: string, scope: string}
+     */
+    private function messageReference(
+        Campaign $campaign,
+        CampaignStepPresetDefinition $definition,
+    ): array {
+        return [
+            'channel' => $this->normalizeSegment($definition->channel ?? $campaign->channel),
+            'purpose' => $this->normalizeSegment($definition->purpose ?? $campaign->purpose),
+            'scope' => $this->normalizeSegment($definition->scope ?? $campaign->scope),
+        ];
+    }
+
+    private function normalizeSegment(string $value): string
+    {
+        return str_replace('-', '_', strtolower(trim($value)));
     }
 }

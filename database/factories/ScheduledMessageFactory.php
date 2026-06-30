@@ -3,8 +3,10 @@
 namespace Database\Factories;
 
 use App\Modules\Core\Models\Contact;
-use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\InternalNotifications\Models\TeamMember;
+use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Messaging\Payloads\SmsPayload;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -22,14 +24,15 @@ class ScheduledMessageFactory extends Factory
             'context_id' => null,
 
             'channel' => 'email',
-
-            'purpose' => 'transactional',
-
-            'scope' => 'general',
-
             'message_type' => 'message',
 
-            'payload_class' => \App\Modules\Messaging\Payloads\EmailPayload::class,
+            'purpose' => 'transactional',
+            'scope' => 'general',
+
+            'payload_class' => EmailPayload::class,
+            'queue' => 'emails',
+            'dispatch_keys' => ['message'],
+            'definition_config_path' => null,
 
             'payload' => [
                 'to' => $this->faker->safeEmail(),
@@ -37,17 +40,20 @@ class ScheduledMessageFactory extends Factory
                 'context' => [],
             ],
 
-            'meta' => [],
-
-            'status' => 'pending',
-
             'send_at' => now(),
+
+            'status' => ScheduledMessage::STATUS_PENDING,
 
             'sent_at' => null,
             'failed_at' => null,
             'skipped_at' => null,
 
+            'dedupe_key' => null,
+
             'failure_reason' => null,
+            'skip_reason' => null,
+
+            'meta' => [],
         ];
     }
 
@@ -73,7 +79,8 @@ class ScheduledMessageFactory extends Factory
     {
         return $this->state(fn () => [
             'channel' => 'email',
-            'payload_class' => \App\Modules\Messaging\Payloads\EmailPayload::class,
+            'payload_class' => EmailPayload::class,
+            'queue' => 'emails',
         ]);
     }
 
@@ -81,14 +88,15 @@ class ScheduledMessageFactory extends Factory
     {
         return $this->state(fn () => [
             'channel' => 'sms',
-            'payload_class' => \App\Modules\Messaging\Payloads\SmsPayload::class,
+            'payload_class' => SmsPayload::class,
+            'queue' => 'notifications',
         ]);
     }
 
     public function sent(): static
     {
         return $this->state(fn () => [
-            'status' => 'sent',
+            'status' => ScheduledMessage::STATUS_SENT,
             'sent_at' => now(),
         ]);
     }
@@ -96,7 +104,7 @@ class ScheduledMessageFactory extends Factory
     public function failed(string $reason = 'Failed'): static
     {
         return $this->state(fn () => [
-            'status' => 'failed',
+            'status' => ScheduledMessage::STATUS_FAILED,
             'failed_at' => now(),
             'failure_reason' => $reason,
         ]);
@@ -105,7 +113,7 @@ class ScheduledMessageFactory extends Factory
     public function skipped(string $reason = 'Skipped'): static
     {
         return $this->state(fn () => [
-            'status' => 'skipped',
+            'status' => ScheduledMessage::STATUS_SKIPPED,
             'skipped_at' => now(),
             'skip_reason' => $reason,
             'failure_reason' => null,

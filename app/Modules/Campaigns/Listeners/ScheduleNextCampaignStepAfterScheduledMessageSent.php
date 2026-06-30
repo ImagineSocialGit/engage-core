@@ -3,8 +3,8 @@
 namespace App\Modules\Campaigns\Listeners;
 
 use App\Modules\Campaigns\Actions\ScheduleNextCampaignStepAction;
-use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Messaging\Events\ScheduledMessageSent;
 
 class ScheduleNextCampaignStepAfterScheduledMessageSent
 {
@@ -30,7 +30,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSent
 
         $this->scheduleNextCampaignStepAction->handle(
             enrollment: $enrollment,
-            dispatchKey: 'marketing_message_sent',
+            dispatchKey: null,
             context: $scheduledMessage->context,
             payload: [],
             meta: [

@@ -13,9 +13,14 @@ class CampaignStep extends Model
         'step_number',
         'name',
         'dispatch_key',
+        'channel',
+        'purpose',
+        'scope',
         'is_active',
         'criteria',
-        'payload',
+        'source_version',
+        'is_customized',
+        'customized_at',
         'meta',
     ];
 
@@ -26,7 +31,8 @@ class CampaignStep extends Model
             'step_number' => 'integer',
             'is_active' => 'boolean',
             'criteria' => 'array',
-            'payload' => 'array',
+            'is_customized' => 'boolean',
+            'customized_at' => 'datetime',
             'meta' => 'array',
         ];
     }
@@ -39,5 +45,15 @@ class CampaignStep extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeCustomized(Builder $query): Builder
+    {
+        return $query->where('is_customized', true);
+    }
+
+    public function scopeNotCustomized(Builder $query): Builder
+    {
+        return $query->where('is_customized', false);
     }
 }

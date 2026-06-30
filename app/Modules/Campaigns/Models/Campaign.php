@@ -21,7 +21,6 @@ class Campaign extends Model
         'scope',
         'status',
         'is_active',
-        'preset_key',
         'source_version',
         'is_customized',
         'customized_at',
@@ -58,6 +57,21 @@ class Campaign extends Model
         return $query
             ->where('is_active', true)
             ->where('status', self::STATUS_ACTIVE);
+    }
+
+    public function scopeForKey(Builder $query, string $key): Builder
+    {
+        return $query->where('key', $key);
+    }
+
+    public function scopeCustomized(Builder $query): Builder
+    {
+        return $query->where('is_customized', true);
+    }
+
+    public function scopeNotCustomized(Builder $query): Builder
+    {
+        return $query->where('is_customized', false);
     }
 
     public function isActive(): bool

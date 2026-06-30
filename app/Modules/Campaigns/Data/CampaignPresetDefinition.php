@@ -2,6 +2,8 @@
 
 namespace App\Modules\Campaigns\Data;
 
+use InvalidArgumentException;
+
 class CampaignPresetDefinition
 {
     /**
@@ -17,8 +19,7 @@ class CampaignPresetDefinition
         public readonly string $scope,
         public readonly string $status,
         public readonly bool $isActive,
-        public readonly ?string $presetKey,
-        public readonly ?int $sourceVersion,
+        public readonly ?string $sourceVersion,
         public readonly array $steps,
         public readonly array $meta = [],
     ) {}
@@ -26,7 +27,7 @@ class CampaignPresetDefinition
     /**
      * @param array<string, mixed> $data
      */
-    public static function fromArray(array $data, ?string $presetKey = null): self
+    public static function fromArray(array $data): self
     {
         $steps = [];
 
@@ -47,8 +48,7 @@ class CampaignPresetDefinition
             scope: self::requiredString($data['scope'] ?? null, 'campaign scope'),
             status: self::nullableString($data['status'] ?? null) ?? 'active',
             isActive: (bool) ($data['is_active'] ?? true),
-            presetKey: self::nullableString($data['preset_key'] ?? null) ?? $presetKey,
-            sourceVersion: isset($data['source_version']) ? (int) $data['source_version'] : null,
+            sourceVersion: self::nullableString($data['source_version'] ?? null),
             steps: $steps,
             meta: is_array($data['meta'] ?? null) ? $data['meta'] : [],
         );
@@ -57,7 +57,7 @@ class CampaignPresetDefinition
     private static function requiredString(mixed $value, string $field): string
     {
         if (! is_string($value) || trim($value) === '') {
-            throw new \InvalidArgumentException('Missing required '.$field.'.');
+            throw new InvalidArgumentException('Missing required '.$field.'.');
         }
 
         return trim($value);

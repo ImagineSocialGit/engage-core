@@ -63,8 +63,8 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar',
-            'message_type' => 'step_1',
-            'status' => 'sent',
+            'message_type' => 'webinar_attended_step_1',
+            'status' => ScheduledMessage::STATUS_SENT,
             'sent_at' => now(),
             'meta' => [
                 'campaign_enrollment_id' => $enrollment->id,
@@ -91,12 +91,26 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             ->whereKey($enrollment->last_scheduled_message_id)
             ->firstOrFail();
 
-        $this->assertSame('step_2', $nextMessage->message_type);
+        $this->assertSame('webinar_attended_step_2', $nextMessage->message_type);
+        $this->assertSame('email', $nextMessage->channel);
+        $this->assertSame('marketing', $nextMessage->purpose);
+        $this->assertSame('webinar', $nextMessage->scope);
+        $this->assertSame('marketing', $nextMessage->queue);
+        $this->assertSame(['campaign_step_due'], $nextMessage->dispatch_keys);
+        $this->assertSame(
+            'messaging.email.marketing.webinar.campaigns.webinar_attended.steps.2',
+            $nextMessage->definition_config_path,
+        );
         $this->assertSame($enrollment->id, $nextMessage->meta['campaign_enrollment_id']);
         $this->assertSame($campaign->id, $nextMessage->meta['campaign_id']);
+        $this->assertSame('webinar_attended', $nextMessage->meta['campaign_key']);
+        $this->assertSame(2, $nextMessage->meta['campaign_step']);
         $this->assertSame($stepTwo->id, $nextMessage->meta['campaign_step_id']);
         $this->assertSame($sentMessage->id, $nextMessage->meta['previous_scheduled_message_id']);
-        $this->assertNull($nextMessage->meta['definition_config_path']);
+        $this->assertSame(
+            'messaging.email.marketing.webinar.campaigns.webinar_attended.steps.2',
+            $nextMessage->meta['definition_config_path'],
+        );
     }
 
     public function test_it_does_nothing_when_sent_message_has_no_campaign_metadata(): void
@@ -114,7 +128,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             'purpose' => 'transactional',
             'scope' => 'webinar',
             'message_type' => 'confirmation',
-            'status' => 'sent',
+            'status' => ScheduledMessage::STATUS_SENT,
             'sent_at' => now(),
             'meta' => [],
         ]);
@@ -140,11 +154,20 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             'meta' => [],
         ]);
 
+        $this->defineCampaignStepMessageTemplate(
+            campaignKey: 'webinar_attended',
+            stepNumber: 1,
+            body: 'First message',
+        );
+
         CampaignStep::create([
             'campaign_id' => $campaign->id,
             'step_number' => 1,
             'name' => 'Step 1',
-            'dispatch_key' => 'webinar_ended',
+            'dispatch_key' => 'campaign_step_due',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar',
             'is_active' => true,
             'criteria' => [
                 'timing' => [
@@ -152,29 +175,25 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
                     'minutes' => 720,
                 ],
             ],
-            'payload' => [
-                'to' => '{email}',
-                'subject' => 'Step 1',
-                'body' => 'First message',
-            ],
             'meta' => [
                 'type' => 'message',
-                'message' => [
-                    'channel' => 'email',
-                    'purpose' => 'marketing',
-                    'scope' => 'webinar',
-                    'message_type' => 'step_1',
-                    'payload_class' => EmailPayload::class,
-                    'queue' => 'marketing',
-                ],
             ],
         ]);
+
+        $this->defineCampaignStepMessageTemplate(
+            campaignKey: 'webinar_attended',
+            stepNumber: 2,
+            body: 'Second message',
+        );
 
         CampaignStep::create([
             'campaign_id' => $campaign->id,
             'step_number' => 2,
             'name' => 'Step 2',
-            'dispatch_key' => 'marketing_message_sent',
+            'dispatch_key' => 'campaign_step_due',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar',
             'is_active' => true,
             'criteria' => [
                 'timing' => [
@@ -182,25 +201,32 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
                     'minutes' => 720,
                 ],
             ],
-            'payload' => [
-                'to' => '{email}',
-                'subject' => 'Step 2',
-                'body' => 'Second message',
-            ],
             'meta' => [
                 'type' => 'message',
-                'message' => [
-                    'channel' => 'email',
-                    'purpose' => 'marketing',
-                    'scope' => 'webinar',
-                    'message_type' => 'step_2',
-                    'payload_class' => EmailPayload::class,
-                    'queue' => 'marketing',
-                ],
             ],
         ]);
 
         return $campaign->refresh();
+    }
+
+    private function defineCampaignStepMessageTemplate(
+        string $campaignKey,
+        int $stepNumber,
+        string $body,
+    ): void {
+        config()->set(
+            "messaging.email.marketing.webinar.campaigns.{$campaignKey}.steps.{$stepNumber}",
+            [
+                'dispatch_key' => 'campaign_step_due',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'marketing',
+                'payload' => [
+                    'to' => '{email}',
+                    'subject' => 'Step '.$stepNumber,
+                    'body' => $body,
+                ],
+            ],
+        );
     }
 
     protected function tearDown(): void

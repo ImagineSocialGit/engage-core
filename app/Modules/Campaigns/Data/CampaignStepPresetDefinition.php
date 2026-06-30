@@ -2,20 +2,24 @@
 
 namespace App\Modules\Campaigns\Data;
 
+use InvalidArgumentException;
+
 class CampaignStepPresetDefinition
 {
     /**
      * @param array<string, mixed> $criteria
-     * @param array<string, mixed> $payload
      * @param array<string, mixed> $meta
      */
     public function __construct(
         public readonly int $stepNumber,
         public readonly ?string $name,
         public readonly string $dispatchKey,
+        public readonly ?string $channel = null,
+        public readonly ?string $purpose = null,
+        public readonly ?string $scope = null,
         public readonly bool $isActive = true,
         public readonly array $criteria = [],
-        public readonly array $payload = [],
+        public readonly ?string $sourceVersion = null,
         public readonly array $meta = [],
     ) {}
 
@@ -28,16 +32,19 @@ class CampaignStepPresetDefinition
         $dispatchKey = self::requiredString($data['dispatch_key'] ?? null, 'campaign step dispatch_key');
 
         if ($stepNumber < 1) {
-            throw new \InvalidArgumentException('Campaign step step_number must be greater than zero.');
+            throw new InvalidArgumentException('Campaign step step_number must be greater than zero.');
         }
 
         return new self(
             stepNumber: $stepNumber,
             name: self::nullableString($data['name'] ?? null),
             dispatchKey: $dispatchKey,
+            channel: self::nullableString($data['channel'] ?? null),
+            purpose: self::nullableString($data['purpose'] ?? null),
+            scope: self::nullableString($data['scope'] ?? null),
             isActive: (bool) ($data['is_active'] ?? true),
             criteria: self::criteria($data),
-            payload: self::payload($data),
+            sourceVersion: self::nullableString($data['source_version'] ?? null),
             meta: self::meta($data),
         );
     }
@@ -63,21 +70,6 @@ class CampaignStepPresetDefinition
      * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
-    private static function payload(array $data): array
-    {
-        $payload = is_array($data['payload'] ?? null) ? $data['payload'] : [];
-
-        if (array_key_exists('payload', $payload) && is_array($payload['payload'])) {
-            return $payload['payload'];
-        }
-
-        return $payload;
-    }
-
-    /**
-     * @param array<string, mixed> $data
-     * @return array<string, mixed>
-     */
     private static function meta(array $data): array
     {
         $meta = is_array($data['meta'] ?? null) ? $data['meta'] : [];
@@ -87,14 +79,6 @@ class CampaignStepPresetDefinition
             ?? 'message';
 
         $meta['type'] = $type;
-
-        if (array_key_exists('message', $data) && is_array($data['message'])) {
-            $meta['message'] = $data['message'];
-        }
-
-        if (array_key_exists('message', $data['payload'] ?? []) && is_array($data['payload']['message'] ?? null)) {
-            $meta['message'] = $data['payload']['message'];
-        }
 
         if (array_key_exists('eligibility_failure', $data) && is_array($data['eligibility_failure'])) {
             $meta['eligibility_failure'] = $data['eligibility_failure'];
@@ -106,7 +90,7 @@ class CampaignStepPresetDefinition
     private static function requiredString(mixed $value, string $field): string
     {
         if (! is_string($value) || trim($value) === '') {
-            throw new \InvalidArgumentException('Missing required '.$field.'.');
+            throw new InvalidArgumentException('Missing required '.$field.'.');
         }
 
         return trim($value);

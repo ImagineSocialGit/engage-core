@@ -50,7 +50,7 @@ class ScheduledMessageGate
                 purpose: $scheduledMessage->purpose,
                 scope: $scheduledMessage->scope,
                 messageKey: $scheduledMessage->message_type,
-                definitionConfigPath: $scheduledMessage->meta['definition_config_path'] ?? null,
+                definitionConfigPath: $scheduledMessage->definition_config_path,
             )) {
                 return 'Message eligibility gate denied send.';
             }
@@ -75,7 +75,7 @@ class ScheduledMessageGate
 
     private function definitionStillEnabled(ScheduledMessage $scheduledMessage): bool
     {
-        $configPath = $scheduledMessage->meta['definition_config_path'] ?? null;
+        $configPath = $scheduledMessage->definition_config_path;
 
         if (! is_string($configPath) || trim($configPath) === '') {
             return true;
@@ -91,7 +91,7 @@ class ScheduledMessageGate
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param array<string, mixed> $payload
      */
     private function hasDestination(array $payload): bool
     {
