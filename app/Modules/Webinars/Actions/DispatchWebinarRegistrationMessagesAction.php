@@ -3,11 +3,11 @@
 namespace App\Modules\Webinars\Actions;
 
 use App\Modules\Messaging\Actions\DispatchMessageAction;
-use App\Modules\Webinars\Data\WebinarMessageData;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
-use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Messaging\Services\MessageEligibilityGate;
+use App\Modules\Webinars\Data\WebinarMessageData;
+use App\Modules\Webinars\Models\WebinarRegistration;
 
 class DispatchWebinarRegistrationMessagesAction
 {
@@ -33,7 +33,6 @@ class DispatchWebinarRegistrationMessagesAction
         $messageData = WebinarMessageData::fromRegistration($registration)->toArray();
 
         foreach ([MessageChannel::Email, MessageChannel::Sms] as $channel) {
-
             if (! $this->messageEligibilityGate->allows(
                 contact: $registration->contact,
                 channel: $channel,

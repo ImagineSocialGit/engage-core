@@ -2,12 +2,12 @@
 
 namespace Tests\Feature\Webinars;
 
+use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\DispatchMessageAction;
+use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Webinars\Actions\AddRegistrantToWebinarProviderAction;
 use App\Modules\Webinars\Actions\CreateWebinarRegistrationAction;
 use App\Modules\Webinars\Actions\DispatchWebinarRegistrationMessagesAction;
-use App\Modules\Core\Models\Contact;
-use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,7 +20,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_creates_registration_contact_consents_and_dispatches(): void
+    public function test_it_creates_registration_contact_email_consents_and_dispatches(): void
     {
         $webinar = Webinar::factory()->create([
             'external_id' => null,
@@ -46,7 +46,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
 
         $dispatchMessage
             ->shouldReceive('handle')
-            ->times(4)
+            ->once()
             ->andReturn([]);
 
         app()->instance(
@@ -89,9 +89,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
                 'phone' => '(555) 555-0123',
 
                 'transactional_email_consent' => true,
-                'transactional_sms_consent' => true,
                 'marketing_email_consent' => true,
-                'marketing_sms_consent' => true,
             ],
 
             request: $request,
@@ -134,7 +132,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
         ]);
 
         $this->assertSame(
-            4,
+            2,
             MessageConsent::query()
                 ->where('contact_id', $contact->id)
                 ->count()
@@ -149,23 +147,14 @@ class CreateWebinarRegistrationActionTest extends TestCase
 
         $this->assertDatabaseHas('message_consents', [
             'contact_id' => $contact->id,
-            'channel' => 'sms',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-        ]);
-
-        $this->assertDatabaseHas('message_consents', [
-            'contact_id' => $contact->id,
             'channel' => 'email',
             'purpose' => 'marketing',
-            'scope' => 'webinar',
+            'scope' => 'webinar_nurture',
         ]);
 
-        $this->assertDatabaseHas('message_consents', [
+        $this->assertDatabaseMissing('message_consents', [
             'contact_id' => $contact->id,
             'channel' => 'sms',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
         ]);
     }
 
@@ -204,8 +193,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
 
         $dispatchMessage
             ->shouldReceive('handle')
-            ->once()
-            ->andReturn([]);
+            ->never();
 
         app()->instance(
             DispatchMessageAction::class,

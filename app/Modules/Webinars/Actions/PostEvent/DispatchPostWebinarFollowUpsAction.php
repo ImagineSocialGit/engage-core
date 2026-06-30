@@ -25,6 +25,10 @@ class DispatchPostWebinarFollowUpsAction
         Webinar $webinar,
         string $event,
     ): bool {
+        if (! config('webinars.post_event.outcome_messages.enabled', true)) {
+            return true;
+        }
+
         $conditions = config('webinars.post_event.outcome_messages.conditions', []);
 
         if (
@@ -97,7 +101,6 @@ class DispatchPostWebinarFollowUpsAction
                     'webinar_slug' => $registration->webinar_slug,
                     'webinar_title' => $webinar->title,
                     'webinar_playback_url' => $webinar->playback_url,
-                    'playback_url' => $webinar->playback_url,
                     'registration_attended_at' => $registration->attended_at?->toIso8601String(),
                     'runtime_context' => [
                         'webinar' => $webinar->toArray(),
@@ -105,6 +108,8 @@ class DispatchPostWebinarFollowUpsAction
                     ],
                 ],
             );
+
+            unset($payload['playback_url']);
 
             $meta = [
                 'webinar_id' => $webinar->getKey(),

@@ -3,6 +3,9 @@
 namespace Tests\Feature\Webinars\PostEvent;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Actions\DispatchMessageAction;
+use App\Modules\Messaging\Enums\MessageChannel;
+use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Webinars\Actions\PostEvent\DispatchPostWebinarFollowUpsAction;
 use App\Modules\Webinars\Actions\PostEvent\RecordWebinarProviderAttendanceAction;
 use App\Modules\Webinars\Actions\PostEvent\ResolveWebinarPlaybackAction;
@@ -87,7 +90,6 @@ class ProcessPostWebinarEventJobTest extends TestCase
         $this->assertNull($missedRegistration->attended_at);
         $this->assertSame('missed', data_get($missedRegistration->meta, 'attendance.status'));
         $this->assertSame('zoom', data_get($missedRegistration->meta, 'attendance.provider'));
-
     }
 
     public function test_it_runs_configured_post_event_actions_in_order(): void
@@ -166,7 +168,94 @@ class ProcessPostWebinarEventJobTest extends TestCase
 
         $this->assertNull($missedRegistration->attended_at);
         $this->assertSame('missed', data_get($missedRegistration->meta, 'attendance.status'));
+    }
 
+    public function test_it_dispatches_transactional_follow_ups_with_canonical_playback_payload(): void
+    {
+        Queue::fake();
+
+        Config::set('webinars.post_event.events', [
+            'webinar.ended' => [
+                RecordWebinarProviderAttendanceAction::class,
+                ResolveWebinarPlaybackAction::class,
+                DispatchPostWebinarFollowUpsAction::class,
+            ],
+        ]);
+
+        Config::set('webinars.post_event.attendance.enabled', true);
+        Config::set('webinars.post_event.recordings.enabled', true);
+
+        Config::set('webinars.post_event.outcome_messages', [
+            'enabled' => true,
+            'dispatch_key' => 'webinar_ended',
+            'conditions' => [
+                [
+                    'field' => 'webinar.playback_url',
+                    'operator' => 'filled',
+                ],
+            ],
+        ]);
+
+        Carbon::setTestNow('2026-06-12 12:00:00');
+
+        [$webinar, , , $attendanceRecord] = $this->makeWebinarWithRegistrations();
+
+        $provider = $this->mock(WebinarProvider::class, function (MockInterface $mock) use ($webinar, $attendanceRecord): void {
+            $mock->shouldReceive('key')
+                ->zeroOrMoreTimes()
+                ->andReturn('zoom');
+
+            $mock->shouldReceive('listAttendanceRecords')
+                ->once()
+                ->withArgs(fn (Webinar $passedWebinar) => $passedWebinar->is($webinar))
+                ->andReturn(collect([$attendanceRecord]));
+
+            $mock->shouldReceive('getRecording')
+                ->once()
+                ->withArgs(fn (Webinar $passedWebinar) => $passedWebinar->is($webinar))
+                ->andReturn(new ProviderRecordingData(
+                    playbackUrl: 'https://zoom.example.test/rec/play/abc123',
+                    playbackPasscode: 'pass123',
+                    raw: ['recording_id' => 'recording-1'],
+                ));
+        });
+
+        $dispatches = [];
+
+        $this->mock(DispatchMessageAction::class, function (MockInterface $mock) use (&$dispatches): void {
+            $mock->shouldReceive('handle')
+                ->twice()
+                ->andReturnUsing(function (...$arguments) use (&$dispatches): array {
+                    $dispatches[] = $arguments;
+
+                    return [];
+                });
+        });
+
+        $this->mockProviderManager($provider);
+
+        app(ProcessWebinarProviderEventJob::class, [
+            'provider' => 'zoom',
+            'externalWebinarId' => '123456789',
+            'event' => 'webinar.ended',
+        ])->handle(
+            webinarProviderManager: app(WebinarProviderManager::class),
+        );
+
+        $this->assertCount(2, $dispatches);
+
+        foreach ($dispatches as $dispatch) {
+            $payload = $dispatch[5];
+
+            $this->assertSame(MessageChannel::Email, $dispatch[1]);
+            $this->assertSame(MessagePurpose::Transactional, $dispatch[2]);
+            $this->assertSame('webinar', $dispatch[3]);
+            $this->assertSame('webinar_ended', $dispatch[4]);
+
+            $this->assertArrayHasKey('webinar_playback_url', $payload);
+            $this->assertSame('https://zoom.example.test/rec/play/abc123', $payload['webinar_playback_url']);
+            $this->assertArrayNotHasKey('playback_url', $payload);
+        }
     }
 
     public function test_it_safely_no_ops_when_event_has_no_configured_actions(): void
@@ -200,7 +289,6 @@ class ProcessPostWebinarEventJobTest extends TestCase
         $this->assertNull(data_get($webinar->meta, 'normalized.post_event.attendance_recorded_at'));
         $this->assertNull(data_get($webinar->meta, 'normalized.post_event.playback_resolved_at'));
         $this->assertNull(data_get($webinar->meta, 'automation_events.webinar_ended_recorded_at'));
-
     }
 
     private function makeWebinarWithRegistrations(): array
