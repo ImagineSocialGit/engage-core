@@ -129,6 +129,19 @@ class ModuleDependencyBoundaryTest extends TestCase
         ]);
     }
 
+    public function test_messaging_dispatch_internals_are_not_imported_by_other_modules(): void
+    {
+        $this->assertAppDoesNotImportOutsideModule(
+            allowedModule: 'Messaging',
+            forbiddenImports: [
+                'App\\Modules\\Messaging\\Services\\MessageDispatchDefinitionNormalizer',
+                'App\\Modules\\Messaging\\Services\\MessageDispatchDefinitionMatcher',
+                'App\\Modules\\Messaging\\Services\\MessageSendTimeResolver',
+                'App\\Modules\\Messaging\\Services\\MessageDedupeKeyBuilder',
+            ],
+        );
+    }
+
     /**
      * @param  array<int, string>  $forbiddenModules
      */
@@ -155,6 +168,44 @@ class ModuleDependencyBoundaryTest extends TestCase
                 }
 
                 $violations[] = str_replace(base_path().'/', '', $file).' imports '.$needle;
+            }
+        }
+
+        $this->assertSame([], $violations);
+    }
+
+    /**
+     * @param  array<int, string>  $forbiddenImports
+     */
+    private function assertAppDoesNotImportOutsideModule(
+        string $allowedModule,
+        array $forbiddenImports,
+    ): void {
+        $basePath = app_path('Modules');
+
+        $this->assertDirectoryExists($basePath);
+
+        $allowedPathPrefix = app_path("Modules/{$allowedModule}").DIRECTORY_SEPARATOR;
+
+        $violations = [];
+
+        foreach ($this->phpFiles($basePath) as $file) {
+            if (str_starts_with($file, $allowedPathPrefix)) {
+                continue;
+            }
+
+            $contents = file_get_contents($file);
+
+            if ($contents === false) {
+                continue;
+            }
+
+            foreach ($forbiddenImports as $forbiddenImport) {
+                if (! Str::contains($contents, $forbiddenImport)) {
+                    continue;
+                }
+
+                $violations[] = str_replace(base_path().'/', '', $file).' imports private service '.$forbiddenImport;
             }
         }
 
