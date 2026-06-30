@@ -13,6 +13,7 @@ return new class extends Migration
             $table->id();
 
             $table->foreignIdFor(ContactStatus::class)
+                ->nullable()
                 ->constrained()
                 ->cascadeOnDelete();
 
@@ -32,6 +33,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['contact_status_id', 'version']);
+            $table->unique(['preset_key', 'version']);
+
             $table->index(['contact_status_id', 'is_active']);
             $table->index(['preset_key', 'source_version']);
         });

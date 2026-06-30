@@ -34,7 +34,10 @@ return [
 
         'webinar_attended_campaign_enrollment' => [
             'key' => 'webinar_attended_campaign_enrollment',
-            'contact_status_key' => 'attended_webinar',
+            'trigger' => [
+                'type' => 'automation_event',
+                'event_key' => 'webinar.attended',
+            ],
             'name' => 'Webinar Attended Follow-Up',
             'version' => 1,
             'is_active' => true,
@@ -57,16 +60,14 @@ return [
                         'payload' => [],
                         'meta' => [
                             'source' => 'flow_route',
-                            'reason' => 'webinar_attended_status',
+                            'reason' => 'webinar_attended_event',
                         ],
                         'start_context' => [
-                            'workflow' => [
-                                'contact_status_key' => 'attended_webinar',
-                            ],
+                            'source' => 'flow_route',
+                            'trigger_type' => 'automation_event',
+                            'event_key' => 'webinar.attended',
                         ],
-                        'exit_conditions' => [
-                            'stop_when_contact_leaves_workflow_status' => true,
-                        ],
+                        'exit_conditions' => [],
                     ],
                     'default_settings' => [],
                     'is_active' => true,
@@ -91,7 +92,10 @@ return [
 
         'webinar_missed_campaign_enrollment' => [
             'key' => 'webinar_missed_campaign_enrollment',
-            'contact_status_key' => 'missed_webinar',
+            'trigger' => [
+                'type' => 'automation_event',
+                'event_key' => 'webinar.missed',
+            ],
             'name' => 'Webinar Missed Follow-Up',
             'version' => 1,
             'is_active' => true,
@@ -114,16 +118,14 @@ return [
                         'payload' => [],
                         'meta' => [
                             'source' => 'flow_route',
-                            'reason' => 'webinar_missed_status',
+                            'reason' => 'webinar_missed_event',
                         ],
                         'start_context' => [
-                            'workflow' => [
-                                'contact_status_key' => 'missed_webinar',
-                            ],
+                            'source' => 'flow_route',
+                            'trigger_type' => 'automation_event',
+                            'event_key' => 'webinar.missed',
                         ],
-                        'exit_conditions' => [
-                            'stop_when_contact_leaves_workflow_status' => true,
-                        ],
+                        'exit_conditions' => [],
                     ],
                     'default_settings' => [],
                     'is_active' => true,

@@ -15,11 +15,12 @@ class FlowRoutePresetDefinition
     public function __construct(
         public readonly string $presetKey,
         public readonly string $key,
-        public readonly string $contactStatusKey,
+        public readonly ?string $contactStatusKey,
         public readonly string $name,
         public readonly int $version = 1,
         public readonly bool $isActive = true,
         public readonly ?string $sourceVersion = null,
+        public readonly array $trigger = [],
         public readonly array $points = [],
         public readonly array $flowRoutePoints = [],
         public readonly array $meta = [],
@@ -35,6 +36,13 @@ class FlowRoutePresetDefinition
 
         $points = [];
         $flowRoutePoints = [];
+
+        $contactStatusKey = self::string($data, 'contact_status_key');
+        $trigger = self::array($data, 'trigger');
+
+        if ($contactStatusKey === null && $trigger === []) {
+            throw new InvalidArgumentException('Preset FlowRoute must define either [contact_status_key] or [trigger].');
+        }
 
         foreach (self::arrayList($data, 'points') as $index => $pointData) {
             if (! is_array($pointData)) {
@@ -64,11 +72,12 @@ class FlowRoutePresetDefinition
         return new self(
             presetKey: $presetKey,
             key: self::requiredString($data, 'key'),
-            contactStatusKey: self::requiredString($data, 'contact_status_key'),
+            contactStatusKey: $contactStatusKey,
             name: self::requiredString($data, 'name'),
             version: self::int($data, 'version') ?? 1,
             isActive: (bool) ($data['is_active'] ?? true),
             sourceVersion: $sourceVersion,
+            trigger: $trigger,
             points: $points,
             flowRoutePoints: $flowRoutePoints,
             meta: self::array($data, 'meta'),

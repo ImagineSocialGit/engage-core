@@ -91,4 +91,11 @@ class FlowRoute extends Model
     {
         return $query->where('is_customized', false);
     }
+
+    public function scopeForAutomationEvent(Builder $query, string $eventKey): Builder
+    {
+        return $query
+            ->where('meta->preset->trigger->type', 'automation_event')
+            ->where('meta->preset->trigger->event_key', $eventKey);
+    }
 }

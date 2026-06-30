@@ -150,20 +150,29 @@ class SyncFlowRoutePresetsAction
         bool $force,
     ): void {
         DB::transaction(function () use ($definition, $result, $force) {
-            $contactStatus = ContactStatus::query()
-                ->where('key', $definition->contactStatusKey)
-                ->first();
+            $contactStatus = null;
 
-            if (! $contactStatus) {
-                $result->warn("FlowRoute preset [{$definition->key}] skipped because ContactStatus [{$definition->contactStatusKey}] does not exist.");
+            if ($definition->contactStatusKey !== null) {
+                $contactStatus = ContactStatus::query()
+                    ->where('key', $definition->contactStatusKey)
+                    ->first();
 
-                return;
+                if (! $contactStatus) {
+                    $result->warn("FlowRoute preset [{$definition->key}] skipped because ContactStatus [{$definition->contactStatusKey}] does not exist.");
+
+                    return;
+                }
+
+                $flowRoute = FlowRoute::query()->firstOrNew([
+                    'contact_status_id' => $contactStatus->getKey(),
+                    'version' => $definition->version,
+                ]);
+            } else {
+                $flowRoute = FlowRoute::query()->firstOrNew([
+                    'preset_key' => $definition->presetKey.'.'.$definition->key,
+                    'version' => $definition->version,
+                ]);
             }
-
-            $flowRoute = FlowRoute::query()->firstOrNew([
-                'contact_status_id' => $contactStatus->getKey(),
-                'version' => $definition->version,
-            ]);
 
             $flowRouteWasRecentlyCreated = ! $flowRoute->exists;
 
@@ -171,7 +180,7 @@ class SyncFlowRoutePresetsAction
                 $result->recordSkipped('flow_routes');
             } else {
                 $flowRoute->forceFill([
-                    'contact_status_id' => $contactStatus->getKey(),
+                    'contact_status_id' => $contactStatus?->getKey(),
                     'name' => $definition->name,
                     'version' => $definition->version,
                     'is_active' => $definition->isActive,
@@ -184,6 +193,7 @@ class SyncFlowRoutePresetsAction
                             'client_preset_key' => $definition->presetKey,
                             'flow_route_key' => $definition->key,
                             'contact_status_key' => $definition->contactStatusKey,
+                            'trigger' => $definition->trigger,
                         ],
                         'definition' => $definition->meta,
                     ]),

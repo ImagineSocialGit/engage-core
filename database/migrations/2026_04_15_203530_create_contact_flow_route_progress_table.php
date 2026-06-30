@@ -15,11 +15,12 @@ return new class extends Migration
             $table->id();
 
             $table->unsignedBigInteger('contact_id')->index('cfrp_contact_id_idx');
-            $table->unsignedBigInteger('contact_status_id')->index('cfrp_status_id_idx');
+            $table->unsignedBigInteger('contact_status_id')->nullable()->index('cfrp_status_id_idx');
 
             $table->foreignIdFor(ContactWorkflowProfile::class)
+                ->nullable()
                 ->constrained()
-                ->cascadeOnDelete();
+                ->nullOnDelete();
 
             $table->foreignIdFor(FlowRoute::class)
                 ->constrained()
