@@ -200,6 +200,94 @@ class BroadcastControllerTest extends TestCase
         $this->assertNotNull($broadcast->send_at);
     }
 
+    public function test_it_creates_a_draft_broadcast_for_selected_contacts(): void
+    {
+        $user = User::factory()->create();
+
+        $included = Contact::factory()->create();
+        $other = Contact::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->post(route('crm.broadcasts.store'), [
+                'intent' => 'draft',
+                'name' => 'Selected contacts update',
+                'subject' => 'Selected contacts',
+                'body' => 'This goes to selected contacts.',
+                'recipient_filter_type' => 'contact_ids',
+                'contact_ids' => [$included->id],
+            ]);
+
+        $broadcast = Broadcast::query()->first();
+
+        $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
+
+        $this->assertSame('contact_ids', $broadcast->recipient_filter['type']);
+        $this->assertSame([$included->id], $broadcast->recipient_filter['contact_ids']);
+        $this->assertNotContains($other->id, $broadcast->recipient_filter['contact_ids']);
+    }
+
+    public function test_it_updates_a_draft_broadcast_to_selected_contacts(): void
+    {
+        $user = User::factory()->create();
+
+        $included = Contact::factory()->create();
+        $other = Contact::factory()->create();
+
+        $broadcast = Broadcast::factory()->create([
+            'status' => Broadcast::STATUS_DRAFT,
+            'recipient_filter' => [
+                'type' => 'all',
+            ],
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->patch(route('crm.broadcasts.update', $broadcast), [
+                'name' => 'Updated selected contacts',
+                'subject' => 'Updated selected contacts',
+                'body' => 'This now goes to selected contacts.',
+                'recipient_filter_type' => 'contact_ids',
+                'contact_ids' => [$included->id],
+            ]);
+
+        $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
+
+        $broadcast->refresh();
+
+        $this->assertSame('contact_ids', $broadcast->recipient_filter['type']);
+        $this->assertSame([$included->id], $broadcast->recipient_filter['contact_ids']);
+        $this->assertNotContains($other->id, $broadcast->recipient_filter['contact_ids']);
+    }
+
+    public function test_it_shows_selected_contact_recipient_filter_details(): void
+    {
+        $user = User::factory()->create();
+
+        $contact = Contact::factory()->create([
+            'name' => 'Jane Lead',
+            'email' => 'jane@example.test',
+        ]);
+
+        $broadcast = Broadcast::factory()->create([
+            'status' => Broadcast::STATUS_DRAFT,
+            'name' => 'Selected contacts update',
+            'recipient_filter' => [
+                'type' => 'contact_ids',
+                'contact_ids' => [$contact->id],
+            ],
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.broadcasts.show', $broadcast));
+
+        $response->assertOk();
+        $response->assertSee('Selected contacts');
+        $response->assertSee('Jane Lead');
+        $response->assertSee('jane@example.test');
+    }
+
     public function test_it_does_not_show_the_edit_form_for_a_non_draft_broadcast(): void
     {
         $user = User::factory()->create();

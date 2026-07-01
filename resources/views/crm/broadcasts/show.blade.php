@@ -111,7 +111,7 @@
                         </h2>
 
                         <p class="mt-1 text-sm text-slate-500">
-                            Showing up to 250 recipients.
+                            Showing up to 250 recipients after scheduling.
                         </p>
                     </div>
 
@@ -236,7 +236,35 @@
                                 {{ implode(', ', $recipientFilter['tags'] ?? []) }}
                             </span>
                         @elseif(($recipientFilter['type'] ?? 'all') === 'contact_ids')
-                            Selected contacts.
+                            <div class="space-y-3">
+                                <p>
+                                    Selected contacts:
+                                    <span class="font-semibold">
+                                        {{ count($recipientFilter['contact_ids'] ?? []) }}
+                                    </span>
+                                </p>
+
+                                <div class="space-y-2">
+                                    @forelse($recipientFilterContacts as $contact)
+                                        <div class="rounded-xl border border-slate-200 p-3">
+                                            <a
+                                                href="{{ route('crm.contacts.show', $contact) }}"
+                                                class="font-medium text-slate-900 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900"
+                                            >
+                                                {{ $contact->name ?: trim($contact->first_name.' '.$contact->last_name) ?: $contact->email }}
+                                            </a>
+
+                                            <div class="mt-1 text-xs text-slate-500">
+                                                {{ $contact->email }}
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <p class="text-sm text-slate-500">
+                                            No selected contacts found.
+                                        </p>
+                                    @endforelse
+                                </div>
+                            </div>
                         @else
                             All contacts.
                         @endif

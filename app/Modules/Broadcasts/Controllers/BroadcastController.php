@@ -9,6 +9,8 @@ use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Broadcasts\Requests\StoreBroadcastRequest;
 use App\Modules\Broadcasts\Requests\UpdateBroadcastRequest;
+use App\Modules\Core\Models\Contact;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -26,6 +28,7 @@ class BroadcastController extends Controller
             'title' => 'Broadcasts',
             'heading' => 'Broadcasts',
             'broadcasts' => $broadcasts,
+            'contactOptions' => $this->contactOptions(),
         ]);
     }
 
@@ -74,6 +77,7 @@ class BroadcastController extends Controller
             'heading' => $broadcast->name,
             'broadcast' => $broadcast,
             'recipients' => $recipients,
+            'recipientFilterContacts' => $this->recipientFilterContacts($broadcast),
             'scheduledMessages' => $scheduledMessages,
         ]);
     }
@@ -90,6 +94,7 @@ class BroadcastController extends Controller
             'title' => 'Edit Broadcast',
             'heading' => 'Edit Broadcast',
             'broadcast' => $broadcast,
+            'contactOptions' => $this->contactOptions(),
         ]);
     }
 
@@ -154,5 +159,48 @@ class BroadcastController extends Controller
         return redirect()
             ->route('crm.broadcasts.show', $broadcast)
             ->with('success', 'Broadcast cancelled.');
+    }
+
+    /**
+     * @return Collection<int, Contact>
+     */
+    private function contactOptions(): Collection
+    {
+        return Contact::query()
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->orderBy('email')
+            ->limit(200)
+            ->get(['id', 'first_name', 'last_name', 'name', 'email']);
+    }
+
+    /**
+     * @return Collection<int, Contact>
+     */
+    private function recipientFilterContacts(Broadcast $broadcast): Collection
+    {
+        $recipientFilter = $broadcast->recipient_filter ?? [];
+
+        if (($recipientFilter['type'] ?? null) !== 'contact_ids') {
+            return new Collection();
+        }
+
+        $contactIds = collect($recipientFilter['contact_ids'] ?? [])
+            ->filter(fn (mixed $value): bool => is_numeric($value))
+            ->map(fn (mixed $value): int => (int) $value)
+            ->filter(fn (int $value): bool => $value > 0)
+            ->unique()
+            ->values();
+
+        if ($contactIds->isEmpty()) {
+            return new Collection();
+        }
+
+        return Contact::query()
+            ->whereIn('id', $contactIds->all())
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->orderBy('email')
+            ->get(['id', 'first_name', 'last_name', 'name', 'email']);
     }
 }

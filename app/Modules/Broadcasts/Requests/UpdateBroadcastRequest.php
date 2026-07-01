@@ -22,7 +22,7 @@ class UpdateBroadcastRequest extends FormRequest
 
             'recipient_filter_type' => ['required', 'string', Rule::in(['all', 'tag', 'contact_ids'])],
             'recipient_tag' => ['nullable', 'string', 'max:100', 'required_if:recipient_filter_type,tag'],
-            'contact_ids' => ['nullable', 'array'],
+            'contact_ids' => ['nullable', 'array', 'required_if:recipient_filter_type,contact_ids'],
             'contact_ids.*' => ['integer', Rule::exists('contacts', 'id')],
         ];
     }
@@ -63,7 +63,10 @@ class UpdateBroadcastRequest extends FormRequest
         if ($type === 'contact_ids') {
             return [
                 'type' => 'contact_ids',
-                'contact_ids' => array_values($validated['contact_ids'] ?? []),
+                'contact_ids' => array_values(array_unique(array_map(
+                    fn (mixed $contactId): int => (int) $contactId,
+                    $validated['contact_ids'] ?? [],
+                ))),
             ];
         }
 
