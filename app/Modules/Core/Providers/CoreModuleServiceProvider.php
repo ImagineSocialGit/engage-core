@@ -86,6 +86,14 @@ class CoreModuleServiceProvider extends ServiceProvider
                     contactAttribute: 'last_activity_at',
                     sort: 90,
                 ),
+
+                ContactImportField::make(
+                    key: 'import_status',
+                    label: 'Original Import Status',
+                    section: 'Import Metadata',
+                    description: 'Original status value from the imported system. Stored for audit/debugging only.',
+                    sort: 1000,
+                ),
             ]);
         });
     }

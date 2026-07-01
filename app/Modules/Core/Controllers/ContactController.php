@@ -252,16 +252,49 @@ class ContactController extends Controller
                 continue;
             }
 
-            if (array_key_exists('phone', $contactData) && $contactData['phone'] === null) {
+            if (array_key_exists('phone', $mapping)
+                && $contactImportRegistry->mappedValue(row: $data, mapping: $mapping, field: 'phone') === null
+            ) {
                 $phoneWarnings++;
             }
 
-            $wasExisting = Contact::query()
+            $existingContact = Contact::query()
                 ->where('email', $email)
-                ->exists();
+                ->first(['id', 'meta']);
+
+            $wasExisting = $existingContact !== null;
+
+            $existingImportedAt = is_array($existingContact?->meta)
+                ? data_get($existingContact->meta, 'imported_at')
+                : null;
+                
+            $importedAt = now();
+
+            $originalSource = $contactData['source'] ?? null;
+            $originalSubsource = $contactData['subsource'] ?? null;
+            $originalStatus = $contactImportRegistry->mappedValue(
+                row: $data,
+                mapping: $mapping,
+                field: 'import_status',
+            );
 
             $contact = $createOrUpdateContact->handle(
-                data: $contactData,
+                data: [
+                    ...$contactData,
+                    'source' => 'import',
+                    'meta' => array_replace_recursive(
+                        $contactData['meta'] ?? [],
+                        [
+                            'imported' => true,
+                            'imported_at' => $existingImportedAt ?? $importedAt->toISOString(),
+                            'import' => [
+                                'original_source' => $originalSource,
+                                'original_subsource' => $originalSubsource,
+                                'original_status' => $originalStatus,
+                            ],
+                        ],
+                    ),
+                ],
                 statusKey: null,
                 statusChangeReason: 'crm_import',
             );
