@@ -6,8 +6,10 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ConsentRevocation;
+use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\MessageSuppression;
+use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use App\Modules\Messaging\Services\MessageEligibilityGate;
 use App\Modules\Messaging\Services\MessageSuppressionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -50,7 +52,7 @@ class MessageEligibilityGateTest extends TestCase
         );
     }
 
-    public function test_imported_email_permission_pass_allows_marketing_email_without_consent(): void
+    public function test_imported_contact_permission_invitation_allows_email_without_existing_consent(): void
     {
         $contact = Contact::factory()->create([
             'email' => 'imported@example.com',
@@ -61,18 +63,43 @@ class MessageEligibilityGateTest extends TestCase
             app(MessageEligibilityGate::class)->allows(
                 contact: $contact,
                 channel: MessageChannel::Email,
-                purpose: MessagePurpose::Marketing,
-                scope: 'broadcast',
+                purpose: MessagePurpose::Transactional,
+                scope: 'permission_invitation',
+                messageKey: ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
                 context: [
                     'consent_policy' => [
-                        'imported_contact_permission_pass' => true,
+                        'permission_invitation' => [
+                            'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+                            'one_time' => true,
+                        ],
                     ],
                 ],
             )
         );
     }
 
-    public function test_imported_email_permission_pass_does_not_apply_to_sms(): void
+    public function test_imported_contact_permission_invitation_does_not_allow_regular_marketing_broadcast_without_consent(): void
+    {
+        $contact = Contact::factory()->create([
+            'email' => 'imported@example.com',
+            'source' => 'import',
+        ]);
+
+        $this->assertFalse(
+            app(MessageEligibilityGate::class)->allows(
+                contact: $contact,
+                channel: MessageChannel::Email,
+                purpose: MessagePurpose::Marketing,
+                scope: 'broadcast',
+                messageKey: 'broadcast',
+                context: [
+                    'consent_policy' => [],
+                ],
+            )
+        );
+    }
+
+    public function test_imported_contact_permission_invitation_does_not_apply_to_sms(): void
     {
         $contact = Contact::factory()->create([
             'phone' => '+15555550123',
@@ -83,18 +110,22 @@ class MessageEligibilityGateTest extends TestCase
             app(MessageEligibilityGate::class)->allows(
                 contact: $contact,
                 channel: MessageChannel::Sms,
-                purpose: MessagePurpose::Marketing,
-                scope: 'broadcast',
+                purpose: MessagePurpose::Transactional,
+                scope: 'permission_invitation',
+                messageKey: ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
                 context: [
                     'consent_policy' => [
-                        'imported_contact_permission_pass' => true,
+                        'permission_invitation' => [
+                            'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+                            'one_time' => true,
+                        ],
                     ],
                 ],
             )
         );
     }
 
-    public function test_imported_email_permission_pass_does_not_apply_to_non_imported_contacts(): void
+    public function test_imported_contact_permission_invitation_does_not_apply_to_non_imported_contacts(): void
     {
         $contact = Contact::factory()->create([
             'email' => 'organic@example.com',
@@ -105,18 +136,57 @@ class MessageEligibilityGateTest extends TestCase
             app(MessageEligibilityGate::class)->allows(
                 contact: $contact,
                 channel: MessageChannel::Email,
-                purpose: MessagePurpose::Marketing,
-                scope: 'broadcast',
+                purpose: MessagePurpose::Transactional,
+                scope: 'permission_invitation',
+                messageKey: ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
                 context: [
                     'consent_policy' => [
-                        'imported_contact_permission_pass' => true,
+                        'permission_invitation' => [
+                            'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+                            'one_time' => true,
+                        ],
                     ],
                 ],
             )
         );
     }
 
-    public function test_imported_email_permission_pass_does_not_override_revocation(): void
+    public function test_imported_contact_permission_invitation_does_not_override_existing_invitation(): void
+    {
+        $contact = Contact::factory()->create([
+            'email' => 'already-invited@example.com',
+            'source' => 'import',
+        ]);
+
+        ContactPermissionInvitation::query()->create([
+            'contact_id' => $contact->id,
+            'channel' => ContactPermissionInvitation::CHANNEL_EMAIL,
+            'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+            'status' => ContactPermissionInvitation::STATUS_SENT,
+            'claimed_at' => now()->subMinutes(5),
+            'sent_at' => now()->subMinutes(4),
+        ]);
+
+        $this->assertFalse(
+            app(MessageEligibilityGate::class)->allows(
+                contact: $contact,
+                channel: MessageChannel::Email,
+                purpose: MessagePurpose::Transactional,
+                scope: 'permission_invitation',
+                messageKey: ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+                context: [
+                    'consent_policy' => [
+                        'permission_invitation' => [
+                            'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+                            'one_time' => true,
+                        ],
+                    ],
+                ],
+            )
+        );
+    }
+
+    public function test_imported_contact_permission_invitation_does_not_override_revocation(): void
     {
         $contact = Contact::factory()->create([
             'email' => 'revoked@example.com',
@@ -136,11 +206,15 @@ class MessageEligibilityGateTest extends TestCase
             app(MessageEligibilityGate::class)->allows(
                 contact: $contact,
                 channel: MessageChannel::Email,
-                purpose: MessagePurpose::Marketing,
-                scope: 'broadcast',
+                purpose: MessagePurpose::Transactional,
+                scope: 'permission_invitation',
+                messageKey: ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
                 context: [
                     'consent_policy' => [
-                        'imported_contact_permission_pass' => true,
+                        'permission_invitation' => [
+                            'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+                            'one_time' => true,
+                        ],
                     ],
                 ],
             )

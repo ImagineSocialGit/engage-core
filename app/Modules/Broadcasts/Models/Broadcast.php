@@ -3,6 +3,7 @@
 namespace App\Modules\Broadcasts\Models;
 
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use Database\Factories\BroadcastFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -24,8 +25,16 @@ class Broadcast extends Model
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_CANCELLED = 'cancelled';
 
+    public const BROADCAST_TYPE_REGULAR = 'regular';
+    public const BROADCAST_TYPE_PERMISSION_INVITATION = 'permission_invitation';
+
     public const DEFAULT_DISPATCH_KEY = 'broadcast_send';
     public const DEFAULT_MESSAGE_TYPE = 'broadcast';
+
+    public const PERMISSION_INVITATION_DISPATCH_KEY = 'imported_contact_permission_invitation';
+
+    public const MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION =
+        ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION;
 
     protected $fillable = [
         'user_id',
@@ -71,5 +80,10 @@ class Broadcast extends Model
     public function scheduledMessages(): MorphMany
     {
         return $this->morphMany(ScheduledMessage::class, 'context');
+    }
+
+    public function isPermissionInvitation(): bool
+    {
+        return $this->message_type === self::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION;
     }
 }

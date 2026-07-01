@@ -50,12 +50,16 @@ class BroadcastController extends Controller
 
             return redirect()
                 ->route('crm.broadcasts.show', $broadcast)
-                ->with('success', 'Broadcast scheduled. Immediate sends use a 5-minute safety buffer.');
+                ->with('success', $broadcast->isPermissionInvitation()
+                    ? 'Opt-in invitation scheduled. Each imported contact can only receive this invitation once.'
+                    : 'Broadcast scheduled. Immediate sends use a 5-minute safety buffer.');
         }
 
         return redirect()
             ->route('crm.broadcasts.show', $broadcast)
-            ->with('success', 'Broadcast draft saved.');
+            ->with('success', $broadcast->isPermissionInvitation()
+                ? 'Opt-in invitation draft saved.'
+                : 'Broadcast draft saved.');
     }
 
     public function show(Broadcast $broadcast): View
@@ -98,8 +102,8 @@ class BroadcastController extends Controller
         }
 
         return view('crm.broadcasts.edit', [
-            'title' => 'Edit Broadcast',
-            'heading' => 'Edit Broadcast',
+            'title' => $broadcast->isPermissionInvitation() ? 'Edit Opt-In Invitation' : 'Edit Broadcast',
+            'heading' => $broadcast->isPermissionInvitation() ? 'Edit Opt-In Invitation' : 'Edit Broadcast',
             'broadcast' => $broadcast,
             'selectedRecipientContacts' => $this->selectedContactOptions(
                 session()->getOldInput('contact_ids', $broadcast->recipient_filter['contact_ids'] ?? []),
@@ -121,7 +125,9 @@ class BroadcastController extends Controller
 
         return redirect()
             ->route('crm.broadcasts.show', $broadcast)
-            ->with('success', 'Broadcast draft updated.');
+            ->with('success', $broadcast->isPermissionInvitation()
+                ? 'Opt-in invitation draft updated.'
+                : 'Broadcast draft updated.');
     }
 
     public function schedule(
@@ -147,7 +153,9 @@ class BroadcastController extends Controller
 
         return redirect()
             ->route('crm.broadcasts.show', $broadcast)
-            ->with('success', 'Broadcast scheduled. Immediate sends use a 5-minute safety buffer.');
+            ->with('success', $broadcast->isPermissionInvitation()
+                ? 'Opt-in invitation scheduled. Each imported contact can only receive this invitation once.'
+                : 'Broadcast scheduled. Immediate sends use a 5-minute safety buffer.');
     }
 
     public function cancel(
@@ -167,7 +175,9 @@ class BroadcastController extends Controller
 
         return redirect()
             ->route('crm.broadcasts.show', $broadcast)
-            ->with('success', 'Broadcast cancelled.');
+            ->with('success', $broadcast->isPermissionInvitation()
+                ? 'Opt-in invitation cancelled.'
+                : 'Broadcast cancelled.');
     }
 
     /**

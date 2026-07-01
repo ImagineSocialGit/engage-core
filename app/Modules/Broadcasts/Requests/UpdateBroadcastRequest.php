@@ -2,6 +2,7 @@
 
 namespace App\Modules\Broadcasts\Requests;
 
+use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Core\Requests\Concerns\NormalizesContactFilter;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -34,6 +35,7 @@ class UpdateBroadcastRequest extends FormRequest
     public function broadcastAttributes(): array
     {
         $validated = $this->validated();
+        $broadcast = $this->route('broadcast');
 
         return [
             'name' => $validated['name'],
@@ -42,12 +44,14 @@ class UpdateBroadcastRequest extends FormRequest
                 'subject' => $validated['subject'],
                 'body' => $validated['body'],
             ],
-            'recipient_filter' => $this->contactFilterAttributes(
-                validated: $validated,
-                typeField: 'recipient_filter_type',
-                tagField: 'recipient_tag',
-                idsField: 'contact_ids',
-            ),
+            'recipient_filter' => $broadcast instanceof Broadcast && $broadcast->isPermissionInvitation()
+                ? ['type' => 'imported']
+                : $this->contactFilterAttributes(
+                    validated: $validated,
+                    typeField: 'recipient_filter_type',
+                    tagField: 'recipient_tag',
+                    idsField: 'contact_ids',
+                ),
         ];
     }
 }

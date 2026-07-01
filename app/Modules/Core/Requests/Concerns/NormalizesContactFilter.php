@@ -15,7 +15,7 @@ trait NormalizesContactFilter
         string $idsField = 'contact_ids',
     ): array {
         return [
-            $typeField => ['required', 'string', Rule::in(['all', 'tag', 'contact_ids'])],
+            $typeField => ['required', 'string', Rule::in(['all', 'tag', 'contact_ids', 'imported'])],
             $tagField => ['nullable', 'string', 'max:100', 'required_if:'.$typeField.',tag'],
             $idsField => ['nullable', 'array', 'required_if:'.$typeField.',contact_ids'],
             $idsField.'.*' => ['integer', Rule::exists('contacts', 'id')],
@@ -45,6 +45,9 @@ trait NormalizesContactFilter
                 'type' => 'contact_ids',
                 'contact_ids' => $this->normalizedContactFilterIds($validated[$idsField] ?? []),
             ],
+            'imported' => [
+                'type' => 'imported',
+            ],
             default => [
                 'type' => 'all',
             ],
@@ -54,7 +57,7 @@ trait NormalizesContactFilter
     private function normalizedContactFilterType(mixed $value): string
     {
         return is_string($value) && trim($value) !== ''
-            ? strtolower(trim($value))
+            ? str_replace('-', '_', strtolower(trim($value)))
             : 'all';
     }
 

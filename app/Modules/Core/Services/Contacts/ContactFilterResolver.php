@@ -26,6 +26,7 @@ class ContactFilterResolver
         return match ($type) {
             'all' => $this->allContactsQuery(),
             'contact_ids' => $this->contactIdsQuery($filter),
+            'imported' => $this->importedContactsQuery(),
             'tag' => $this->tagsQuery($filter),
             default => $this->emptyContactsQuery(),
         };
@@ -54,6 +55,21 @@ class ContactFilterResolver
 
         return Contact::query()
             ->whereIn('id', $contactIds)
+            ->orderBy('id');
+    }
+
+    /**
+     * @return Builder<Contact>
+     */
+    private function importedContactsQuery(): Builder
+    {
+        return Contact::query()
+            ->where(function (Builder $query): void {
+                $query
+                    ->where('source', 'import')
+                    ->orWhere('meta->imported', true)
+                    ->orWhereNotNull('meta->imported_at');
+            })
             ->orderBy('id');
     }
 
@@ -89,7 +105,7 @@ class ContactFilterResolver
     private function filterType(mixed $value): string
     {
         return is_string($value) && trim($value) !== ''
-            ? strtolower(trim($value))
+            ? str_replace('-', '_', strtolower(trim($value)))
             : 'all';
     }
 

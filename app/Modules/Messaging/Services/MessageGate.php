@@ -12,6 +12,7 @@ class MessageGate
 {
     public function __construct(
         private readonly MessageSuppressionService $messageSuppressionService,
+        private readonly ContactPermissionInvitationService $permissionInvitationService,
     ) {}
 
     /**
@@ -29,6 +30,7 @@ class MessageGate
         $channel = $this->normalizeChannel($channel);
         $purpose = $this->normalizePurpose($purpose);
         $scope = trim($scope);
+        $messageKey = $this->normalizeNullableSegment($messageKey);
         $context ??= [];
 
         if ($scope === '') {
@@ -47,7 +49,7 @@ class MessageGate
 
         if (
             ! $this->hasActiveConsent($contact, $channel, $purpose, $scope)
-            && ! $this->allowsImportedContactPermissionPass($contact, $channel, $purpose, $scope, $context)
+            && ! $this->allowsImportedContactInvitationPass($contact, $channel, $messageKey, $context)
         ) {
             return false;
         }
@@ -117,51 +119,29 @@ class MessageGate
     /**
      * @param array<string, mixed> $context
      */
-    private function allowsImportedContactPermissionPass(
+    private function allowsImportedContactInvitationPass(
         Contact $contact,
         string $channel,
-        string $purpose,
-        string $scope,
+        ?string $messageKey,
         array $context,
     ): bool {
-        if (! (bool) ($context['consent_policy']['imported_contact_permission_pass'] ?? false)) {
+        if (! $messageKey) {
             return false;
         }
 
-        if ($channel !== MessageChannel::Email->value) {
-            return false;
-        }
-
-        if ($purpose !== MessagePurpose::Marketing->value) {
-            return false;
-        }
-
-        if (! $this->isImportedContact($contact)) {
+        if (! $this->permissionInvitationService->allowsImportedContactInvitationPass(
+            contact: $contact,
+            channel: $channel,
+            messageType: $messageKey,
+            context: $context,
+        )) {
             return false;
         }
 
         return ! ConsentRevocation::query()
             ->where('contact_id', $contact->getKey())
             ->where('channel', $channel)
-            ->where('purpose', $purpose)
-            ->where('scope', $scope)
             ->exists();
-    }
-
-    private function isImportedContact(Contact $contact): bool
-    {
-        $source = is_string($contact->source)
-            ? str_replace('-', '_', strtolower(trim($contact->source)))
-            : null;
-
-        if ($source === 'import') {
-            return true;
-        }
-
-        $meta = is_array($contact->meta) ? $contact->meta : [];
-
-        return (bool) ($meta['imported'] ?? false)
-            || array_key_exists('imported_at', $meta);
     }
 
     private function destinationFor(Contact $contact, string $channel): ?string
@@ -185,5 +165,14 @@ class MessageGate
         return $purpose instanceof MessagePurpose
             ? $purpose->value
             : strtolower(trim($purpose));
+    }
+
+    private function normalizeNullableSegment(?string $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return str_replace('-', '_', strtolower(trim($value)));
     }
 }

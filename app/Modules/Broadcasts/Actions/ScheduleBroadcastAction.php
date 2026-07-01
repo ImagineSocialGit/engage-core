@@ -6,6 +6,7 @@ use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Broadcasts\Services\BroadcastRecipientResolver;
 use App\Modules\Messaging\Actions\DispatchMessageAction;
+use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -144,13 +145,19 @@ class ScheduleBroadcastAction
      */
     private function consentPolicy(Broadcast $broadcast): array
     {
-        if ($broadcast->channel !== 'email') {
+        if ($broadcast->message_type !== Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION) {
+            return [];
+        }
+
+        if ($broadcast->channel !== ContactPermissionInvitation::CHANNEL_EMAIL) {
             return [];
         }
 
         return [
-            'imported_contact_permission_pass' => true,
-            'source' => 'broadcast',
+            'permission_invitation' => [
+                'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+                'one_time' => true,
+            ],
         ];
     }
 

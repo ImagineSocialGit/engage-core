@@ -48,6 +48,7 @@ class BroadcastControllerTest extends TestCase
         $response = $this
             ->actingAs($user)
             ->post(route('crm.broadcasts.store'), [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_REGULAR,
                 'intent' => 'draft',
                 'name' => 'Weekly update',
                 'subject' => 'This week',
@@ -57,14 +58,50 @@ class BroadcastControllerTest extends TestCase
 
         $broadcast = Broadcast::query()->first();
 
+        $this->assertNotNull($broadcast);
+
         $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
 
         $this->assertSame($user->id, $broadcast->user_id);
         $this->assertSame(Broadcast::STATUS_DRAFT, $broadcast->status);
+        $this->assertSame(Broadcast::BROADCAST_TYPE_REGULAR, $broadcast->meta['broadcast_type']);
+        $this->assertSame(Broadcast::DEFAULT_MESSAGE_TYPE, $broadcast->message_type);
         $this->assertSame('Weekly update', $broadcast->name);
         $this->assertSame('This week', $broadcast->payload['subject']);
         $this->assertSame('Here is the update.', $broadcast->payload['body']);
         $this->assertSame(['type' => 'all'], $broadcast->recipient_filter);
+    }
+
+    public function test_it_creates_a_draft_opt_in_invitation(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->post(route('crm.broadcasts.store'), [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
+                'intent' => 'draft',
+                'name' => 'Imported opt-in invitation',
+                'subject' => 'Confirm how you want to hear from us',
+                'body' => 'Please confirm your communication preferences.',
+                'recipient_filter_type' => 'imported',
+            ]);
+
+        $broadcast = Broadcast::query()->first();
+
+        $this->assertNotNull($broadcast);
+
+        $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
+
+        $this->assertSame($user->id, $broadcast->user_id);
+        $this->assertSame(Broadcast::STATUS_DRAFT, $broadcast->status);
+        $this->assertSame(Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION, $broadcast->meta['broadcast_type']);
+        $this->assertSame(Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION, $broadcast->message_type);
+        $this->assertSame(Broadcast::PERMISSION_INVITATION_DISPATCH_KEY, $broadcast->dispatch_key);
+        $this->assertSame('email', $broadcast->channel);
+        $this->assertSame('transactional', $broadcast->purpose);
+        $this->assertSame('permission_invitation', $broadcast->scope);
+        $this->assertSame(['type' => 'imported'], $broadcast->recipient_filter);
     }
 
     public function test_it_schedules_a_broadcast_from_create_request(): void
@@ -87,6 +124,7 @@ class BroadcastControllerTest extends TestCase
         $response = $this
             ->actingAs($user)
             ->post(route('crm.broadcasts.store'), [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_REGULAR,
                 'intent' => 'schedule',
                 'name' => 'Weekly update',
                 'subject' => 'This week',
@@ -96,6 +134,8 @@ class BroadcastControllerTest extends TestCase
             ]);
 
         $broadcast = Broadcast::query()->first();
+
+        $this->assertNotNull($broadcast);
 
         $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
 
@@ -210,6 +250,7 @@ class BroadcastControllerTest extends TestCase
         $response = $this
             ->actingAs($user)
             ->post(route('crm.broadcasts.store'), [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_REGULAR,
                 'intent' => 'draft',
                 'name' => 'Selected contacts update',
                 'subject' => 'Selected contacts',
@@ -219,6 +260,8 @@ class BroadcastControllerTest extends TestCase
             ]);
 
         $broadcast = Broadcast::query()->first();
+
+        $this->assertNotNull($broadcast);
 
         $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
 

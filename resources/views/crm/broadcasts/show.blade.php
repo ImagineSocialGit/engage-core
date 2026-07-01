@@ -1,7 +1,7 @@
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
-    subheading="Broadcast details"
+    :subheading="$broadcast->isPermissionInvitation() ? 'Opt-in invitation details' : 'Broadcast details'"
 >
     <div class="space-y-6">
         @if (session('success'))
@@ -74,31 +74,47 @@
                             </h2>
 
                             <p class="mt-1 text-sm text-slate-500">
-                                Regular broadcast email payload.
+                                @if($broadcast->isPermissionInvitation())
+                                    Email-only imported-contact opt-in invitation.
+                                @else
+                                    Regular broadcast email payload.
+                                @endif
                             </p>
                         </div>
 
-                        <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                            {{ str_replace('_', ' ', $broadcast->status) }}
-                        </span>
+                        @if($broadcast->isPermissionInvitation())
+                            <span class="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
+                                Opt-in invitation
+                            </span>
+                        @else
+                            <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                                Broadcast
+                            </span>
+                        @endif
                     </div>
 
+                    @if($broadcast->isPermissionInvitation())
+                        <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                            This message can only use the one-time imported-contact invitation policy. Each imported contact can receive this invitation once.
+                        </div>
+                    @endif
+
                     <div>
-                        <p class="text-sm text-slate-500">
+                        <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
                             Subject
-                        </p>
+                        </div>
 
-                        <p class="mt-1 font-medium text-slate-900">
+                        <div class="mt-1 text-sm font-medium text-slate-900">
                             {{ $broadcast->payload['subject'] ?? 'No subject' }}
-                        </p>
+                        </div>
                     </div>
 
                     <div>
-                        <p class="text-sm text-slate-500">
+                        <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
                             Body
-                        </p>
+                        </div>
 
-                        <div class="mt-1 whitespace-pre-line rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                        <div class="mt-2 whitespace-pre-line rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                             {{ $broadcast->payload['body'] ?? '' }}
                         </div>
                     </div>
@@ -111,7 +127,7 @@
                         </h2>
 
                         <p class="mt-1 text-sm text-slate-500">
-                            Showing up to 250 recipients after scheduling.
+                            Showing the first 250 broadcast recipient records.
                         </p>
                     </div>
 
@@ -120,6 +136,7 @@
                             <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <tr>
                                     <th class="px-6 py-3">Contact</th>
+                                    <th class="px-6 py-3">Email</th>
                                     <th class="px-6 py-3">Status</th>
                                     <th class="px-6 py-3">Sent</th>
                                     <th class="px-6 py-3">Reason</th>
@@ -128,22 +145,22 @@
 
                             <tbody class="divide-y divide-slate-200">
                                 @forelse($recipients as $recipient)
-                                    <tr class="hover:bg-slate-50">
+                                    <tr>
                                         <td class="px-6 py-4">
                                             @if($recipient->contact)
                                                 <a
                                                     href="{{ route('crm.contacts.show', $recipient->contact) }}"
                                                     class="font-medium text-slate-900 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900"
                                                 >
-                                                    {{ $recipient->contact->name ?: $recipient->contact->email }}
+                                                    {{ $recipient->contact->name ?: trim($recipient->contact->first_name.' '.$recipient->contact->last_name) ?: $recipient->contact->email }}
                                                 </a>
-
-                                                <div class="mt-1 text-xs text-slate-500">
-                                                    {{ $recipient->contact->email }}
-                                                </div>
                                             @else
-                                                <span class="text-slate-500">Missing contact</span>
+                                                <span class="text-slate-500">Contact missing</span>
                                             @endif
+                                        </td>
+
+                                        <td class="px-6 py-4 text-slate-600">
+                                            {{ $recipient->contact?->email ?? '—' }}
                                         </td>
 
                                         <td class="px-6 py-4">
@@ -162,7 +179,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="px-6 py-6 text-sm text-slate-600">
+                                        <td colspan="5" class="px-6 py-6 text-sm text-slate-600">
                                             No recipients yet.
                                         </td>
                                     </tr>
@@ -180,6 +197,13 @@
                     </h2>
 
                     <dl class="mt-4 space-y-3 text-sm">
+                        <div class="flex justify-between gap-4">
+                            <dt class="text-slate-500">Type</dt>
+                            <dd class="font-medium text-slate-900">
+                                {{ $broadcast->isPermissionInvitation() ? 'Opt-in invitation' : 'Broadcast' }}
+                            </dd>
+                        </div>
+
                         <div class="flex justify-between gap-4">
                             <dt class="text-slate-500">Status</dt>
                             <dd class="font-medium text-slate-900">{{ str_replace('_', ' ', $broadcast->status) }}</dd>
@@ -230,7 +254,9 @@
                     @php($recipientFilter = $broadcast->recipient_filter ?? [])
 
                     <div class="mt-4 text-sm text-slate-700">
-                        @if(($recipientFilter['type'] ?? 'all') === 'tag')
+                        @if(($recipientFilter['type'] ?? 'all') === 'imported')
+                            Imported contacts only.
+                        @elseif(($recipientFilter['type'] ?? 'all') === 'tag')
                             Contacts tagged:
                             <span class="font-semibold">
                                 {{ implode(', ', $recipientFilter['tags'] ?? []) }}

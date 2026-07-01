@@ -8,8 +8,10 @@ use App\Modules\Messaging\Contracts\Sms\SmsMessage;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
 use App\Modules\Messaging\Models\ConsentRevocation;
+use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use App\Modules\Messaging\Services\Email\EmailMessagingService;
 use App\Modules\Messaging\Services\ScheduledMessageGate;
 use App\Modules\Messaging\Services\Sms\SmsMessagingService;
@@ -59,11 +61,7 @@ class SendScheduledMessageJobTest extends TestCase
 
         app()->instance(EmailMessagingService::class, $emailService);
 
-        (new SendScheduledMessageJob($scheduledMessage->id))->handle(
-            scheduledMessageGate: app(ScheduledMessageGate::class),
-            emailMessagingService: app(EmailMessagingService::class),
-            smsMessagingService: app(SmsMessagingService::class),
-        );
+        $this->handleScheduledMessage($scheduledMessage);
 
         $scheduledMessage->refresh();
 
@@ -112,11 +110,7 @@ class SendScheduledMessageJobTest extends TestCase
 
         app()->instance(SmsMessagingService::class, $smsService);
 
-        (new SendScheduledMessageJob($scheduledMessage->id))->handle(
-            scheduledMessageGate: app(ScheduledMessageGate::class),
-            emailMessagingService: app(EmailMessagingService::class),
-            smsMessagingService: app(SmsMessagingService::class),
-        );
+        $this->handleScheduledMessage($scheduledMessage);
 
         $scheduledMessage->refresh();
 
@@ -129,7 +123,7 @@ class SendScheduledMessageJobTest extends TestCase
         );
     }
 
-    public function test_it_sends_imported_contact_marketing_email_with_permission_pass_without_consent(): void
+    public function test_it_sends_imported_contact_permission_invitation_once_without_existing_consent(): void
     {
         Event::fake([ScheduledMessageSent::class]);
 
@@ -142,9 +136,9 @@ class SendScheduledMessageJobTest extends TestCase
             'recipient_type' => Contact::class,
             'recipient_id' => $contact->id,
             'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'broadcast',
-            'message_type' => 'broadcast',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
             'payload_class' => FakeJobEmailPayload::class,
             'payload' => [
                 'to' => 'imported@example.com',
@@ -153,7 +147,10 @@ class SendScheduledMessageJobTest extends TestCase
             'meta' => [
                 'conditions' => [],
                 'consent_policy' => [
-                    'imported_contact_permission_pass' => true,
+                    'permission_invitation' => [
+                        'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+                        'one_time' => true,
+                    ],
                 ],
             ],
         ]);
@@ -166,16 +163,20 @@ class SendScheduledMessageJobTest extends TestCase
 
         app()->instance(EmailMessagingService::class, $emailService);
 
-        (new SendScheduledMessageJob($scheduledMessage->id))->handle(
-            scheduledMessageGate: app(ScheduledMessageGate::class),
-            emailMessagingService: app(EmailMessagingService::class),
-            smsMessagingService: app(SmsMessagingService::class),
-        );
+        $this->handleScheduledMessage($scheduledMessage);
 
         $scheduledMessage->refresh();
 
         $this->assertSame('sent', $scheduledMessage->status);
         $this->assertNotNull($scheduledMessage->sent_at);
+
+        $this->assertDatabaseHas('contact_permission_invitations', [
+            'contact_id' => $contact->id,
+            'scheduled_message_id' => $scheduledMessage->id,
+            'channel' => ContactPermissionInvitation::CHANNEL_EMAIL,
+            'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+            'status' => ContactPermissionInvitation::STATUS_SENT,
+        ]);
 
         Event::assertDispatched(
             ScheduledMessageSent::class,
@@ -183,7 +184,7 @@ class SendScheduledMessageJobTest extends TestCase
         );
     }
 
-    public function test_it_does_not_apply_imported_contact_permission_pass_to_sms(): void
+    public function test_it_does_not_apply_imported_contact_permission_invitation_to_sms(): void
     {
         Event::fake([ScheduledMessageSent::class]);
 
@@ -196,9 +197,9 @@ class SendScheduledMessageJobTest extends TestCase
             'recipient_type' => Contact::class,
             'recipient_id' => $contact->id,
             'channel' => 'sms',
-            'purpose' => 'marketing',
-            'scope' => 'broadcast',
-            'message_type' => 'broadcast',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
             'payload_class' => FakeJobSmsPayload::class,
             'payload' => [
                 'to' => '+15555550123',
@@ -208,7 +209,10 @@ class SendScheduledMessageJobTest extends TestCase
             'meta' => [
                 'conditions' => [],
                 'consent_policy' => [
-                    'imported_contact_permission_pass' => true,
+                    'permission_invitation' => [
+                        'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+                        'one_time' => true,
+                    ],
                 ],
             ],
         ]);
@@ -218,17 +222,82 @@ class SendScheduledMessageJobTest extends TestCase
 
         app()->instance(SmsMessagingService::class, $smsService);
 
-        (new SendScheduledMessageJob($scheduledMessage->id))->handle(
-            scheduledMessageGate: app(ScheduledMessageGate::class),
-            emailMessagingService: app(EmailMessagingService::class),
-            smsMessagingService: app(SmsMessagingService::class),
-        );
+        $this->handleScheduledMessage($scheduledMessage);
 
         $scheduledMessage->refresh();
 
         $this->assertSame('skipped', $scheduledMessage->status);
         $this->assertSame('Message eligibility gate denied send.', $scheduledMessage->skip_reason);
         $this->assertNull($scheduledMessage->sent_at);
+
+        $this->assertDatabaseMissing('contact_permission_invitations', [
+            'contact_id' => $contact->id,
+            'channel' => ContactPermissionInvitation::CHANNEL_EMAIL,
+            'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+        ]);
+
+        Event::assertNotDispatched(ScheduledMessageSent::class);
+    }
+
+    public function test_it_skips_imported_contact_permission_invitation_when_already_used(): void
+    {
+        Event::fake([ScheduledMessageSent::class]);
+
+        $contact = Contact::factory()->create([
+            'email' => 'already-invited@example.com',
+            'source' => 'import',
+        ]);
+
+        ContactPermissionInvitation::query()->create([
+            'contact_id' => $contact->id,
+            'channel' => ContactPermissionInvitation::CHANNEL_EMAIL,
+            'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+            'status' => ContactPermissionInvitation::STATUS_SENT,
+            'claimed_at' => now()->subMinutes(10),
+            'sent_at' => now()->subMinutes(9),
+        ]);
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'recipient_type' => Contact::class,
+            'recipient_id' => $contact->id,
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'payload_class' => FakeJobEmailPayload::class,
+            'payload' => [
+                'to' => 'already-invited@example.com',
+            ],
+            'status' => 'pending',
+            'meta' => [
+                'conditions' => [],
+                'consent_policy' => [
+                    'permission_invitation' => [
+                        'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+                        'one_time' => true,
+                    ],
+                ],
+            ],
+        ]);
+
+        $emailService = Mockery::mock(EmailMessagingService::class);
+        $emailService->shouldNotReceive('send');
+
+        app()->instance(EmailMessagingService::class, $emailService);
+
+        $this->handleScheduledMessage($scheduledMessage);
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame('skipped', $scheduledMessage->status);
+        $this->assertSame('Message eligibility gate denied send.', $scheduledMessage->skip_reason);
+        $this->assertNull($scheduledMessage->sent_at);
+
+        $this->assertSame(1, ContactPermissionInvitation::query()
+            ->where('contact_id', $contact->id)
+            ->where('channel', ContactPermissionInvitation::CHANNEL_EMAIL)
+            ->where('source', ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT)
+            ->count());
 
         Event::assertNotDispatched(ScheduledMessageSent::class);
     }
@@ -270,11 +339,7 @@ class SendScheduledMessageJobTest extends TestCase
 
         app()->instance(EmailMessagingService::class, $emailService);
 
-        (new SendScheduledMessageJob($scheduledMessage->id))->handle(
-            scheduledMessageGate: app(ScheduledMessageGate::class),
-            emailMessagingService: app(EmailMessagingService::class),
-            smsMessagingService: app(SmsMessagingService::class),
-        );
+        $this->handleScheduledMessage($scheduledMessage);
 
         $scheduledMessage->refresh();
 
@@ -329,11 +394,7 @@ class SendScheduledMessageJobTest extends TestCase
 
         app()->instance(EmailMessagingService::class, $emailService);
 
-        (new SendScheduledMessageJob($scheduledMessage->id))->handle(
-            scheduledMessageGate: app(ScheduledMessageGate::class),
-            emailMessagingService: app(EmailMessagingService::class),
-            smsMessagingService: app(SmsMessagingService::class),
-        );
+        $this->handleScheduledMessage($scheduledMessage);
 
         $scheduledMessage->refresh();
 
@@ -375,10 +436,9 @@ class SendScheduledMessageJobTest extends TestCase
 
         app()->instance(EmailMessagingService::class, $emailService);
 
-        (new SendScheduledMessageJob($scheduledMessage->id))->handle(
+        $this->handleScheduledMessage(
+            scheduledMessage: $scheduledMessage,
             scheduledMessageGate: $this->scheduledMessageGate('Message eligibility gate denied send.'),
-            emailMessagingService: app(EmailMessagingService::class),
-            smsMessagingService: app(SmsMessagingService::class),
         );
 
         $scheduledMessage->refresh();
@@ -423,11 +483,7 @@ class SendScheduledMessageJobTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         try {
-            (new SendScheduledMessageJob($scheduledMessage->id))->handle(
-                scheduledMessageGate: app(ScheduledMessageGate::class),
-                emailMessagingService: app(EmailMessagingService::class),
-                smsMessagingService: app(SmsMessagingService::class),
-            );
+            $this->handleScheduledMessage($scheduledMessage);
         } finally {
             $scheduledMessage->refresh();
 
@@ -464,6 +520,18 @@ class SendScheduledMessageJobTest extends TestCase
             ->andReturn($denialReason);
 
         return $gate;
+    }
+
+    private function handleScheduledMessage(
+        ScheduledMessage $scheduledMessage,
+        ?ScheduledMessageGate $scheduledMessageGate = null,
+    ): void {
+        (new SendScheduledMessageJob($scheduledMessage->id))->handle(
+            scheduledMessageGate: $scheduledMessageGate ?? app(ScheduledMessageGate::class),
+            emailMessagingService: app(EmailMessagingService::class),
+            smsMessagingService: app(SmsMessagingService::class),
+            permissionInvitationService: app(ContactPermissionInvitationService::class),
+        );
     }
 }
 

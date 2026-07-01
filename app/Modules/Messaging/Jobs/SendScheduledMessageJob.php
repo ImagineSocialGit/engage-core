@@ -8,7 +8,9 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
+use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use App\Modules\Messaging\Services\Email\EmailMessagingService;
 use App\Modules\Messaging\Services\ScheduledMessageGate;
 use App\Modules\Messaging\Services\Sms\SmsMessagingService;
@@ -33,6 +35,7 @@ class SendScheduledMessageJob implements ShouldQueue
         ScheduledMessageGate $scheduledMessageGate,
         EmailMessagingService $emailMessagingService,
         SmsMessagingService $smsMessagingService,
+        ContactPermissionInvitationService $permissionInvitationService,
     ): void {
         $scheduledMessage = ScheduledMessage::query()
             ->with(['recipient', 'context'])
@@ -44,6 +47,19 @@ class SendScheduledMessageJob implements ShouldQueue
 
         if ($denialReason = $scheduledMessageGate->denialReason($scheduledMessage)) {
             $this->markSkipped($scheduledMessage, $denialReason);
+
+            return;
+        }
+
+        $permissionInvitation = $this->claimPermissionInvitation(
+            scheduledMessage: $scheduledMessage,
+            permissionInvitationService: $permissionInvitationService,
+        );
+
+        if ($permissionInvitationService->isImportedContactPermissionInvitationMessage($scheduledMessage)
+            && ! $permissionInvitation
+        ) {
+            $this->markSkipped($scheduledMessage, 'Imported contact permission invitation was already used.');
 
             return;
         }
@@ -63,6 +79,10 @@ class SendScheduledMessageJob implements ShouldQueue
                 'failure_reason' => null,
             ])->save();
 
+            if ($permissionInvitation) {
+                $permissionInvitationService->markSent($permissionInvitation, $scheduledMessage);
+            }
+
             ScheduledMessageSent::dispatch($scheduledMessage);
         } catch (Throwable $exception) {
             $scheduledMessage->forceFill([
@@ -70,6 +90,14 @@ class SendScheduledMessageJob implements ShouldQueue
                 'failed_at' => now(),
                 'failure_reason' => $exception->getMessage(),
             ])->save();
+
+            if ($permissionInvitation) {
+                $permissionInvitationService->markFailed(
+                    invitation: $permissionInvitation,
+                    scheduledMessage: $scheduledMessage,
+                    reason: $exception->getMessage(),
+                );
+            }
 
             ScheduledMessageFailed::dispatch($scheduledMessage);
 
@@ -156,5 +184,12 @@ class SendScheduledMessageJob implements ShouldQueue
         ])->save();
 
         ScheduledMessageSkipped::dispatch($scheduledMessage);
+    }
+
+    private function claimPermissionInvitation(
+        ScheduledMessage $scheduledMessage,
+        ContactPermissionInvitationService $permissionInvitationService,
+    ): ?ContactPermissionInvitation {
+        return $permissionInvitationService->claimForScheduledMessage($scheduledMessage);
     }
 }
