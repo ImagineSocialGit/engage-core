@@ -2,10 +2,10 @@
 
 namespace App\Modules\Messaging\Services;
 
+use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ConsentRevocation;
-use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\MessageConsent;
 
 class MessageGate
@@ -14,6 +14,9 @@ class MessageGate
         private readonly MessageSuppressionService $messageSuppressionService,
     ) {}
 
+    /**
+     * @param array<string, mixed>|null $context
+     */
     public function allows(
         Contact $contact,
         MessageChannel|string $channel,
@@ -21,10 +24,12 @@ class MessageGate
         string $scope,
         ?string $messageKey = null,
         ?string $definitionConfigPath = null,
+        ?array $context = null,
     ): bool {
         $channel = $this->normalizeChannel($channel);
         $purpose = $this->normalizePurpose($purpose);
         $scope = trim($scope);
+        $context ??= [];
 
         if ($scope === '') {
             return false;
@@ -40,7 +45,10 @@ class MessageGate
             return false;
         }
 
-        if (! $this->hasActiveConsent($contact, $channel, $purpose, $scope)) {
+        if (
+            ! $this->hasActiveConsent($contact, $channel, $purpose, $scope)
+            && ! $this->allowsImportedContactPermissionPass($contact, $channel, $purpose, $scope, $context)
+        ) {
             return false;
         }
 
@@ -104,6 +112,56 @@ class MessageGate
             ->where('scope', $scope)
             ->where('revoked_at', '>=', $latestConsent->consented_at)
             ->exists();
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function allowsImportedContactPermissionPass(
+        Contact $contact,
+        string $channel,
+        string $purpose,
+        string $scope,
+        array $context,
+    ): bool {
+        if (! (bool) ($context['consent_policy']['imported_contact_permission_pass'] ?? false)) {
+            return false;
+        }
+
+        if ($channel !== MessageChannel::Email->value) {
+            return false;
+        }
+
+        if ($purpose !== MessagePurpose::Marketing->value) {
+            return false;
+        }
+
+        if (! $this->isImportedContact($contact)) {
+            return false;
+        }
+
+        return ! ConsentRevocation::query()
+            ->where('contact_id', $contact->getKey())
+            ->where('channel', $channel)
+            ->where('purpose', $purpose)
+            ->where('scope', $scope)
+            ->exists();
+    }
+
+    private function isImportedContact(Contact $contact): bool
+    {
+        $source = is_string($contact->source)
+            ? str_replace('-', '_', strtolower(trim($contact->source)))
+            : null;
+
+        if ($source === 'import') {
+            return true;
+        }
+
+        $meta = is_array($contact->meta) ? $contact->meta : [];
+
+        return (bool) ($meta['imported'] ?? false)
+            || array_key_exists('imported_at', $meta);
     }
 
     private function destinationFor(Contact $contact, string $channel): ?string

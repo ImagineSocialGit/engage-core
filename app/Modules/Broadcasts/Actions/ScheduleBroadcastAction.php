@@ -25,6 +25,7 @@ class ScheduleBroadcastAction
             $sendAt = $this->resolveSendAt($broadcast);
             $contacts = $this->recipientResolver->resolve($broadcast);
             $scheduledRecipientCount = 0;
+            $consentPolicy = $this->consentPolicy($broadcast);
 
             foreach ($contacts as $contact) {
                 $recipient = BroadcastRecipient::query()->firstOrCreate(
@@ -55,6 +56,7 @@ class ScheduleBroadcastAction
                         'broadcast_id' => $broadcast->getKey(),
                         'broadcast_recipient_id' => $recipient->getKey(),
                         'send_buffer_minutes' => self::SEND_BUFFER_MINUTES,
+                        'consent_policy' => $consentPolicy,
                     ],
                     definitions: [
                         [
@@ -72,9 +74,11 @@ class ScheduleBroadcastAction
                                 'minutes' => 0,
                             ],
                             'payload' => $broadcast->payload ?? [],
+                            'consent_policy' => $consentPolicy,
                             'meta' => [
                                 'source' => 'broadcast',
                                 'broadcast_id' => $broadcast->getKey(),
+                                'consent_policy' => $consentPolicy,
                             ],
                         ],
                     ],
@@ -133,6 +137,21 @@ class ScheduleBroadcastAction
         $sendAt = Carbon::parse($broadcast->send_at);
 
         return $sendAt->gt($minimumSendAt) ? $sendAt : $minimumSendAt;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function consentPolicy(Broadcast $broadcast): array
+    {
+        if ($broadcast->channel !== 'email') {
+            return [];
+        }
+
+        return [
+            'imported_contact_permission_pass' => true,
+            'source' => 'broadcast',
+        ];
     }
 
     /**

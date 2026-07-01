@@ -10,6 +10,7 @@ use App\Modules\Core\Models\ContactTag;
 use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Messaging\Payloads\SmsPayload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
@@ -85,6 +86,96 @@ class ScheduleBroadcastActionTest extends TestCase
             $this->assertCount(1, $recipient->scheduled_message_ids);
             $this->assertNull($recipient->skip_reason);
         }
+    }
+
+    public function test_it_requests_imported_contact_permission_pass_for_email_broadcasts(): void
+    {
+        Contact::factory()->create([
+            'email' => 'imported@example.com',
+            'source' => 'import',
+        ]);
+
+        $broadcast = Broadcast::factory()->create([
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'payload_class' => EmailPayload::class,
+            'recipient_filter' => [
+                'type' => 'all',
+            ],
+        ]);
+
+        $this->mock(DispatchMessageAction::class)
+            ->shouldReceive('handle')
+            ->once()
+            ->andReturnUsing(function (...$arguments): array {
+                $recipient = $arguments['recipient'] ?? $arguments[0];
+                $broadcast = $arguments['context'] ?? $arguments[6];
+                $meta = $arguments['meta'] ?? $arguments[9];
+                $definitions = $arguments['definitions'] ?? $arguments[11];
+
+                $this->assertTrue($meta['consent_policy']['imported_contact_permission_pass']);
+                $this->assertSame('broadcast', $meta['consent_policy']['source']);
+                $this->assertTrue($definitions[0]['consent_policy']['imported_contact_permission_pass']);
+                $this->assertSame('broadcast', $definitions[0]['meta']['consent_policy']['source']);
+
+                return [
+                    ScheduledMessage::factory()->create([
+                        'recipient_type' => $recipient->getMorphClass(),
+                        'recipient_id' => $recipient->getKey(),
+                        'context_type' => $broadcast->getMorphClass(),
+                        'context_id' => $broadcast->getKey(),
+                    ]),
+                ];
+            });
+
+        app(ScheduleBroadcastAction::class)->handle($broadcast);
+    }
+
+    public function test_it_does_not_request_imported_contact_permission_pass_for_sms_broadcasts(): void
+    {
+        Contact::factory()->create([
+            'phone' => '+15555550123',
+            'source' => 'import',
+        ]);
+
+        $broadcast = Broadcast::factory()->create([
+            'channel' => 'sms',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'payload_class' => SmsPayload::class,
+            'recipient_filter' => [
+                'type' => 'all',
+            ],
+            'payload' => [
+                'message' => 'Broadcast message',
+            ],
+        ]);
+
+        $this->mock(DispatchMessageAction::class)
+            ->shouldReceive('handle')
+            ->once()
+            ->andReturnUsing(function (...$arguments): array {
+                $recipient = $arguments['recipient'] ?? $arguments[0];
+                $broadcast = $arguments['context'] ?? $arguments[6];
+                $meta = $arguments['meta'] ?? $arguments[9];
+                $definitions = $arguments['definitions'] ?? $arguments[11];
+
+                $this->assertSame([], $meta['consent_policy']);
+                $this->assertSame([], $definitions[0]['consent_policy']);
+                $this->assertSame([], $definitions[0]['meta']['consent_policy']);
+
+                return [
+                    ScheduledMessage::factory()->create([
+                        'recipient_type' => $recipient->getMorphClass(),
+                        'recipient_id' => $recipient->getKey(),
+                        'context_type' => $broadcast->getMorphClass(),
+                        'context_id' => $broadcast->getKey(),
+                    ]),
+                ];
+            });
+
+        app(ScheduleBroadcastAction::class)->handle($broadcast);
     }
 
     public function test_it_schedules_a_broadcast_to_specific_contacts(): void

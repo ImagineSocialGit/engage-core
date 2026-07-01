@@ -2,12 +2,12 @@
 
 namespace Tests\Feature\Messaging;
 
+use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Contracts\Email\EmailMessage;
 use App\Modules\Messaging\Contracts\Sms\SmsMessage;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
 use App\Modules\Messaging\Models\ConsentRevocation;
-use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\Email\EmailMessagingService;
@@ -127,6 +127,110 @@ class SendScheduledMessageJobTest extends TestCase
             ScheduledMessageSent::class,
             fn (ScheduledMessageSent $event): bool => $event->scheduledMessage->is($scheduledMessage),
         );
+    }
+
+    public function test_it_sends_imported_contact_marketing_email_with_permission_pass_without_consent(): void
+    {
+        Event::fake([ScheduledMessageSent::class]);
+
+        $contact = Contact::factory()->create([
+            'email' => 'imported@example.com',
+            'source' => 'import',
+        ]);
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'recipient_type' => Contact::class,
+            'recipient_id' => $contact->id,
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'message_type' => 'broadcast',
+            'payload_class' => FakeJobEmailPayload::class,
+            'payload' => [
+                'to' => 'imported@example.com',
+            ],
+            'status' => 'pending',
+            'meta' => [
+                'conditions' => [],
+                'consent_policy' => [
+                    'imported_contact_permission_pass' => true,
+                ],
+            ],
+        ]);
+
+        $emailService = Mockery::mock(EmailMessagingService::class);
+        $emailService
+            ->shouldReceive('send')
+            ->once()
+            ->with(Mockery::type(FakeJobEmailPayload::class));
+
+        app()->instance(EmailMessagingService::class, $emailService);
+
+        (new SendScheduledMessageJob($scheduledMessage->id))->handle(
+            scheduledMessageGate: app(ScheduledMessageGate::class),
+            emailMessagingService: app(EmailMessagingService::class),
+            smsMessagingService: app(SmsMessagingService::class),
+        );
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame('sent', $scheduledMessage->status);
+        $this->assertNotNull($scheduledMessage->sent_at);
+
+        Event::assertDispatched(
+            ScheduledMessageSent::class,
+            fn (ScheduledMessageSent $event): bool => $event->scheduledMessage->is($scheduledMessage),
+        );
+    }
+
+    public function test_it_does_not_apply_imported_contact_permission_pass_to_sms(): void
+    {
+        Event::fake([ScheduledMessageSent::class]);
+
+        $contact = Contact::factory()->create([
+            'phone' => '+15555550123',
+            'source' => 'import',
+        ]);
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'recipient_type' => Contact::class,
+            'recipient_id' => $contact->id,
+            'channel' => 'sms',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'message_type' => 'broadcast',
+            'payload_class' => FakeJobSmsPayload::class,
+            'payload' => [
+                'to' => '+15555550123',
+                'message' => 'Hello',
+            ],
+            'status' => 'pending',
+            'meta' => [
+                'conditions' => [],
+                'consent_policy' => [
+                    'imported_contact_permission_pass' => true,
+                ],
+            ],
+        ]);
+
+        $smsService = Mockery::mock(SmsMessagingService::class);
+        $smsService->shouldNotReceive('send');
+
+        app()->instance(SmsMessagingService::class, $smsService);
+
+        (new SendScheduledMessageJob($scheduledMessage->id))->handle(
+            scheduledMessageGate: app(ScheduledMessageGate::class),
+            emailMessagingService: app(EmailMessagingService::class),
+            smsMessagingService: app(SmsMessagingService::class),
+        );
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame('skipped', $scheduledMessage->status);
+        $this->assertSame('Message eligibility gate denied send.', $scheduledMessage->skip_reason);
+        $this->assertNull($scheduledMessage->sent_at);
+
+        Event::assertNotDispatched(ScheduledMessageSent::class);
     }
 
     public function test_it_skips_when_conditions_fail_at_send_time(): void

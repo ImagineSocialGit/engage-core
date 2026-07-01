@@ -51,6 +51,7 @@ class ScheduledMessageGate
                 scope: $scheduledMessage->scope,
                 messageKey: $scheduledMessage->message_type,
                 definitionConfigPath: $scheduledMessage->definition_config_path,
+                context: $this->eligibilityContext($scheduledMessage),
             )) {
                 return 'Message eligibility gate denied send.';
             }
@@ -107,5 +108,17 @@ class ScheduledMessageGate
         return is_string($type) && trim($type) !== ''
             ? trim($type)
             : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function eligibilityContext(ScheduledMessage $scheduledMessage): array
+    {
+        $consentPolicy = $scheduledMessage->meta['consent_policy'] ?? [];
+
+        return [
+            'consent_policy' => is_array($consentPolicy) ? $consentPolicy : [],
+        ];
     }
 }

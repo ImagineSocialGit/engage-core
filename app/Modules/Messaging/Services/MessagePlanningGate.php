@@ -50,6 +50,7 @@ class MessagePlanningGate
                 scope: $scope,
                 messageKey: $definition['message_type'] ?? null,
                 definitionConfigPath: $definition['config_path'] ?? null,
+                context: $this->eligibilityContext($definition),
             );
         }
 
@@ -96,5 +97,20 @@ class MessagePlanningGate
         return is_string($type) && trim($type) !== ''
             ? trim($type)
             : null;
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     * @return array<string, mixed>
+     */
+    private function eligibilityContext(array $definition): array
+    {
+        $consentPolicy = $definition['consent_policy']
+            ?? $definition['meta']['consent_policy']
+            ?? [];
+
+        return [
+            'consent_policy' => is_array($consentPolicy) ? $consentPolicy : [],
+        ];
     }
 }
