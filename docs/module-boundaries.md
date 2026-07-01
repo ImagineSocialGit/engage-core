@@ -4,7 +4,7 @@ Engage Core is a modular contact engagement platform.
 
 The goal is to let each client enable only the capabilities they need without forcing every client into CRM, sales, webinar, marketing, internal notifications, automation, or vertical-specific workflows.
 
-This document defines module ownership, dependency direction, and the architectural rules that should guide future implementation.
+This document defines module ownership, dependency direction, and the architectural rules that should guide future implementation. Actionable implementation backlog belongs in TODO.md, not this file.
 
 ## Core Rule
 

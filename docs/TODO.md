@@ -207,13 +207,28 @@ These are repeatable checklists. Run the relevant checklist after a production s
 
 - [ ] Define the import flow that marks contacts as imported.
   - `source = import` and/or `meta.imported = true` / `meta.imported_at`.
-  - Confirm whether import batches need a first-class model later.
   - Confirm whether imported contacts should receive a default tag.
+  - Preserve enough import metadata to understand where the contact came from without making Core own vertical-specific import behavior.
 
-- [ ] Consider an import batch filter later.
-  - “Imported contacts” is now broad.
-  - Future UX may need “contacts from this import only.”
-  - Do not build this until import batch modeling exists.
+- [ ] Add imported-contact cohort/filter support before adding first-class import batch modeling.
+  - Prefer deriving useful cohorts from existing contact facts first.
+  - Example: imported contacts with no Messaging consent records.
+  - Example: imported contacts assigned specific statuses during import.
+  - Example: imported contacts with `source = import`, `meta.imported = true`, or `meta.imported_at` plus selected import-time status values.
+  - Use this to support common “send opt-in to imported contacts who still have no consent” workflows without prematurely adding an import batch model.
+
+- [ ] Add import-time status mapping behavior.
+  - Imports may contain multiple legacy/client status values from the old system.
+  - The import flow should let an operator map each incoming status to an existing Engage Core `ContactStatus`.
+  - The import flow should let an operator convert a legacy status to an Engage Core equivalent.
+  - The import flow should let an operator flag unmapped/ambiguous statuses for review.
+  - Flagged rows should not silently receive the wrong status.
+  - Preserve the original imported status in metadata for audit/debugging.
+
+- [ ] Consider a first-class import batch model only if derived import cohorts are not enough.
+  - “Imported contacts” is broad.
+  - Future UX may need “contacts from this exact import file/run only.”
+  - Do not build this until the no-consent/status-based imported cohort approach proves insufficient.
 
 ### Automation/event seams
 
@@ -228,6 +243,7 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [ ] Build or refine UI for task templates/default definitions if needed.
   - Preset sync creates DB-owned/default task template definitions only.
   - No live tasks are created by preset sync.
+  - This is not beta-blocking unless clients need to manage task templates themselves.
 
 - [ ] Keep Tasks standalone-capable.
   - Tasks can be related to contacts but must not require contacts.
@@ -239,10 +255,25 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - Client should be able to add a Route point and associated tasks quickly.
   - Avoid exposing internal complexity.
   - FlowRoutes should not model every campaign email/text as separate points.
+  - This is not beta-blocking unless beta clients need to build or edit Routes themselves.
 
 - [ ] Later: make FlowRoutes respond to task completion through neutral events.
   - FlowRoutes should advance when a related route task is completed.
   - It should ignore unrelated task changes.
+
+### Client self-serve readiness
+
+- [ ] Do not treat controlled beta readiness as full client self-serve readiness.
+  - Controlled beta can assume operator-assisted setup/configuration.
+  - Full self-serve requires more polished builders, safer config validation, clearer import review tools, and stronger client-facing admin UX.
+
+- [ ] Identify which admin surfaces must exist before clients can operate without developer/operator help.
+  - Route builder/editor.
+  - Campaign/template management.
+  - Task template management.
+  - Import mapping/review.
+  - Broadcast/permission invitation setup.
+  - Provider/channel settings.
 
 ### Documentation maintenance
 
