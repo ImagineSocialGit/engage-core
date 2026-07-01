@@ -11,6 +11,7 @@ use App\Modules\Messaging\Models\ConsentRevocation;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use App\Modules\Messaging\Services\Email\EmailMessagingService;
 use App\Modules\Messaging\Services\ScheduledMessageGate;
@@ -572,6 +573,89 @@ class SendScheduledMessageJobTest extends TestCase
         $this->assertSame('Copy this link', $capturedPayload->secondaryLink['label']);
         $this->assertSame($expectedUrl, $capturedPayload->secondaryLink['url']);
         $this->assertSame($expectedUrl, $capturedPayload->tokens['permission_invitation']['url']);
+    }
+
+
+    public function test_it_renders_permission_invitation_email_with_runtime_cta_and_secondary_link(): void
+    {
+        Event::fake([ScheduledMessageSent::class]);
+
+        config([
+            'messaging.permission_invitations.email.cta_label' => 'Confirm preferences',
+            'messaging.permission_invitations.email.secondary_link_label' => 'Copy this link',
+        ]);
+
+        $contact = Contact::factory()->create([
+            'email' => 'imported@example.com',
+            'source' => 'import',
+        ]);
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'recipient_type' => Contact::class,
+            'recipient_id' => $contact->id,
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'payload_class' => EmailPayload::class,
+            'payload' => [
+                'to' => 'imported@example.com',
+                'subject' => 'Confirm your preferences',
+                'body' => "Please confirm how you want to hear from us.
+{cta}
+Thanks.",
+            ],
+            'status' => 'pending',
+            'meta' => [
+                'conditions' => [],
+                'consent_policy' => [
+                    'permission_invitation' => [
+                        'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+                        'one_time' => true,
+                    ],
+                ],
+            ],
+        ]);
+
+        $capturedHtml = null;
+
+        $emailService = Mockery::mock(EmailMessagingService::class);
+        $emailService
+            ->shouldReceive('send')
+            ->once()
+            ->with(Mockery::on(function (EmailMessage $payload) use (&$capturedHtml): bool {
+                if (! $payload instanceof EmailPayload) {
+                    return false;
+                }
+
+                $capturedHtml = $payload->html();
+
+                return true;
+            }));
+
+        app()->instance(EmailMessagingService::class, $emailService);
+
+        $this->handleScheduledMessage($scheduledMessage);
+
+        $scheduledMessage->refresh();
+
+        $invitation = ContactPermissionInvitation::query()
+            ->where('contact_id', $contact->id)
+            ->first();
+
+        $this->assertNotNull($invitation);
+        $this->assertSame('sent', $scheduledMessage->status);
+
+        $expectedUrl = route('messaging.permission-invitations.show', [
+            'token' => $invitation->token,
+        ]);
+
+        $this->assertIsString($capturedHtml);
+        $this->assertStringContainsString('Confirm preferences', $capturedHtml);
+        $this->assertStringContainsString('href="'.$expectedUrl.'"', $capturedHtml);
+        $this->assertStringContainsString('Copy this link', $capturedHtml);
+        $this->assertStringContainsString($expectedUrl, $capturedHtml);
+        $this->assertStringNotContainsString('{cta}', $capturedHtml);
     }
 
     private function grantConsent(Contact $contact, string $channel, string $purpose): void

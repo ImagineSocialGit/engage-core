@@ -307,6 +307,59 @@ class EmailPayloadTest extends TestCase
         );
     }
 
+
+    public function test_it_renders_inline_cta_and_secondary_link(): void
+    {
+        $payload = EmailPayload::fromArray([
+            'email' => 'test@example.com',
+            'subject' => 'Confirm your preferences',
+            'body' => "Please confirm your preferences.
+{cta}
+Thanks.",
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'message_type' => 'imported_contact_permission_invitation',
+            'cta' => [
+                'label' => 'Confirm preferences',
+                'url' => 'https://example.test/preferences/token',
+            ],
+            'secondary_link' => [
+                'label' => 'Copy this link',
+                'url' => 'https://example.test/preferences/token',
+            ],
+        ]);
+
+        $html = $payload->html();
+
+        $this->assertStringContainsString('Confirm preferences', $html);
+        $this->assertStringContainsString('href="https://example.test/preferences/token"', $html);
+        $this->assertStringContainsString('Copy this link', $html);
+        $this->assertStringContainsString('https://example.test/preferences/token', $html);
+        $this->assertStringNotContainsString('{cta}', $html);
+    }
+
+    public function test_it_renders_cta_after_body_when_inline_token_is_missing(): void
+    {
+        $payload = EmailPayload::fromArray([
+            'email' => 'test@example.com',
+            'subject' => 'Confirm your preferences',
+            'body' => 'Please confirm your preferences.',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'message_type' => 'imported_contact_permission_invitation',
+            'cta' => [
+                'label' => 'Confirm preferences',
+                'url' => 'https://example.test/preferences/token',
+            ],
+        ]);
+
+        $html = $payload->html();
+
+        $this->assertStringContainsString('Please confirm your preferences.', $html);
+        $this->assertStringContainsString('Confirm preferences', $html);
+        $this->assertStringContainsString('href="https://example.test/preferences/token"', $html);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
