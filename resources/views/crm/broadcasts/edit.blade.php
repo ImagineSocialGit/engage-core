@@ -7,7 +7,6 @@
         $recipientFilter = $broadcast->recipient_filter ?? ['type' => 'all'];
         $recipientFilterType = old('recipient_filter_type', $recipientFilter['type'] ?? 'all');
         $recipientTag = old('recipient_tag', $recipientFilter['tags'][0] ?? '');
-        $selectedContactIds = array_map('intval', old('contact_ids', $recipientFilter['contact_ids'] ?? []));
     @endphp
 
     <div class="space-y-6">
@@ -43,7 +42,12 @@
                 </p>
             </div>
 
-            <form method="POST" action="{{ route('crm.broadcasts.update', $broadcast) }}" class="mt-5 space-y-4">
+            <form
+                method="POST"
+                action="{{ route('crm.broadcasts.update', $broadcast) }}"
+                class="mt-5 space-y-4"
+                x-data="{ recipientFilterType: @js($recipientFilterType) }"
+            >
                 @csrf
                 @method('PATCH')
 
@@ -97,16 +101,21 @@
                         Recipients
                     </x-ui.form.label>
 
-                    <x-ui.form.select id="recipient_filter_type" name="recipient_filter_type" required>
-                        <option value="all" @selected($recipientFilterType === 'all')>
+                    <x-ui.form.select
+                        id="recipient_filter_type"
+                        name="recipient_filter_type"
+                        x-model="recipientFilterType"
+                        required
+                    >
+                        <option value="all">
                             All contacts
                         </option>
 
-                        <option value="tag" @selected($recipientFilterType === 'tag')>
+                        <option value="tag">
                             Contacts with tag
                         </option>
 
-                        <option value="contact_ids" @selected($recipientFilterType === 'contact_ids')>
+                        <option value="contact_ids">
                             Selected contacts
                         </option>
                     </x-ui.form.select>
@@ -114,7 +123,7 @@
                     <x-ui.form.error name="recipient_filter_type" />
                 </div>
 
-                <div>
+                <div x-show="recipientFilterType === 'tag'">
                     <x-ui.form.label for="recipient_tag">
                         Recipient Tag
                     </x-ui.form.label>
@@ -129,45 +138,17 @@
                     <x-ui.form.error name="recipient_tag" />
                 </div>
 
-                <div>
+                <div x-show="recipientFilterType === 'contact_ids'">
                     <x-ui.form.label>
                         Selected Contacts
                     </x-ui.form.label>
 
-                    <div class="mt-2 max-h-64 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-3">
-                        @forelse($contactOptions as $contact)
-                            <label class="flex items-start gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50">
-                                <input
-                                    type="checkbox"
-                                    name="contact_ids[]"
-                                    value="{{ $contact->id }}"
-                                    @checked(in_array($contact->id, $selectedContactIds, true))
-                                    class="mt-1 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
-                                >
-
-                                <span>
-                                    <span class="block text-sm font-medium text-slate-900">
-                                        {{ $contact->name ?: trim($contact->first_name.' '.$contact->last_name) ?: $contact->email }}
-                                    </span>
-
-                                    <span class="block text-xs text-slate-500">
-                                        {{ $contact->email }}
-                                    </span>
-                                </span>
-                            </label>
-                        @empty
-                            <p class="text-sm text-slate-500">
-                                No contacts available.
-                            </p>
-                        @endforelse
+                    <div class="mt-2">
+                        <x-crm.contact-picker
+                            :selected-contacts="$selectedRecipientContacts"
+                            input-name="contact_ids[]"
+                        />
                     </div>
-
-                    <p class="mt-2 text-xs text-slate-500">
-                        Used only when Recipients is set to Selected contacts.
-                    </p>
-
-                    <x-ui.form.error name="contact_ids" />
-                    <x-ui.form.error name="contact_ids.*" />
                 </div>
 
                 <div>

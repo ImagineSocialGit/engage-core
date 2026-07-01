@@ -17,7 +17,7 @@ use Illuminate\View\View;
 
 class BroadcastController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         $broadcasts = Broadcast::query()
             ->latest()
@@ -28,7 +28,9 @@ class BroadcastController extends Controller
             'title' => 'Broadcasts',
             'heading' => 'Broadcasts',
             'broadcasts' => $broadcasts,
-            'contactOptions' => $this->contactOptions(),
+            'selectedRecipientContacts' => $this->selectedContactOptions(
+                $request->session()->getOldInput('contact_ids', []),
+            ),
         ]);
     }
 
@@ -94,7 +96,9 @@ class BroadcastController extends Controller
             'title' => 'Edit Broadcast',
             'heading' => 'Edit Broadcast',
             'broadcast' => $broadcast,
-            'contactOptions' => $this->contactOptions(),
+            'selectedRecipientContacts' => $this->selectedContactOptions(
+                session()->getOldInput('contact_ids', $broadcast->recipient_filter['contact_ids'] ?? []),
+            ),
         ]);
     }
 
@@ -162,30 +166,12 @@ class BroadcastController extends Controller
     }
 
     /**
+     * @param array<int, mixed> $contactIds
      * @return Collection<int, Contact>
      */
-    private function contactOptions(): Collection
+    private function selectedContactOptions(array $contactIds): Collection
     {
-        return Contact::query()
-            ->orderBy('last_name')
-            ->orderBy('first_name')
-            ->orderBy('email')
-            ->limit(200)
-            ->get(['id', 'first_name', 'last_name', 'name', 'email']);
-    }
-
-    /**
-     * @return Collection<int, Contact>
-     */
-    private function recipientFilterContacts(Broadcast $broadcast): Collection
-    {
-        $recipientFilter = $broadcast->recipient_filter ?? [];
-
-        if (($recipientFilter['type'] ?? null) !== 'contact_ids') {
-            return new Collection();
-        }
-
-        $contactIds = collect($recipientFilter['contact_ids'] ?? [])
+        $contactIds = collect($contactIds)
             ->filter(fn (mixed $value): bool => is_numeric($value))
             ->map(fn (mixed $value): int => (int) $value)
             ->filter(fn (int $value): bool => $value > 0)
@@ -201,6 +187,20 @@ class BroadcastController extends Controller
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->orderBy('email')
-            ->get(['id', 'first_name', 'last_name', 'name', 'email']);
+            ->get(['id', 'first_name', 'last_name', 'name', 'email', 'phone']);
+    }
+
+    /**
+     * @return Collection<int, Contact>
+     */
+    private function recipientFilterContacts(Broadcast $broadcast): Collection
+    {
+        $recipientFilter = $broadcast->recipient_filter ?? [];
+
+        if (($recipientFilter['type'] ?? null) !== 'contact_ids') {
+            return new Collection();
+        }
+
+        return $this->selectedContactOptions($recipientFilter['contact_ids'] ?? []);
     }
 }
