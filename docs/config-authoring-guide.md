@@ -594,7 +594,7 @@ Do not add one-off `sms.enabled` checks directly inside individual views or cont
 
 Surfaces should ask the Messaging channel availability service which channels are available for that surface.
 
-Current surface keys may include:
+Current canonical channel availability surface keys are:
 
 ```text
 broadcasts
@@ -605,6 +605,22 @@ webinar_waitlists
 internal_notifications
 route_send_message_points
 ```
+
+Use plural noun-phrase surface keys for channel availability.
+
+Do not rename singular scope/source/message/context keys just because a matching surface key is plural.
+
+Examples that should remain singular:
+
+- `scope = permission_invitation`
+- `scope = webinar_waitlist`
+- `source = webinar_registration`
+- `source = webinar_waitlist`
+- `transactional:permission_invitation`
+- `marketing:webinar_waitlist`
+- `imported_contact_permission_invitation`
+- `webinar_registration` payload/context keys
+- `webinar_waitlist_signup` payload/context keys
 
 ## Review checklist before committing configs
 

@@ -182,15 +182,12 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - SMS checkbox requires a phone number.
   - SMS option can be hidden by config.
   
-- [ ] Wire Messaging channel availability into remaining channel-choice surfaces.
-  - Broadcast builders.
-  - Campaign builders.
-  - Webinar registration.
-  - Webinar waitlist.
-  - Internal notifications.
-  - FlowRoute/Route send-message points.
-  - Any future message/template builders.
-  - Surfaces should use the Messaging channel availability seam instead of reading raw SMS/provider config directly.
+- [ ] Wire Messaging channel availability into future channel-choice builder UIs as they are added.
+  - Campaign builder.
+  - Broadcast builder, if SMS authoring is exposed later.
+  - FlowRoute/Route send-message point builder.
+  - Internal notification preference UI.
+  - Show channel preference controls only when more than one channel is available for that surface.
 
 ### Imports and contact onboarding
 

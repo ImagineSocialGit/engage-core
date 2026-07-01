@@ -2,13 +2,14 @@
 
 namespace App\Modules\InternalNotifications\Actions;
 
-use App\Modules\Messaging\Actions\ScheduleMessageAction;
-use App\Modules\Messaging\Enums\MessageChannel;
-use App\Modules\Messaging\Payloads\Internal\InternalEmailNotificationPayload;
-use App\Modules\Messaging\Payloads\Internal\InternalSmsNotificationPayload;
-use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\InternalNotifications\Services\InternalNotificationChannelResolver;
 use App\Modules\InternalNotifications\Services\InternalNotificationRecipient;
+use App\Modules\Messaging\Actions\ScheduleMessageAction;
+use App\Modules\Messaging\Enums\MessageChannel;
+use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Payloads\Internal\InternalEmailNotificationPayload;
+use App\Modules\Messaging\Payloads\Internal\InternalSmsNotificationPayload;
+use App\Modules\Messaging\Services\MessageChannelAvailability;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use InvalidArgumentException;
@@ -17,6 +18,7 @@ class ScheduleInternalNotificationAction
 {
     public function __construct(
         private readonly InternalNotificationChannelResolver $channelResolver,
+        private readonly MessageChannelAvailability $messageChannelAvailability,
         private readonly ScheduleMessageAction $scheduleMessageAction,
     ) {}
 
@@ -36,10 +38,26 @@ class ScheduleInternalNotificationAction
         ?array $meta = null,
         array $allowedChannels = [MessageChannel::Email, MessageChannel::Sms],
     ): ?ScheduledMessage {
+        $availableChannels = $this->messageChannelAvailability->normalizeVisibleChannelsForSurface(
+            channels: array_map(
+                fn (MessageChannel|string $channel): string => $channel instanceof MessageChannel
+                    ? $channel->value
+                    : $channel,
+                $allowedChannels,
+            ),
+            surface: 'internal_notifications',
+            purpose: 'internal',
+            scope: $scope,
+        );
+
+        if ($availableChannels === []) {
+            return null;
+        }
+
         $channel = $this->channelResolver->resolve(
             recipient: $recipient,
             notificationType: $recipient->notificationType,
-            allowedChannels: $allowedChannels,
+            allowedChannels: $availableChannels,
         );
 
         if (! $channel) {

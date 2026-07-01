@@ -188,7 +188,7 @@ class CreateWebinarRegistrationAction
                         'consented_at' => $now,
                         'ip_address' => $request->ip(),
                         'user_agent' => $request->userAgent(),
-                        'source' => 'webinar_registrations',
+                        'source' => 'webinar_registration',
                         'meta' => [
                             'webinar_registration_id' => $registration->id,
                             'webinar_id' => $registration->webinar_id,

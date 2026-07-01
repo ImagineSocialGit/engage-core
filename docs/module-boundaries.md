@@ -591,6 +591,20 @@ Client/admin surfaces should not read raw SMS/provider config directly.
 
 Surfaces such as Broadcasts, Campaign builders, webinar registration, permission invitation pages, internal notifications, and Route send-message points should ask Messaging’s channel availability service which channels are available for that surface.
 
+Canonical channel availability surface keys are:
+
+- `broadcasts`
+- `campaigns`
+- `permission_invitations`
+- `webinar_registrations`
+- `webinar_waitlists`
+- `internal_notifications`
+- `route_send_message_points`
+
+Surface keys describe UI/admin/client channel-choice surfaces.
+
+They should not replace singular Messaging scopes, sources, message types, consent policy keys, token contexts, or payload/context keys.
+
 Hiding SMS from a surface does not disable SMS runtime safety behavior.
 
 SMS provider integrations, consent gates, revocations, suppressions, STOP/HELP handling, and send guards remain backend/runtime concerns.
