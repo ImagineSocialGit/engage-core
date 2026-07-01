@@ -7,6 +7,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\GrantMessageConsentAction;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\PhoneNumberNormalizer;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 class CreateWebinarRegistrationAction
 {
     public function __construct(
+        private readonly MessageChannelAvailability $messageChannelAvailability,
         private readonly PhoneNumberNormalizer $phoneNumberNormalizer,
         private readonly AddRegistrantToWebinarProviderAction $addRegistrantToWebinarProviderAction,
         private readonly DispatchWebinarRegistrationMessagesAction $dispatchWebinarRegistrationMessagesAction,
@@ -67,6 +69,22 @@ class CreateWebinarRegistrationAction
                 'source' => 'webinar_subdomain',
                 'registered_at' => $now,
                 'attended_at' => null,
+                'meta' => [
+                    'request_ip' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                    'accepted_channels' => [
+                        'transactional' => $this->acceptedChannels(
+                            validated: $validated,
+                            purpose: MessagePurpose::Transactional,
+                            scope: 'webinar',
+                        ),
+                        'marketing' => $this->acceptedChannels(
+                            validated: $validated,
+                            purpose: MessagePurpose::Marketing,
+                            scope: 'webinar_nurture',
+                        ),
+                    ],
+                ],
             ]);
 
             $this->storeMessageConsents($validated, $request, $contact, $registration, $now);
@@ -118,9 +136,27 @@ class CreateWebinarRegistrationAction
                 ],
             ],
 
+            'transactional_sms_consent' => [
+                [
+                    'channel' => MessageChannel::Sms,
+                    'purpose' => MessagePurpose::Transactional,
+                    'scope' => 'webinar',
+                    'dispatch_opt_in_message' => false,
+                ],
+            ],
+
             'marketing_email_consent' => [
                 [
                     'channel' => MessageChannel::Email,
+                    'purpose' => MessagePurpose::Marketing,
+                    'scope' => 'webinar_nurture',
+                    'dispatch_opt_in_message' => true,
+                ],
+            ],
+
+            'marketing_sms_consent' => [
+                [
+                    'channel' => MessageChannel::Sms,
                     'purpose' => MessagePurpose::Marketing,
                     'scope' => 'webinar_nurture',
                     'dispatch_opt_in_message' => true,
@@ -134,6 +170,15 @@ class CreateWebinarRegistrationAction
             }
 
             foreach ($consentDefinitions as $consent) {
+                if (! $this->messageChannelAvailability->isVisibleForSurface(
+                    channel: $consent['channel'],
+                    surface: 'webinar_registrations',
+                    purpose: $consent['purpose']->value,
+                    scope: $consent['scope'],
+                )) {
+                    continue;
+                }
+
                 $this->grantMessageConsentAction->handle(
                     contact: $contact,
                     data: [
@@ -143,7 +188,7 @@ class CreateWebinarRegistrationAction
                         'consented_at' => $now,
                         'ip_address' => $request->ip(),
                         'user_agent' => $request->userAgent(),
-                        'source' => 'webinar_registration',
+                        'source' => 'webinar_registrations',
                         'meta' => [
                             'webinar_registration_id' => $registration->id,
                             'webinar_id' => $registration->webinar_id,
@@ -163,6 +208,37 @@ class CreateWebinarRegistrationAction
                 );
             }
         }
+    }
+
+
+    /**
+     * @return array<int, string>
+     */
+    private function acceptedChannels(
+        array $validated,
+        MessagePurpose $purpose,
+        string $scope,
+    ): array {
+        $channels = [];
+
+        foreach ([MessageChannel::Email, MessageChannel::Sms] as $channel) {
+            if (! ($validated["{$purpose->value}_{$channel->value}_consent"] ?? false)) {
+                continue;
+            }
+
+            if (! $this->messageChannelAvailability->isVisibleForSurface(
+                channel: $channel,
+                surface: 'webinar_registrations',
+                purpose: $purpose->value,
+                scope: $scope,
+            )) {
+                continue;
+            }
+
+            $channels[] = $channel->value;
+        }
+
+        return $channels;
     }
 
     private function syncRegistrationToWebinarPlatform(

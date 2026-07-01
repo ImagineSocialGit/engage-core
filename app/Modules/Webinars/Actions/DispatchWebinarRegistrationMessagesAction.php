@@ -5,6 +5,7 @@ namespace App\Modules\Webinars\Actions;
 use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\MessageEligibilityGate;
 use App\Modules\Webinars\Data\WebinarMessageData;
 use App\Modules\Webinars\Models\WebinarRegistration;
@@ -16,6 +17,7 @@ class DispatchWebinarRegistrationMessagesAction
     public function __construct(
         private readonly DispatchMessageAction $dispatchMessageAction,
         private readonly MessageEligibilityGate $messageEligibilityGate,
+        private readonly MessageChannelAvailability $messageChannelAvailability,
     ) {}
 
     public function handle(WebinarRegistration $registration): void
@@ -32,7 +34,7 @@ class DispatchWebinarRegistrationMessagesAction
 
         $messageData = WebinarMessageData::fromRegistration($registration)->toArray();
 
-        foreach ([MessageChannel::Email, MessageChannel::Sms] as $channel) {
+        foreach ($this->availableTransactionalChannels($registration) as $channel) {
             if (! $this->messageEligibilityGate->allows(
                 contact: $registration->contact,
                 channel: $channel,
@@ -68,4 +70,28 @@ class DispatchWebinarRegistrationMessagesAction
             );
         }
     }
+    /**
+     * @return array<int, MessageChannel>
+     */
+    private function availableTransactionalChannels(WebinarRegistration $registration): array
+    {
+        $channels = $this->messageChannelAvailability->visibleChannelsForSurface(
+            surface: 'webinar_registrations',
+            purpose: MessagePurpose::Transactional->value,
+            scope: self::SCOPE,
+        );
+
+        $acceptedChannels = $registration->meta['accepted_channels']['transactional'] ?? null;
+
+        if (is_array($acceptedChannels)) {
+            $channels = array_values(array_intersect($channels, $acceptedChannels));
+        }
+
+        return collect($channels)
+            ->map(fn (string $channel): ?MessageChannel => MessageChannel::tryFrom($channel))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
 }

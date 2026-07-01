@@ -2,13 +2,14 @@
 
 namespace Tests\Feature\Webinars;
 
-use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
 
 class WebinarRegistrationControllerTest extends TestCase
@@ -20,6 +21,8 @@ class WebinarRegistrationControllerTest extends TestCase
         parent::setUp();
 
         Cache::flush();
+
+        $this->configureWebinarRegistrationChannelAvailability();
     }
 
     public function test_show_displays_notify_me_page_when_no_upcoming_webinar_exists(): void
@@ -64,6 +67,52 @@ class WebinarRegistrationControllerTest extends TestCase
         $response->assertSee(route('webinar.registration.store', $series->slug), false);
     }
 
+    public function test_show_hides_sms_consent_options_when_sms_is_not_available_for_registration(): void
+    {
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'hidden-sms',
+            'title' => 'Hidden SMS',
+        ]);
+
+        Webinar::factory()->create([
+            'webinar_series_id' => $series->id,
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $response = $this->get(route('webinar.show', $series->slug));
+
+        $response->assertOk();
+
+        $response->assertSee('name="transactional_email_consent"', false);
+        $response->assertSee('name="marketing_email_consent"', false);
+        $response->assertDontSee('name="transactional_sms_consent"', false);
+        $response->assertDontSee('name="marketing_sms_consent"', false);
+    }
+
+    public function test_show_displays_sms_consent_options_when_sms_is_available_for_registration(): void
+    {
+        $this->enableWebinarRegistrationSms();
+
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'visible-sms',
+            'title' => 'Visible SMS',
+        ]);
+
+        Webinar::factory()->create([
+            'webinar_series_id' => $series->id,
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $response = $this->get(route('webinar.show', $series->slug));
+
+        $response->assertOk();
+
+        $response->assertSee('name="transactional_sms_consent"', false);
+        $response->assertSee('name="marketing_sms_consent"', false);
+    }
+
     public function test_index_displays_only_active_series(): void
     {
         $activeSeries = WebinarSeries::factory()->create([
@@ -104,7 +153,7 @@ class WebinarRegistrationControllerTest extends TestCase
             'email' => 'jeff@example.com',
             'phone' => '6155551212',
             'transactional_email_consent' => true,
-            'transactional_sms_consent' => true,
+            'transactional_sms_consent' => false,
             'marketing_email_consent' => false,
             'marketing_sms_consent' => false,
         ]);
@@ -149,8 +198,38 @@ class WebinarRegistrationControllerTest extends TestCase
             ->assertDontSee(route('webinar.waitlist.store', $series->slug), false);
     }
 
+    public function test_store_rejects_sms_consent_when_sms_is_not_available_for_registration(): void
+    {
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'homebuyer-basics',
+        ]);
+
+        Webinar::factory()->create([
+            'webinar_series_id' => $series->id,
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $response = $this->from(route('webinar.show', $series->slug))
+            ->post(route('webinar.registration.store', $series->slug), [
+                'first_name' => 'Jeff',
+                'last_name' => 'Yarnall',
+                'email' => 'jeff@example.com',
+                'phone' => '6155551212',
+                'transactional_email_consent' => true,
+                'transactional_sms_consent' => true,
+                'marketing_email_consent' => false,
+                'marketing_sms_consent' => false,
+            ]);
+
+        $response->assertRedirect(route('webinar.show', $series->slug));
+        $response->assertSessionHasErrors('transactional_sms_consent');
+    }
+
     public function test_store_requires_phone_when_transactional_sms_consent_is_checked(): void
     {
+        $this->enableWebinarRegistrationSms();
+
         $series = WebinarSeries::factory()->create([
             'status' => 'active',
             'slug' => 'homebuyer-basics',
@@ -179,6 +258,8 @@ class WebinarRegistrationControllerTest extends TestCase
 
     public function test_store_requires_phone_when_marketing_sms_consent_is_checked(): void
     {
+        $this->enableWebinarRegistrationSms();
+
         $series = WebinarSeries::factory()->create([
             'status' => 'active',
             'slug' => 'homebuyer-basics',
@@ -243,5 +324,39 @@ class WebinarRegistrationControllerTest extends TestCase
         $response->assertSessionHasErrors([
             'email' => 'This email has already been used to register for this webinar.',
         ]);
+    }
+
+    private function configureWebinarRegistrationChannelAvailability(): void
+    {
+        Config::set('messaging.channel_availability.email', [
+            'runtime_supported' => true,
+            'provider_enabled' => true,
+            'requires_explicit_opt_in' => false,
+            'surfaces' => [
+                'webinar_registrations' => true,
+            ],
+            'purpose_scopes' => [
+                'transactional:webinar' => true,
+                'marketing:webinar_nurture' => true,
+            ],
+        ]);
+
+        Config::set('messaging.channel_availability.sms', [
+            'runtime_supported' => true,
+            'provider_enabled' => true,
+            'requires_explicit_opt_in' => true,
+            'surfaces' => [
+                'webinar_registrations' => false,
+            ],
+            'purpose_scopes' => [
+                'transactional:webinar' => true,
+                'marketing:webinar_nurture' => true,
+            ],
+        ]);
+    }
+
+    private function enableWebinarRegistrationSms(): void
+    {
+        Config::set('messaging.channel_availability.sms.surfaces.webinar_registrations', true);
     }
 }

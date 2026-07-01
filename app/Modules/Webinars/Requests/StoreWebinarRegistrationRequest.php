@@ -2,6 +2,7 @@
 
 namespace App\Modules\Webinars\Requests;
 
+use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarSeries;
@@ -11,6 +12,8 @@ use Illuminate\Validation\Validator;
 
 class StoreWebinarRegistrationRequest extends FormRequest
 {
+    private const SURFACE = 'webinar_registrations';
+
     public function authorize(): bool
     {
         return true;
@@ -54,13 +57,12 @@ class StoreWebinarRegistrationRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
-                if (
-                    ! $this->boolean('transactional_email_consent')
-                    && ! $this->boolean('transactional_sms_consent')
-                ) {
+                $this->rejectUnavailableSelectedChannels($validator);
+
+                if (! $this->hasSelectedAvailableTransactionalChannel()) {
                     $validator->errors()->add(
                         'transactional_consent',
-                        'Consent to at least one (Email or SMS) transactional message fields are required for this webinar.'
+                        'Consent to at least one available webinar notification channel is required.'
                     );
                 }
 
@@ -77,14 +79,72 @@ class StoreWebinarRegistrationRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'phone.required' => 'Since you checked SMS consent fields, please enter a phone number,.',
+            'phone.required' => 'Since you checked SMS consent fields, please enter a phone number.',
         ];
     }
 
     private function requiresPhoneNumber(): bool
     {
-        return $this->boolean('transactional_sms_consent')
-            || $this->boolean('marketing_sms_consent');
+        return (
+            $this->boolean('transactional_sms_consent')
+            && $this->channelAvailable('sms', 'transactional', 'webinar')
+        ) || (
+            $this->boolean('marketing_sms_consent')
+            && $this->channelAvailable('sms', 'marketing', 'webinar_nurture')
+        );
+    }
+
+    private function hasSelectedAvailableTransactionalChannel(): bool
+    {
+        foreach ($this->availableTransactionalChannels() as $channel) {
+            if ($this->boolean("transactional_{$channel}_consent")) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function rejectUnavailableSelectedChannels(Validator $validator): void
+    {
+        foreach ([
+            'transactional_email_consent' => ['email', 'transactional', 'webinar'],
+            'transactional_sms_consent' => ['sms', 'transactional', 'webinar'],
+            'marketing_email_consent' => ['email', 'marketing', 'webinar_nurture'],
+            'marketing_sms_consent' => ['sms', 'marketing', 'webinar_nurture'],
+        ] as $field => [$channel, $purpose, $scope]) {
+            if (
+                $this->boolean($field)
+                && ! $this->channelAvailable($channel, $purpose, $scope)
+            ) {
+                $validator->errors()->add(
+                    $field,
+                    'This communication channel is not available for this registration form.'
+                );
+            }
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function availableTransactionalChannels(): array
+    {
+        return app(MessageChannelAvailability::class)->visibleChannelsForSurface(
+            surface: self::SURFACE,
+            purpose: 'transactional',
+            scope: 'webinar',
+        );
+    }
+
+    private function channelAvailable(string $channel, string $purpose, string $scope): bool
+    {
+        return app(MessageChannelAvailability::class)->isVisibleForSurface(
+            channel: $channel,
+            surface: self::SURFACE,
+            purpose: $purpose,
+            scope: $scope,
+        );
     }
 
     private function duplicateRegistrationExists(): bool

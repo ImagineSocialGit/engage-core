@@ -6,6 +6,7 @@ use App\Modules\Webinars\Actions\CreateWebinarRegistrationAction;
 use App\Modules\Webinars\Actions\GetActiveWebinarSeriesAction;
 use App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction;
 use App\Http\Controllers\Controller;
+use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Webinars\Requests\StoreWebinarRegistrationRequest;
 use App\Support\Caching\CacheKey;
 use Illuminate\Http\Response;
@@ -71,11 +72,25 @@ class WebinarRegistrationController extends Controller
             ])->render();
         }
 
+        $channelAvailability = app(MessageChannelAvailability::class);
+
         return view('webinar.register', [
             'webinar' => $webinar,
             'series' => $series,
             'page' => $config->content('register', $series->slug, $series->meta ?? []),
             'style' => $config->style('register', $series->slug),
+            'webinarRegistrationChannels' => [
+                'transactional' => $channelAvailability->visibleChannelsForSurface(
+                    surface: 'webinar_registrations',
+                    purpose: 'transactional',
+                    scope: 'webinar',
+                ),
+                'marketing' => $channelAvailability->visibleChannelsForSurface(
+                    surface: 'webinar_registrations',
+                    purpose: 'marketing',
+                    scope: 'webinar_nurture',
+                ),
+            ],
         ])->render();
     }
 

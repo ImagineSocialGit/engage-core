@@ -600,10 +600,11 @@ Current surface keys may include:
 broadcasts
 campaigns
 permission_invitations
-webinar_registration
-webinar_waitlist
+webinar_registrations
+webinar_waitlists
 internal_notifications
 route_send_message_points
+```
 
 ## Review checklist before committing configs
 

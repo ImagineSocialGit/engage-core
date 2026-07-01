@@ -397,6 +397,7 @@
             :page="$page"
             :tokens="$tokens"
             :series="$series"
+            :webinar-registration-channels="$webinarRegistrationChannels ?? []"
         />
 
     </section>
