@@ -3,14 +3,14 @@
 namespace App\Modules\Broadcasts\Requests;
 
 use App\Modules\Broadcasts\Models\Broadcast;
-use App\Modules\Broadcasts\Requests\Concerns\NormalizesBroadcastRecipientFilter;
+use App\Modules\Core\Requests\Concerns\NormalizesContactFilter;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreBroadcastRequest extends FormRequest
 {
-    use NormalizesBroadcastRecipientFilter;
+    use NormalizesContactFilter;
 
     public function authorize(): bool
     {
@@ -25,7 +25,11 @@ class StoreBroadcastRequest extends FormRequest
             'subject' => ['required', 'string', 'max:255'],
             'body' => ['required', 'string'],
             'send_at' => ['nullable', 'date'],
-        ], $this->recipientFilterRules());
+        ], $this->contactFilterRules(
+            typeField: 'recipient_filter_type',
+            tagField: 'recipient_tag',
+            idsField: 'contact_ids',
+        ));
     }
 
     /**
@@ -51,7 +55,12 @@ class StoreBroadcastRequest extends FormRequest
                 'subject' => $validated['subject'],
                 'body' => $validated['body'],
             ],
-            'recipient_filter' => $this->recipientFilterAttributes($validated),
+            'recipient_filter' => $this->contactFilterAttributes(
+                validated: $validated,
+                typeField: 'recipient_filter_type',
+                tagField: 'recipient_tag',
+                idsField: 'contact_ids',
+            ),
             'recipient_count' => 0,
             'scheduled_count' => 0,
             'meta' => [

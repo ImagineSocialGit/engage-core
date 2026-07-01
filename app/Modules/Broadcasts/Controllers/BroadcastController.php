@@ -10,6 +10,7 @@ use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Broadcasts\Requests\StoreBroadcastRequest;
 use App\Modules\Broadcasts\Requests\UpdateBroadcastRequest;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Services\Contacts\ContactFilterResolver;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,10 @@ use Illuminate\View\View;
 
 class BroadcastController extends Controller
 {
+    public function __construct(
+        private readonly ContactFilterResolver $contactFilterResolver,
+    ) {}
+
     public function index(Request $request): View
     {
         $broadcasts = Broadcast::query()
@@ -171,23 +176,10 @@ class BroadcastController extends Controller
      */
     private function selectedContactOptions(array $contactIds): Collection
     {
-        $contactIds = collect($contactIds)
-            ->filter(fn (mixed $value): bool => is_numeric($value))
-            ->map(fn (mixed $value): int => (int) $value)
-            ->filter(fn (int $value): bool => $value > 0)
-            ->unique()
-            ->values();
-
-        if ($contactIds->isEmpty()) {
-            return new Collection();
-        }
-
-        return Contact::query()
-            ->whereIn('id', $contactIds->all())
-            ->orderBy('last_name')
-            ->orderBy('first_name')
-            ->orderBy('email')
-            ->get(['id', 'first_name', 'last_name', 'name', 'email', 'phone']);
+        return $this->contactFilterResolver->resolve([
+            'type' => 'contact_ids',
+            'contact_ids' => $contactIds,
+        ]);
     }
 
     /**

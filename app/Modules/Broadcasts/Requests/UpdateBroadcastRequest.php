@@ -2,12 +2,12 @@
 
 namespace App\Modules\Broadcasts\Requests;
 
-use App\Modules\Broadcasts\Requests\Concerns\NormalizesBroadcastRecipientFilter;
+use App\Modules\Core\Requests\Concerns\NormalizesContactFilter;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateBroadcastRequest extends FormRequest
 {
-    use NormalizesBroadcastRecipientFilter;
+    use NormalizesContactFilter;
 
     public function authorize(): bool
     {
@@ -21,7 +21,11 @@ class UpdateBroadcastRequest extends FormRequest
             'subject' => ['required', 'string', 'max:255'],
             'body' => ['required', 'string'],
             'send_at' => ['nullable', 'date'],
-        ], $this->recipientFilterRules());
+        ], $this->contactFilterRules(
+            typeField: 'recipient_filter_type',
+            tagField: 'recipient_tag',
+            idsField: 'contact_ids',
+        ));
     }
 
     /**
@@ -38,7 +42,12 @@ class UpdateBroadcastRequest extends FormRequest
                 'subject' => $validated['subject'],
                 'body' => $validated['body'],
             ],
-            'recipient_filter' => $this->recipientFilterAttributes($validated),
+            'recipient_filter' => $this->contactFilterAttributes(
+                validated: $validated,
+                typeField: 'recipient_filter_type',
+                tagField: 'recipient_tag',
+                idsField: 'contact_ids',
+            ),
         ];
     }
 }
