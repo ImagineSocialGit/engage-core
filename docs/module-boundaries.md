@@ -165,15 +165,42 @@ Everything else belongs to a first-party module, vertical module, or app-global 
 
 A table should not move ownership after client rollout unless there is a clear architectural mistake.
 
+## Module Tiers
+
+Engage Core should be organized in four layers:
+
+1. Core
+2. Universal modules
+3. Vertical modules
+4. Integrations/adapters
+
+Core is the minimal identity/contact foundation. It should almost never change unless a new universal capability requires a genuinely generic Core seam. When Core does change, prefer adding a module-neutral extension point, contract, or registry rather than storing new domain state on Core models.
+
+Universal modules are reusable capability modules. They may not be enabled for every client, but they are not tied to one business vertical. Universal modules own generic capabilities such as messaging, tasks, scheduling, forms, documents, portal access, commerce, webinars, reporting, and automation.
+
+Vertical modules compose Core and universal modules into a business-specific product. Vertical modules own domain language, domain records, vertical-specific workflow meaning, and vertical-specific integrations or mappings.
+
+Integrations/adapters connect modules to external providers. They are not modules. They live behind module-owned contracts, managers, services, or provider abstractions.
+
+Decision rule:
+
+    Core = required identity/contact foundation.
+    Universal module = reusable capability many verticals can use.
+    Vertical module = business-domain-specific concepts/rules/language.
+    Integration = external provider adapter behind the owning module.
+
 ## Current Module Layout
 
 Primary application modules live under:
 
     app/Modules
 
-Current modules include:
+Current Core module:
 
 - `Core`
+
+Current universal modules include:
+
 - `Messaging`
 - `InboundMessaging`
 - `InternalNotifications`
@@ -184,7 +211,24 @@ Current modules include:
 - `Broadcasts`
 - `Webinars`
 - `Reporting`
+
+Planned universal modules include:
+
+- `Scheduling`
+- `Portal`
+- `Forms`
+- `Documents`
+- `Commerce`
+- `Location`
+
+Current vertical modules include:
+
 - `Mortgage`
+
+Planned vertical modules include:
+
+- `PetServices`
+- `Music`
 
 Blade views intentionally remain under:
 
@@ -229,6 +273,19 @@ Accepted dependency direction:
 - InboundMessaging -> Messaging
 - InternalNotifications -> Messaging
 - InternalNotifications may conditionally integrate with InboundMessaging through events/listeners
+- Scheduling -> Core
+- Scheduling may optionally use Messaging, Tasks, InternalNotifications, Portal, and Integrations through public services/contracts when those modules are enabled
+- Portal -> Core
+- Portal may optionally use Messaging for account invitations/notifications
+- Forms -> Core, when submissions are contact-linked
+- Forms may optionally use Portal for customer-submitted forms
+- Documents -> Core, when documents are contact-linked
+- Documents may optionally use Portal, Tasks, and Messaging through public services/contracts when those modules are enabled
+- Commerce -> Core
+- Commerce may use Integrations through provider contracts/managers such as a Shopify adapter
+- Location -> Core
+- PetServices may consume Core, Scheduling, Portal, Forms, Documents, Tasks, Messaging, Campaigns, FlowRoutes, Reporting, and Integrations as needed
+- Music may consume Core, Commerce, Messaging, Campaigns, Broadcasts, FlowRoutes, Reporting, Scheduling, Portal, and Integrations as needed
 - Mortgage may consume Core, Workflow, FlowRoutes, Tasks, Messaging, Campaigns, Broadcasts, Webinars, Reporting, and Integrations as needed
 - Messaging may use Integrations through provider contracts/managers
 - Webinars may use Integrations through provider contracts/managers
@@ -246,6 +303,14 @@ Avoid:
 - Core -> Broadcasts
 - Core -> FlowRoutes
 - Core -> Mortgage
+- Core -> Scheduling
+- Core -> Portal
+- Core -> Forms
+- Core -> Documents
+- Core -> Commerce
+- Core -> Location
+- Core -> PetServices
+- Core -> Music
 - Messaging -> InternalNotifications
 - Messaging -> InboundMessaging
 - Messaging -> Webinars
@@ -1589,6 +1654,303 @@ Reporting should avoid becoming a dumping ground for cross-module business logic
 
 Reporting should not mutate another module’s internal state directly.
 
+## Scheduling Module
+
+Scheduling is a planned universal module.
+
+Scheduling should own simple, intuitive appointment and booking behavior that can be reused by multiple verticals.
+
+Scheduling may be used for:
+
+- dog training sessions
+- consultations
+- coaching calls
+- music lessons
+- studio bookings
+- internal or customer-facing appointments
+
+Scheduling should own, when implemented:
+
+- bookable services
+- appointment records
+- appointment attendees
+- availability windows
+- scheduling rules
+- cancellation and rescheduling rules
+- appointment status/lifecycle behavior
+- customer-facing booking pages, if generic enough
+- appointment reminder orchestration through Messaging
+- appointment-related task creation through Tasks
+
+Scheduling should not own:
+
+- pet-specific training goals
+- dog behavior notes
+- music-specific lesson curriculum
+- mortgage-specific consultation outcomes
+- external customer identity/auth
+- file uploads or intake submissions
+
+Scheduling may depend on:
+
+- Core, for contact-linked appointments
+- Messaging, for appointment reminders
+- Tasks, for appointment-related manual work
+- InternalNotifications, for team-facing schedule alerts
+- Portal, for customer self-booking
+- Integrations, for external calendar sync adapters if added later
+
+Vertical modules may add domain-specific metadata or workflows around Scheduling records, but Scheduling should keep the core booking model vertical-neutral.
+
+Good:
+
+    PetServices -> Scheduling appointment for dog training session
+    Music -> Scheduling appointment for lesson or studio booking
+    Scheduling -> Messaging appointment reminder
+
+Bad:
+
+    Scheduling owns dog training plan state
+    Scheduling owns fan purchase history
+    Scheduling stores vertical-specific business rules directly on appointments
+
+## Portal Module
+
+Portal is a planned universal module.
+
+Portal should own external/customer account access. It is separate from internal app users.
+
+Portal may be used for:
+
+- customer self-booking
+- customer intake forms
+- document uploads
+- account invitations
+- self-service profile/preferences
+- customer-facing dashboards
+
+Portal should own, when implemented:
+
+- portal users or customer account identities
+- contact-to-portal-user links
+- portal invitations
+- portal authentication and account lifecycle
+- customer-facing access permissions
+- generic portal dashboard shell
+
+Portal should not own:
+
+- internal team users
+- Contact records
+- appointment scheduling rules
+- form definitions
+- document review rules
+- vertical-specific customer profile fields
+
+Portal may depend on:
+
+- Core, for linking portal users to contacts
+- Messaging, for invitations and customer account notifications
+
+Scheduling, Forms, Documents, Commerce, PetServices, Music, Mortgage, or other modules may expose portal-facing functionality through Portal extension points.
+
+Good:
+
+    Portal owns customer login
+    Scheduling contributes customer booking UI
+    Documents contributes customer upload UI
+
+Bad:
+
+    Core users table doubles as customer portal accounts
+    Portal owns dog profiles or music purchases
+
+## Forms Module
+
+Forms is a planned universal module.
+
+Forms should own configurable forms, intake flows, submissions, and review state.
+
+Forms may be used for:
+
+- dog training intake forms
+- mortgage lead/application intake
+- music booking inquiries
+- webinar questionnaires
+- general client questionnaires
+
+Forms should own, when implemented:
+
+- form definitions
+- form versions
+- form fields/schema
+- form submissions
+- submission values
+- submission review state
+- optional mappings from submitted values into Contact or module-specific records
+
+Forms should not own:
+
+- uploaded document storage/review, except simple form attachments if explicitly designed
+- appointment booking
+- vertical-specific profile meaning
+- contact identity itself
+
+Forms may depend on:
+
+- Core, when submissions are contact-linked
+- Portal, when customers submit forms from portal accounts
+- Messaging, for form-submission notifications or confirmations if needed
+- Tasks, for follow-up review tasks if needed
+
+Vertical modules should own interpretation of vertical-specific answers.
+
+Good:
+
+    Forms stores submitted dog intake form answers
+    PetServices interprets those answers into pet/training data
+
+Bad:
+
+    Forms owns pet behavior models
+    Forms owns mortgage underwriting state
+
+## Documents Module
+
+Documents is a planned universal module.
+
+Documents should own document requests, uploaded files, document review status, and document-related audit trails. Raw file storage remains infrastructure/provider behavior; Documents owns the domain records around requested or submitted files.
+
+Documents may be used for:
+
+- dog vaccination records
+- waivers and agreements
+- mortgage income/asset documents
+- music contracts or assets
+- general customer uploads
+
+Documents should own, when implemented:
+
+- document requests
+- uploaded document records
+- document categories/types, if generic
+- document review events
+- document status/lifecycle behavior
+- links to related subjects through morphs where appropriate
+
+Documents should not own:
+
+- pet vaccination policy meaning, if domain-specific
+- mortgage underwriting/doc collection state, if domain-specific
+- customer authentication
+- generic task assignment semantics
+
+Documents may depend on:
+
+- Core, when documents are contact-linked
+- Portal, for customer uploads
+- Tasks, for review/follow-up tasks
+- Messaging, for document request/reminder messages
+
+Vertical modules may define vertical-specific document types, requirements, and interpretation rules while Documents owns the reusable upload/request/review capability.
+
+Good:
+
+    Documents owns uploaded vaccination record file
+    PetServices owns whether that vaccination record satisfies dog-training requirements
+
+Bad:
+
+    Documents owns full mortgage loan document underwriting state
+
+## Commerce Module
+
+Commerce is a planned universal module.
+
+Commerce should own normalized purchase/order/product facts that can be used by multiple verticals.
+
+Commerce may be used for:
+
+- Shopify purchase history
+- product-based contact filters
+- fan/customer segmentation
+- post-purchase campaigns
+- purchase-triggered automation events
+
+Commerce should own, when implemented:
+
+- commerce products
+- commerce orders
+- commerce order items
+- customer/contact links
+- external commerce IDs and sync metadata
+- normalized purchase events
+- commerce provider sync state
+
+Commerce should not own:
+
+- Shopify adapter internals directly in module business logic
+- music-specific fan/release strategy
+- pet-service package fulfillment rules, unless modeled generically
+- Contact identity itself
+
+Commerce may depend on:
+
+- Core, for linking purchases to contacts
+- Messaging, Campaigns, or FlowRoutes through public actions/events when purchase behavior triggers communication or automation
+- Integrations, through provider contracts/managers such as Shopify
+
+Shopify should be an adapter behind Commerce, not the module itself.
+
+Good:
+
+    Shopify adapter -> Commerce normalized order records
+    Music -> Commerce read service: has purchased product X
+    Commerce -> AutomationEventRecorded(commerce.order_created)
+
+Bad:
+
+    Music imports Shopify adapter directly for general purchase lookup
+    Core stores purchased product IDs on contacts
+
+## Location Module
+
+Location is a planned universal module.
+
+Location should own reusable geographic information when the app needs location-aware behavior that goes beyond simple contact source/import metadata.
+
+Location may be used for:
+
+- radius filtering
+- service-area matching
+- market/city/region segmentation
+- event/show proximity targeting
+- appointment service-area eligibility
+
+Location should own, when implemented:
+
+- contact locations
+- address/city/state/zip/country records
+- latitude/longitude
+- normalized market/region data
+- radius and service-area filtering
+
+Location should not be part of Core contacts unless there is a deliberate future decision to make basic address fields Core.
+
+Location may depend on:
+
+- Core, for contact-linked locations
+- Integrations, for geocoding or address-normalization providers if added later
+
+Good:
+
+    Broadcasts asks Core/filter seam for contacts matching a Location-provided radius filter
+    Music targets contacts near an upcoming show through Location-provided filters
+
+Bad:
+
+    Core contacts become the permanent home for every location/address use case by default
+
 ## Mortgage Module
 
 Mortgage is a vertical module.
@@ -1625,18 +1987,104 @@ Vertical-specific migrations belong under:
 
 Mortgage may depend on Arive or other LOS providers through adapter contracts/services.
 
-## Location Module
+## PetServices Module
 
-Location is not currently present in the tree, but may exist later as an optional module.
+PetServices is a planned vertical module.
 
-Location would own:
+PetServices should own pet-service and dog-training-specific business meaning.
 
-- contact locations
-- city/state/zip/country
-- latitude/longitude
-- radius/market filtering
+PetServices may own, when implemented:
 
-Location should not be part of Core contacts unless there is a deliberate future decision to make basic address fields core.
+- pets/dogs
+- pet profiles
+- dog training programs
+- training goals
+- behavior notes
+- trainer assignments, if domain-specific
+- vaccination requirement rules, if domain-specific
+- pet-service-specific workflow definitions
+- pet-service-specific FlowRoute definitions
+- pet-service-specific form/document templates and interpretation rules
+
+PetServices may consume:
+
+- Core
+- Scheduling
+- Portal
+- Forms
+- Documents
+- Tasks
+- Messaging
+- Campaigns
+- Broadcasts
+- FlowRoutes
+- Reporting
+- Integrations
+
+PetServices must not push pet-specific state into Core contacts.
+
+Vertical-specific migrations should live in:
+
+    database/migrations/verticals/pet-services
+
+Good:
+
+    PetServices owns DogProfile
+    Scheduling owns appointment time/status
+    Documents owns uploaded vaccination record
+    PetServices decides whether that record satisfies a dog-training requirement
+
+Bad:
+
+    Core contacts get dog_name, breed, vaccination_status, or training_goal columns
+    Scheduling owns dog behavior/training data
+
+## Music Module
+
+Music is a planned vertical module.
+
+Music should own music-specific business meaning and fan/customer strategy.
+
+Music may own, when implemented:
+
+- artist/fan-specific profile data, if needed
+- release campaign configuration/meaning
+- music product interest categories
+- fan segmentation rules that are music-specific
+- show/event interest behavior that is not generic Scheduling or Location
+- music-specific Commerce mappings, if generic Commerce records are not enough
+- music-specific FlowRoute/Campaign presets
+
+Music may consume:
+
+- Core
+- Commerce
+- Messaging
+- Campaigns
+- Broadcasts
+- FlowRoutes
+- Scheduling
+- Portal
+- Location
+- Reporting
+- Integrations
+
+Music must not push music-specific state into Core contacts.
+
+Vertical-specific migrations should live in:
+
+    database/migrations/verticals/music
+
+Good:
+
+    Commerce owns normalized Shopify orders
+    Music decides what buying vinyl, merch, or tickets means for fan segmentation
+    Location provides show-radius contact filtering when needed
+
+Bad:
+
+    Core contacts store purchased_shopify_product_ids
+    Music imports Shopify adapter directly for generic order sync
 
 ## Adapters / Integrations
 
@@ -1647,6 +2095,9 @@ Examples:
 - Resend powers email
 - Telnyx/Twilio power SMS
 - Zoom powers webinar behavior
+- Shopify adapter powers Commerce
+- External calendar adapters may power Scheduling sync later
+- Geocoding/address providers may power Location later
 - Arive may power mortgage LOS behavior later
 
 Adapters should sit behind contracts, managers, resolvers, or provider services.
@@ -1663,6 +2114,9 @@ Current examples:
     app/Integrations/Messaging/Sms/Telnyx
     app/Integrations/Messaging/Sms/Twilio
     app/Integrations/Webinars/Zoom
+    app/Integrations/Commerce/Shopify, later
+    app/Integrations/Scheduling, later
+    app/Integrations/Location, later
 
 ## Contact Show UI
 

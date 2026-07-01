@@ -261,6 +261,46 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - FlowRoutes should advance when a related route task is completed.
   - It should ignore unrelated task changes.
 
+### Universal module planning
+
+- [ ] Add a project-organization reference doc that classifies systems as Core, universal modules, vertical modules, and integrations.
+  - Keep this separate from `module-boundaries.md` where possible.
+  - Use it as a quick orientation map for future threads and client planning.
+
+- [ ] Plan the Scheduling universal module.
+  - Keep Scheduling vertical-neutral.
+  - Support simple appointment/session/booking behavior.
+  - Dog training sessions, consultations, lessons, coaching, and studio bookings should all fit the generic model.
+  - Scheduling may use Messaging for reminders, Tasks for appointment-related follow-up, Portal for customer self-booking, and integrations for external calendar sync later.
+  - PetServices, Music, Mortgage, or other verticals should own domain-specific meaning around scheduled appointments.
+
+- [ ] Plan the Portal universal module.
+  - Keep Portal separate from internal app users.
+  - Own external/customer account identity, contact links, account invitations, portal auth, and generic portal dashboard/access behavior.
+  - Scheduling, Forms, Documents, Commerce, and vertical modules may contribute portal-facing surfaces later.
+  - Do not push portal account state into Core contacts.
+
+- [ ] Plan the Forms universal module.
+  - Own form definitions, versions, schemas, submissions, submission values, and review state.
+  - Support dog intake forms, mortgage intake, music booking inquiries, webinar questionnaires, and other client questionnaires.
+  - Vertical modules should own interpretation of vertical-specific answers.
+
+- [ ] Plan the Documents universal module.
+  - Own document requests, uploaded document records, review events, and generic document lifecycle state.
+  - Support dog vaccination records, waivers, mortgage documents, music contracts/assets, and general customer uploads.
+  - Vertical modules should own domain-specific document requirements and interpretation rules.
+
+- [ ] Plan the Commerce universal module.
+  - Own normalized products, orders, order items, customer/contact links, external IDs, sync metadata, and purchase events.
+  - Shopify should be an adapter behind Commerce, not a Music-owned provider dependency.
+  - Music can consume Commerce to answer questions like whether a contact bought a specific product.
+  - Do not store purchase history directly on Core contacts.
+
+- [ ] Revisit Location as a universal module when location-aware behavior becomes necessary.
+  - Own contact locations, city/state/zip/country, latitude/longitude, markets/regions, radius filters, and service-area behavior.
+  - Useful for music show-radius targeting, dog trainer service areas, scheduling eligibility, and future local campaigns.
+  - Do not push broad address/location behavior into Core by default.
+
 ### Client self-serve readiness
 
 - [ ] Do not treat controlled beta readiness as full client self-serve readiness.
@@ -274,6 +314,23 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - Import mapping/review.
   - Broadcast/permission invitation setup.
   - Provider/channel settings.
+
+### Vertical module planning
+
+- [ ] Plan the PetServices vertical module.
+  - Own pets/dogs, pet profiles, training programs, training goals, dog behavior notes, trainer-specific domain rules, and pet-service-specific workflows.
+  - Consume Scheduling for dog training appointments/sessions.
+  - Consume Portal for customer access.
+  - Consume Forms for dog intake forms.
+  - Consume Documents for vaccination records, waivers, and other uploads.
+  - Keep pet-specific fields out of Core contacts.
+
+- [ ] Plan the Music vertical module.
+  - Own music-specific fan/customer meaning, release/fan campaign strategy, music product interest categories, and music-specific segmentation rules.
+  - Consume Commerce for Shopify/purchase facts.
+  - Consume Location later for show-radius targeting if needed.
+  - Consume Campaigns, Broadcasts, Messaging, and FlowRoutes for fan communication/automation.
+  - Keep music-specific purchase/interest state out of Core contacts unless represented through a proper universal module relation.
 
 ### Documentation maintenance
 
