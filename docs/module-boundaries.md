@@ -58,6 +58,8 @@ Feature availability is controlled through:
 
 Do not put module-enabled conditionals inside normal shared migrations.
 
+During pre-rollout branch work, replace current branch migrations when a table shape changes instead of adding modify-table migrations. Once a migration has shipped to a real environment that must be preserved, use normal append-only migrations.
+
 The database can contain reusable capability tables even when a module is not visible to the current client.
 
 ## Module Enabled vs Provider Loaded
@@ -75,6 +77,8 @@ Example:
 Feature visibility should follow explicit module enablement.
 
 Provider availability may include dependencies.
+
+SMS code may exist even when SMS UI is hidden. SMS provider integrations, consent handling, STOP/HELP behavior, and runtime gates may remain available while config hides SMS options from Broadcast, Campaign, permission-invitation, or other client/admin builders.
 
 ## Migration Organization
 
@@ -129,6 +133,7 @@ Current ownership:
 | message_consents | Messaging |
 | consent_revocations | Messaging |
 | scheduled_messages | Messaging |
+| contact_permission_invitations | Messaging |
 | message_suppressions | Messaging |
 | inbound_messages | InboundMessaging |
 | campaigns | Campaigns |
@@ -314,6 +319,7 @@ Shape:
     subject_id nullable
     occurred_at
     payload
+    consent_policy
     meta
 
 Examples:
@@ -430,9 +436,9 @@ Bad:
     TaskSpecificContactLookupController
     WebinarSpecificContactPicker
 
-Core may own a future generic contact filter resolver.
+Core owns the generic contact filter resolver used by modules for stable Contact-owned filter facts.
 
-That resolver should understand stable Core-owned contact facts such as contact IDs, tags, statuses, source fields, and generic timestamps.
+That resolver should understand stable Core-owned contact facts such as contact IDs, tags, imported/source fields, statuses, and generic timestamps.
 
 Modules may consume resolved contact sets, but Core should not absorb module-specific business rules by default.
 
@@ -454,6 +460,9 @@ Messaging owns:
 - message consents
 - consent revocations
 - message suppressions
+- contact permission invitations
+- imported-contact one-time opt-in invitation records
+- public preference confirmation pages for Messaging consent
 - email/SMS provider contracts
 - provider managers
 - message payloads
@@ -560,6 +569,36 @@ Internal team notification preferences belong to InternalNotifications, not Mess
 Generic recipient support for scheduled delivery lives in `scheduled_messages.recipient_type` / `scheduled_messages.recipient_id`.
 
 Messaging may schedule messages for non-Contact recipients through recipient payload/gate extension points, but it should not own those recipient models or their preferences.
+
+
+### Imported-contact permission invitations
+
+Messaging owns the one-time imported-contact permission invitation capability.
+
+This includes:
+
+- `contact_permission_invitations`
+- invitation token generation
+- one-time invitation enforcement
+- public preference confirmation route/controller
+- public preference page consent recording
+- accepted channel tracking
+- runtime injection of preference URLs into invitation email payloads
+
+The invitation is not a general consent bypass.
+
+Rules:
+
+- The bypass applies only to the canonical imported-contact permission invitation message.
+- The invitation send is email-only.
+- The recipient must be an imported Contact.
+- The invitation must use `message_type = imported_contact_permission_invitation`.
+- The invitation must carry a `consent_policy.permission_invitation` payload with `source = imported_contact` and `one_time = true`.
+- The system must refuse repeat invitations once a `contact_permission_invitations` row exists for the same contact/channel/source.
+- Accepted public preferences create normal Messaging `MessageConsent` records for configured scopes.
+- SMS consent must be explicitly selected by the contact and must not be inferred from email consent.
+
+Other modules may request this flow through Messaging public services/actions, but they must not create invitation records directly.
 
 ## InboundMessaging Module
 
@@ -1276,7 +1315,7 @@ Broadcasts owns:
 - broadcast recipient filter metadata
 - broadcast recipient state
 - ad hoc one-time message payload/copy
-- broadcast scheduling/orchestration behavior later
+- broadcast scheduling/orchestration behavior
 - broadcast-specific metadata
 - broadcast delivery bookkeeping
 
@@ -1340,7 +1379,13 @@ Current supported recipient filter shapes include:
       "contact_ids": [1, 2, 3]
     }
 
-Broadcasts may store recipient filter definitions, but Core should own generic contact lookup and future generic contact filter resolution.
+    {
+      "type": "imported"
+    }
+
+`imported` is a Core-owned contact filter for contacts imported from another system. Current imported detection includes `source = import`, `meta.imported = true`, or `meta.imported_at`.
+
+Broadcasts may store recipient filter definitions, but Core owns generic contact lookup and generic contact filter resolution.
 
 Broadcasts should not become the app-wide contact query engine.
 
@@ -1403,6 +1448,24 @@ Current runtime direction:
     BroadcastRecipient stores resulting scheduled_message_ids/status bookkeeping
     Broadcast listeners record sent/skipped/failed Messaging lifecycle events
     Broadcast completes when every BroadcastRecipient is terminal
+
+
+### Broadcast opt-in invitations
+
+Broadcasts may provide a UI entry point for the imported-contact opt-in invitation, but the permission-invitation rules are Messaging-owned.
+
+A permission invitation Broadcast should:
+
+- use `channel = email`
+- use `purpose = transactional`
+- use `scope = permission_invitation`
+- use `dispatch_key = imported_contact_permission_invitation`
+- use `message_type = imported_contact_permission_invitation`
+- use `recipient_filter = {"type":"imported"}`
+
+A normal Broadcast must not receive the imported-contact bypass.
+
+Normal Broadcasts remain consent-gated by Messaging.
 
 Broadcast cancellation should use Messaging-owned skip behavior for pending scheduled messages rather than mutating Messaging internals directly.
 

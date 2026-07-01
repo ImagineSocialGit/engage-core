@@ -17,10 +17,14 @@ Use these rules when converting a client request into config:
 10. `config/modules.php` owns enabled modules and dependency visibility.
 11. Use `lead/leads` in CRM/client-facing text unless explicitly told otherwise.
 12. Default webinar configs should be vertical-neutral. Vertical-specific copy belongs in vertical-specific scopes.
+13. SMS capabilities may exist in code even when SMS is hidden in client/admin UI. UI exposure for SMS options should be controlled by config.
+14. Normal Broadcasts require normal Messaging consent. Imported-contact opt-in invitations are a distinct one-time email flow, not a general Broadcast consent bypass.
+15. While a branch is still pre-rollout, replace current branch migrations instead of adding modify-table migrations. After rollout, use normal append-only migrations.
 
 ## Preferred purpose/scope pairs
 
 - `transactional:webinar` for confirmations, reminders, join reminders, replay/recording follow-ups.
+- `transactional:permission_invitation` for imported-contact one-time opt-in invitation emails.
 - `marketing:webinar_nurture` for attended/missed webinar nurture campaigns.
 - `marketing:webinar_waitlist` for waitlist notifications.
 - `marketing:mortgage_homebuyer_nurture` for mortgage-specific long-term homebuyer nurture.
@@ -34,6 +38,8 @@ Use these rules when converting a client request into config:
 - `webinar_added` — webinar waitlist availability trigger.
 - `webinar_ended` — post-webinar transactional follow-up trigger.
 - `campaign_step_due` — campaign step message trigger.
+- `broadcast_send` — one-time Broadcast send trigger.
+- `imported_contact_permission_invitation` — one-time imported-contact preference confirmation email trigger.
 
 Legacy only:
 
@@ -46,6 +52,7 @@ Legacy only:
 - `reminders`
 - `post_event`
 - `marketing`
+- `emails`
 - `waitlist`
 - `notifications`
 
@@ -68,5 +75,47 @@ Campaign-authored timing values:
 - `type = anchored` plus `minutes`, `hours`, or `days`
 
 Campaign step timing is authored in Campaign presets and normalized before dispatching through Messaging.
+
+## Broadcast recipient filter shapes
+
+Core owns generic contact filter resolution. Broadcasts store recipient selection metadata in `broadcasts.recipient_filter` and delegate contact lookup/resolution to Core.
+
+Supported current shapes:
+
+```json
+{"type":"all"}
+```
+
+```json
+{"type":"tag","tags":["homebuyer"]}
+```
+
+```json
+{"type":"contact_ids","contact_ids":[1,2,3]}
+```
+
+```json
+{"type":"imported"}
+```
+
+`imported` means contacts where `source = import`, `meta.imported = true`, or `meta.imported_at` exists.
+
+## Imported-contact opt-in invitations
+
+Imported contacts may receive exactly one permission invitation email through the special Messaging permission-invitation flow.
+
+This is not a normal marketing Broadcast bypass.
+
+Rules:
+
+- The invitation send is email-only.
+- The invitation uses `message_type = imported_contact_permission_invitation`.
+- The invitation uses `dispatch_key = imported_contact_permission_invitation`.
+- The invitation uses `purpose = transactional` and `scope = permission_invitation`.
+- `contact_permission_invitations` enforces one invitation per imported contact/source/channel.
+- The public preference page can let the contact opt into email, SMS, or both.
+- SMS opt-in requires explicit choice and a phone number.
+- Accepted channels create `MessageConsent` rows for configured scopes.
+- A normal marketing Broadcast to imported contacts still requires normal Messaging consent.
 
 Token references are documented in `TOKEN_REFERENCE.md`.

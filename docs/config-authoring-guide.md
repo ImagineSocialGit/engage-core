@@ -23,6 +23,9 @@ Primary references:
 9. Do not invent new keys until checking the key registry.
 10. Do not use undocumented tokens in client-facing message copy.
 11. Avoid backward compatibility/legacy aliases unless explicitly chosen.
+12. Normal Broadcasts require normal Messaging consent. Do not use Broadcasts as a general imported-contact consent bypass.
+13. Imported-contact opt-in invitations are a distinct one-time Messaging flow with configurable public copy/style.
+14. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
 
 ## Before creating a config
 
@@ -49,6 +52,10 @@ transactional:webinar
     Webinar reminders
     Live join reminders
     Replay/recording follow-ups
+
+transactional:permission_invitation
+    One-time imported-contact opt-in invitation emails
+    Public preference confirmation flow
 
 marketing:webinar_nurture
     Generic attended webinar nurture campaigns
@@ -110,6 +117,13 @@ Use automation_event_key: webinar.attended
 Use FlowRoute point type: enroll_campaign
 Use campaign_key: webinar_attended_nurture
 ```
+
+
+Client asks: “We imported contacts and need them to confirm whether they want email or SMS.”
+Use dispatch_key: imported_contact_permission_invitation
+Use purpose/scope: transactional:permission_invitation
+Use config/messaging/permission_invitations.php for public page and email CTA copy/style.
+Do not treat this as a normal marketing Broadcast bypass.
 
 ## When to add a new key
 
@@ -274,6 +288,7 @@ Examples:
 config/messaging/email/transactional/webinar.php
 config/messaging/email/marketing/webinar_nurture.php
 config/messaging/email/marketing/mortgage_homebuyer_nurture.php
+config/messaging/permission_invitations.php
 client/slam-dunk-crm/config/messaging/email/transactional/webinar.php
 client/slam-dunk-crm/config/messaging/email/marketing/webinar_nurture.php
 ```
@@ -506,6 +521,73 @@ scope = webinar
 
 Marketing nurture after attendance/missed outcomes should happen separately through FlowRoutes enrolling Campaigns.
 
+
+## Imported-contact permission invitation config
+
+Imported-contact opt-in invitations are authored separately from normal Broadcast copy.
+
+Use:
+
+```text
+config/messaging/permission_invitations.php
+client/{client-key}/config/messaging/permission_invitations.php
+```
+
+This config owns public preference-page copy, email CTA labels, accepted consent scopes, and Tailwind-style class strings for the public page.
+
+Expected top-level shape:
+
+```php
+return [
+    'email' => [
+        'cta_label' => 'Confirm my preferences',
+        'secondary_link_label' => 'Or copy and paste this link into your browser',
+    ],
+
+    'consent' => [
+        'scopes' => ['broadcast', 'campaign'],
+    ],
+
+    'content' => [
+        'title' => 'Confirm how you want to hear from us',
+        'heading' => 'Choose how you want to hear from us.',
+        'body' => '...',
+        'options' => [
+            'email' => ['label' => 'Email updates', 'body' => '...'],
+            'sms' => ['label' => 'Text message updates', 'body' => '...'],
+        ],
+        'legal' => '...',
+        'accepted_heading' => 'Your preferences are confirmed.',
+    ],
+
+    'style' => [
+        'section' => '...',
+        'inner' => '...',
+        'card' => '...',
+        'button' => '...',
+    ],
+];
+```
+
+The invitation email should include `{cta}` on its own line when the button should render in the body. The runtime injects `cta.url` and `secondary_link.url` using the invitation token.
+
+Do not hand-author public preference URLs in client copy.
+
+## SMS visibility and availability
+
+SMS provider code and SMS-capable runtime infrastructure may exist even when SMS is not exposed to a client in the UI.
+
+Client/surface config should control whether SMS appears as an option in:
+
+- Broadcast builders
+- Campaign builders
+- Permission invitation pages
+- Other future route/message builders
+
+Hiding SMS in UI does not remove SMS provider integrations, inbound STOP/HELP handling, consent models, or runtime safety checks.
+
+SMS opt-in must be explicit. Do not infer SMS consent from imported contacts, email consent, or general preference confirmation.
+
 ## Review checklist before committing configs
 
 - [ ] Does every config key exist in the key registry or client key registry?
@@ -522,6 +604,9 @@ Marketing nurture after attendance/missed outcomes should happen separately thro
 - [ ] Are transactional webinar messages using `transactional:webinar`?
 - [ ] Is mortgage-specific copy isolated to mortgage-specific scopes or client overrides?
 - [ ] Are SMS messages short and supplemental?
+- [ ] Is SMS UI exposure controlled by config when relevant?
+- [ ] Are imported-contact opt-in invitations separated from normal Broadcasts?
+- [ ] Does permission invitation copy avoid hand-authored preference URLs?
 - [ ] Are client-specific keys clearly client-owned?
 - [ ] Are new keys genuinely necessary?
 
@@ -551,6 +636,8 @@ Rules:
 - Use documented tokens only.
 - If the client request needs a missing token, recommend adding that token to the runtime payload or changing the copy.
 - Use lead/leads in CRM/client-facing text.
+- Keep SMS options config-toggleable in UI.
+- Keep imported-contact permission invitations separate from normal Broadcasts.
 
 Client request:
 [PASTE REQUEST HERE]

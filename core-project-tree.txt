@@ -799,12 +799,15 @@
 │   │   ├── messaging-email-template.php
 │   │   ├── messaging-sms-template.php
 │   │   ├── modules-template.php
+│   │   ├── permission-invitations.md
 │   │   ├── presets-root-template.php
 │   │   ├── README.md
 │   │   ├── task-presets-template.php
 │   │   ├── TOKEN_REFERENCE.md
 │   │   └── webinar-post-event-template.php
-│   └── module-boundaries.md
+│   ├── DOCUMENTATION_AUDIT.md
+│   ├── module-boundaries.md
+│   └── TODO.md
 ├── package.json
 ├── package-lock.json
 ├── phpunit.xml
@@ -1016,4 +1019,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-348 directories, 669 files
+348 directories, 672 files

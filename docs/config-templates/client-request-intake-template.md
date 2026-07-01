@@ -23,9 +23,14 @@ Rules:
 - Webinar post-event config owns provider orchestration, not message copy.
 - Default webinar configs should be vertical-neutral.
 - Vertical-specific copy belongs in vertical-specific scopes such as marketing:mortgage_homebuyer_nurture.
-- Email first. SMS can mirror after email passes.
+- Email first. SMS may mirror after email passes, but SMS visibility in UI should be config-toggleable per client/surface.
+- Normal Broadcasts require normal Messaging consent.
+- Imported-contact opt-in invitations are a distinct one-time email flow, not a normal Broadcast bypass.
+- Permission invitation copy/style lives in config/messaging/permission_invitations.php or a client override.
+- Permission invitation public pages may offer email, SMS, or both according to config/client requirements.
 - Use purpose/scope pairs:
   - transactional:webinar for confirmations/reminders/replay follow-ups.
+  - transactional:permission_invitation for imported-contact one-time opt-in invitation emails.
   - marketing:webinar_nurture for attended/missed webinar nurture campaigns.
   - marketing:webinar_waitlist for waitlist notices.
   - marketing:mortgage_homebuyer_nurture for mortgage-specific long-term homebuyer nurture.
@@ -34,6 +39,8 @@ Rules:
   - consent_granted for opt-in messages.
   - webinar_ended for transactional post-webinar replay/follow-ups.
   - campaign_step_due for campaign step messages.
+  - broadcast_send for regular one-time Broadcast sends.
+  - imported_contact_permission_invitation for the one-time imported-contact opt-in invitation.
 - Do not use marketing_message_sent for new configs.
 
 Attached reference templates:
@@ -41,6 +48,7 @@ Attached reference templates:
 - TOKEN_REFERENCE.md
 - messaging-email-template.php
 - messaging-sms-template.php
+- permission_invitations.php
 - campaign-presets-template.php
 - contact-status-presets-template.php
 - task-presets-template.php
