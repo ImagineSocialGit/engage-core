@@ -64,6 +64,14 @@ class SendScheduledMessageJob implements ShouldQueue
             return;
         }
 
+        if ($permissionInvitation) {
+            $this->applyPermissionInvitationPayload(
+                scheduledMessage: $scheduledMessage,
+                permissionInvitation: $permissionInvitation,
+                permissionInvitationService: $permissionInvitationService,
+            );
+        }
+
         try {
             $payload = $this->resolvePayload($scheduledMessage);
 
@@ -191,5 +199,18 @@ class SendScheduledMessageJob implements ShouldQueue
         ContactPermissionInvitationService $permissionInvitationService,
     ): ?ContactPermissionInvitation {
         return $permissionInvitationService->claimForScheduledMessage($scheduledMessage);
+    }
+
+    private function applyPermissionInvitationPayload(
+        ScheduledMessage $scheduledMessage,
+        ContactPermissionInvitation $permissionInvitation,
+        ContactPermissionInvitationService $permissionInvitationService,
+    ): void {
+        $scheduledMessage->forceFill([
+            'payload' => array_replace_recursive(
+                $scheduledMessage->payload ?? [],
+                $permissionInvitationService->publicEmailPayload($permissionInvitation),
+            ),
+        ])->save();
     }
 }

@@ -22,6 +22,10 @@ return new class extends Migration
                 ->constrained()
                 ->nullOnDelete();
 
+            $table->string('token', 96)
+                ->nullable()
+                ->unique();
+
             $table->nullableMorphs('context');
 
             $table->string('channel')->index();
@@ -33,7 +37,11 @@ return new class extends Migration
             $table->timestamp('failed_at')->nullable()->index();
             $table->timestamp('accepted_at')->nullable()->index();
 
+            $table->json('accepted_channels')
+                ->nullable();
+
             $table->text('failure_reason')->nullable();
+
             $table->json('meta')->nullable();
 
             $table->timestamps();

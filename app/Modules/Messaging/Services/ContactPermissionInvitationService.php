@@ -4,9 +4,14 @@ namespace App\Modules\Messaging\Services;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Enums\MessageChannel;
+use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
+use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 
 class ContactPermissionInvitationService
 {
@@ -75,6 +80,7 @@ class ContactPermissionInvitationService
             return ContactPermissionInvitation::query()->create([
                 'contact_id' => $contact->getKey(),
                 'scheduled_message_id' => $scheduledMessage->getKey(),
+                'token' => $this->newToken(),
                 'context_type' => $scheduledMessage->context_type,
                 'context_id' => $scheduledMessage->context_id,
                 'channel' => ContactPermissionInvitation::CHANNEL_EMAIL,
@@ -122,6 +128,107 @@ class ContactPermissionInvitationService
         ])->save();
     }
 
+    /**
+     * @param array<int, string> $channels
+     */
+    public function accept(
+        ContactPermissionInvitation $invitation,
+        array $channels,
+        Request $request,
+    ): ContactPermissionInvitation {
+        $channels = $this->normalizedAcceptedChannels($channels);
+        $contact = $invitation->contact;
+
+        if (! $contact) {
+            return $invitation;
+        }
+
+        foreach ($channels as $channel) {
+            foreach ($this->consentScopes() as $scope) {
+                MessageConsent::query()->updateOrCreate(
+                    [
+                        'contact_id' => $contact->getKey(),
+                        'channel' => $channel,
+                        'purpose' => MessagePurpose::Marketing->value,
+                        'scope' => $scope,
+                    ],
+                    [
+                        'consented_at' => now(),
+                        'source' => 'imported_contact_permission_invitation',
+                        'ip_address' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                        'meta' => [
+                            'permission_invitation_id' => $invitation->getKey(),
+                            'permission_invitation_source' => $invitation->source,
+                            'accepted_from' => 'public_form',
+                        ],
+                    ],
+                );
+            }
+        }
+
+        $invitation->forceFill([
+            'status' => ContactPermissionInvitation::STATUS_ACCEPTED,
+            'accepted_at' => now(),
+            'accepted_channels' => $channels,
+            'meta' => array_replace_recursive($invitation->meta ?? [], [
+                'accepted' => [
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                    'channels' => $channels,
+                    'scopes' => $this->consentScopes(),
+                ],
+            ]),
+        ])->save();
+
+        return $invitation->refresh();
+    }
+
+    public function findPublicInvitation(string $token): ?ContactPermissionInvitation
+    {
+        return ContactPermissionInvitation::query()
+            ->with('contact')
+            ->where('token', $token)
+            ->first();
+    }
+
+    public function publicUrl(ContactPermissionInvitation $invitation): string
+    {
+        return route('messaging.permission-invitations.show', [
+            'token' => $invitation->token,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function publicEmailPayload(ContactPermissionInvitation $invitation): array
+    {
+        $url = $this->publicUrl($invitation);
+
+        return [
+            'tokens' => [
+                'permission_invitation' => [
+                    'url' => $url,
+                ],
+                'contact' => [
+                    'first_name' => $invitation->contact?->first_name,
+                    'last_name' => $invitation->contact?->last_name,
+                    'name' => $invitation->contact?->name,
+                    'email' => $invitation->contact?->email,
+                ],
+            ],
+            'cta' => [
+                'label' => config('messaging.permission_invitations.email.cta_label', 'Confirm my preferences'),
+                'url' => $url,
+            ],
+            'secondary_link' => [
+                'label' => config('messaging.permission_invitations.email.secondary_link_label', 'Or copy and paste this link into your browser'),
+                'url' => $url,
+            ],
+        ];
+    }
+
     public function hasExistingImportedContactEmailInvitation(Contact $contact): bool
     {
         return ContactPermissionInvitation::query()
@@ -162,5 +269,53 @@ class ContactPermissionInvitationService
 
         return (bool) ($meta['imported'] ?? false)
             || array_key_exists('imported_at', $meta);
+    }
+
+    private function newToken(): string
+    {
+        do {
+            $token = Str::random(64);
+        } while (ContactPermissionInvitation::query()->where('token', $token)->exists());
+
+        return $token;
+    }
+
+    /**
+     * @param array<int, string> $channels
+     * @return array<int, string>
+     */
+    private function normalizedAcceptedChannels(array $channels): array
+    {
+        $allowed = [
+            MessageChannel::Email->value,
+            MessageChannel::Sms->value,
+        ];
+
+        return array_values(array_intersect($allowed, array_values(array_unique(array_map(
+            fn (string $channel): string => str_replace('-', '_', strtolower(trim($channel))),
+            $channels,
+        )))));
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function consentScopes(): array
+    {
+        $scopes = config('messaging.permission_invitations.consent.scopes', [
+            'broadcast',
+            'campaign',
+        ]);
+
+        if (! is_array($scopes)) {
+            return ['broadcast'];
+        }
+
+        return array_values(array_unique(array_filter(array_map(
+            fn (mixed $scope): ?string => is_string($scope) && trim($scope) !== ''
+                ? str_replace('-', '_', strtolower(trim($scope)))
+                : null,
+            Arr::wrap($scopes),
+        )))) ?: ['broadcast'];
     }
 }

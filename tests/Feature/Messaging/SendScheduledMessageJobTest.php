@@ -497,6 +497,83 @@ class SendScheduledMessageJobTest extends TestCase
         }
     }
 
+    public function test_it_injects_public_preference_url_into_permission_invitation_email_payload(): void
+    {
+        Event::fake([ScheduledMessageSent::class]);
+
+        config([
+            'messaging.permission_invitations.email.cta_label' => 'Confirm preferences',
+            'messaging.permission_invitations.email.secondary_link_label' => 'Copy this link',
+        ]);
+
+        $contact = Contact::factory()->create([
+            'email' => 'imported@example.com',
+            'source' => 'import',
+        ]);
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'recipient_type' => Contact::class,
+            'recipient_id' => $contact->id,
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'payload_class' => FakeJobPermissionInvitationEmailPayload::class,
+            'payload' => [
+                'to' => 'imported@example.com',
+                'subject' => 'Confirm preferences',
+                'body' => 'Please confirm preferences.',
+            ],
+            'status' => 'pending',
+            'meta' => [
+                'conditions' => [],
+                'consent_policy' => [
+                    'permission_invitation' => [
+                        'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+                        'one_time' => true,
+                    ],
+                ],
+            ],
+        ]);
+
+        $capturedPayload = null;
+
+        $emailService = Mockery::mock(EmailMessagingService::class);
+        $emailService
+            ->shouldReceive('send')
+            ->once()
+            ->with(Mockery::on(function (FakeJobPermissionInvitationEmailPayload $payload) use (&$capturedPayload): bool {
+                $capturedPayload = $payload;
+
+                return true;
+            }));
+
+        app()->instance(EmailMessagingService::class, $emailService);
+
+        $this->handleScheduledMessage($scheduledMessage);
+
+        $scheduledMessage->refresh();
+
+        $invitation = ContactPermissionInvitation::query()
+            ->where('contact_id', $contact->id)
+            ->first();
+
+        $this->assertNotNull($invitation);
+        $this->assertNotNull($invitation->token);
+        $this->assertSame('sent', $scheduledMessage->status);
+
+        $expectedUrl = route('messaging.permission-invitations.show', [
+            'token' => $invitation->token,
+        ]);
+
+        $this->assertInstanceOf(FakeJobPermissionInvitationEmailPayload::class, $capturedPayload);
+        $this->assertSame('Confirm preferences', $capturedPayload->cta['label']);
+        $this->assertSame($expectedUrl, $capturedPayload->cta['url']);
+        $this->assertSame('Copy this link', $capturedPayload->secondaryLink['label']);
+        $this->assertSame($expectedUrl, $capturedPayload->secondaryLink['url']);
+        $this->assertSame($expectedUrl, $capturedPayload->tokens['permission_invitation']['url']);
+    }
+
     private function grantConsent(Contact $contact, string $channel, string $purpose): void
     {
         MessageConsent::query()->create([
@@ -620,5 +697,50 @@ class FakeJobSmsPayload implements SmsMessage
     public function sourceIp(): ?string
     {
         return null;
+    }
+}
+
+class FakeJobPermissionInvitationEmailPayload implements EmailMessage
+{
+    public function __construct(
+        private readonly string $to,
+        public readonly array $tokens = [],
+        public readonly array $cta = [],
+        public readonly array $secondaryLink = [],
+    ) {}
+
+    public static function fromArray(array $payload): self
+    {
+        return new self(
+            to: $payload['to'],
+            tokens: is_array($payload['tokens'] ?? null) ? $payload['tokens'] : [],
+            cta: is_array($payload['cta'] ?? null) ? $payload['cta'] : [],
+            secondaryLink: is_array($payload['secondary_link'] ?? null) ? $payload['secondary_link'] : [],
+        );
+    }
+
+    public function to(): string
+    {
+        return $this->to;
+    }
+
+    public function mailable(): Mailable
+    {
+        return new class extends Mailable {
+            public function build(): static
+            {
+                return $this->subject('Test')->html('Test');
+            }
+        };
+    }
+
+    public function devPayload(): array
+    {
+        return [
+            'to' => $this->to,
+            'tokens' => $this->tokens,
+            'cta' => $this->cta,
+            'secondary_link' => $this->secondaryLink,
+        ];
     }
 }

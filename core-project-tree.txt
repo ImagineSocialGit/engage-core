@@ -302,7 +302,8 @@
 │   │   │   │       └── SmsProvider.php
 │   │   │   ├── Controllers
 │   │   │   │   └── Public
-│   │   │   │       └── ConsentRevocationController.php
+│   │   │   │       ├── ConsentRevocationController.php
+│   │   │   │       └── ContactPermissionInvitationController.php
 │   │   │   ├── Data
 │   │   │   │   └── MessageData.php
 │   │   │   ├── Enums
@@ -318,6 +319,7 @@
 │   │   │   │   └── SendScheduledMessageJob.php
 │   │   │   ├── Models
 │   │   │   │   ├── ConsentRevocation.php
+│   │   │   │   ├── ContactPermissionInvitation.php
 │   │   │   │   ├── MessageConsent.php
 │   │   │   │   ├── MessageSuppression.php
 │   │   │   │   └── ScheduledMessage.php
@@ -330,11 +332,13 @@
 │   │   │   ├── Providers
 │   │   │   │   └── MessagingModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   │   └── StoreContactPermissionInvitationConsentRequest.php
 │   │   │   ├── Rules
 │   │   │   │   ├── ConsentRevocationRules.php
 │   │   │   │   └── MessageConsentRules.php
 │   │   │   ├── Services
 │   │   │   │   ├── ConditionChecker.php
+│   │   │   │   ├── ContactPermissionInvitationService.php
 │   │   │   │   ├── ContactShow
 │   │   │   │   │   ├── ContactMessagingShowDataProvider.php
 │   │   │   │   │   └── ContactScheduledMessagesVisibilityDataProvider.php
@@ -681,6 +685,7 @@
 │   │   │   └── transactional
 │   │   │       └── webinar.php
 │   │   ├── email.php
+│   │   ├── permission_invitations.php
 │   │   ├── sms
 │   │   │   ├── marketing
 │   │   │   │   ├── webinar.php
@@ -774,6 +779,7 @@
 │   │   ├── 2026_06_19_203549_create_webinar_registrations_table.php
 │   │   ├── 2026_06_20_155410_create_webinar_waitlist_signups_table.php
 │   │   ├── 2026_06_29_000000_create_task_templates_table.php
+│   │   ├── 2026_07_01_000001_create_contact_permission_invitations_table.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -906,6 +912,9 @@
 │       │       └── index.blade.php
 │       ├── email.blade.php
 │       ├── messaging
+│       │   ├── permission-invitations
+│       │   │   ├── accepted.blade.php
+│       │   │   └── show.blade.php
 │       │   ├── transactional-opt-out-already-confirmed.blade.php
 │       │   ├── transactional-opt-out-confirmed.blade.php
 │       │   ├── transactional-opt-out-invalid.blade.php
@@ -967,6 +976,7 @@
 │   │   ├── Messaging
 │   │   │   ├── ConditionCheckerTest.php
 │   │   │   ├── ConsentRevocationControllerTest.php
+│   │   │   ├── ContactPermissionInvitationControllerTest.php
 │   │   │   ├── DispatchMessageActionTest.php
 │   │   │   ├── EmailMessagingServiceTest.php
 │   │   │   ├── EmailPayloadTest.php
@@ -1006,4 +1016,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-347 directories, 660 files
+348 directories, 669 files

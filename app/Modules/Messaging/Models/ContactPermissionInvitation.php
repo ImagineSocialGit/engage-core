@@ -21,6 +21,7 @@ class ContactPermissionInvitation extends Model
     protected $fillable = [
         'contact_id',
         'scheduled_message_id',
+        'token',
         'context_type',
         'context_id',
         'channel',
@@ -30,6 +31,7 @@ class ContactPermissionInvitation extends Model
         'sent_at',
         'failed_at',
         'accepted_at',
+        'accepted_channels',
         'failure_reason',
         'meta',
     ];
@@ -44,6 +46,7 @@ class ContactPermissionInvitation extends Model
             'sent_at' => 'datetime',
             'failed_at' => 'datetime',
             'accepted_at' => 'datetime',
+            'accepted_channels' => 'array',
             'meta' => 'array',
         ];
     }
@@ -61,5 +64,11 @@ class ContactPermissionInvitation extends Model
     public function context(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    public function hasBeenAccepted(): bool
+    {
+        return $this->accepted_at !== null
+            || $this->status === self::STATUS_ACCEPTED;
     }
 }
