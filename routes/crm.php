@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Broadcasts\Controllers\BroadcastController;
+use App\Modules\Broadcasts\Controllers\BroadcastRecipientContactSearchController;
 use App\Modules\Core\Controllers\ContactController;
 use App\Modules\Core\Controllers\ContactNoteController;
 use App\Modules\Tasks\Controllers\TaskController;
@@ -36,6 +37,9 @@ Route::middleware('auth')->group(function () {
 
             Route::post('/', [BroadcastController::class, 'store'])
                 ->name('store');
+
+            Route::get('/recipient-contacts/search', BroadcastRecipientContactSearchController::class)
+                ->name('recipient-contacts.search');
 
             Route::get('/{broadcast}', [BroadcastController::class, 'show'])
                 ->name('show');
