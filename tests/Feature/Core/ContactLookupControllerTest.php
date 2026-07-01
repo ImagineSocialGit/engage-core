@@ -1,26 +1,17 @@
 <?php
 
-namespace Tests\Feature\Broadcasts;
+namespace Tests\Feature\Core;
 
 use App\Models\User;
 use App\Modules\Core\Models\Contact;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class BroadcastRecipientContactSearchControllerTest extends TestCase
+class ContactLookupControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        config([
-            'modules.modules.broadcasts.enabled' => true,
-        ]);
-    }
-
-    public function test_it_searches_contacts_by_name_for_broadcast_recipient_selection(): void
+    public function test_it_searches_contacts_by_name(): void
     {
         $user = User::factory()->create();
 
@@ -38,7 +29,7 @@ class BroadcastRecipientContactSearchControllerTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->getJson(route('crm.broadcasts.recipient-contacts.search', [
+            ->getJson(route('crm.contacts.lookup', [
                 'q' => 'Jane',
             ]));
 
@@ -48,7 +39,7 @@ class BroadcastRecipientContactSearchControllerTest extends TestCase
         $response->assertJsonCount(1, 'contacts');
     }
 
-    public function test_it_searches_contacts_by_email_for_broadcast_recipient_selection(): void
+    public function test_it_searches_contacts_by_email(): void
     {
         $user = User::factory()->create();
 
@@ -64,7 +55,7 @@ class BroadcastRecipientContactSearchControllerTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->getJson(route('crm.broadcasts.recipient-contacts.search', [
+            ->getJson(route('crm.contacts.lookup', [
                 'q' => 'jane@example',
             ]));
 
@@ -74,7 +65,7 @@ class BroadcastRecipientContactSearchControllerTest extends TestCase
         $response->assertJsonCount(1, 'contacts');
     }
 
-    public function test_it_searches_contacts_by_phone_for_broadcast_recipient_selection(): void
+    public function test_it_searches_contacts_by_phone(): void
     {
         $user = User::factory()->create();
 
@@ -92,7 +83,7 @@ class BroadcastRecipientContactSearchControllerTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->getJson(route('crm.broadcasts.recipient-contacts.search', [
+            ->getJson(route('crm.contacts.lookup', [
                 'q' => '1112222',
             ]));
 
@@ -100,6 +91,46 @@ class BroadcastRecipientContactSearchControllerTest extends TestCase
         $response->assertJsonPath('contacts.0.id', $match->id);
         $response->assertJsonPath('contacts.0.phone', '5551112222');
         $response->assertJsonCount(1, 'contacts');
+    }
+
+    public function test_it_returns_contacts_by_ids(): void
+    {
+        $user = User::factory()->create();
+
+        $first = Contact::factory()->create([
+            'name' => 'Jane Lead',
+            'email' => 'jane@example.test',
+        ]);
+
+        $second = Contact::factory()->create([
+            'name' => 'Robert Client',
+            'email' => 'robert@example.test',
+        ]);
+
+        Contact::factory()->create([
+            'name' => 'Ignored Lead',
+            'email' => 'ignored@example.test',
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->getJson(route('crm.contacts.lookup', [
+                'ids' => [$first->id, $second->id],
+            ]));
+
+        $response->assertOk();
+        $response->assertJsonCount(2, 'contacts');
+        $response->assertJsonFragment([
+            'id' => $first->id,
+            'label' => 'Jane Lead — jane@example.test',
+        ]);
+        $response->assertJsonFragment([
+            'id' => $second->id,
+            'label' => 'Robert Client — robert@example.test',
+        ]);
+        $response->assertJsonMissing([
+            'email' => 'ignored@example.test',
+        ]);
     }
 
     public function test_it_returns_empty_results_for_empty_search(): void
@@ -110,7 +141,7 @@ class BroadcastRecipientContactSearchControllerTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->getJson(route('crm.broadcasts.recipient-contacts.search'));
+            ->getJson(route('crm.contacts.lookup'));
 
         $response->assertOk();
         $response->assertExactJson([
@@ -130,7 +161,7 @@ class BroadcastRecipientContactSearchControllerTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->getJson(route('crm.broadcasts.recipient-contacts.search', [
+            ->getJson(route('crm.contacts.lookup', [
                 'q' => 'Shared',
             ]));
 

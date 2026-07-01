@@ -1,8 +1,8 @@
 <?php
 
 use App\Modules\Broadcasts\Controllers\BroadcastController;
-use App\Modules\Broadcasts\Controllers\BroadcastRecipientContactSearchController;
 use App\Modules\Core\Controllers\ContactController;
+use App\Modules\Core\Controllers\ContactLookupController;
 use App\Modules\Core\Controllers\ContactNoteController;
 use App\Modules\Tasks\Controllers\TaskController;
 use App\Modules\Webinars\Controllers\CRM\WebinarController;
@@ -37,9 +37,6 @@ Route::middleware('auth')->group(function () {
 
             Route::post('/', [BroadcastController::class, 'store'])
                 ->name('store');
-
-            Route::get('/recipient-contacts/search', BroadcastRecipientContactSearchController::class)
-                ->name('recipient-contacts.search');
 
             Route::get('/{broadcast}', [BroadcastController::class, 'show'])
                 ->name('show');
@@ -88,6 +85,9 @@ Route::middleware('auth')->group(function () {
 
             Route::post('/', [ContactController::class, 'store'])
                 ->name('store');
+
+            Route::get('/lookup', ContactLookupController::class)
+                ->name('lookup');
 
             Route::get('/import', [ContactController::class, 'import'])
                 ->name('import');
