@@ -401,6 +401,43 @@ Current Core contact extension points include:
 - `ContactImportHandler`
 - `ContactImportRegistry`
 
+Core owns generic contact lookup behavior used by CRM modules.
+
+Generic contact lookup may search by:
+
+- name
+- first name
+- last name
+- email
+- phone
+- explicit contact IDs
+
+Core contact lookup should return compact contact option payloads suitable for reusable CRM components such as contact pickers.
+
+Core contact lookup should remain module-neutral.
+
+It must not know why another module is selecting contacts.
+
+Good:
+
+    ContactLookupController
+    route('crm.contacts.lookup')
+    <x-crm.contact-picker />
+
+Bad:
+
+    BroadcastRecipientContactSearchController
+    TaskSpecificContactLookupController
+    WebinarSpecificContactPicker
+
+Core may own a future generic contact filter resolver.
+
+That resolver should understand stable Core-owned contact facts such as contact IDs, tags, statuses, source fields, and generic timestamps.
+
+Modules may consume resolved contact sets, but Core should not absorb module-specific business rules by default.
+
+Future module-specific contact filters should be contributed through explicit provider/registry seams rather than hard-coded into Core.
+
 Core `ContactController` may ask registries for module-provided data.
 
 Core `ContactController` must not directly import module-specific models/services such as Tasks, Messaging, InboundMessaging, InternalNotifications, Webinars, Campaigns, Mortgage, or FlowRoutes.
@@ -1047,7 +1084,7 @@ Use Tasks for manual human actions/dependencies.
 
 Use Messaging for delivery.
 
-Use Broadcasts for one-time or audience-wide announcements.
+Use Broadcasts for one-time or batch recipient sends.
 
 Campaigns owns:
 
@@ -1230,13 +1267,13 @@ Campaigns should treat source morphs as context unless an explicit public integr
 
 Broadcasts is optional.
 
-Broadcasts owns one-time and batch audience sends.
+Broadcasts owns one-time and batch recipient sends.
 
 Broadcasts owns:
 
 - broadcasts
 - broadcast recipients
-- broadcast audience metadata
+- broadcast recipient filter metadata
 - broadcast recipient state
 - ad hoc one-time message payload/copy
 - broadcast scheduling/orchestration behavior later
@@ -1259,7 +1296,7 @@ Campaigns and Broadcasts are separate concepts.
 
 Campaigns are enrolled, multi-step journeys with lifecycle/progression.
 
-Broadcasts are one-time or batch sends to an audience.
+Broadcasts are one-time or batch sends to recipients.
 
 Broadcasts may store ad hoc payload/copy because broadcasts are not reusable Campaign journeys.
 
@@ -1269,6 +1306,57 @@ Broadcasts may depend on:
 
 - Core
 - Messaging
+
+Broadcast recipient selection should use recipient-oriented terminology.
+
+Use:
+
+    recipient_filter
+    BroadcastRecipientResolver
+    BroadcastRecipient
+    recipients
+
+Avoid:
+
+    audience
+    audience_filter
+    BroadcastAudienceResolver
+
+`broadcasts.recipient_filter` is the canonical storage for recipient selection metadata.
+
+Current supported recipient filter shapes include:
+
+    {
+      "type": "all"
+    }
+
+    {
+      "type": "tag",
+      "tags": ["homebuyer"]
+    }
+
+    {
+      "type": "contact_ids",
+      "contact_ids": [1, 2, 3]
+    }
+
+Broadcasts may store recipient filter definitions, but Core should own generic contact lookup and future generic contact filter resolution.
+
+Broadcasts should not become the app-wide contact query engine.
+
+Broadcasts may use Core-owned contact lookup/picker functionality for individual contact selection.
+
+Good:
+
+    route('crm.contacts.lookup')
+    <x-crm.contact-picker />
+    BroadcastRecipientResolver
+
+Bad:
+
+    BroadcastRecipientContactSearchController
+    Broadcast-specific contact picker components
+    duplicated contact lookup logic inside Broadcasts
 
 Broadcast delivery metadata should be first-class on `broadcasts`:
 
@@ -1304,13 +1392,23 @@ BroadcastRecipient records are Broadcast bookkeeping.
 
 BroadcastRecipient records may store scheduled message IDs for visibility/audit, but they do not own the scheduled delivery lifecycle.
 
-Expected future runtime direction:
+Current runtime direction:
 
-    Broadcast UI/action creates Broadcast
-    Broadcast audience resolver creates BroadcastRecipients
-    Broadcast send/schedule action calls Messaging public action/service
+    Broadcast UI/action creates or edits draft Broadcast
+    Broadcast stores recipient_filter metadata
+    Broadcast recipient resolver resolves Contacts from recipient_filter
+    Broadcast schedule action creates BroadcastRecipients
+    Broadcast schedule action calls Messaging public action/service
     Messaging creates ScheduledMessages
     BroadcastRecipient stores resulting scheduled_message_ids/status bookkeeping
+    Broadcast listeners record sent/skipped/failed Messaging lifecycle events
+    Broadcast completes when every BroadcastRecipient is terminal
+
+Broadcast cancellation should use Messaging-owned skip behavior for pending scheduled messages rather than mutating Messaging internals directly.
+
+Good:
+
+    CancelBroadcastAction -> SkipScheduledMessagesAction
 
 Broadcasts should remain simpler than Campaigns.
 
