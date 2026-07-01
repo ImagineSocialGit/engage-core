@@ -2,7 +2,90 @@
 
 This file is intentionally disposable. Add work here when it is real but not yet ready for an implementation slice. Delete items as they are completed. Do not treat this as an architectural reference; long-lived decisions belong in `module-boundaries.md` or a feature-specific doc.
 
-## Current priorities
+## Run through after completing an item or system update
+
+These are repeatable checklists. Run the relevant checklist after a production slice, config update, client setup change, or staging deployment. Do not leave one-off feature work here; put one-off work in the backlog sections below.
+
+### After each production code slice
+
+- [ ] Run focused tests for the modules touched by the slice.
+  - Broadcasts.
+  - Messaging.
+  - Core contact filters.
+  - Campaigns, FlowRoutes, Tasks, Webinars, or Modules when touched.
+- [ ] Run broader adjacent-module tests before committing when module boundaries are involved.
+- [ ] Confirm production code changes are architectural fixes, not test-shaped legacy preservation.
+- [ ] Confirm no new direct cross-module model/table writes were introduced where a public action/service should be used.
+- [ ] Confirm migrations are replacements, not modify-table migrations, while this branch remains pre-rollout.
+- [ ] Run `php artisan optimize:clear` after config, route, provider, or view changes.
+- [ ] Update docs only when the architecture or operator/client behavior changed.
+
+### After each config or client-template update
+
+- [ ] Confirm every config key is supported by the relevant template, guide, or feature doc.
+- [ ] Confirm client copy uses documented tokens only.
+- [ ] Confirm runtime-only URLs/tokens are not guessed or hard-coded in static config.
+- [ ] Confirm Campaign presets do not own reusable message payload/copy.
+- [ ] Confirm Campaign preset step message references use first-class `channel`, `purpose`, and `scope` keys.
+- [ ] Confirm Messaging templates live under the expected channel/purpose/scope path.
+- [ ] Confirm SMS visibility is controlled by config where the surface exposes channel choices.
+- [ ] Confirm missing optional content/style keys do not break public pages.
+- [ ] Confirm tests are tolerant of client copy changes unless exact copy is the behavior under test.
+
+### After each permission-invitation update
+
+- [ ] Confirm the invitation remains email-only for the one-time bypass send.
+- [ ] Confirm normal Broadcasts do not receive imported-contact bypass behavior.
+- [ ] Confirm SMS opt-in remains explicit and requires a phone number when SMS is selected.
+- [ ] Confirm already accepted or previously claimed/sent invitations cannot create duplicate consent rows or resend through the bypass.
+- [ ] Confirm the public preference URL is injected at runtime before provider send.
+- [ ] Confirm accepted consent scopes match `messaging.permission_invitations.consent.scopes`.
+- [ ] Confirm client copy can change without breaking behavioral tests.
+
+### After each SMS/channel-visibility update
+
+- [ ] Confirm SMS provider/runtime code remains present.
+- [ ] Confirm SMS is hidden from client/admin UI when disabled for that surface.
+- [ ] Confirm hiding SMS does not disable backend protections.
+  - Consent gates still enforce SMS rules.
+  - Suppression/revocation still works.
+  - Inbound STOP/HELP handling still works if provider/webhook is active.
+- [ ] Confirm SMS appears only on explicitly enabled surfaces.
+- [ ] Confirm permission invitation SMS opt-in remains explicit.
+
+### Before committing a feature slice
+
+- [ ] Review changed files for stale terminology, especially `audience` vs `recipient` and borrower/borrowers vs lead/leads.
+- [ ] Confirm newly added public routes/controllers follow module directory conventions.
+- [ ] Confirm feature-specific docs or `TODO.md` were updated when useful.
+- [ ] Confirm `module-boundaries.md` was updated only for long-lived architectural decisions.
+- [ ] Confirm temporary TODO items were deleted or moved into the one-off backlog below.
+
+### Before staging smoke tests
+
+- [ ] Run focused tests and adjacent-module tests locally.
+- [ ] Run `php artisan migrate` against staging only after confirming migration shape is final for that branch.
+- [ ] Run `php artisan optimize:clear` on staging.
+- [ ] Confirm module visibility and navigation match config.
+- [ ] Confirm provider credentials/config are present for enabled providers.
+- [ ] Confirm queue workers/Horizon are running if scheduled/send behavior is being tested.
+
+### Staging smoke test checklist
+
+- [ ] Create/import at least one test contact.
+- [ ] Confirm Core contact lookup/contact picker works where used.
+- [ ] Create a regular Broadcast draft and confirm it remains consent-gated.
+- [ ] Create an imported-contact opt-in invitation and confirm it is separate from normal Broadcasts.
+- [ ] Send/schedule the opt-in invitation to an imported test contact.
+- [ ] Confirm the invitation email renders the CTA/link correctly.
+- [ ] Open the public preference page from the email link.
+- [ ] Confirm email-only opt-in creates the expected consent records.
+- [ ] Confirm SMS opt-in requires and stores a phone number when SMS is enabled.
+- [ ] Confirm re-opening an accepted invitation shows the accepted state.
+- [ ] Confirm repeat invitation attempts are blocked by the one-time invitation record.
+- [ ] Confirm cancellation/skip/failure states remain understandable in Broadcast and ScheduledMessage views.
+
+## One-off backlog
 
 ### Permission invitations
 
@@ -176,12 +259,6 @@ This file is intentionally disposable. Add work here when it is real but not yet
   - Similar docs may be useful for Broadcasts, Campaigns, FlowRoutes, Tasks, and Imports once each stabilizes.
 
 ### Testing backlog
-
-- [ ] Re-run focused tests after each production slice.
-  - Broadcasts.
-  - Messaging.
-  - Core contact filters.
-  - Modules boundary tests.
 
 - [ ] Add test coverage for SMS visibility config once implemented.
   - SMS option hidden when disabled.
