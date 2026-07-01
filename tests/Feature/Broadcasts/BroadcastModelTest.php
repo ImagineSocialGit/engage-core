@@ -33,7 +33,7 @@ class BroadcastModelTest extends TestCase
                 'subject' => 'Market update',
                 'body' => 'Here is the latest market update.',
             ],
-            'audience' => [
+            'recipient_filter' => [
                 'type' => 'tag',
                 'tags' => ['homebuyer'],
             ],
@@ -54,7 +54,7 @@ class BroadcastModelTest extends TestCase
         $this->assertSame('marketing', $broadcast->queue);
         $this->assertSame(Broadcast::STATUS_DRAFT, $broadcast->status);
         $this->assertSame('Market update', $broadcast->payload['subject']);
-        $this->assertSame(['homebuyer'], $broadcast->audience['tags']);
+        $this->assertSame(['homebuyer'], $broadcast->recipient_filter['tags']);
         $this->assertSame('test', $broadcast->meta['created_from']);
     }
 

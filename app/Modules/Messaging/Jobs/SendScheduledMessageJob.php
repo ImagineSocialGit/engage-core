@@ -5,7 +5,9 @@ namespace App\Modules\Messaging\Jobs;
 use App\Modules\Messaging\Contracts\Email\EmailMessage;
 use App\Modules\Messaging\Contracts\Sms\SmsMessage;
 use App\Modules\Messaging\Enums\MessageChannel;
+use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
+use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\Email\EmailMessagingService;
 use App\Modules\Messaging\Services\ScheduledMessageGate;
@@ -68,6 +70,8 @@ class SendScheduledMessageJob implements ShouldQueue
                 'failed_at' => now(),
                 'failure_reason' => $exception->getMessage(),
             ])->save();
+
+            ScheduledMessageFailed::dispatch($scheduledMessage);
 
             throw $exception;
         }
@@ -150,5 +154,7 @@ class SendScheduledMessageJob implements ShouldQueue
             'skip_reason' => $reason,
             'failure_reason' => null,
         ])->save();
+
+        ScheduledMessageSkipped::dispatch($scheduledMessage);
     }
 }

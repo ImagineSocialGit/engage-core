@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('status')->default('draft');
             $table->timestamp('send_at')->nullable();
             $table->json('payload')->nullable();
-            $table->json('audience')->nullable();
+            $table->json('recipient_filter')->nullable();
             $table->unsignedInteger('recipient_count')->default(0);
             $table->unsignedInteger('scheduled_count')->default(0);
             $table->timestamp('cancelled_at')->nullable();

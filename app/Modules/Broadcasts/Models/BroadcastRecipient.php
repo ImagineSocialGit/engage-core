@@ -29,6 +29,7 @@ class BroadcastRecipient extends Model
         'contact_id',
         'status',
         'scheduled_message_ids',
+        'sent_at',
         'skip_reason',
         'meta',
     ];
@@ -39,6 +40,7 @@ class BroadcastRecipient extends Model
             'broadcast_id' => 'integer',
             'contact_id' => 'integer',
             'scheduled_message_ids' => 'array',
+            'sent_at' => 'datetime',
             'meta' => 'array',
         ];
     }

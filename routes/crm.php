@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Broadcasts\Controllers\BroadcastController;
 use App\Modules\Core\Controllers\ContactController;
 use App\Modules\Core\Controllers\ContactNoteController;
 use App\Modules\Tasks\Controllers\TaskController;
@@ -25,6 +26,32 @@ Route::middleware('auth')->group(function () {
         Route::delete('/webinar-series/{series}', [WebinarController::class, 'destroySeries'])
             ->name('crm.webinar-series.destroy');
     });
+
+    Route::middleware('module:broadcasts')
+        ->prefix('broadcasts')
+        ->name('crm.broadcasts.')
+        ->group(function () {
+            Route::get('/', [BroadcastController::class, 'index'])
+                ->name('index');
+
+            Route::post('/', [BroadcastController::class, 'store'])
+                ->name('store');
+
+            Route::get('/{broadcast}', [BroadcastController::class, 'show'])
+                ->name('show');
+
+            Route::get('/{broadcast}/edit', [BroadcastController::class, 'edit'])
+                ->name('edit');
+
+            Route::patch('/{broadcast}', [BroadcastController::class, 'update'])
+                ->name('update');
+
+            Route::patch('/{broadcast}/schedule', [BroadcastController::class, 'schedule'])
+                ->name('schedule');
+
+            Route::patch('/{broadcast}/cancel', [BroadcastController::class, 'cancel'])
+                ->name('cancel');
+        });
 
     Route::middleware('module:tasks')
         ->prefix('tasks')

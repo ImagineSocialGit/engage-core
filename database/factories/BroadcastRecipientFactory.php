@@ -21,6 +21,7 @@ class BroadcastRecipientFactory extends Factory
             'contact_id' => Contact::factory(),
             'status' => BroadcastRecipient::STATUS_PENDING,
             'scheduled_message_ids' => null,
+            'sent_at' => null,
             'skip_reason' => null,
             'meta' => [],
         ];
@@ -31,6 +32,15 @@ class BroadcastRecipientFactory extends Factory
         return $this->state(fn (): array => [
             'status' => BroadcastRecipient::STATUS_SCHEDULED,
             'scheduled_message_ids' => $scheduledMessageIds,
+        ]);
+    }
+
+    public function sent(): static
+    {
+        return $this->state(fn (): array => [
+            'status' => BroadcastRecipient::STATUS_SENT,
+            'sent_at' => now(),
+            'skip_reason' => null,
         ]);
     }
 

@@ -32,7 +32,7 @@ class BroadcastFactory extends Factory
                 'subject' => 'Test broadcast',
                 'body' => 'This is a test broadcast.',
             ],
-            'audience' => [
+            'recipient_filter' => [
                 'type' => 'all',
             ],
             'recipient_count' => 0,

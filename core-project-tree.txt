@@ -43,15 +43,27 @@
 │   ├── Modules
 │   │   ├── Broadcasts
 │   │   │   ├── Actions
+│   │   │   │   ├── CancelBroadcastAction.php
+│   │   │   │   └── ScheduleBroadcastAction.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
+│   │   │   │   └── BroadcastController.php
 │   │   │   ├── Data
+│   │   │   ├── Listeners
+│   │   │   │   ├── MarkBroadcastRecipientFailed.php
+│   │   │   │   ├── MarkBroadcastRecipientSent.php
+│   │   │   │   └── MarkBroadcastRecipientSkipped.php
 │   │   │   ├── Models
 │   │   │   │   ├── Broadcast.php
 │   │   │   │   └── BroadcastRecipient.php
 │   │   │   ├── Providers
 │   │   │   │   └── BroadcastsModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   │   ├── StoreBroadcastRequest.php
+│   │   │   │   └── UpdateBroadcastRequest.php
+│   │   │   ├── Services
+│   │   │   │   ├── BroadcastRecipientResolver.php
+│   │   │   │   └── BroadcastScheduledMessageResultRecorder.php
 │   │   │   └── Support
 │   │   ├── Campaigns
 │   │   │   ├── Actions
@@ -293,7 +305,9 @@
 │   │   │   ├── Events
 │   │   │   │   ├── MessageConsentGranted.php
 │   │   │   │   ├── MessageConsentRevoked.php
-│   │   │   │   └── ScheduledMessageSent.php
+│   │   │   │   ├── ScheduledMessageFailed.php
+│   │   │   │   ├── ScheduledMessageSent.php
+│   │   │   │   └── ScheduledMessageSkipped.php
 │   │   │   ├── Jobs
 │   │   │   │   └── SendScheduledMessageJob.php
 │   │   │   ├── Models
@@ -869,6 +883,10 @@
 │       │       ├── hero.blade.php
 │       │       └── registration-form-modal.blade.php
 │       ├── crm
+│       │   ├── broadcasts
+│       │   │   ├── edit.blade.php
+│       │   │   ├── index.blade.php
+│       │   │   └── show.blade.php
 │       │   ├── contacts
 │       │   │   ├── import.blade.php
 │       │   │   ├── import-preview.blade.php
@@ -911,7 +929,12 @@
 │   │   ├── Auth
 │   │   │   └── LoginThrottlingTest.php
 │   │   ├── Broadcasts
-│   │   │   └── BroadcastModelTest.php
+│   │   │   ├── BroadcastControllerTest.php
+│   │   │   ├── BroadcastModelTest.php
+│   │   │   ├── CancelBroadcastActionTest.php
+│   │   │   ├── MarkBroadcastRecipientSentTest.php
+│   │   │   ├── MarkBroadcastRecipientTerminalStatusTest.php
+│   │   │   └── ScheduleBroadcastActionTest.php
 │   │   ├── Campaigns
 │   │   │   ├── EnrollContactInCampaignActionTest.php
 │   │   │   ├── ScheduleNextCampaignStepActionTest.php
@@ -973,4 +996,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-340 directories, 634 files
+343 directories, 654 files

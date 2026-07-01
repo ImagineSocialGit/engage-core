@@ -15,19 +15,32 @@
                     <a href="/" class="block rounded-lg px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-100">
                         Dashboard
                     </a>
+
                     <a
                         href="{{ route('crm.contacts.index') }}"
                         class="block rounded-lg px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-100 capitalize"
                     >
                         {{ config('contacts.labels.plural') }}
                     </a>
+
+                    @if(module_enabled('broadcasts'))
+                        <a
+                            href="{{ route('crm.broadcasts.index') }}"
+                            class="block rounded-lg px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-100"
+                        >
+                            Broadcasts
+                        </a>
+                    @endif
+
                     @if(module_enabled('webinars'))
                         <a href="/webinars" class="block rounded-lg px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-100">
                             Webinars
                         </a>
                     @endif
+
                     <form method="POST" action="/logout" class="">
                         @csrf
+
                         <div class="block">
                             <button
                                 type="submit"

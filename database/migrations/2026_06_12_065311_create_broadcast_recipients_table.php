@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignIdFor(Contact::class)->constrained()->cascadeOnDelete();
             $table->string('status')->default('pending');
             $table->json('scheduled_message_ids')->nullable();
+            $table->timestamp('sent_at')->nullable();
             $table->string('skip_reason')->nullable();
             $table->json('meta')->nullable();
             $table->timestamps();
