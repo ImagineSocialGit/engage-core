@@ -10,6 +10,7 @@ use App\Modules\FlowRoutes\Data\Points\SendMessagePointDefinition;
 use App\Modules\FlowRoutes\Models\Point;
 use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Services\MessageChannelAvailability;
 use Illuminate\Support\Carbon;
 use Throwable;
 
@@ -17,6 +18,7 @@ class SendMessagePointHandler implements PointHandler
 {
     public function __construct(
         private readonly DispatchMessageAction $dispatchMessage,
+        private readonly MessageChannelAvailability $messageChannelAvailability,
     ) {}
 
     public function type(): string
@@ -49,6 +51,22 @@ class SendMessagePointHandler implements PointHandler
                 reason: 'send_message_contact_not_found',
                 meta: [
                     'contact_id' => $context->progress->contact_id,
+                    'flow_route_progress_id' => $context->progress->getKey(),
+                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                ],
+            );
+        }
+
+        if (! $this->messageChannelAvailability->isVisibleForSurface(
+            channel: $definition->channel,
+            surface: 'route_send_message_points',
+            purpose: $definition->purpose,
+            scope: $definition->scope,
+        )) {
+            return PointExecutionResult::skipped(
+                reason: 'send_message_channel_unavailable',
+                meta: [
+                    'send_message_definition' => $definition->toMetaPayload(),
                     'flow_route_progress_id' => $context->progress->getKey(),
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
                 ],

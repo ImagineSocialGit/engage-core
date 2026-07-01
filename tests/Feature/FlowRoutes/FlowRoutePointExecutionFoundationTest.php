@@ -12,6 +12,8 @@ use App\Modules\FlowRoutes\Models\Point;
 use App\Modules\FlowRoutes\PointHandlers\NoopPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\WaitPointHandler;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
+use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -121,6 +123,57 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertNull($setup['progress']->waiting_event_key);
         $this->assertSame('point_handler_not_registered', $setup['progress']->failure_reason);
         $this->assertNotNull($setup['progress']->failed_at);
+    }
+
+    public function test_send_message_point_skips_when_channel_is_not_available_for_route_send_message_points(): void
+    {
+        config()->set('messaging.channel_availability.sms.runtime_supported', true);
+        config()->set('messaging.channel_availability.sms.provider_enabled', true);
+        config()->set('messaging.channel_availability.sms.surfaces.route_send_message_points', false);
+        config()->set('messaging.channel_availability.sms.purpose_scopes', [
+            'marketing:webinar_nurture' => true,
+        ]);
+
+        config()->set('messaging.sms.marketing.webinar_nurture.route_test', [
+            [
+                'dispatch_key' => 'route_send_message_test',
+                'channel' => 'sms',
+                'purpose' => 'marketing',
+                'scope' => 'webinar_nurture',
+                'timing' => 'immediate',
+                'payload_class' => SmsPayload::class,
+                'queue' => 'marketing',
+                'payload' => [
+                    'message' => 'Route SMS test',
+                ],
+            ],
+        ]);
+
+        $setup = $this->createProgressWithPoints([
+            Point::TYPE_SEND_MESSAGE,
+        ]);
+
+        $setup['flow_route_points'][0]->forceFill([
+            'definition' => [
+                'channel' => 'sms',
+                'purpose' => 'marketing',
+                'scope' => 'webinar_nurture',
+                'dispatch_keys' => ['route_send_message_test'],
+                'on_no_messages' => 'skipped',
+            ],
+        ])->save();
+
+        $result = app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']);
+
+        $this->assertSame(PointExecutionResult::STATUS_SKIPPED, $result->status);
+        $this->assertSame('send_message_channel_unavailable', $result->reason);
+        $this->assertSame('sms', data_get($result->meta, 'send_message_definition.channel'));
+
+        $setup['progress']->refresh();
+
+        $this->assertSame(ContactFlowRouteProgress::STATUS_COMPLETED, $setup['progress']->status);
+        $this->assertNull($setup['progress']->current_flow_route_point_id);
+        $this->assertSame(0, ScheduledMessage::query()->count());
     }
 
     /**
