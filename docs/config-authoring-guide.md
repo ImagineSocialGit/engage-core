@@ -588,6 +588,23 @@ Hiding SMS in UI does not remove SMS provider integrations, inbound STOP/HELP ha
 
 SMS opt-in must be explicit. Do not infer SMS consent from imported contacts, email consent, or general preference confirmation.
 
+The canonical runtime seam for UI/channel choices is Messaging channel availability.
+
+Do not add one-off `sms.enabled` checks directly inside individual views or controllers.
+
+Surfaces should ask the Messaging channel availability service which channels are available for that surface.
+
+Current surface keys may include:
+
+```text
+broadcasts
+campaigns
+permission_invitations
+webinar_registration
+webinar_waitlist
+internal_notifications
+route_send_message_points
+
 ## Review checklist before committing configs
 
 - [ ] Does every config key exist in the key registry or client key registry?

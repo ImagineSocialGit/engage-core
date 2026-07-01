@@ -46,6 +46,56 @@ class ContactFilterResolverTest extends TestCase
         $this->assertNotContains($excluded->id, $resolved->pluck('id')->values()->all());
     }
 
+    public function test_it_resolves_imported_contacts_from_core_owned_import_facts(): void
+    {
+        $sourceImported = Contact::factory()->create([
+            'source' => 'import',
+            'meta' => [],
+        ]);
+
+        $metaImported = Contact::factory()->create([
+            'source' => 'manual',
+            'meta' => [
+                'imported' => true,
+            ],
+        ]);
+
+        $importedAt = Contact::factory()->create([
+            'source' => 'manual',
+            'meta' => [
+                'imported_at' => now()->toISOString(),
+            ],
+        ]);
+
+        $notImported = Contact::factory()->create([
+            'source' => 'manual',
+            'meta' => [
+                'imported' => false,
+            ],
+        ]);
+
+        $noImportFacts = Contact::factory()->create([
+            'source' => 'webinar',
+            'meta' => [],
+        ]);
+
+        $resolved = app(ContactFilterResolver::class)->resolve([
+            'type' => 'imported',
+        ]);
+
+        $this->assertSame(
+            [
+                $sourceImported->id,
+                $metaImported->id,
+                $importedAt->id,
+            ],
+            $resolved->pluck('id')->values()->all(),
+        );
+
+        $this->assertNotContains($notImported->id, $resolved->pluck('id')->values()->all());
+        $this->assertNotContains($noImportFacts->id, $resolved->pluck('id')->values()->all());
+    }
+
     public function test_it_resolves_contacts_by_tags(): void
     {
         $tagged = Contact::factory()->create();

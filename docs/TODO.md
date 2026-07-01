@@ -89,16 +89,6 @@ These are repeatable checklists. Run the relevant checklist after a production s
 
 ### Permission invitations
 
-- [ ] Finish SMS visibility/config cleanup before expanding channel UI.
-  - SMS should always exist in code.
-  - SMS should only appear in Broadcasts, Campaigns, permission invitation pages, and other client/admin surfaces when enabled by config.
-  - Permission invitation page should hide the SMS option when SMS is disabled for that client.
-
-- [ ] Verify the permission invitation email rendering end-to-end.
-  - Confirm the CTA button/link renders cleanly through `EmailPayload` and `resources/views/messaging/email.blade.php`.
-  - Confirm the runtime URL is injected into the email payload before provider send.
-  - Confirm client copy can reference the opt-in URL without hard-coding it.
-
 - [ ] Add/refine public opt-in tests as needed after UI polish.
   - Invalid token returns 404.
   - Email-only consent creates expected rows.
@@ -116,11 +106,6 @@ These are repeatable checklists. Run the relevant checklist after a production s
 
 ### Broadcasts
 
-- [ ] Polish Broadcast index UI after SMS toggle/config cleanup.
-  - Keep regular broadcasts separate from imported-contact opt-in invitations.
-  - Avoid making opt-in invitations look like a normal marketing broadcast.
-  - Make status/type labels simple for client users.
-
 - [ ] Consider adding a clearer imported-contact count/preview before scheduling an opt-in invitation.
   - Should be Core contact-filter backed.
   - Should not duplicate contact query logic in Broadcasts.
@@ -130,12 +115,6 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - Already sent invitation rows remain historical and still block repeat bypass sends.
 
 ### Core contact filters
-
-- [ ] Expand Core contact filter tests for the `imported` filter type.
-  - `source = import`.
-  - `meta.imported = true`.
-  - `meta.imported_at` present.
-  - Non-imported contacts excluded.
 
 - [ ] Decide whether Core contact filter normalization should support additional stable Core-owned filters.
   - Status, tags, source, subsource, last activity/contacted timestamps.
@@ -202,6 +181,16 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - No automatic SMS consent from email invitation open/click.
   - SMS checkbox requires a phone number.
   - SMS option can be hidden by config.
+  
+- [ ] Wire Messaging channel availability into remaining channel-choice surfaces.
+  - Broadcast builders.
+  - Campaign builders.
+  - Webinar registration.
+  - Webinar waitlist.
+  - Internal notifications.
+  - FlowRoute/Route send-message points.
+  - Any future message/template builders.
+  - Surfaces should use the Messaging channel availability seam instead of reading raw SMS/provider config directly.
 
 ### Imports and contact onboarding
 
@@ -347,11 +336,6 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - Similar docs may be useful for Broadcasts, Campaigns, FlowRoutes, Tasks, and Imports once each stabilizes.
 
 ### Testing backlog
-
-- [ ] Add test coverage for SMS visibility config once implemented.
-  - SMS option hidden when disabled.
-  - SMS option visible when enabled.
-  - Backend gate behavior unchanged regardless of UI visibility.
 
 - [ ] Add test coverage for client config fallback behavior.
   - Missing optional content/style keys should not break public pages.

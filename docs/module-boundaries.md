@@ -575,6 +575,26 @@ A definition may omit fields that are inferable from caller context, but adapter
 
 Messaging definitions are reusable templates.
 
+### Messaging channel availability
+
+Messaging owns the canonical channel availability seam.
+
+Channel availability answers whether a channel is:
+
+- runtime-supported
+- provider-enabled
+- visible for a specific client/admin surface
+- allowed for a specific purpose/scope
+- explicit-opt-in only
+
+Client/admin surfaces should not read raw SMS/provider config directly.
+
+Surfaces such as Broadcasts, Campaign builders, webinar registration, permission invitation pages, internal notifications, and Route send-message points should ask Messaging’s channel availability service which channels are available for that surface.
+
+Hiding SMS from a surface does not disable SMS runtime safety behavior.
+
+SMS provider integrations, consent gates, revocations, suppressions, STOP/HELP handling, and send guards remain backend/runtime concerns.
+
 Messaging owns reusable message copy and delivery templates, including subject/body/CTA payloads.
 
 Campaign-owned message templates live inside Messaging configs under:
