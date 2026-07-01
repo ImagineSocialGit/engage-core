@@ -8,6 +8,7 @@ use App\Modules\Broadcasts\Services\BroadcastRecipientResolver;
 use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Services\MessageChannelAvailability;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -18,6 +19,7 @@ class ScheduleBroadcastAction
     public function __construct(
         private readonly BroadcastRecipientResolver $recipientResolver,
         private readonly DispatchMessageAction $dispatchMessageAction,
+        private readonly MessageChannelAvailability $messageChannelAvailability,
     ) {}
 
     public function handle(Broadcast $broadcast): Broadcast
@@ -41,6 +43,31 @@ class ScheduleBroadcastAction
                         'meta' => [],
                     ],
                 );
+
+                if (! $this->messageChannelAvailability->isVisibleForSurface(
+                    channel: $broadcast->channel,
+                    surface: 'broadcasts',
+                    purpose: $broadcast->purpose,
+                    scope: $broadcast->scope,
+                )) {
+                    $recipient->forceFill([
+                        'status' => BroadcastRecipient::STATUS_SKIPPED,
+                        'scheduled_message_ids' => null,
+                        'skip_reason' => 'broadcast_channel_unavailable',
+                        'meta' => array_replace_recursive($recipient->meta ?? [], [
+                            'broadcast' => [
+                                'attempted_at' => now()->toISOString(),
+                                'channel' => $broadcast->channel,
+                                'purpose' => $broadcast->purpose,
+                                'scope' => $broadcast->scope,
+                                'surface' => 'broadcasts',
+                                'skip_reason' => 'broadcast_channel_unavailable',
+                            ],
+                        ]),
+                    ])->save();
+
+                    continue;
+                }
 
                 $scheduledMessages = $this->dispatchMessageAction->handle(
                     recipient: $contact,
