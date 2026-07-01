@@ -1,7 +1,7 @@
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
-    :subheading="$broadcast->isPermissionInvitation() ? 'Update draft opt-in invitation' : 'Update draft broadcast'"
+    :subheading="$broadcast->isPermissionInvitation() ? 'Update imported-contact opt-in invitation draft' : 'Update regular broadcast draft'"
 >
     @php
         $recipientFilter = $broadcast->recipient_filter ?? ['type' => 'all'];
@@ -29,24 +29,30 @@
                 href="{{ route('crm.broadcasts.show', $broadcast) }}"
                 class="text-sm font-semibold text-slate-600 underline hover:text-slate-900"
             >
-                Back to Broadcast
+                Back to {{ $broadcast->typeLabel() }}
             </a>
         </div>
 
-        <x-ui.card class="max-w-3xl">
+        <x-ui.card class="max-w-3xl {{ $broadcast->isPermissionInvitation() ? 'border-amber-200 bg-amber-50/30' : '' }}">
             <div>
-                <h2 class="text-lg font-semibold tracking-tight">
+                <div class="{{ $broadcast->isPermissionInvitation() ? 'inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800' : 'inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700' }}">
+                    {{ $broadcast->typeLabel() }}
+                </div>
+
+                <h2 class="mt-3 text-lg font-semibold tracking-tight">
                     {{ $broadcast->isPermissionInvitation() ? 'Edit Opt-In Invitation Draft' : 'Edit Broadcast Draft' }}
                 </h2>
 
                 <p class="mt-1 text-sm text-slate-500">
-                    @if($broadcast->isPermissionInvitation())
-                        This email is limited to imported contacts and each imported contact can receive it only once.
-                    @else
-                        Draft broadcasts can be edited until they are scheduled.
-                    @endif
+                    {{ $broadcast->typeDescription() }}
                 </p>
             </div>
+
+            @if($broadcast->isPermissionInvitation())
+                <div class="mt-5 rounded-xl border border-amber-200 bg-white p-3 text-sm text-amber-900">
+                    Recipients are locked to imported contacts. This keeps the one-time opt-in invitation separate from normal marketing broadcasts.
+                </div>
+            @endif
 
             <form
                 method="POST"
@@ -99,15 +105,17 @@
                         required
                     >{{ old('body', $broadcast->payload['body'] ?? '') }}</x-ui.form.textarea>
 
+                    @if($broadcast->isPermissionInvitation())
+                        <p class="mt-2 text-xs text-slate-600">
+                            Use <span class="font-mono">{cta}</span> on its own line to render the opt-in button. Messaging injects the public preference URL at send time.
+                        </p>
+                    @endif
+
                     <x-ui.form.error name="body" />
                 </div>
 
                 @if($broadcast->isPermissionInvitation())
                     <input type="hidden" name="recipient_filter_type" value="imported">
-
-                    <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                        Recipients are locked to imported contacts. This keeps the opt-in invitation separate from normal marketing broadcasts.
-                    </div>
                 @else
                     <div>
                         <x-ui.form.label for="recipient_filter_type">

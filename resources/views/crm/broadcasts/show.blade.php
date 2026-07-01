@@ -1,7 +1,7 @@
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
-    :subheading="$broadcast->isPermissionInvitation() ? 'Opt-in invitation details' : 'Broadcast details'"
+    :subheading="$broadcast->typeDescription()"
 >
     <div class="space-y-6">
         @if (session('success'))
@@ -43,7 +43,7 @@
                         />
 
                         <x-ui.button type="submit">
-                            Schedule
+                            {{ $broadcast->isPermissionInvitation() ? 'Schedule Invitation' : 'Schedule Broadcast' }}
                         </x-ui.button>
                     </form>
                 @endif
@@ -64,6 +64,18 @@
             </div>
         </div>
 
+        @if($broadcast->isPermissionInvitation())
+            <x-ui.card class="border-amber-200 bg-amber-50 text-sm text-amber-950">
+                <div class="font-semibold">
+                    Imported-contact opt-in invitation
+                </div>
+
+                <p class="mt-1">
+                    This is an email-only, one-time invitation flow. Messaging owns the invitation token, public preference page, consent recording, and repeat-send enforcement.
+                </p>
+            </x-ui.card>
+        @endif
+
         <div class="grid gap-6 xl:grid-cols-[1fr_380px]">
             <div class="space-y-6">
                 <x-ui.card class="space-y-5">
@@ -74,30 +86,14 @@
                             </h2>
 
                             <p class="mt-1 text-sm text-slate-500">
-                                @if($broadcast->isPermissionInvitation())
-                                    Email-only imported-contact opt-in invitation.
-                                @else
-                                    Regular broadcast email payload.
-                                @endif
+                                {{ $broadcast->typeDescription() }}
                             </p>
                         </div>
 
-                        @if($broadcast->isPermissionInvitation())
-                            <span class="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
-                                Opt-in invitation
-                            </span>
-                        @else
-                            <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                                Broadcast
-                            </span>
-                        @endif
+                        <span class="{{ $broadcast->isPermissionInvitation() ? 'inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800' : 'inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700' }}">
+                            {{ $broadcast->typeLabel() }}
+                        </span>
                     </div>
-
-                    @if($broadcast->isPermissionInvitation())
-                        <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                            This message can only use the one-time imported-contact invitation policy. Each imported contact can receive this invitation once.
-                        </div>
-                    @endif
 
                     <div>
                         <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -200,13 +196,23 @@
                         <div class="flex justify-between gap-4">
                             <dt class="text-slate-500">Type</dt>
                             <dd class="font-medium text-slate-900">
-                                {{ $broadcast->isPermissionInvitation() ? 'Opt-in invitation' : 'Broadcast' }}
+                                {{ $broadcast->typeLabel() }}
                             </dd>
                         </div>
 
                         <div class="flex justify-between gap-4">
                             <dt class="text-slate-500">Status</dt>
                             <dd class="font-medium text-slate-900">{{ str_replace('_', ' ', $broadcast->status) }}</dd>
+                        </div>
+
+                        <div class="flex justify-between gap-4">
+                            <dt class="text-slate-500">Channel</dt>
+                            <dd class="font-medium text-slate-900">{{ strtoupper($broadcast->channel) }}</dd>
+                        </div>
+
+                        <div class="flex justify-between gap-4">
+                            <dt class="text-slate-500">Purpose / Scope</dt>
+                            <dd class="font-medium text-slate-900">{{ $broadcast->purpose }} / {{ $broadcast->scope }}</dd>
                         </div>
 
                         <div class="flex justify-between gap-4">

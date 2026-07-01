@@ -86,4 +86,42 @@ class Broadcast extends Model
     {
         return $this->message_type === self::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION;
     }
+
+    public function isRegularBroadcast(): bool
+    {
+        return ! $this->isPermissionInvitation();
+    }
+
+    public function broadcastType(): string
+    {
+        return $this->isPermissionInvitation()
+            ? self::BROADCAST_TYPE_PERMISSION_INVITATION
+            : self::BROADCAST_TYPE_REGULAR;
+    }
+
+    public function typeLabel(): string
+    {
+        return $this->isPermissionInvitation()
+            ? 'Opt-in invitation'
+            : 'Broadcast';
+    }
+
+    public function typeDescription(): string
+    {
+        return $this->isPermissionInvitation()
+            ? 'Email-only one-time imported-contact opt-in invitation.'
+            : 'Regular consent-gated one-time broadcast.';
+    }
+
+    public function recipientFilterLabel(): string
+    {
+        $recipientFilter = $this->recipient_filter ?? [];
+
+        return match ($recipientFilter['type'] ?? 'all') {
+            'imported' => 'Imported contacts',
+            'tag' => 'Contacts tagged '.implode(', ', $recipientFilter['tags'] ?? []),
+            'contact_ids' => 'Selected contacts',
+            default => 'All contacts',
+        };
+    }
 }

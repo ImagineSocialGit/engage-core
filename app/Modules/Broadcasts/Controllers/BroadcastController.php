@@ -33,6 +33,12 @@ class BroadcastController extends Controller
             'title' => 'Broadcasts',
             'heading' => 'Broadcasts',
             'broadcasts' => $broadcasts,
+            'regularBroadcasts' => $broadcasts
+                ->filter(fn (Broadcast $broadcast): bool => $broadcast->isRegularBroadcast())
+                ->values(),
+            'permissionInvitationBroadcasts' => $broadcasts
+                ->filter(fn (Broadcast $broadcast): bool => $broadcast->isPermissionInvitation())
+                ->values(),
             'selectedRecipientContacts' => $this->selectedContactOptions(
                 $request->session()->getOldInput('contact_ids', []),
             ),

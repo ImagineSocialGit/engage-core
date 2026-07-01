@@ -24,12 +24,31 @@ class BroadcastControllerTest extends TestCase
         ]);
     }
 
-    public function test_it_lists_broadcasts(): void
+    public function test_it_lists_broadcasts_and_opt_in_invitations_as_separate_sections(): void
     {
         $user = User::factory()->create();
 
         Broadcast::factory()->create([
             'name' => 'Weekly update',
+            'message_type' => Broadcast::DEFAULT_MESSAGE_TYPE,
+            'meta' => [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_REGULAR,
+            ],
+        ]);
+
+        Broadcast::factory()->create([
+            'name' => 'Imported opt-in invitation',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'dispatch_key' => Broadcast::PERMISSION_INVITATION_DISPATCH_KEY,
+            'message_type' => Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'recipient_filter' => [
+                'type' => 'imported',
+            ],
+            'meta' => [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
+            ],
         ]);
 
         $response = $this
@@ -38,7 +57,14 @@ class BroadcastControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Broadcasts');
+        $response->assertSee('Send a Broadcast');
+        $response->assertSee('Send Opt-In Invitation');
+        $response->assertSee('Recent Broadcasts');
+        $response->assertSee('Opt-In Invitations');
         $response->assertSee('Weekly update');
+        $response->assertSee('Imported opt-in invitation');
+        $response->assertSee('Normal Messaging consent, suppression, and revocation gates apply.');
+        $response->assertSee('Email-only, one-time, and enforced by Messaging.');
     }
 
     public function test_it_creates_a_draft_broadcast(): void
@@ -170,6 +196,39 @@ class BroadcastControllerTest extends TestCase
         $response->assertSee('Weekly update');
         $response->assertSee('Jane Lead');
         $response->assertSee('jane@example.test');
+        $response->assertSee('Regular consent-gated one-time broadcast.');
+    }
+
+    public function test_it_shows_an_opt_in_invitation_with_distinct_copy(): void
+    {
+        $user = User::factory()->create();
+
+        $broadcast = Broadcast::factory()->create([
+            'status' => Broadcast::STATUS_DRAFT,
+            'name' => 'Imported opt-in invitation',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'dispatch_key' => Broadcast::PERMISSION_INVITATION_DISPATCH_KEY,
+            'message_type' => Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'recipient_filter' => [
+                'type' => 'imported',
+            ],
+            'meta' => [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
+            ],
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.broadcasts.show', $broadcast));
+
+        $response->assertOk();
+        $response->assertSee('Imported-contact opt-in invitation');
+        $response->assertSee('Email-only one-time imported-contact opt-in invitation.');
+        $response->assertSee('Messaging owns the invitation token, public preference page, consent recording, and repeat-send enforcement.');
+        $response->assertSee('Imported contacts only.');
+        $response->assertSee('transactional / permission_invitation');
     }
 
     public function test_it_shows_the_edit_form_for_a_draft_broadcast(): void
@@ -199,6 +258,33 @@ class BroadcastControllerTest extends TestCase
         $response->assertSee('Draft subject');
         $response->assertSee('Draft body');
         $response->assertSee('homebuyer');
+    }
+
+    public function test_it_shows_the_edit_form_for_an_opt_in_invitation_with_locked_recipients(): void
+    {
+        $user = User::factory()->create();
+
+        $broadcast = Broadcast::factory()->create([
+            'status' => Broadcast::STATUS_DRAFT,
+            'name' => 'Imported opt-in invitation',
+            'message_type' => Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'recipient_filter' => [
+                'type' => 'imported',
+            ],
+            'meta' => [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
+            ],
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.broadcasts.edit', $broadcast));
+
+        $response->assertOk();
+        $response->assertSee('Edit Opt-In Invitation Draft');
+        $response->assertSee('Recipients are locked to imported contacts.');
+        $response->assertSee('Messaging injects the public preference URL at send time.');
+        $response->assertSee('value="imported"', false);
     }
 
     public function test_it_updates_a_draft_broadcast(): void
@@ -238,6 +324,45 @@ class BroadcastControllerTest extends TestCase
         $this->assertSame('tag', $broadcast->recipient_filter['type']);
         $this->assertSame(['realtor'], $broadcast->recipient_filter['tags']);
         $this->assertNotNull($broadcast->send_at);
+    }
+
+    public function test_it_updates_an_opt_in_invitation_without_changing_the_imported_recipient_filter(): void
+    {
+        $user = User::factory()->create();
+
+        $broadcast = Broadcast::factory()->create([
+            'status' => Broadcast::STATUS_DRAFT,
+            'name' => 'Old invitation',
+            'message_type' => Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'payload' => [
+                'subject' => 'Old subject',
+                'body' => 'Old body',
+            ],
+            'recipient_filter' => [
+                'type' => 'imported',
+            ],
+            'meta' => [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
+            ],
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->patch(route('crm.broadcasts.update', $broadcast), [
+                'name' => 'Updated invitation',
+                'subject' => 'Updated subject',
+                'body' => 'Updated body',
+                'recipient_filter_type' => 'all',
+            ]);
+
+        $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
+
+        $broadcast->refresh();
+
+        $this->assertSame('Updated invitation', $broadcast->name);
+        $this->assertSame('Updated subject', $broadcast->payload['subject']);
+        $this->assertSame('Updated body', $broadcast->payload['body']);
+        $this->assertSame(['type' => 'imported'], $broadcast->recipient_filter);
     }
 
     public function test_it_creates_a_draft_broadcast_for_selected_contacts(): void
