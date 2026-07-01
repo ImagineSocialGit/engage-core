@@ -15,6 +15,10 @@ use Illuminate\Support\Str;
 
 class ContactPermissionInvitationService
 {
+    public function __construct(
+        private readonly MessageChannelAvailability $channelAvailability,
+    ) {}
+
     public const MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION = 'imported_contact_permission_invitation';
 
     /**
@@ -286,15 +290,12 @@ class ContactPermissionInvitationService
      */
     private function normalizedAcceptedChannels(array $channels): array
     {
-        $allowed = [
-            MessageChannel::Email->value,
-            MessageChannel::Sms->value,
-        ];
-
-        return array_values(array_intersect($allowed, array_values(array_unique(array_map(
-            fn (string $channel): string => str_replace('-', '_', strtolower(trim($channel))),
-            $channels,
-        )))));
+        return $this->channelAvailability->normalizeVisibleChannelsForSurface(
+            channels: $channels,
+            surface: 'permission_invitations',
+            purpose: 'marketing',
+            scope: 'broadcast',
+        );
     }
 
     /**

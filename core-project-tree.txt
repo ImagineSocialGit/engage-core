@@ -346,6 +346,7 @@
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailMessagingService.php
 │   │   │   │   │   └── EmailProviderManager.php
+│   │   │   │   ├── MessageChannelAvailability.php
 │   │   │   │   ├── MessageDedupeKeyBuilder.php
 │   │   │   │   ├── MessageDefinitionResolver.php
 │   │   │   │   ├── MessageDispatchDefinitionMatcher.php
@@ -805,8 +806,8 @@
 │   │   ├── task-presets-template.php
 │   │   ├── TOKEN_REFERENCE.md
 │   │   └── webinar-post-event-template.php
-│   ├── DOCUMENTATION_AUDIT.md
 │   ├── module-boundaries.md
+│   ├── project-organization.md
 │   └── TODO.md
 ├── package.json
 ├── package-lock.json
@@ -1019,4 +1020,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-348 directories, 672 files
+348 directories, 673 files

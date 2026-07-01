@@ -24,10 +24,18 @@ class ContactPermissionInvitationControllerTest extends TestCase
                 'broadcast',
                 'campaign',
             ],
+            'messaging.channel_availability.email.runtime_supported' => true,
+            'messaging.channel_availability.email.provider_enabled' => true,
+            'messaging.channel_availability.email.surfaces.permission_invitations' => true,
+            'messaging.channel_availability.email.purpose_scopes' => ['*' => true],
+            'messaging.channel_availability.sms.runtime_supported' => true,
+            'messaging.channel_availability.sms.provider_enabled' => false,
+            'messaging.channel_availability.sms.surfaces.permission_invitations' => false,
+            'messaging.channel_availability.sms.purpose_scopes' => ['*' => true],
         ]);
     }
 
-    public function test_public_invitation_page_renders_from_token(): void
+    public function test_public_invitation_page_renders_email_option_from_token(): void
     {
         $invitation = $this->invitation();
 
@@ -38,6 +46,22 @@ class ContactPermissionInvitationControllerTest extends TestCase
         $response->assertOk();
         $response->assertSee($invitation->contact->email);
         $response->assertSee('name="channels[]"', false);
+        $response->assertSee('value="email"', false);
+        $response->assertDontSee('value="sms"', false);
+        $response->assertDontSee('name="phone"', false);
+    }
+
+    public function test_public_invitation_page_renders_sms_option_when_enabled_for_permission_invitations(): void
+    {
+        $this->enablePermissionInvitationSms();
+
+        $invitation = $this->invitation();
+
+        $response = $this->get(route('messaging.permission-invitations.show', [
+            'token' => $invitation->token,
+        ]));
+
+        $response->assertOk();
         $response->assertSee('value="email"', false);
         $response->assertSee('value="sms"', false);
         $response->assertSee('name="phone"', false);
@@ -89,8 +113,31 @@ class ContactPermissionInvitationControllerTest extends TestCase
         $this->assertSame(2, MessageConsent::query()->count());
     }
 
-    public function test_contact_can_opt_into_sms_with_phone(): void
+    public function test_sms_opt_in_is_rejected_when_hidden_for_permission_invitations(): void
     {
+        $invitation = $this->invitation();
+
+        $response = $this->from(route('messaging.permission-invitations.show', [
+            'token' => $invitation->token,
+        ]))->post(route('messaging.permission-invitations.store', [
+            'token' => $invitation->token,
+        ]), [
+            'channels' => ['sms'],
+            'phone' => '+15555550123',
+        ]);
+
+        $response->assertSessionHasErrors('channels.0');
+
+        $invitation->refresh();
+
+        $this->assertNull($invitation->accepted_at);
+        $this->assertSame(0, MessageConsent::query()->count());
+    }
+
+    public function test_contact_can_opt_into_sms_with_phone_when_sms_is_enabled(): void
+    {
+        $this->enablePermissionInvitationSms();
+
         $invitation = $this->invitation();
 
         $response = $this->post(route('messaging.permission-invitations.store', [
@@ -123,8 +170,10 @@ class ContactPermissionInvitationControllerTest extends TestCase
         $this->assertSame(2, MessageConsent::query()->count());
     }
 
-    public function test_sms_opt_in_requires_phone(): void
+    public function test_sms_opt_in_requires_phone_when_sms_is_enabled(): void
     {
+        $this->enablePermissionInvitationSms();
+
         $invitation = $this->invitation();
 
         $response = $this->from(route('messaging.permission-invitations.show', [
@@ -143,8 +192,10 @@ class ContactPermissionInvitationControllerTest extends TestCase
         $this->assertSame(0, MessageConsent::query()->count());
     }
 
-    public function test_contact_can_opt_into_email_and_sms(): void
+    public function test_contact_can_opt_into_email_and_sms_when_sms_is_enabled(): void
     {
+        $this->enablePermissionInvitationSms();
+
         $invitation = $this->invitation();
 
         $response = $this->post(route('messaging.permission-invitations.store', [
@@ -197,6 +248,8 @@ class ContactPermissionInvitationControllerTest extends TestCase
 
     public function test_already_accepted_invitation_cannot_create_duplicate_consent_rows(): void
     {
+        $this->enablePermissionInvitationSms();
+
         $invitation = $this->invitation([
             'status' => ContactPermissionInvitation::STATUS_ACCEPTED,
             'accepted_at' => now(),
@@ -229,6 +282,14 @@ class ContactPermissionInvitationControllerTest extends TestCase
         $this->assertSame(['email'], $invitation->accepted_channels);
         $this->assertNull($invitation->contact->phone);
         $this->assertSame(1, MessageConsent::query()->count());
+    }
+
+    private function enablePermissionInvitationSms(): void
+    {
+        config([
+            'messaging.channel_availability.sms.provider_enabled' => true,
+            'messaging.channel_availability.sms.surfaces.permission_invitations' => true,
+        ]);
     }
 
     /**

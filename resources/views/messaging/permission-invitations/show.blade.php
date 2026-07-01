@@ -38,49 +38,53 @@
                     @csrf
 
                     <div class="space-y-3">
-                        <label class="{{ $style['option'] ?? 'block rounded-2xl border border-slate-200 p-4' }}">
-                            <div class="flex gap-3">
-                                <input
-                                    type="checkbox"
-                                    name="channels[]"
-                                    value="email"
-                                    class="mt-1"
-                                    @checked(in_array('email', old('channels', ['email']), true))
-                                >
+                        @if(in_array('email', $availableChannels ?? ['email'], true))
+                            <label class="{{ $style['option'] ?? 'block rounded-2xl border border-slate-200 p-4' }}">
+                                <div class="flex gap-3">
+                                    <input
+                                        type="checkbox"
+                                        name="channels[]"
+                                        value="email"
+                                        class="mt-1"
+                                        @checked(in_array('email', old('channels', ['email']), true))
+                                    >
 
-                                <div>
-                                    <div class="{{ $style['option_label'] ?? 'font-bold text-slate-900' }}">
-                                        {{ $content['options']['email']['label'] ?? 'Email updates' }}
-                                    </div>
+                                    <div>
+                                        <div class="{{ $style['option_label'] ?? 'font-bold text-slate-900' }}">
+                                            {{ $content['options']['email']['label'] ?? 'Email updates' }}
+                                        </div>
 
-                                    <div class="{{ $style['option_body'] ?? 'mt-1 text-sm text-slate-600' }}">
-                                        {{ $content['options']['email']['body'] ?? 'Receive updates by email.' }}
-                                    </div>
-                                </div>
-                            </div>
-                        </label>
-
-                        <label class="{{ $style['option'] ?? 'block rounded-2xl border border-slate-200 p-4' }}">
-                            <div class="flex gap-3">
-                                <input
-                                    type="checkbox"
-                                    name="channels[]"
-                                    value="sms"
-                                    class="mt-1"
-                                    @checked(in_array('sms', old('channels', []), true))
-                                >
-
-                                <div>
-                                    <div class="{{ $style['option_label'] ?? 'font-bold text-slate-900' }}">
-                                        {{ $content['options']['sms']['label'] ?? 'Text message updates' }}
-                                    </div>
-
-                                    <div class="{{ $style['option_body'] ?? 'mt-1 text-sm text-slate-600' }}">
-                                        {{ $content['options']['sms']['body'] ?? 'Receive updates by SMS.' }}
+                                        <div class="{{ $style['option_body'] ?? 'mt-1 text-sm text-slate-600' }}">
+                                            {{ $content['options']['email']['body'] ?? 'Receive updates by email.' }}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </label>
+                            </label>
+                        @endif
+
+                        @if($smsAvailable ?? false)
+                            <label class="{{ $style['option'] ?? 'block rounded-2xl border border-slate-200 p-4' }}">
+                                <div class="flex gap-3">
+                                    <input
+                                        type="checkbox"
+                                        name="channels[]"
+                                        value="sms"
+                                        class="mt-1"
+                                        @checked(in_array('sms', old('channels', []), true))
+                                    >
+
+                                    <div>
+                                        <div class="{{ $style['option_label'] ?? 'font-bold text-slate-900' }}">
+                                            {{ $content['options']['sms']['label'] ?? 'Text message updates' }}
+                                        </div>
+
+                                        <div class="{{ $style['option_body'] ?? 'mt-1 text-sm text-slate-600' }}">
+                                            {{ $content['options']['sms']['body'] ?? 'Receive updates by SMS.' }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </label>
+                        @endif
 
                         @error('channels')
                             <p class="text-sm font-semibold text-red-600">{{ $message }}</p>
@@ -91,27 +95,29 @@
                         @enderror
                     </div>
 
-                    <div>
-                        <label for="phone" class="block text-sm font-bold text-slate-900">
-                            {{ $content['phone_label'] ?? 'Mobile phone number' }}
-                        </label>
+                    @if($smsAvailable ?? false)
+                        <div>
+                            <label for="phone" class="block text-sm font-bold text-slate-900">
+                                {{ $content['phone_label'] ?? 'Mobile phone number' }}
+                            </label>
 
-                        <input
-                            id="phone"
-                            name="phone"
-                            type="tel"
-                            value="{{ old('phone', $contact?->phone) }}"
-                            class="mt-2 w-full rounded-2xl border border-black/10 px-4 py-3 text-base font-medium text-slate-900 shadow-sm"
-                        >
+                            <input
+                                id="phone"
+                                name="phone"
+                                type="tel"
+                                value="{{ old('phone', $contact?->phone) }}"
+                                class="mt-2 w-full rounded-2xl border border-black/10 px-4 py-3 text-base font-medium text-slate-900 shadow-sm"
+                            >
 
-                        <p class="mt-2 text-xs text-slate-500">
-                            {{ $content['phone_help'] ?? 'Required if you choose text messages.' }}
-                        </p>
+                            <p class="mt-2 text-xs text-slate-500">
+                                {{ $content['phone_help'] ?? 'Required if you choose text messages.' }}
+                            </p>
 
-                        @error('phone')
-                            <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
+                            @error('phone')
+                                <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    @endif
 
                     <p class="{{ $style['legal'] ?? 'text-xs leading-5 text-slate-600' }}">
                         {{ $content['legal'] ?? '' }}

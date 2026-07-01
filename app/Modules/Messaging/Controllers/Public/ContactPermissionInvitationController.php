@@ -5,6 +5,7 @@ namespace App\Modules\Messaging\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Modules\Messaging\Requests\StoreContactPermissionInvitationConsentRequest;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
+use App\Modules\Messaging\Services\MessageChannelAvailability;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -12,6 +13,7 @@ class ContactPermissionInvitationController extends Controller
 {
     public function __construct(
         private readonly ContactPermissionInvitationService $permissionInvitationService,
+        private readonly MessageChannelAvailability $channelAvailability,
     ) {}
 
     public function show(string $token): View
@@ -29,12 +31,20 @@ class ContactPermissionInvitationController extends Controller
             ]);
         }
 
+        $availableChannels = $this->channelAvailability->visibleChannelsForSurface(
+            surface: 'permission_invitations',
+            purpose: 'marketing',
+            scope: 'broadcast',
+        ) ?: ['email'];
+
         return view('messaging.permission-invitations.show', [
             'title' => config('messaging.permission_invitations.content.title', 'Confirm your preferences'),
             'invitation' => $invitation,
             'contact' => $invitation->contact,
             'content' => config('messaging.permission_invitations.content', []),
             'style' => config('messaging.permission_invitations.style', []),
+            'availableChannels' => $availableChannels,
+            'smsAvailable' => in_array('sms', $availableChannels, true),
         ]);
     }
 
