@@ -29,6 +29,7 @@ return new class extends Migration
             $table->json('meta')->nullable();
             $table->timestamps();
 
+            $table->unique(['webinar_series_id', 'contact_id']);
             $table->index(['webinar_series_id', 'notified_at']);
             $table->index('contact_id');
         });

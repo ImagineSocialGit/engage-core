@@ -433,6 +433,7 @@
 │   │   │   │   ├── AddRegistrantToWebinarProviderAction.php
 │   │   │   │   ├── CancelWebinarRegistrationAction.php
 │   │   │   │   ├── CreateWebinarRegistrationAction.php
+│   │   │   │   ├── CreateWebinarWaitlistSignupAction.php
 │   │   │   │   ├── DispatchWebinarRegistrationMessagesAction.php
 │   │   │   │   ├── DispatchWebinarWaitlistMessagesAction.php
 │   │   │   │   ├── EmitWebinarAutomationEventAction.php
@@ -485,6 +486,7 @@
 │   │   │   ├── Requests
 │   │   │   │   ├── StoreWebinarRegistrationRequest.php
 │   │   │   │   ├── StoreWebinarSeriesRequest.php
+│   │   │   │   ├── StoreWebinarWaitlistSignupRequest.php
 │   │   │   │   └── SyncWebinarSeriesRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── ContactPanels
@@ -1014,10 +1016,11 @@
 │   │   │   ├── DispatchWebinarWaitlistMessagesActionTest.php
 │   │   │   ├── PostEvent
 │   │   │   │   └── ProcessPostWebinarEventJobTest.php
-│   │   │   └── WebinarRegistrationControllerTest.php
+│   │   │   ├── WebinarRegistrationControllerTest.php
+│   │   │   └── WebinarWaitlistSignupControllerTest.php
 │   │   └── Workflow
 │   │       └── TransitionContactWorkflowStatusActionTest.php
 │   └── TestCase.php
 └── vite.config.js
 
-348 directories, 673 files
+348 directories, 676 files

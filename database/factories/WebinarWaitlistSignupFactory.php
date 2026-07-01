@@ -21,7 +21,34 @@ class WebinarWaitlistSignupFactory extends Factory
             'webinar_series_id' => WebinarSeries::factory(),
             'notified_at' => null,
             'source_page' => 'webinar-notify-me',
-            'meta' => [],
+            'meta' => [
+                'accepted_channels' => [
+                    'marketing' => [
+                        'email',
+                    ],
+                ],
+            ],
         ];
+    }
+
+    public function withSms(): self
+    {
+        return $this->state(fn (): array => [
+            'meta' => [
+                'accepted_channels' => [
+                    'marketing' => [
+                        'email',
+                        'sms',
+                    ],
+                ],
+            ],
+        ]);
+    }
+
+    public function notified(): self
+    {
+        return $this->state(fn (): array => [
+            'notified_at' => now(),
+        ]);
     }
 }

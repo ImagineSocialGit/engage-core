@@ -25,10 +25,13 @@ class WebinarWaitlistSignup extends Model
         'meta',
     ];
 
-    protected $casts = [
-        'notified_at' => 'datetime',
-        'meta' => 'array',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'notified_at' => 'datetime',
+            'meta' => 'array',
+        ];
+    }
 
     public function contact(): BelongsTo
     {

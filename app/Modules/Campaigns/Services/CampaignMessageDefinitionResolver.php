@@ -4,6 +4,7 @@ namespace App\Modules\Campaigns\Services;
 
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignStep;
+use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\MessageDefinitionResolver;
 use InvalidArgumentException;
 
@@ -11,6 +12,7 @@ class CampaignMessageDefinitionResolver
 {
     public function __construct(
         private readonly MessageDefinitionResolver $messageDefinitionResolver,
+        private readonly MessageChannelAvailability $messageChannelAvailability,
     ) {}
 
     /**
@@ -19,6 +21,20 @@ class CampaignMessageDefinitionResolver
     public function resolve(Campaign $campaign, CampaignStep $step): array
     {
         $reference = $this->reference($campaign, $step);
+
+        if (! $this->messageChannelAvailability->isVisibleForSurface(
+            channel: $reference['channel'],
+            surface: 'campaigns',
+            purpose: $reference['purpose'],
+            scope: $reference['scope'],
+        )) {
+            return $this->unavailableChannelDefinition(
+                campaign: $campaign,
+                step: $step,
+                reference: $reference,
+            );
+        }
+
         $definition = $this->findMessagingDefinition($reference, $step);
 
         $schedule = $this->messageSchedule($step);
@@ -123,6 +139,45 @@ class CampaignMessageDefinitionResolver
             ]).
             '].'
         );
+    }
+
+    /**
+     * @param array{
+     *     dispatch_key: string,
+     *     campaign_key: string,
+     *     step_number: int,
+     *     channel: string,
+     *     purpose: string,
+     *     scope: string
+     * } $reference
+     * @return array<string, mixed>
+     */
+    private function unavailableChannelDefinition(
+        Campaign $campaign,
+        CampaignStep $step,
+        array $reference,
+    ): array {
+        return [
+            'channel' => $reference['channel'],
+            'purpose' => $reference['purpose'],
+            'scope' => $reference['scope'],
+            'dispatch_keys' => [$reference['dispatch_key']],
+            'conditions' => $this->conditions($step),
+            'payload' => [],
+            'campaign_key' => $campaign->key,
+            'step' => $step->step_number,
+            'skip_when_join_clicked' => (bool) data_get($step->meta ?? [], 'skip_when_join_clicked', false),
+            'notification_type' => data_get($step->meta ?? [], 'notification_type'),
+            'meta' => [
+                'campaign' => [
+                    'campaign_id' => $campaign->id,
+                    'campaign_key' => $campaign->key,
+                    'campaign_step_id' => $step->id,
+                    'campaign_step' => $step->step_number,
+                ],
+                'campaign_skip_reason' => 'campaign_channel_unavailable',
+            ],
+        ];
     }
 
     /**

@@ -2,11 +2,11 @@
 
 namespace App\Modules\Webinars\Controllers\Public;
 
+use App\Http\Controllers\Controller;
+use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Webinars\Actions\CreateWebinarRegistrationAction;
 use App\Modules\Webinars\Actions\GetActiveWebinarSeriesAction;
 use App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction;
-use App\Http\Controllers\Controller;
-use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Webinars\Requests\StoreWebinarRegistrationRequest;
 use App\Support\Caching\CacheKey;
 use Illuminate\Http\Response;
@@ -63,16 +63,22 @@ class WebinarRegistrationController extends Controller
         $webinar = $getNextUpcomingWebinarAction->getForSeries($series);
 
         $config = app(\App\Modules\Webinars\Support\WebinarRegisterPageConfig::class);
+        $channelAvailability = app(MessageChannelAvailability::class);
 
         if (! $webinar) {
             return view('webinar.notify-me', [
                 'series' => $series,
                 'page' => $config->content('notify-me', $series->slug, $series->meta ?? []),
                 'style' => $config->style('notify-me', $series->slug),
+                'webinarWaitlistChannels' => [
+                    'marketing' => $channelAvailability->visibleChannelsForSurface(
+                        surface: 'webinar_waitlists',
+                        purpose: 'marketing',
+                        scope: 'webinar_waitlist',
+                    ),
+                ],
             ])->render();
         }
-
-        $channelAvailability = app(MessageChannelAvailability::class);
 
         return view('webinar.register', [
             'webinar' => $webinar,
