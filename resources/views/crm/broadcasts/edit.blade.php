@@ -61,6 +61,49 @@
                 <div class="mt-5 rounded-xl border border-amber-200 bg-white p-3 text-sm text-amber-900">
                     Recipients are locked to imported contacts. This keeps the one-time opt-in invitation separate from normal marketing broadcasts.
                 </div>
+
+            @if($permissionInvitationPreview)
+                <div class="mt-5 rounded-xl border border-amber-200 bg-white p-4">
+                    <h3 class="text-sm font-semibold text-slate-900">
+                        Invitation Eligibility Preview
+                    </h3>
+
+                    <dl class="mt-3 grid gap-3 sm:grid-cols-3">
+                        <div class="rounded-lg bg-slate-50 p-3">
+                            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Imported contacts found
+                            </dt>
+                            <dd class="mt-1 text-2xl font-semibold text-slate-900">
+                                {{ $permissionInvitationPreview['imported_contacts_count'] }}
+                            </dd>
+                        </div>
+
+                        <div class="rounded-lg bg-slate-50 p-3">
+                            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Already consented / ineligible
+                            </dt>
+                            <dd class="mt-1 text-2xl font-semibold text-slate-900">
+                                {{ $permissionInvitationPreview['already_consented_count'] }}
+                            </dd>
+                        </div>
+
+                        <div class="rounded-lg bg-slate-50 p-3">
+                            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Eligible for invitation
+                            </dt>
+                            <dd class="mt-1 text-2xl font-semibold text-slate-900">
+                                {{ $permissionInvitationPreview['eligible_contacts_count'] }}
+                            </dd>
+                        </div>
+                    </dl>
+
+                    @if(($permissionInvitationPreview['excluded_by_prior_broadcast_count'] ?? 0) > 0)
+                        <p class="mt-3 text-xs text-slate-600">
+                            {{ $permissionInvitationPreview['excluded_by_prior_broadcast_count'] }} imported contacts are excluded by prior-Broadcast duplicate-send rules.
+                        </p>
+                    @endif
+                </div>
+            @endif
             @endif
 
             <form

@@ -8,6 +8,7 @@ use App\Modules\Broadcasts\Actions\ScheduleBroadcastAction;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\MessageConsent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -680,4 +681,123 @@ class BroadcastControllerTest extends TestCase
         $this->assertSame(Broadcast::STATUS_CANCELLED, $broadcast->status);
         $this->assertNotNull($broadcast->cancelled_at);
     }
+
+    public function test_it_shows_permission_invitation_eligibility_preview_on_show_page(): void
+    {
+        $user = User::factory()->create();
+
+        Contact::factory()->create([
+            'source' => 'import',
+            'email' => 'eligible@example.test',
+        ]);
+
+        $alreadyConsented = Contact::factory()->create([
+            'source' => 'import',
+            'email' => 'consented@example.test',
+        ]);
+
+        Contact::factory()->create([
+            'source' => 'crm',
+            'email' => 'not-imported@example.test',
+        ]);
+
+        MessageConsent::query()->create([
+            'contact_id' => $alreadyConsented->id,
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'consented_at' => now(),
+            'source' => 'test',
+        ]);
+
+        $broadcast = Broadcast::factory()->create([
+            'status' => Broadcast::STATUS_DRAFT,
+            'name' => 'Imported opt-in invitation',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'dispatch_key' => Broadcast::PERMISSION_INVITATION_DISPATCH_KEY,
+            'message_type' => Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'recipient_filter' => [
+                'type' => 'imported',
+            ],
+            'meta' => [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
+            ],
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.broadcasts.show', $broadcast));
+
+        $response->assertOk();
+        $response->assertSee('Imported contacts found');
+        $response->assertSee('Already consented / ineligible');
+        $response->assertSee('Eligible for invitation');
+        $response->assertSeeInOrder([
+            'Imported contacts found',
+            '2',
+            'Already consented / ineligible',
+            '1',
+            'Eligible for invitation',
+            '1',
+        ]);
+    }
+
+    public function test_it_shows_permission_invitation_eligibility_preview_on_edit_page(): void
+    {
+        $user = User::factory()->create();
+
+        Contact::factory()->create([
+            'source' => 'import',
+            'email' => 'eligible@example.test',
+        ]);
+
+        $alreadyConsented = Contact::factory()->create([
+            'source' => 'import',
+            'email' => 'consented@example.test',
+        ]);
+
+        MessageConsent::query()->create([
+            'contact_id' => $alreadyConsented->id,
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'campaign',
+            'consented_at' => now(),
+            'source' => 'test',
+        ]);
+
+        $broadcast = Broadcast::factory()->create([
+            'status' => Broadcast::STATUS_DRAFT,
+            'name' => 'Imported opt-in invitation',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'dispatch_key' => Broadcast::PERMISSION_INVITATION_DISPATCH_KEY,
+            'message_type' => Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'recipient_filter' => [
+                'type' => 'imported',
+            ],
+            'meta' => [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
+            ],
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.broadcasts.edit', $broadcast));
+
+        $response->assertOk();
+        $response->assertSee('Invitation Eligibility Preview');
+        $response->assertSeeInOrder([
+            'Imported contacts found',
+            '2',
+            'Already consented / ineligible',
+            '1',
+            'Eligible for invitation',
+            '1',
+        ]);
+    }
+
+
 }

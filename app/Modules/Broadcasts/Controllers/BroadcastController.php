@@ -7,6 +7,7 @@ use App\Modules\Broadcasts\Actions\CancelBroadcastAction;
 use App\Modules\Broadcasts\Actions\ScheduleBroadcastAction;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
+use App\Modules\Broadcasts\Services\BroadcastRecipientResolver;
 use App\Modules\Broadcasts\Requests\StoreBroadcastRequest;
 use App\Modules\Broadcasts\Requests\UpdateBroadcastRequest;
 use App\Modules\Core\Models\Contact;
@@ -20,6 +21,7 @@ class BroadcastController extends Controller
 {
     public function __construct(
         private readonly ContactFilterResolver $contactFilterResolver,
+        private readonly BroadcastRecipientResolver $broadcastRecipientResolver,
     ) {}
 
     public function index(Request $request): View
@@ -103,6 +105,7 @@ class BroadcastController extends Controller
             'broadcast' => $broadcast,
             'recipients' => $recipients,
             'recipientFilterContacts' => $this->recipientFilterContacts($broadcast),
+            'permissionInvitationPreview' => $this->permissionInvitationPreview($broadcast),
             'scheduledMessages' => $scheduledMessages,
         ]);
     }
@@ -133,6 +136,7 @@ class BroadcastController extends Controller
                 ->latest()
                 ->limit(50)
                 ->get(['id', 'name', 'channel', 'status', 'send_at']),
+            'permissionInvitationPreview' => $this->permissionInvitationPreview($broadcast),
         ]);
     }
 
@@ -203,6 +207,24 @@ class BroadcastController extends Controller
             ->with('success', $broadcast->isPermissionInvitation()
                 ? 'Opt-in invitation cancelled.'
                 : 'Broadcast cancelled.');
+    }
+
+
+    /**
+     * @return array{
+     *     imported_contacts_count: int,
+     *     already_consented_count: int,
+     *     eligible_contacts_count: int,
+     *     excluded_by_prior_broadcast_count: int
+     * }|null
+     */
+    private function permissionInvitationPreview(Broadcast $broadcast): ?array
+    {
+        if (! $broadcast->isPermissionInvitation()) {
+            return null;
+        }
+
+        return $this->broadcastRecipientResolver->permissionInvitationPreview($broadcast);
     }
 
     /**

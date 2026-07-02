@@ -176,6 +176,13 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - SMS visibility/channel availability.
   - Safe defaults when a client config omits optional values.
 
+- [ ] Add client config fallback tests.
+  - Confirm default config is used when a client override is missing.
+  - Confirm client override config wins when present.
+  - Confirm nested messaging/config-template fallbacks do not silently drop required keys.
+  - Confirm missing optional content/style keys use safe defaults.
+  - Confirm permission invitation config fallback works for email copy, public-page copy, consent scopes, and style keys.
+
 ### SMS toggleability
 
 - [ ] Add config-driven channel availability rules.

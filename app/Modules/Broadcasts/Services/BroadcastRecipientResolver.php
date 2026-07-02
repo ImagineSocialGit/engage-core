@@ -39,6 +39,39 @@ class BroadcastRecipientResolver
         return $contacts->values();
     }
 
+
+    /**
+     * @return array{
+     *     imported_contacts_count: int,
+     *     already_consented_count: int,
+     *     eligible_contacts_count: int,
+     *     excluded_by_prior_broadcast_count: int
+     * }
+     */
+    public function permissionInvitationPreview(Broadcast $broadcast): array
+    {
+        $importedContacts = $this->contactFilterResolver->resolve(['type' => 'imported']);
+
+        if ($importedContacts->isEmpty()) {
+            return [
+                'imported_contacts_count' => 0,
+                'already_consented_count' => 0,
+                'eligible_contacts_count' => 0,
+                'excluded_by_prior_broadcast_count' => 0,
+            ];
+        }
+
+        $afterPriorBroadcastExclusions = $this->excludePriorBroadcastRecipients($broadcast, $importedContacts);
+        $contactIdsWithConsent = $this->contactIdsWithMessageConsent($afterPriorBroadcastExclusions);
+
+        return [
+            'imported_contacts_count' => $importedContacts->count(),
+            'already_consented_count' => count($contactIdsWithConsent),
+            'eligible_contacts_count' => max(0, $afterPriorBroadcastExclusions->count() - count($contactIdsWithConsent)),
+            'excluded_by_prior_broadcast_count' => max(0, $importedContacts->count() - $afterPriorBroadcastExclusions->count()),
+        ];
+    }
+
     /**
      * @param Collection<int, Contact> $contacts
      * @return Collection<int, Contact>
@@ -77,10 +110,7 @@ class BroadcastRecipientResolver
      */
     private function excludeContactsWithMessageConsent(Collection $contacts): Collection
     {
-        $contactIdsWithConsent = MessageConsent::query()
-            ->whereIn('contact_id', $contacts->modelKeys())
-            ->pluck('contact_id')
-            ->all();
+        $contactIdsWithConsent = $this->contactIdsWithMessageConsent($contacts);
 
         if ($contactIdsWithConsent === []) {
             return $contacts;
@@ -89,6 +119,24 @@ class BroadcastRecipientResolver
         return $contacts->reject(
             fn (Contact $contact): bool => in_array($contact->getKey(), $contactIdsWithConsent, true)
         );
+    }
+
+    /**
+     * @param Collection<int, Contact> $contacts
+     * @return array<int, int>
+     */
+    private function contactIdsWithMessageConsent(Collection $contacts): array
+    {
+        if ($contacts->isEmpty()) {
+            return [];
+        }
+
+        return MessageConsent::query()
+            ->whereIn('contact_id', $contacts->modelKeys())
+            ->distinct()
+            ->pluck('contact_id')
+            ->map(fn (mixed $contactId): int => (int) $contactId)
+            ->all();
     }
 
     private function shouldExcludeContactsWithMessageConsent(Broadcast $broadcast): bool

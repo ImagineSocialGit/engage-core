@@ -73,6 +73,43 @@
                 <p class="mt-1">
                     This is an email-only, one-time invitation flow. Messaging owns the invitation token, public preference page, consent recording, and repeat-send enforcement.
                 </p>
+
+                @if($permissionInvitationPreview)
+                    <dl class="mt-4 grid gap-3 sm:grid-cols-3">
+                        <div class="rounded-lg bg-white/70 p-3">
+                            <dt class="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                                Imported contacts found
+                            </dt>
+                            <dd class="mt-1 text-2xl font-semibold text-amber-950">
+                                {{ $permissionInvitationPreview['imported_contacts_count'] }}
+                            </dd>
+                        </div>
+
+                        <div class="rounded-lg bg-white/70 p-3">
+                            <dt class="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                                Already consented / ineligible
+                            </dt>
+                            <dd class="mt-1 text-2xl font-semibold text-amber-950">
+                                {{ $permissionInvitationPreview['already_consented_count'] }}
+                            </dd>
+                        </div>
+
+                        <div class="rounded-lg bg-white/70 p-3">
+                            <dt class="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                                Eligible for invitation
+                            </dt>
+                            <dd class="mt-1 text-2xl font-semibold text-amber-950">
+                                {{ $permissionInvitationPreview['eligible_contacts_count'] }}
+                            </dd>
+                        </div>
+                    </dl>
+
+                    @if(($permissionInvitationPreview['excluded_by_prior_broadcast_count'] ?? 0) > 0)
+                        <p class="mt-3 text-xs">
+                            {{ $permissionInvitationPreview['excluded_by_prior_broadcast_count'] }} imported contacts are excluded by prior-Broadcast duplicate-send rules.
+                        </p>
+                    @endif
+                @endif
             </x-ui.card>
         @endif
 
