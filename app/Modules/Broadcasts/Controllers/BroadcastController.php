@@ -7,14 +7,15 @@ use App\Modules\Broadcasts\Actions\CancelBroadcastAction;
 use App\Modules\Broadcasts\Actions\ScheduleBroadcastAction;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
-use App\Modules\Broadcasts\Services\BroadcastRecipientResolver;
 use App\Modules\Broadcasts\Requests\StoreBroadcastRequest;
 use App\Modules\Broadcasts\Requests\UpdateBroadcastRequest;
+use App\Modules\Broadcasts\Services\BroadcastRecipientResolver;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Services\Contacts\ContactFilterResolver;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
 class BroadcastController extends Controller
@@ -35,6 +36,7 @@ class BroadcastController extends Controller
             'title' => 'Broadcasts',
             'heading' => 'Broadcasts',
             'broadcasts' => $broadcasts,
+            'permissionInvitationPreview' => $this->newPermissionInvitationPreview(),
             'regularBroadcasts' => $broadcasts
                 ->filter(fn (Broadcast $broadcast): bool => $broadcast->isRegularBroadcast())
                 ->values(),
@@ -62,6 +64,16 @@ class BroadcastController extends Controller
         $broadcast = Broadcast::query()->create($request->broadcastAttributes());
 
         if ($request->shouldSchedule()) {
+            if ($broadcast->isPermissionInvitation()) {
+                $preview = $this->permissionInvitationPreview($broadcast);
+
+                if (($preview['eligible_contacts_count'] ?? 0) < 1) {
+                    return redirect()
+                        ->route('crm.broadcasts.show', $broadcast)
+                        ->with('error', 'No imported contacts are currently eligible for this opt-in invitation.');
+                }
+            }
+
             $broadcast = $scheduleBroadcastAction->handle($broadcast);
 
             return redirect()
@@ -178,6 +190,16 @@ class BroadcastController extends Controller
             'send_at' => $validated['send_at'] ?? $broadcast->send_at,
         ])->save();
 
+        if ($broadcast->isPermissionInvitation()) {
+            $preview = $this->permissionInvitationPreview($broadcast);
+
+            if (($preview['eligible_contacts_count'] ?? 0) < 1) {
+                return redirect()
+                    ->route('crm.broadcasts.show', $broadcast)
+                    ->with('error', 'No imported contacts are currently eligible for this opt-in invitation.');
+            }
+        }
+
         $broadcast = $scheduleBroadcastAction->handle($broadcast);
 
         return redirect()
@@ -214,6 +236,8 @@ class BroadcastController extends Controller
      * @return array{
      *     imported_contacts_count: int,
      *     already_consented_count: int,
+     *     already_invited_count: int,
+     *     ineligible_contacts_count: int,
      *     eligible_contacts_count: int,
      *     excluded_by_prior_broadcast_count: int
      * }|null
@@ -223,6 +247,36 @@ class BroadcastController extends Controller
         if (! $broadcast->isPermissionInvitation()) {
             return null;
         }
+
+        return $this->broadcastRecipientResolver->permissionInvitationPreview($broadcast);
+    }
+
+    /**
+     * @return array{
+     *     imported_contacts_count: int,
+     *     already_consented_count: int,
+     *     already_invited_count: int,
+     *     ineligible_contacts_count: int,
+     *     eligible_contacts_count: int,
+     *     excluded_by_prior_broadcast_count: int
+     * }
+     */
+    private function newPermissionInvitationPreview(): array
+    {
+        $broadcast = new Broadcast([
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'dispatch_key' => Broadcast::PERMISSION_INVITATION_DISPATCH_KEY,
+            'message_type' => Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'recipient_filter' => [
+                'type' => 'imported',
+            ],
+            'send_at' => Carbon::now()->addMinutes(5),
+            'meta' => [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
+            ],
+        ]);
 
         return $this->broadcastRecipientResolver->permissionInvitationPreview($broadcast);
     }

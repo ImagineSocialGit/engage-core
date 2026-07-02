@@ -8,6 +8,7 @@ use App\Modules\Broadcasts\Actions\ScheduleBroadcastAction;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -799,5 +800,110 @@ class BroadcastControllerTest extends TestCase
         ]);
     }
 
+    public function test_it_shows_permission_invitation_eligibility_preview_on_index_page(): void
+    {
+        $user = User::factory()->create();
+
+        Contact::factory()->create([
+            'source' => 'import',
+            'email' => 'eligible@example.test',
+        ]);
+
+        $alreadyConsented = Contact::factory()->create([
+            'source' => 'import',
+            'email' => 'consented@example.test',
+        ]);
+
+        $alreadyInvited = Contact::factory()->create([
+            'source' => 'import',
+            'email' => 'invited@example.test',
+        ]);
+
+        Contact::factory()->create([
+            'source' => 'crm',
+            'email' => 'not-imported@example.test',
+        ]);
+
+        MessageConsent::query()->create([
+            'contact_id' => $alreadyConsented->id,
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'consented_at' => now(),
+            'source' => 'test',
+        ]);
+
+        ContactPermissionInvitation::query()->create([
+            'contact_id' => $alreadyInvited->id,
+            'channel' => ContactPermissionInvitation::CHANNEL_EMAIL,
+            'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+            'status' => ContactPermissionInvitation::STATUS_SENT,
+            'claimed_at' => now()->subHour(),
+            'sent_at' => now()->subMinutes(55),
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.broadcasts.index'));
+
+        $response->assertOk();
+        $response->assertSee('Invitation Eligibility Preview');
+        $response->assertSeeInOrder([
+            'Imported contacts found',
+            '3',
+            'Already consented',
+            '1',
+            'Already invited',
+            '1',
+            'Eligible for invitation',
+            '1',
+        ]);
+    }
+
+    public function test_it_blocks_scheduling_permission_invitation_when_no_imported_contacts_are_eligible(): void
+    {
+        $user = User::factory()->create();
+
+        $alreadyConsented = Contact::factory()->create([
+            'source' => 'import',
+            'email' => 'consented@example.test',
+        ]);
+
+        MessageConsent::query()->create([
+            'contact_id' => $alreadyConsented->id,
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'consented_at' => now(),
+            'source' => 'test',
+        ]);
+
+        $this->mock(ScheduleBroadcastAction::class)
+            ->shouldNotReceive('handle');
+
+        $response = $this
+            ->actingAs($user)
+            ->post(route('crm.broadcasts.store'), [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
+                'intent' => 'schedule',
+                'name' => 'Imported opt-in invitation',
+                'subject' => 'Confirm how you want to hear from us',
+                'body' => 'Please confirm your communication preferences.',
+                'recipient_filter_type' => 'imported',
+            ]);
+
+        $broadcast = Broadcast::query()->first();
+
+        $this->assertNotNull($broadcast);
+
+        $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
+        $response->assertSessionHas('error', 'No imported contacts are currently eligible for this opt-in invitation.');
+
+        $broadcast->refresh();
+
+        $this->assertSame(Broadcast::STATUS_DRAFT, $broadcast->status);
+        $this->assertSame(0, $broadcast->recipient_count);
+        $this->assertSame(0, $broadcast->scheduled_count);
+    }
 
 }
