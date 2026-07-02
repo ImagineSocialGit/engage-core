@@ -193,6 +193,33 @@ A permission invitation Broadcast should:
 - use `message_type = imported_contact_permission_invitation`
 - use `recipient_filter = {"type":"imported"}` or a narrower Core-owned imported-contact filter such as `{"type":"import_batch","import_batch_ids":[...]}`
 
+Broadcasts may provide an eligibility preview before scheduling imported-contact opt-in invitations.
+
+The preview should be based on the same recipient-resolution path used for scheduling and may include:
+
+```text
+imported_contacts_count
+already_consented_count
+already_invited_count
+ineligible_contacts_count
+eligible_contacts_count
+excluded_by_prior_broadcast_count
+```
+
+Permission invitation Broadcast scheduling should be blocked when no contacts are eligible.
+
+Broadcast-side eligibility narrowing may exclude contacts that:
+
+- already have relevant Messaging consent
+- already have an imported-contact email permission invitation row
+- are excluded by prior-Broadcast recipient exclusion rules
+
+This Broadcast-side narrowing improves operator safety and preview accuracy.
+
+It does not replace Messaging-owned one-time enforcement.
+
+When a Broadcast uses `recipient_filter.type = import_batch`, the CRM should display selected import batch names/details when available instead of only raw batch IDs.
+
 A normal Broadcast must not receive the imported-contact bypass.
 
 Normal Broadcasts remain consent-gated by Messaging.

@@ -100,6 +100,14 @@ These are repeatable checklists. Run the relevant checklist after a production s
 
 ### Permission invitations
 
+Completed baseline:
+
+- Imported-contact permission invitations can be created from Broadcasts as email-only one-time invitations.
+- Broadcasts can target all imported contacts or selected import batches.
+- Eligibility preview counts imported contacts, already-consented contacts, already-invited contacts, prior-Broadcast exclusions, and eligible contacts.
+- Scheduling is blocked when no contacts are eligible.
+- Messaging still owns final one-time enforcement, token injection, public preference handling, and consent creation.
+
 - [ ] Add/refine public opt-in tests as needed after UI polish.
   - Invalid token returns 404.
   - Email-only consent creates expected rows.
@@ -201,16 +209,13 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - Flagged rows should not silently receive the wrong status.
   - Preserve the original imported status in metadata for audit/debugging.
 
-- [ ] Consider a first-class import batch model only if derived import cohorts are not enough.
-  - Current imported-contact cohorts are derived from stable Contact-owned facts:
-    - `source = import`
-    - `meta.imported = true`
-    - `meta.imported_at` present
-  - Broadcasts can combine imported-contact resolution with Messaging consent state for permission-invitation eligibility.
-  - Broadcasts can exclude contacts already scheduled/sent in prior Broadcasts through `recipient_filter.exclude`.
-  - “Imported contacts” is still broad.
-  - Future UX may need “contacts from this exact import file/run only.”
-  - Do not build first-class import batches until derived cohorts and prior-Broadcast exclusions prove insufficient.
+- [ ] Add import batch management visibility.
+  - `contact_import_batches` already exists as a first-class Core model/table.
+  - Broadcasts can already target selected import batches through `recipient_filter.type = import_batch`.
+  - Add a simple CRM list/detail surface for import batches.
+  - Show name, source, original filename, status, imported date, contact count, successful count, failed count, and metadata as needed.
+  - Keep import-batch ownership in Core.
+  - Broadcasts may link to import-batch detail pages once routes exist, but must not own import-batch management.
 
 ### Automation/event seams
 

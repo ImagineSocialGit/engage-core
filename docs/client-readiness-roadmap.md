@@ -41,39 +41,42 @@ imported/new contact
 
 | # | Planned item | Rough estimate | Notes |
 | -: | --- | ---: | --- |
-| 1 | Imports and contact onboarding | 0.5–1 session | Tighten the practical contact-import/onboarding path before layering more outbound behavior on top. |
-| 2 | Imported-contact cohorts and no-consent filters | 0.5–1 session | Ensure imported-contact targeting and no-consent eligibility are clear, predictable, and not Broadcast-owned beyond Broadcast bookkeeping. |
-| 3 | Import-time status mapping | 1–2 sessions | Let operators map legacy/imported statuses to Engage Core ContactStatus records without silently assigning wrong statuses. |
-| 4 | Optional import batch modeling decision | 0.25 session | Decide whether existing import-batch model support is sufficient for exact-import-file targeting and audit needs. |
-| 5 | Permission invitation accepted automation event decision | 0.25–0.5 session | Decide whether accepted invitations should emit a neutral automation event such as `permission_invitation.accepted`. |
-| 6 | Permission invitation cancellation behavior | 0.5–1 session | Clarify how cancellation/skip/failure should appear for permission-invitation Broadcast bookkeeping and Messaging scheduled messages. |
-| 7 | Imported-contact count/preview before invitation scheduling | 0.5–1 session | Give operators a reliable preview/count before scheduling imported-contact invitations. |
-| 8 | Config validation guidance | 0.5–1 session | Convert current config-template expectations into practical validation behavior and operator/debug feedback. |
-| 9 | SMS Broadcast authoring + channel availability wiring | 1–2 sessions | Regular Broadcasts remain single-channel; email uses subject/body, SMS uses message; channel choices come from Messaging channel availability. Permission invitations remain email-only for the bypass send. |
-| 10 | Task template/default definition UI | 1–2 sessions, maybe more if polished | Only needed when clients/operators need to manage task templates themselves. Preset sync already creates DB-owned definitions only. |
-| 11 | FlowRoutes route-builder UX | 3–6 sessions | Keep Route builder simple, guided, and client-appropriate. Do not expose raw automation internals as a blank-canvas builder. |
-| 12 | Task-completed FlowRoutes resume behavior | 0.5–1 session | Resume route event-wait points from neutral `task.completed` automation events, not direct Task-specific FlowRoutes listeners. |
-| 13 | Client self-serve readiness audit | 0.5–1 session | Separate controlled beta/operator-assisted readiness from true client self-serve readiness. |
-| 14 | PetServices vertical planning | 0.5–1 session | Plan vertical-owned pet/service concepts without pushing domain fields into Core. |
-| 15 | Music vertical planning | 0.5–1 session | Plan vertical-owned music/fan/product-interest concepts using Commerce, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Scheduling, Portal, and Reporting as needed. |
-| 16 | Feature-specific docs as modules stabilize | Ongoing | Keep module docs current when architecture/operator behavior changes. Do not turn docs into speculative backlog. |
-| 17 | Client config fallback tests | 0.5–1 session | Verify default/client config fallback, numeric-array replacement, optional content/style safety, and copy-tolerant tests. |
+| 1 | Import batch management visibility | 0.5–1 session | Add a simple CRM list/detail surface for first-class import batches so operators can see source, filename, status, imported date, and counts. Broadcasts can already target selected import batches. |
+| 2 | Import-time status mapping | 1–2 sessions | Let operators map legacy/imported statuses to Engage Core ContactStatus records without silently assigning wrong statuses. |
+| 3 | Permission invitation accepted automation event decision | 0.25–0.5 session | Decide whether accepted invitations should emit a neutral automation event such as `permission_invitation.accepted`. |
+| 4 | Permission invitation cancellation behavior | 0.5–1 session | Clarify how cancellation/skip/failure should appear for permission-invitation Broadcast bookkeeping and Messaging scheduled messages. |
+| 5 | Config validation guidance | 0.5–1 session | Convert current config-template expectations into practical validation behavior and operator/debug feedback. |
+| 6 | SMS Broadcast authoring + channel availability wiring | 1–2 sessions | Regular Broadcasts remain single-channel; email uses subject/body, SMS uses message; channel choices come from Messaging channel availability. Permission invitations remain email-only for the bypass send. |
+| 7 | Task template/default definition UI | 1–2 sessions, maybe more if polished | Only needed when clients/operators need to manage task templates themselves. Preset sync already creates DB-owned definitions only. |
+| 8 | FlowRoutes route-builder UX | 3–6 sessions | Keep Route builder simple, guided, and client-appropriate. Do not expose raw automation internals as a blank-canvas builder. |
+| 9 | Task-completed FlowRoutes resume behavior | 0.5–1 session | Resume route event-wait points from neutral `task.completed` automation events, not direct Task-specific FlowRoutes listeners. |
+| 10 | Client self-serve readiness audit | 0.5–1 session | Separate controlled beta/operator-assisted readiness from true client self-serve readiness. |
+| 11 | PetServices vertical planning | 0.5–1 session | Plan vertical-owned pet/service concepts without pushing domain fields into Core. |
+| 12 | Music vertical planning | 0.5–1 session | Plan vertical-owned music/fan/product-interest concepts using Commerce, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Scheduling, Portal, and Reporting as needed. |
+| 13 | Feature-specific docs as modules stabilize | Ongoing | Keep module docs current when architecture/operator behavior changes. Do not turn docs into speculative backlog. |
+| 14 | Client config fallback tests | 0.5–1 session | Verify default/client config fallback, numeric-array replacement, optional content/style safety, and copy-tolerant tests. |
 
 ## Recommended next implementation target
 
 The next implementation target should be:
 
 ```text
-SMS Broadcast authoring + channel availability wiring
+Import batch management visibility
 ```
 
 Reason:
 
-- It is concrete client/operator-facing work.
-- It uses the Messaging channel availability direction already established.
-- It reinforces that Broadcasts are single-channel sends.
-- It keeps permission-invitation email-only bypass behavior separate from normal Broadcasts.
-- It directly supports client communication readiness without adding another speculative foundation module.
+- Broadcasts can now target all imported contacts or selected import batches.
+- Operators need a simple way to inspect import batches before using them for opt-in invitations.
+- It improves the imported-contact onboarding path without adding import-processing complexity yet.
+- It keeps Core owning import-batch records while Broadcasts only consumes them for recipient targeting and display.
+- It sets up better links from Broadcast recipient filters to import-batch detail pages later.
+
+After that, the next likely implementation target is:
+
+```text
+SMS Broadcast authoring + channel availability wiring
+```
 
 ## What this roadmap intentionally avoids
 

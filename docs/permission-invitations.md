@@ -50,10 +50,16 @@ Messaging still owns the final one-time invitation enforcement.
    - `source = import`
    - `meta.imported = true`
    - `meta.imported_at` present
+   - a present `contact_import_batch_id`
 3. A user creates or schedules an opt-in invitation Broadcast.
-4. The Broadcast uses `recipient_filter = {"type":"imported"}`.
-5. Broadcast recipient resolution starts with the Core imported-contact filter.
-6. Broadcasts may narrow that recipient set for invitation eligibility, such as excluding imported contacts that already have Messaging consent records.
+4. The Broadcast uses one of:
+   - `recipient_filter = {"type":"imported"}`
+   - `recipient_filter = {"type":"import_batch","import_batch_ids":[...]}`
+5. Broadcast recipient resolution starts with the Core imported-contact or import-batch filter.
+6. Broadcasts may narrow that recipient set for invitation eligibility before scheduling, including:
+   - excluding contacts that already have Messaging consent records
+   - excluding contacts that already have a matching imported-contact email permission invitation row
+   - excluding contacts already scheduled/sent in prior Broadcasts through Broadcast-owned recipient-filter exclusions
 7. Broadcast scheduling calls Messaging through public actions/services.
 8. Messaging evaluates and enforces the permission invitation policy.
 9. Messaging creates a `contact_permission_invitations` row before provider send.
@@ -62,6 +68,27 @@ Messaging still owns the final one-time invitation enforcement.
 12. The public preference page lets the contact choose email, SMS, or both.
 13. Messaging creates `MessageConsent` rows for the configured scopes.
 14. Messaging marks the invitation accepted and stores accepted channels.
+
+## Broadcast eligibility preview
+
+Broadcasts may provide operator-facing preview counts before scheduling an imported-contact permission invitation.
+
+The preview may include:
+
+```text
+imported_contacts_count
+already_consented_count
+already_invited_count
+ineligible_contacts_count
+eligible_contacts_count
+excluded_by_prior_broadcast_count
+```
+
+This preview is operator guidance and scheduling safety.
+
+It is not the final permission check.
+
+Messaging still owns final send-time enforcement.
 
 ## Required message identity
 
@@ -214,3 +241,8 @@ Coverage should prove:
 - scheduled-send job injects the public preference URL before sending
 - SMS does not receive the email-only bypass
 - normal Broadcasts do not receive the imported-contact bypass
+- Broadcast preview counts already-invited imported contacts as ineligible
+- Broadcast scheduling blocks permission invitations when zero contacts are eligible
+- import-batch targeted permission invitations only resolve contacts from selected import batches
+- contacts with `contact_import_batch_id` count as imported for final Messaging send-time enforcement
+
