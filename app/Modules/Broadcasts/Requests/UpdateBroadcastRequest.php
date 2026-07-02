@@ -47,7 +47,7 @@ class UpdateBroadcastRequest extends FormRequest
         $broadcast = $this->route('broadcast');
 
         $recipientFilter = $broadcast instanceof Broadcast && $broadcast->isPermissionInvitation()
-            ? ['type' => 'imported']
+            ? $this->permissionInvitationRecipientFilter($validated)
             : $this->withRecipientExclusions(
                 recipientFilter: $this->contactFilterAttributes(
                     validated: $validated,
@@ -126,5 +126,30 @@ class UpdateBroadcastRequest extends FormRequest
         )));
 
         return $statuses === [] ? $allowed : $statuses;
+    }
+
+    /**
+     * @param array<string, mixed> $validated
+     * @return array<string, mixed>
+     */
+    private function permissionInvitationRecipientFilter(array $validated): array
+    {
+        $recipientFilter = $this->contactFilterAttributes(
+            validated: $validated,
+            typeField: 'recipient_filter_type',
+            tagField: 'recipient_tag',
+            idsField: 'contact_ids',
+            importBatchIdsField: 'import_batch_ids',
+        );
+
+        if (($recipientFilter['type'] ?? null) !== 'import_batch') {
+            return [
+                'type' => 'imported',
+            ];
+        }
+
+        return $recipientFilter['import_batch_ids'] === []
+            ? ['type' => 'imported']
+            : $recipientFilter;
     }
 }

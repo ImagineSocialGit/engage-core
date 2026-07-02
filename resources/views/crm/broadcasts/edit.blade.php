@@ -5,9 +5,7 @@
 >
     @php
         $recipientFilter = $broadcast->recipient_filter ?? ['type' => 'all'];
-        $recipientFilterType = $broadcast->isPermissionInvitation()
-            ? 'imported'
-            : old('recipient_filter_type', $recipientFilter['type'] ?? 'all');
+        $recipientFilterType = old('recipient_filter_type', $recipientFilter['type'] ?? 'all');
         $recipientTag = old('recipient_tag', $recipientFilter['tags'][0] ?? '');
 
         $excludeBroadcastIds = collect(old('exclude_broadcast_ids', data_get($recipientFilter, 'exclude.broadcast_ids', [])))
@@ -59,7 +57,7 @@
 
             @if($broadcast->isPermissionInvitation())
                 <div class="mt-5 rounded-xl border border-amber-200 bg-white p-3 text-sm text-amber-900">
-                    Recipients are locked to imported contacts. This keeps the one-time opt-in invitation separate from normal marketing broadcasts.
+                    Recipients are restricted to imported contacts. You can target all imported contacts or selected import batches.
                 </div>
 
             @if($permissionInvitationPreview)
@@ -167,7 +165,53 @@
                 </div>
 
                 @if($broadcast->isPermissionInvitation())
-                    <input type="hidden" name="recipient_filter_type" value="imported">
+                    <div>
+                        <x-ui.form.label for="recipient_filter_type">
+                            Imported Contact Target
+                        </x-ui.form.label>
+
+                        <x-ui.form.select
+                            id="recipient_filter_type"
+                            name="recipient_filter_type"
+                            x-model="recipientFilterType"
+                        >
+                            <option value="imported">All imported contacts</option>
+                            <option value="import_batch">Selected import batches</option>
+                        </x-ui.form.select>
+
+                        <x-ui.form.error name="recipient_filter_type" />
+                    </div>
+
+                    <div x-show="recipientFilterType === 'import_batch'">
+                        <x-ui.form.label for="import_batch_ids">
+                            Import Batches
+                        </x-ui.form.label>
+
+                        <select
+                            id="import_batch_ids"
+                            name="import_batch_ids[]"
+                            multiple
+                            class="mt-1 block min-h-32 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                        >
+                            @foreach($importBatches as $importBatch)
+                                <option
+                                    value="{{ $importBatch->id }}"
+                                    @selected(in_array($importBatch->id, $selectedImportBatchIds, true))
+                                >
+                                    {{ $importBatch->name ?? 'Import #'.$importBatch->id }}
+                                    — {{ $importBatch->imported_at?->format('M j, Y') ?? 'No import date' }}
+                                    — {{ $importBatch->successful_count }} contacts
+                                </option>
+                            @endforeach
+                        </select>
+
+                        <p class="mt-2 text-xs text-slate-600">
+                            Hold Ctrl/Cmd to select multiple batches.
+                        </p>
+
+                        <x-ui.form.error name="import_batch_ids" />
+                        <x-ui.form.error name="import_batch_ids.*" />
+                    </div>
                 @else
                     <div>
                         <x-ui.form.label for="recipient_filter_type">

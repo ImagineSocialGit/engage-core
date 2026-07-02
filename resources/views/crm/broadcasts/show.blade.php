@@ -304,6 +304,10 @@
                             <span class="font-semibold">
                                 {{ implode(', ', $recipientFilter['import_batch_ids'] ?? []) }}
                             </span>
+
+                            <p class="mt-2 text-xs text-slate-500">
+                                Showing batch IDs for now. A later import-management UI can display import names here.
+                            </p>
                         @elseif(($recipientFilter['type'] ?? 'all') === 'tag')
                             Contacts tagged:
                             <span class="font-semibold">

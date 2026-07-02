@@ -11,6 +11,7 @@ use App\Modules\Broadcasts\Requests\StoreBroadcastRequest;
 use App\Modules\Broadcasts\Requests\UpdateBroadcastRequest;
 use App\Modules\Broadcasts\Services\BroadcastRecipientResolver;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Core\Services\Contacts\ContactFilterResolver;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -36,7 +37,9 @@ class BroadcastController extends Controller
             'title' => 'Broadcasts',
             'heading' => 'Broadcasts',
             'broadcasts' => $broadcasts,
-            'permissionInvitationPreview' => $this->newPermissionInvitationPreview(),
+            'permissionInvitationPreview' => $this->newPermissionInvitationPreview($request),
+            'importBatches' => $this->importBatches(),
+            'selectedImportBatchIds' => $this->selectedImportBatchIds($request->session()->getOldInput('import_batch_ids', [])),
             'regularBroadcasts' => $broadcasts
                 ->filter(fn (Broadcast $broadcast): bool => $broadcast->isRegularBroadcast())
                 ->values(),
@@ -149,6 +152,10 @@ class BroadcastController extends Controller
                 ->limit(50)
                 ->get(['id', 'name', 'channel', 'status', 'send_at']),
             'permissionInvitationPreview' => $this->permissionInvitationPreview($broadcast),
+            'importBatches' => $this->importBatches(),
+            'selectedImportBatchIds' => $this->selectedImportBatchIds(
+                session()->getOldInput('import_batch_ids', $broadcast->recipient_filter['import_batch_ids'] ?? []),
+            ),
         ]);
     }
 
@@ -261,7 +268,7 @@ class BroadcastController extends Controller
      *     excluded_by_prior_broadcast_count: int
      * }
      */
-    private function newPermissionInvitationPreview(): array
+    private function newPermissionInvitationPreview(Request $request): array
     {
         $broadcast = new Broadcast([
             'channel' => 'email',
@@ -269,9 +276,7 @@ class BroadcastController extends Controller
             'scope' => 'permission_invitation',
             'dispatch_key' => Broadcast::PERMISSION_INVITATION_DISPATCH_KEY,
             'message_type' => Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
-            'recipient_filter' => [
-                'type' => 'imported',
-            ],
+            'recipient_filter' => $this->permissionInvitationRecipientFilterFromOldInput($request),
             'send_at' => Carbon::now()->addMinutes(5),
             'meta' => [
                 'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
@@ -305,5 +310,57 @@ class BroadcastController extends Controller
         }
 
         return $this->selectedContactOptions($recipientFilter['contact_ids'] ?? []);
+    }
+
+    /**
+     * @return Collection<int, ContactImportBatch>
+     */
+    private function importBatches(): Collection
+    {
+        return ContactImportBatch::query()
+            ->latest('imported_at')
+            ->latest()
+            ->limit(50)
+            ->get();
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function selectedImportBatchIds(mixed $values): array
+    {
+        if (! is_array($values)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(array_map(
+            fn (mixed $value): ?int => is_numeric($value) ? (int) $value : null,
+            $values,
+        ), fn (?int $value): bool => $value !== null && $value > 0)));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function permissionInvitationRecipientFilterFromOldInput(Request $request): array
+    {
+        $type = $request->session()->getOldInput('recipient_filter_type', 'imported');
+
+        if ($type !== 'import_batch') {
+            return [
+                'type' => 'imported',
+            ];
+        }
+
+        $importBatchIds = $this->selectedImportBatchIds(
+            $request->session()->getOldInput('import_batch_ids', []),
+        );
+
+        return $importBatchIds === []
+            ? ['type' => 'imported']
+            : [
+                'type' => 'import_batch',
+                'import_batch_ids' => $importBatchIds,
+            ];
     }
 }

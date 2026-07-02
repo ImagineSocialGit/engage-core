@@ -127,9 +127,7 @@ class StoreBroadcastRequest extends FormRequest
                 'subject' => $validated['subject'],
                 'body' => $validated['body'],
             ],
-            'recipient_filter' => [
-                'type' => 'imported',
-            ],
+            'recipient_filter' => $this->permissionInvitationRecipientFilter($validated),
             'recipient_count' => 0,
             'scheduled_count' => 0,
             'meta' => [
@@ -210,5 +208,30 @@ class StoreBroadcastRequest extends FormRequest
         )));
 
         return $statuses === [] ? $allowed : $statuses;
+    }
+
+    /**
+     * @param array<string, mixed> $validated
+     * @return array<string, mixed>
+     */
+    private function permissionInvitationRecipientFilter(array $validated): array
+    {
+        $recipientFilter = $this->contactFilterAttributes(
+            validated: $validated,
+            typeField: 'recipient_filter_type',
+            tagField: 'recipient_tag',
+            idsField: 'contact_ids',
+            importBatchIdsField: 'import_batch_ids',
+        );
+
+        if (($recipientFilter['type'] ?? null) !== 'import_batch') {
+            return [
+                'type' => 'imported',
+            ];
+        }
+
+        return $recipientFilter['import_batch_ids'] === []
+            ? ['type' => 'imported']
+            : $recipientFilter;
     }
 }

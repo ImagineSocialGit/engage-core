@@ -261,7 +261,7 @@
             <x-ui.card class="space-y-5 border-amber-200 bg-amber-50/40">
                 <div>
                     <div class="inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
-                        Imported Contacts Only
+                        Imported Contacts
                     </div>
 
                     <h2 class="mt-3 text-lg font-semibold tracking-tight">
@@ -269,7 +269,7 @@
                     </h2>
 
                     <p class="mt-1 text-sm text-slate-600">
-                        Email-only one-time invitation asking imported contacts to confirm future email or SMS preferences.
+                        Email-only one-time invitation asking imported contacts, or a selected import batch, to confirm future email or SMS preferences.
                     </p>
                 </div>
 
@@ -337,7 +337,60 @@
                     @csrf
 
                     <input type="hidden" name="broadcast_type" value="{{ \App\Modules\Broadcasts\Models\Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION }}">
-                    <input type="hidden" name="recipient_filter_type" value="imported">
+                    @php
+                        $permissionInvitationRecipientFilterType = old('recipient_filter_type', 'imported');
+                    @endphp
+
+                    <div>
+                        <x-ui.form.label for="permission_invitation_recipient_filter_type">
+                            Imported Contact Target
+                        </x-ui.form.label>
+
+                        <x-ui.form.select
+                            id="permission_invitation_recipient_filter_type"
+                            name="recipient_filter_type"
+                        >
+                            <option value="imported" @selected($permissionInvitationRecipientFilterType === 'imported')>
+                                All imported contacts
+                            </option>
+                            <option value="import_batch" @selected($permissionInvitationRecipientFilterType === 'import_batch')>
+                                Selected import batches
+                            </option>
+                        </x-ui.form.select>
+
+                        <x-ui.form.error name="recipient_filter_type" />
+                    </div>
+
+                    <div>
+                        <x-ui.form.label for="permission_invitation_import_batch_ids">
+                            Import Batches
+                        </x-ui.form.label>
+
+                        <select
+                            id="permission_invitation_import_batch_ids"
+                            name="import_batch_ids[]"
+                            multiple
+                            class="mt-1 block min-h-32 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                        >
+                            @foreach($importBatches as $importBatch)
+                                <option
+                                    value="{{ $importBatch->id }}"
+                                    @selected(in_array($importBatch->id, $selectedImportBatchIds, true))
+                                >
+                                    {{ $importBatch->name ?? 'Import #'.$importBatch->id }}
+                                    — {{ $importBatch->imported_at?->format('M j, Y') ?? 'No import date' }}
+                                    — {{ $importBatch->successful_count }} contacts
+                                </option>
+                            @endforeach
+                        </select>
+
+                        <p class="mt-2 text-xs text-slate-600">
+                            Leave this unselected when targeting all imported contacts. Hold Ctrl/Cmd to select multiple batches.
+                        </p>
+
+                        <x-ui.form.error name="import_batch_ids" />
+                        <x-ui.form.error name="import_batch_ids.*" />
+                    </div>
 
                     <div>
                         <x-ui.form.label for="permission_invitation_name">

@@ -8,6 +8,7 @@ use App\Modules\Broadcasts\Actions\ScheduleBroadcastAction;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -356,9 +357,10 @@ class BroadcastControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Edit Opt-In Invitation Draft');
-        $response->assertSee('Recipients are locked to imported contacts.');
+        $response->assertSee('Recipients are restricted to imported contacts.');
         $response->assertSee('Messaging injects the public preference URL at send time.');
-        $response->assertSee('value="imported"', false);
+        $response->assertSee('All imported contacts');
+        $response->assertSee('Selected import batches');
     }
 
     public function test_it_updates_a_draft_broadcast(): void
@@ -904,6 +906,117 @@ class BroadcastControllerTest extends TestCase
         $this->assertSame(Broadcast::STATUS_DRAFT, $broadcast->status);
         $this->assertSame(0, $broadcast->recipient_count);
         $this->assertSame(0, $broadcast->scheduled_count);
+    }
+
+    public function test_it_creates_a_draft_opt_in_invitation_for_selected_import_batches(): void
+    {
+        $user = User::factory()->create();
+
+        $batch = ContactImportBatch::factory()->create([
+            'name' => 'June import',
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->post(route('crm.broadcasts.store'), [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
+                'intent' => 'draft',
+                'name' => 'June import opt-in invitation',
+                'subject' => 'Confirm how you want to hear from us',
+                'body' => 'Please confirm your communication preferences.',
+                'recipient_filter_type' => 'import_batch',
+                'import_batch_ids' => [$batch->id],
+            ]);
+
+        $broadcast = Broadcast::query()->first();
+
+        $this->assertNotNull($broadcast);
+
+        $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
+
+        $this->assertSame(Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION, $broadcast->meta['broadcast_type']);
+        $this->assertSame(Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION, $broadcast->message_type);
+        $this->assertSame([
+            'type' => 'import_batch',
+            'import_batch_ids' => [$batch->id],
+        ], $broadcast->recipient_filter);
+    }
+
+    public function test_it_updates_an_opt_in_invitation_to_selected_import_batches(): void
+    {
+        $user = User::factory()->create();
+
+        $batch = ContactImportBatch::factory()->create([
+            'name' => 'June import',
+        ]);
+
+        $broadcast = Broadcast::factory()->create([
+            'status' => Broadcast::STATUS_DRAFT,
+            'name' => 'Old invitation',
+            'message_type' => Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'payload' => [
+                'subject' => 'Old subject',
+                'body' => 'Old body',
+            ],
+            'recipient_filter' => [
+                'type' => 'imported',
+            ],
+            'meta' => [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
+            ],
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->patch(route('crm.broadcasts.update', $broadcast), [
+                'name' => 'Updated invitation',
+                'subject' => 'Updated subject',
+                'body' => 'Updated body',
+                'recipient_filter_type' => 'import_batch',
+                'import_batch_ids' => [$batch->id],
+            ]);
+
+        $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
+
+        $broadcast->refresh();
+
+        $this->assertSame('Updated invitation', $broadcast->name);
+        $this->assertSame([
+            'type' => 'import_batch',
+            'import_batch_ids' => [$batch->id],
+        ], $broadcast->recipient_filter);
+    }
+
+    public function test_it_shows_import_batch_recipient_filter_details_for_opt_in_invitation(): void
+    {
+        $user = User::factory()->create();
+
+        $batch = ContactImportBatch::factory()->create();
+
+        $broadcast = Broadcast::factory()->create([
+            'status' => Broadcast::STATUS_DRAFT,
+            'name' => 'Batch opt-in invitation',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'dispatch_key' => Broadcast::PERMISSION_INVITATION_DISPATCH_KEY,
+            'message_type' => Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'recipient_filter' => [
+                'type' => 'import_batch',
+                'import_batch_ids' => [$batch->id],
+            ],
+            'meta' => [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
+            ],
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.broadcasts.show', $broadcast));
+
+        $response->assertOk();
+        $response->assertSee('Imported contacts from selected batches');
+        $response->assertSee((string) $batch->id);
     }
 
 }
