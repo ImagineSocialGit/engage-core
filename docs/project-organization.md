@@ -105,12 +105,12 @@ Universal modules are reusable capability modules. They may be disabled for many
 | Portal | External/customer accounts, portal auth, account invitations, contact-account links, customer-facing shell. |
 | Forms | Form definitions, versions, schemas, submissions, submission review state. |
 | Documents | Document requests, uploaded document records, review events, document lifecycle state. |
+| Commerce | Commerce customers, products, orders, order items, order events, provider-synced purchase history. |
 
 ### Planned universal modules
 
 | Module | Responsibility | Example uses |
 | --- | --- | --- |
-| Commerce | Normalized products, orders, order items, customer/contact links, purchase events, provider sync state. | Shopify purchase history, product-based filters, fan/customer segmentation. |
 | Location | Contact locations, addresses, geocoding-derived coordinates, markets/regions, radius/service-area filters. | Show-radius targeting, dog trainer service areas, appointment eligibility. |
 
 Universal modules should expose public actions/services/contracts/events where other modules need them. Other modules should not write directly to their internals when a public seam exists.

@@ -178,6 +178,11 @@ Current ownership:
 | document_requests | Documents |
 | document_uploads | Documents |
 | document_review_events | Documents |
+| commerce_customers | Commerce |
+| commerce_products | Commerce |
+| commerce_orders | Commerce |
+| commerce_order_items | Commerce |
+| commerce_order_events | Commerce |
 | team_members | InternalNotifications |
 | team_member_notification_preferences | InternalNotifications |
 | contact_workflow_profiles | Workflow |
@@ -273,9 +278,9 @@ Current universal modules include:
 - `Portal`
 - `Forms`
 - `Documents`
+- `Commerce`
 
 Planned universal modules include:
-- `Commerce`
 - `Location`
 
 Current vertical modules include:
@@ -579,7 +584,8 @@ Accepted dependency direction:
 - Forms may optionally use Portal for customer-submitted forms
 - Documents -> Core, when documents are contact-linked
 - Documents may optionally use Portal, Tasks, and Messaging through public services/contracts when those modules are enabled
-- Commerce -> Core
+- Commerce -> Core, when commerce customers/orders are contact-linked
+- Commerce may optionally use Messaging, Broadcasts, Campaigns, FlowRoutes, Portal, and Reporting through public services/contracts when those modules are enabled
 - Commerce may use Integrations through provider contracts/managers such as a Shopify adapter
 - Location -> Core
 - PetServices may consume Core, Scheduling, Portal, Forms, Documents, Tasks, Messaging, Campaigns, FlowRoutes, Reporting, and Integrations as needed

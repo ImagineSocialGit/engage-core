@@ -94,6 +94,22 @@
 │   │   │   │   └── ContactShow
 │   │   │   │       └── ContactCampaignsVisibilityDataProvider.php
 │   │   │   └── Support
+│   │   ├── Commerce
+│   │   │   ├── Actions
+│   │   │   ├── Contracts
+│   │   │   ├── Controllers
+│   │   │   ├── Data
+│   │   │   ├── Models
+│   │   │   │   ├── CommerceCustomer.php
+│   │   │   │   ├── CommerceOrderEvent.php
+│   │   │   │   ├── CommerceOrderItem.php
+│   │   │   │   ├── CommerceOrder.php
+│   │   │   │   └── CommerceProduct.php
+│   │   │   ├── Providers
+│   │   │   │   └── CommerceModuleServiceProvider.php
+│   │   │   ├── Requests
+│   │   │   ├── Services
+│   │   │   └── Support
 │   │   ├── Core
 │   │   │   ├── Actions
 │   │   │   │   ├── Contacts
@@ -804,6 +820,11 @@
 │   │   ├── BookableServiceFactory.php
 │   │   ├── BroadcastFactory.php
 │   │   ├── BroadcastRecipientFactory.php
+│   │   ├── CommerceCustomerFactory.php
+│   │   ├── CommerceOrderEventFactory.php
+│   │   ├── CommerceOrderFactory.php
+│   │   ├── CommerceOrderItemFactory.php
+│   │   ├── CommerceProductFactory.php
 │   │   ├── ContactFactory.php
 │   │   ├── ContactImportBatchFactory.php
 │   │   ├── DocumentRequestFactory.php
@@ -878,6 +899,11 @@
 │   │   ├── 2026_07_02_000002_create_document_requests_table.php
 │   │   ├── 2026_07_02_000003_create_document_uploads_table.php
 │   │   ├── 2026_07_02_000004_create_document_review_events_table.php
+│   │   ├── 2026_07_02_000005_create_commerce_customers_table.php
+│   │   ├── 2026_07_02_000006_create_commerce_products_table.php
+│   │   ├── 2026_07_02_000007_create_commerce_orders_table.php
+│   │   ├── 2026_07_02_000008_create_commerce_order_items_table.php
+│   │   ├── 2026_07_02_000009_create_commerce_order_events_table.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -905,6 +931,7 @@
 │   │   └── webinar-post-event-template.php
 │   ├── module-boundaries.md
 │   ├── modules
+│   │   ├── commerce.md
 │   │   ├── documents.md
 │   │   ├── forms.md
 │   │   ├── portal.md
@@ -1064,6 +1091,8 @@
 │   │   │   └── ScheduleNextCampaignStepAfterScheduledMessageSentTest.php
 │   │   ├── Clients
 │   │   │   └── ClientConfigFallbackTest.php
+│   │   ├── Commerce
+│   │   │   └── CommerceFoundationTest.php
 │   │   ├── Core
 │   │   │   ├── ContactFilterResolverTest.php
 │   │   │   └── ContactLookupControllerTest.php
@@ -1135,4 +1164,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-394 directories, 742 files
+405 directories, 760 files

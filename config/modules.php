@@ -3,6 +3,7 @@
 use App\Modules\Broadcasts\Providers\BroadcastsModuleServiceProvider;
 use App\Modules\Campaigns\Providers\CampaignsModuleServiceProvider;
 use App\Modules\Core\Providers\CoreModuleServiceProvider;
+use App\Modules\Commerce\Providers\CommerceModuleServiceProvider;
 use App\Modules\Documents\Providers\DocumentsModuleServiceProvider;
 use App\Modules\FlowRoutes\Providers\FlowRoutesModuleServiceProvider;
 use App\Modules\Forms\Providers\FormsModuleServiceProvider;
@@ -112,6 +113,14 @@ return [
             'depends_on' => ['core'],
             'providers' => [
                 DocumentsModuleServiceProvider::class,
+            ],
+        ],
+
+        'commerce' => [
+            'name' => 'Commerce',
+            'depends_on' => ['core'],
+            'providers' => [
+                CommerceModuleServiceProvider::class,
             ],
         ],
 
