@@ -122,6 +122,14 @@ Current ownership:
 | contact_import_batches | Core |
 | contact_tags | Core |
 | notes | Core |
+| bookable_services | Scheduling |
+| scheduling_availability_windows | Scheduling |
+| appointments | Scheduling |
+| appointment_attendees | Scheduling |
+| portal_users | Portal |
+| portal_contact_links | Portal |
+| portal_invitations | Portal |
+| portal_access_grants | Portal |
 | team_members | InternalNotifications |
 | team_member_notification_preferences | InternalNotifications |
 | contact_workflow_profiles | Workflow |
@@ -213,11 +221,11 @@ Current universal modules include:
 - `Broadcasts`
 - `Webinars`
 - `Reporting`
+- `Scheduling`
+- `Portal`
 
 Planned universal modules include:
 
-- `Scheduling`
-- `Portal`
 - `Forms`
 - `Documents`
 - `Commerce`
@@ -2019,7 +2027,7 @@ Reporting should not mutate another module’s internal state directly.
 
 ## Scheduling Module
 
-Scheduling is a planned universal module.
+Scheduling is a current universal module.
 
 Scheduling should own simple, intuitive appointment and booking behavior that can be reused by multiple verticals.
 
@@ -2032,7 +2040,7 @@ Scheduling may be used for:
 - studio bookings
 - internal or customer-facing appointments
 
-Scheduling should own, when implemented:
+Scheduling owns:
 
 - bookable services
 - appointment records
@@ -2079,7 +2087,7 @@ Bad:
 
 ## Portal Module
 
-Portal is a planned universal module.
+Portal is a current universal module.
 
 Portal should own external/customer account access. It is separate from internal app users.
 
@@ -2092,7 +2100,7 @@ Portal may be used for:
 - self-service profile/preferences
 - customer-facing dashboards
 
-Portal should own, when implemented:
+Portal owns:
 
 - portal users or customer account identities
 - contact-to-portal-user links

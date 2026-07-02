@@ -8,10 +8,13 @@ use App\Modules\InboundMessaging\Providers\InboundMessagingModuleServiceProvider
 use App\Modules\InternalNotifications\Providers\InternalNotificationsModuleServiceProvider;
 use App\Modules\Messaging\Providers\MessagingModuleServiceProvider;
 use App\Modules\Mortgage\Providers\MortgageModuleServiceProvider;
+use App\Modules\Portal\Providers\PortalModuleServiceProvider;
 use App\Modules\Reporting\Providers\ReportingModuleServiceProvider;
+use App\Modules\Scheduling\Providers\SchedulingModuleServiceProvider;
 use App\Modules\Tasks\Providers\TasksModuleServiceProvider;
 use App\Modules\Webinars\Providers\WebinarsModuleServiceProvider;
 use App\Modules\Workflow\Providers\WorkflowModuleServiceProvider;
+use App\Providers\Modules\IntegrationsModuleServiceProvider;
 
 return [
 
@@ -23,106 +26,149 @@ return [
     | File path:
     | config/modules.php
     |
-    | enabled controls explicit feature visibility.
-    | Providers may load as dependencies without making a module visible.
+    | This is product/onboarding configuration, not a client-facing feature
+    | toggle system. Core is always treated as enabled by ModuleManager.
     |
-    | Keep dependency direction one-way and intentional.
-    | Do not enable vertical modules unless that vertical is installed.
+    | enabled controls explicit feature visibility. Providers may load as
+    | dependencies without making a module visible.
+    |
+    | Keep dependency direction one-way and intentional. Do not enable vertical
+    | modules unless that vertical is installed.
+    |
     */
 
+    'enabled' => array_filter(array_map(
+        'trim',
+        explode(',', env(
+            'ENABLED_MODULES',
+            'tasks,workflow,flow_routes,messaging,inbound_messaging,internal_notifications,campaigns,broadcasts,webinars,integrations,reporting'
+        ))
+    )),
+
     'modules' => [
+
         'core' => [
-            'name' => 'Core',
-            'enabled' => true,
-            'provider' => CoreModuleServiceProvider::class,
+            'name' => 'Core CRM',
+            'always_on' => true,
             'depends_on' => [],
+            'providers' => [
+                CoreModuleServiceProvider::class,
+            ],
         ],
 
         'messaging' => [
             'name' => 'Messaging',
-            'enabled' => true,
-            'provider' => MessagingModuleServiceProvider::class,
             'depends_on' => ['core'],
-        ],
-
-        'webinars' => [
-            'name' => 'Webinars',
-            'enabled' => true,
-            'provider' => WebinarsModuleServiceProvider::class,
-            'depends_on' => ['core', 'messaging'],
-        ],
-
-        'workflow' => [
-            'name' => 'Workflow',
-            'enabled' => true,
-            'provider' => WorkflowModuleServiceProvider::class,
-            'depends_on' => ['core'],
-        ],
-
-        'campaigns' => [
-            'name' => 'Campaigns',
-            'enabled' => true,
-            'provider' => CampaignsModuleServiceProvider::class,
-            'depends_on' => ['core', 'messaging'],
-        ],
-
-        'flow_routes' => [
-            'name' => 'FlowRoutes',
-            'enabled' => true,
-            'provider' => FlowRoutesModuleServiceProvider::class,
-            'depends_on' => ['workflow'],
-        ],
-
-        'tasks' => [
-            'name' => 'Tasks',
-            'enabled' => true,
-            'provider' => TasksModuleServiceProvider::class,
-            'depends_on' => ['core'],
+            'providers' => [
+                MessagingModuleServiceProvider::class,
+            ],
         ],
 
         'inbound_messaging' => [
             'name' => 'Inbound Messaging',
-            'enabled' => false,
-            'provider' => InboundMessagingModuleServiceProvider::class,
             'depends_on' => ['core', 'messaging'],
+            'providers' => [
+                InboundMessagingModuleServiceProvider::class,
+            ],
         ],
 
         'internal_notifications' => [
             'name' => 'Internal Notifications',
-            'enabled' => false,
-            'provider' => InternalNotificationsModuleServiceProvider::class,
             'depends_on' => ['messaging'],
+            'providers' => [
+                InternalNotificationsModuleServiceProvider::class,
+            ],
+        ],
+
+        'tasks' => [
+            'name' => 'Tasks',
+            'depends_on' => ['core'],
+            'providers' => [
+                TasksModuleServiceProvider::class,
+            ],
+        ],
+
+
+        'scheduling' => [
+            'name' => 'Scheduling',
+            'depends_on' => ['core'],
+            'providers' => [
+                SchedulingModuleServiceProvider::class,
+            ],
+        ],
+
+        'portal' => [
+            'name' => 'Portal',
+            'depends_on' => ['core'],
+            'providers' => [
+                PortalModuleServiceProvider::class,
+            ],
+        ],
+
+        'workflow' => [
+            'name' => 'Workflow',
+            'depends_on' => ['core'],
+            'providers' => [
+                WorkflowModuleServiceProvider::class,
+            ],
+        ],
+
+        'flow_routes' => [
+            'name' => 'Flow Routes',
+            'depends_on' => ['workflow'],
+            'providers' => [
+                FlowRoutesModuleServiceProvider::class,
+            ],
+        ],
+
+        'campaigns' => [
+            'name' => 'Campaigns',
+            'depends_on' => ['core', 'messaging'],
+            'providers' => [
+                CampaignsModuleServiceProvider::class,
+            ],
         ],
 
         'broadcasts' => [
             'name' => 'Broadcasts',
-            'enabled' => false,
-            'provider' => BroadcastsModuleServiceProvider::class,
             'depends_on' => ['core', 'messaging'],
+            'providers' => [
+                BroadcastsModuleServiceProvider::class,
+            ],
         ],
 
-        'reporting' => [
-            'name' => 'Reporting',
-            'enabled' => false,
-            'provider' => ReportingModuleServiceProvider::class,
-            'depends_on' => ['core'],
+        'webinars' => [
+            'name' => 'Webinars',
+            'depends_on' => ['core', 'messaging'],
+            'providers' => [
+                WebinarsModuleServiceProvider::class,
+            ],
         ],
 
         'mortgage' => [
             'name' => 'Mortgage',
-            'enabled' => false,
-            'provider' => MortgageModuleServiceProvider::class,
-            'depends_on' => [
-                'core',
-                'workflow',
-                'flow_routes',
-                'tasks',
-                'messaging',
-                'campaigns',
-                'webinars',
-                'reporting',
+            'depends_on' => ['core'],
+            'providers' => [
+                MortgageModuleServiceProvider::class,
             ],
         ],
+
+        'integrations' => [
+            'name' => 'Integrations',
+            'depends_on' => ['core'],
+            'providers' => [
+                IntegrationsModuleServiceProvider::class,
+            ],
+        ],
+
+        'reporting' => [
+            'name' => 'Reporting',
+            'depends_on' => ['core'],
+            'providers' => [
+                ReportingModuleServiceProvider::class,
+            ],
+        ],
+
     ],
 
 ];
