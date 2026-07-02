@@ -31,6 +31,8 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [ ] Confirm SMS visibility is controlled by config where the surface exposes channel choices.
 - [ ] Confirm missing optional content/style keys do not break public pages.
 - [ ] Confirm tests are tolerant of client copy changes unless exact copy is the behavior under test.
+- [ ] Confirm unsupported keys are rejected, flagged, or intentionally ignored with clear operator/debug feedback.
+- [ ] Confirm client config overrides preserve unspecified nested defaults where fallback is expected.
 
 ### After each permission-invitation update
 
@@ -105,16 +107,6 @@ These are repeatable checklists. Run the relevant checklist after a production s
 
 ### Broadcasts
 
-- [ ] Add a clearer imported-contact count/preview before scheduling an opt-in invitation.
-  - Should be Core contact-filter backed.
-  - Should show how many imported contacts are eligible before scheduling.
-  - Should account for imported contacts that already have Messaging consent.
-  - Should not duplicate contact query logic in Broadcasts.
-
-- [ ] Confirm cancellation behavior for permission invitations.
-  - Cancelling pending scheduled messages should not create or mark accepted invitation rows.
-  - Already sent or claimed invitation rows remain historical and still block repeat bypass sends.
-
 - [ ] Add standard SMS Broadcast authoring.
   - Broadcasts should remain single-channel.
   - Regular Broadcast creation/editing should allow `email` or `sms` only when Messaging channel availability exposes that channel for the `broadcasts` surface.
@@ -166,20 +158,6 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - Broadcast/message tokens.
   - Any public URL tokens.
   - Clarify which tokens are runtime-only and should not be guessed in static config.
-
-- [ ] Add config validation guidance.
-  - Required keys.
-  - Unsupported keys.
-  - Token validation.
-  - SMS visibility/channel availability.
-  - Safe defaults when a client config omits optional values.
-
-- [ ] Add client config fallback tests.
-  - Confirm default config is used when a client override is missing.
-  - Confirm client override config wins when present.
-  - Confirm nested messaging/config-template fallbacks do not silently drop required keys.
-  - Confirm missing optional content/style keys use safe defaults.
-  - Confirm permission invitation config fallback works for email copy, public-page copy, consent scopes, and style keys.
 
 ### SMS toggleability
 

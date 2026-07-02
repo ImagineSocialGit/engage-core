@@ -76,6 +76,22 @@ Campaign-authored timing values:
 
 Campaign step timing is authored in Campaign presets and normalized before dispatching through Messaging.
 
+
+## Client override and validation expectations
+
+Client config files may partially override default config. Associative arrays should merge over defaults so omitted nested copy/style keys keep safe defaults. Numeric arrays should replace defaults when present, especially ordered definitions and lists such as consent scopes.
+
+Before shipping a client config, confirm:
+
+- Required keys are present directly or through default fallback.
+- Unsupported keys are rejected, flagged, or intentionally ignored with clear operator/debug feedback.
+- Dispatch keys and tokens are documented in the default or client reference registries.
+- Runtime-only URLs/tokens are injected by runtime services, not guessed in static config.
+- Missing optional public-page content/style keys do not break rendering.
+- SMS visibility is controlled through Messaging channel availability for the relevant surface.
+
+Permission invitation config should preserve the email-only one-time bypass send, explicit SMS opt-in, and configured consent scopes. Normal Broadcasts still require normal Messaging consent.
+
 ## Broadcast recipient filter shapes
 
 Core owns generic contact filter resolution. Broadcasts store recipient selection metadata in `broadcasts.recipient_filter` and delegate base contact lookup/resolution to Core.

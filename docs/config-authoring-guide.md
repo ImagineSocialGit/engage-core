@@ -477,6 +477,31 @@ After sync, Slam Dunk should have 1 step, not default steps 2 and 3.
 
 Default mortgage campaigns may remain active for a mortgage client until that client creates its own mortgage-specific override.
 
+## Client config fallback and validation
+
+Client config overrides should be treated as partial overrides unless a feature explicitly documents that a section is authoritative.
+
+Expected fallback behavior:
+
+- Missing client config files use the default config.
+- Client associative-array overrides merge over default config without dropping unspecified nested keys.
+- Numeric arrays replace the default array when present. This is intentional for ordered definitions and lists such as `consent.scopes`.
+- Missing optional public-page `content` or `style` keys should fall back to safe defaults or render without breaking the page.
+- Client copy changes should not break behavioral tests unless exact copy is the behavior under test.
+
+Before accepting a client config, validate:
+
+- Required top-level keys for that config type are present or supplied by default fallback.
+- Unsupported keys are rejected, flagged, or intentionally ignored with clear operator/debug feedback.
+- Dispatch keys exist in `config/reference/keys.php` or the client key registry.
+- Tokens exist in `config/reference/tokens.php` or the client token registry.
+- Runtime-only URLs are supplied by runtime payloads/services and are not guessed in static config.
+- SMS channel visibility uses Messaging channel availability for the relevant surface instead of one-off provider checks.
+- Permission invitation configs preserve email-only bypass sending, explicit SMS opt-in, and configured consent scopes.
+
+Validation should protect authoring mistakes without turning optional style/copy omissions into runtime failures.
+
+
 ## FlowRoute config shape
 
 FlowRoutes should reference public actions/capabilities through point definitions.
@@ -648,7 +673,11 @@ Examples that should remain singular:
 ## Review checklist before committing configs
 
 - [ ] Does every config key exist in the key registry or client key registry?
+- [ ] Are unsupported keys rejected, flagged, or intentionally ignored with clear operator/debug feedback?
 - [ ] Does every token exist in the token registry or client token registry?
+- [ ] Are runtime-only URLs/tokens supplied by runtime payloads/services instead of static config guesses?
+- [ ] Do missing optional content/style keys fall back safely?
+- [ ] Do client config overrides preserve unspecified nested defaults where fallback is expected?
 - [ ] Are Campaign presets free of reusable subject/body/CTA copy?
 - [ ] Are Campaign presets free of payload overrides?
 - [ ] Are Campaign preset step message references first-class `channel`, `purpose`, and `scope` keys?

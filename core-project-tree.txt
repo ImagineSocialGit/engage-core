@@ -122,6 +122,7 @@
 │   │   │   ├── Enums
 │   │   │   │   └── TagType.php
 │   │   │   ├── Models
+│   │   │   │   ├── ContactImportBatch.php
 │   │   │   │   ├── Contact.php
 │   │   │   │   ├── ContactStatus.php
 │   │   │   │   ├── ContactTag.php
@@ -741,6 +742,7 @@
 │   │   ├── BroadcastFactory.php
 │   │   ├── BroadcastRecipientFactory.php
 │   │   ├── ContactFactory.php
+│   │   ├── ContactImportBatchFactory.php
 │   │   ├── ScheduledMessageFactory.php
 │   │   ├── TaskFactory.php
 │   │   ├── TaskTemplateFactory.php
@@ -758,6 +760,7 @@
 │   │   ├── 2026_04_10_173406_create_team_members_table.php
 │   │   ├── 2026_04_11_174215_create_team_member_notification_preferences_table.php
 │   │   ├── 2026_04_15_195800_create_contact_statuses_table.php
+│   │   ├── 2026_04_15_195849_create_contact_import_batches_table.php
 │   │   ├── 2026_04_15_195850_create_contacts_table.php
 │   │   ├── 2026_04_15_195851_create_contact_tags_table.php
 │   │   ├── 2026_04_15_195900_create_contact_workflow_profiles_table.php
@@ -961,6 +964,8 @@
 │   │   │   ├── EnrollContactInCampaignActionTest.php
 │   │   │   ├── ScheduleNextCampaignStepActionTest.php
 │   │   │   └── ScheduleNextCampaignStepAfterScheduledMessageSentTest.php
+│   │   ├── Clients
+│   │   │   └── ClientConfigFallbackTest.php
 │   │   ├── Core
 │   │   │   ├── ContactFilterResolverTest.php
 │   │   │   └── ContactLookupControllerTest.php
@@ -1024,4 +1029,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-348 directories, 677 files
+349 directories, 681 files
