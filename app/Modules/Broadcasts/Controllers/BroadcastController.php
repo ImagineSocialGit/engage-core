@@ -120,6 +120,7 @@ class BroadcastController extends Controller
             'broadcast' => $broadcast,
             'recipients' => $recipients,
             'recipientFilterContacts' => $this->recipientFilterContacts($broadcast),
+            'selectedImportBatches' => $this->selectedImportBatches($broadcast),
             'permissionInvitationPreview' => $this->permissionInvitationPreview($broadcast),
             'scheduledMessages' => $scheduledMessages,
         ]);
@@ -310,6 +311,29 @@ class BroadcastController extends Controller
         }
 
         return $this->selectedContactOptions($recipientFilter['contact_ids'] ?? []);
+    }
+
+    /**
+     * @return Collection<int, ContactImportBatch>
+     */
+    private function selectedImportBatches(Broadcast $broadcast): Collection
+    {
+        $recipientFilter = $broadcast->recipient_filter ?? [];
+
+        if (($recipientFilter['type'] ?? null) !== 'import_batch') {
+            return new Collection();
+        }
+
+        $importBatchIds = $this->selectedImportBatchIds($recipientFilter['import_batch_ids'] ?? []);
+
+        if ($importBatchIds === []) {
+            return new Collection();
+        }
+
+        return ContactImportBatch::query()
+            ->whereIn('id', $importBatchIds)
+            ->orderByRaw('FIELD(id, '.implode(',', $importBatchIds).')')
+            ->get();
     }
 
     /**

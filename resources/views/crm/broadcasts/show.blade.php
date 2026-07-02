@@ -300,14 +300,38 @@
                         @if(($recipientFilter['type'] ?? 'all') === 'imported')
                             Imported contacts only.
                         @elseif(($recipientFilter['type'] ?? 'all') === 'import_batch')
-                            Imported contacts from selected batches:
-                            <span class="font-semibold">
-                                {{ implode(', ', $recipientFilter['import_batch_ids'] ?? []) }}
-                            </span>
+                            <div class="space-y-3">
+                                <p>
+                                    Imported contacts from selected batches:
+                                    <span class="font-semibold">
+                                        {{ count($recipientFilter['import_batch_ids'] ?? []) }}
+                                    </span>
+                                </p>
 
-                            <p class="mt-2 text-xs text-slate-500">
-                                Showing batch IDs for now. A later import-management UI can display import names here.
-                            </p>
+                                <div class="space-y-2">
+                                    @forelse($selectedImportBatches as $importBatch)
+                                        <div class="rounded-xl border border-slate-200 p-3">
+                                            <div class="font-medium text-slate-900">
+                                                {{ $importBatch->name ?? 'Import #'.$importBatch->id }}
+                                            </div>
+
+                                            <div class="mt-1 text-xs text-slate-500">
+                                                {{ $importBatch->original_filename ?? 'No filename' }}
+                                            </div>
+
+                                            <div class="mt-1 text-xs text-slate-500">
+                                                {{ $importBatch->imported_at?->format('M j, Y g:i A') ?? 'No import date' }}
+                                                · {{ $importBatch->successful_count }} successful
+                                                · {{ $importBatch->failed_count }} failed
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <p class="text-sm text-slate-500">
+                                            No selected import batches found.
+                                        </p>
+                                    @endforelse
+                                </div>
+                            </div>
                         @elseif(($recipientFilter['type'] ?? 'all') === 'tag')
                             Contacts tagged:
                             <span class="font-semibold">

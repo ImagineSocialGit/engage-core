@@ -991,7 +991,12 @@ class BroadcastControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $batch = ContactImportBatch::factory()->create();
+        $batch = ContactImportBatch::factory()->create([
+            'name' => 'June CSV Import',
+            'original_filename' => 'june-leads.csv',
+            'successful_count' => 12,
+            'failed_count' => 1,
+        ]);
 
         $broadcast = Broadcast::factory()->create([
             'status' => Broadcast::STATUS_DRAFT,
@@ -1016,7 +1021,10 @@ class BroadcastControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Imported contacts from selected batches');
-        $response->assertSee((string) $batch->id);
+        $response->assertSee('June CSV Import');
+        $response->assertSee('june-leads.csv');
+        $response->assertSee('12 successful');
+        $response->assertSee('1 failed');
     }
 
 }
