@@ -2,12 +2,13 @@
 
 namespace Tests\Feature\Messaging;
 
+use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
-use App\Modules\Messaging\Payloads\EmailPayload;
-use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Messaging\Payloads\SmsPayload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
@@ -289,6 +290,110 @@ class DispatchMessageActionTest extends TestCase
         );
     }
 
+    public function test_it_hydrates_sms_payload_with_contact_phone_and_message_context(): void
+    {
+        Queue::fake();
+
+        Config::set('messaging.sms.marketing.broadcast', [
+            'broadcast' => [
+                'dispatch_key' => 'broadcast_send',
+                'timing' => 'immediate',
+                'payload_class' => SmsPayload::class,
+                'queue' => 'marketing',
+                'payload' => [
+                    'message' => 'Config fallback message',
+                ],
+            ],
+        ]);
+
+        $contact = $this->contactWithConsent(
+            channel: 'sms',
+            purpose: 'marketing',
+            scope: 'broadcast',
+            attributes: [
+                'email' => null,
+                'phone' => '+15555550123',
+            ],
+        );
+
+        $messages = app(DispatchMessageAction::class)->handle(
+            recipient: $contact,
+            channel: 'sms',
+            purpose: 'marketing',
+            scope: 'broadcast',
+            dispatchKeys: 'broadcast_send',
+            payload: [
+                'message' => 'Runtime SMS broadcast.',
+            ],
+        );
+
+        $this->assertCount(1, $messages);
+
+        $message = ScheduledMessage::query()->first();
+
+        $this->assertNotNull($message);
+        $this->assertSame('sms', $message->channel);
+        $this->assertSame('marketing', $message->purpose);
+        $this->assertSame('broadcast', $message->scope);
+        $this->assertSame('broadcast', $message->message_type);
+        $this->assertSame(SmsPayload::class, $message->payload_class);
+        $this->assertSame('marketing', $message->queue);
+
+        $this->assertSame('+15555550123', $message->payload['to']);
+        $this->assertSame('sms', $message->payload['channel']);
+        $this->assertSame('marketing', $message->payload['purpose']);
+        $this->assertSame('broadcast', $message->payload['scope']);
+        $this->assertSame('broadcast', $message->payload['message_type']);
+        $this->assertSame('Runtime SMS broadcast.', $message->payload['message']);
+        $this->assertSame(Contact::class, $message->payload['recipient_type']);
+        $this->assertSame($contact->id, $message->payload['recipient_id']);
+
+        Queue::assertPushed(SendScheduledMessageJob::class);
+    }
+
+    public function test_it_schedules_no_sms_message_when_contact_has_no_phone(): void
+    {
+        Queue::fake();
+
+        Config::set('messaging.sms.marketing.broadcast', [
+            'broadcast' => [
+                'dispatch_key' => 'broadcast_send',
+                'timing' => 'immediate',
+                'payload_class' => SmsPayload::class,
+                'queue' => 'marketing',
+                'payload' => [
+                    'message' => 'Runtime SMS broadcast.',
+                ],
+            ],
+        ]);
+
+        $contact = $this->contactWithConsent(
+            channel: 'sms',
+            purpose: 'marketing',
+            scope: 'broadcast',
+            attributes: [
+                'email' => 'person@example.com',
+                'phone' => null,
+            ],
+        );
+
+        $messages = app(DispatchMessageAction::class)->handle(
+            recipient: $contact,
+            channel: 'sms',
+            purpose: 'marketing',
+            scope: 'broadcast',
+            dispatchKeys: 'broadcast_send',
+            payload: [
+                'message' => 'Runtime SMS broadcast.',
+            ],
+        );
+
+        $this->assertSame([], $messages);
+        $this->assertDatabaseCount('scheduled_messages', 0);
+
+        Queue::assertNothingPushed();
+    }
+
     public function test_it_filters_campaign_messages_by_criteria(): void
     {
         Queue::fake();
@@ -445,11 +550,31 @@ class DispatchMessageActionTest extends TestCase
             ],
         );
     }
+
+    public function test_it_builds_sms_broadcast_payload_from_resolved_scheduled_message_payload(): void
+    {
+        $payload = SmsPayload::fromArray([
+            'to' => '+15555550123',
+            'channel' => 'sms',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'message_type' => 'broadcast',
+            'message' => 'Runtime SMS broadcast.',
+            'recipient_type' => 'contact',
+            'recipient_id' => 123,
+        ]);
+
+        $this->assertSame('+15555550123', $payload->to());
+        $this->assertSame('Runtime SMS broadcast.', $payload->message());
+        $this->assertSame('broadcast', $payload->kind());
+        $this->assertSame('marketing', $payload->purpose());
+    }
     
     private function contactWithConsent(
         string $purpose = 'transactional',
         string $scope = 'webinar',
         array $attributes = [],
+        string $channel = 'email',
     ): Contact {
         $contact = Contact::factory()->create([
             'email' => 'person@example.com',
@@ -458,7 +583,7 @@ class DispatchMessageActionTest extends TestCase
 
         MessageConsent::query()->create([
             'contact_id' => $contact->id,
-            'channel' => 'email',
+            'channel' => $channel,
             'purpose' => $purpose,
             'scope' => $scope,
             'consented_at' => now()->subMinute(),
