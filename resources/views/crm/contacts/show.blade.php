@@ -37,6 +37,22 @@
                             {{ module_enabled('workflow') ? ($contact->workflowProfile?->contactStatus?->name ?? '—') : '—' }}
                         </p>
                     </div>
+
+                    @if (data_get($contact->meta, 'import.status_mapping.state') === 'unmapped')
+                        <div>
+                            <p class="text-sm text-slate-500">Import Status Review</p>
+                            <p class="font-medium text-amber-700">
+                                {{ data_get($contact->meta, 'import.original_status') ?: 'Unmapped imported status' }}
+                            </p>
+                        </div>
+                    @elseif (data_get($contact->meta, 'import.original_status'))
+                        <div>
+                            <p class="text-sm text-slate-500">Original Imported Status</p>
+                            <p class="font-medium text-slate-900">
+                                {{ data_get($contact->meta, 'import.original_status') }}
+                            </p>
+                        </div>
+                    @endif
                 </x-ui.card>
             </div>
 

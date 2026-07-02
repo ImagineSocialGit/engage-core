@@ -3,7 +3,30 @@
     :heading="'Map CSV Fields'"
     :subheading="'Choose which CSV columns map to import fields'"
 >
-    <div class="max-w-6xl space-y-6">
+    <div
+        class="max-w-6xl space-y-6"
+        x-data="{
+            rows: @js($rows),
+            importStatusColumn: @js(old('mapping.import_status')),
+            statusValues() {
+                if (! this.importStatusColumn) {
+                    return [];
+                }
+
+                const values = [];
+
+                this.rows.forEach((row) => {
+                    const value = String(row[this.importStatusColumn] || '').trim();
+
+                    if (value && ! values.includes(value)) {
+                        values.push(value);
+                    }
+                });
+
+                return values.sort();
+            },
+        }"
+    >
         <x-ui.card class="space-y-6">
             <div>
                 <h2 class="text-lg font-semibold tracking-tight">
@@ -64,6 +87,9 @@
                                     <select
                                         id="mapping_{{ $field->key }}"
                                         name="mapping[{{ $field->key }}]"
+                                        @if ($field->key === 'import_status')
+                                            x-model="importStatusColumn"
+                                        @endif
                                         @required($field->required)
                                         class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                     >
@@ -89,6 +115,65 @@
                         </div>
                     </div>
                 @endforeach
+
+                <div
+                    x-show="statusValues().length > 0"
+                    class="space-y-4 border-t border-slate-200 pt-6"
+                >
+                    <div>
+                        <h3 class="text-base font-semibold tracking-tight">
+                            Status Mapping
+                        </h3>
+
+                        <p class="mt-1 text-sm text-slate-500">
+                            Map imported status values to active CRM statuses. Leave values unmapped when they need review.
+                        </p>
+                    </div>
+
+                    @error('status_mapping')
+                        <p class="text-sm text-red-600">
+                            {{ $message }}
+                        </p>
+                    @enderror
+
+                    <div class="overflow-hidden rounded-xl border border-slate-200">
+                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">
+                                        Imported Status
+                                    </th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">
+                                        CRM Status
+                                    </th>
+                                </tr>
+                            </thead>
+
+                            <tbody class="divide-y divide-slate-200 bg-white">
+                                <template x-for="value in statusValues()" :key="value">
+                                    <tr>
+                                        <td class="px-4 py-3 font-medium text-slate-900" x-text="value"></td>
+
+                                        <td class="px-4 py-3">
+                                            <select
+                                                x-bind:name="`status_mapping[${value}]`"
+                                                class="block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                            >
+                                                <option value="">Leave unmapped / review later</option>
+
+                                                @foreach ($contactStatuses as $status)
+                                                    <option value="{{ $status->id }}">
+                                                        {{ $status->name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
                 @if (! empty($rows))
                     <div class="space-y-3 border-t border-slate-200 pt-6">

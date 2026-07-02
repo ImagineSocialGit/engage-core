@@ -26,15 +26,29 @@
 
             <div class="divide-y divide-slate-200">
                 @forelse($importBatches as $importBatch)
+                    @php
+                        $statusMapping = data_get($importBatch->meta, 'status_mapping', []);
+                        $reviewRequired = (bool) data_get($statusMapping, 'review_required', false);
+                        $unmappedCount = (int) data_get($statusMapping, 'unmapped_count', 0);
+                    @endphp
+
                     <a
                         href="{{ route('crm.contacts.import-batches.show', $importBatch) }}"
                         class="block px-6 py-4 transition hover:bg-slate-50"
                     >
                         <div class="flex flex-wrap items-start justify-between gap-4">
                             <div>
-                                <p class="font-semibold text-slate-900">
-                                    {{ $importBatch->name ?? 'Import #'.$importBatch->id }}
-                                </p>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <p class="font-semibold text-slate-900">
+                                        {{ $importBatch->name ?? 'Import #'.$importBatch->id }}
+                                    </p>
+
+                                    @if ($reviewRequired)
+                                        <span class="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                                            Status Review Needed
+                                        </span>
+                                    @endif
+                                </div>
 
                                 <p class="mt-1 text-sm text-slate-500">
                                     {{ $importBatch->original_filename ?? 'No filename' }}
@@ -46,6 +60,12 @@
                                         {{ $importBatch->source ? str($importBatch->source)->replace('_', ' ')->title() : '—' }}
                                     </span>
                                 </p>
+
+                                @if ($unmappedCount > 0)
+                                    <p class="mt-1 text-xs font-medium text-amber-700">
+                                        {{ $unmappedCount }} imported status {{ str('value')->plural($unmappedCount) }} unmapped.
+                                    </p>
+                                @endif
                             </div>
 
                             <div class="grid gap-2 text-right text-sm text-slate-600 sm:grid-cols-4 sm:text-left">

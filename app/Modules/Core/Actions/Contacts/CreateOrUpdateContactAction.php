@@ -39,7 +39,10 @@ class CreateOrUpdateContactAction
             'contact_import_batch_id' => $data['contact_import_batch_id'] ?? $contact->contact_import_batch_id,
             'last_contacted_at' => $data['last_contacted_at'] ?? $contact->last_contacted_at,
             'last_activity_at' => $data['last_activity_at'] ?? $contact->last_activity_at,
-            'meta' => $data['meta'] ?? $contact->meta,
+            'meta' => array_replace_recursive(
+                is_array($contact->meta) ? $contact->meta : [],
+                is_array($data['meta'] ?? null) ? $data['meta'] : [],
+            ),
         ]);
 
         $contact->save();

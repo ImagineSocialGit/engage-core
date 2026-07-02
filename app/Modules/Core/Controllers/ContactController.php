@@ -4,15 +4,18 @@ namespace App\Modules\Core\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Actions\Contacts\CreateOrUpdateContactAction;
+use App\Modules\Core\Contracts\Contacts\UpdatesContactStatus;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Core\Requests\StoreContactRequest;
+use App\Modules\Core\Services\Contacts\ContactImportStatusMapper;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Core\Support\Contacts\ContactShowDataRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -100,6 +103,7 @@ class ContactController extends Controller
     public function previewImport(
         Request $request,
         ContactImportRegistry $contactImportRegistry,
+        ContactImportStatusMapper $contactImportStatusMapper,
     ): View|RedirectResponse {
         $validated = $request->validate([
             'csv' => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
@@ -151,11 +155,18 @@ class ContactController extends Controller
 
         fclose($handle);
 
+        $contactStatuses = ContactStatus::query()
+            ->active()
+            ->ordered()
+            ->get(['id', 'name']);
+
         return view('crm.contacts.import-preview', [
             'headers' => $headers,
             'rows' => $rows,
             'csvPath' => $storedPath,
             'importSections' => $contactImportRegistry->sections(),
+            'contactStatuses' => $contactStatuses,
+            'statusPreviewValues' => collect(),
         ]);
     }
 
@@ -163,11 +174,19 @@ class ContactController extends Controller
         Request $request,
         CreateOrUpdateContactAction $createOrUpdateContact,
         ContactImportRegistry $contactImportRegistry,
+        ContactImportStatusMapper $contactImportStatusMapper,
     ): RedirectResponse {
         $rules = [
             'csv_path' => ['required', 'string'],
             'mapping' => ['required', 'array'],
+            'status_mapping' => ['nullable', 'array'],
         ];
+
+        foreach ($contactImportRegistry->fieldKeys() as $field) {
+            $rules["mapping.{$field}"] = in_array($field, $contactImportRegistry->requiredFieldKeys(), true)
+                ? ['required', 'string']
+                : ['nullable', 'string'];
+        }
 
         foreach ($contactImportRegistry->requiredFieldKeys() as $field) {
             $rules["mapping.{$field}"] = ['required', 'string'];
@@ -177,10 +196,27 @@ class ContactController extends Controller
 
         $csvPath = $validated['csv_path'];
 
+        $allowedMappingFields = array_values(array_unique([
+            ...$contactImportRegistry->fieldKeys(),
+            'import_status',
+        ]));
+
         $mapping = collect($validated['mapping'])
-            ->filter()
-            ->only($contactImportRegistry->fieldKeys())
+            ->filter(fn (mixed $value): bool => is_string($value) && trim($value) !== '')
+            ->only($allowedMappingFields)
             ->toArray();
+
+        $submittedStatusMapping = $contactImportStatusMapper->normalizeSubmittedMapping(
+            $validated['status_mapping'] ?? [],
+        );
+
+        if ($submittedStatusMapping !== [] && ! App::bound(UpdatesContactStatus::class)) {
+            throw ValidationException::withMessages([
+                'status_mapping' => 'Status mapping requires Workflow because current contact status is stored in Workflow profiles.',
+            ]);
+        }
+
+        $statusesById = $contactImportStatusMapper->validateActiveStatusMapping($submittedStatusMapping);
 
         if (! Storage::disk('local')->exists($csvPath)) {
             throw ValidationException::withMessages([
@@ -234,6 +270,7 @@ class ContactController extends Controller
         $updated = 0;
         $skipped = 0;
         $phoneWarnings = 0;
+        $statusMappingResults = [];
 
         try {
             while (($row = fgetcsv($handle)) !== false) {
@@ -290,16 +327,27 @@ class ContactController extends Controller
 
                 $originalSource = $contactData['source'] ?? null;
                 $originalSubsource = $contactData['subsource'] ?? null;
-                $originalStatus = $contactImportRegistry->mappedValue(
+                $originalStatus = $this->mappedImportStatusValue(
                     row: $data,
                     mapping: $mapping,
-                    field: 'import_status',
+                    contactImportRegistry: $contactImportRegistry,
                 );
 
+                $statusMappingResult = $contactImportStatusMapper->resolve(
+                    originalStatus: $originalStatus,
+                    mapping: $submittedStatusMapping,
+                    statusesById: $statusesById,
+                );
+
+                $statusMappingResults[] = $statusMappingResult;
+
                 $contact = $createOrUpdateContact->handle(
-                    data: [
+                    data: array_filter([
                         ...$contactData,
                         'source' => 'import',
+                        'contact_status_id' => $statusMappingResult->isMapped()
+                            ? $statusMappingResult->contactStatusId
+                            : null,
                         'meta' => array_replace_recursive(
                             $contactData['meta'] ?? [],
                             [
@@ -310,10 +358,11 @@ class ContactController extends Controller
                                     'original_source' => $originalSource,
                                     'original_subsource' => $originalSubsource,
                                     'original_status' => $originalStatus,
+                                    'status_mapping' => $statusMappingResult->toMeta(),
                                 ],
                             ],
                         ),
-                    ],
+                    ], fn (mixed $value): bool => $value !== null),
                     statusKey: null,
                     statusChangeReason: 'crm_import',
                 );
@@ -341,6 +390,11 @@ class ContactController extends Controller
                     'failure' => [
                         'message' => $exception->getMessage(),
                     ],
+                    'status_mapping' => $contactImportStatusMapper->batchMeta(
+                        sourceColumn: $mapping['import_status'] ?? null,
+                        mapping: $submittedStatusMapping,
+                        results: $statusMappingResults,
+                    ),
                 ]),
             ])->save();
 
@@ -349,21 +403,63 @@ class ContactController extends Controller
             fclose($handle);
         }
 
+        $statusMappingMeta = $contactImportStatusMapper->batchMeta(
+            sourceColumn: $mapping['import_status'] ?? null,
+            mapping: $submittedStatusMapping,
+            results: $statusMappingResults,
+        );
+
         $importBatch->forceFill([
             'status' => ContactImportBatch::STATUS_COMPLETED,
             'contact_count' => $created + $updated + $skipped,
             'successful_count' => $created + $updated,
             'failed_count' => $skipped,
+            'meta' => array_replace_recursive($importBatch->meta ?? [], [
+                'status_mapping' => $statusMappingMeta,
+            ]),
         ])->save();
 
         return redirect()
             ->route('crm.contacts.index')
             ->with('success', sprintf(
-                'Import complete. %d created, %d updated, %d skipped%s.',
+                'Import complete. %d created, %d updated, %d skipped%s%s.',
                 $created,
                 $updated,
                 $skipped,
-                $phoneWarnings > 0 ? ", {$phoneWarnings} phone values were ignored" : ''
+                $phoneWarnings > 0 ? ", {$phoneWarnings} phone values were ignored" : '',
+                $statusMappingMeta['review_required'] ? ', status review needed for unmapped values' : ''
             ));
+    }
+
+    private function mappedImportStatusValue(
+        array $row,
+        array $mapping,
+        ContactImportRegistry $contactImportRegistry,
+    ): ?string {
+        $value = $contactImportRegistry->mappedValue(
+            row: $row,
+            mapping: $mapping,
+            field: 'import_status',
+        );
+
+        if ($value !== null) {
+            return $value;
+        }
+
+        $header = $mapping['import_status'] ?? null;
+
+        if (! is_string($header) || trim($header) === '') {
+            return null;
+        }
+
+        $value = $row[$header] ?? null;
+
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value !== '' ? $value : null;
     }
 }

@@ -135,6 +135,7 @@
 │   │   │   ├── Data
 │   │   │   │   └── Contacts
 │   │   │   │       ├── ContactImportField.php
+│   │   │   │       ├── ContactImportStatusMappingResult.php
 │   │   │   │       └── ContactPanel.php
 │   │   │   ├── Enums
 │   │   │   │   └── TagType.php
@@ -153,7 +154,8 @@
 │   │   │   │   └── StoreContactRequest.php
 │   │   │   ├── Services
 │   │   │   │   └── Contacts
-│   │   │   │       └── ContactFilterResolver.php
+│   │   │   │       ├── ContactFilterResolver.php
+│   │   │   │       └── ContactImportStatusMapper.php
 │   │   │   └── Support
 │   │   │       └── Contacts
 │   │   │           ├── ContactImportRegistry.php
@@ -1140,8 +1142,10 @@
 │   │   ├── Commerce
 │   │   │   └── CommerceFoundationTest.php
 │   │   ├── Core
+│   │   │   ├── ContactControllerTest.php
 │   │   │   ├── ContactFilterResolverTest.php
 │   │   │   ├── ContactImportBatchControllerTest.php
+│   │   │   ├── ContactImportStatusMappingTest.php
 │   │   │   └── ContactLookupControllerTest.php
 │   │   ├── CRM
 │   │   │   ├── UpdateContactStatusActionTest.php
@@ -1214,4 +1218,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-417 directories, 798 files
+417 directories, 802 files
