@@ -1484,6 +1484,31 @@ Current supported recipient filter shapes include:
 
 `imported` is a Core-owned contact filter for contacts imported from another system. Current imported detection includes `source = import`, `meta.imported = true`, or `meta.imported_at`.
 
+Recipient filters may also include Broadcast-owned exclusions:
+
+    {
+      "type": "all",
+      "exclude": {
+        "broadcast_ids": [12, 13],
+        "statuses": ["scheduled", "sent"]
+      }
+    }
+
+`exclude.broadcast_ids` removes contacts that already have matching `BroadcastRecipient` rows for those prior Broadcasts.
+
+`exclude.statuses` currently supports:
+
+    scheduled
+    sent
+
+This is Broadcast-owned duplicate-send protection. It lets operators send separate single-channel Broadcasts, such as SMS first and email second, without hitting the same contact twice.
+
+Core does not own prior-Broadcast exclusion logic.
+
+Messaging does not own prior-Broadcast exclusion logic.
+
+Broadcasts owns this because it is based on BroadcastRecipient bookkeeping.
+
 Broadcasts may store recipient filter definitions, but Core owns generic contact lookup and generic contact filter resolution.
 
 Broadcasts should not become the app-wide contact query engine.
@@ -1573,6 +1598,21 @@ Good:
     CancelBroadcastAction -> SkipScheduledMessagesAction
 
 Broadcasts should remain simpler than Campaigns.
+
+Broadcasts are single-channel sends.
+
+A single Broadcast should represent one channel and one payload shape.
+
+Examples:
+
+    Email Broadcast -> channel=email, payload.subject, payload.body
+    SMS Broadcast -> channel=sms, payload.message
+
+Do not make a normal Broadcast default to both email and SMS.
+
+Multi-channel fallback or “use SMS if available, otherwise email” is future channel-strategy work and should be modeled deliberately if needed.
+
+For now, operators should create separate single-channel Broadcasts and use prior-Broadcast recipient exclusions to avoid duplicate outreach across channels.
 
 Do not add multi-step progression, enrollment lifecycle, or journey logic to Broadcasts.
 

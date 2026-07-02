@@ -29,6 +29,8 @@ Broadcasts may own:
 - the CRM UI entry point for creating/scheduling the invitation
 - the Broadcast record used for audit/bookkeeping
 - BroadcastRecipient records for delivery bookkeeping
+- recipient preview/count behavior for the CRM invitation entry point
+- Broadcast-side narrowing of imported-contact recipients before scheduling, such as excluding imported contacts that already have Messaging consent
 
 Broadcasts must not own:
 
@@ -36,6 +38,10 @@ Broadcasts must not own:
 - consent creation
 - public preference token behavior
 - Messaging delivery gates
+
+Broadcast-side recipient narrowing is not the permission bypass.
+
+Messaging still owns the final one-time invitation enforcement.
 
 ## Runtime flow
 
@@ -46,14 +52,16 @@ Broadcasts must not own:
    - `meta.imported_at` present
 3. A user creates or schedules an opt-in invitation Broadcast.
 4. The Broadcast uses `recipient_filter = {"type":"imported"}`.
-5. Broadcast scheduling calls Messaging through public actions/services.
-6. Messaging evaluates the permission invitation policy.
-7. Messaging creates a `contact_permission_invitations` row before provider send.
-8. Messaging injects a public preference URL into the email payload.
-9. The contact clicks the CTA/link.
-10. The public preference page lets the contact choose email, SMS, or both.
-11. Messaging creates `MessageConsent` rows for the configured scopes.
-12. Messaging marks the invitation accepted and stores accepted channels.
+5. Broadcast recipient resolution starts with the Core imported-contact filter.
+6. Broadcasts may narrow that recipient set for invitation eligibility, such as excluding imported contacts that already have Messaging consent records.
+7. Broadcast scheduling calls Messaging through public actions/services.
+8. Messaging evaluates and enforces the permission invitation policy.
+9. Messaging creates a `contact_permission_invitations` row before provider send.
+10. Messaging injects a public preference URL into the email payload.
+11. The contact clicks the CTA/link.
+12. The public preference page lets the contact choose email, SMS, or both.
+13. Messaging creates `MessageConsent` rows for the configured scopes.
+14. Messaging marks the invitation accepted and stores accepted channels.
 
 ## Required message identity
 

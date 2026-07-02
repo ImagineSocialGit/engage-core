@@ -78,9 +78,9 @@ Campaign step timing is authored in Campaign presets and normalized before dispa
 
 ## Broadcast recipient filter shapes
 
-Core owns generic contact filter resolution. Broadcasts store recipient selection metadata in `broadcasts.recipient_filter` and delegate contact lookup/resolution to Core.
+Core owns generic contact filter resolution. Broadcasts store recipient selection metadata in `broadcasts.recipient_filter` and delegate base contact lookup/resolution to Core.
 
-Supported current shapes:
+Supported current base shapes:
 
 ```json
 {"type":"all"}
@@ -99,6 +99,31 @@ Supported current shapes:
 ```
 
 `imported` means contacts where `source = import`, `meta.imported = true`, or `meta.imported_at` exists.
+
+Broadcast recipient filters may also include Broadcast-owned exclusions:
+
+```json
+{
+  "type": "all",
+  "exclude": {
+    "broadcast_ids": [12, 13],
+    "statuses": ["scheduled", "sent"]
+  }
+}
+```
+
+`exclude.broadcast_ids` removes contacts that already have matching `BroadcastRecipient` records for those prior Broadcasts.
+
+`exclude.statuses` currently supports:
+
+```text
+scheduled
+sent
+```
+
+Use this for duplicate-send protection when sending related single-channel Broadcasts, such as sending SMS first and then emailing everyone who was not already scheduled or sent the SMS Broadcast.
+
+Broadcasts remain single-channel sends. Do not use one normal Broadcast as an implicit email+SMS fanout.
 
 ## Imported-contact opt-in invitations
 

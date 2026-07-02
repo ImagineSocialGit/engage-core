@@ -84,6 +84,7 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [ ] Confirm re-opening an accepted invitation shows the accepted state.
 - [ ] Confirm repeat invitation attempts are blocked by the one-time invitation record.
 - [ ] Confirm cancellation/skip/failure states remain understandable in Broadcast and ScheduledMessage views.
+- [ ] Confirm prior-Broadcast exclusions prevent duplicate outreach across related single-channel Broadcasts.
 
 ## One-off backlog
 
@@ -106,13 +107,23 @@ These are repeatable checklists. Run the relevant checklist after a production s
 
 ### Broadcasts
 
-- [ ] Consider adding a clearer imported-contact count/preview before scheduling an opt-in invitation.
+- [ ] Add a clearer imported-contact count/preview before scheduling an opt-in invitation.
   - Should be Core contact-filter backed.
+  - Should show how many imported contacts are eligible before scheduling.
+  - Should account for imported contacts that already have Messaging consent.
   - Should not duplicate contact query logic in Broadcasts.
 
 - [ ] Confirm cancellation behavior for permission invitations.
   - Cancelling pending scheduled messages should not create or mark accepted invitation rows.
-  - Already sent invitation rows remain historical and still block repeat bypass sends.
+  - Already sent or claimed invitation rows remain historical and still block repeat bypass sends.
+
+- [ ] Add standard SMS Broadcast authoring.
+  - Broadcasts should remain single-channel.
+  - Regular Broadcast creation/editing should allow `email` or `sms` only when Messaging channel availability exposes that channel for the `broadcasts` surface.
+  - Permission invitation Broadcasts remain email-only.
+  - Email Broadcast payloads should use `subject` and `body`.
+  - SMS Broadcast payloads should use `message`.
+  - The UI should cleanly swap email/SMS fields when the selected channel changes.
 
 ### Core contact filters
 
@@ -191,18 +202,6 @@ These are repeatable checklists. Run the relevant checklist after a production s
 
 ### Imports and contact onboarding
 
-- [ ] Define the import flow that marks contacts as imported.
-  - `source = import` and/or `meta.imported = true` / `meta.imported_at`.
-  - Confirm whether imported contacts should receive a default tag.
-  - Preserve enough import metadata to understand where the contact came from without making Core own vertical-specific import behavior.
-
-- [ ] Add imported-contact cohort/filter support before adding first-class import batch modeling.
-  - Prefer deriving useful cohorts from existing contact facts first.
-  - Example: imported contacts with no Messaging consent records.
-  - Example: imported contacts assigned specific statuses during import.
-  - Example: imported contacts with `source = import`, `meta.imported = true`, or `meta.imported_at` plus selected import-time status values.
-  - Use this to support common “send opt-in to imported contacts who still have no consent” workflows without prematurely adding an import batch model.
-
 - [ ] Add import-time status mapping behavior.
   - Imports may contain multiple legacy/client status values from the old system.
   - The import flow should let an operator map each incoming status to an existing Engage Core `ContactStatus`.
@@ -212,9 +211,15 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - Preserve the original imported status in metadata for audit/debugging.
 
 - [ ] Consider a first-class import batch model only if derived import cohorts are not enough.
-  - “Imported contacts” is broad.
+  - Current imported-contact cohorts are derived from stable Contact-owned facts:
+    - `source = import`
+    - `meta.imported = true`
+    - `meta.imported_at` present
+  - Broadcasts can combine imported-contact resolution with Messaging consent state for permission-invitation eligibility.
+  - Broadcasts can exclude contacts already scheduled/sent in prior Broadcasts through `recipient_filter.exclude`.
+  - “Imported contacts” is still broad.
   - Future UX may need “contacts from this exact import file/run only.”
-  - Do not build this until the no-consent/status-based imported cohort approach proves insufficient.
+  - Do not build first-class import batches until derived cohorts and prior-Broadcast exclusions prove insufficient.
 
 ### Automation/event seams
 
@@ -248,10 +253,6 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - It should ignore unrelated task changes.
 
 ### Universal module planning
-
-- [ ] Add a project-organization reference doc that classifies systems as Core, universal modules, vertical modules, and integrations.
-  - Keep this separate from `module-boundaries.md` where possible.
-  - Use it as a quick orientation map for future threads and client planning.
 
 - [ ] Plan the Scheduling universal module.
   - Keep Scheduling vertical-neutral.

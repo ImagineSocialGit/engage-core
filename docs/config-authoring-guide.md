@@ -594,6 +594,29 @@ Do not add one-off `sms.enabled` checks directly inside individual views or cont
 
 Surfaces should ask the Messaging channel availability service which channels are available for that surface.
 
+Broadcasts are single-channel sends.
+
+When standard SMS Broadcast authoring is exposed, the Broadcast builder should ask Messaging channel availability for the `broadcasts` surface and then let the operator choose one available channel.
+
+Expected payload shapes:
+
+```text
+Email Broadcast:
+    channel = email
+    payload.subject
+    payload.body
+
+SMS Broadcast:
+    channel = sms
+    payload.message
+```
+
+Permission invitation Broadcasts are an exception: the one-time imported-contact permission invitation send remains email-only, even if the public preference page can offer SMS opt-in.
+
+Do not model a normal Broadcast as default email+SMS fanout.
+
+Do not add multi-channel fallback behavior to Broadcasts without a deliberate channel-strategy design.
+
 Current canonical channel availability surface keys are:
 
 ```text
