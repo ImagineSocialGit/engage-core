@@ -132,25 +132,37 @@
                         </span>
                     </div>
 
-                    <div>
-                        <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Subject
+                    @if($broadcast->channel === 'sms')
+                        <div>
+                            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                SMS Message
+                            </div>
+
+                            <div class="mt-2 whitespace-pre-line rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                                {{ $broadcast->payload['message'] ?? '' }}
+                            </div>
+                        </div>
+                    @else
+                        <div>
+                            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Subject
+                            </div>
+
+                            <div class="mt-1 text-sm font-medium text-slate-900">
+                                {{ $broadcast->payload['subject'] ?? 'No subject' }}
+                            </div>
                         </div>
 
-                        <div class="mt-1 text-sm font-medium text-slate-900">
-                            {{ $broadcast->payload['subject'] ?? 'No subject' }}
-                        </div>
-                    </div>
+                        <div>
+                            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Body
+                            </div>
 
-                    <div>
-                        <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Body
+                            <div class="mt-2 whitespace-pre-line rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                                {{ $broadcast->payload['body'] ?? '' }}
+                            </div>
                         </div>
-
-                        <div class="mt-2 whitespace-pre-line rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                            {{ $broadcast->payload['body'] ?? '' }}
-                        </div>
-                    </div>
+                    @endif
                 </x-ui.card>
 
                 <x-ui.card class="overflow-hidden p-0">
@@ -169,7 +181,7 @@
                             <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <tr>
                                     <th class="px-6 py-3">Contact</th>
-                                    <th class="px-6 py-3">Email</th>
+                                    <th class="px-6 py-3">{{ $broadcast->channel === 'sms' ? 'Phone' : 'Email' }}</th>
                                     <th class="px-6 py-3">Status</th>
                                     <th class="px-6 py-3">Sent</th>
                                     <th class="px-6 py-3">Reason</th>
@@ -193,7 +205,9 @@
                                         </td>
 
                                         <td class="px-6 py-4 text-slate-600">
-                                            {{ $recipient->contact?->email ?? '—' }}
+                                            {{ $broadcast->channel === 'sms'
+                                                ? ($recipient->contact?->phone ?? '—')
+                                                : ($recipient->contact?->email ?? '—') }}
                                         </td>
 
                                         <td class="px-6 py-4">
@@ -207,7 +221,9 @@
                                         </td>
 
                                         <td class="px-6 py-4 text-slate-600">
-                                            {{ $recipient->skip_reason ?? $recipient->meta['delivery']['failure_reason'] ?? '—' }}
+                                            @php($reason = $recipient->skip_reason ?? $recipient->meta['delivery']['failure_reason'] ?? null)
+
+                                            {{ $reason ? str_replace('_', ' ', $reason) : '—' }}
                                         </td>
                                     </tr>
                                 @empty

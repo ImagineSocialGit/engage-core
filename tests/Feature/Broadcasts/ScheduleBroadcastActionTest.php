@@ -557,6 +557,57 @@ class ScheduleBroadcastActionTest extends TestCase
         $this->assertSame('broadcasts', data_get($recipient->meta, 'broadcast.surface'));
     }
 
+    public function test_it_marks_sms_recipient_skipped_when_contact_has_no_phone(): void
+    {
+        $contact = Contact::factory()->create([
+            'phone' => null,
+        ]);
+
+        config()->set('messaging.channel_availability.sms.runtime_supported', true);
+        config()->set('messaging.channel_availability.sms.provider_enabled', true);
+        config()->set('messaging.channel_availability.sms.surfaces.broadcasts', true);
+        config()->set('messaging.channel_availability.sms.purpose_scopes', [
+            'marketing:broadcast' => true,
+        ]);
+
+        $broadcast = Broadcast::factory()->create([
+            'channel' => 'sms',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'dispatch_key' => Broadcast::DEFAULT_DISPATCH_KEY,
+            'message_type' => Broadcast::DEFAULT_MESSAGE_TYPE,
+            'payload_class' => SmsPayload::class,
+            'queue' => 'marketing',
+            'recipient_filter' => [
+                'type' => 'all',
+            ],
+            'payload' => [
+                'message' => 'Broadcast message',
+            ],
+        ]);
+
+        $this->mock(DispatchMessageAction::class)
+            ->shouldReceive('handle')
+            ->once()
+            ->andReturn([]);
+
+        $scheduledBroadcast = app(ScheduleBroadcastAction::class)->handle($broadcast);
+
+        $recipient = BroadcastRecipient::query()
+            ->where('broadcast_id', $broadcast->id)
+            ->where('contact_id', $contact->id)
+            ->first();
+
+        $this->assertSame(Broadcast::STATUS_SCHEDULED, $scheduledBroadcast->status);
+        $this->assertSame(1, $scheduledBroadcast->recipient_count);
+        $this->assertSame(0, $scheduledBroadcast->scheduled_count);
+
+        $this->assertNotNull($recipient);
+        $this->assertSame(BroadcastRecipient::STATUS_SKIPPED, $recipient->status);
+        $this->assertNull($recipient->scheduled_message_ids);
+        $this->assertSame('not_scheduled_by_messaging', $recipient->skip_reason);
+    }
+
     public function test_it_schedules_a_broadcast_to_specific_contacts(): void
     {
         $included = Contact::factory()->create();

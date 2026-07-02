@@ -413,6 +413,93 @@ class BroadcastControllerTest extends TestCase
         $response->assertSee('Regular consent-gated one-time broadcast.');
     }
 
+    public function test_it_shows_sms_broadcast_recipient_outcomes(): void
+    {
+        $user = User::factory()->create();
+
+        $broadcast = Broadcast::factory()->scheduled()->create([
+            'name' => 'SMS update',
+            'channel' => 'sms',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'payload_class' => SmsPayload::class,
+            'payload' => [
+                'message' => 'This is an SMS broadcast.',
+            ],
+            'recipient_count' => 3,
+            'scheduled_count' => 1,
+        ]);
+
+        $scheduledContact = Contact::factory()->create([
+            'name' => 'Scheduled Lead',
+            'phone' => '+15555550123',
+        ]);
+
+        $skippedContact = Contact::factory()->create([
+            'name' => 'Skipped Lead',
+            'phone' => '+15555550124',
+        ]);
+
+        $failedContact = Contact::factory()->create([
+            'name' => 'Failed Lead',
+            'phone' => '+15555550125',
+        ]);
+
+        BroadcastRecipient::factory()->scheduled([1])->create([
+            'broadcast_id' => $broadcast->id,
+            'contact_id' => $scheduledContact->id,
+        ]);
+
+        BroadcastRecipient::factory()->create([
+            'broadcast_id' => $broadcast->id,
+            'contact_id' => $skippedContact->id,
+            'status' => BroadcastRecipient::STATUS_SKIPPED,
+            'skip_reason' => 'broadcast_channel_unavailable',
+            'scheduled_message_ids' => null,
+        ]);
+
+        BroadcastRecipient::factory()->create([
+            'broadcast_id' => $broadcast->id,
+            'contact_id' => $failedContact->id,
+            'status' => BroadcastRecipient::STATUS_FAILED,
+            'skip_reason' => null,
+            'meta' => [
+                'delivery' => [
+                    'failure_reason' => 'provider_rejected',
+                ],
+            ],
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.broadcasts.show', $broadcast));
+
+        $response->assertOk();
+        $response->assertSee('SMS update');
+        $response->assertSee('SMS Message');
+        $response->assertSee('This is an SMS broadcast.');
+        $response->assertSee('Phone');
+        $response->assertSee('+15555550123');
+        $response->assertSee('+15555550124');
+        $response->assertSee('+15555550125');
+
+        $response->assertSeeInOrder([
+            'Recipients',
+            '3',
+            'Scheduled',
+            '1',
+            'Sent',
+            '0',
+            'Skipped',
+            '1',
+            'Failed',
+            '1',
+        ]);
+
+        $response->assertSee('broadcast channel unavailable');
+        $response->assertSee('provider rejected');
+    }
+
     public function test_it_shows_an_opt_in_invitation_with_distinct_copy(): void
     {
         $user = User::factory()->create();
