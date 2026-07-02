@@ -5,19 +5,31 @@
 >
     <div class="space-y-6">
 
-        <div class="flex items-start justify-between gap-4">
+        <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
                 <h2 class="text-xl font-semibold tracking-tight capitalize">
                     All {{ config('contacts.labels.plural') }}
                 </h2>
+
+                <p class="mt-1 text-sm text-slate-500">
+                    Create, import, and review {{ strtolower(config('contacts.labels.plural')) }}.
+                </p>
             </div>
 
-            <form
-                method="POST"
-                action="{{ route('crm.contacts.import.preview') }}"
-                enctype="multipart/form-data"
-                class="flex items-center gap-3"
-            >
+            <div class="flex flex-wrap items-center gap-3">
+                <x-ui.button
+                    href="{{ route('crm.contacts.import-batches.index') }}"
+                    variant="secondary"
+                >
+                    View Imports
+                </x-ui.button>
+
+                <form
+                    method="POST"
+                    action="{{ route('crm.contacts.import.preview') }}"
+                    enctype="multipart/form-data"
+                    class="flex items-center gap-3"
+                >
                 @csrf
 
                 <label class="block">
@@ -32,10 +44,11 @@
                     />
                 </label>
 
-                <x-ui.button type="submit">
-                    Import CSV
-                </x-ui.button>
-            </form>
+                    <x-ui.button type="submit">
+                        Import CSV
+                    </x-ui.button>
+                </form>
+            </div>
         </div>
 
         @if (session('success'))

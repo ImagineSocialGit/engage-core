@@ -311,9 +311,12 @@
                                 <div class="space-y-2">
                                     @forelse($selectedImportBatches as $importBatch)
                                         <div class="rounded-xl border border-slate-200 p-3">
-                                            <div class="font-medium text-slate-900">
+                                            <a
+                                                href="{{ route('crm.contacts.import-batches.show', $importBatch) }}"
+                                                class="font-medium text-slate-900 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900"
+                                            >
                                                 {{ $importBatch->name ?? 'Import #'.$importBatch->id }}
-                                            </div>
+                                            </a>
 
                                             <div class="mt-1 text-xs text-slate-500">
                                                 {{ $importBatch->original_filename ?? 'No filename' }}

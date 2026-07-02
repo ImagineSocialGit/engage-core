@@ -5,6 +5,7 @@ namespace App\Modules\Core\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Actions\Contacts\CreateOrUpdateContactAction;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Core\Requests\StoreContactRequest;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
@@ -211,104 +212,149 @@ class ContactController extends Controller
             ->values()
             ->all();
 
+        $importedAt = now();
+
+        $importBatch = ContactImportBatch::query()->create([
+            'name' => 'Contact import '.$importedAt->format('M j, Y g:i A'),
+            'source' => 'crm_csv',
+            'original_filename' => basename($csvPath),
+            'status' => ContactImportBatch::STATUS_PROCESSING,
+            'imported_at' => $importedAt,
+            'contact_count' => 0,
+            'successful_count' => 0,
+            'failed_count' => 0,
+            'meta' => [
+                'csv_path' => $csvPath,
+                'mapping' => $mapping,
+                'headers' => $headers,
+            ],
+        ]);
+
         $created = 0;
         $updated = 0;
         $skipped = 0;
         $phoneWarnings = 0;
 
-        while (($row = fgetcsv($handle)) !== false) {
-            $row = array_pad($row, count($headers), null);
+        try {
+            while (($row = fgetcsv($handle)) !== false) {
+                $row = array_pad($row, count($headers), null);
 
-            $data = array_combine(
-                $headers,
-                array_slice($row, 0, count($headers)),
-            );
-
-            if (! is_array($data)) {
-                $skipped++;
-
-                continue;
-            }
-
-            $contactData = [];
-
-            foreach ($contactImportRegistry->contactAttributeFields() as $field) {
-                $value = $contactImportRegistry->mappedValue(
-                    row: $data,
-                    mapping: $mapping,
-                    field: $field->key,
+                $data = array_combine(
+                    $headers,
+                    array_slice($row, 0, count($headers)),
                 );
 
-                if ($value !== null) {
-                    $contactData[$field->contactAttribute] = $value;
+                if (! is_array($data)) {
+                    $skipped++;
+
+                    continue;
                 }
-            }
 
-            $email = $contactData['email'] ?? null;
+                $contactData = [];
 
-            if ($email === null) {
-                $skipped++;
+                foreach ($contactImportRegistry->contactAttributeFields() as $field) {
+                    $value = $contactImportRegistry->mappedValue(
+                        row: $data,
+                        mapping: $mapping,
+                        field: $field->key,
+                    );
 
-                continue;
-            }
+                    if ($value !== null) {
+                        $contactData[$field->contactAttribute] = $value;
+                    }
+                }
 
-            if (array_key_exists('phone', $mapping)
-                && $contactImportRegistry->mappedValue(row: $data, mapping: $mapping, field: 'phone') === null
-            ) {
-                $phoneWarnings++;
-            }
+                $email = $contactData['email'] ?? null;
 
-            $existingContact = Contact::query()
-                ->where('email', $email)
-                ->first(['id', 'meta']);
+                if ($email === null) {
+                    $skipped++;
 
-            $wasExisting = $existingContact !== null;
+                    continue;
+                }
 
-            $existingImportedAt = is_array($existingContact?->meta)
-                ? data_get($existingContact->meta, 'imported_at')
-                : null;
-                
-            $importedAt = now();
+                if (array_key_exists('phone', $mapping)
+                    && $contactImportRegistry->mappedValue(row: $data, mapping: $mapping, field: 'phone') === null
+                ) {
+                    $phoneWarnings++;
+                }
 
-            $originalSource = $contactData['source'] ?? null;
-            $originalSubsource = $contactData['subsource'] ?? null;
-            $originalStatus = $contactImportRegistry->mappedValue(
-                row: $data,
-                mapping: $mapping,
-                field: 'import_status',
-            );
+                $existingContact = Contact::query()
+                    ->where('email', $email)
+                    ->first(['id', 'meta']);
 
-            $contact = $createOrUpdateContact->handle(
-                data: [
-                    ...$contactData,
-                    'source' => 'import',
-                    'meta' => array_replace_recursive(
-                        $contactData['meta'] ?? [],
-                        [
-                            'imported' => true,
-                            'imported_at' => $existingImportedAt ?? $importedAt->toISOString(),
-                            'import' => [
-                                'original_source' => $originalSource,
-                                'original_subsource' => $originalSubsource,
-                                'original_status' => $originalStatus,
+                $wasExisting = $existingContact !== null;
+
+                $existingImportedAt = is_array($existingContact?->meta)
+                    ? data_get($existingContact->meta, 'imported_at')
+                    : null;
+
+                $originalSource = $contactData['source'] ?? null;
+                $originalSubsource = $contactData['subsource'] ?? null;
+                $originalStatus = $contactImportRegistry->mappedValue(
+                    row: $data,
+                    mapping: $mapping,
+                    field: 'import_status',
+                );
+
+                $contact = $createOrUpdateContact->handle(
+                    data: [
+                        ...$contactData,
+                        'source' => 'import',
+                        'meta' => array_replace_recursive(
+                            $contactData['meta'] ?? [],
+                            [
+                                'imported' => true,
+                                'imported_at' => $existingImportedAt ?? $importedAt->toISOString(),
+                                'import' => [
+                                    'batch_id' => $importBatch->id,
+                                    'original_source' => $originalSource,
+                                    'original_subsource' => $originalSubsource,
+                                    'original_status' => $originalStatus,
+                                ],
                             ],
-                        ],
-                    ),
-                ],
-                statusKey: null,
-                statusChangeReason: 'crm_import',
-            );
+                        ),
+                    ],
+                    statusKey: null,
+                    statusChangeReason: 'crm_import',
+                );
 
-            $contactImportRegistry->handleModuleImports(
-                contact: $contact,
-                row: $data,
-                mapping: $mapping,
-            );
+                $contact->forceFill([
+                    'contact_import_batch_id' => $importBatch->id,
+                ])->save();
 
-            $wasExisting ? $updated++ : $created++;
+                $contactImportRegistry->handleModuleImports(
+                    contact: $contact,
+                    row: $data,
+                    mapping: $mapping,
+                );
+
+                $wasExisting ? $updated++ : $created++;
+            }
+        } catch (\Throwable $exception) {
+            $importBatch->forceFill([
+                'status' => ContactImportBatch::STATUS_FAILED,
+                'contact_count' => $created + $updated,
+                'successful_count' => $created + $updated,
+                'failed_count' => $skipped,
+                'meta' => array_replace_recursive($importBatch->meta ?? [], [
+                    'failed_at' => now()->toISOString(),
+                    'failure' => [
+                        'message' => $exception->getMessage(),
+                    ],
+                ]),
+            ])->save();
+
+            throw $exception;
+        } finally {
+            fclose($handle);
         }
 
-        fclose($handle);
+        $importBatch->forceFill([
+            'status' => ContactImportBatch::STATUS_COMPLETED,
+            'contact_count' => $created + $updated + $skipped,
+            'successful_count' => $created + $updated,
+            'failed_count' => $skipped,
+        ])->save();
 
         return redirect()
             ->route('crm.contacts.index')

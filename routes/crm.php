@@ -2,6 +2,7 @@
 
 use App\Modules\Broadcasts\Controllers\BroadcastController;
 use App\Modules\Core\Controllers\ContactController;
+use App\Modules\Core\Controllers\ContactImportBatchController;
 use App\Modules\Core\Controllers\ContactLookupController;
 use App\Modules\Core\Controllers\ContactNoteController;
 use App\Modules\Tasks\Controllers\TaskController;
@@ -97,6 +98,12 @@ Route::middleware('auth')->group(function () {
 
             Route::post('/import', [ContactController::class, 'processImport'])
                 ->name('import.process');
+
+            Route::get('/import-batches', [ContactImportBatchController::class, 'index'])
+                ->name('import-batches.index');
+
+            Route::get('/import-batches/{contactImportBatch}', [ContactImportBatchController::class, 'show'])
+                ->name('import-batches.show');
 
             Route::get('/{contact}', [ContactController::class, 'show'])
                 ->name('show');
