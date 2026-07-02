@@ -918,6 +918,8 @@ Canonical channel availability surface keys are:
 
 Surface keys describe UI/admin/client channel-choice surfaces.
 
+The `broadcasts` surface controls whether regular Broadcast authoring exposes SMS as a selectable channel. It does not make permission invitations SMS-capable, and it does not change runtime SMS consent, suppression, revocation, STOP/HELP, or send-guard behavior.
+
 They should not replace singular Messaging scopes, sources, message types, consent policy keys, token contexts, or payload/context keys.
 
 Hiding SMS from a surface does not disable SMS runtime safety behavior.
@@ -1974,6 +1976,33 @@ Multi-channel fallback or “use SMS if available, otherwise email” is future 
 
 For now, operators should create separate single-channel Broadcasts and use prior-Broadcast recipient exclusions to avoid duplicate outreach across channels.
 
+Broadcast detail visibility should expose operator-useful recipient outcomes without making Broadcasts own delivery infrastructure:
+
+```text
+recipient_count
+scheduled_count
+sent_recipients_count
+skipped_recipients_count
+failed_recipients_count
+broadcast_recipients.status
+broadcast_recipients.skip_reason
+broadcast_recipients.meta.delivery.failure_reason
+scheduled_messages attached through context
+```
+
+Common skipped states include:
+
+```text
+broadcast_channel_unavailable
+not_scheduled_by_messaging
+```
+
+`broadcast_channel_unavailable` means the channel is not visible/allowed for the Broadcast surface at schedule time.
+
+`not_scheduled_by_messaging` means Messaging declined to schedule a recipient, such as when an SMS Broadcast recipient has no usable phone destination or Messaging planning gates reject the recipient.
+
+Broadcasts may display these outcomes for operator troubleshooting, but Messaging still owns the scheduled delivery lifecycle and final send-time gates.
+
 Do not add multi-step progression, enrollment lifecycle, or journey logic to Broadcasts.
 
 If a send needs multiple sequenced steps, it belongs in Campaigns, not Broadcasts.
@@ -2411,7 +2440,7 @@ Recommended direction:
 2. Keep config templates aligned with the canonical Messaging/Campaign/FlowRoute/Preset shapes.
 3. Add public seams only when a concrete consumer/workflow needs them.
 4. Add contact filters for Commerce or Location only when Broadcasts, Campaigns, Reporting, or another consuming surface needs them.
-5. Return to the Broadcasts/Campaigns/Messaging client MVP path after docs/templates are stable.
+5. Continue the client-readiness path with import-time status mapping, permission-invitation accepted-event decisions, and config validation guidance.
 6. Regenerate `core-project-tree.txt` from the repo after each structural batch.
 
 Do not use this section as a backlog. Actionable items belong in `TODO.md`.

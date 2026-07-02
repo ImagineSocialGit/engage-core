@@ -17,7 +17,9 @@ return [
     |
     | Examples:
     | config/messaging/email/transactional/webinar.php
+    | config/messaging/email/transactional/permission_invitation.php
     | config/messaging/email/marketing/webinar_nurture.php
+    | config/messaging/email/marketing/broadcast.php
     | config/messaging/email/marketing/mortgage_homebuyer_nurture.php
     | config/messaging/email/marketing/webinar_waitlist.php
     |
@@ -33,6 +35,11 @@ return [
     |
     | Keep default webinar copy vertical-neutral.
     | Put vertical-specific copy in vertical-specific scopes.
+    |
+    | Normal Broadcasts usually provide ad hoc payloads inline from the
+    | Broadcast record. Email Broadcast payloads use subject/body. Do not add
+    | reusable Broadcast copy here unless a future workflow intentionally
+    | dispatches Broadcast messages from Messaging config.
     */
 
     /*
@@ -219,6 +226,21 @@ TEXT,
             ],
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | marketing:broadcast note
+    |--------------------------------------------------------------------------
+    |
+    | Regular email Broadcasts are single-channel ad hoc sends. The Broadcast
+    | stores payload.subject and payload.body, then passes an inline Messaging
+    | definition with dispatch_key = broadcast_send. That means this template
+    | normally does not need to define reusable broadcast copy.
+    |
+    | If a future feature intentionally dispatches reusable Broadcast-style
+    | email from config, it should use purpose = marketing, scope = broadcast,
+    | dispatch_key = broadcast_send, and EmailPayload::class.
+    */
 
     /*
     |--------------------------------------------------------------------------

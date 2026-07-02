@@ -17,11 +17,12 @@ Use these rules when converting a client request into config:
 10. `config/modules.php` owns enabled modules and dependency visibility.
 11. Use `lead/leads` in CRM/client-facing text unless explicitly told otherwise.
 12. Default webinar configs should be vertical-neutral. Vertical-specific copy belongs in vertical-specific scopes.
-13. SMS capabilities may exist in code even when SMS is hidden in client/admin UI. UI exposure for SMS options should be controlled by config.
-14. Normal Broadcasts require normal Messaging consent. Imported-contact opt-in invitations are a distinct one-time email flow, not a general Broadcast consent bypass.
-15. While a branch is still pre-rollout, replace current branch migrations instead of adding modify-table migrations. After rollout, use normal append-only migrations.
-16. Module-specific behavior belongs in the owning module doc. Config templates should not invent unsupported module behavior.
-17. Commerce and Location should be used for client/admin convenience and integrations, not as storefront/GIS replacements.
+13. SMS capabilities may exist in code even when SMS is hidden in client/admin UI. UI exposure for SMS options should be controlled through Messaging channel availability.
+14. Normal Broadcasts are single-channel sends. Email Broadcasts use `payload.subject` and `payload.body`; SMS Broadcasts use `payload.message`.
+15. Normal Broadcasts require normal Messaging consent. Imported-contact opt-in invitations are a distinct one-time email flow, not a general Broadcast consent bypass.
+16. While a branch is still pre-rollout, replace current branch migrations instead of adding modify-table migrations. After rollout, use normal append-only migrations.
+17. Module-specific behavior belongs in the owning module doc. Config templates should not invent unsupported module behavior.
+18. Commerce and Location should be used for client/admin convenience and integrations, not as storefront/GIS replacements.
 
 
 ## Config template files
@@ -51,6 +52,7 @@ webinar-post-event-template.php
 - `transactional:permission_invitation` for imported-contact one-time opt-in invitation emails.
 - `marketing:webinar_nurture` for attended/missed webinar nurture campaigns.
 - `marketing:webinar_waitlist` for waitlist notifications.
+- `marketing:broadcast` for normal one-time Broadcast sends.
 - `marketing:mortgage_homebuyer_nurture` for mortgage-specific long-term homebuyer nurture.
 - `internal:inbound_messages` for team-facing inbound reply notifications.
 - `internal:tasks` for task assignment/digest notifications.
@@ -138,7 +140,13 @@ Supported current base shapes:
 {"type":"imported"}
 ```
 
-`imported` means contacts where `source = import`, `meta.imported = true`, or `meta.imported_at` exists.
+```json
+{"type":"import_batch","import_batch_ids":[1,2,3]}
+```
+
+`imported` means contacts where `source = import`, `meta.imported = true`, `meta.imported_at` exists, or `contact_import_batch_id` is present.
+
+`import_batch` means contacts from specific Core-owned `contact_import_batches` records.
 
 Broadcast recipient filters may also include Broadcast-owned exclusions:
 
@@ -163,7 +171,21 @@ sent
 
 Use this for duplicate-send protection when sending related single-channel Broadcasts, such as sending SMS first and then emailing everyone who was not already scheduled or sent the SMS Broadcast.
 
-Broadcasts remain single-channel sends. Do not use one normal Broadcast as an implicit email+SMS fanout.
+Broadcasts remain single-channel sends.
+
+Email Broadcasts store ad hoc payload copy as:
+
+```json
+{"subject":"Subject","body":"Message body"}
+```
+
+SMS Broadcasts store ad hoc payload copy as:
+
+```json
+{"message":"SMS body"}
+```
+
+Do not use one normal Broadcast as an implicit email+SMS fanout.
 
 ## Imported-contact opt-in invitations
 

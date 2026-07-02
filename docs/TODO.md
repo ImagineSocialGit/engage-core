@@ -86,6 +86,7 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [ ] Confirm re-opening an accepted invitation shows the accepted state.
 - [ ] Confirm repeat invitation attempts are blocked by the one-time invitation record.
 - [ ] Confirm cancellation/skip/failure states remain understandable in Broadcast and ScheduledMessage views.
+- [ ] Confirm Broadcast detail pages show scheduled/skipped/failed recipient outcome visibility and useful skip/failure reasons.
 - [ ] Confirm prior-Broadcast exclusions prevent duplicate outreach across related single-channel Broadcasts.
 
 ### Roadmap tracking
@@ -123,13 +124,20 @@ Completed baseline:
 
 ### Broadcasts
 
-- [ ] Add standard SMS Broadcast authoring.
-  - Broadcasts should remain single-channel.
-  - Regular Broadcast creation/editing should allow `email` or `sms` only when Messaging channel availability exposes that channel for the `broadcasts` surface.
-  - Permission invitation Broadcasts remain email-only.
-  - Email Broadcast payloads should use `subject` and `body`.
-  - SMS Broadcast payloads should use `message`.
-  - The UI should cleanly swap email/SMS fields when the selected channel changes.
+Completed baseline:
+
+- Regular Broadcast creation/editing supports email or SMS when Messaging channel availability exposes the channel for the `broadcasts` surface.
+- Broadcasts remain single-channel.
+- Permission invitation Broadcasts remain email-only.
+- Email Broadcast payloads use `subject` and `body`.
+- SMS Broadcast payloads use `message`.
+- SMS Broadcast scheduling hydrates recipient phone, channel, purpose, scope, and message type through Messaging.
+- Broadcast detail pages show recipient outcome counts and per-recipient skip/failure reasons.
+
+- [ ] Revisit Broadcast cancellation/completion lifecycle if operator visibility needs more polish after staging smoke tests.
+  - Keep Broadcast recipient state as Broadcast bookkeeping.
+  - Use Messaging-owned skip behavior for pending scheduled messages.
+  - Do not mutate Messaging scheduled-message internals directly from Broadcasts.
 
 ### Core contact filters
 
@@ -177,27 +185,22 @@ Completed baseline:
 
 ### SMS toggleability
 
-- [ ] Add config-driven channel availability rules.
-  - Global SMS enabled/disabled.
-  - Surface-specific SMS visibility, such as Broadcasts, Campaigns, permission invitations, internal notifications.
-  - Distinguish “code supported” from “client UI option visible.”
+Completed baseline:
 
-- [ ] Ensure SMS hiding does not remove backend protections.
-  - Consent gates still enforce SMS rules.
-  - Suppression/revocation still works.
-  - Inbound STOP/HELP handling still works if provider/webhook is active.
+- Messaging owns canonical channel availability rules.
+- SMS code/runtime capability can exist while SMS is hidden from client/admin UI surfaces.
+- Broadcast builder uses Messaging channel availability for the `broadcasts` surface.
+- Permission invitations remain email-only for the one-time bypass send.
+- SMS opt-in remains explicit on the public preference page when exposed by config and requires a phone number.
+- Hiding SMS from a UI surface does not remove backend protections.
 
-- [ ] Confirm permission invitation SMS opt-in remains explicit.
-  - No automatic SMS consent from email invitation open/click.
-  - SMS checkbox requires a phone number.
-  - SMS option can be hidden by config.
-  
 - [ ] Wire Messaging channel availability into future channel-choice builder UIs as they are added.
   - Campaign builder.
-  - Broadcast builder, if SMS authoring is exposed later.
   - FlowRoute/Route send-message point builder.
   - Internal notification preference UI.
   - Show channel preference controls only when more than one channel is available for that surface.
+
+- [ ] Add operator/debug validation around unsupported channel/surface combinations as config validation matures.
 
 ### Imports and contact onboarding
 
@@ -209,13 +212,13 @@ Completed baseline:
   - Flagged rows should not silently receive the wrong status.
   - Preserve the original imported status in metadata for audit/debugging.
 
-- [ ] Add import batch management visibility.
-  - `contact_import_batches` already exists as a first-class Core model/table.
-  - Broadcasts can already target selected import batches through `recipient_filter.type = import_batch`.
-  - Add a simple CRM list/detail surface for import batches.
-  - Show name, source, original filename, status, imported date, contact count, successful count, failed count, and metadata as needed.
-  - Keep import-batch ownership in Core.
-  - Broadcasts may link to import-batch detail pages once routes exist, but must not own import-batch management.
+Completed import-batch visibility baseline:
+
+- `contact_import_batches` exists as a first-class Core model/table.
+- Core provides simple CRM list/detail visibility for import batches.
+- Broadcasts can target selected import batches through `recipient_filter.type = import_batch`.
+- Broadcast recipient-filter display can link to Core-owned import-batch detail pages.
+- Broadcasts consume import batches but do not own import-batch management.
 
 ### Automation/event seams
 

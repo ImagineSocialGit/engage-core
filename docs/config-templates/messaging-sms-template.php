@@ -16,9 +16,14 @@ return [
     | Create one file per purpose/scope pair.
     |
     | Keep SMS payloads short.
-    | SMS should be supplemental and safe to skip if consent is missing.
+    | SMS should be supplemental and safe to skip if consent, suppression,
+    | provider, or recipient-phone requirements are not satisfied.
     |
-    | Email is the primary implementation path right now.
+    | SMS capability may exist while SMS is hidden from client/admin UI.
+    | UI exposure should come from Messaging channel availability, not from
+    | raw provider config.
+    |
+    | Email is the primary implementation path for most workflows.
     | Mirror SMS only after the email config path passes.
     |
     | Campaign SMS templates use the same structure as email campaign templates:
@@ -27,6 +32,11 @@ return [
     |
     | Campaign presets own timing. Campaign SMS templates own only delivery
     | template fields such as payload_class, queue, and payload.
+    |
+    | Regular SMS Broadcasts usually provide ad hoc payloads inline from the
+    | Broadcast record. SMS Broadcast payloads use payload.message and are
+    | hydrated by Messaging with to/channel/purpose/scope/message_type before
+    | scheduling.
     */
 
     /*
@@ -147,6 +157,24 @@ return [
             ],
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | marketing:broadcast note
+    |--------------------------------------------------------------------------
+    |
+    | Regular SMS Broadcasts are single-channel ad hoc sends. The Broadcast
+    | stores payload.message, then passes an inline Messaging definition with
+    | dispatch_key = broadcast_send. Messaging resolves the Contact phone into
+    | the scheduled payload's to field.
+    |
+    | If a Contact has no usable phone, Messaging schedules nothing for that
+    | recipient and Broadcast bookkeeping records the recipient as skipped.
+    |
+    | If a future feature intentionally dispatches reusable Broadcast-style SMS
+    | from config, it should use purpose = marketing, scope = broadcast,
+    | dispatch_key = broadcast_send, and SmsPayload::class.
+    */
 
     /*
     |--------------------------------------------------------------------------
