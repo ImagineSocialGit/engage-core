@@ -113,7 +113,7 @@ class Broadcast extends Model
             : 'Regular consent-gated one-time broadcast.';
     }
 
-        public function recipientFilterLabel(): string
+    public function recipientFilterLabel(): string
     {
         $recipientFilter = $this->recipient_filter ?? [];
 

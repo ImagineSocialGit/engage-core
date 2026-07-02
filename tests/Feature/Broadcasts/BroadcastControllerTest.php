@@ -266,7 +266,6 @@ class BroadcastControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('name="channel" value="email"', false);
-        $response->assertSee('name="channel" value="email"', false);
         $response->assertDontSee('<option value="sms">', false);
     }
 

@@ -91,6 +91,129 @@ class ScheduleBroadcastActionTest extends TestCase
         }
     }
 
+    public function test_it_schedules_an_sms_broadcast_to_all_contacts_through_messaging(): void
+    {
+        $contacts = Contact::factory()->count(2)->create([
+            'phone' => '+15555550123',
+        ]);
+
+        config()->set('messaging.channel_availability.sms.runtime_supported', true);
+        config()->set('messaging.channel_availability.sms.provider_enabled', true);
+        config()->set('messaging.channel_availability.sms.surfaces.broadcasts', true);
+        config()->set('messaging.channel_availability.sms.purpose_scopes', [
+            'marketing:broadcast' => true,
+        ]);
+
+        $broadcast = Broadcast::factory()->create([
+            'channel' => 'sms',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'dispatch_key' => Broadcast::DEFAULT_DISPATCH_KEY,
+            'message_type' => Broadcast::DEFAULT_MESSAGE_TYPE,
+            'payload_class' => SmsPayload::class,
+            'queue' => 'marketing',
+            'send_at' => now()->addHour(),
+            'recipient_filter' => [
+                'type' => 'all',
+            ],
+            'payload' => [
+                'message' => 'This is an SMS broadcast.',
+            ],
+        ]);
+
+        $this->mock(DispatchMessageAction::class)
+            ->shouldReceive('handle')
+            ->twice()
+            ->andReturnUsing(function (...$arguments): array {
+                $recipient = $arguments['recipient'] ?? $arguments[0];
+                $channel = $arguments['channel'] ?? $arguments[1];
+                $purpose = $arguments['purpose'] ?? $arguments[2];
+                $scope = $arguments['scope'] ?? $arguments[3];
+                
+                $payload = collect($arguments)->first(
+                    fn (mixed $argument): bool => is_array($argument)
+                        && ($argument['message'] ?? null) === 'This is an SMS broadcast.',
+                );
+
+                $broadcast = collect($arguments)->first(
+                    fn (mixed $argument): bool => $argument instanceof Broadcast,
+                );
+
+                $meta = collect($arguments)->first(
+                    fn (mixed $argument): bool => is_array($argument)
+                        && array_key_exists('queue', $argument)
+                        && array_key_exists('broadcast_id', $argument),
+                );
+
+                $definitions = collect($arguments)->first(
+                    fn (mixed $argument): bool => is_array($argument)
+                        && isset($argument[0])
+                        && is_array($argument[0])
+                        && array_key_exists('dispatch_key', $argument[0]),
+                );
+
+                $this->assertInstanceOf(Broadcast::class, $broadcast);
+                $this->assertSame('sms', $channel);
+                $this->assertSame('marketing', $purpose);
+                $this->assertSame('broadcast', $scope);
+                $this->assertSame([
+                    'message' => 'This is an SMS broadcast.',
+                ], $payload);
+
+                $this->assertIsArray($meta);
+                $this->assertSame('marketing', $meta['queue']);
+
+                $this->assertIsArray($definitions);
+                $this->assertSame(Broadcast::DEFAULT_DISPATCH_KEY, $definitions[0]['dispatch_key']);
+                $this->assertSame(Broadcast::DEFAULT_MESSAGE_TYPE, $definitions[0]['message_type']);
+                $this->assertSame('sms', $definitions[0]['channel']);
+                $this->assertSame('marketing', $definitions[0]['purpose']);
+                $this->assertSame('broadcast', $definitions[0]['scope']);
+                $this->assertSame(SmsPayload::class, $definitions[0]['payload_class']);
+                $this->assertSame([
+                    'message' => 'This is an SMS broadcast.',
+                ], $definitions[0]['payload']);
+                $this->assertSame([], $definitions[0]['consent_policy']);
+
+                return [
+                    ScheduledMessage::factory()->create([
+                        'recipient_type' => $recipient->getMorphClass(),
+                        'recipient_id' => $recipient->getKey(),
+                        'context_type' => $broadcast->getMorphClass(),
+                        'context_id' => $broadcast->getKey(),
+                        'channel' => 'sms',
+                        'purpose' => 'marketing',
+                        'scope' => 'broadcast',
+                        'message_type' => Broadcast::DEFAULT_MESSAGE_TYPE,
+                        'payload_class' => SmsPayload::class,
+                        'queue' => 'marketing',
+                        'dispatch_keys' => [Broadcast::DEFAULT_DISPATCH_KEY],
+                        'payload' => [
+                            'message' => 'This is an SMS broadcast.',
+                        ],
+                    ]),
+                ];
+            });
+
+        $scheduledBroadcast = app(ScheduleBroadcastAction::class)->handle($broadcast);
+
+        $this->assertSame(Broadcast::STATUS_SCHEDULED, $scheduledBroadcast->status);
+        $this->assertSame(2, $scheduledBroadcast->recipient_count);
+        $this->assertSame(2, $scheduledBroadcast->scheduled_count);
+
+        foreach ($contacts as $contact) {
+            $recipient = BroadcastRecipient::query()
+                ->where('broadcast_id', $broadcast->id)
+                ->where('contact_id', $contact->id)
+                ->first();
+
+            $this->assertNotNull($recipient);
+            $this->assertSame(BroadcastRecipient::STATUS_SCHEDULED, $recipient->status);
+            $this->assertCount(1, $recipient->scheduled_message_ids);
+            $this->assertNull($recipient->skip_reason);
+        }
+    }
+
     public function test_regular_email_broadcasts_do_not_request_imported_contact_permission_policy(): void
     {
         Contact::factory()->create([

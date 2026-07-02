@@ -125,6 +125,60 @@ class SendScheduledMessageJobTest extends TestCase
         );
     }
 
+    public function test_it_sends_pending_sms_broadcast_message(): void
+    {
+        Event::fake([ScheduledMessageSent::class]);
+
+        $contact = Contact::factory()->create([
+            'phone' => '+15555550123',
+        ]);
+
+        $this->grantConsent($contact, 'sms', 'marketing', 'broadcast');
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'recipient_type' => Contact::class,
+            'recipient_id' => $contact->id,
+            'channel' => 'sms',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'message_type' => 'broadcast',
+            'payload_class' => FakeJobSmsPayload::class,
+            'payload' => [
+                'to' => '+15555550123',
+                'message' => 'This is an SMS broadcast.',
+                'purpose' => 'marketing',
+            ],
+            'status' => 'pending',
+            'meta' => [
+                'conditions' => [],
+            ],
+        ]);
+
+        $smsService = Mockery::mock(SmsMessagingService::class);
+        $smsService
+            ->shouldReceive('send')
+            ->once()
+            ->with(Mockery::on(function (FakeJobSmsPayload $payload): bool {
+                return $payload->to() === '+15555550123'
+                    && $payload->message() === 'This is an SMS broadcast.'
+                    && $payload->purpose() === 'marketing';
+            }));
+
+        app()->instance(SmsMessagingService::class, $smsService);
+
+        $this->handleScheduledMessage($scheduledMessage);
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame(ScheduledMessage::STATUS_SENT, $scheduledMessage->status);
+        $this->assertNotNull($scheduledMessage->sent_at);
+
+        Event::assertDispatched(
+            ScheduledMessageSent::class,
+            fn (ScheduledMessageSent $event): bool => $event->scheduledMessage->is($scheduledMessage),
+        );
+    }
+
     public function test_it_sends_imported_contact_permission_invitation_once_without_existing_consent(): void
     {
         Event::fake([ScheduledMessageSent::class]);
@@ -796,13 +850,18 @@ Thanks.",
         );
     }
 
-    private function grantConsent(Contact $contact, string $channel, string $purpose): void
+    private function grantConsent(
+        Contact $contact,
+        string $channel,
+        string $purpose,
+        string $scope = 'webinar',
+    ): void
     {
         MessageConsent::query()->create([
             'contact_id' => $contact->id,
             'channel' => $channel,
             'purpose' => $purpose,
-            'scope' => 'webinar',
+            'scope' => $scope,
             'consented_at' => now()->subMinute(),
             'source' => 'test',
         ]);
