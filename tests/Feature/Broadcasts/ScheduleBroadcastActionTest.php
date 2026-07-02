@@ -9,6 +9,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactTag;
 use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
+use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
@@ -182,6 +183,80 @@ class ScheduleBroadcastActionTest extends TestCase
             });
 
         app(ScheduleBroadcastAction::class)->handle($broadcast);
+    }
+
+    public function test_permission_invitation_broadcasts_only_schedule_imported_contacts_without_message_consent(): void
+    {
+        $eligible = Contact::factory()->create([
+            'email' => 'eligible@example.com',
+            'source' => 'import',
+        ]);
+
+        $alreadyConsented = Contact::factory()->create([
+            'email' => 'consented@example.com',
+            'source' => 'import',
+        ]);
+
+        Contact::factory()->create([
+            'email' => 'not-imported@example.com',
+            'source' => 'crm',
+        ]);
+
+        MessageConsent::query()->create([
+            'contact_id' => $alreadyConsented->id,
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'consented_at' => now(),
+            'source' => 'test',
+        ]);
+
+        $broadcast = Broadcast::factory()->create([
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'dispatch_key' => Broadcast::PERMISSION_INVITATION_DISPATCH_KEY,
+            'message_type' => Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'payload_class' => EmailPayload::class,
+            'recipient_filter' => [
+                'type' => 'imported',
+            ],
+        ]);
+
+        $this->mock(DispatchMessageAction::class)
+            ->shouldReceive('handle')
+            ->once()
+            ->andReturnUsing(function (...$arguments) use ($eligible): array {
+                $recipient = $arguments['recipient'] ?? $arguments[0];
+                $broadcast = $arguments['context'] ?? $arguments[6];
+
+                $this->assertSame($eligible->id, $recipient->id);
+
+                return [
+                    ScheduledMessage::factory()->create([
+                        'recipient_type' => $recipient->getMorphClass(),
+                        'recipient_id' => $recipient->getKey(),
+                        'context_type' => $broadcast->getMorphClass(),
+                        'context_id' => $broadcast->getKey(),
+                    ]),
+                ];
+            });
+
+        $scheduledBroadcast = app(ScheduleBroadcastAction::class)->handle($broadcast);
+
+        $this->assertSame(1, $scheduledBroadcast->recipient_count);
+        $this->assertSame(1, $scheduledBroadcast->scheduled_count);
+
+        $this->assertDatabaseHas('broadcast_recipients', [
+            'broadcast_id' => $broadcast->id,
+            'contact_id' => $eligible->id,
+            'status' => BroadcastRecipient::STATUS_SCHEDULED,
+        ]);
+
+        $this->assertDatabaseMissing('broadcast_recipients', [
+            'broadcast_id' => $broadcast->id,
+            'contact_id' => $alreadyConsented->id,
+        ]);
     }
 
     public function test_it_does_not_request_imported_contact_permission_policy_for_sms_broadcasts(): void
@@ -509,5 +584,86 @@ class ScheduleBroadcastActionTest extends TestCase
             '2026-07-01 11:00:00',
             $scheduledBroadcast->send_at->toDateTimeString(),
         );
+    }
+
+    public function test_it_excludes_contacts_already_scheduled_or_sent_previous_broadcasts(): void
+    {
+        $included = Contact::factory()->create();
+        $previouslyScheduled = Contact::factory()->create();
+        $previouslySent = Contact::factory()->create();
+        $previouslyFailed = Contact::factory()->create();
+
+        $previousBroadcast = Broadcast::factory()->create([
+            'status' => Broadcast::STATUS_COMPLETED,
+        ]);
+
+        BroadcastRecipient::factory()->scheduled([1])->create([
+            'broadcast_id' => $previousBroadcast->id,
+            'contact_id' => $previouslyScheduled->id,
+        ]);
+
+        BroadcastRecipient::factory()->sent()->create([
+            'broadcast_id' => $previousBroadcast->id,
+            'contact_id' => $previouslySent->id,
+        ]);
+
+        BroadcastRecipient::factory()->failed()->create([
+            'broadcast_id' => $previousBroadcast->id,
+            'contact_id' => $previouslyFailed->id,
+        ]);
+
+        $broadcast = Broadcast::factory()->create([
+            'recipient_filter' => [
+                'type' => 'all',
+                'exclude' => [
+                    'broadcast_ids' => [$previousBroadcast->id],
+                    'statuses' => [
+                        BroadcastRecipient::STATUS_SCHEDULED,
+                        BroadcastRecipient::STATUS_SENT,
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->mock(DispatchMessageAction::class)
+            ->shouldReceive('handle')
+            ->twice()
+            ->andReturnUsing(function (...$arguments): array {
+                $recipient = $arguments['recipient'] ?? $arguments[0];
+                $broadcast = $arguments['context'] ?? $arguments[6];
+
+                return [
+                    ScheduledMessage::factory()->create([
+                        'recipient_type' => $recipient->getMorphClass(),
+                        'recipient_id' => $recipient->getKey(),
+                        'context_type' => $broadcast->getMorphClass(),
+                        'context_id' => $broadcast->getKey(),
+                    ]),
+                ];
+            });
+
+        app(ScheduleBroadcastAction::class)->handle($broadcast);
+
+        $this->assertDatabaseHas('broadcast_recipients', [
+            'broadcast_id' => $broadcast->id,
+            'contact_id' => $included->id,
+            'status' => BroadcastRecipient::STATUS_SCHEDULED,
+        ]);
+
+        $this->assertDatabaseHas('broadcast_recipients', [
+            'broadcast_id' => $broadcast->id,
+            'contact_id' => $previouslyFailed->id,
+            'status' => BroadcastRecipient::STATUS_SCHEDULED,
+        ]);
+
+        $this->assertDatabaseMissing('broadcast_recipients', [
+            'broadcast_id' => $broadcast->id,
+            'contact_id' => $previouslyScheduled->id,
+        ]);
+
+        $this->assertDatabaseMissing('broadcast_recipients', [
+            'broadcast_id' => $broadcast->id,
+            'contact_id' => $previouslySent->id,
+        ]);
     }
 }

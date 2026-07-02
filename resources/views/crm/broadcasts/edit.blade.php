@@ -9,6 +9,15 @@
             ? 'imported'
             : old('recipient_filter_type', $recipientFilter['type'] ?? 'all');
         $recipientTag = old('recipient_tag', $recipientFilter['tags'][0] ?? '');
+
+        $excludeBroadcastIds = collect(old('exclude_broadcast_ids', data_get($recipientFilter, 'exclude.broadcast_ids', [])))
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $excludeBroadcastStatuses = old('exclude_broadcast_statuses', data_get($recipientFilter, 'exclude.statuses', [
+            \App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SCHEDULED,
+            \App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SENT,
+        ]));
     @endphp
 
     <div class="space-y-6">
@@ -163,6 +172,80 @@
                         </div>
                     </div>
                 @endif
+
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-900">
+                            Avoid Duplicate Sends
+                        </h3>
+
+                        <p class="mt-1 text-xs text-slate-600">
+                            Exclude contacts who were already scheduled or sent one of these previous broadcasts.
+                        </p>
+                    </div>
+
+                    <div class="mt-4">
+                        <x-ui.form.label for="exclude_broadcast_ids">
+                            Previous Broadcasts to Exclude
+                        </x-ui.form.label>
+
+                        <select
+                            id="exclude_broadcast_ids"
+                            name="exclude_broadcast_ids[]"
+                            multiple
+                            class="mt-1 block min-h-32 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                        >
+                            @foreach($excludableBroadcasts as $excludableBroadcast)
+                                <option
+                                    value="{{ $excludableBroadcast->id }}"
+                                    @selected(in_array($excludableBroadcast->id, $excludeBroadcastIds, true))
+                                >
+                                    {{ $excludableBroadcast->name }}
+                                    — {{ strtoupper($excludableBroadcast->channel) }}
+                                    — {{ str_replace('_', ' ', $excludableBroadcast->status) }}
+                                </option>
+                            @endforeach
+                        </select>
+
+                        <p class="mt-2 text-xs text-slate-500">
+                            Hold Ctrl/Cmd to select multiple broadcasts.
+                        </p>
+
+                        <x-ui.form.error name="exclude_broadcast_ids" />
+                        <x-ui.form.error name="exclude_broadcast_ids.*" />
+                    </div>
+
+                    <div class="mt-4 space-y-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Exclude contacts with prior status
+                        </p>
+
+                        <label class="flex items-center gap-2 text-sm text-slate-700">
+                            <input
+                                type="checkbox"
+                                name="exclude_broadcast_statuses[]"
+                                value="{{ \App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SCHEDULED }}"
+                                @checked(in_array(\App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SCHEDULED, $excludeBroadcastStatuses, true))
+                                class="rounded border-slate-300"
+                            >
+                            Scheduled
+                        </label>
+
+                        <label class="flex items-center gap-2 text-sm text-slate-700">
+                            <input
+                                type="checkbox"
+                                name="exclude_broadcast_statuses[]"
+                                value="{{ \App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SENT }}"
+                                @checked(in_array(\App\Modules\Broadcasts\Models\BroadcastRecipient::STATUS_SENT, $excludeBroadcastStatuses, true))
+                                class="rounded border-slate-300"
+                            >
+                            Sent
+                        </label>
+
+                        <x-ui.form.error name="exclude_broadcast_statuses" />
+                        <x-ui.form.error name="exclude_broadcast_statuses.*" />
+                    </div>
+                </div>
 
                 <div>
                     <x-ui.form.label for="send_at">

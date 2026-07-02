@@ -98,6 +98,46 @@ class BroadcastControllerTest extends TestCase
         $this->assertSame(['type' => 'all'], $broadcast->recipient_filter);
     }
 
+    public function test_it_creates_a_draft_broadcast_with_prior_broadcast_exclusions(): void
+    {
+        $user = User::factory()->create();
+
+        $previousBroadcast = Broadcast::factory()->completed()->create([
+            'name' => 'Prior SMS send',
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->post(route('crm.broadcasts.store'), [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_REGULAR,
+                'intent' => 'draft',
+                'name' => 'Follow-up email',
+                'subject' => 'Follow-up',
+                'body' => 'Here is the follow-up.',
+                'recipient_filter_type' => 'all',
+                'exclude_broadcast_ids' => [$previousBroadcast->id],
+                'exclude_broadcast_statuses' => [
+                    BroadcastRecipient::STATUS_SCHEDULED,
+                    BroadcastRecipient::STATUS_SENT,
+                ],
+            ]);
+
+        $broadcast = Broadcast::query()
+            ->where('name', 'Follow-up email')
+            ->first();
+
+        $this->assertNotNull($broadcast);
+
+        $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
+
+        $this->assertSame(['type' => 'all'], array_intersect_key($broadcast->recipient_filter, ['type' => true]));
+        $this->assertSame([$previousBroadcast->id], data_get($broadcast->recipient_filter, 'exclude.broadcast_ids'));
+        $this->assertSame([
+            BroadcastRecipient::STATUS_SCHEDULED,
+            BroadcastRecipient::STATUS_SENT,
+        ], data_get($broadcast->recipient_filter, 'exclude.statuses'));
+    }
+
     public function test_it_creates_a_draft_opt_in_invitation(): void
     {
         $user = User::factory()->create();
@@ -128,6 +168,38 @@ class BroadcastControllerTest extends TestCase
         $this->assertSame('transactional', $broadcast->purpose);
         $this->assertSame('permission_invitation', $broadcast->scope);
         $this->assertSame(['type' => 'imported'], $broadcast->recipient_filter);
+    }
+
+    public function test_permission_invitation_create_request_ignores_submitted_recipient_filter(): void
+    {
+        $user = User::factory()->create();
+
+        $contact = Contact::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->post(route('crm.broadcasts.store'), [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
+                'intent' => 'draft',
+                'name' => 'Imported opt-in invitation',
+                'subject' => 'Confirm how you want to hear from us',
+                'body' => 'Please confirm your communication preferences.',
+                'recipient_filter_type' => 'contact_ids',
+                'contact_ids' => [$contact->id],
+            ]);
+
+        $broadcast = Broadcast::query()->first();
+
+        $this->assertNotNull($broadcast);
+
+        $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
+
+        $this->assertSame(['type' => 'imported'], $broadcast->recipient_filter);
+        $this->assertSame('email', $broadcast->channel);
+        $this->assertSame('transactional', $broadcast->purpose);
+        $this->assertSame('permission_invitation', $broadcast->scope);
+        $this->assertSame(Broadcast::PERMISSION_INVITATION_DISPATCH_KEY, $broadcast->dispatch_key);
+        $this->assertSame(Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION, $broadcast->message_type);
     }
 
     public function test_it_schedules_a_broadcast_from_create_request(): void
@@ -324,6 +396,49 @@ class BroadcastControllerTest extends TestCase
         $this->assertSame('tag', $broadcast->recipient_filter['type']);
         $this->assertSame(['realtor'], $broadcast->recipient_filter['tags']);
         $this->assertNotNull($broadcast->send_at);
+    }
+
+    public function test_it_updates_a_draft_broadcast_with_prior_broadcast_exclusions(): void
+    {
+        $user = User::factory()->create();
+
+        $previousBroadcast = Broadcast::factory()->completed()->create([
+            'name' => 'Prior SMS send',
+        ]);
+
+        $broadcast = Broadcast::factory()->create([
+            'status' => Broadcast::STATUS_DRAFT,
+            'recipient_filter' => [
+                'type' => 'all',
+            ],
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->patch(route('crm.broadcasts.update', $broadcast), [
+                'name' => 'Updated broadcast',
+                'subject' => 'Updated subject',
+                'body' => 'Updated body',
+                'recipient_filter_type' => 'tag',
+                'recipient_tag' => 'homebuyer',
+                'exclude_broadcast_ids' => [$previousBroadcast->id],
+                'exclude_broadcast_statuses' => [
+                    BroadcastRecipient::STATUS_SCHEDULED,
+                    BroadcastRecipient::STATUS_SENT,
+                ],
+            ]);
+
+        $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
+
+        $broadcast->refresh();
+
+        $this->assertSame('tag', $broadcast->recipient_filter['type']);
+        $this->assertSame(['homebuyer'], $broadcast->recipient_filter['tags']);
+        $this->assertSame([$previousBroadcast->id], data_get($broadcast->recipient_filter, 'exclude.broadcast_ids'));
+        $this->assertSame([
+            BroadcastRecipient::STATUS_SCHEDULED,
+            BroadcastRecipient::STATUS_SENT,
+        ], data_get($broadcast->recipient_filter, 'exclude.statuses'));
     }
 
     public function test_it_updates_an_opt_in_invitation_without_changing_the_imported_recipient_filter(): void

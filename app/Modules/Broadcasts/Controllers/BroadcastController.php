@@ -42,6 +42,14 @@ class BroadcastController extends Controller
             'selectedRecipientContacts' => $this->selectedContactOptions(
                 $request->session()->getOldInput('contact_ids', []),
             ),
+            'excludableBroadcasts' => $broadcasts
+                ->filter(fn (Broadcast $broadcast): bool => $broadcast->isRegularBroadcast()
+                    && in_array($broadcast->status, [
+                        Broadcast::STATUS_SCHEDULED,
+                        Broadcast::STATUS_SENDING,
+                        Broadcast::STATUS_COMPLETED,
+                    ], true))
+                ->values(),
         ]);
     }
 
@@ -114,6 +122,17 @@ class BroadcastController extends Controller
             'selectedRecipientContacts' => $this->selectedContactOptions(
                 session()->getOldInput('contact_ids', $broadcast->recipient_filter['contact_ids'] ?? []),
             ),
+            'excludableBroadcasts' => Broadcast::query()
+                ->whereKeyNot($broadcast->getKey())
+                ->where('message_type', '!=', Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION)
+                ->whereIn('status', [
+                    Broadcast::STATUS_SCHEDULED,
+                    Broadcast::STATUS_SENDING,
+                    Broadcast::STATUS_COMPLETED,
+                ])
+                ->latest()
+                ->limit(50)
+                ->get(['id', 'name', 'channel', 'status', 'send_at']),
         ]);
     }
 
