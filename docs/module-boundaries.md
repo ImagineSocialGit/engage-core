@@ -119,6 +119,7 @@ Current ownership:
 | jobs | App-global infrastructure |
 | contacts | Core |
 | contact_statuses | Core |
+| contact_import_batches | Core |
 | contact_tags | Core |
 | notes | Core |
 | team_members | InternalNotifications |
@@ -152,6 +153,7 @@ Core schema freeze target:
 
 - contacts
 - contact_statuses
+- contact_import_batches
 - contact_tags
 - notes
 
@@ -246,6 +248,278 @@ Examples:
 - Zoom webinar adapter
 
 Adapters are not modules. They sit behind module-owned contracts/managers/services.
+
+## How to Add a Universal Module
+
+Use this process when adding a reusable capability module such as Scheduling, Portal, Forms, Documents, Commerce, or Location.
+
+The goal is to establish durable ownership and dependency direction without forcing Core to understand the new module or adding speculative vertical behavior.
+
+### 1. Classify the module
+
+Confirm the capability is truly universal rather than Core, vertical, or integration code.
+
+A universal module should be reusable across multiple verticals and should own a capability rather than a business-specific meaning.
+
+Examples:
+
+```text
+Scheduling = universal appointment/booking capability.
+Portal = universal external/customer account capability.
+Forms = universal configurable form/submission capability.
+Documents = universal document request/upload/review capability.
+Commerce = universal normalized product/order/purchase capability.
+Location = universal geographic/address/radius capability.
+```
+
+Do not create a universal module when the behavior is only vertical-specific. Vertical-specific interpretation belongs to a vertical module.
+
+### 2. Decide ownership before schema
+
+Before proposing schema, review mature FOSS or open-source-adjacent products in the same category and extract the common durable capabilities they support.
+
+Use those products as feature-shape references, not implementation sources.
+
+For each common capability, decide whether Engage Core should:
+
+```text
+- own it in the new module
+- consume another Engage Core module for it
+- expose it later through a public seam
+- defer it as UI/provider/vertical behavior
+```
+
+Examples:
+
+```text
+Scheduling products commonly include reminders and notifications.
+Scheduling should orchestrate appointment reminders, but Messaging/InternalNotifications should deliver them.
+
+Scheduling products commonly include intake questions.
+Scheduling may reference intake needs, but Forms should own form definitions and submissions.
+
+Scheduling products commonly include paid bookings.
+Scheduling may reference booking/payment state later, but Commerce should own products, orders, and purchase/payment records.
+
+Scheduling products commonly include calendar sync.
+Scheduling owns appointment state, but external calendar integrations belong behind Scheduling-owned adapter contracts under app/Integrations.
+```
+
+This scan should happen before adding tables so baseline migrations are roomy enough for common durable features without pushing notification, form, payment, portal, location, or vertical behavior into the wrong module.
+
+Before adding migrations, write down:
+
+```text
+- tables the module owns
+- models the module owns
+- public actions/services/contracts the module will expose
+- modules it may depend on
+- modules that may consume it later
+- Core seams it needs, if any
+```
+
+Prefer module-owned tables linked to Contact over new Core columns.
+
+Good:
+
+```text
+Scheduling owns appointments linked to contacts.
+Documents owns document requests linked to contacts or other subjects.
+Commerce owns orders linked to contacts.
+Location owns contact locations linked to contacts.
+```
+
+Bad:
+
+```text
+contacts.appointment_status
+contacts.portal_account_state
+contacts.latest_form_submission
+contacts.document_review_status
+contacts.purchased_product_ids
+contacts.latitude / contacts.longitude by default
+```
+
+### 3. Add the module shell
+
+Create the standard module directories, even if some are initially empty:
+
+```text
+app/Modules/{ModuleName}/Actions
+app/Modules/{ModuleName}/Contracts
+app/Modules/{ModuleName}/Controllers
+app/Modules/{ModuleName}/Data
+app/Modules/{ModuleName}/Models
+app/Modules/{ModuleName}/Providers
+app/Modules/{ModuleName}/Requests
+app/Modules/{ModuleName}/Services
+app/Modules/{ModuleName}/Support
+```
+
+Create a module service provider:
+
+```text
+app/Modules/{ModuleName}/Providers/{ModuleName}ModuleServiceProvider.php
+```
+
+The provider should be safe to load when the module is installed but not visible. Avoid registering routes, navigation, jobs, or UI unless the feature is intentionally enabled.
+
+### 4. Register the module in `config/modules.php`
+
+Add the module with:
+
+```text
+name
+enabled
+provider
+depends_on
+```
+
+Keep dependencies one-way and minimal. Use explicit module enablement for feature visibility. Provider loading for dependencies must not accidentally expose UI.
+
+Typical planned universal dependencies:
+
+```text
+Scheduling -> Core
+Portal -> Core, optionally Messaging
+Forms -> Core when contact-linked
+Documents -> Core when contact-linked
+Commerce -> Core
+Location -> Core
+```
+
+Optional integrations with Messaging, Tasks, InternalNotifications, Portal, Campaigns, Broadcasts, FlowRoutes, Reporting, or adapters should go through public services/contracts/events, not direct writes into private internals.
+
+### 5. Add migrations only for durable ownership
+
+Add migrations when the ownership is clear enough that future UI/workflows are unlikely to invalidate the table.
+
+Use boring, generic fields first:
+
+```text
+id
+contact_id nullable where contact-linked
+subject_type / subject_id where the record may relate to multiple module subjects
+status
+source
+provider nullable
+external_id nullable
+starts_at / ends_at / occurred_at / submitted_at where obvious
+meta json
+timestamps
+```
+
+Avoid speculative columns that encode vertical meaning, unfinished UI assumptions, or provider-specific details. Put uncertain details in `meta` until the runtime behavior deserves first-class fields.
+
+During pre-rollout branch work, replace current branch migrations when table shapes change instead of adding modify-table migrations. After rollout, use append-only migrations.
+
+### 6. Add models/factories/tests with ownership assertions
+
+For each new table, add:
+
+```text
+model
+factory when tests need records
+focused model/schema test
+boundary test if dependency direction could regress
+```
+
+Schema tests should verify durable fields and relationships, not UI behavior.
+
+Boundary tests should protect:
+
+```text
+Core does not import the new module.
+The new module does not import higher-level or unrelated modules.
+Consumers use public actions/services/contracts/events.
+Feature visibility follows explicit module enablement.
+```
+
+### 7. Add public seams before consumers depend on internals
+
+If another module needs this module, expose a public seam first:
+
+```text
+action
+service
+contract
+DTO/data object
+event
+registry/provider extension point
+read/query service
+```
+
+Good:
+
+```text
+FlowRoutes -> Scheduling public action
+Documents -> Tasks public CreateTaskAction
+Commerce -> AutomationEventRecorded(commerce.order_created)
+Broadcasts -> Core contact filter seam
+```
+
+Bad:
+
+```text
+FlowRoutes creates appointment rows directly.
+Documents mutates task internals directly.
+Music imports Shopify adapter directly for purchase history.
+Core imports module models for contact pages.
+```
+
+### 8. Keep UI, provider adapters, and vertical meaning separate
+
+Adding a module foundation does not require adding full UI, provider sync, or vertical behavior.
+
+Module foundation may include:
+
+```text
+provider
+config/modules entry
+models
+migrations
+factories
+public actions/services/contracts
+boundary/schema tests
+```
+
+It should not automatically include:
+
+```text
+admin builders
+portal screens
+provider sync engines
+full customer-facing UI
+vertical-specific fields
+vertical-specific workflow decisions
+```
+
+Vertical modules may later interpret or extend universal module records through their own tables, configs, presets, and public seams.
+
+### 9. Update docs and tree after the slice
+
+After adding a module foundation, update only the durable docs that changed:
+
+```text
+docs/module-boundaries.md for ownership/dependency/process changes
+docs/project-organization.md for module classification changes
+docs/TODO.md for remaining implementation backlog
+core-project-tree.txt after regenerating from the repo
+```
+
+Do not turn `module-boundaries.md` into a backlog. Actionable implementation steps belong in `TODO.md`.
+
+### 10. Run focused tests
+
+Run focused tests for the touched module plus boundary/module tests. When Core seams or contact filters are involved, also run Core contact-filter tests.
+
+Example:
+
+```bash
+php artisan test tests/Feature/Modules tests/Feature/Core
+```
+
+Adjust the command to the actual test locations added by the slice.
 
 ## Dependency Direction
 
@@ -427,6 +701,7 @@ Core owns:
 - contact tags
 - contact notes
 - contact imports
+- contact import batches
 - generic contact CRM pages/controllers
 - contact show extension registries
 - module-safe contact-facing extension points
@@ -1482,7 +1757,14 @@ Current supported recipient filter shapes include:
       "type": "imported"
     }
 
-`imported` is a Core-owned contact filter for contacts imported from another system. Current imported detection includes `source = import`, `meta.imported = true`, or `meta.imported_at`.
+    {
+      "type": "import_batch",
+      "import_batch_ids": [1, 2, 3]
+    }
+
+`imported` is a Core-owned contact filter for contacts imported from another system. Current imported detection includes `source = import`, `meta.imported = true`, `meta.imported_at`, or a present `contact_import_batch_id`.
+
+`import_batch` is a Core-owned contact filter for contacts from specific first-class `contact_import_batches` records. Use it when the operator needs to target one exact import file/run instead of all imported contacts.
 
 Recipient filters may also include Broadcast-owned exclusions:
 
@@ -1585,7 +1867,7 @@ A permission invitation Broadcast should:
 - use `scope = permission_invitation`
 - use `dispatch_key = imported_contact_permission_invitation`
 - use `message_type = imported_contact_permission_invitation`
-- use `recipient_filter = {"type":"imported"}`
+- use `recipient_filter = {"type":"imported"}` or a narrower Core-owned imported-contact filter such as `{"type":"import_batch","import_batch_ids":[...]}`
 
 A normal Broadcast must not receive the imported-contact bypass.
 

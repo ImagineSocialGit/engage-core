@@ -9,6 +9,7 @@ use App\Modules\InternalNotifications\Providers\InternalNotificationsModuleServi
 use App\Modules\Messaging\Providers\MessagingModuleServiceProvider;
 use App\Modules\Mortgage\Providers\MortgageModuleServiceProvider;
 use App\Modules\Reporting\Providers\ReportingModuleServiceProvider;
+use App\Modules\Scheduling\Providers\SchedulingModuleServiceProvider;
 use App\Modules\Tasks\Providers\TasksModuleServiceProvider;
 use App\Modules\Webinars\Providers\WebinarsModuleServiceProvider;
 use App\Modules\Workflow\Providers\WorkflowModuleServiceProvider;
@@ -74,6 +75,15 @@ return [
             'depends_on' => ['core'],
             'providers' => [
                 TasksModuleServiceProvider::class,
+            ],
+        ],
+
+
+        'scheduling' => [
+            'name' => 'Scheduling',
+            'depends_on' => ['core'],
+            'providers' => [
+                SchedulingModuleServiceProvider::class,
             ],
         ],
 
