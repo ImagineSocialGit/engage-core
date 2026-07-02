@@ -183,6 +183,10 @@ Current ownership:
 | commerce_orders | Commerce |
 | commerce_order_items | Commerce |
 | commerce_order_events | Commerce |
+| locations | Location |
+| contact_locations | Location |
+| location_areas | Location |
+| location_area_assignments | Location |
 | team_members | InternalNotifications |
 | team_member_notification_preferences | InternalNotifications |
 | contact_workflow_profiles | Workflow |
@@ -279,9 +283,9 @@ Current universal modules include:
 - `Forms`
 - `Documents`
 - `Commerce`
+- `Location`
 
 Planned universal modules include:
-- `Location`
 
 Current vertical modules include:
 
@@ -2340,41 +2344,59 @@ Bad:
 
 ## Location Module
 
-Location is a planned universal module.
+Location is a universal module.
 
-Location should own reusable geographic information when the app needs location-aware behavior that goes beyond simple contact source/import metadata.
+Location owns reusable address, contact-location, geocoding-result, market, region, and service-area capability.
 
-Location may be used for:
+Location exists to make admin/client work easier, not to replace map providers, route optimizers, or GIS products.
 
-- radius filtering
-- service-area matching
-- market/city/region segmentation
-- event/show proximity targeting
-- appointment service-area eligibility
+Location owns:
 
-Location should own, when implemented:
+- locations
+- contact_locations
+- location_areas
+- location_area_assignments
+- normalized address/location records
+- contact-location links
+- geocoding result metadata
+- markets, regions, territories, zones, and service areas
+- optional area assignment records
 
-- contact locations
-- address/city/state/zip/country records
-- latitude/longitude
-- normalized market/region data
-- radius and service-area filtering
+Location does not own:
 
-Location should not be part of Core contacts unless there is a deliberate future decision to make basic address fields Core.
+- Core contacts
+- Scheduling appointment lifecycle
+- Portal accounts
+- Messaging delivery
+- Commerce orders
+- Documents uploads
+- vertical-specific territory strategy
+- route optimization
+- full GIS editing UX
+- provider adapter internals
+
+Do not add latitude, longitude, address, market, or service-area fields directly to `contacts` by default.
 
 Location may depend on:
 
 - Core, for contact-linked locations
-- Integrations, for geocoding or address-normalization providers if added later
+- Integrations later, for geocoding/address-normalization providers behind Location-owned contracts/managers
+
+Future consumers may use Location through public actions/services/contracts/events/read services or a future location-aware contact filter provider when a real workflow needs it.
+
+Do not add the filter seam until a consuming workflow needs it, unless the future seam exposes a schema gap that must be fixed pre-rollout.
 
 Good:
 
-    Broadcasts asks Core/filter seam for contacts matching a Location-provided radius filter
+    Broadcasts asks a future Core/Location filter seam for contacts in a service area
+    Scheduling asks Location whether a contact is inside a service area
     Music targets contacts near an upcoming show through Location-provided filters
 
 Bad:
 
     Core contacts become the permanent home for every location/address use case by default
+    Location owns route optimization or map rendering
+    A vertical module stores general contact addresses in vertical-specific tables by default
 
 ## Mortgage Module
 

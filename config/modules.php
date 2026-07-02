@@ -9,6 +9,7 @@ use App\Modules\FlowRoutes\Providers\FlowRoutesModuleServiceProvider;
 use App\Modules\Forms\Providers\FormsModuleServiceProvider;
 use App\Modules\InboundMessaging\Providers\InboundMessagingModuleServiceProvider;
 use App\Modules\InternalNotifications\Providers\InternalNotificationsModuleServiceProvider;
+use App\Modules\Location\Providers\LocationModuleServiceProvider;
 use App\Modules\Messaging\Providers\MessagingModuleServiceProvider;
 use App\Modules\Mortgage\Providers\MortgageModuleServiceProvider;
 use App\Modules\Portal\Providers\PortalModuleServiceProvider;
@@ -121,6 +122,15 @@ return [
             'depends_on' => ['core'],
             'providers' => [
                 CommerceModuleServiceProvider::class,
+            ],
+        ],
+
+
+        'location' => [
+            'name' => 'Location',
+            'depends_on' => ['core'],
+            'providers' => [
+                LocationModuleServiceProvider::class,
             ],
         ],
 
