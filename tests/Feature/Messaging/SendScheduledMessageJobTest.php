@@ -3,6 +3,7 @@
 namespace Tests\Feature\Messaging;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Messaging\Contracts\Email\EmailMessage;
 use App\Modules\Messaging\Contracts\Sms\SmsMessage;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
@@ -729,6 +730,70 @@ Thanks.",
         $this->assertSame($expectedUrl, $capturedPayload->cta['url']);
         $this->assertSame('Or copy and paste this link into your browser', $capturedPayload->secondaryLink['label']);
         $this->assertSame($expectedUrl, $capturedPayload->secondaryLink['url']);
+    }
+
+    public function test_it_treats_contacts_with_import_batch_as_imported_for_permission_invitations(): void
+    {
+        Event::fake([ScheduledMessageSent::class]);
+
+        $batch = ContactImportBatch::factory()->create();
+
+        $contact = Contact::factory()->create([
+            'email' => 'batch-imported@example.com',
+            'source' => null,
+            'contact_import_batch_id' => $batch->id,
+            'meta' => [],
+        ]);
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'recipient_type' => Contact::class,
+            'recipient_id' => $contact->id,
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'payload_class' => FakeJobEmailPayload::class,
+            'payload' => [
+                'to' => 'batch-imported@example.com',
+            ],
+            'status' => 'pending',
+            'meta' => [
+                'conditions' => [],
+                'consent_policy' => [
+                    'permission_invitation' => [
+                        'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+                        'one_time' => true,
+                    ],
+                ],
+            ],
+        ]);
+
+        $emailService = Mockery::mock(EmailMessagingService::class);
+        $emailService
+            ->shouldReceive('send')
+            ->once()
+            ->with(Mockery::type(FakeJobEmailPayload::class));
+
+        app()->instance(EmailMessagingService::class, $emailService);
+
+        $this->handleScheduledMessage($scheduledMessage);
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame(ScheduledMessage::STATUS_SENT, $scheduledMessage->status);
+
+        $this->assertDatabaseHas('contact_permission_invitations', [
+            'contact_id' => $contact->id,
+            'scheduled_message_id' => $scheduledMessage->id,
+            'channel' => ContactPermissionInvitation::CHANNEL_EMAIL,
+            'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+            'status' => ContactPermissionInvitation::STATUS_SENT,
+        ]);
+
+        Event::assertDispatched(
+            ScheduledMessageSent::class,
+            fn (ScheduledMessageSent $event): bool => $event->scheduledMessage->is($scheduledMessage),
+        );
     }
 
     private function grantConsent(Contact $contact, string $channel, string $purpose): void

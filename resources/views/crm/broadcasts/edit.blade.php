@@ -83,7 +83,7 @@
                                 Already consented / ineligible
                             </dt>
                             <dd class="mt-1 text-2xl font-semibold text-slate-900">
-                                {{ $permissionInvitationPreview['already_consented_count'] }}
+                                {{ $permissionInvitationPreview['ineligible_contacts_count'] }}
                             </dd>
                         </div>
 

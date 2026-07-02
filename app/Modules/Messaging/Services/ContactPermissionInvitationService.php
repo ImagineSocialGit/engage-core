@@ -269,6 +269,10 @@ class ContactPermissionInvitationService
             return true;
         }
 
+        if ($contact->contact_import_batch_id !== null) {
+            return true;
+        }
+
         $meta = is_array($contact->meta) ? $contact->meta : [];
 
         return (bool) ($meta['imported'] ?? false)

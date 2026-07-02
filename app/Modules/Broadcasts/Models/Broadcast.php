@@ -113,12 +113,13 @@ class Broadcast extends Model
             : 'Regular consent-gated one-time broadcast.';
     }
 
-    public function recipientFilterLabel(): string
+        public function recipientFilterLabel(): string
     {
         $recipientFilter = $this->recipient_filter ?? [];
 
         return match ($recipientFilter['type'] ?? 'all') {
             'imported' => 'Imported contacts',
+            'import_batch' => 'Imported contacts from selected batches',
             'tag' => 'Contacts tagged '.implode(', ', $recipientFilter['tags'] ?? []),
             'contact_ids' => 'Selected contacts',
             default => 'All contacts',

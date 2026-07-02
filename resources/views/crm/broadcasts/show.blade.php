@@ -90,7 +90,7 @@
                                 Already consented / ineligible
                             </dt>
                             <dd class="mt-1 text-2xl font-semibold text-amber-950">
-                                {{ $permissionInvitationPreview['already_consented_count'] }}
+                                {{ $permissionInvitationPreview['ineligible_contacts_count'] }}
                             </dd>
                         </div>
 
@@ -299,6 +299,11 @@
                     <div class="mt-4 text-sm text-slate-700">
                         @if(($recipientFilter['type'] ?? 'all') === 'imported')
                             Imported contacts only.
+                        @elseif(($recipientFilter['type'] ?? 'all') === 'import_batch')
+                            Imported contacts from selected batches:
+                            <span class="font-semibold">
+                                {{ implode(', ', $recipientFilter['import_batch_ids'] ?? []) }}
+                            </span>
                         @elseif(($recipientFilter['type'] ?? 'all') === 'tag')
                             Contacts tagged:
                             <span class="font-semibold">

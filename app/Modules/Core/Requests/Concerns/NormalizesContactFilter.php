@@ -13,12 +13,15 @@ trait NormalizesContactFilter
         string $typeField = 'contact_filter_type',
         string $tagField = 'contact_tag',
         string $idsField = 'contact_ids',
+        string $importBatchIdsField = 'import_batch_ids',
     ): array {
         return [
-            $typeField => ['required', 'string', Rule::in(['all', 'tag', 'contact_ids', 'imported'])],
+            $typeField => ['required', 'string', Rule::in(['all', 'tag', 'contact_ids', 'imported', 'import_batch'])],
             $tagField => ['nullable', 'string', 'max:100', 'required_if:'.$typeField.',tag'],
             $idsField => ['nullable', 'array', 'required_if:'.$typeField.',contact_ids'],
             $idsField.'.*' => ['integer', Rule::exists('contacts', 'id')],
+            $importBatchIdsField => ['nullable', 'array', 'required_if:'.$typeField.',import_batch'],
+            $importBatchIdsField.'.*' => ['integer', Rule::exists('contact_import_batches', 'id')],
         ];
     }
 
@@ -31,6 +34,7 @@ trait NormalizesContactFilter
         string $typeField = 'contact_filter_type',
         string $tagField = 'contact_tag',
         string $idsField = 'contact_ids',
+        string $importBatchIdsField = 'import_batch_ids',
     ): array {
         $type = $this->normalizedContactFilterType($validated[$typeField] ?? null);
 
@@ -47,6 +51,10 @@ trait NormalizesContactFilter
             ],
             'imported' => [
                 'type' => 'imported',
+            ],
+            'import_batch' => [
+                'type' => 'import_batch',
+                'import_batch_ids' => $this->normalizedContactFilterIds($validated[$importBatchIdsField] ?? []),
             ],
             default => [
                 'type' => 'all',

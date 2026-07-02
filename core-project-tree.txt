@@ -937,6 +937,7 @@
 │       ├── UserSeeder.php
 │       └── WebinarSeeder.php
 ├── docs
+│   ├── client-readiness-roadmap.md
 │   ├── config-authoring-guide.md
 │   ├── config-templates
 │   │   ├── campaign-presets-template.php
@@ -979,6 +980,7 @@
 │   ├── product-principles.md
 │   ├── project-organization.md
 │   └── TODO.md
+├── engage-core-requested-files.txt
 ├── package.json
 ├── package-lock.json
 ├── phpunit.xml
@@ -1206,4 +1208,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-416 directories, 791 files
+416 directories, 793 files
