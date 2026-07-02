@@ -1,6 +1,6 @@
 # Commerce Module
 
-Commerce is a planned universal module.
+Commerce is a current universal module.
 
 Commerce owns reusable commerce-history and purchase-intelligence capability that can be used by multiple verticals without pushing order, product, or purchase state into Core contacts or vertical-specific tables.
 

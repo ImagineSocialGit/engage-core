@@ -102,6 +102,8 @@ During pre-rollout branch work, replace current branch migrations when a table s
 
 The database can contain reusable capability tables even when a module is not visible to the current client.
 
+Optional schema relationships are allowed when they make a future workflow simpler, but they do not automatically create feature visibility dependencies. For example, `appointments.location_id` may reference a saved Location record while Scheduling still depends only on Core for normal feature visibility. If Location is not enabled or visible, Scheduling can still use its freeform location fields.
+
 ## Module Enabled vs Provider Loaded
 
 There is an important distinction:
@@ -287,6 +289,8 @@ Current universal modules include:
 
 Planned universal modules include:
 
+- None currently documented.
+
 Current vertical modules include:
 
 - `Mortgage`
@@ -318,6 +322,8 @@ Adapters are not modules. They sit behind module-owned contracts/managers/servic
 Use this process when adding a reusable capability module such as Scheduling, Portal, Forms, Documents, Commerce, or Location.
 
 The goal is to establish durable ownership and dependency direction without forcing Core to understand the new module or adding speculative vertical behavior.
+
+Each current universal module with a foundation doc should keep module-specific details in `docs/modules/{module}.md`. This document should keep only durable global rules, ownership freezes, and dependency direction.
 
 ### 1. Classify the module
 
@@ -581,7 +587,7 @@ Accepted dependency direction:
 - InternalNotifications -> Messaging
 - InternalNotifications may conditionally integrate with InboundMessaging through events/listeners
 - Scheduling -> Core
-- Scheduling may optionally use Messaging, Tasks, InternalNotifications, Portal, and Integrations through public services/contracts when those modules are enabled
+- Scheduling may optionally use Messaging, Tasks, InternalNotifications, Portal, Location, and Integrations through public services/contracts when those modules are enabled
 - Portal -> Core
 - Portal may optionally use Messaging for account invitations/notifications
 - Forms -> Core, when submissions are contact-linked
@@ -2082,321 +2088,31 @@ Reporting should avoid becoming a dumping ground for cross-module business logic
 
 Reporting should not mutate another module’s internal state directly.
 
-## Scheduling Module
-
-Scheduling is a current universal module.
-
-Scheduling should own simple, intuitive appointment and booking behavior that can be reused by multiple verticals.
-
-Scheduling may be used for:
-
-- dog training sessions
-- consultations
-- coaching calls
-- music lessons
-- studio bookings
-- internal or customer-facing appointments
-
-Scheduling owns:
-
-- bookable services
-- appointment records
-- appointment attendees
-- availability windows
-- scheduling rules
-- cancellation and rescheduling rules
-- appointment status/lifecycle behavior
-- customer-facing booking pages, if generic enough
-- appointment reminder orchestration through Messaging
-- appointment-related task creation through Tasks
-
-Scheduling should not own:
-
-- pet-specific training goals
-- dog behavior notes
-- music-specific lesson curriculum
-- mortgage-specific consultation outcomes
-- external customer identity/auth
-- file uploads or intake submissions
-
-Scheduling may depend on:
-
-- Core, for contact-linked appointments
-- Messaging, for appointment reminders
-- Tasks, for appointment-related manual work
-- InternalNotifications, for team-facing schedule alerts
-- Portal, for customer self-booking
-- Integrations, for external calendar sync adapters if added later
-
-Vertical modules may add domain-specific metadata or workflows around Scheduling records, but Scheduling should keep the core booking model vertical-neutral.
-
-Good:
-
-    PetServices -> Scheduling appointment for dog training session
-    Music -> Scheduling appointment for lesson or studio booking
-    Scheduling -> Messaging appointment reminder
-
-Bad:
-
-    Scheduling owns dog training plan state
-    Scheduling owns fan purchase history
-    Scheduling stores vertical-specific business rules directly on appointments
-
-## Portal Module
-
-Portal is a current universal module.
-
-Portal should own external/customer account access. It is separate from internal app users.
-
-Portal may be used for:
-
-- customer self-booking
-- customer intake forms
-- document uploads
-- account invitations
-- self-service profile/preferences
-- customer-facing dashboards
-
-Portal owns:
-
-- portal users or customer account identities
-- contact-to-portal-user links
-- portal invitations
-- portal authentication and account lifecycle
-- customer-facing access permissions
-- generic portal dashboard shell
-
-Portal should not own:
-
-- internal team users
-- Contact records
-- appointment scheduling rules
-- form definitions
-- document review rules
-- vertical-specific customer profile fields
-
-Portal may depend on:
-
-- Core, for linking portal users to contacts
-- Messaging, for invitations and customer account notifications
-
-Scheduling, Forms, Documents, Commerce, PetServices, Music, Mortgage, or other modules may expose portal-facing functionality through Portal extension points.
-
-Good:
-
-    Portal owns customer login
-    Scheduling contributes customer booking UI
-    Documents contributes customer upload UI
-
-Bad:
-
-    Core users table doubles as customer portal accounts
-    Portal owns dog profiles or music purchases
-
-## Forms Module
-
-Forms is a current universal module.
-
-Forms should own configurable forms, intake flows, submissions, and review state.
-
-Forms may be used for:
-
-- dog training intake forms
-- mortgage lead/application intake
-- music booking inquiries
-- webinar questionnaires
-- general client questionnaires
-
-Forms owns:
-
-- form definitions
-- form versions
-- form schemas
-- form submissions
-- submission values
-- submission review state
-
-Forms may later support optional mappings from submitted values into Contact or module-specific records through public actions/services.
-
-Forms should not own:
-
-- uploaded document storage/review, except simple form attachments if explicitly designed
-- appointment booking
-- vertical-specific profile meaning
-- contact identity itself
-
-Forms may depend on:
-
-- Core, when submissions are contact-linked
-- Portal, when customers submit forms from portal accounts
-- Messaging, for form-submission notifications or confirmations if needed
-- Tasks, for follow-up review tasks if needed
-
-Vertical modules should own interpretation of vertical-specific answers.
-
-Good:
-
-    Forms stores submitted dog intake form answers
-    PetServices interprets those answers into pet/training data
-
-Bad:
-
-    Forms owns pet behavior models
-    Forms owns mortgage underwriting state
-
-## Documents Module
-
-Documents is a universal module.
-
-Documents should own document requests, uploaded files, document review status, and document-related audit trails. Raw file storage remains infrastructure/provider behavior; Documents owns the domain records around requested or submitted files.
-
-Documents may be used for:
-
-- dog vaccination records
-- waivers and agreements
-- mortgage income/asset documents
-- music contracts or assets
-- general customer uploads
-
-Documents should own, when implemented:
-
-- document requests
-- uploaded document records
-- document categories/types, if generic
-- document review events
-- document status/lifecycle behavior
-- links to related subjects through morphs where appropriate
-
-Documents should not own:
-
-- pet vaccination policy meaning, if domain-specific
-- mortgage underwriting/doc collection state, if domain-specific
-- customer authentication
-- generic task assignment semantics
-
-Documents may depend on:
-
-- Core, when documents are contact-linked
-- Portal, for customer uploads
-- Tasks, for review/follow-up tasks
-- Messaging, for document request/reminder messages
-
-Vertical modules may define vertical-specific document types, requirements, and interpretation rules while Documents owns the reusable upload/request/review capability.
-
-Good:
-
-    Documents owns uploaded vaccination record file
-    PetServices owns whether that vaccination record satisfies dog-training requirements
-
-Bad:
-
-    Documents owns full mortgage loan document underwriting state
-
-## Commerce Module
-
-Commerce is a planned universal module.
-
-Commerce should own normalized purchase/order/product facts that can be used by multiple verticals.
-
-Commerce may be used for:
-
-- Shopify purchase history
-- product-based contact filters
-- fan/customer segmentation
-- post-purchase campaigns
-- purchase-triggered automation events
-
-Commerce should own, when implemented:
-
-- commerce products
-- commerce orders
-- commerce order items
-- customer/contact links
-- external commerce IDs and sync metadata
-- normalized purchase events
-- commerce provider sync state
-
-Commerce should not own:
-
-- Shopify adapter internals directly in module business logic
-- music-specific fan/release strategy
-- pet-service package fulfillment rules, unless modeled generically
-- Contact identity itself
-
-Commerce may depend on:
-
-- Core, for linking purchases to contacts
-- Messaging, Campaigns, or FlowRoutes through public actions/events when purchase behavior triggers communication or automation
-- Integrations, through provider contracts/managers such as Shopify
-
-Shopify should be an adapter behind Commerce, not the module itself.
-
-Good:
-
-    Shopify adapter -> Commerce normalized order records
-    Music -> Commerce read service: has purchased product X
-    Commerce -> AutomationEventRecorded(commerce.order_created)
-
-Bad:
-
-    Music imports Shopify adapter directly for general purchase lookup
-    Core stores purchased product IDs on contacts
-
-## Location Module
-
-Location is a universal module.
-
-Location owns reusable address, contact-location, geocoding-result, market, region, and service-area capability.
-
-Location exists to make admin/client work easier, not to replace map providers, route optimizers, or GIS products.
-
-Location owns:
-
-- locations
-- contact_locations
-- location_areas
-- location_area_assignments
-- normalized address/location records
-- contact-location links
-- geocoding result metadata
-- markets, regions, territories, zones, and service areas
-- optional area assignment records
-
-Location does not own:
-
-- Core contacts
-- Scheduling appointment lifecycle
-- Portal accounts
-- Messaging delivery
-- Commerce orders
-- Documents uploads
-- vertical-specific territory strategy
-- route optimization
-- full GIS editing UX
-- provider adapter internals
-
-Do not add latitude, longitude, address, market, or service-area fields directly to `contacts` by default.
-
-Location may depend on:
-
-- Core, for contact-linked locations
-- Integrations later, for geocoding/address-normalization providers behind Location-owned contracts/managers
-
-Future consumers may use Location through public actions/services/contracts/events/read services or a future location-aware contact filter provider when a real workflow needs it.
-
-Do not add the filter seam until a consuming workflow needs it, unless the future seam exposes a schema gap that must be fixed pre-rollout.
-
-Good:
-
-    Broadcasts asks a future Core/Location filter seam for contacts in a service area
-    Scheduling asks Location whether a contact is inside a service area
-    Music targets contacts near an upcoming show through Location-provided filters
-
-Bad:
-
-    Core contacts become the permanent home for every location/address use case by default
-    Location owns route optimization or map rendering
-    A vertical module stores general contact addresses in vertical-specific tables by default
+## Current universal module docs
+
+Detailed foundation docs for the current universal modules live in:
+
+```text
+docs/modules/scheduling.md
+docs/modules/portal.md
+docs/modules/forms.md
+docs/modules/documents.md
+docs/modules/commerce.md
+docs/modules/location.md
+```
+
+This file should not duplicate those module-specific docs. Keep module-specific schema notes, FOSS feature-shape notes, table notes, deferred work, and open questions in the module docs.
+
+Global rules from those modules that belong here:
+
+- Core stays minimal; do not add appointment, portal, form, document, commerce, or location state to `contacts`.
+- Universal module tables may exist in every install even when the feature is not enabled or visible.
+- Optional schema relationships between universal modules do not automatically change `config/modules.php` feature visibility dependencies.
+- Public seams should be added before a consumer directly mutates another module's internals.
+- Do not add public seams, filters, builders, provider adapters, or vertical behavior until a concrete workflow needs them, unless a schema gap must be fixed pre-rollout.
+- Scheduling can optionally reference saved Location records for appointments, while still using freeform location fields when Location is not enabled.
+- Commerce is purchase-history/intelligence first, not a storefront, checkout, payment, fulfillment, or inventory engine.
+- Location is address/location intelligence first, not GIS, route optimization, or map-provider replacement.
 
 ## Mortgage Module
 
@@ -2676,254 +2392,26 @@ A whitelist should only be used for a deliberate, documented exception.
 
 ## Current Implementation Direction
 
-The current architecture is entering client-rollout schema freeze.
-
-Recommended next implementation order:
-
-1. Phase 17 — Schema/module freeze pass
-2. Phase 18 — Generic automation event seam for external resumes
-3. Phase 18.5 — Automation boundary audit and cleanup
-4. Phase 19 — Default presets
-5. Phase 20 — Tasks and digest verification
-6. Phase 21 — Minimal contact visibility/debug
-7. Phase 22 — Client MVP smoke test
-8. Phase 22.5 — Canonical message config and post-webinar follow-up cleanup
-
-### Phase 17 — Schema/module freeze pass
-
-Confirm Core stays minimal.
-
-Confirm every existing table belongs clearly to one owner:
-
-- Core
-- app-global auth/infrastructure
-- reusable first-party module
-- vertical module
-
-Confirm model namespaces match table ownership.
-
-Confirm `config/modules.php` dependency direction is final enough for rollout.
-
-Confirm `config/presets.php` module selections align with ownership.
-
-Update boundary docs and boundary tests only where they protect final dependency direction.
-
-Do not add product features, admin UI, or migrations unless the audit reveals a clear ownership mistake.
-
-### Phase 18 — Generic automation event seam for external resumes
-
-Add the generic automation event seam:
-
-    AutomationEventData
-    AutomationEventRecorded
-
-Producer modules emit generic automation events after recording their own domain state.
-
-FlowRoutes listens to `AutomationEventRecorded` and maps those events into `FlowRouteExternalEvent` internally.
-
-FlowRoutes may:
-
-- start matching event-triggered routes
-- resume matching existing `event_wait` progress
-
-Webinars emits:
-
-- `webinar.registered`
-- `webinar.cancelled`
-- `webinar.attended`
-- `webinar.missed`
-- `webinar.ended`
-
-Tasks emits:
-
-- `task.completed`
-
-Remove direct producer-specific FlowRoutes listeners where the outcome is an external event wait/resume/start trigger.
-
-Keep Workflow status changes direct because they are FlowRoute lifecycle behavior, not generic producer outcomes.
-
-FlowRoutes should decide reactions through:
-
-- automation-event route triggers
-- `event_wait`
-- `enroll_campaign`
-- `cancel_campaign`
-- `create_task`
-- `change_status`
-- `send_message`
-
-### Phase 18.5 — Automation boundary audit and cleanup
-
-Audit event/listener boundaries before adding MVP presets.
-
-Confirmed direction:
-
-- FlowRoutes listens to `ContactWorkflowStatusChanged` for Workflow lifecycle behavior.
-- FlowRoutes listens to `AutomationEventRecorded` for generic automation-event route starts and external event waits.
-- Tasks emits `task.completed` through `AutomationEventRecorded`.
-- Webinars emits webinar outcomes through `AutomationEventRecorded`.
-- Campaigns may listen to `ScheduledMessageSent` for campaign step progression because that is Campaign-owned lifecycle bookkeeping.
-- InternalNotifications may listen to `InboundMessageReceived` because inbound reply notification is an InternalNotifications feature.
-- Messaging consent and scheduled-message events remain Messaging domain events.
-
-Guardrails:
-
-- Do not add producer-specific listeners to FlowRoutes.
-- Do not make producer modules import FlowRoutes.
-- Do not route ordinary capability calls through automation events unnecessarily.
-- Do not use the automation bus as a replacement for public actions/services.
-
-### Phase 19 — Default presets
-
-Add default preset definitions and sync tooling for:
-
-- ContactStatus presets
-- Task template presets
-- Campaign presets
-- FlowRoute presets
-
-Preset config should create/update DB-owned definitions.
-
-Runtime behavior should remain DB-driven.
-
-Preset config should not become runtime business logic.
-
-Default presets should stay small, understandable, and client-safe.
-
-The normal setup path should use the app-level preset sync command:
-
-    php artisan presets:sync
-
-That command should prompt for or accept a preset package key, inspect the selected preset, and run the required module preset syncs in dependency-safe order.
-
-Current dependency-safe order:
-
-1. ContactStatus presets
-2. Task template presets
-3. Campaign presets
-4. FlowRoute presets
-
-Module-specific sync commands may remain available as lower-level operator/debugging tools, but new project setup should use `presets:sync`.
-
-Do not add large workflow builders or admin editors in this phase.
-
-### Phase 20 — Task UX and digest verification
-
-Confirm manually-created and FlowRoutes-created tasks behave correctly.
-
-Confirm Tasks remain standalone-capable.
-
-Confirm tasks may be contact-related but are not contact-required.
-
-Confirm assigned and unassigned tasks are valid.
-
-Confirm `assigned_to` and `responsible_party` remain separate concepts.
-
-Confirm `responsible_party` is displayed clearly enough for mortgage/manual dependency tracking.
-
-Confirm task templates are DB-owned definitions only and preset sync does not create live tasks.
-
-Confirm FlowRoutes-created tasks use `CreateTaskAction`.
-
-Confirm `task.completed` is emitted through `AutomationEventRecorded`, not direct FlowRoutes listeners.
-
-Confirm daily and weekly digests are assignment-driven.
-
-Confirm task digest and assignment notification behavior is gated behind InternalNotifications.
-
-Confirm reusable task components live under the Tasks component namespace and can be attached to contact pages without becoming contact-specific.
-
-### Phase 21 — Minimal contact visibility/debug
-
-Add read-only contact visibility for:
-
-- current status/workflow profile
-- active/recent FlowRoute progress
-- Campaign enrollments
-- scheduled messages
-- tasks
-
-Do not add builders or editors.
-
-### Phase 22 — Client MVP smoke test
-
-Verify the real MVP path:
-
-1. Register for webinar.
-2. Simulate provider attendance or missed outcome.
-3. Confirm Webinars records attendance/playback.
-4. Confirm webinar-owned transactional post-event follow-ups are scheduled/sent.
-5. Confirm Webinars emits automation events.
-6. Confirm FlowRoutes starts event-triggered routes from `AutomationEventRecorded`.
-7. Confirm Campaign enrollment/cancellation.
-8. Confirm scheduled campaign messages.
-9. Confirm task creation/digest when configured.
-
-### Phase 22.5 — Canonical message config and post-webinar follow-up cleanup
-
-Current cleanup target:
-
-- make message configs use one consistent canonical definition shape
-- keep transactional webinar follow-ups separate from marketing nurture campaigns
-- make post-webinar transactional follow-ups dispatch through Messaging definitions
-- make campaign steps resolve Messaging templates by campaign key and step number
-- keep CampaignStep message template references in first-class `channel`, `purpose`, and `scope` fields, not `meta.message`
-- keep Campaign presets focused on journey orchestration, not reusable message copy
-- prevent Campaign presets from defining or overriding payloads
-- keep default webinar copy vertical-neutral
-- keep mortgage-specific copy in mortgage-specific scopes such as `mortgage_homebuyer_nurture`
-- grant/check consent using the correct purpose/scope pair
-
-Purpose/scope decisions:
-
-    transactional:webinar
-        confirmations
-        reminders
-        live join reminders
-        replay/recording follow-ups
-
-    marketing:webinar_nurture
-        attended nurture campaign
-        missed nurture campaign
-        long-term post-webinar nurture
-
-Implementation direction:
-
-1. Webinars post-event action should dispatch transactional follow-ups with:
-       dispatch_key = webinar_ended
-       purpose = transactional
-       scope = webinar
-
-2. Webinars should emit automation events after recording domain state:
-       webinar.attended
-       webinar.missed
-       webinar.ended
-
-3. FlowRoutes should start event-triggered routes from contact-scoped automation events:
-       webinar.attended -> webinar_attended_nurture campaign
-       webinar.missed -> webinar_missed_nurture campaign
-
-4. Campaigns should schedule nurture steps through Messaging public actions.
-
-5. Campaign message templates should resolve from Messaging using:
-       messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
-
-6. Campaign preset steps should store template references as first-class fields:
-       channel
-       purpose
-       scope
-
-   New configs should not use `meta.message` for CampaignStep template references.
-
-7. Campaign step timing may be authored in days/hours/minutes but must normalize before Messaging dispatch.
-
-8. Messaging should own the canonical delivery template shape, payload/copy, and delivery gating.
-
-9. Registration consent should clearly distinguish:
-       transactional:webinar
-       marketing:webinar_nurture
-
-10. Mortgage-specific long-term nurture should use:
-       marketing:mortgage_homebuyer_nurture
-
-Do not collapse `webinar_nurture` into `webinar` unless the product decision is that all webinar-related marketing uses a single broad consent scope.
+The current architecture has completed the universal schema foundation run for:
+
+```text
+Scheduling
+Portal
+Forms
+Documents
+Commerce
+Location
+```
+
+The next stage should keep the platform moving toward client rollout without adding speculative module internals.
+
+Recommended direction:
+
+1. Keep module-specific docs in `docs/modules/{module}.md` and keep this file focused on global architecture.
+2. Keep config templates aligned with the canonical Messaging/Campaign/FlowRoute/Preset shapes.
+3. Add public seams only when a concrete consumer/workflow needs them.
+4. Add contact filters for Commerce or Location only when Broadcasts, Campaigns, Reporting, or another consuming surface needs them.
+5. Return to the Broadcasts/Campaigns/Messaging client MVP path after docs/templates are stable.
+6. Regenerate `core-project-tree.txt` from the repo after each structural batch.
+
+Do not use this section as a backlog. Actionable items belong in `TODO.md`.

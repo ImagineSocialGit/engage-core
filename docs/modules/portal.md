@@ -1,6 +1,6 @@
 # Portal Module
 
-Portal is a planned universal module.
+Portal is a current universal module.
 
 Portal owns reusable external/customer account access that can be used by multiple verticals without pushing portal account state into Core contacts or reusing internal app users as customer accounts.
 

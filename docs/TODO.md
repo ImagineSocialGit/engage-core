@@ -235,31 +235,11 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - FlowRoutes should advance when a related route task is completed.
   - It should ignore unrelated task changes.
 
-### Universal module planning
+### Universal module foundations
 
-- [ ] Plan the Scheduling universal module.
-  - Keep Scheduling vertical-neutral.
-  - Support simple appointment/session/booking behavior.
-  - Dog training sessions, consultations, lessons, coaching, and studio bookings should all fit the generic model.
-  - Scheduling may use Messaging for reminders, Tasks for appointment-related follow-up, Portal for customer self-booking, and integrations for external calendar sync later.
-  - PetServices, Music, Mortgage, or other verticals should own domain-specific meaning around scheduled appointments.
-
-- [ ] Plan the Portal universal module.
-  - Keep Portal separate from internal app users.
-  - Own external/customer account identity, contact links, account invitations, portal auth, and generic portal dashboard/access behavior.
-  - Scheduling, Forms, Documents, Commerce, and vertical modules may contribute portal-facing surfaces later.
-  - Do not push portal account state into Core contacts.
-
-- [ ] Plan the Commerce universal module.
-  - Own normalized products, orders, order items, customer/contact links, external IDs, sync metadata, and purchase events.
-  - Shopify should be an adapter behind Commerce, not a Music-owned provider dependency.
-  - Music can consume Commerce to answer questions like whether a contact bought a specific product.
-  - Do not store purchase history directly on Core contacts.
-
-- [ ] Revisit Location as a universal module when location-aware behavior becomes necessary.
-  - Own contact locations, city/state/zip/country, latitude/longitude, markets/regions, radius filters, and service-area behavior.
-  - Useful for music show-radius targeting, dog trainer service areas, scheduling eligibility, and future local campaigns.
-  - Do not push broad address/location behavior into Core by default.
+- [ ] Add public seams for Scheduling, Portal, Forms, Documents, Commerce, or Location only when a concrete consumer/workflow needs them.
+- [ ] Add Commerce/Location contact filter providers only when Broadcasts, Campaigns, Reporting, or another consuming surface actually needs purchase/location targeting.
+- [ ] Keep newly founded universal modules out of Core; use module-owned tables and future public seams instead.
 
 ### Client self-serve readiness
 
@@ -294,7 +274,7 @@ These are repeatable checklists. Run the relevant checklist after a production s
 
 ### Documentation maintenance
 
-- [ ] Regenerate `core-project-tree.txt` from the repo after this branch settles.
+- [ ] Regenerate `core-project-tree.txt` from the repo after structural module/file changes.
   - Do not hand-maintain it.
   - Include new Messaging permission invitation controller/request/model/service/views/tests/migrations.
 

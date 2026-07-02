@@ -1,6 +1,6 @@
 # Documents Module
 
-Documents is a planned universal module.
+Documents is a current universal module.
 
 Documents owns reusable document request, upload, review, and lifecycle capability that can be used by multiple verticals without pushing document state into Core contacts, Forms submissions, Portal accounts, or vertical-specific tables.
 

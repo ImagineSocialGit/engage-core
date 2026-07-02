@@ -101,17 +101,16 @@ Universal modules are reusable capability modules. They may be disabled for many
 | Broadcasts | One-time/batch sends and recipient bookkeeping. |
 | Webinars | Webinar series, webinars, registrations, waitlists, provider behavior, attendance, replay/follow-up orchestration. |
 | Reporting | Reporting queries, dashboards, data objects, and report surfaces. |
-| Scheduling | Appointments, availability, booking/reschedule/cancel behavior, appointment reminders. |
+| Scheduling | Appointments, availability, optional saved appointment places, booking/reschedule/cancel behavior, appointment reminders. |
 | Portal | External/customer accounts, portal auth, account invitations, contact-account links, customer-facing shell. |
 | Forms | Form definitions, versions, schemas, submissions, submission review state. |
 | Documents | Document requests, uploaded document records, review events, document lifecycle state. |
 | Commerce | Commerce customers, products, orders, order items, order events, provider-synced purchase history. |
-| Location | Contact locations, addresses, geocoding-derived coordinates, markets/regions, radius/service-area filters. |
+| Location | Contact locations, reusable saved places, addresses, geocoding-derived coordinates, markets/regions, radius/service-area filters. |
 
 ### Planned universal modules
 
-| Module | Responsibility | Example uses |
-| --- | --- | --- |
+None currently documented.
 
 Universal modules should expose public actions/services/contracts/events where other modules need them. Other modules should not write directly to their internals when a public seam exists.
 
@@ -131,7 +130,7 @@ Vertical modules should not push domain-specific fields into Core contacts.
 
 | Module | Responsibility | Universal modules it likely consumes |
 | --- | --- | --- |
-| PetServices | Pets/dogs, pet profiles, training goals, training programs, behavior notes, pet-service-specific rules/workflows. | Scheduling, Portal, Forms, Documents, Tasks, Messaging, Campaigns, Broadcasts, FlowRoutes, Reporting. |
+| PetServices | Pets/dogs, pet profiles, training goals, training programs, behavior notes, pet-service-specific rules/workflows. | Scheduling, Portal, Forms, Documents, Tasks, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Reporting. |
 | Music | Music-specific fan/customer meaning, release/fan strategy, music product interest categories, show/release logic, music-specific segmentation. | Commerce, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Scheduling, Portal, Reporting. |
 
 ## Integrations / Adapters

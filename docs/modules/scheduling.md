@@ -1,6 +1,6 @@
 # Scheduling Module
 
-Scheduling is a planned universal module.
+Scheduling is a current universal module.
 
 Scheduling owns reusable appointment and booking capability that can be used by multiple verticals without pushing appointment state into Core or vertical-specific tables.
 
@@ -41,7 +41,7 @@ Scheduling should not become a generic calendar-builder product for clients to m
 Scheduling should answer:
 
 ```text
-What can be booked, when can it be booked, who is attending, and what is the lifecycle state of the appointment?
+What can be booked, when can it be booked, who is attending, where does it happen when that matters, and what is the lifecycle state of the appointment?
 ```
 
 Scheduling should stay vertical-neutral.
@@ -99,6 +99,7 @@ appointment-related domain events
 generic booking-page orchestration, if generic enough
 appointment reminder orchestration requests
 appointment-related task orchestration requests
+optional saved-location references on appointments
 ```
 
 Scheduling should not own message delivery, task lifecycle, portal accounts, form definitions, commerce/order records, geocoding, or vertical-specific meaning.
@@ -148,7 +149,7 @@ Tasks -> manual follow-up work generated from appointment outcomes
 Portal -> customer self-booking and customer-facing schedule views
 Forms -> intake questions/submissions attached to appointment flows
 Commerce -> paid booking/order/payment records
-Location -> service-area, venue, or radius eligibility
+Location -> optional saved appointment places, service-area checks, venue reuse, or radius eligibility
 Integrations -> external calendar/provider adapters behind Scheduling-owned contracts
 ```
 
@@ -315,6 +316,10 @@ Scheduling products commonly include calendar sync and locations.
 
 External calendar adapters belong under `app/Integrations` behind Scheduling-owned contracts/managers. Reusable service-area/radius/location behavior belongs to Location.
 
+Appointments may optionally reference a saved `Location` record for reusable offices, venues, service addresses, or other normalized places. That relationship is optional. Scheduling still works with `location_type` and `location_details` when Location is not enabled or when the appointment uses a one-off, virtual, phone, or freeform location.
+
+This is a schema relationship, not a feature-visibility dependency. Scheduling should not require the Location module to be explicitly enabled for normal appointment scheduling.
+
 ## Schema foundation
 
 The first Scheduling foundation should add these tables:
@@ -418,6 +423,7 @@ Important fields:
 ```text
 bookable_service_id
 contact_id
+location_id nullable
 primary_attendee_type / primary_attendee_id
 rescheduled_from_id
 status
@@ -439,6 +445,8 @@ external_url
 created_by_type / created_by_id
 meta
 ```
+
+`location_id` is optional and points to a saved Location-owned place when available. `location_type` and `location_details` remain the freeform/fallback path for one-off, virtual, phone, customer-address, provider-supplied, or not-yet-normalized locations.
 
 Cancellation and rescheduling stay on `appointments` for the first foundation slice. A separate audit table can be added later only if lifecycle audit requirements justify it.
 

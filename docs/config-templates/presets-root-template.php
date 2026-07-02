@@ -23,6 +23,9 @@ return [
     |
     | Campaigns must sync before FlowRoutes because FlowRoutes may reference
     | campaign_key values in enroll_campaign points.
+    |
+    | Modules with no preset sync, such as Commerce or Location foundations,
+    | should not appear in sync_order until they own DB-backed preset sync.
     */
 
     'default_package' => env('PRESET_PACKAGE', 'webinar_default'),

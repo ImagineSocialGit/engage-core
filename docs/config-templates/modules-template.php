@@ -2,10 +2,14 @@
 
 use App\Modules\Broadcasts\Providers\BroadcastsModuleServiceProvider;
 use App\Modules\Campaigns\Providers\CampaignsModuleServiceProvider;
+use App\Modules\Commerce\Providers\CommerceModuleServiceProvider;
 use App\Modules\Core\Providers\CoreModuleServiceProvider;
+use App\Modules\Documents\Providers\DocumentsModuleServiceProvider;
 use App\Modules\FlowRoutes\Providers\FlowRoutesModuleServiceProvider;
+use App\Modules\Forms\Providers\FormsModuleServiceProvider;
 use App\Modules\InboundMessaging\Providers\InboundMessagingModuleServiceProvider;
 use App\Modules\InternalNotifications\Providers\InternalNotificationsModuleServiceProvider;
+use App\Modules\Location\Providers\LocationModuleServiceProvider;
 use App\Modules\Messaging\Providers\MessagingModuleServiceProvider;
 use App\Modules\Mortgage\Providers\MortgageModuleServiceProvider;
 use App\Modules\Portal\Providers\PortalModuleServiceProvider;
@@ -31,6 +35,11 @@ return [
     |
     | enabled controls explicit feature visibility. Providers may load as
     | dependencies without making a module visible.
+    |
+    | Shared schema may include optional relationships between universal
+    | modules. That does not automatically make the target module visible.
+    | Example: Scheduling can optionally reference saved Location records while
+    | Scheduling still depends only on Core for feature visibility.
     |
     | Keep dependency direction one-way and intentional. Do not enable vertical
     | modules unless that vertical is installed.
@@ -88,6 +97,13 @@ return [
             ],
         ],
 
+        'location' => [
+            'name' => 'Location',
+            'depends_on' => ['core'],
+            'providers' => [
+                LocationModuleServiceProvider::class,
+            ],
+        ],
 
         'scheduling' => [
             'name' => 'Scheduling',
@@ -102,6 +118,30 @@ return [
             'depends_on' => ['core'],
             'providers' => [
                 PortalModuleServiceProvider::class,
+            ],
+        ],
+
+        'forms' => [
+            'name' => 'Forms',
+            'depends_on' => ['core'],
+            'providers' => [
+                FormsModuleServiceProvider::class,
+            ],
+        ],
+
+        'documents' => [
+            'name' => 'Documents',
+            'depends_on' => ['core'],
+            'providers' => [
+                DocumentsModuleServiceProvider::class,
+            ],
+        ],
+
+        'commerce' => [
+            'name' => 'Commerce',
+            'depends_on' => ['core'],
+            'providers' => [
+                CommerceModuleServiceProvider::class,
             ],
         ],
 

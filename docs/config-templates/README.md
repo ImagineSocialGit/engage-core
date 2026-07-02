@@ -20,6 +20,30 @@ Use these rules when converting a client request into config:
 13. SMS capabilities may exist in code even when SMS is hidden in client/admin UI. UI exposure for SMS options should be controlled by config.
 14. Normal Broadcasts require normal Messaging consent. Imported-contact opt-in invitations are a distinct one-time email flow, not a general Broadcast consent bypass.
 15. While a branch is still pre-rollout, replace current branch migrations instead of adding modify-table migrations. After rollout, use normal append-only migrations.
+16. Module-specific behavior belongs in the owning module doc. Config templates should not invent unsupported module behavior.
+17. Commerce and Location should be used for client/admin convenience and integrations, not as storefront/GIS replacements.
+
+
+## Config template files
+
+Current reference templates:
+
+```text
+TOKEN_REFERENCE.md
+campaign-presets-template.php
+client-request-intake-template.md
+contact-status-presets-template.php
+flow-routes-template.php
+messaging-email-template.php
+messaging-sms-template.php
+modules-template.php
+permission-invitations-template.php
+presets-root-template.php
+task-presets-template.php
+webinar-post-event-template.php
+```
+
+`permission-invitations-template.php` is the config shape for `config/messaging/permission_invitations.php`. The broader feature/process reference remains `docs/permission-invitations.md`.
 
 ## Preferred purpose/scope pairs
 
@@ -160,3 +184,9 @@ Rules:
 - A normal marketing Broadcast to imported contacts still requires normal Messaging consent.
 
 Token references are documented in `TOKEN_REFERENCE.md`.
+
+## Module and feature scope
+
+Config templates may reference current universal modules, but they should not imply those modules are enabled by default. `config/modules.php` controls feature visibility. Shared schema may exist even when a module is not visible to the client.
+
+When a client asks for purchase-history targeting, service-area targeting, document collection, portal upload, or form/submission behavior, first check the owning module doc before adding config keys or templates.

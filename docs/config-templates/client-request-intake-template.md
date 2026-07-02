@@ -11,7 +11,7 @@ Rules:
 - Integrations live under app/Integrations.
 - Use lead/leads, not borrower/borrowers, in CRM/client-facing text unless explicitly told otherwise.
 - Do not preserve old behavior by default.
-- Do not invent columns, runtime features, or undocumented tokens.
+- Do not invent columns, runtime features, unsupported module behavior, or undocumented tokens.
 - Messaging configs own reusable message copy and delivery templates.
 - Campaign presets own journey/order/timing/template references.
 - Campaign presets do not own payload/copy and do not override payload/copy.
@@ -26,7 +26,7 @@ Rules:
 - Email first. SMS may mirror after email passes, but SMS visibility in UI should be config-toggleable per client/surface.
 - Normal Broadcasts require normal Messaging consent.
 - Imported-contact opt-in invitations are a distinct one-time email flow, not a normal Broadcast bypass.
-- Permission invitation copy/style lives in config/messaging/permission_invitations.php or a client override.
+- Permission invitation copy/style lives in config/messaging/permission_invitations.php or a client override, using permission-invitations-template.php as the config shape.
 - Permission invitation public pages may offer email, SMS, or both according to config/client requirements.
 - Use purpose/scope pairs:
   - transactional:webinar for confirmations/reminders/replay follow-ups.
@@ -42,13 +42,15 @@ Rules:
   - broadcast_send for regular one-time Broadcast sends.
   - imported_contact_permission_invitation for the one-time imported-contact opt-in invitation.
 - Do not use marketing_message_sent for new configs.
+- Commerce/Location requests should improve admin/client convenience; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
+- If a request needs module behavior beyond config, identify the owning module and list required code/seam work separately.
 
 Attached reference templates:
 - README.md
 - TOKEN_REFERENCE.md
 - messaging-email-template.php
 - messaging-sms-template.php
-- permission_invitations.php
+- permission-invitations-template.php
 - campaign-presets-template.php
 - contact-status-presets-template.php
 - task-presets-template.php
@@ -62,4 +64,5 @@ Client request:
 
 Return complete config files only, using the same structural shapes as the templates.
 List any recommended new keys/tokens separately.
+If the request requires unsupported module behavior, list the needed module/seam work separately instead of inventing config keys.
 ```

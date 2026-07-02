@@ -26,6 +26,8 @@ Primary references:
 12. Normal Broadcasts require normal Messaging consent. Do not use Broadcasts as a general imported-contact consent bypass.
 13. Imported-contact opt-in invitations are a distinct one-time Messaging flow with configurable public copy/style.
 14. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
+15. Module docs are the source of truth for module ownership and client-facing scope. Configs should not create a module feature that the owning module does not support.
+16. Commerce and Location configs should support admin convenience and integrations; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
 
 ## Before creating a config
 
@@ -556,6 +558,12 @@ Use:
 ```text
 config/messaging/permission_invitations.php
 client/{client-key}/config/messaging/permission_invitations.php
+```
+
+Template reference:
+
+```text
+docs/config-templates/permission-invitations-template.php
 ```
 
 This config owns public preference-page copy, email CTA labels, accepted consent scopes, and Tailwind-style class strings for the public page.

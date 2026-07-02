@@ -127,6 +127,7 @@ geocoding result storage
 service area, market, region, territory, and zone definitions
 radius/area membership support
 location read/query services
+optional saved-place support for modules that have a first-class location relationship
 geocoding provider contracts/managers
 location-aware contact filter provider, when a consuming surface needs it
 ```
@@ -207,6 +208,8 @@ Music targets contacts near an upcoming show.
 PetServices checks whether a dog trainer serves the customer's location.
 Reporting summarizes contacts/orders by market or region.
 ```
+
+Scheduling appointments may optionally reference saved Location records for reusable places. This does not make Location required for Scheduling feature visibility; Scheduling can still use freeform `location_type` and `location_details` when Location is not enabled or when a saved place is unnecessary.
 
 ## Public seams to add later
 
@@ -443,7 +446,7 @@ Deferred work:
 geocoding provider adapters
 radius queries
 service-area eligibility service
-Scheduling/location integration
+Scheduling service-area eligibility beyond optional saved appointment places
 Broadcast/Campaign location filters
 Portal location/profile screens
 vertical-specific location interpretation
