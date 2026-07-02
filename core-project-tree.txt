@@ -390,6 +390,21 @@
 │   │   │   │   └── ReportingModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   └── Support
+│   │   ├── Scheduling
+│   │   │   ├── Actions
+│   │   │   ├── Contracts
+│   │   │   ├── Controllers
+│   │   │   ├── Data
+│   │   │   ├── Models
+│   │   │   │   ├── AppointmentAttendee.php
+│   │   │   │   ├── Appointment.php
+│   │   │   │   ├── BookableService.php
+│   │   │   │   └── SchedulingAvailabilityWindow.php
+│   │   │   ├── Providers
+│   │   │   │   └── SchedulingModuleServiceProvider.php
+│   │   │   ├── Requests
+│   │   │   ├── Services
+│   │   │   └── Support
 │   │   ├── Tasks
 │   │   │   ├── Actions
 │   │   │   │   ├── BuildTaskDigestsAction.php
@@ -739,11 +754,15 @@
 ├── database
 │   ├── database.sqlite
 │   ├── factories
+│   │   ├── AppointmentAttendeeFactory.php
+│   │   ├── AppointmentFactory.php
+│   │   ├── BookableServiceFactory.php
 │   │   ├── BroadcastFactory.php
 │   │   ├── BroadcastRecipientFactory.php
 │   │   ├── ContactFactory.php
 │   │   ├── ContactImportBatchFactory.php
 │   │   ├── ScheduledMessageFactory.php
+│   │   ├── SchedulingAvailabilityWindowFactory.php
 │   │   ├── TaskFactory.php
 │   │   ├── TaskTemplateFactory.php
 │   │   ├── TeamMemberFactory.php
@@ -763,6 +782,10 @@
 │   │   ├── 2026_04_15_195849_create_contact_import_batches_table.php
 │   │   ├── 2026_04_15_195850_create_contacts_table.php
 │   │   ├── 2026_04_15_195851_create_contact_tags_table.php
+│   │   ├── 2026_04_15_195860_create_bookable_services_table.php
+│   │   ├── 2026_04_15_195861_create_scheduling_availability_windows_table.php
+│   │   ├── 2026_04_15_195862_create_appointments_table.php
+│   │   ├── 2026_04_15_195863_create_appointment_attendees_table.php
 │   │   ├── 2026_04_15_195900_create_contact_workflow_profiles_table.php
 │   │   ├── 2026_04_15_203500_create_flow_routes_table.php
 │   │   ├── 2026_04_15_203510_create_points_table.php
@@ -812,6 +835,8 @@
 │   │   ├── TOKEN_REFERENCE.md
 │   │   └── webinar-post-event-template.php
 │   ├── module-boundaries.md
+│   ├── modules
+│   │   └── scheduling.md
 │   ├── project-organization.md
 │   └── TODO.md
 ├── package.json
@@ -1009,6 +1034,8 @@
 │   │   │   ├── ModuleManagerTest.php
 │   │   │   ├── ModuleNavigationTest.php
 │   │   │   └── ModuleRouteMiddlewareTest.php
+│   │   ├── Scheduling
+│   │   │   └── SchedulingFoundationTest.php
 │   │   ├── Tasks
 │   │   │   └── RuntimeTaskBehaviorTest.php
 │   │   ├── Webhooks
@@ -1029,4 +1056,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-349 directories, 681 files
+361 directories, 696 files

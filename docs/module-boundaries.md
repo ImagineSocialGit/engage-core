@@ -276,37 +276,6 @@ Do not create a universal module when the behavior is only vertical-specific. Ve
 
 ### 2. Decide ownership before schema
 
-Before proposing schema, review mature FOSS or open-source-adjacent products in the same category and extract the common durable capabilities they support.
-
-Use those products as feature-shape references, not implementation sources.
-
-For each common capability, decide whether Engage Core should:
-
-```text
-- own it in the new module
-- consume another Engage Core module for it
-- expose it later through a public seam
-- defer it as UI/provider/vertical behavior
-```
-
-Examples:
-
-```text
-Scheduling products commonly include reminders and notifications.
-Scheduling should orchestrate appointment reminders, but Messaging/InternalNotifications should deliver them.
-
-Scheduling products commonly include intake questions.
-Scheduling may reference intake needs, but Forms should own form definitions and submissions.
-
-Scheduling products commonly include paid bookings.
-Scheduling may reference booking/payment state later, but Commerce should own products, orders, and purchase/payment records.
-
-Scheduling products commonly include calendar sync.
-Scheduling owns appointment state, but external calendar integrations belong behind Scheduling-owned adapter contracts under app/Integrations.
-```
-
-This scan should happen before adding tables so baseline migrations are roomy enough for common durable features without pushing notification, form, payment, portal, location, or vertical behavior into the wrong module.
-
 Before adding migrations, write down:
 
 ```text
@@ -941,6 +910,44 @@ That is intentional for external contact messaging consent.
 Internal team notification preferences belong to InternalNotifications, not Messaging.
 
 Generic recipient support for scheduled delivery lives in `scheduled_messages.recipient_type` / `scheduled_messages.recipient_id`.
+
+Scheduled message domain context lives in `scheduled_messages.context_type` / `scheduled_messages.context_id`.
+
+Meaning:
+
+```text
+recipient_type / recipient_id
+    Who receives the scheduled message.
+
+context_type / context_id
+    What domain record the scheduled message is about or attached to.
+```
+
+Examples:
+
+```text
+Appointment reminder
+    recipient = Contact
+    context = Appointment
+
+Document request reminder
+    recipient = Contact
+    context = DocumentRequest
+
+Webinar reminder
+    recipient = Contact
+    context = WebinarRegistration or Webinar
+
+Campaign step message
+    recipient = Contact
+    context = CampaignEnrollment
+
+Task digest
+    recipient = TeamMember
+    context = TaskDigest or null batch context
+```
+
+Do not add separate `subject_type` / `subject_id` columns to `scheduled_messages` unless there is a deliberate future decision to replace the existing `context` morph. The existing `context` morph is the canonical scheduled-message "about this record" relationship.
 
 Messaging may schedule messages for non-Contact recipients through recipient payload/gate extension points, but it should not own those recipient models or their preferences.
 

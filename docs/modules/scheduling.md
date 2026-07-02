@@ -211,10 +211,32 @@ Scheduling products commonly include reminders and notifications.
 
 In Engage Core, Scheduling should orchestrate appointment reminder intent, but Messaging and InternalNotifications should deliver messages or team alerts.
 
+When Scheduling schedules a customer-facing appointment message through Messaging, the scheduled message should use Messaging's existing recipient/context split:
+
+```text
+recipient_type / recipient_id
+    Who receives the scheduled message.
+
+context_type / context_id
+    What domain record the scheduled message is about.
+```
+
+Example:
+
+```text
+Appointment reminder
+    recipient = Contact
+    context = Appointment
+```
+
+Scheduling should not ask Messaging for new `subject_type` / `subject_id` columns. `scheduled_messages.context_type` / `scheduled_messages.context_id` is already the canonical scheduled-message "about this record" morph.
+
 Good:
 
 ```text
 Scheduling -> Messaging public action/service for customer reminder scheduling
+ScheduledMessage recipient = Contact
+ScheduledMessage context = Appointment
 Scheduling -> InternalNotifications public action/service for team alerts
 ```
 
@@ -223,6 +245,7 @@ Bad:
 ```text
 Scheduling owns message consent
 Scheduling owns scheduled_messages
+Scheduling adds duplicate subject_type / subject_id fields to Messaging
 Scheduling owns team notification preferences
 ```
 
