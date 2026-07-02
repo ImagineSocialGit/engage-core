@@ -6,6 +6,7 @@ use App\Modules\Broadcasts\Actions\ScheduleBroadcastAction;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Core\Models\ContactTag;
 use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
@@ -664,6 +665,87 @@ class ScheduleBroadcastActionTest extends TestCase
         $this->assertDatabaseMissing('broadcast_recipients', [
             'broadcast_id' => $broadcast->id,
             'contact_id' => $previouslySent->id,
+        ]);
+    }
+
+    public function test_it_schedules_a_permission_invitation_broadcast_to_a_specific_import_batch(): void
+    {
+        $targetBatch = ContactImportBatch::factory()->create();
+        $otherBatch = ContactImportBatch::factory()->create();
+
+        $eligible = Contact::factory()->create([
+            'email' => 'eligible@example.com',
+            'source' => 'import',
+            'contact_import_batch_id' => $targetBatch->id,
+        ]);
+
+        $alreadyConsented = Contact::factory()->create([
+            'email' => 'consented@example.com',
+            'source' => 'import',
+            'contact_import_batch_id' => $targetBatch->id,
+        ]);
+
+        Contact::factory()->create([
+            'email' => 'other-batch@example.com',
+            'source' => 'import',
+            'contact_import_batch_id' => $otherBatch->id,
+        ]);
+
+        MessageConsent::query()->create([
+            'contact_id' => $alreadyConsented->id,
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'consented_at' => now(),
+            'source' => 'test',
+        ]);
+
+        $broadcast = Broadcast::factory()->create([
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'dispatch_key' => Broadcast::PERMISSION_INVITATION_DISPATCH_KEY,
+            'message_type' => Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'payload_class' => EmailPayload::class,
+            'recipient_filter' => [
+                'type' => 'import_batch',
+                'import_batch_ids' => [$targetBatch->id],
+            ],
+        ]);
+
+        $this->mock(DispatchMessageAction::class)
+            ->shouldReceive('handle')
+            ->once()
+            ->andReturnUsing(function (...$arguments) use ($eligible): array {
+                $recipient = $arguments['recipient'] ?? $arguments[0];
+                $broadcast = $arguments['context'] ?? $arguments[6];
+
+                $this->assertSame($eligible->id, $recipient->id);
+
+                return [
+                    ScheduledMessage::factory()->create([
+                        'recipient_type' => $recipient->getMorphClass(),
+                        'recipient_id' => $recipient->getKey(),
+                        'context_type' => $broadcast->getMorphClass(),
+                        'context_id' => $broadcast->getKey(),
+                    ]),
+                ];
+            });
+
+        $scheduledBroadcast = app(ScheduleBroadcastAction::class)->handle($broadcast);
+
+        $this->assertSame(1, $scheduledBroadcast->recipient_count);
+        $this->assertSame(1, $scheduledBroadcast->scheduled_count);
+
+        $this->assertDatabaseHas('broadcast_recipients', [
+            'broadcast_id' => $broadcast->id,
+            'contact_id' => $eligible->id,
+            'status' => BroadcastRecipient::STATUS_SCHEDULED,
+        ]);
+
+        $this->assertDatabaseMissing('broadcast_recipients', [
+            'broadcast_id' => $broadcast->id,
+            'contact_id' => $alreadyConsented->id,
         ]);
     }
 }

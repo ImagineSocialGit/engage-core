@@ -5,6 +5,7 @@ namespace App\Modules\Core\Models;
 use Database\Factories\ContactFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Contact extends Model
@@ -24,6 +25,7 @@ class Contact extends Model
         'phone',
         'source',
         'subsource',
+        'contact_import_batch_id',
         'last_contacted_at',
         'last_activity_at',
         'meta',
@@ -34,6 +36,11 @@ class Contact extends Model
         'last_activity_at' => 'datetime',
         'meta' => 'array',
     ];
+
+    public function importBatch(): BelongsTo
+    {
+        return $this->belongsTo(ContactImportBatch::class, 'contact_import_batch_id');
+    }
 
     public function notes(): HasMany
     {

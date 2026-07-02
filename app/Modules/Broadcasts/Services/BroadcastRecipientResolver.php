@@ -50,9 +50,9 @@ class BroadcastRecipientResolver
      */
     public function permissionInvitationPreview(Broadcast $broadcast): array
     {
-        $importedContacts = $this->contactFilterResolver->resolve(['type' => 'imported']);
+        $candidateContacts = $this->contactFilterResolver->resolve($broadcast->recipient_filter ?? []);
 
-        if ($importedContacts->isEmpty()) {
+        if ($candidateContacts->isEmpty()) {
             return [
                 'imported_contacts_count' => 0,
                 'already_consented_count' => 0,
@@ -61,14 +61,14 @@ class BroadcastRecipientResolver
             ];
         }
 
-        $afterPriorBroadcastExclusions = $this->excludePriorBroadcastRecipients($broadcast, $importedContacts);
+        $afterPriorBroadcastExclusions = $this->excludePriorBroadcastRecipients($broadcast, $candidateContacts);
         $contactIdsWithConsent = $this->contactIdsWithMessageConsent($afterPriorBroadcastExclusions);
 
         return [
-            'imported_contacts_count' => $importedContacts->count(),
+            'imported_contacts_count' => $candidateContacts->count(),
             'already_consented_count' => count($contactIdsWithConsent),
             'eligible_contacts_count' => max(0, $afterPriorBroadcastExclusions->count() - count($contactIdsWithConsent)),
-            'excluded_by_prior_broadcast_count' => max(0, $importedContacts->count() - $afterPriorBroadcastExclusions->count()),
+            'excluded_by_prior_broadcast_count' => max(0, $candidateContacts->count() - $afterPriorBroadcastExclusions->count()),
         ];
     }
 
@@ -145,7 +145,7 @@ class BroadcastRecipientResolver
             && $broadcast->channel === 'email'
             && $broadcast->purpose === 'transactional'
             && $broadcast->scope === 'permission_invitation'
-            && data_get($broadcast->recipient_filter, 'type') === 'imported';
+            && in_array(data_get($broadcast->recipient_filter, 'type'), ['imported', 'import_batch'], true);
     }
 
     /**

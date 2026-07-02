@@ -21,6 +21,11 @@ return new class extends Migration
             $table->string('source')->nullable()->index();
             $table->string('subsource')->nullable()->index();
 
+            $table->foreignId('contact_import_batch_id')
+                ->nullable()
+                ->constrained('contact_import_batches')
+                ->nullOnDelete();
+
             $table->timestamp('last_contacted_at')->nullable()->index();
             $table->timestamp('last_activity_at')->nullable()->index();
 

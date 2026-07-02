@@ -26,6 +26,7 @@ class ContactFilterResolver
         return match ($type) {
             'all' => $this->allContactsQuery(),
             'contact_ids' => $this->contactIdsQuery($filter),
+            'import_batch' => $this->importBatchQuery($filter),
             'imported' => $this->importedContactsQuery(),
             'tag' => $this->tagsQuery($filter),
             default => $this->emptyContactsQuery(),
@@ -59,6 +60,23 @@ class ContactFilterResolver
     }
 
     /**
+     * @param array<string, mixed> $filter
+     * @return Builder<Contact>
+     */
+    private function importBatchQuery(array $filter): Builder
+    {
+        $importBatchIds = $this->integerValues($filter['import_batch_ids'] ?? []);
+
+        if ($importBatchIds === []) {
+            return $this->emptyContactsQuery();
+        }
+
+        return Contact::query()
+            ->whereIn('contact_import_batch_id', $importBatchIds)
+            ->orderBy('id');
+    }
+
+    /**
      * @return Builder<Contact>
      */
     private function importedContactsQuery(): Builder
@@ -67,6 +85,7 @@ class ContactFilterResolver
             ->where(function (Builder $query): void {
                 $query
                     ->where('source', 'import')
+                    ->orWhereNotNull('contact_import_batch_id')
                     ->orWhere('meta->imported', true)
                     ->orWhereNotNull('meta->imported_at');
             })

@@ -20,6 +20,7 @@ class ContactFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'phone' => fake()->optional()->numerify('##########'),
             'source' => 'factory',
+            'contact_import_batch_id' => null,
         ];
     }
 }

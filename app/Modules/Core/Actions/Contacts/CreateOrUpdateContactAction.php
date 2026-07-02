@@ -36,6 +36,7 @@ class CreateOrUpdateContactAction
             'phone' => $data['phone'] ?? $contact->phone,
             'source' => $data['source'] ?? $contact->source ?? 'crm',
             'subsource' => $data['subsource'] ?? $contact->subsource,
+            'contact_import_batch_id' => $data['contact_import_batch_id'] ?? $contact->contact_import_batch_id,
             'last_contacted_at' => $data['last_contacted_at'] ?? $contact->last_contacted_at,
             'last_activity_at' => $data['last_activity_at'] ?? $contact->last_activity_at,
             'meta' => $data['meta'] ?? $contact->meta,
