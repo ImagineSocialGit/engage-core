@@ -1,3 +1,4 @@
+
 # Engage Core Config Templates
 
 These files are reference templates for generating default and client config files without drifting shapes.
@@ -198,11 +199,12 @@ Rules:
 - The invitation send is email-only.
 - The invitation uses `message_type = imported_contact_permission_invitation`.
 - The invitation uses `dispatch_key = imported_contact_permission_invitation`.
-- The invitation uses `purpose = transactional` and `scope = permission_invitation`.
+- The current import-batch invitation scheduling path uses `purpose = marketing` and `scope = broadcast`, while still requiring the imported-contact permission invitation message type and consent policy.
 - `contact_permission_invitations` enforces one invitation per imported contact/source/channel.
 - The public preference page can let the contact opt into email, SMS, or both.
 - SMS opt-in requires explicit choice and a phone number.
 - Accepted channels create `MessageConsent` rows for configured scopes.
+- The import-batch scheduling action belongs to Messaging and should not be implemented as Core-owned Messaging record creation.
 - A normal marketing Broadcast to imported contacts still requires normal Messaging consent.
 
 Token references are documented in `TOKEN_REFERENCE.md`.

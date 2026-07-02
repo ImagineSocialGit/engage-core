@@ -1,3 +1,4 @@
+
 # Engage Core Module Boundaries
 
 Engage Core is a modular contact engagement platform.
@@ -816,6 +817,10 @@ Bad:
     TaskSpecificContactLookupController
     WebinarSpecificContactPicker
 
+Core owns import batch records and import batch CRM visibility.
+
+Core may expose module-owned actions on Core pages when the owning module is enabled. For example, the import batch detail page may show a Messaging-owned permission invitation action when Messaging is enabled. Core must not directly import Messaging actions, services, models, or scheduled-message internals to support that UI.
+
 Core owns the generic contact filter resolver used by modules for stable Contact-owned filter facts.
 
 That resolver should understand stable Core-owned contact facts such as contact IDs, tags, imported/source fields, statuses, and generic timestamps.
@@ -1038,6 +1043,9 @@ This includes:
 - public preference page consent recording
 - accepted channel tracking
 - runtime injection of preference URLs into invitation email payloads
+- import-batch permission invitation scheduling action
+- import-batch permission invitation eligibility checks
+- duplicate pending/sent scheduled invitation protection
 
 The invitation is not a general consent bypass.
 
@@ -1049,6 +1057,7 @@ Rules:
 - The invitation must use `message_type = imported_contact_permission_invitation`.
 - The invitation must carry a `consent_policy.permission_invitation` payload with `source = imported_contact` and `one_time = true`.
 - The system must refuse repeat invitations once a `contact_permission_invitations` row exists for the same contact/channel/source.
+- The system must also refuse repeat scheduling when a pending or sent imported-contact permission invitation scheduled message already exists for the contact.
 - Accepted public preferences create normal Messaging `MessageConsent` records for configured scopes.
 - SMS consent must be explicitly selected by the contact and must not be inferred from email consent.
 
@@ -2342,7 +2351,7 @@ Bad:
     Core ContactController -> Task::query()
     Core ContactController -> TeamMember::query()
     Core ContactController -> ScheduledMessage::query()
-    Core Contact model -> messageConsents()
+    Core-owned models defining hardcoded Messaging relationships
     Core Contact model -> inboundMessages()
 
 Core contacts remain generic. Module-specific contact page details are contributed by modules.
@@ -2440,7 +2449,7 @@ Recommended direction:
 2. Keep config templates aligned with the canonical Messaging/Campaign/FlowRoute/Preset shapes.
 3. Add public seams only when a concrete consumer/workflow needs them.
 4. Add contact filters for Commerce or Location only when Broadcasts, Campaigns, Reporting, or another consuming surface needs them.
-5. Continue the client-readiness path with import-time status mapping, permission-invitation accepted-event decisions, and config validation guidance.
+5. Continue the client-readiness path with permission-invitation accepted-event decisions and config validation guidance.
 6. Regenerate `core-project-tree.txt` from the repo after each structural batch.
 
 Do not use this section as a backlog. Actionable items belong in `TODO.md`.

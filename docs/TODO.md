@@ -1,3 +1,4 @@
+
 # Engage Core TODO
 
 This file is intentionally disposable. Add work here when it is real but not yet ready for an implementation slice. Delete items as they are completed. Do not treat this as an architectural reference; long-lived decisions belong in `module-boundaries.md` or a feature-specific doc.
@@ -103,11 +104,11 @@ These are repeatable checklists. Run the relevant checklist after a production s
 
 Completed baseline:
 
-- Imported-contact permission invitations can be created from Broadcasts as email-only one-time invitations.
-- Broadcasts can target all imported contacts or selected import batches.
-- Eligibility preview counts imported contacts, already-consented contacts, already-invited contacts, prior-Broadcast exclusions, and eligible contacts.
-- Scheduling is blocked when no contacts are eligible.
-- Messaging still owns final one-time enforcement, token injection, public preference handling, and consent creation.
+- Imported-contact permission invitations can be scheduled from Core import batch detail pages when Messaging is enabled.
+- Messaging owns the import-batch scheduling action, eligibility checks, scheduled-message creation, send-time invitation claiming, token injection, public preference handling, and consent creation.
+- The one-time invitation send remains email-only.
+- Repeat scheduling is blocked when a contact already has a pending/sent imported-contact permission invitation scheduled message or an imported-contact email permission invitation row.
+- The import batch detail page shows current-page permission invitation visibility for imported contacts.
 
 - [ ] Add/refine public opt-in tests as needed after UI polish.
   - Invalid token returns 404.
@@ -204,13 +205,13 @@ Completed baseline:
 
 ### Imports and contact onboarding
 
-- [ ] Add import-time status mapping behavior.
-  - Imports may contain multiple legacy/client status values from the old system.
-  - The import flow should let an operator map each incoming status to an existing Engage Core `ContactStatus`.
-  - The import flow should let an operator convert a legacy status to an Engage Core equivalent.
-  - The import flow should let an operator flag unmapped/ambiguous statuses for review.
-  - Flagged rows should not silently receive the wrong status.
-  - Preserve the original imported status in metadata for audit/debugging.
+Completed import-time status mapping baseline:
+
+- Import preview can map incoming legacy/client status values to active Core `ContactStatus` records.
+- Original imported status values are preserved in contact metadata.
+- Unmapped statuses are flagged for review instead of silently assigning the wrong status.
+- Missing status values are tracked separately from unmapped values.
+- Current contact status assignment still flows through the Workflow-owned status profile seam when Workflow is enabled.
 
 Completed import-batch visibility baseline:
 

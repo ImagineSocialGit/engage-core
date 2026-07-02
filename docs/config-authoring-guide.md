@@ -1,3 +1,4 @@
+
 # Engage Core Config Authoring Guide
 
 This guide is for creating or reviewing Engage Core default configs and client-specific configs.
@@ -566,13 +567,15 @@ Template reference:
 docs/config-templates/permission-invitations-template.php
 ```
 
-This config owns public preference-page copy, email CTA labels, accepted consent scopes, and Tailwind-style class strings for the public page.
+This config owns the permission invitation email subject/body/CTA labels, public preference-page copy, accepted consent scopes, and Tailwind-style class strings for the public page.
 
 Expected top-level shape:
 
 ```php
 return [
     'email' => [
+        'subject' => 'Confirm how you want to hear from us',
+        'body' => 'Hi {first_name}, please confirm your communication preferences so we know how you want to hear from us.',
         'cta_label' => 'Confirm my preferences',
         'secondary_link_label' => 'Or copy and paste this link into your browser',
     ],

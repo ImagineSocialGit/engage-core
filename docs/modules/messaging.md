@@ -1,3 +1,4 @@
+
 # Messaging Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -208,6 +209,9 @@ This includes:
 - public preference page consent recording
 - accepted channel tracking
 - runtime injection of preference URLs into invitation email payloads
+- import-batch permission invitation scheduling action
+- import-batch permission invitation eligibility checks
+- duplicate pending/sent scheduled invitation protection
 
 The invitation is not a general consent bypass.
 
@@ -219,7 +223,12 @@ Rules:
 - The invitation must use `message_type = imported_contact_permission_invitation`.
 - The invitation must carry a `consent_policy.permission_invitation` payload with `source = imported_contact` and `one_time = true`.
 - The system must refuse repeat invitations once a `contact_permission_invitations` row exists for the same contact/channel/source.
+- The system must also refuse repeat scheduling when a pending or sent imported-contact permission invitation scheduled message already exists for the contact.
 - Accepted public preferences create normal Messaging `MessageConsent` records for configured scopes.
 - SMS consent must be explicitly selected by the contact and must not be inferred from email consent.
+
+Current import-batch invitation scheduling is Messaging-owned.
+
+Core may expose the operator entry point on the import batch detail page when Messaging is enabled, but Core must not directly import Messaging actions, services, or models.
 
 Other modules may request this flow through Messaging public services/actions, but they must not create invitation records directly.

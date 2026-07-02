@@ -1,3 +1,4 @@
+
 # Core Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -86,6 +87,15 @@ Bad:
     BroadcastRecipientContactSearchController
     TaskSpecificContactLookupController
     WebinarSpecificContactPicker
+
+
+Core owns import batch records and import batch CRM visibility.
+
+Core may expose module-owned actions on Core pages when the owning module is enabled.
+
+For example, the import batch detail page may show a Messaging-owned permission invitation action when Messaging is enabled.
+
+Core must not directly import Messaging actions, services, models, or scheduled-message internals to support that UI.
 
 Core owns the generic contact filter resolver used by modules for stable Contact-owned filter facts.
 

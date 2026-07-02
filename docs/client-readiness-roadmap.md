@@ -1,3 +1,4 @@
+
 # Engage Core Client-Readiness Roadmap
 
 This roadmap tracks the near-term implementation order for getting Engage Core ready for real client operation without treating the work as a limited or throwaway MVP.
@@ -50,22 +51,40 @@ The imported-contact onboarding and Broadcast visibility foundation is now in pl
 
 | # | Planned item | Rough estimate | Notes |
 | -: | --- | ---: | --- |
-| 1 | Import-time status mapping | 1–2 sessions | Let operators map legacy/imported statuses to Engage Core ContactStatus records without silently assigning wrong statuses. Preserve original imported status metadata for audit/debugging. |
-| 2 | Permission invitation accepted automation event decision | 0.25–0.5 session | Decide whether accepted invitations should emit a neutral automation event such as `permission_invitation.accepted`. |
-| 3 | Permission invitation cancellation behavior | 0.5–1 session | Clarify how cancellation/skip/failure should appear for permission-invitation Broadcast bookkeeping and Messaging scheduled messages. |
-| 4 | Config validation guidance | 0.5–1 session | Convert current config-template expectations into practical validation behavior and operator/debug feedback. |
-| 5 | Task template/default definition UI | 1–2 sessions, maybe more if polished | Only needed when clients/operators need to manage task templates themselves. Preset sync already creates DB-owned definitions only. |
-| 6 | FlowRoutes route-builder UX | 3–6 sessions | Keep Route builder simple, guided, and client-appropriate. Do not expose raw automation internals as a blank-canvas builder. |
-| 7 | Task-completed FlowRoutes resume behavior | 0.5–1 session | Resume route event-wait points from neutral `task.completed` automation events, not direct Task-specific FlowRoutes listeners. |
-| 8 | Client self-serve readiness audit | 0.5–1 session | Separate controlled beta/operator-assisted readiness from true client self-serve readiness. |
-| 9 | PetServices vertical planning | 0.5–1 session | Plan vertical-owned pet/service concepts without pushing domain fields into Core. |
-| 10 | Music vertical planning | 0.5–1 session | Plan vertical-owned music/fan/product-interest concepts using Commerce, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Scheduling, Portal, and Reporting as needed. |
-| 11 | Feature-specific docs as modules stabilize | Ongoing | Keep module docs current when architecture/operator behavior changes. Do not turn docs into speculative backlog. |
-| 12 | Client config fallback tests | 0.5–1 session | Verify default/client config fallback, numeric-array replacement, optional content/style safety, and copy-tolerant tests. |
+| 1 | Permission invitation accepted automation event decision | 0.25–0.5 session | Decide whether accepted invitations should emit a neutral automation event such as `permission_invitation.accepted`. |
+| 2 | Permission invitation cancellation behavior | 0.5–1 session | Clarify how cancellation/skip/failure should appear for permission-invitation Broadcast bookkeeping and Messaging scheduled messages. |
+| 3 | Config validation guidance | 0.5–1 session | Convert current config-template expectations into practical validation behavior and operator/debug feedback. |
+| 4 | Task template/default definition UI | 1–2 sessions, maybe more if polished | Only needed when clients/operators need to manage task templates themselves. Preset sync already creates DB-owned definitions only. |
+| 5 | FlowRoutes route-builder UX | 3–6 sessions | Keep Route builder simple, guided, and client-appropriate. Do not expose raw automation internals as a blank-canvas builder. |
+| 6 | Task-completed FlowRoutes resume behavior | 0.5–1 session | Resume route event-wait points from neutral `task.completed` automation events, not direct Task-specific FlowRoutes listeners. |
+| 7 | Client self-serve readiness audit | 0.5–1 session | Separate controlled beta/operator-assisted readiness from true client self-serve readiness. |
+| 8 | PetServices vertical planning | 0.5–1 session | Plan vertical-owned pet/service concepts without pushing domain fields into Core. |
+| 9 | Music vertical planning | 0.5–1 session | Plan vertical-owned music/fan/product-interest concepts using Commerce, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Scheduling, Portal, and Reporting as needed. |
+| 10 | Feature-specific docs as modules stabilize | Ongoing | Keep module docs current when architecture/operator behavior changes. Do not turn docs into speculative backlog. |
+| 11 | Client config fallback tests | 0.5–1 session | Verify default/client config fallback, numeric-array replacement, optional content/style safety, and copy-tolerant tests. |
 
 ## Recently completed client-readiness items
 
 These items are no longer the recommended next implementation target, but they explain the current baseline.
+
+
+### Import-time status mapping
+
+Completed baseline:
+
+- Operators can map imported legacy/client status values to active Core `ContactStatus` records during import.
+- Original imported status values are preserved in contact metadata.
+- Unmapped statuses are flagged for review instead of silently assigning the wrong Engage Core status.
+- Missing status values are tracked separately from unmapped values.
+
+### Import batch permission invitation scheduling
+
+Completed baseline:
+
+- Import batch detail pages expose a Messaging-owned permission invitation action when Messaging is enabled.
+- Messaging schedules eligible imported-contact permission invitation messages for the selected batch.
+- Repeat scheduling is prevented when a pending/sent invitation message or existing imported-contact invitation row already exists.
+- The page shows current-page permission invitation status visibility for imported contacts.
 
 ### Import batch management visibility
 
@@ -96,21 +115,15 @@ Completed baseline:
 The next implementation target should be:
 
 ```text
-Import-time status mapping
+Permission invitation accepted automation event decision
 ```
 
 Reason:
 
 - Import batches are now visible and usable.
-- Imported-contact permission invitations and SMS Broadcasts now have enough operator visibility to be usable.
-- The next onboarding risk is silently assigning imported leads the wrong Engage Core status.
-- Mapping imported status values to Core-owned `ContactStatus` records keeps Core ownership clear and avoids pushing workflow or vertical-specific state into contacts.
-
-After that, the next likely implementation target is:
-
-```text
-Permission invitation accepted automation event decision
-```
+- Import-time status mapping is in place.
+- Imported-contact permission invitations can be scheduled from import batch detail pages.
+- The next onboarding decision is whether accepted invitations should emit a neutral automation event for downstream status changes, tasks, campaigns, routes, or team notifications.
 
 ## What this roadmap intentionally avoids
 

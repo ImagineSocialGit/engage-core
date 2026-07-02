@@ -13,6 +13,9 @@ Messaging owns:
 - `contact_permission_invitations`
 - invitation token generation
 - one-time send enforcement
+- import-batch permission invitation scheduling action
+- import-batch permission invitation eligibility checks
+- duplicate pending/sent scheduled invitation protection
 - public preference routes/controllers
 - consent recording from the public form
 - accepted channel tracking
@@ -21,16 +24,17 @@ Messaging owns:
 Core owns:
 
 - Contact records
-- imported-contact filter resolution
+- contact import batches
+- import batch CRM visibility
 - generic contact filter normalization/resolution
 
-Broadcasts may own:
+Messaging owns the CRM action that schedules imported-contact permission invitation messages for an import batch.
 
-- the CRM UI entry point for creating/scheduling the invitation
-- the Broadcast record used for audit/bookkeeping
-- BroadcastRecipient records for delivery bookkeeping
-- recipient preview/count behavior for the CRM invitation entry point
-- Broadcast-side narrowing of imported-contact recipients before scheduling, such as excluding imported contacts that already have Messaging consent
+Core owns the import batch records and import batch detail page.
+
+Core may display the Messaging-owned action when Messaging is enabled, but Core must not import Messaging models, actions, or services directly.
+
+Broadcasts do not own the current import-batch permission invitation scheduling path.
 
 Broadcasts must not own:
 
@@ -38,10 +42,7 @@ Broadcasts must not own:
 - consent creation
 - public preference token behavior
 - Messaging delivery gates
-
-Broadcast-side recipient narrowing is not the permission bypass.
-
-Messaging still owns the final one-time invitation enforcement.
+- direct creation of permission invitation records
 
 ## Runtime flow
 
@@ -51,44 +52,34 @@ Messaging still owns the final one-time invitation enforcement.
    - `meta.imported = true`
    - `meta.imported_at` present
    - a present `contact_import_batch_id`
-3. A user creates or schedules an opt-in invitation Broadcast.
-4. The Broadcast uses one of:
-   - `recipient_filter = {"type":"imported"}`
-   - `recipient_filter = {"type":"import_batch","import_batch_ids":[...]}`
-5. Broadcast recipient resolution starts with the Core imported-contact or import-batch filter.
-6. Broadcasts may narrow that recipient set for invitation eligibility before scheduling, including:
-   - excluding contacts that already have Messaging consent records
-   - excluding contacts that already have a matching imported-contact email permission invitation row
-   - excluding contacts already scheduled/sent in prior Broadcasts through Broadcast-owned recipient-filter exclusions
-7. Broadcast scheduling calls Messaging through public actions/services.
-8. Messaging evaluates and enforces the permission invitation policy.
-9. Messaging creates a `contact_permission_invitations` row before provider send.
-10. Messaging injects a public preference URL into the email payload.
-11. The contact clicks the CTA/link.
-12. The public preference page lets the contact choose email, SMS, or both.
-13. Messaging creates `MessageConsent` rows for the configured scopes.
-14. Messaging marks the invitation accepted and stores accepted channels.
+3. An operator opens the Core-owned import batch detail page.
+4. If Messaging is enabled, the page exposes a Messaging-owned action to send permission invitations for that batch.
+5. The Messaging action evaluates imported contacts for eligibility.
+6. Contacts are skipped when they:
+   - are not imported
+   - have no email address
+   - already have the configured marketing email consent
+   - already have an imported-contact email permission invitation row
+   - already have a pending or sent imported-contact permission invitation scheduled message
+7. Messaging schedules the canonical imported-contact permission invitation email message.
+8. The scheduled-message send job evaluates final send-time gates.
+9. The scheduled-message send job claims the permission invitation before provider send.
+10. Messaging creates the `contact_permission_invitations` row at claim/send time.
+11. Messaging injects the public preference URL into the email payload.
+12. The contact clicks the CTA/link.
+13. The public preference page lets the contact choose email, SMS, or both, depending on channel availability config.
+14. Messaging creates `MessageConsent` rows for the configured scopes.
+15. Messaging marks the invitation accepted and stores accepted channels.
 
-## Broadcast eligibility preview
+## Import batch invitation visibility
 
-Broadcasts may provide operator-facing preview counts before scheduling an imported-contact permission invitation.
+The import batch detail page may show operator-facing permission invitation status for the currently displayed page of contacts.
 
-The preview may include:
-
-```text
-imported_contacts_count
-already_consented_count
-already_invited_count
-ineligible_contacts_count
-eligible_contacts_count
-excluded_by_prior_broadcast_count
-```
-
-This preview is operator guidance and scheduling safety.
+This visibility is operational UI.
 
 It is not the final permission check.
 
-Messaging still owns final send-time enforcement.
+Messaging still owns eligibility checks, one-time enforcement, scheduled-message creation, send-time claiming, and consent creation.
 
 ## Required message identity
 
@@ -96,8 +87,8 @@ Permission invitation emails must use:
 
 ```text
 channel = email
-purpose = transactional
-scope = permission_invitation
+purpose = marketing
+scope = broadcast
 dispatch_key = imported_contact_permission_invitation
 message_type = imported_contact_permission_invitation
 ```
@@ -126,6 +117,10 @@ contact_id + channel + source
 Once a matching `contact_permission_invitations` row exists, Messaging should not send another invitation through the bypass.
 
 This includes invitations that were claimed/sent before the public preference form was accepted.
+
+Because permission invitation rows are claimed at send time, eligibility also treats an existing pending or sent `ScheduledMessage` with `message_type = imported_contact_permission_invitation` as already invited.
+
+This prevents repeated operator clicks from scheduling duplicate invitation messages before the first message is sent.
 
 ## Consent behavior
 
@@ -197,7 +192,7 @@ return [
 ];
 ```
 
-`email` controls CTA labels in the email payload.
+`email` controls the invitation email subject/body and CTA labels.
 
 `consent.scopes` controls which scopes receive consent records.
 
@@ -227,6 +222,8 @@ For the default email view, place `{cta}` on its own line in the body to render 
 
 If `{cta}` is not present and the CTA exists, the default email view renders the button after the body.
 
+Do not hand-author public preference URLs in client copy.
+
 ## Testing expectations
 
 Coverage should prove:
@@ -241,8 +238,9 @@ Coverage should prove:
 - scheduled-send job injects the public preference URL before sending
 - SMS does not receive the email-only bypass
 - normal Broadcasts do not receive the imported-contact bypass
-- Broadcast preview counts already-invited imported contacts as ineligible
-- Broadcast scheduling blocks permission invitations when zero contacts are eligible
-- import-batch targeted permission invitations only resolve contacts from selected import batches
+- import-batch permission invitation scheduling only schedules eligible contacts from the selected import batch
+- running the import-batch scheduling action twice does not create duplicate pending/sent invitation messages
+- contacts with existing imported-contact email invitation rows are skipped
+- contacts with required marketing email consent are skipped
+- contacts without email addresses are skipped
 - contacts with `contact_import_batch_id` count as imported for final Messaging send-time enforcement
-
