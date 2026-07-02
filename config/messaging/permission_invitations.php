@@ -2,6 +2,8 @@
 
 return [
     'email' => [
+        'subject' => 'Confirm how you want to hear from us',
+        'body' => 'Hi {first_name}, please confirm your communication preferences so we know how you want to hear from us.',
         'cta_label' => 'Confirm my preferences',
         'secondary_link_label' => 'Or copy and paste this link into your browser',
     ],

@@ -2,12 +2,17 @@
 
 namespace App\Modules\Messaging\Providers;
 
+use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\ContactPermissionInvitation;
+use App\Modules\Messaging\Models\MessageConsent;
+use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ContactShow\ContactMessagingShowDataProvider;
 use App\Modules\Messaging\Services\ContactShow\ContactScheduledMessagesVisibilityDataProvider;
 use App\Modules\Messaging\Services\Email\EmailProviderManager;
 use App\Modules\Messaging\Services\MessageRecipientGateRegistry;
 use App\Modules\Messaging\Services\MessageRecipientPayloadProviderRegistry;
 use App\Modules\Messaging\Services\Sms\SmsProviderManager;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\ServiceProvider;
 use Twilio\Rest\Client;
 
@@ -51,6 +56,17 @@ class MessagingModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        //
+        Contact::resolveRelationUsing('messageConsents', function (Contact $contact): HasMany {
+            return $contact->hasMany(MessageConsent::class);
+        });
+
+        Contact::resolveRelationUsing('permissionInvitations', function (Contact $contact): HasMany {
+            return $contact->hasMany(ContactPermissionInvitation::class);
+        });
+
+        Contact::resolveRelationUsing('scheduledMessages', function (Contact $contact): HasMany {
+            return $contact->hasMany(ScheduledMessage::class, 'recipient_id')
+                ->where('recipient_type', $contact->getMorphClass());
+        });
     }
 }

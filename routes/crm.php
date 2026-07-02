@@ -5,6 +5,7 @@ use App\Modules\Core\Controllers\ContactController;
 use App\Modules\Core\Controllers\ContactImportBatchController;
 use App\Modules\Core\Controllers\ContactLookupController;
 use App\Modules\Core\Controllers\ContactNoteController;
+use App\Modules\Messaging\Controllers\ContactImportBatchPermissionInvitationController;
 use App\Modules\Tasks\Controllers\TaskController;
 use App\Modules\Webinars\Controllers\CRM\WebinarController;
 use Illuminate\Support\Facades\Route;
@@ -104,6 +105,10 @@ Route::middleware('auth')->group(function () {
 
             Route::get('/import-batches/{contactImportBatch}', [ContactImportBatchController::class, 'show'])
                 ->name('import-batches.show');
+
+            Route::post('/import-batches/{contactImportBatch}/permission-invitations', ContactImportBatchPermissionInvitationController::class)
+                ->middleware('module:messaging')
+                ->name('import-batches.permission-invitations.store');
 
             Route::get('/{contact}', [ContactController::class, 'show'])
                 ->name('show');

@@ -305,7 +305,7 @@ class ContactPermissionInvitationService
     /**
      * @return array<int, string>
      */
-    private function consentScopes(): array
+    public function consentScopes(): array
     {
         $scopes = config('messaging.permission_invitations.consent.scopes', [
             'broadcast',
