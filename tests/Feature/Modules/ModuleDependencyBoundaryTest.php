@@ -43,6 +43,8 @@ class ModuleDependencyBoundaryTest extends TestCase
         $this->assertContains('inbound_messaging', $registered);
         $this->assertContains('internal_notifications', $registered);
         $this->assertContains('tasks', $registered);
+        $this->assertContains('scheduling', $registered);
+        $this->assertContains('portal', $registered);
         $this->assertContains('workflow', $registered);
         $this->assertContains('flow_routes', $registered);
         $this->assertContains('campaigns', $registered);
@@ -61,6 +63,7 @@ class ModuleDependencyBoundaryTest extends TestCase
             'InboundMessaging',
             'InternalNotifications',
             'Mortgage',
+            'Portal',
             'Reporting',
             'Tasks',
             'Webinars',
@@ -85,7 +88,31 @@ class ModuleDependencyBoundaryTest extends TestCase
             'InternalNotifications',
             'Messaging',
             'Mortgage',
+            'Portal',
             'Reporting',
+            'Scheduling',
+            'Tasks',
+            'Webinars',
+            'Workflow',
+        ]);
+    }
+
+
+    public function test_portal_module_does_not_import_domain_or_delivery_modules(): void
+    {
+        $this->assertModuleDoesNotImport('Portal', [
+            'Broadcasts',
+            'Campaigns',
+            'Documents',
+            'FlowRoutes',
+            'Forms',
+            'InboundMessaging',
+            'InternalNotifications',
+            'Messaging',
+            'Mortgage',
+            'PetServices',
+            'Music',
+            'Scheduling',
             'Tasks',
             'Webinars',
             'Workflow',

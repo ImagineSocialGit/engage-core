@@ -8,6 +8,7 @@ use App\Modules\InboundMessaging\Providers\InboundMessagingModuleServiceProvider
 use App\Modules\InternalNotifications\Providers\InternalNotificationsModuleServiceProvider;
 use App\Modules\Messaging\Providers\MessagingModuleServiceProvider;
 use App\Modules\Mortgage\Providers\MortgageModuleServiceProvider;
+use App\Modules\Portal\Providers\PortalModuleServiceProvider;
 use App\Modules\Reporting\Providers\ReportingModuleServiceProvider;
 use App\Modules\Scheduling\Providers\SchedulingModuleServiceProvider;
 use App\Modules\Tasks\Providers\TasksModuleServiceProvider;
@@ -84,6 +85,14 @@ return [
             'depends_on' => ['core'],
             'providers' => [
                 SchedulingModuleServiceProvider::class,
+            ],
+        ],
+
+        'portal' => [
+            'name' => 'Portal',
+            'depends_on' => ['core'],
+            'providers' => [
+                PortalModuleServiceProvider::class,
             ],
         ],
 

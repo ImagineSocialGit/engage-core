@@ -380,6 +380,21 @@
 │   │   │   │   └── MortgageModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   └── Support
+│   │   ├── Portal
+│   │   │   ├── Actions
+│   │   │   ├── Contracts
+│   │   │   ├── Controllers
+│   │   │   ├── Data
+│   │   │   ├── Models
+│   │   │   │   ├── PortalAccessGrant.php
+│   │   │   │   ├── PortalContactLink.php
+│   │   │   │   ├── PortalInvitation.php
+│   │   │   │   └── PortalUser.php
+│   │   │   ├── Providers
+│   │   │   │   └── PortalModuleServiceProvider.php
+│   │   │   ├── Requests
+│   │   │   ├── Services
+│   │   │   └── Support
 │   │   ├── Reporting
 │   │   │   ├── Actions
 │   │   │   ├── Contracts
@@ -761,6 +776,10 @@
 │   │   ├── BroadcastRecipientFactory.php
 │   │   ├── ContactFactory.php
 │   │   ├── ContactImportBatchFactory.php
+│   │   ├── PortalAccessGrantFactory.php
+│   │   ├── PortalContactLinkFactory.php
+│   │   ├── PortalInvitationFactory.php
+│   │   ├── PortalUserFactory.php
 │   │   ├── ScheduledMessageFactory.php
 │   │   ├── SchedulingAvailabilityWindowFactory.php
 │   │   ├── TaskFactory.php
@@ -786,6 +805,10 @@
 │   │   ├── 2026_04_15_195861_create_scheduling_availability_windows_table.php
 │   │   ├── 2026_04_15_195862_create_appointments_table.php
 │   │   ├── 2026_04_15_195863_create_appointment_attendees_table.php
+│   │   ├── 2026_04_15_195870_create_portal_users_table.php
+│   │   ├── 2026_04_15_195871_create_portal_contact_links_table.php
+│   │   ├── 2026_04_15_195872_create_portal_invitations_table.php
+│   │   ├── 2026_04_15_195873_create_portal_access_grants_table.php
 │   │   ├── 2026_04_15_195900_create_contact_workflow_profiles_table.php
 │   │   ├── 2026_04_15_203500_create_flow_routes_table.php
 │   │   ├── 2026_04_15_203510_create_points_table.php
@@ -836,6 +859,7 @@
 │   │   └── webinar-post-event-template.php
 │   ├── module-boundaries.md
 │   ├── modules
+│   │   ├── portal.md
 │   │   └── scheduling.md
 │   ├── project-organization.md
 │   └── TODO.md
@@ -1034,6 +1058,8 @@
 │   │   │   ├── ModuleManagerTest.php
 │   │   │   ├── ModuleNavigationTest.php
 │   │   │   └── ModuleRouteMiddlewareTest.php
+│   │   ├── Portal
+│   │   │   └── PortalFoundationTest.php
 │   │   ├── Scheduling
 │   │   │   └── SchedulingFoundationTest.php
 │   │   ├── Tasks
@@ -1056,4 +1082,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-361 directories, 696 files
+372 directories, 711 files
