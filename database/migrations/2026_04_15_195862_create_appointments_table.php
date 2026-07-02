@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Location\Models\Location;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\BookableService;
 use Illuminate\Database\Migrations\Migration;
@@ -20,6 +21,11 @@ return new class extends Migration
                 ->nullOnDelete();
 
             $table->foreignIdFor(Contact::class)
+                ->nullable()
+                ->constrained()
+                ->nullOnDelete();
+
+            $table->foreignIdFor(Location::class)
                 ->nullable()
                 ->constrained()
                 ->nullOnDelete();
@@ -64,6 +70,7 @@ return new class extends Migration
 
             $table->index(['status', 'starts_at'], 'appointments_status_starts_at_index');
             $table->index(['contact_id', 'status', 'starts_at'], 'appointments_contact_status_starts_at_index');
+            $table->index(['location_id', 'status', 'starts_at'], 'appointments_location_status_starts_at_index');
             $table->index(['bookable_service_id', 'status', 'starts_at'], 'appointments_service_status_starts_at_index');
             $table->index(['provider', 'external_id'], 'appointments_provider_external_index');
         });

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Scheduling;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Location\Models\Location;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\AppointmentAttendee;
 use App\Modules\Scheduling\Models\BookableService;
@@ -168,6 +169,36 @@ class SchedulingFoundationTest extends TestCase
         $this->assertTrue($appointment->attendees->contains($attendee));
         $this->assertTrue($attendee->contact->is($contact));
         $this->assertTrue($attendee->attendee->is($contact));
+    }
+
+    public function test_appointments_can_optionally_use_a_saved_location_without_requiring_one(): void
+    {
+        $locationlessAppointment = Appointment::factory()->create([
+            'location_id' => null,
+            'location_type' => 'virtual',
+            'location_details' => [
+                'url' => 'https://example.test/meeting',
+            ],
+        ]);
+
+        $location = Location::factory()->create([
+            'name' => 'Main Office',
+        ]);
+
+        $appointment = Appointment::factory()->create([
+            'location_id' => $location->id,
+            'location_type' => 'office',
+            'location_details' => [
+                'room' => 'Consultation Room',
+            ],
+        ]);
+
+        $this->assertNull($locationlessAppointment->location);
+        $this->assertSame('virtual', $locationlessAppointment->location_type);
+        $this->assertSame('https://example.test/meeting', $locationlessAppointment->location_details['url']);
+        $this->assertTrue($appointment->location->is($location));
+        $this->assertSame('office', $appointment->location_type);
+        $this->assertSame('Consultation Room', $appointment->location_details['room']);
     }
 
     public function test_appointments_can_track_reschedule_lineage_without_a_separate_cancellation_table(): void

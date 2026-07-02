@@ -22,6 +22,7 @@ class AppointmentFactory extends Factory
         return [
             'bookable_service_id' => BookableService::factory(),
             'contact_id' => Contact::factory(),
+            'location_id' => null,
             'primary_attendee_type' => null,
             'primary_attendee_id' => null,
             'rescheduled_from_id' => null,

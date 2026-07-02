@@ -3,6 +3,7 @@
 namespace App\Modules\Scheduling\Models;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Location\Models\Location;
 use Database\Factories\AppointmentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -31,6 +32,7 @@ class Appointment extends Model
     protected $fillable = [
         'bookable_service_id',
         'contact_id',
+        'location_id',
         'primary_attendee_type',
         'primary_attendee_id',
         'rescheduled_from_id',
@@ -61,6 +63,7 @@ class Appointment extends Model
         return [
             'bookable_service_id' => 'integer',
             'contact_id' => 'integer',
+            'location_id' => 'integer',
             'primary_attendee_id' => 'integer',
             'rescheduled_from_id' => 'integer',
             'location_details' => 'array',
@@ -83,6 +86,11 @@ class Appointment extends Model
     public function contact(): BelongsTo
     {
         return $this->belongsTo(Contact::class);
+    }
+
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class);
     }
 
     public function primaryAttendee(): MorphTo
