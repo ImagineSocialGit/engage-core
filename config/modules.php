@@ -3,6 +3,7 @@
 use App\Modules\Broadcasts\Providers\BroadcastsModuleServiceProvider;
 use App\Modules\Campaigns\Providers\CampaignsModuleServiceProvider;
 use App\Modules\Core\Providers\CoreModuleServiceProvider;
+use App\Modules\Documents\Providers\DocumentsModuleServiceProvider;
 use App\Modules\FlowRoutes\Providers\FlowRoutesModuleServiceProvider;
 use App\Modules\Forms\Providers\FormsModuleServiceProvider;
 use App\Modules\InboundMessaging\Providers\InboundMessagingModuleServiceProvider;
@@ -103,6 +104,14 @@ return [
             'depends_on' => ['core'],
             'providers' => [
                 FormsModuleServiceProvider::class,
+            ],
+        ],
+
+        'documents' => [
+            'name' => 'Documents',
+            'depends_on' => ['core'],
+            'providers' => [
+                DocumentsModuleServiceProvider::class,
             ],
         ],
 

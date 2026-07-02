@@ -250,11 +250,6 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - Scheduling, Forms, Documents, Commerce, and vertical modules may contribute portal-facing surfaces later.
   - Do not push portal account state into Core contacts.
 
-- [ ] Plan the Documents universal module.
-  - Own document requests, uploaded document records, review events, and generic document lifecycle state.
-  - Support dog vaccination records, waivers, mortgage documents, music contracts/assets, and general customer uploads.
-  - Vertical modules should own domain-specific document requirements and interpretation rules.
-
 - [ ] Plan the Commerce universal module.
   - Own normalized products, orders, order items, customer/contact links, external IDs, sync metadata, and purchase events.
   - Shopify should be an adapter behind Commerce, not a Music-owned provider dependency.

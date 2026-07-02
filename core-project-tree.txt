@@ -142,6 +142,21 @@
 │   │   │           ├── ContactImportRegistry.php
 │   │   │           ├── ContactPanelRegistry.php
 │   │   │           └── ContactShowDataRegistry.php
+│   │   ├── Documents
+│   │   │   ├── Actions
+│   │   │   ├── Contracts
+│   │   │   ├── Controllers
+│   │   │   ├── Data
+│   │   │   ├── Models
+│   │   │   │   ├── DocumentRequest.php
+│   │   │   │   ├── DocumentRequirementDefinition.php
+│   │   │   │   ├── DocumentReviewEvent.php
+│   │   │   │   └── DocumentUpload.php
+│   │   │   ├── Providers
+│   │   │   │   └── DocumentsModuleServiceProvider.php
+│   │   │   ├── Requests
+│   │   │   ├── Services
+│   │   │   └── Support
 │   │   ├── FlowRoutes
 │   │   │   ├── Actions
 │   │   │   │   ├── AdvanceContactFlowRouteProgressAction.php
@@ -791,6 +806,10 @@
 │   │   ├── BroadcastRecipientFactory.php
 │   │   ├── ContactFactory.php
 │   │   ├── ContactImportBatchFactory.php
+│   │   ├── DocumentRequestFactory.php
+│   │   ├── DocumentRequirementDefinitionFactory.php
+│   │   ├── DocumentReviewEventFactory.php
+│   │   ├── DocumentUploadFactory.php
 │   │   ├── FormDefinitionFactory.php
 │   │   ├── FormSubmissionFactory.php
 │   │   ├── FormSubmissionValueFactory.php
@@ -855,6 +874,10 @@
 │   │   ├── 2026_06_20_155410_create_webinar_waitlist_signups_table.php
 │   │   ├── 2026_06_29_000000_create_task_templates_table.php
 │   │   ├── 2026_07_01_000001_create_contact_permission_invitations_table.php
+│   │   ├── 2026_07_02_000001_create_document_requirement_definitions_table.php
+│   │   ├── 2026_07_02_000002_create_document_requests_table.php
+│   │   ├── 2026_07_02_000003_create_document_uploads_table.php
+│   │   ├── 2026_07_02_000004_create_document_review_events_table.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -882,6 +905,7 @@
 │   │   └── webinar-post-event-template.php
 │   ├── module-boundaries.md
 │   ├── modules
+│   │   ├── documents.md
 │   │   ├── forms.md
 │   │   ├── portal.md
 │   │   └── scheduling.md
@@ -1046,6 +1070,8 @@
 │   │   ├── CRM
 │   │   │   ├── UpdateContactStatusActionTest.php
 │   │   │   └── WebinarSyncTest.php
+│   │   ├── Documents
+│   │   │   └── DocumentsFoundationTest.php
 │   │   ├── Email
 │   │   │   └── HandleInboundEmailWebhookActionTest.php
 │   │   ├── FlowRoutes
@@ -1109,4 +1135,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-383 directories, 727 files
+394 directories, 742 files

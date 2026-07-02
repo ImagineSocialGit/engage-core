@@ -174,6 +174,10 @@ Current ownership:
 | form_versions | Forms |
 | form_submissions | Forms |
 | form_submission_values | Forms |
+| document_requirement_definitions | Documents |
+| document_requests | Documents |
+| document_uploads | Documents |
+| document_review_events | Documents |
 | team_members | InternalNotifications |
 | team_member_notification_preferences | InternalNotifications |
 | contact_workflow_profiles | Workflow |
@@ -268,9 +272,9 @@ Current universal modules include:
 - `Scheduling`
 - `Portal`
 - `Forms`
+- `Documents`
 
 Planned universal modules include:
-- `Documents`
 - `Commerce`
 - `Location`
 
@@ -2232,7 +2236,7 @@ Bad:
 
 ## Documents Module
 
-Documents is a planned universal module.
+Documents is a universal module.
 
 Documents should own document requests, uploaded files, document review status, and document-related audit trails. Raw file storage remains infrastructure/provider behavior; Documents owns the domain records around requested or submitted files.
 
