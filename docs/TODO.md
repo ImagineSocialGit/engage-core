@@ -88,6 +88,14 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [ ] Confirm cancellation/skip/failure states remain understandable in Broadcast and ScheduledMessage views.
 - [ ] Confirm prior-Broadcast exclusions prevent duplicate outreach across related single-channel Broadcasts.
 
+### Roadmap tracking
+
+- [ ] Keep `docs/client-readiness-roadmap.md` current as the focused client-readiness implementation roadmap.
+  - Use `TODO.md` for disposable backlog/checklists.
+  - Use the roadmap for implementation order and session planning.
+  - Do not treat roadmap items as temporary MVP shortcuts.
+  - Delete completed roadmap items or move them back to TODO when they are no longer near-term.
+
 ## One-off backlog
 
 ### Permission invitations
