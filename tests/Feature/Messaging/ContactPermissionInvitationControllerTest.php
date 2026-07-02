@@ -284,6 +284,35 @@ class ContactPermissionInvitationControllerTest extends TestCase
         $this->assertSame(1, MessageConsent::query()->count());
     }
 
+    public function test_acceptance_falls_back_to_broadcast_scope_when_scope_config_is_missing(): void
+    {
+        config([
+            'messaging.permission_invitations.consent.scopes' => null,
+        ]);
+
+        $invitation = $this->invitation();
+
+        $response = $this->post(route('messaging.permission-invitations.store', [
+            'token' => $invitation->token,
+        ]), [
+            'channels' => ['email'],
+        ]);
+
+        $response->assertRedirect(route('messaging.permission-invitations.show', [
+            'token' => $invitation->token,
+        ]));
+
+        $this->assertDatabaseHas('message_consents', [
+            'contact_id' => $invitation->contact_id,
+            'channel' => MessageChannel::Email->value,
+            'purpose' => MessagePurpose::Marketing->value,
+            'scope' => 'broadcast',
+            'source' => 'imported_contact_permission_invitation',
+        ]);
+
+        $this->assertSame(1, MessageConsent::query()->count());
+    }
+
     private function enablePermissionInvitationSms(): void
     {
         config([

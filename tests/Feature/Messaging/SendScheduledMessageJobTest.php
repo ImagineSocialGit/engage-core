@@ -658,6 +658,79 @@ Thanks.",
         $this->assertStringNotContainsString('{cta}', $capturedHtml);
     }
 
+    public function test_it_uses_default_permission_invitation_email_labels_when_config_omits_them(): void
+    {
+        Event::fake([ScheduledMessageSent::class]);
+
+        config([
+            'messaging.permission_invitations.email' => [],
+        ]);
+
+        $contact = Contact::factory()->create([
+            'email' => 'imported@example.com',
+            'source' => 'import',
+        ]);
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'recipient_type' => Contact::class,
+            'recipient_id' => $contact->id,
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'permission_invitation',
+            'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'payload_class' => FakeJobPermissionInvitationEmailPayload::class,
+            'payload' => [
+                'to' => 'imported@example.com',
+                'subject' => 'Confirm preferences',
+                'body' => 'Please confirm preferences.',
+            ],
+            'status' => 'pending',
+            'meta' => [
+                'conditions' => [],
+                'consent_policy' => [
+                    'permission_invitation' => [
+                        'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+                        'one_time' => true,
+                    ],
+                ],
+            ],
+        ]);
+
+        $capturedPayload = null;
+
+        $emailService = Mockery::mock(EmailMessagingService::class);
+        $emailService
+            ->shouldReceive('send')
+            ->once()
+            ->with(Mockery::on(function (FakeJobPermissionInvitationEmailPayload $payload) use (&$capturedPayload): bool {
+                $capturedPayload = $payload;
+
+                return true;
+            }));
+
+        app()->instance(EmailMessagingService::class, $emailService);
+
+        $this->handleScheduledMessage($scheduledMessage);
+
+        $scheduledMessage->refresh();
+
+        $invitation = ContactPermissionInvitation::query()
+            ->where('contact_id', $contact->id)
+            ->first();
+
+        $this->assertNotNull($invitation);
+
+        $expectedUrl = route('messaging.permission-invitations.show', [
+            'token' => $invitation->token,
+        ]);
+
+        $this->assertInstanceOf(FakeJobPermissionInvitationEmailPayload::class, $capturedPayload);
+        $this->assertSame('Confirm my preferences', $capturedPayload->cta['label']);
+        $this->assertSame($expectedUrl, $capturedPayload->cta['url']);
+        $this->assertSame('Or copy and paste this link into your browser', $capturedPayload->secondaryLink['label']);
+        $this->assertSame($expectedUrl, $capturedPayload->secondaryLink['url']);
+    }
+
     private function grantConsent(Contact $contact, string $channel, string $purpose): void
     {
         MessageConsent::query()->create([

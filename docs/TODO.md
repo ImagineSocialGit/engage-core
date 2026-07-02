@@ -98,8 +98,6 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - Already accepted invitation cannot create duplicate consent rows.
   - Accepted page is copy-config tolerant.
 
-- [ ] Decide whether permission invitation accepted consent should apply to only `broadcast` and `campaign`, or whether additional scopes are needed before launch.
-
 - [ ] Consider whether accepted invitations should emit a neutral automation event later.
   - Example: `permission_invitation.accepted`.
   - Consumers could update contact status, create a task, enroll a campaign, or notify the team.
