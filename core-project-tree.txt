@@ -946,7 +946,7 @@
 │   │   ├── messaging-email-template.php
 │   │   ├── messaging-sms-template.php
 │   │   ├── modules-template.php
-│   │   ├── permission-invitations.md
+│   │   ├── permission-invitations-template.php
 │   │   ├── presets-root-template.php
 │   │   ├── README.md
 │   │   ├── task-presets-template.php
@@ -954,12 +954,28 @@
 │   │   └── webinar-post-event-template.php
 │   ├── module-boundaries.md
 │   ├── modules
+│   │   ├── broadcasts.md
+│   │   ├── campaigns.md
 │   │   ├── commerce.md
+│   │   ├── core.md
 │   │   ├── documents.md
+│   │   ├── flow-routes.md
 │   │   ├── forms.md
+│   │   ├── inbound-messaging.md
+│   │   ├── internal-notifications.md
 │   │   ├── location.md
+│   │   ├── messaging.md
+│   │   ├── mortgage.md
+│   │   ├── music.md
+│   │   ├── pet-services.md
 │   │   ├── portal.md
-│   │   └── scheduling.md
+│   │   ├── README.md
+│   │   ├── reporting.md
+│   │   ├── scheduling.md
+│   │   ├── tasks.md
+│   │   ├── webinars.md
+│   │   └── workflow.md
+│   ├── permission-invitations.md
 │   ├── product-principles.md
 │   ├── project-organization.md
 │   └── TODO.md
@@ -1190,4 +1206,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-416 directories, 775 files
+416 directories, 791 files
