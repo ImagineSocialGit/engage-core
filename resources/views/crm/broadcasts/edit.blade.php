@@ -4,9 +4,14 @@
     :subheading="$broadcast->isPermissionInvitation() ? 'Update imported-contact opt-in invitation draft' : 'Update regular broadcast draft'"
 >
     @php
+        $broadcastChannel = old('channel', $broadcast->channel ?? ($availableBroadcastChannels[0] ?? 'email'));
         $recipientFilter = $broadcast->recipient_filter ?? ['type' => 'all'];
         $recipientFilterType = old('recipient_filter_type', $recipientFilter['type'] ?? 'all');
         $recipientTag = old('recipient_tag', $recipientFilter['tags'][0] ?? '');
+
+        $emailFieldVisibility = $broadcast->isPermissionInvitation()
+            ? 'true'
+            : "channel === 'email'";
 
         $excludeBroadcastIds = collect(old('exclude_broadcast_ids', data_get($recipientFilter, 'exclude.broadcast_ids', [])))
             ->map(fn ($id) => (int) $id)
@@ -108,10 +113,42 @@
                 method="POST"
                 action="{{ route('crm.broadcasts.update', $broadcast) }}"
                 class="mt-5 space-y-4"
-                x-data="{ recipientFilterType: @js($recipientFilterType) }"
+                x-data="{
+                    recipientFilterType: @js($recipientFilterType),
+                    channel: @js($broadcastChannel),
+                }"
             >
                 @csrf
                 @method('PATCH')
+
+                @if(! $broadcast->isPermissionInvitation())
+                    @if(count($availableBroadcastChannels) > 1)
+                        <div>
+                            <x-ui.form.label for="channel">
+                                Channel
+                            </x-ui.form.label>
+
+                            <x-ui.form.select
+                                id="channel"
+                                name="channel"
+                                x-model="channel"
+                            >
+                                @foreach($availableBroadcastChannels as $availableBroadcastChannel)
+                                    <option
+                                        value="{{ $availableBroadcastChannel }}"
+                                        @selected($broadcastChannel === $availableBroadcastChannel)
+                                    >
+                                        {{ strtoupper($availableBroadcastChannel) }}
+                                    </option>
+                                @endforeach
+                            </x-ui.form.select>
+
+                            <x-ui.form.error name="channel" />
+                        </div>
+                    @else
+                        <input type="hidden" name="channel" value="{{ $availableBroadcastChannels[0] ?? 'email' }}">
+                    @endif
+                @endif
 
                 <div>
                     <x-ui.form.label for="name">
@@ -128,7 +165,7 @@
                     <x-ui.form.error name="name" />
                 </div>
 
-                <div>
+                <div x-show="{{ $emailFieldVisibility }}">
                     <x-ui.form.label for="subject">
                         Email Subject
                     </x-ui.form.label>
@@ -137,13 +174,13 @@
                         id="subject"
                         name="subject"
                         value="{{ old('subject', $broadcast->payload['subject'] ?? '') }}"
-                        required
+                        x-bind:required="{{ $emailFieldVisibility }}"
                     />
 
                     <x-ui.form.error name="subject" />
                 </div>
 
-                <div>
+                <div x-show="{{ $emailFieldVisibility }}">
                     <x-ui.form.label for="body">
                         Email Body
                     </x-ui.form.label>
@@ -152,7 +189,7 @@
                         id="body"
                         name="body"
                         rows="10"
-                        required
+                        x-bind:required="{{ $emailFieldVisibility }}"
                     >{{ old('body', $broadcast->payload['body'] ?? '') }}</x-ui.form.textarea>
 
                     @if($broadcast->isPermissionInvitation())
@@ -163,6 +200,27 @@
 
                     <x-ui.form.error name="body" />
                 </div>
+
+                @if(! $broadcast->isPermissionInvitation())
+                    <div x-show="channel === 'sms'">
+                        <x-ui.form.label for="message">
+                            SMS Message
+                        </x-ui.form.label>
+
+                        <x-ui.form.textarea
+                            id="message"
+                            name="message"
+                            rows="5"
+                            x-bind:required="channel === 'sms'"
+                        >{{ old('message', $broadcast->payload['message'] ?? '') }}</x-ui.form.textarea>
+
+                        <p class="mt-2 text-xs text-slate-500">
+                            Keep SMS copy short. Normal Messaging SMS consent, suppression, revocation, and send guards still apply.
+                        </p>
+
+                        <x-ui.form.error name="message" />
+                    </div>
+                @endif
 
                 @if($broadcast->isPermissionInvitation())
                     <div>

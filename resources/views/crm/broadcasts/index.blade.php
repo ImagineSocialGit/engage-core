@@ -28,7 +28,7 @@
                     </h2>
 
                     <p class="mt-1 text-sm text-slate-500">
-                        One-time email to selected recipients. Normal Messaging consent, suppression, and revocation gates apply.
+                        One-time message to selected recipients. Normal Messaging consent, suppression, and revocation gates apply.
                     </p>
                 </div>
 
@@ -36,11 +36,38 @@
                     method="POST"
                     action="{{ route('crm.broadcasts.store') }}"
                     class="space-y-4"
-                    x-data="{ recipientFilterType: @js(old('recipient_filter_type', 'all')) }"
+                    x-data="{
+                        recipientFilterType: @js(old('recipient_filter_type', 'all')),
+                        channel: @js(old('channel', $availableBroadcastChannels[0] ?? 'email')),
+                    }"
                 >
                     @csrf
 
                     <input type="hidden" name="broadcast_type" value="{{ \App\Modules\Broadcasts\Models\Broadcast::BROADCAST_TYPE_REGULAR }}">
+
+                    @if(count($availableBroadcastChannels) > 1)
+                    <div>
+                        <x-ui.form.label for="channel">
+                            Channel
+                        </x-ui.form.label>
+
+                        <x-ui.form.select
+                            id="channel"
+                            name="channel"
+                            x-model="channel"
+                        >
+                            @foreach($availableBroadcastChannels as $availableBroadcastChannel)
+                                <option value="{{ $availableBroadcastChannel }}">
+                                    {{ strtoupper($availableBroadcastChannel) }}
+                                </option>
+                            @endforeach
+                        </x-ui.form.select>
+
+                        <x-ui.form.error name="channel" />
+                    </div>
+                @else
+                    <input type="hidden" name="channel" value="{{ $availableBroadcastChannels[0] ?? 'email' }}">
+                @endif
 
                     @php
                         $excludeBroadcastIds = collect(old('exclude_broadcast_ids', []))
@@ -68,7 +95,7 @@
                         <x-ui.form.error name="name" />
                     </div>
 
-                    <div>
+                    <div x-show="channel === 'email'">
                         <x-ui.form.label for="subject">
                             Email Subject
                         </x-ui.form.label>
@@ -77,13 +104,13 @@
                             id="subject"
                             name="subject"
                             value="{{ old('subject') }}"
-                            required
+                            x-bind:required="channel === 'email'"
                         />
 
                         <x-ui.form.error name="subject" />
                     </div>
 
-                    <div>
+                    <div x-show="channel === 'email'">
                         <x-ui.form.label for="body">
                             Email Body
                         </x-ui.form.label>
@@ -92,10 +119,29 @@
                             id="body"
                             name="body"
                             rows="8"
-                            required
+                            x-bind:required="channel === 'email'"
                         >{{ old('body') }}</x-ui.form.textarea>
 
                         <x-ui.form.error name="body" />
+                    </div>
+
+                    <div x-show="channel === 'sms'">
+                        <x-ui.form.label for="message">
+                            SMS Message
+                        </x-ui.form.label>
+
+                        <x-ui.form.textarea
+                            id="message"
+                            name="message"
+                            rows="5"
+                            x-bind:required="channel === 'sms'"
+                        >{{ old('message') }}</x-ui.form.textarea>
+
+                        <p class="mt-2 text-xs text-slate-500">
+                            Keep SMS copy short (ideally &lt;160 characters). Normal Messaging SMS consent, suppression, revocation, and send guards still apply.
+                        </p>
+
+                        <x-ui.form.error name="message" />
                     </div>
 
                     <div>
@@ -518,7 +564,11 @@
                                         </a>
 
                                         <div class="mt-1 text-xs text-slate-500">
-                                            {{ $broadcast->payload['subject'] ?? 'No subject' }}
+                                            @if($broadcast->channel === 'sms')
+                                                {{ str($broadcast->payload['message'] ?? 'No message')->limit(80) }}
+                                            @else
+                                                {{ $broadcast->payload['subject'] ?? 'No subject' }}
+                                            @endif
                                         </div>
                                     </td>
 

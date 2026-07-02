@@ -13,6 +13,7 @@ use App\Modules\Broadcasts\Services\BroadcastRecipientResolver;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Core\Services\Contacts\ContactFilterResolver;
+use App\Modules\Messaging\Services\MessageChannelAvailability;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,6 +25,7 @@ class BroadcastController extends Controller
     public function __construct(
         private readonly ContactFilterResolver $contactFilterResolver,
         private readonly BroadcastRecipientResolver $broadcastRecipientResolver,
+        private readonly MessageChannelAvailability $messageChannelAvailability,
     ) {}
 
     public function index(Request $request): View
@@ -37,6 +39,7 @@ class BroadcastController extends Controller
             'title' => 'Broadcasts',
             'heading' => 'Broadcasts',
             'broadcasts' => $broadcasts,
+            'availableBroadcastChannels' => $this->availableRegularBroadcastChannels(),
             'permissionInvitationPreview' => $this->newPermissionInvitationPreview($request),
             'importBatches' => $this->importBatches(),
             'selectedImportBatchIds' => $this->selectedImportBatchIds($request->session()->getOldInput('import_batch_ids', [])),
@@ -138,6 +141,7 @@ class BroadcastController extends Controller
             'title' => $broadcast->isPermissionInvitation() ? 'Edit Opt-In Invitation' : 'Edit Broadcast',
             'heading' => $broadcast->isPermissionInvitation() ? 'Edit Opt-In Invitation' : 'Edit Broadcast',
             'broadcast' => $broadcast,
+            'availableBroadcastChannels' => $this->availableRegularBroadcastChannels($broadcast->channel),
             'selectedRecipientContacts' => $this->selectedContactOptions(
                 session()->getOldInput('contact_ids', $broadcast->recipient_filter['contact_ids'] ?? []),
             ),
@@ -386,5 +390,28 @@ class BroadcastController extends Controller
                 'type' => 'import_batch',
                 'import_batch_ids' => $importBatchIds,
             ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function availableRegularBroadcastChannels(?string $currentChannel = null): array
+    {
+        $channels = $this->messageChannelAvailability->visibleChannelsForSurface(
+            surface: 'broadcasts',
+            purpose: 'marketing',
+            scope: 'broadcast',
+            requireProvider: false,
+        );
+
+        if ($channels === []) {
+            $channels = ['email'];
+        }
+
+        if ($currentChannel !== null && ! in_array($currentChannel, $channels, true)) {
+            $channels[] = $currentChannel;
+        }
+
+        return array_values(array_unique($channels));
     }
 }

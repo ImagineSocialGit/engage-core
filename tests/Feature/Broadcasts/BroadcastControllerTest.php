@@ -11,6 +11,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
+use App\Modules\Messaging\Payloads\SmsPayload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -150,11 +151,14 @@ class BroadcastControllerTest extends TestCase
             ->post(route('crm.broadcasts.store'), [
                 'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
                 'intent' => 'draft',
+                'channel' => 'email',
                 'name' => 'Imported opt-in invitation',
                 'subject' => 'Confirm how you want to hear from us',
                 'body' => 'Please confirm your communication preferences.',
                 'recipient_filter_type' => 'imported',
             ]);
+
+        $response->assertSessionHasNoErrors();
 
         $broadcast = Broadcast::query()->first();
 
@@ -185,6 +189,7 @@ class BroadcastControllerTest extends TestCase
                 'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
                 'intent' => 'draft',
                 'name' => 'Imported opt-in invitation',
+                'channel' => 'email',
                 'subject' => 'Confirm how you want to hear from us',
                 'body' => 'Please confirm your communication preferences.',
                 'recipient_filter_type' => 'contact_ids',
@@ -243,6 +248,141 @@ class BroadcastControllerTest extends TestCase
         $this->assertSame(Broadcast::STATUS_SCHEDULED, $broadcast->status);
         $this->assertSame('tag', $broadcast->recipient_filter['type']);
         $this->assertSame(['homebuyer'], $broadcast->recipient_filter['tags']);
+    }
+
+    public function test_regular_broadcast_form_hides_sms_when_sms_is_not_visible_for_broadcasts(): void
+    {
+        $user = User::factory()->create();
+
+        config([
+            'messaging.channel_availability.sms.runtime_supported' => true,
+            'messaging.channel_availability.sms.provider_enabled' => true,
+            'messaging.channel_availability.sms.surfaces.broadcasts' => false,
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.broadcasts.index'));
+
+        $response->assertOk();
+        $response->assertSee('name="channel" value="email"', false);
+        $response->assertSee('name="channel" value="email"', false);
+        $response->assertDontSee('<option value="sms">', false);
+    }
+
+    public function test_regular_broadcast_form_shows_sms_when_sms_is_visible_for_broadcasts(): void
+    {
+        $user = User::factory()->create();
+
+        config([
+            'messaging.channel_availability.sms.runtime_supported' => true,
+            'messaging.channel_availability.sms.provider_enabled' => true,
+            'messaging.channel_availability.sms.surfaces.broadcasts' => true,
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.broadcasts.index'));
+
+        $response->assertOk();
+        $response->assertSee('Channel');
+        $response->assertSee('SMS');
+        $response->assertSee('SMS Message');
+    }
+
+    public function test_it_creates_a_draft_sms_broadcast_when_sms_is_visible_for_broadcasts(): void
+    {
+        $user = User::factory()->create();
+
+        config([
+            'messaging.channel_availability.sms.runtime_supported' => true,
+            'messaging.channel_availability.sms.provider_enabled' => true,
+            'messaging.channel_availability.sms.surfaces.broadcasts' => true,
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->post(route('crm.broadcasts.store'), [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_REGULAR,
+                'intent' => 'draft',
+                'channel' => 'sms',
+                'name' => 'SMS update',
+                'message' => 'This is an SMS broadcast.',
+                'recipient_filter_type' => 'all',
+            ]);
+
+        $broadcast = Broadcast::query()->first();
+
+        $this->assertNotNull($broadcast);
+
+        $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
+
+        $this->assertSame('sms', $broadcast->channel);
+        $this->assertSame(SmsPayload::class, $broadcast->payload_class);
+        $this->assertSame('This is an SMS broadcast.', $broadcast->payload['message']);
+        $this->assertArrayNotHasKey('subject', $broadcast->payload);
+        $this->assertArrayNotHasKey('body', $broadcast->payload);
+    }
+
+    public function test_it_rejects_sms_broadcast_when_sms_is_not_visible_for_broadcasts(): void
+    {
+        $user = User::factory()->create();
+
+        config([
+            'messaging.channel_availability.sms.runtime_supported' => true,
+            'messaging.channel_availability.sms.provider_enabled' => true,
+            'messaging.channel_availability.sms.surfaces.broadcasts' => false,
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->from(route('crm.broadcasts.index'))
+            ->post(route('crm.broadcasts.store'), [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_REGULAR,
+                'intent' => 'draft',
+                'channel' => 'sms',
+                'name' => 'SMS update',
+                'message' => 'This is an SMS broadcast.',
+                'recipient_filter_type' => 'all',
+            ]);
+
+        $response->assertRedirect(route('crm.broadcasts.index'));
+        $response->assertSessionHasErrors('channel');
+
+        $this->assertDatabaseCount('broadcasts', 0);
+    }
+
+    public function test_permission_invitation_ignores_submitted_sms_channel(): void
+    {
+        $user = User::factory()->create();
+
+        config([
+            'messaging.channel_availability.sms.runtime_supported' => true,
+            'messaging.channel_availability.sms.provider_enabled' => true,
+            'messaging.channel_availability.sms.surfaces.broadcasts' => true,
+            'messaging.channel_availability.sms.surfaces.permission_invitations' => true,
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->post(route('crm.broadcasts.store'), [
+                'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
+                'intent' => 'draft',
+                'channel' => 'sms',
+                'name' => 'Imported opt-in invitation',
+                'subject' => 'Confirm how you want to hear from us',
+                'body' => 'Please confirm your communication preferences.',
+                'recipient_filter_type' => 'imported',
+            ]);
+
+        $broadcast = Broadcast::query()->first();
+
+        $this->assertNotNull($broadcast);
+
+        $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
+
+        $this->assertSame('email', $broadcast->channel);
+        $this->assertSame(Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION, $broadcast->message_type);
     }
 
     public function test_it_shows_a_broadcast(): void
@@ -889,6 +1029,7 @@ class BroadcastControllerTest extends TestCase
                 'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
                 'intent' => 'schedule',
                 'name' => 'Imported opt-in invitation',
+                'channel' => 'email',
                 'subject' => 'Confirm how you want to hear from us',
                 'body' => 'Please confirm your communication preferences.',
                 'recipient_filter_type' => 'imported',
@@ -922,6 +1063,7 @@ class BroadcastControllerTest extends TestCase
                 'broadcast_type' => Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION,
                 'intent' => 'draft',
                 'name' => 'June import opt-in invitation',
+                'channel' => 'email',
                 'subject' => 'Confirm how you want to hear from us',
                 'body' => 'Please confirm your communication preferences.',
                 'recipient_filter_type' => 'import_batch',

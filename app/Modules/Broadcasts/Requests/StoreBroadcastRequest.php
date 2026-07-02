@@ -6,8 +6,11 @@ use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Core\Requests\Concerns\NormalizesContactFilter;
 use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Messaging\Payloads\SmsPayload;
+use App\Modules\Messaging\Services\MessageChannelAvailability;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class StoreBroadcastRequest extends FormRequest
 {
@@ -27,8 +30,24 @@ class StoreBroadcastRequest extends FormRequest
             ])],
             'intent' => ['required', 'string', Rule::in(['draft', 'schedule'])],
             'name' => ['required', 'string', 'max:255'],
-            'subject' => ['required', 'string', 'max:255'],
-            'body' => ['required', 'string'],
+            'channel' => ['nullable', 'string', Rule::in(['email', 'sms'])],
+            'subject' => [
+                Rule::requiredIf(fn (): bool => $this->isPermissionInvitationRequest() || $this->regularBroadcastChannelInput() === 'email'),
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'body' => [
+                Rule::requiredIf(fn (): bool => $this->isPermissionInvitationRequest() || $this->regularBroadcastChannelInput() === 'email'),
+                'nullable',
+                'string',
+            ],
+            'message' => [
+                Rule::requiredIf(fn (): bool => $this->isRegularBroadcastRequest() && $this->regularBroadcastChannelInput() === 'sms'),
+                'nullable',
+                'string',
+                'max:1600',
+            ],
             'send_at' => ['nullable', 'date'],
             'exclude_broadcast_ids' => ['nullable', 'array'],
             'exclude_broadcast_ids.*' => ['integer', 'exists:broadcasts,id'],
@@ -79,22 +98,21 @@ class StoreBroadcastRequest extends FormRequest
 
         $recipientFilter = $this->withRecipientExclusions($recipientFilter, $validated);
 
+        $channel = $this->regularBroadcastChannel($validated);
+
         return [
             'user_id' => $this->user()?->getKey(),
             'name' => $validated['name'],
-            'channel' => 'email',
+            'channel' => $channel,
             'purpose' => 'marketing',
             'scope' => 'broadcast',
             'dispatch_key' => Broadcast::DEFAULT_DISPATCH_KEY,
             'message_type' => Broadcast::DEFAULT_MESSAGE_TYPE,
-            'payload_class' => EmailPayload::class,
+            'payload_class' => $channel === 'sms' ? SmsPayload::class : EmailPayload::class,
             'queue' => 'marketing',
             'status' => Broadcast::STATUS_DRAFT,
             'send_at' => $validated['send_at'] ?? null,
-            'payload' => [
-                'subject' => $validated['subject'],
-                'body' => $validated['body'],
-            ],
+            'payload' => $this->regularBroadcastPayload($channel, $validated),
             'recipient_filter' => $recipientFilter,
             'recipient_count' => 0,
             'scheduled_count' => 0,
@@ -234,4 +252,66 @@ class StoreBroadcastRequest extends FormRequest
             ? ['type' => 'imported']
             : $recipientFilter;
     }
+
+    /**
+    * @param array<string, mixed> $validated
+    */
+    private function regularBroadcastChannel(array $validated): string
+    {
+        $channel = $this->regularBroadcastChannelInput($validated);
+
+        $availableChannels = app(MessageChannelAvailability::class)->visibleChannelsForSurface(
+            surface: 'broadcasts',
+            purpose: 'marketing',
+            scope: 'broadcast',
+            requireProvider: false,
+        );
+
+        if (! in_array($channel, $availableChannels, true)) {
+            throw ValidationException::withMessages([
+                'channel' => 'That Broadcast channel is not currently available.',
+            ]);
+        }
+
+        return $channel;
+    }
+
+    /**
+    * @param array<string, mixed> $validated
+    * @return array<string, mixed>
+    */
+    private function regularBroadcastPayload(string $channel, array $validated): array
+    {
+        if ($channel === 'sms') {
+            return [
+                'message' => $validated['message'],
+            ];
+        }
+
+        return [
+            'subject' => $validated['subject'],
+            'body' => $validated['body'],
+        ];
+    }
+
+    /**
+    * @param array<string, mixed>|null $validated
+    */
+    private function regularBroadcastChannelInput(?array $validated = null): string
+    {
+        $value = $validated['channel'] ?? $this->input('channel', 'email');
+
+        return $value === 'sms' ? 'sms' : 'email';
+    }
+
+    private function isPermissionInvitationRequest(): bool
+    {
+        return $this->input('broadcast_type') === Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION;
+    }
+
+    private function isRegularBroadcastRequest(): bool
+    {
+        return ! $this->isPermissionInvitationRequest();
+    }
+
 }
