@@ -6,6 +6,46 @@ The goal is to let each client enable only the capabilities they need without fo
 
 This document defines module ownership, dependency direction, and the architectural rules that should guide future implementation. Actionable implementation backlog belongs in TODO.md, not this file.
 
+## Product Capability Barometer
+
+Module boundaries should preserve a simple product standard:
+
+```text
+If a client-facing task cannot realistically be completed in Engage Core in 10-15 minutes total, it should usually not be a client-facing workflow.
+```
+
+Instead, it should be developer/operator work, automated, preconfigured, preset-driven, hidden behind a simpler action, or split into a guided workflow that only asks the client for business decisions they are qualified to make.
+
+This barometer applies to feature/module capability decisions.
+
+Good client-facing capabilities are action-oriented and fast:
+
+```text
+Draft a Broadcast message.
+Select who receives it.
+Schedule an appointment for a person on a known day.
+Send an existing form.
+Review a submission.
+Request documents.
+Mark a task complete.
+```
+
+Developer/operator-facing capabilities may be more complex because they encode the reusable system:
+
+```text
+Build a form.
+Design a Campaign.
+Configure a FlowRoute.
+Define document requirements.
+Map vertical-specific answers.
+Wire integrations.
+Create client-specific presets.
+```
+
+This does not mean Engage Core avoids powerful modules. It means powerful modules should expose simple runtime actions to clients and keep system design work with the developer/operator.
+
+Use `product-principles.md` for the fuller product posture.
+
 ## Core Rule
 
 Modules may depend on another module’s public API, but should not depend on another module’s private internals.

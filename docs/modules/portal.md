@@ -4,6 +4,37 @@ Portal is a planned universal module.
 
 Portal owns reusable external/customer account access that can be used by multiple verticals without pushing portal account state into Core contacts or reusing internal app users as customer accounts.
 
+## Client-facing expectation
+
+Portal should follow the Engage Core product barometer:
+
+```text
+A customer/client-facing portal action should be obvious and quick.
+A business-client-facing portal setup workflow should not ask the client to design a portal from scratch.
+```
+
+Portal should provide the account/access shell that lets customers do simple useful things:
+
+```text
+Book an appointment.
+Submit an existing form.
+Upload a requested document.
+View relevant account/order/appointment information.
+Update basic profile or preference information.
+```
+
+The developer/operator should own complex setup work:
+
+```text
+Configure portal surfaces.
+Decide which modules contribute portal panels/routes.
+Define customer access rules.
+Wire portal invitations and notifications.
+Create vertical-specific portal experiences.
+```
+
+Portal should not become a blank-canvas website/client-portal builder that every client has to learn.
+
 ## Responsibility
 
 Portal should answer:

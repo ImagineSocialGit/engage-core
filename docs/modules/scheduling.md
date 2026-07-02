@@ -4,6 +4,38 @@ Scheduling is a planned universal module.
 
 Scheduling owns reusable appointment and booking capability that can be used by multiple verticals without pushing appointment state into Core or vertical-specific tables.
 
+## Client-facing expectation
+
+Scheduling should follow the Engage Core product barometer:
+
+```text
+A client-facing scheduling task should be completable in 10-15 minutes total, and common appointment scheduling should usually take far less.
+```
+
+Scheduling an appointment for a known person on a known day should feel closer to a 30-second task than a configuration workflow.
+
+Client-facing Scheduling UX should focus on fast actions:
+
+```text
+Schedule this appointment.
+Reschedule this appointment.
+Cancel this appointment.
+Confirm attendance.
+Mark completed or no-show.
+```
+
+Developer/operator-facing setup may own the more complex work:
+
+```text
+Define bookable services.
+Configure availability patterns.
+Wire reminders.
+Connect external calendar providers.
+Attach forms/tasks/portal behavior.
+```
+
+Scheduling should not become a generic calendar-builder product for clients to maintain.
+
 ## Responsibility
 
 Scheduling should answer:
