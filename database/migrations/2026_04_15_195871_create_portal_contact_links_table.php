@@ -1,5 +1,7 @@
 <?php
 
+use App\Modules\Core\Models\Contact;
+use App\Modules\Portal\Models\PortalUser;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -11,12 +13,12 @@ return new class extends Migration
         Schema::create('portal_contact_links', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('portal_user_id')
-                ->constrained('portal_users')
+            $table->foreignIdFor(PortalUser::class)
+                ->constrained()
                 ->cascadeOnDelete();
 
-            $table->foreignId('contact_id')
-                ->constrained('contacts')
+            $table->foreignIdFor(Contact::class)
+                ->constrained()
                 ->cascadeOnDelete();
 
             $table->string('relationship')->nullable()->index();

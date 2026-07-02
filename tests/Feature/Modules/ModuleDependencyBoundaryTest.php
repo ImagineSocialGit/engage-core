@@ -47,6 +47,7 @@ class ModuleDependencyBoundaryTest extends TestCase
         $this->assertContains('portal', $registered);
         $this->assertContains('workflow', $registered);
         $this->assertContains('flow_routes', $registered);
+        $this->assertContains('forms', $registered);
         $this->assertContains('campaigns', $registered);
         $this->assertContains('broadcasts', $registered);
         $this->assertContains('webinars', $registered);
@@ -60,6 +61,7 @@ class ModuleDependencyBoundaryTest extends TestCase
             'Broadcasts',
             'Campaigns',
             'FlowRoutes',
+            'Forms',
             'InboundMessaging',
             'InternalNotifications',
             'Mortgage',
@@ -84,6 +86,7 @@ class ModuleDependencyBoundaryTest extends TestCase
             'Broadcasts',
             'Campaigns',
             'FlowRoutes',
+            'Forms',
             'InboundMessaging',
             'InternalNotifications',
             'Messaging',
@@ -97,6 +100,29 @@ class ModuleDependencyBoundaryTest extends TestCase
         ]);
     }
 
+
+
+
+    public function test_forms_module_does_not_import_domain_or_delivery_modules(): void
+    {
+        $this->assertModuleDoesNotImport('Forms', [
+            'Broadcasts',
+            'Campaigns',
+            'Documents',
+            'FlowRoutes',
+            'InboundMessaging',
+            'InternalNotifications',
+            'Messaging',
+            'Mortgage',
+            'PetServices',
+            'Music',
+            'Portal',
+            'Scheduling',
+            'Tasks',
+            'Webinars',
+            'Workflow',
+        ]);
+    }
 
     public function test_portal_module_does_not_import_domain_or_delivery_modules(): void
     {

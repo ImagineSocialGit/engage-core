@@ -1,5 +1,8 @@
 <?php
 
+use App\Modules\Core\Models\Contact;
+use App\Modules\Scheduling\Models\Appointment;
+use App\Modules\Scheduling\Models\BookableService;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -11,19 +14,19 @@ return new class extends Migration
         Schema::create('appointments', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('bookable_service_id')
+            $table->foreignIdFor(BookableService::class)
                 ->nullable()
-                ->constrained('bookable_services')
+                ->constrained()
                 ->nullOnDelete();
 
-            $table->foreignId('contact_id')
+            $table->foreignIdFor(Contact::class)
                 ->nullable()
-                ->constrained('contacts')
+                ->constrained()
                 ->nullOnDelete();
 
             $table->nullableMorphs('primary_attendee');
 
-            $table->foreignId('rescheduled_from_id')
+            $table->foreignIdFor(Appointment::class, 'rescheduled_from_id')
                 ->nullable()
                 ->constrained('appointments')
                 ->nullOnDelete();

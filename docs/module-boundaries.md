@@ -170,6 +170,10 @@ Current ownership:
 | portal_contact_links | Portal |
 | portal_invitations | Portal |
 | portal_access_grants | Portal |
+| form_definitions | Forms |
+| form_versions | Forms |
+| form_submissions | Forms |
+| form_submission_values | Forms |
 | team_members | InternalNotifications |
 | team_member_notification_preferences | InternalNotifications |
 | contact_workflow_profiles | Workflow |
@@ -263,10 +267,9 @@ Current universal modules include:
 - `Reporting`
 - `Scheduling`
 - `Portal`
+- `Forms`
 
 Planned universal modules include:
-
-- `Forms`
 - `Documents`
 - `Commerce`
 - `Location`
@@ -2178,7 +2181,7 @@ Bad:
 
 ## Forms Module
 
-Forms is a planned universal module.
+Forms is a current universal module.
 
 Forms should own configurable forms, intake flows, submissions, and review state.
 
@@ -2190,15 +2193,16 @@ Forms may be used for:
 - webinar questionnaires
 - general client questionnaires
 
-Forms should own, when implemented:
+Forms owns:
 
 - form definitions
 - form versions
-- form fields/schema
+- form schemas
 - form submissions
 - submission values
 - submission review state
-- optional mappings from submitted values into Contact or module-specific records
+
+Forms may later support optional mappings from submitted values into Contact or module-specific records through public actions/services.
 
 Forms should not own:
 

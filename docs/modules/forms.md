@@ -1,6 +1,6 @@
 # Forms Module
 
-Forms is a planned universal module.
+Forms is a current universal module.
 
 Forms owns reusable form definition, form runtime, submission, and review capability that can be used by multiple verticals without pushing submitted answers into Core contacts or vertical-specific tables by default.
 

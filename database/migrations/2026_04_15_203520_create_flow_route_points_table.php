@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\FlowRoutes\Models\FlowRoute;
+use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\Point;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -27,7 +28,7 @@ return new class extends Migration
             $table->boolean('is_start')->default(false)->index();
             $table->boolean('is_active')->default(true)->index();
 
-            $table->foreignId('next_flow_route_point_id')
+            $table->foreignIdFor(FlowRoutePoint::class, 'next_flow_route_point_id')
                 ->nullable()
                 ->constrained('flow_route_points')
                 ->nullOnDelete();

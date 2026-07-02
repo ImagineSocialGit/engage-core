@@ -1,5 +1,8 @@
 <?php
 
+use App\Modules\FlowRoutes\Models\FlowRoute;
+use App\Modules\FlowRoutes\Models\FlowRoutePoint;
+use App\Modules\FlowRoutes\Models\Point;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -8,38 +11,54 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('contacts', function (Blueprint $table) {
+        Schema::create('flow_route_points', function (Blueprint $table) {
             $table->id();
 
-            $table->string('first_name')->nullable();
-            $table->string('last_name')->nullable();
-            $table->string('name')->nullable();
+            $table->foreignIdFor(FlowRoute::class)
+                ->constrained()
+                ->cascadeOnDelete();
 
-            $table->string('email')->nullable()->unique();
-            $table->string('phone')->nullable()->index();
+            $table->foreignIdFor(Point::class)
+                ->constrained()
+                ->cascadeOnDelete();
 
-            $table->string('source')->nullable()->index();
-            $table->string('subsource')->nullable()->index();
+            $table->string('key')->nullable();
 
-            $table->foreignId('contact_import_batch_id')
+            $table->unsignedSmallInteger('sort_order')->default(0);
+            $table->boolean('is_start')->default(false)->index();
+            $table->boolean('is_active')->default(true)->index();
+
+            $table->foreignIdFor(FlowRoutePoint::class, 'next_flow_route_point_id')
                 ->nullable()
-                ->constrained('contact_import_batches')
+                ->constrained('flow_route_points')
                 ->nullOnDelete();
 
-            $table->timestamp('last_contacted_at')->nullable()->index();
-            $table->timestamp('last_activity_at')->nullable()->index();
+            $table->json('definition')->nullable();
+            $table->json('settings')->nullable();
+            $table->json('cancel_conditions')->nullable();
+
+            $table->string('source_version')->nullable();
+
+            $table->boolean('is_customized')->default(false)->index();
+            $table->timestamp('customized_at')->nullable();
 
             $table->json('meta')->nullable();
 
             $table->timestamps();
 
-            $table->index(['source', 'subsource']);
-            $table->index(['last_activity_at', 'last_contacted_at']);
+            $table->unique(['flow_route_id', 'key']);
+            $table->unique(['flow_route_id', 'sort_order']);
+
+            $table->index(['flow_route_id', 'is_active', 'sort_order']);
+            $table->index(['flow_route_id', 'is_start']);
+            $table->index(['point_id', 'is_active']);
+            $table->index(['key', 'source_version']);
+            $table->index(['next_flow_route_point_id']);
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('contacts');
+        Schema::dropIfExists('flow_route_points');
     }
 };

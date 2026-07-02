@@ -103,12 +103,12 @@ Universal modules are reusable capability modules. They may be disabled for many
 | Reporting | Reporting queries, dashboards, data objects, and report surfaces. |
 | Scheduling | Appointments, availability, booking/reschedule/cancel behavior, appointment reminders. |
 | Portal | External/customer accounts, portal auth, account invitations, contact-account links, customer-facing shell. |
+| Forms | Form definitions, versions, schemas, submissions, submission review state. |
 
 ### Planned universal modules
 
 | Module | Responsibility | Example uses |
 | --- | --- | --- |
-| Forms | Form definitions, versions, schemas, submissions, submission review state. | Dog intake forms, mortgage intake, music booking inquiries, webinar questionnaires. |
 | Documents | Document requests, uploaded document records, review events, document lifecycle state. | Vaccination records, waivers, mortgage docs, music contracts/assets. |
 | Commerce | Normalized products, orders, order items, customer/contact links, purchase events, provider sync state. | Shopify purchase history, product-based filters, fan/customer segmentation. |
 | Location | Contact locations, addresses, geocoding-derived coordinates, markets/regions, radius/service-area filters. | Show-radius targeting, dog trainer service areas, appointment eligibility. |

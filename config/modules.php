@@ -4,6 +4,7 @@ use App\Modules\Broadcasts\Providers\BroadcastsModuleServiceProvider;
 use App\Modules\Campaigns\Providers\CampaignsModuleServiceProvider;
 use App\Modules\Core\Providers\CoreModuleServiceProvider;
 use App\Modules\FlowRoutes\Providers\FlowRoutesModuleServiceProvider;
+use App\Modules\Forms\Providers\FormsModuleServiceProvider;
 use App\Modules\InboundMessaging\Providers\InboundMessagingModuleServiceProvider;
 use App\Modules\InternalNotifications\Providers\InternalNotificationsModuleServiceProvider;
 use App\Modules\Messaging\Providers\MessagingModuleServiceProvider;
@@ -93,6 +94,15 @@ return [
             'depends_on' => ['core'],
             'providers' => [
                 PortalModuleServiceProvider::class,
+            ],
+        ],
+
+
+        'forms' => [
+            'name' => 'Forms',
+            'depends_on' => ['core'],
+            'providers' => [
+                FormsModuleServiceProvider::class,
             ],
         ],
 

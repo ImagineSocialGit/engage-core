@@ -217,6 +217,21 @@
 │   │   │   │   ├── FlowRouteConditionEvaluatorRegistry.php
 │   │   │   │   └── PointHandlerRegistry.php
 │   │   │   └── Support
+│   │   ├── Forms
+│   │   │   ├── Actions
+│   │   │   ├── Contracts
+│   │   │   ├── Controllers
+│   │   │   ├── Data
+│   │   │   ├── Models
+│   │   │   │   ├── FormDefinition.php
+│   │   │   │   ├── FormSubmission.php
+│   │   │   │   ├── FormSubmissionValue.php
+│   │   │   │   └── FormVersion.php
+│   │   │   ├── Providers
+│   │   │   │   └── FormsModuleServiceProvider.php
+│   │   │   ├── Requests
+│   │   │   ├── Services
+│   │   │   └── Support
 │   │   ├── InboundMessaging
 │   │   │   ├── Actions
 │   │   │   │   ├── Email
@@ -776,6 +791,10 @@
 │   │   ├── BroadcastRecipientFactory.php
 │   │   ├── ContactFactory.php
 │   │   ├── ContactImportBatchFactory.php
+│   │   ├── FormDefinitionFactory.php
+│   │   ├── FormSubmissionFactory.php
+│   │   ├── FormSubmissionValueFactory.php
+│   │   ├── FormVersionFactory.php
 │   │   ├── PortalAccessGrantFactory.php
 │   │   ├── PortalContactLinkFactory.php
 │   │   ├── PortalInvitationFactory.php
@@ -809,6 +828,10 @@
 │   │   ├── 2026_04_15_195871_create_portal_contact_links_table.php
 │   │   ├── 2026_04_15_195872_create_portal_invitations_table.php
 │   │   ├── 2026_04_15_195873_create_portal_access_grants_table.php
+│   │   ├── 2026_04_15_195880_create_form_definitions_table.php
+│   │   ├── 2026_04_15_195881_create_form_versions_table.php
+│   │   ├── 2026_04_15_195882_create_form_submissions_table.php
+│   │   ├── 2026_04_15_195883_create_form_submission_values_table.php
 │   │   ├── 2026_04_15_195900_create_contact_workflow_profiles_table.php
 │   │   ├── 2026_04_15_203500_create_flow_routes_table.php
 │   │   ├── 2026_04_15_203510_create_points_table.php
@@ -1030,6 +1053,8 @@
 │   │   │   ├── FlowRoutePointExecutionFoundationTest.php
 │   │   │   ├── FlowRoutesModelSchemaTest.php
 │   │   │   └── HandleContactWorkflowStatusChangedTest.php
+│   │   ├── Forms
+│   │   │   └── FormsFoundationTest.php
 │   │   ├── Integrations
 │   │   │   └── Messaging
 │   │   │       └── Sms
@@ -1084,4 +1109,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-372 directories, 713 files
+383 directories, 727 files
