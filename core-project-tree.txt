@@ -415,6 +415,7 @@
 │   │   │   │   │   ├── EmailMessagingService.php
 │   │   │   │   │   └── EmailProviderManager.php
 │   │   │   │   ├── MessageChannelAvailability.php
+│   │   │   │   ├── MessageConfigValidator.php
 │   │   │   │   ├── MessageDedupeKeyBuilder.php
 │   │   │   │   ├── MessageDefinitionResolver.php
 │   │   │   │   ├── MessageDispatchDefinitionMatcher.php
@@ -1165,7 +1166,8 @@
 │   │   │   ├── FlowRouteConditionBranchPointTest.php
 │   │   │   ├── FlowRoutePointExecutionFoundationTest.php
 │   │   │   ├── FlowRoutesModelSchemaTest.php
-│   │   │   └── HandleContactWorkflowStatusChangedTest.php
+│   │   │   ├── HandleContactWorkflowStatusChangedTest.php
+│   │   │   └── SyncFlowRoutePresetsActionTest.php
 │   │   ├── Forms
 │   │   │   └── FormsFoundationTest.php
 │   │   ├── Integrations
@@ -1187,6 +1189,7 @@
 │   │   │   ├── InternalNotificationChannelResolverTest.php
 │   │   │   ├── InternalNotificationGateTest.php
 │   │   │   ├── MessageChannelAvailabilityTest.php
+│   │   │   ├── MessageConfigValidatorTest.php
 │   │   │   ├── MessageDefinitionResolverTest.php
 │   │   │   ├── MessageEligibilityGateTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
@@ -1226,4 +1229,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-417 directories, 810 files
+417 directories, 813 files

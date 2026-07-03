@@ -204,9 +204,9 @@ return [
         ],
         'smoke_attended_webinar_to_in_process' => [
             'key' => 'smoke_attended_webinar_to_in_process',
+            'contact_status_key' => 'attended_webinar',
             'trigger' => [
                 'type' => 'contact_status',
-                'contact_status_key' => 'attended_webinar',
             ],
             'name' => 'Smoke Attended Webinar to In Process',
             'version' => 1,
@@ -249,9 +249,9 @@ return [
         ],
         'smoke_in_process_task_completion_message' => [
             'key' => 'smoke_in_process_task_completion_message',
+            'contact_status_key' => 'in_process',
             'trigger' => [
                 'type' => 'contact_status',
-                'contact_status_key' => 'in_process',
             ],
             'name' => 'Smoke In Process Task Completion Message',
             'version' => 1,
