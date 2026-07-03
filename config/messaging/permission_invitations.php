@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'public' => [
+        'base_url' => env('PERMISSION_INVITATION_PUBLIC_URL'),
+    ],
+
     'email' => [
         'subject' => 'Confirm how you want to hear from us',
         'body' => 'Hi {first_name}, please confirm your communication preferences so we know how you want to hear from us.',

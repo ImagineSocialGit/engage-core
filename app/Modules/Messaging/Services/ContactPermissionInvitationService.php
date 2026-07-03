@@ -213,6 +213,16 @@ class ContactPermissionInvitationService
 
     public function publicUrl(ContactPermissionInvitation $invitation): string
     {
+        $path = route('messaging.permission-invitations.show', [
+            'token' => $invitation->token,
+        ], false);
+
+        $baseUrl = $this->publicBaseUrl();
+
+        if ($baseUrl !== null) {
+            return $baseUrl.$path;
+        }
+
         return route('messaging.permission-invitations.show', [
             'token' => $invitation->token,
         ]);
@@ -340,6 +350,20 @@ class ContactPermissionInvitationService
 
         return $token;
     }
+
+    private function publicBaseUrl(): ?string
+    {
+        $baseUrl = config('messaging.permission_invitations.public.base_url');
+
+        if (! is_string($baseUrl)) {
+            return null;
+        }
+
+        $baseUrl = rtrim(trim($baseUrl), '/');
+
+        return $baseUrl !== '' ? $baseUrl : null;
+    }
+
 
     /**
      * @param array<int, string> $channels

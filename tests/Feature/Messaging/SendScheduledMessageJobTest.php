@@ -786,6 +786,128 @@ Thanks.",
         $this->assertSame($expectedUrl, $capturedPayload->secondaryLink['url']);
     }
 
+    public function test_permission_invitation_public_url_uses_configured_base_url(): void
+    {
+        config([
+            'messaging.permission_invitations.public.base_url' => 'https://crm.example.test/',
+        ]);
+
+        $contact = Contact::factory()->create([
+            'email' => 'imported@example.com',
+            'source' => 'import',
+        ]);
+
+        $invitation = ContactPermissionInvitation::query()->create([
+            'contact_id' => $contact->id,
+            'channel' => ContactPermissionInvitation::CHANNEL_EMAIL,
+            'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+            'status' => ContactPermissionInvitation::STATUS_SENT,
+            'token' => 'configured-base-url-token',
+            'claimed_at' => now(),
+            'sent_at' => now(),
+        ]);
+
+        $url = app(ContactPermissionInvitationService::class)->publicUrl($invitation);
+
+        $this->assertSame(
+            'https://crm.example.test/preferences/configured-base-url-token',
+            $url,
+        );
+    }
+
+    public function test_permission_invitation_page_renders_without_client_key(): void
+    {
+        $this->withoutVite();
+
+        config([
+            'app.client_key' => null,
+            'client.key' => null,
+            'messaging.permission_invitations.content' => [],
+            'messaging.permission_invitations.style' => [],
+        ]);
+
+        $contact = Contact::factory()->create([
+            'email' => 'imported@example.com',
+            'source' => 'import',
+        ]);
+
+        $invitation = ContactPermissionInvitation::query()->create([
+            'contact_id' => $contact->id,
+            'channel' => ContactPermissionInvitation::CHANNEL_EMAIL,
+            'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+            'status' => ContactPermissionInvitation::STATUS_SENT,
+            'token' => 'public-page-token',
+            'claimed_at' => now(),
+            'sent_at' => now(),
+        ]);
+
+        $this->get(route('messaging.permission-invitations.show', ['token' => $invitation->token]))
+            ->assertOk()
+            ->assertSee('Choose how you want to hear from us.')
+            ->assertSee('imported@example.com');
+    }
+
+    public function test_permission_invitation_email_only_acceptance_renders_accepted_page_and_creates_consent(): void
+    {
+        $this->withoutVite();
+
+        config([
+            'app.client_key' => null,
+            'client.key' => null,
+            'messaging.permission_invitations.content' => [],
+            'messaging.permission_invitations.style' => [],
+            'messaging.permission_invitations.consent.scopes' => [
+                'broadcast',
+                'campaign',
+            ],
+        ]);
+
+        $contact = Contact::factory()->create([
+            'email' => 'imported@example.com',
+            'source' => 'import',
+        ]);
+
+        $invitation = ContactPermissionInvitation::query()->create([
+            'contact_id' => $contact->id,
+            'channel' => ContactPermissionInvitation::CHANNEL_EMAIL,
+            'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+            'status' => ContactPermissionInvitation::STATUS_SENT,
+            'token' => 'email-only-acceptance-token',
+            'claimed_at' => now(),
+            'sent_at' => now(),
+        ]);
+
+        $this->post(route('messaging.permission-invitations.store', ['token' => $invitation->token]), [
+            'channels' => ['email'],
+        ])->assertRedirect(route('messaging.permission-invitations.show', ['token' => $invitation->token]));
+
+        $invitation->refresh();
+
+        $this->assertSame(ContactPermissionInvitation::STATUS_ACCEPTED, $invitation->status);
+        $this->assertSame(['email'], $invitation->accepted_channels);
+
+        $this->assertDatabaseHas('message_consents', [
+            'contact_id' => $contact->id,
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'source' => 'imported_contact_permission_invitation',
+        ]);
+
+        $this->assertDatabaseHas('message_consents', [
+            'contact_id' => $contact->id,
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'campaign',
+            'source' => 'imported_contact_permission_invitation',
+        ]);
+
+        $this->get(route('messaging.permission-invitations.show', ['token' => $invitation->token]))
+            ->assertOk()
+            ->assertSee('Your preferences are confirmed.')
+            ->assertSee('EMAIL');
+    }
+
     public function test_it_treats_contacts_with_import_batch_as_imported_for_permission_invitations(): void
     {
         Event::fake([ScheduledMessageSent::class]);
