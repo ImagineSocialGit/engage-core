@@ -31,11 +31,55 @@
                         </div>
                     </div>
 
-                    <div>
-                        <p class="text-sm text-slate-500">Status</p>
-                        <p class="font-medium text-slate-900">
-                            {{ module_enabled('workflow') ? ($contact->workflowProfile?->contactStatus?->name ?? '—') : '—' }}
-                        </p>
+                    <div class="space-y-3">
+                        <div>
+                            <p class="text-sm text-slate-500">Status</p>
+                            <p class="font-medium text-slate-900">
+                                {{ module_enabled('workflow') ? ($contact->workflowProfile?->contactStatus?->name ?? '—') : '—' }}
+                            </p>
+                        </div>
+
+                        @if(module_enabled('workflow'))
+                            <form
+                                method="POST"
+                                action="{{ route('crm.contacts.status.update', $contact) }}"
+                                class="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-end"
+                            >
+                                @csrf
+                                @method('PATCH')
+
+                                <div class="flex-1">
+                                    <x-ui.form.label for="contact_status_id">
+                                        Update Status
+                                    </x-ui.form.label>
+
+                                    <select
+                                        id="contact_status_id"
+                                        name="contact_status_id"
+                                        class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                                    >
+                                        @foreach($contactStatuses as $contactStatus)
+                                            <option
+                                                value="{{ $contactStatus->id }}"
+                                                @selected((int) old('contact_status_id', $contact->workflowProfile?->contact_status_id) === (int) $contactStatus->id)
+                                            >
+                                                {{ $contactStatus->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+
+                                    @error('contact_status_id')
+                                        <p class="mt-1 text-sm text-red-600">
+                                            {{ $message }}
+                                        </p>
+                                    @enderror
+                                </div>
+
+                                <x-ui.button type="submit">
+                                    Update
+                                </x-ui.button>
+                            </form>
+                        @endif
                     </div>
 
                     @if (data_get($contact->meta, 'import.status_mapping.state') === 'unmapped')

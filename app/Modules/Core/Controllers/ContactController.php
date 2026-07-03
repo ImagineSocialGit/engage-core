@@ -13,10 +13,12 @@ use App\Modules\Core\Services\Contacts\ContactImportStatusMapper;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Core\Support\Contacts\ContactShowDataRegistry;
+use App\Modules\Workflow\Actions\TransitionContactWorkflowStatusAction;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -92,7 +94,49 @@ class ContactController extends Controller
             'taskView' => request('task_view') === 'archived' ? 'archived' : 'active',
             'tasks' => collect(),
             'archivedTasks' => collect(),
+            'contactStatuses' => module_enabled('workflow')
+                ? ContactStatus::query()->active()->ordered()->get(['id', 'name'])
+                : collect(),
         ], $contactShowDataRegistry->dataFor($contact)));
+    }
+
+    public function updateStatus(
+        Request $request,
+        Contact $contact,
+        TransitionContactWorkflowStatusAction $transitionContactWorkflowStatus,
+    ): RedirectResponse {
+        if (! module_enabled('workflow')) {
+            return back()->with('error', 'Workflow is not enabled.');
+        }
+
+        $validated = $request->validate([
+            'contact_status_id' => [
+                'required',
+                'integer',
+                Rule::exists('contact_statuses', 'id')
+                    ->where(fn ($query) => $query->where('is_active', true)),
+            ],
+        ]);
+
+        $status = ContactStatus::query()
+            ->active()
+            ->findOrFail($validated['contact_status_id']);
+
+        $transitionContactWorkflowStatus->handle(
+            contact: $contact,
+            toStatus: $status,
+            reason: 'crm_manual_status_update',
+            source: 'crm',
+            actor: $request->user(),
+            meta: [
+                'source' => 'contact_show_status_form',
+            ],
+            force: true,
+        );
+
+        return redirect()
+            ->route('crm.contacts.show', $contact)
+            ->with('success', config('contacts.labels.singular').' status updated.');
     }
 
     public function import(): View

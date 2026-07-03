@@ -117,6 +117,10 @@ Route::middleware('auth')->group(function () {
             Route::get('/{contact}', [ContactController::class, 'show'])
                 ->name('show');
 
+            Route::patch('/{contact}/status', [ContactController::class, 'updateStatus'])
+                ->middleware('module:workflow')
+                ->name('status.update');
+
             Route::post('/{contact}/notes', [ContactNoteController::class, 'store'])
                 ->name('notes.store');
 
