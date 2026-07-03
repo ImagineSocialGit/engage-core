@@ -351,6 +351,50 @@ class DispatchMessageActionTest extends TestCase
         Queue::assertPushed(SendScheduledMessageJob::class);
     }
 
+    public function test_sms_payload_uses_contact_phone_even_when_contact_email_exists(): void
+    {
+        Queue::fake();
+
+        Config::set('messaging.sms.marketing.webinar_waitlist', [
+            'opt_in' => [
+                'dispatch_key' => 'consent_granted',
+                'timing' => 'immediate',
+                'payload_class' => SmsPayload::class,
+                'queue' => 'opt_in_messages',
+                'payload' => [
+                    'message' => 'Thanks for joining the waitlist.',
+                ],
+            ],
+        ]);
+
+        $contact = $this->contactWithConsent(
+            channel: 'sms',
+            purpose: 'marketing',
+            scope: 'webinar_waitlist',
+            attributes: [
+                'email' => 'person@example.com',
+                'phone' => '+15555550123',
+            ],
+        );
+
+        app(DispatchMessageAction::class)->handle(
+            recipient: $contact,
+            channel: 'sms',
+            purpose: 'marketing',
+            scope: 'webinar_waitlist',
+            dispatchKeys: 'consent_granted',
+        );
+
+        $message = ScheduledMessage::query()->first();
+
+        $this->assertNotNull($message);
+        $this->assertSame('sms', $message->channel);
+        $this->assertSame('+15555550123', $message->payload['to']);
+        $this->assertNotSame('person@example.com', $message->payload['to']);
+
+        Queue::assertPushed(SendScheduledMessageJob::class);
+    }
+
     public function test_it_schedules_no_sms_message_when_contact_has_no_phone(): void
     {
         Queue::fake();

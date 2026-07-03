@@ -13,7 +13,6 @@ use App\Modules\Core\Services\Contacts\ContactImportStatusMapper;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Core\Support\Contacts\ContactShowDataRegistry;
-use App\Modules\Workflow\Actions\TransitionContactWorkflowStatusAction;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
@@ -103,7 +102,7 @@ class ContactController extends Controller
     public function updateStatus(
         Request $request,
         Contact $contact,
-        TransitionContactWorkflowStatusAction $transitionContactWorkflowStatus,
+        UpdatesContactStatus $updatesContactStatus,
     ): RedirectResponse {
         if (! module_enabled('workflow')) {
             return back()->with('error', 'Workflow is not enabled.');
@@ -122,9 +121,9 @@ class ContactController extends Controller
             ->active()
             ->findOrFail($validated['contact_status_id']);
 
-        $transitionContactWorkflowStatus->handle(
+        $updatesContactStatus->handle(
             contact: $contact,
-            toStatus: $status,
+            status: $status,
             reason: 'crm_manual_status_update',
             source: 'crm',
             actor: $request->user(),

@@ -38,7 +38,7 @@ class MessageRecipientPayloadResolver
             recipient: $recipient,
         );
 
-        $destination = $this->explicitDestination($mergedPayload)
+        $destination = $this->explicitDestination($mergedPayload, $channel)
             ?? $this->destinationForChannel($recipient, $channel);
 
         if (! is_string($destination) || trim($destination) === '') {
@@ -145,9 +145,15 @@ class MessageRecipientPayloadResolver
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function explicitDestination(array $payload): ?string
+    private function explicitDestination(array $payload, string $channel): ?string
     {
-        foreach (['to', 'email', 'phone'] as $key) {
+        $keys = match ($channel) {
+            MessageChannel::Email->value => ['to', 'email', 'contact_email'],
+            MessageChannel::Sms->value => ['to', 'phone', 'contact_phone'],
+            default => ['to'],
+        };
+
+        foreach ($keys as $key) {
             $value = $payload[$key] ?? null;
 
             if (is_string($value) && trim($value) !== '') {
