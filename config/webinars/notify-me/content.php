@@ -32,4 +32,10 @@ return [
 
     ],
 
+    'success' => [
+        'title' => 'You’re on the list',
+        'message' => 'Thanks for signing up. We’ll let you know when the next webinar session is scheduled.',
+        'body' => 'You can close this page now, or keep an eye on your inbox for future webinar updates.',
+    ],
+
 ];

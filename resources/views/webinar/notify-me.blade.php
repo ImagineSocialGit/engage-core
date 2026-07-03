@@ -65,9 +65,29 @@
                 @if($page['form_card']['enabled'] ?? true)
                     <div class="{{ $style['form_card']['class'] ?? 'rounded-3xl border border-black/10 bg-white p-6 text-ink shadow-2xl shadow-black/20 sm:p-8' }}">
                         
-                        @if(session('success'))
-                            <div class="mb-6 rounded-2xl bg-green-100 px-4 py-3 text-sm font-bold text-green-800">
-                                {{ session('success') }}
+                        @if(session('webinar_waitlist_success'))
+                            <div
+                                role="status"
+                                aria-live="polite"
+                                class="{{ $style['success']['wrapper'] ?? 'mb-6 rounded-3xl border border-green-200 bg-green-50 p-5 text-green-950 shadow-sm' }}"
+                            >
+                                <p class="{{ $style['success']['eyebrow'] ?? 'text-xs font-extrabold uppercase tracking-[0.18em] text-green-700' }}">
+                                    Success
+                                </p>
+
+                                <h2 class="{{ $style['success']['title'] ?? 'mt-2 text-2xl font-extrabold tracking-[-0.03em] text-green-950' }}">
+                                    {{ $page['success']['title'] ?? 'You’re on the list' }}
+                                </h2>
+
+                                <p class="{{ $style['success']['message'] ?? 'mt-2 text-sm font-bold leading-6 text-green-900' }}">
+                                    {{ session('success') ?? ($page['success']['message'] ?? 'Thanks for signing up. We’ll let you know when the next webinar is scheduled.') }}
+                                </p>
+
+                                @if(filled($page['success']['body'] ?? null))
+                                    <p class="{{ $style['success']['body'] ?? 'mt-2 text-sm font-medium leading-6 text-green-800' }}">
+                                        {{ $page['success']['body'] }}
+                                    </p>
+                                @endif
                             </div>
                         @endif
 

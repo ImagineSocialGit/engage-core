@@ -97,6 +97,9 @@ class WebinarWaitlistSignupControllerTest extends TestCase
         $response->assertRedirect(route('webinar.show', $series->slug));
         $response->assertSessionHasNoErrors();
 
+        $response->assertSessionHas('webinar_waitlist_success', true);
+        $response->assertSessionHas('success');
+
         $contact = Contact::query()->where('email', 'jeff@example.com')->first();
 
         $this->assertNotNull($contact);
@@ -118,6 +121,33 @@ class WebinarWaitlistSignupControllerTest extends TestCase
             'source' => 'webinar_waitlist',
         ]);
 
+        $this->assertSame(1, MessageConsent::query()->count());
+    }
+
+    public function test_it_shows_success_confirmation_after_waitlist_signup(): void
+    {
+        Queue::fake();
+
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'homebuyer-basics',
+            'title' => 'Homebuyer Basics',
+        ]);
+
+        $this->followingRedirects()
+            ->from(route('webinar.show', $series->slug))
+            ->post(route('webinar.waitlist.store', $series->slug), [
+                'first_name' => 'Jeff',
+                'last_name' => 'Yarnall',
+                'email' => 'jeff-visible@example.com',
+                'marketing_email_consent' => true,
+                'marketing_sms_consent' => false,
+            ])
+            ->assertOk()
+            ->assertSee('You’re on the list')
+            ->assertSee('Thanks for signing up');
+
+        $this->assertSame(1, WebinarWaitlistSignup::query()->count());
         $this->assertSame(1, MessageConsent::query()->count());
     }
 

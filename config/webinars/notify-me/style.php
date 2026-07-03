@@ -35,6 +35,14 @@ return [
         'error' => 'mt-2 text-sm font-bold text-red-600',
     ],
 
+    'success' => [
+        'wrapper' => 'mb-6 rounded-3xl border border-green-200 bg-green-50 p-5 text-green-950 shadow-sm',
+        'eyebrow' => 'text-xs font-extrabold uppercase tracking-[0.18em] text-green-700',
+        'title' => 'mt-2 text-2xl font-extrabold tracking-[-0.03em] text-green-950',
+        'message' => 'mt-2 text-sm font-bold leading-6 text-green-900',
+        'body' => 'mt-2 text-sm font-medium leading-6 text-green-800',
+    ],
+
     'compliance' => [
         'wrapper' => 'bg-secondary px-6 pb-10 text-center',
         'text' => 'mx-auto max-w-4xl text-xs font-medium leading-6 text-white/55',

@@ -29,6 +29,13 @@ class WebinarWaitlistSignupController extends Controller
 
         return redirect()
             ->route('webinar.show', $series->slug)
-            ->with('success', 'You’re on the list. We’ll let you know when the next webinar is scheduled.');
+            ->with('webinar_waitlist_success', true)
+            ->with(
+                'success',
+                config(
+                    'webinars.notify-me.content.success.message',
+                    'You’re on the list. We’ll let you know when the next webinar is scheduled.'
+                )
+            );
     }
 }
