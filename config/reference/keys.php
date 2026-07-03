@@ -1,3 +1,4 @@
+
 <?php
 
 return [
@@ -70,6 +71,11 @@ return [
             'preferred_purposes' => ['marketing'],
             'status' => 'active',
         ],
+        'webinar_nurture_test' => [
+            'description' => 'Disposable short-interval marketing nurture scope for webinar smoke testing.',
+            'preferred_purposes' => ['marketing'],
+            'status' => 'temporary',
+        ],
         'webinar_waitlist' => [
             'description' => 'Marketing/waitlist messages for leads waiting for future webinar availability.',
             'preferred_purposes' => ['marketing'],
@@ -99,6 +105,11 @@ return [
             'description' => 'Transactional imported-contact permission invitation email flow.',
             'preferred_purposes' => ['transactional'],
             'status' => 'active',
+        ],
+        'route_test' => [
+            'description' => 'Disposable transactional scope for FlowRoute send-message smoke testing.',
+            'preferred_purposes' => ['transactional'],
+            'status' => 'temporary',
         ],
         'mortgage_homebuyer_nurture' => [
             'description' => 'Mortgage-specific long-term homebuyer nurture messages.',
@@ -186,6 +197,15 @@ return [
             ],
             'typical_channel_purpose_scope' => ['email:marketing:webinar_nurture', 'sms:marketing:webinar_nurture'],
             'status' => 'active',
+        ],
+        'flow_route_task_done' => [
+            'description' => 'Disposable smoke-test trigger for a FlowRoute task-completion send-message point.',
+            'used_by' => ['flow_routes', 'messaging'],
+            'recommended_for' => [
+                'FlowRoute task-completion smoke messages',
+            ],
+            'typical_channel_purpose_scope' => ['email:transactional:route_test', 'sms:transactional:route_test'],
+            'status' => 'temporary',
         ],
         'marketing_message_sent' => [
             'description' => 'Legacy/alternate campaign step trigger. Prefer campaign_step_due for new configs.',
@@ -295,6 +315,11 @@ return [
             'dispatch_key' => 'imported_contact_permission_invitation',
             'status' => 'recommended',
         ],
+        'flow_route_task_done' => [
+            'description' => 'Disposable FlowRoute task-completion smoke-test message.',
+            'dispatch_key' => 'flow_route_task_done',
+            'status' => 'temporary',
+        ],
     ],
 
     'automation_event_keys' => [
@@ -349,6 +374,18 @@ return [
             'scope' => 'webinar_nurture',
             'status' => 'active',
         ],
+        'webinar_attended_nurture_email_test' => [
+            'description' => 'Disposable short-interval attended webinar email nurture smoke campaign.',
+            'purpose' => 'marketing',
+            'scope' => 'webinar_nurture_test',
+            'status' => 'temporary',
+        ],
+        'webinar_attended_nurture_sms_test' => [
+            'description' => 'Disposable short-interval attended webinar SMS nurture smoke campaign.',
+            'purpose' => 'marketing',
+            'scope' => 'webinar_nurture_test',
+            'status' => 'temporary',
+        ],
         'webinar_missed_nurture' => [
             'description' => 'Default nurture campaign for leads who missed a webinar.',
             'purpose' => 'marketing',
@@ -373,6 +410,21 @@ return [
             'description' => 'Route from webinar.missed to missed nurture campaign enrollment.',
             'trigger' => 'webinar.missed',
             'status' => 'recommended',
+        ],
+        'smoke_webinar_attended_nurture_test_enrollment' => [
+            'description' => 'Disposable route from webinar.attended to attended email/SMS nurture smoke campaigns.',
+            'trigger' => 'webinar.attended',
+            'status' => 'temporary',
+        ],
+        'smoke_attended_webinar_to_in_process' => [
+            'description' => 'Disposable route from attended_webinar contact status to in_process.',
+            'trigger' => 'contact_status:attended_webinar',
+            'status' => 'temporary',
+        ],
+        'smoke_in_process_task_completion_message' => [
+            'description' => 'Disposable route from in_process to task creation, task.completed wait, and route-test email/SMS.',
+            'trigger' => 'contact_status:in_process',
+            'status' => 'temporary',
         ],
     ],
 

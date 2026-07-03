@@ -1,3 +1,4 @@
+
 <?php
 
 return [
@@ -34,6 +35,8 @@ return [
             'webinar_attended_nurture',
             'webinar_missed_nurture',
             'mortgage_homebuyer_nurture',
+            'webinar_attended_nurture_email_test',
+            'webinar_attended_nurture_sms_test',
         ],
     ],
 
@@ -271,6 +274,202 @@ return [
                             'purpose' => 'marketing',
                             'scope' => 'mortgage_homebuyer_nurture',
                         ],
+                    ],
+                ],
+            ],
+        ],
+
+
+        'webinar_attended_nurture_email_test' => [
+            'key' => 'webinar_attended_nurture_email_test',
+            'name' => 'Webinar Attended Email Nurture Smoke Test',
+            'description' => 'Disposable smoke-test attended webinar EMAIL nurture sequence. Delete after smoke testing.',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar_nurture_test',
+            'status' => 'active',
+            'is_active' => true,
+            'source_version' => 'smoke_test_2026_07',
+            'meta' => [
+                'domain' => 'webinar',
+                'strategy' => 'smoke_test_short_interval',
+                'temporary' => true,
+                'notes' => 'Four short-interval smoke steps. Step 4 should be skipped if the contact status changes to not_interested before send time.',
+            ],
+            'steps' => [
+                [
+                    'step_number' => 1,
+                    'name' => 'Smoke attended email step 1',
+                    'dispatch_key' => 'campaign_step_due',
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture_test',
+                    'is_active' => true,
+                    'criteria' => [
+                        'timing' => [
+                            'type' => 'delay',
+                            'minutes' => 1,
+                        ],
+                    ],
+                    'meta' => [
+                        'type' => 'message',
+                        'temporary' => true,
+                    ],
+                ],
+                [
+                    'step_number' => 2,
+                    'name' => 'Smoke attended email step 2',
+                    'dispatch_key' => 'campaign_step_due',
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture_test',
+                    'is_active' => true,
+                    'criteria' => [
+                        'timing' => [
+                            'type' => 'delay',
+                            'minutes' => 2,
+                        ],
+                    ],
+                    'meta' => [
+                        'type' => 'message',
+                        'temporary' => true,
+                    ],
+                ],
+                [
+                    'step_number' => 3,
+                    'name' => 'Smoke attended email step 3',
+                    'dispatch_key' => 'campaign_step_due',
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture_test',
+                    'is_active' => true,
+                    'criteria' => [
+                        'timing' => [
+                            'type' => 'delay',
+                            'minutes' => 3,
+                        ],
+                    ],
+                    'meta' => [
+                        'type' => 'message',
+                        'temporary' => true,
+                    ],
+                ],
+                [
+                    'step_number' => 4,
+                    'name' => 'Smoke attended email step 4 should skip after status change',
+                    'dispatch_key' => 'campaign_step_due',
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture_test',
+                    'is_active' => true,
+                    'criteria' => [
+                        'timing' => [
+                            'type' => 'delay',
+                            'minutes' => 3,
+                        ],
+                    ],
+                    'meta' => [
+                        'type' => 'message',
+                        'temporary' => true,
+                        'expected_smoke_result' => 'skip_when_contact_status_is_not_interested',
+                    ],
+                ],
+            ],
+        ],
+
+
+        'webinar_attended_nurture_sms_test' => [
+            'key' => 'webinar_attended_nurture_sms_test',
+            'name' => 'Webinar Attended SMS Nurture Smoke Test',
+            'description' => 'Disposable smoke-test attended webinar SMS nurture sequence. Delete after smoke testing.',
+            'channel' => 'sms',
+            'purpose' => 'marketing',
+            'scope' => 'webinar_nurture_test',
+            'status' => 'active',
+            'is_active' => true,
+            'source_version' => 'smoke_test_2026_07',
+            'meta' => [
+                'domain' => 'webinar',
+                'strategy' => 'smoke_test_short_interval',
+                'temporary' => true,
+                'notes' => 'Four short-interval smoke steps. Step 4 should be skipped if the contact status changes to not_interested before send time.',
+            ],
+            'steps' => [
+                [
+                    'step_number' => 1,
+                    'name' => 'Smoke attended sms step 1',
+                    'dispatch_key' => 'campaign_step_due',
+                    'channel' => 'sms',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture_test',
+                    'is_active' => true,
+                    'criteria' => [
+                        'timing' => [
+                            'type' => 'delay',
+                            'minutes' => 1,
+                        ],
+                    ],
+                    'meta' => [
+                        'type' => 'message',
+                        'temporary' => true,
+                    ],
+                ],
+                [
+                    'step_number' => 2,
+                    'name' => 'Smoke attended sms step 2',
+                    'dispatch_key' => 'campaign_step_due',
+                    'channel' => 'sms',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture_test',
+                    'is_active' => true,
+                    'criteria' => [
+                        'timing' => [
+                            'type' => 'delay',
+                            'minutes' => 2,
+                        ],
+                    ],
+                    'meta' => [
+                        'type' => 'message',
+                        'temporary' => true,
+                    ],
+                ],
+                [
+                    'step_number' => 3,
+                    'name' => 'Smoke attended sms step 3',
+                    'dispatch_key' => 'campaign_step_due',
+                    'channel' => 'sms',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture_test',
+                    'is_active' => true,
+                    'criteria' => [
+                        'timing' => [
+                            'type' => 'delay',
+                            'minutes' => 3,
+                        ],
+                    ],
+                    'meta' => [
+                        'type' => 'message',
+                        'temporary' => true,
+                    ],
+                ],
+                [
+                    'step_number' => 4,
+                    'name' => 'Smoke attended sms step 4 should skip after status change',
+                    'dispatch_key' => 'campaign_step_due',
+                    'channel' => 'sms',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture_test',
+                    'is_active' => true,
+                    'criteria' => [
+                        'timing' => [
+                            'type' => 'delay',
+                            'minutes' => 3,
+                        ],
+                    ],
+                    'meta' => [
+                        'type' => 'message',
+                        'temporary' => true,
+                        'expected_smoke_result' => 'skip_when_contact_status_is_not_interested',
                     ],
                 ],
             ],

@@ -1,3 +1,4 @@
+
 <?php
 
 return [
@@ -26,6 +27,9 @@ return [
         'mortgage_default' => [
             'webinar_attended_campaign_enrollment',
             'webinar_missed_campaign_enrollment',
+            'smoke_webinar_attended_nurture_test_enrollment',
+            'smoke_attended_webinar_to_in_process',
+            'smoke_in_process_task_completion_message',
         ],
 
     ],
@@ -142,6 +146,316 @@ return [
                         'source_version' => 'phase_19_default',
                         'meta' => [
                             'description' => 'First and only point in the missed webinar route.',
+                        ],
+                    ],
+                ],
+            ],
+        ],
+
+
+        'smoke_webinar_attended_nurture_test_enrollment' => [
+            'key' => 'smoke_webinar_attended_nurture_test_enrollment',
+            'trigger' => [
+                'type' => 'automation_event',
+                'event_key' => 'webinar.attended',
+            ],
+            'name' => 'Smoke Webinar Attended Test Nurture Enrollment',
+            'version' => 1,
+            'is_active' => true,
+            'source_version' => 'smoke_test_2026_07',
+            'meta' => [
+                'description' => 'Disposable smoke route that enrolls attended webinar contacts into short email and SMS test nurture campaigns.',
+                'category' => 'smoke_test',
+                'default_role' => 'campaign_enrollment',
+                'temporary' => true,
+            ],
+
+            'points' => [
+                [
+                    'key' => 'enroll_webinar_attended_nurture_email_test',
+                    'type' => 'enroll_campaign',
+                    'name' => 'Enroll Attended Email Test Nurture',
+                    'description' => 'Enroll the contact into the disposable attended webinar email test campaign.',
+                    'default_definition' => [
+                        'campaign_key' => 'webinar_attended_nurture_email_test',
+                        'on_already_enrolled' => 'skipped',
+                        'payload' => [],
+                        'meta' => [
+                            'source' => 'flow_route_smoke_test',
+                            'reason' => 'webinar_attended_event',
+                        ],
+                        'start_context' => [
+                            'source' => 'flow_route_smoke_test',
+                            'trigger_type' => 'automation_event',
+                            'event_key' => 'webinar.attended',
+                        ],
+                        'exit_conditions' => [],
+                    ],
+                    'default_settings' => [],
+                    'is_active' => true,
+                    'source_version' => 'smoke_test_2026_07',
+                    'meta' => [
+                        'description' => 'Smoke-test email campaign enrollment point.',
+                    ],
+                    'route_point' => [
+                        'sort_order' => 1,
+                        'is_start' => true,
+                        'is_active' => true,
+                        'next_point_key' => 'enroll_webinar_attended_nurture_sms_test',
+                        'definition' => [],
+                        'settings' => [],
+                        'cancel_conditions' => [],
+                        'source_version' => 'smoke_test_2026_07',
+                        'meta' => [
+                            'description' => 'First point in disposable attended nurture smoke route.',
+                        ],
+                    ],
+                ],
+                [
+                    'key' => 'enroll_webinar_attended_nurture_sms_test',
+                    'type' => 'enroll_campaign',
+                    'name' => 'Enroll Attended SMS Test Nurture',
+                    'description' => 'Enroll the contact into the disposable attended webinar SMS test campaign.',
+                    'default_definition' => [
+                        'campaign_key' => 'webinar_attended_nurture_sms_test',
+                        'on_already_enrolled' => 'skipped',
+                        'payload' => [],
+                        'meta' => [
+                            'source' => 'flow_route_smoke_test',
+                            'reason' => 'webinar_attended_event',
+                        ],
+                        'start_context' => [
+                            'source' => 'flow_route_smoke_test',
+                            'trigger_type' => 'automation_event',
+                            'event_key' => 'webinar.attended',
+                        ],
+                        'exit_conditions' => [],
+                    ],
+                    'default_settings' => [],
+                    'is_active' => true,
+                    'source_version' => 'smoke_test_2026_07',
+                    'meta' => [
+                        'description' => 'Smoke-test SMS campaign enrollment point.',
+                    ],
+                    'route_point' => [
+                        'sort_order' => 2,
+                        'is_active' => true,
+                        'definition' => [],
+                        'settings' => [],
+                        'cancel_conditions' => [],
+                        'source_version' => 'smoke_test_2026_07',
+                        'meta' => [
+                            'description' => 'Second point in disposable attended nurture smoke route.',
+                        ],
+                    ],
+                ],
+            ],
+        ],
+
+        'smoke_attended_webinar_to_in_process' => [
+            'key' => 'smoke_attended_webinar_to_in_process',
+            'trigger' => [
+                'type' => 'contact_status',
+                'contact_status_key' => 'attended_webinar',
+            ],
+            'name' => 'Smoke Attended Webinar to In Process',
+            'version' => 1,
+            'is_active' => true,
+            'source_version' => 'smoke_test_2026_07',
+            'meta' => [
+                'description' => 'Disposable smoke route that changes attended webinar contacts to in_process.',
+                'category' => 'smoke_test',
+                'temporary' => true,
+            ],
+
+            'points' => [
+                [
+                    'key' => 'smoke_change_status_to_in_process',
+                    'type' => 'change_status',
+                    'name' => 'Change Status to In Process',
+                    'description' => 'Move the contact into the in_process status to start the task-completion route.',
+                    'default_definition' => [
+                        'contact_status_key' => 'in_process',
+                        'reason' => 'smoke_attended_webinar_to_in_process',
+                        'force' => false,
+                        'on_same_status' => 'skipped',
+                        'meta' => [
+                            'source' => 'flow_route_smoke_test',
+                        ],
+                    ],
+                    'default_settings' => [],
+                    'is_active' => true,
+                    'source_version' => 'smoke_test_2026_07',
+                    'meta' => [
+                        'description' => 'Status-change point for smoke testing route handoff behavior.',
+                    ],
+                    'route_point' => [
+                        'sort_order' => 1,
+                        'is_start' => true,
+                        'is_active' => true,
+                        'definition' => [],
+                        'settings' => [],
+                        'cancel_conditions' => [],
+                        'source_version' => 'smoke_test_2026_07',
+                        'meta' => [
+                            'description' => 'Only point in attended_webinar to in_process smoke route.',
+                        ],
+                    ],
+                ],
+            ],
+        ],
+
+        'smoke_in_process_task_completion_message' => [
+            'key' => 'smoke_in_process_task_completion_message',
+            'trigger' => [
+                'type' => 'contact_status',
+                'contact_status_key' => 'in_process',
+            ],
+            'name' => 'Smoke In Process Task Completion Message',
+            'version' => 1,
+            'is_active' => true,
+            'source_version' => 'smoke_test_2026_07',
+            'meta' => [
+                'description' => 'Disposable smoke route that creates a task, waits for task.completed, then sends email and SMS task-done messages.',
+                'category' => 'smoke_test',
+                'temporary' => true,
+            ],
+
+            'points' => [
+                [
+                    'key' => 'smoke_create_attended_webinar_review_task',
+                    'type' => 'create_task',
+                    'name' => 'Create Smoke Review Task',
+                    'description' => 'Create a short follow-up task for the attended webinar smoke contact.',
+                    'default_definition' => [
+                        'title' => 'Smoke test: review attended webinar lead #{contact.id}',
+                        'description' => 'Complete this task to resume the smoke FlowRoute and schedule the task-done email/SMS.',
+                        'responsible_party' => 'internal',
+                        'priority' => 'normal',
+                        'meta' => [
+                            'source' => 'flow_route_smoke_test',
+                            'temporary' => true,
+                        ],
+                    ],
+                    'default_settings' => [],
+                    'is_active' => true,
+                    'source_version' => 'smoke_test_2026_07',
+                    'meta' => [
+                        'description' => 'Task creation point for smoke testing task completion resume behavior.',
+                    ],
+                    'route_point' => [
+                        'sort_order' => 1,
+                        'is_start' => true,
+                        'is_active' => true,
+                        'next_point_key' => 'smoke_wait_for_review_task_completed',
+                        'definition' => [],
+                        'settings' => [],
+                        'cancel_conditions' => [],
+                        'source_version' => 'smoke_test_2026_07',
+                        'meta' => [
+                            'description' => 'First point in in_process task-completion smoke route.',
+                        ],
+                    ],
+                ],
+                [
+                    'key' => 'smoke_wait_for_review_task_completed',
+                    'type' => 'event_wait',
+                    'name' => 'Wait for Smoke Task Completed',
+                    'description' => 'Wait until the contact has a task.completed automation event.',
+                    'default_definition' => [
+                        'event_key' => 'task.completed',
+                        'correlation' => [],
+                        'meta' => [
+                            'source' => 'flow_route_smoke_test',
+                        ],
+                    ],
+                    'default_settings' => [],
+                    'is_active' => true,
+                    'source_version' => 'smoke_test_2026_07',
+                    'meta' => [
+                        'description' => 'Event wait point for task.completed smoke testing.',
+                    ],
+                    'route_point' => [
+                        'sort_order' => 2,
+                        'is_active' => true,
+                        'next_point_key' => 'smoke_send_task_done_email',
+                        'definition' => [],
+                        'settings' => [],
+                        'cancel_conditions' => [],
+                        'source_version' => 'smoke_test_2026_07',
+                        'meta' => [
+                            'description' => 'Second point in in_process task-completion smoke route.',
+                        ],
+                    ],
+                ],
+                [
+                    'key' => 'smoke_send_task_done_email',
+                    'type' => 'send_message',
+                    'name' => 'Send Task Done Email',
+                    'description' => 'Schedule the disposable route-test email after task completion.',
+                    'default_definition' => [
+                        'channel' => 'email',
+                        'purpose' => 'transactional',
+                        'scope' => 'route_test',
+                        'dispatch_keys' => ['flow_route_task_done'],
+                        'payload' => [],
+                        'criteria' => [],
+                        'on_no_messages' => 'skipped',
+                        'meta' => [
+                            'source' => 'flow_route_smoke_test',
+                        ],
+                    ],
+                    'default_settings' => [],
+                    'is_active' => true,
+                    'source_version' => 'smoke_test_2026_07',
+                    'meta' => [
+                        'description' => 'Route-test email send-message point.',
+                    ],
+                    'route_point' => [
+                        'sort_order' => 3,
+                        'is_active' => true,
+                        'next_point_key' => 'smoke_send_task_done_sms',
+                        'definition' => [],
+                        'settings' => [],
+                        'cancel_conditions' => [],
+                        'source_version' => 'smoke_test_2026_07',
+                        'meta' => [
+                            'description' => 'Third point in in_process task-completion smoke route.',
+                        ],
+                    ],
+                ],
+                [
+                    'key' => 'smoke_send_task_done_sms',
+                    'type' => 'send_message',
+                    'name' => 'Send Task Done SMS',
+                    'description' => 'Schedule the disposable route-test SMS after task completion.',
+                    'default_definition' => [
+                        'channel' => 'sms',
+                        'purpose' => 'transactional',
+                        'scope' => 'route_test',
+                        'dispatch_keys' => ['flow_route_task_done'],
+                        'payload' => [],
+                        'criteria' => [],
+                        'on_no_messages' => 'skipped',
+                        'meta' => [
+                            'source' => 'flow_route_smoke_test',
+                        ],
+                    ],
+                    'default_settings' => [],
+                    'is_active' => true,
+                    'source_version' => 'smoke_test_2026_07',
+                    'meta' => [
+                        'description' => 'Route-test SMS send-message point.',
+                    ],
+                    'route_point' => [
+                        'sort_order' => 4,
+                        'is_active' => true,
+                        'definition' => [],
+                        'settings' => [],
+                        'cancel_conditions' => [],
+                        'source_version' => 'smoke_test_2026_07',
+                        'meta' => [
+                            'description' => 'Final point in in_process task-completion smoke route.',
                         ],
                     ],
                 ],
