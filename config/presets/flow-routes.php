@@ -1,29 +1,11 @@
-
 <?php
 
 return [
-
-    /*
-    |--------------------------------------------------------------------------
-    | FlowRoute Presets
-    |--------------------------------------------------------------------------
-    |
-    | FlowRoute presets create DB-owned FlowRoute, Point, and FlowRoutePoint
-    | records. Runtime FlowRoute execution reads database definitions, not this
-    | config file.
-    |
-    | Keep default routes small and client-safe. FlowRoutes should make
-    | automation/control decisions. Campaigns should own the message journey.
-    |
-    */
-
     'groups' => [
-
         'webinar_default' => [
             'webinar_attended_campaign_enrollment',
             'webinar_missed_campaign_enrollment',
         ],
-
         'mortgage_default' => [
             'webinar_attended_campaign_enrollment',
             'webinar_missed_campaign_enrollment',
@@ -31,11 +13,8 @@ return [
             'smoke_attended_webinar_to_in_process',
             'smoke_in_process_task_completion_message',
         ],
-
     ],
-
     'definitions' => [
-
         'webinar_attended_campaign_enrollment' => [
             'key' => 'webinar_attended_campaign_enrollment',
             'trigger' => [
@@ -51,7 +30,6 @@ return [
                 'category' => 'webinar',
                 'default_role' => 'campaign_enrollment',
             ],
-
             'points' => [
                 [
                     'key' => 'enroll_webinar_attended_nurture',
@@ -78,22 +56,16 @@ return [
                     'source_version' => 'phase_19_default',
                     'meta' => [
                         'description' => 'Campaign enrollment point for attended webinar follow-up.',
-                    ],
-                    'route_point' => [
-                        'sort_order' => 1,
-                        'is_active' => true,
-                        'definition' => [],
-                        'settings' => [],
-                        'cancel_conditions' => [],
-                        'source_version' => 'phase_19_default',
-                        'meta' => [
+                        'flow_route_point' => [
                             'description' => 'First and only point in the attended webinar route.',
                         ],
                     ],
+                    'sort_order' => 1,
+                    'cancel_conditions' => [],
+                    'is_start' => true,
                 ],
             ],
         ],
-
         'webinar_missed_campaign_enrollment' => [
             'key' => 'webinar_missed_campaign_enrollment',
             'trigger' => [
@@ -109,7 +81,6 @@ return [
                 'category' => 'webinar',
                 'default_role' => 'campaign_enrollment',
             ],
-
             'points' => [
                 [
                     'key' => 'enroll_webinar_missed_nurture',
@@ -136,23 +107,16 @@ return [
                     'source_version' => 'phase_19_default',
                     'meta' => [
                         'description' => 'Campaign enrollment point for missed webinar follow-up.',
-                    ],
-                    'route_point' => [
-                        'sort_order' => 1,
-                        'is_active' => true,
-                        'definition' => [],
-                        'settings' => [],
-                        'cancel_conditions' => [],
-                        'source_version' => 'phase_19_default',
-                        'meta' => [
+                        'flow_route_point' => [
                             'description' => 'First and only point in the missed webinar route.',
                         ],
                     ],
+                    'sort_order' => 1,
+                    'cancel_conditions' => [],
+                    'is_start' => true,
                 ],
             ],
         ],
-
-
         'smoke_webinar_attended_nurture_test_enrollment' => [
             'key' => 'smoke_webinar_attended_nurture_test_enrollment',
             'trigger' => [
@@ -169,7 +133,6 @@ return [
                 'default_role' => 'campaign_enrollment',
                 'temporary' => true,
             ],
-
             'points' => [
                 [
                     'key' => 'enroll_webinar_attended_nurture_email_test',
@@ -196,20 +159,14 @@ return [
                     'source_version' => 'smoke_test_2026_07',
                     'meta' => [
                         'description' => 'Smoke-test email campaign enrollment point.',
-                    ],
-                    'route_point' => [
-                        'sort_order' => 1,
-                        'is_start' => true,
-                        'is_active' => true,
-                        'next_point_key' => 'enroll_webinar_attended_nurture_sms_test',
-                        'definition' => [],
-                        'settings' => [],
-                        'cancel_conditions' => [],
-                        'source_version' => 'smoke_test_2026_07',
-                        'meta' => [
+                        'flow_route_point' => [
                             'description' => 'First point in disposable attended nurture smoke route.',
                         ],
                     ],
+                    'sort_order' => 1,
+                    'is_start' => true,
+                    'next_point_key' => 'enroll_webinar_attended_nurture_sms_test',
+                    'cancel_conditions' => [],
                 ],
                 [
                     'key' => 'enroll_webinar_attended_nurture_sms_test',
@@ -236,22 +193,15 @@ return [
                     'source_version' => 'smoke_test_2026_07',
                     'meta' => [
                         'description' => 'Smoke-test SMS campaign enrollment point.',
-                    ],
-                    'route_point' => [
-                        'sort_order' => 2,
-                        'is_active' => true,
-                        'definition' => [],
-                        'settings' => [],
-                        'cancel_conditions' => [],
-                        'source_version' => 'smoke_test_2026_07',
-                        'meta' => [
+                        'flow_route_point' => [
                             'description' => 'Second point in disposable attended nurture smoke route.',
                         ],
                     ],
+                    'sort_order' => 2,
+                    'cancel_conditions' => [],
                 ],
             ],
         ],
-
         'smoke_attended_webinar_to_in_process' => [
             'key' => 'smoke_attended_webinar_to_in_process',
             'trigger' => [
@@ -267,7 +217,6 @@ return [
                 'category' => 'smoke_test',
                 'temporary' => true,
             ],
-
             'points' => [
                 [
                     'key' => 'smoke_change_status_to_in_process',
@@ -288,23 +237,16 @@ return [
                     'source_version' => 'smoke_test_2026_07',
                     'meta' => [
                         'description' => 'Status-change point for smoke testing route handoff behavior.',
-                    ],
-                    'route_point' => [
-                        'sort_order' => 1,
-                        'is_start' => true,
-                        'is_active' => true,
-                        'definition' => [],
-                        'settings' => [],
-                        'cancel_conditions' => [],
-                        'source_version' => 'smoke_test_2026_07',
-                        'meta' => [
+                        'flow_route_point' => [
                             'description' => 'Only point in attended_webinar to in_process smoke route.',
                         ],
                     ],
+                    'sort_order' => 1,
+                    'is_start' => true,
+                    'cancel_conditions' => [],
                 ],
             ],
         ],
-
         'smoke_in_process_task_completion_message' => [
             'key' => 'smoke_in_process_task_completion_message',
             'trigger' => [
@@ -320,7 +262,6 @@ return [
                 'category' => 'smoke_test',
                 'temporary' => true,
             ],
-
             'points' => [
                 [
                     'key' => 'smoke_create_attended_webinar_review_task',
@@ -342,20 +283,14 @@ return [
                     'source_version' => 'smoke_test_2026_07',
                     'meta' => [
                         'description' => 'Task creation point for smoke testing task completion resume behavior.',
-                    ],
-                    'route_point' => [
-                        'sort_order' => 1,
-                        'is_start' => true,
-                        'is_active' => true,
-                        'next_point_key' => 'smoke_wait_for_review_task_completed',
-                        'definition' => [],
-                        'settings' => [],
-                        'cancel_conditions' => [],
-                        'source_version' => 'smoke_test_2026_07',
-                        'meta' => [
+                        'flow_route_point' => [
                             'description' => 'First point in in_process task-completion smoke route.',
                         ],
                     ],
+                    'sort_order' => 1,
+                    'is_start' => true,
+                    'next_point_key' => 'smoke_wait_for_review_task_completed',
+                    'cancel_conditions' => [],
                 ],
                 [
                     'key' => 'smoke_wait_for_review_task_completed',
@@ -374,19 +309,13 @@ return [
                     'source_version' => 'smoke_test_2026_07',
                     'meta' => [
                         'description' => 'Event wait point for task.completed smoke testing.',
-                    ],
-                    'route_point' => [
-                        'sort_order' => 2,
-                        'is_active' => true,
-                        'next_point_key' => 'smoke_send_task_done_email',
-                        'definition' => [],
-                        'settings' => [],
-                        'cancel_conditions' => [],
-                        'source_version' => 'smoke_test_2026_07',
-                        'meta' => [
+                        'flow_route_point' => [
                             'description' => 'Second point in in_process task-completion smoke route.',
                         ],
                     ],
+                    'sort_order' => 2,
+                    'next_point_key' => 'smoke_send_task_done_email',
+                    'cancel_conditions' => [],
                 ],
                 [
                     'key' => 'smoke_send_task_done_email',
@@ -397,7 +326,9 @@ return [
                         'channel' => 'email',
                         'purpose' => 'transactional',
                         'scope' => 'route_test',
-                        'dispatch_keys' => ['flow_route_task_done'],
+                        'dispatch_keys' => [
+                            'flow_route_task_done',
+                        ],
                         'payload' => [],
                         'criteria' => [],
                         'on_no_messages' => 'skipped',
@@ -410,19 +341,13 @@ return [
                     'source_version' => 'smoke_test_2026_07',
                     'meta' => [
                         'description' => 'Route-test email send-message point.',
-                    ],
-                    'route_point' => [
-                        'sort_order' => 3,
-                        'is_active' => true,
-                        'next_point_key' => 'smoke_send_task_done_sms',
-                        'definition' => [],
-                        'settings' => [],
-                        'cancel_conditions' => [],
-                        'source_version' => 'smoke_test_2026_07',
-                        'meta' => [
+                        'flow_route_point' => [
                             'description' => 'Third point in in_process task-completion smoke route.',
                         ],
                     ],
+                    'sort_order' => 3,
+                    'next_point_key' => 'smoke_send_task_done_sms',
+                    'cancel_conditions' => [],
                 ],
                 [
                     'key' => 'smoke_send_task_done_sms',
@@ -433,7 +358,9 @@ return [
                         'channel' => 'sms',
                         'purpose' => 'transactional',
                         'scope' => 'route_test',
-                        'dispatch_keys' => ['flow_route_task_done'],
+                        'dispatch_keys' => [
+                            'flow_route_task_done',
+                        ],
                         'payload' => [],
                         'criteria' => [],
                         'on_no_messages' => 'skipped',
@@ -446,22 +373,14 @@ return [
                     'source_version' => 'smoke_test_2026_07',
                     'meta' => [
                         'description' => 'Route-test SMS send-message point.',
-                    ],
-                    'route_point' => [
-                        'sort_order' => 4,
-                        'is_active' => true,
-                        'definition' => [],
-                        'settings' => [],
-                        'cancel_conditions' => [],
-                        'source_version' => 'smoke_test_2026_07',
-                        'meta' => [
+                        'flow_route_point' => [
                             'description' => 'Final point in in_process task-completion smoke route.',
                         ],
                     ],
+                    'sort_order' => 4,
+                    'cancel_conditions' => [],
                 ],
             ],
         ],
-
     ],
-
 ];

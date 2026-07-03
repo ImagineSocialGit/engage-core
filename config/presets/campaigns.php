@@ -1,36 +1,11 @@
-
 <?php
 
 return [
-
-    /*
-    |--------------------------------------------------------------------------
-    | Campaign Presets
-    |--------------------------------------------------------------------------
-    |
-    | Campaign presets define journeys.
-    |
-    | Campaigns own:
-    | - campaign identity
-    | - step order
-    | - step timing
-    | - message template references
-    |
-    | Campaigns do not own reusable message copy.
-    | Campaigns do not define or override payloads.
-    |
-    | Campaign message copy is resolved by:
-    |
-    | messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
-    |
-    */
-
     'groups' => [
         'webinar_default' => [
             'webinar_attended_nurture',
             'webinar_missed_nurture',
         ],
-
         'mortgage_default' => [
             'webinar_attended_nurture',
             'webinar_missed_nurture',
@@ -39,9 +14,7 @@ return [
             'webinar_attended_nurture_sms_test',
         ],
     ],
-
     'definitions' => [
-
         'webinar_attended_nurture' => [
             'key' => 'webinar_attended_nurture',
             'name' => 'Webinar Attended Nurture',
@@ -71,12 +44,10 @@ return [
                     ],
                     'meta' => [
                         'type' => 'message',
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
                     ],
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture',
                 ],
                 [
                     'step_number' => 2,
@@ -91,12 +62,10 @@ return [
                     ],
                     'meta' => [
                         'type' => 'message',
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
                     ],
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture',
                 ],
                 [
                     'step_number' => 3,
@@ -111,16 +80,13 @@ return [
                     ],
                     'meta' => [
                         'type' => 'message',
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
                     ],
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture',
                 ],
             ],
         ],
-
         'webinar_missed_nurture' => [
             'key' => 'webinar_missed_nurture',
             'name' => 'Webinar Missed Nurture',
@@ -150,12 +116,10 @@ return [
                     ],
                     'meta' => [
                         'type' => 'message',
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
                     ],
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture',
                 ],
                 [
                     'step_number' => 2,
@@ -170,12 +134,10 @@ return [
                     ],
                     'meta' => [
                         'type' => 'message',
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
                     ],
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture',
                 ],
                 [
                     'step_number' => 3,
@@ -190,16 +152,13 @@ return [
                     ],
                     'meta' => [
                         'type' => 'message',
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
                     ],
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'webinar_nurture',
                 ],
             ],
         ],
-
         'mortgage_homebuyer_nurture' => [
             'key' => 'mortgage_homebuyer_nurture',
             'name' => 'Mortgage Homebuyer Nurture',
@@ -229,12 +188,10 @@ return [
                     ],
                     'meta' => [
                         'type' => 'message',
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'mortgage_homebuyer_nurture',
-                        ],
                     ],
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'mortgage_homebuyer_nurture',
                 ],
                 [
                     'step_number' => 2,
@@ -249,12 +206,10 @@ return [
                     ],
                     'meta' => [
                         'type' => 'message',
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'mortgage_homebuyer_nurture',
-                        ],
                     ],
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'mortgage_homebuyer_nurture',
                 ],
                 [
                     'step_number' => 3,
@@ -269,17 +224,13 @@ return [
                     ],
                     'meta' => [
                         'type' => 'message',
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'mortgage_homebuyer_nurture',
-                        ],
                     ],
+                    'channel' => 'email',
+                    'purpose' => 'marketing',
+                    'scope' => 'mortgage_homebuyer_nurture',
                 ],
             ],
         ],
-
-
         'webinar_attended_nurture_email_test' => [
             'key' => 'webinar_attended_nurture_email_test',
             'name' => 'Webinar Attended Email Nurture Smoke Test',
@@ -314,11 +265,6 @@ return [
                     'meta' => [
                         'type' => 'message',
                         'temporary' => true,
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture_test',
-                        ],
                     ],
                 ],
                 [
@@ -338,11 +284,6 @@ return [
                     'meta' => [
                         'type' => 'message',
                         'temporary' => true,
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture_test',
-                        ],
                     ],
                 ],
                 [
@@ -362,11 +303,6 @@ return [
                     'meta' => [
                         'type' => 'message',
                         'temporary' => true,
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture_test',
-                        ],
                     ],
                 ],
                 [
@@ -387,17 +323,10 @@ return [
                         'type' => 'message',
                         'temporary' => true,
                         'expected_smoke_result' => 'skip_when_contact_status_is_not_interested',
-                        'message' => [
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture_test',
-                        ],
                     ],
                 ],
             ],
         ],
-
-
         'webinar_attended_nurture_sms_test' => [
             'key' => 'webinar_attended_nurture_sms_test',
             'name' => 'Webinar Attended SMS Nurture Smoke Test',
@@ -432,11 +361,6 @@ return [
                     'meta' => [
                         'type' => 'message',
                         'temporary' => true,
-                        'message' => [
-                            'channel' => 'sms',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture_test',
-                        ],
                     ],
                 ],
                 [
@@ -456,11 +380,6 @@ return [
                     'meta' => [
                         'type' => 'message',
                         'temporary' => true,
-                        'message' => [
-                            'channel' => 'sms',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture_test',
-                        ],
                     ],
                 ],
                 [
@@ -480,11 +399,6 @@ return [
                     'meta' => [
                         'type' => 'message',
                         'temporary' => true,
-                        'message' => [
-                            'channel' => 'sms',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture_test',
-                        ],
                     ],
                 ],
                 [
@@ -505,16 +419,9 @@ return [
                         'type' => 'message',
                         'temporary' => true,
                         'expected_smoke_result' => 'skip_when_contact_status_is_not_interested',
-                        'message' => [
-                            'channel' => 'sms',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture_test',
-                        ],
                     ],
                 ],
             ],
         ],
-
     ],
-
 ];
