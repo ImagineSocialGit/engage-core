@@ -214,7 +214,7 @@ class ScheduleNextCampaignStepAction
             purpose: $definition['purpose'],
             scope: $definition['scope'],
             dispatchKeys: $definition['dispatch_keys'],
-            payload: $payload,
+            payload: $this->campaignPayload($enrollment, $payload),
             context: $context,
             meta: array_replace_recursive([
                 'campaign_enrollment_id' => $enrollment->id,
@@ -320,6 +320,32 @@ class ScheduleNextCampaignStepAction
             'exited_at' => $enrollment->exited_at ?? $now,
             'exit_reason' => $enrollment->exit_reason ?? $reason,
         ])->save();
+    }
+
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function campaignPayload(CampaignEnrollment $enrollment, array $payload): array
+    {
+        $startContext = is_array($enrollment->start_context ?? null)
+            ? $enrollment->start_context
+            : [];
+
+        $storedPayload = [];
+
+        foreach (['runtime_context', 'context', 'tokens'] as $key) {
+            if (is_array($startContext[$key] ?? null)) {
+                $storedPayload[$key] = $startContext[$key];
+            }
+        }
+
+        if (is_array($startContext['payload'] ?? null)) {
+            $storedPayload = array_replace_recursive($storedPayload, $startContext['payload']);
+        }
+
+        return array_replace_recursive($storedPayload, $payload);
     }
 
     private function normalizeSegment(string $value): string

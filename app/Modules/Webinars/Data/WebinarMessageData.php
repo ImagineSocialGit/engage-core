@@ -84,6 +84,7 @@ readonly class WebinarMessageData extends MessageData
             'webinar_series' => $webinarSeries?->toArray() ?? [],
 
             'registration_id' => $this->registration?->getKey(),
+            'registration_attended_at' => $this->registration?->attended_at?->toIso8601String(),
             'waitlist_signup_id' => $this->waitlistSignup?->getKey(),
 
             'webinar_id' => $this->webinar->getKey(),
@@ -95,12 +96,10 @@ readonly class WebinarMessageData extends MessageData
             'webinar_platform' => $this->webinar->platform,
             'webinar_join_url' => $this->webinarJoinUrl,
             'webinar_registration_url' => $this->webinar->registration_url,
-            'webinar_cancel_registration_url' => $cancelRegistrationUrl,
+            'cancel_registration_url' => $cancelRegistrationUrl,
             'webinar_playback_url' => $playbackUrl,
             'webinar_playback_passcode' => $this->webinar->playback_passcode,
 
-            'webinar_starts_at' => $startsAt?->toIso8601String(),
-            'webinar_ends_at' => $endsAt?->toIso8601String(),
             'webinar_start_date' => $this->formatDate($startsAt, $timezone),
             'webinar_start_time' => $this->formatTime($startsAt, $timezone),
             'webinar_start_datetime' => $this->formatDateTime($startsAt, $timezone),
@@ -112,26 +111,6 @@ readonly class WebinarMessageData extends MessageData
             'webinar_series_slug' => $webinarSeries?->slug,
             'webinar_series_title' => $webinarSeries?->title,
             'webinar_series_status' => $webinarSeries?->status,
-
-            'event_id' => $this->webinar->getKey(),
-            'event_slug' => $this->webinar->slug,
-            'event_title' => $this->webinar->title,
-            'event_starts_at' => $startsAt?->toIso8601String(),
-            'event_ends_at' => $endsAt?->toIso8601String(),
-            'event_start_date' => $this->formatDate($startsAt, $timezone),
-            'event_start_time' => $this->formatTime($startsAt, $timezone),
-            'event_start_datetime' => $this->formatDateTime($startsAt, $timezone),
-            'event_join_url' => $this->webinarJoinUrl,
-            'event_registration_url' => $this->webinar->registration_url,
-            'event_cancel_registration_url' => $cancelRegistrationUrl,
-            'event_playback_url' => $playbackUrl,
-            'event_playback_passcode' => $this->webinar->playback_passcode,
-
-            'join_url' => $this->webinarJoinUrl,
-            'registration_url' => $this->webinar->registration_url,
-            'cancel_registration_url' => $cancelRegistrationUrl,
-            'playback_url' => $playbackUrl,
-            'playback_passcode' => $this->webinar->playback_passcode,
         ];
     }
 
@@ -149,7 +128,7 @@ readonly class WebinarMessageData extends MessageData
             waitlistSignup: isset($data['waitlist_signup_id'])
                 ? WebinarWaitlistSignup::query()->find($data['waitlist_signup_id'])
                 : null,
-            webinarJoinUrl: $data['webinar_join_url'] ?? $data['join_url'] ?? null,
+            webinarJoinUrl: $data['webinar_join_url'] ?? null,
             requestIp: $data['request_ip'] ?? null,
         );
     }

@@ -239,12 +239,17 @@ class EmailPayload implements EmailMessage
         return [
             'to' => $this->to,
             'from' => [
-                'address' => $this->fromAddress(),
-                'name' => $this->fromName(),
+                'address' => $this->fromConfigValue('address'),
+                'name' => $this->fromConfigValue('name'),
             ],
             'subject' => $this->subject(),
             'text' => $this->text(),
             'view' => $this->view(),
+            'cta' => $this->resolvedArray('cta', $this->cta),
+            'secondary_link' => $this->resolvedArray('secondary_link', $this->secondaryLink),
+            'footer' => $this->footer ?? $this->configValue('footer'),
+            'unsubscribe_url' => $this->marketingUnsubscribeUrl(),
+            'transactional_opt_out_url' => $this->transactionalOptOutUrl(),
             'tokens' => $this->tokens,
         ];
     }

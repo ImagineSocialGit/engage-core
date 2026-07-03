@@ -172,7 +172,13 @@ class SendScheduledMessageJob implements ShouldQueue
             return null;
         }
 
-        $tokens = $this->unresolvedTokens($payload->devPayload());
+        $devPayload = $payload->devPayload();
+        unset($devPayload['tokens']);
+
+        $tokens = $this->unresolvedTokens(
+            value: $devPayload,
+            ignoredTokens: $this->structuredRenderSlotTokens($devPayload),
+        );
 
         if ($tokens === []) {
             return null;
@@ -184,13 +190,13 @@ class SendScheduledMessageJob implements ShouldQueue
     /**
      * @return array<int, string>
      */
-    private function unresolvedTokens(mixed $value): array
+    private function unresolvedTokens(mixed $value, array $ignoredTokens = []): array
     {
         $tokens = [];
 
         if (is_array($value)) {
             foreach ($value as $item) {
-                $tokens = array_merge($tokens, $this->unresolvedTokens($item));
+                $tokens = array_merge($tokens, $this->unresolvedTokens($item, $ignoredTokens));
             }
 
             return array_values(array_unique($tokens));
@@ -203,10 +209,37 @@ class SendScheduledMessageJob implements ShouldQueue
         preg_match_all('/\{[a-zA-Z_][a-zA-Z0-9_.:-]*\}/', $value, $matches);
 
         foreach ($matches[0] ?? [] as $token) {
+            if (in_array($token, $ignoredTokens, true)) {
+                continue;
+            }
+
             $tokens[] = $token;
         }
 
         return array_values(array_unique($tokens));
+    }
+
+    private function structuredRenderSlotTokens(array $payload): array
+    {
+        $tokens = [];
+
+        foreach ($payload as $key => $value) {
+            if (! is_string($key) || ! is_array($value)) {
+                continue;
+            }
+
+            if (! is_string($value['label'] ?? null) || trim($value['label']) === '') {
+                continue;
+            }
+
+            if (! is_string($value['url'] ?? null) || trim($value['url']) === '') {
+                continue;
+            }
+
+            $tokens[] = '{'.$key.'}';
+        }
+
+        return $tokens;
     }
 
     private function sendEmail(

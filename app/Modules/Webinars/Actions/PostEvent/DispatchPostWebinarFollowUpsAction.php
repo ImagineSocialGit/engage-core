@@ -93,7 +93,7 @@ class DispatchPostWebinarFollowUpsAction
 
             $dispatchKeys = config('webinars.post_event.outcome_messages.dispatch_key', 'webinar_ended');
 
-            $payload = array_replace_recursive(
+            $messageData = array_replace_recursive(
                 WebinarMessageData::fromRegistration($registration)->toArray(),
                 [
                     'webinar_id' => $webinar->getKey(),
@@ -102,14 +102,15 @@ class DispatchPostWebinarFollowUpsAction
                     'webinar_title' => $webinar->title,
                     'webinar_playback_url' => $webinar->playback_url,
                     'registration_attended_at' => $registration->attended_at?->toIso8601String(),
-                    'runtime_context' => [
+                    'context' => [
                         'webinar' => $webinar->toArray(),
                         'webinar_registration' => $registration->toArray(),
+                        'webinar_series' => $registration->webinar?->webinarSeries?->toArray() ?? [],
                     ],
                 ],
             );
 
-            unset($payload['playback_url']);
+            unset($messageData['playback_url']);
 
             $meta = [
                 'webinar_id' => $webinar->getKey(),
@@ -127,7 +128,18 @@ class DispatchPostWebinarFollowUpsAction
                 purpose: MessagePurpose::Transactional,
                 scope: 'webinar',
                 dispatchKeys: $dispatchKeys,
-                payload: $payload,
+                payload: array_replace_recursive(
+                    $messageData,
+                    [
+                        'tokens' => $messageData,
+                        'context' => [
+                            'contact' => $messageData['contact'] ?? $registration->contact->toArray(),
+                            'webinar' => $webinar->toArray(),
+                            'webinar_registration' => $registration->toArray(),
+                            'webinar_series' => $registration->webinar?->webinarSeries?->toArray() ?? [],
+                        ],
+                    ],
+                ),
                 context: $registration,
                 triggeredAt: now(),
                 meta: $meta,

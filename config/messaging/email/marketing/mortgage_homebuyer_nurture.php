@@ -16,6 +16,10 @@ return [
     | Mortgage-specific templates.
     | Only mortgage preset groups/client configs should reference this scope.
     |
+    | Default campaign copy may use universal Contact tokens. Do not include
+    | runtime-only URL tokens unless the campaign enrollment/start payload
+    | explicitly supplies them.
+    |
     */
 
     'campaigns' => [
@@ -39,11 +43,7 @@ return [
 
                     'payload' => [
                         'subject' => 'What to do 3–6 months before buying',
-                        'body' => 'Hi {first_name}, if you are 3–6 months away from buying, this is a good time to review your credit, avoid major debt changes, estimate cash needed, and talk through your loan options.',
-                        'cta' => [
-                            'label' => 'Ask a Question',
-                            'url' => '{contact_url}',
-                        ],
+                        'body' => 'Hi {first_name}, if you are 3–6 months away from buying, this is a good time to review your credit, avoid major debt changes, estimate cash needed, and talk through your loan options. If you have a question, reply to this email.',
                     ],
                 ],
 
@@ -54,11 +54,7 @@ return [
 
                     'payload' => [
                         'subject' => 'Should we revisit your homebuying plan?',
-                        'body' => 'Hi {first_name}, checking in to see whether buying a home is still on your radar. If it is, we can revisit your numbers and next steps.',
-                        'cta' => [
-                            'label' => 'Revisit My Plan',
-                            'url' => '{application_url}',
-                        ],
+                        'body' => 'Hi {first_name}, checking in to see whether buying a home is still on your radar. If it is, reply to this email and we can revisit your numbers and next steps.',
                     ],
                 ],
             ],

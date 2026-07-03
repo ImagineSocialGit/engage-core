@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Services;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Data\MessageData;
 use App\Modules\Messaging\Enums\MessageChannel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -65,11 +66,11 @@ class MessageRecipientPayloadResolver
     public function conditionContext(Model $recipient, ?Model $context, array $payload): array
     {
         $conditionContext = [
-            $this->contextKey($recipient) => $recipient->toArray(),
+            $this->contextKey($recipient) => $this->modelContext($recipient),
         ];
 
         if ($context) {
-            $conditionContext[$this->contextKey($context)] = $context->toArray();
+            $conditionContext[$this->contextKey($context)] = $this->modelContext($context);
         }
 
         return array_replace_recursive(
@@ -105,6 +106,13 @@ class MessageRecipientPayloadResolver
 
         return array_replace_recursive(
             [
+                'contact_id' => $tokens['contact_id'] ?? null,
+                'contact' => $tokens['contact'] ?? [],
+                'first_name' => $tokens['first_name'] ?? '',
+                'last_name' => $tokens['last_name'] ?? '',
+                'name' => $tokens['name'] ?? '',
+                'email' => $tokens['email'] ?? '',
+                'phone' => $tokens['phone'] ?? '',
                 'tokens' => $tokens,
                 'context' => [
                     $this->contextKey($recipient) => $tokens[$this->contextKey($recipient)] ?? $recipient->toArray(),
@@ -123,47 +131,15 @@ class MessageRecipientPayloadResolver
             return [];
         }
 
-        $firstName = $this->nullableString($recipient->getAttribute('first_name'));
-        $lastName = $this->nullableString($recipient->getAttribute('last_name'));
-        $name = $this->nullableString($recipient->getAttribute('name'));
-        $email = $this->nullableString($recipient->getAttribute('email'));
-        $phone = $this->nullableString($recipient->getAttribute('phone'));
-        $status = $this->nullableString($recipient->getAttribute('status'));
-
-        $fullName = trim(implode(' ', array_filter([
-            $firstName,
-            $lastName,
-        ])));
-
-        if ($name === null && $fullName !== '') {
-            $name = $fullName;
-        }
-
-        $contact = [
-            'id' => $recipient->getKey(),
-            'first_name' => $firstName,
-            'last_name' => $lastName,
-            'name' => $name,
-            'email' => $email,
-            'phone' => $phone,
-            'status' => $status,
-        ];
-
-        return [
-            'first_name' => $firstName,
-            'last_name' => $lastName,
-            'name' => $name,
-            'email' => $email,
-            'phone' => $phone,
-            'contact' => $contact,
-        ];
+        return (new MessageData($recipient))->toArray();
     }
 
-    private function nullableString(mixed $value): ?string
+    /**
+     * @return array<string, mixed>
+     */
+    private function modelContext(Model $model): array
     {
-        return is_string($value) && trim($value) !== ''
-            ? trim($value)
-            : null;
+        return $model->toArray();
     }
 
     /**
@@ -171,7 +147,7 @@ class MessageRecipientPayloadResolver
      */
     private function explicitDestination(array $payload): ?string
     {
-        foreach (['to', 'email', 'phone', 'contact_email', 'contact_phone'] as $key) {
+        foreach (['to', 'email', 'phone'] as $key) {
             $value = $payload[$key] ?? null;
 
             if (is_string($value) && trim($value) !== '') {

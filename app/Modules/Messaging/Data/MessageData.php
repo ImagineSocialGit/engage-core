@@ -17,21 +17,34 @@ readonly class MessageData
      */
     public function toArray(): array
     {
+        $firstName = $this->stringValue($this->contact->first_name, 'there');
+        $lastName = $this->stringValue($this->contact->last_name);
+        $name = $this->stringValue($this->contact->name);
+        $email = $this->stringValue($this->contact->email);
+        $phone = $this->stringValue($this->contact->phone);
+
+        if ($name === '') {
+            $name = trim(implode(' ', array_filter([$firstName !== 'there' ? $firstName : null, $lastName])));
+        }
+
+        $contact = [
+            'id' => $this->contact->getKey(),
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'name' => $name,
+            'email' => $email,
+            'phone' => $phone,
+        ];
+
         return [
-            'contact' => $this->contact->toArray(),
-
+            'contact' => $contact,
             'contact_id' => $this->contact->getKey(),
-            'contact_first_name' => $this->contact->first_name ?? 'there',
-            'contact_last_name' => $this->contact->last_name,
-            'contact_full_name' => $this->contact->name,
-            'contact_email' => $this->contact->email,
-            'contact_phone' => $this->contact->phone,
 
-            'first_name' => $this->contact->first_name ?? 'there',
-            'last_name' => $this->contact->last_name,
-            'full_name' => $this->contact->name,
-            'email' => $this->contact->email,
-            'phone' => $this->contact->phone,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'name' => $name,
+            'email' => $email,
+            'phone' => $phone,
 
             'request_ip' => $this->requestIp,
         ];
@@ -54,6 +67,13 @@ readonly class MessageData
 
     protected function formatDateTime(?CarbonInterface $date, string $timezone): ?string
     {
-        return $date?->copy()->setTimezone($timezone)->format('F j, Y \a\t g:i A T');
+        return $date?->copy()->setTimezone($timezone)->format('F j, Y \\a\\t g:i A T');
+    }
+
+    private function stringValue(mixed $value, string $fallback = ''): string
+    {
+        return is_string($value) && trim($value) !== ''
+            ? trim($value)
+            : $fallback;
     }
 }

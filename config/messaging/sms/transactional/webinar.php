@@ -7,7 +7,6 @@ return [
     'confirmations' => [
         [
             'dispatch_key' => 'registration_created',
-            
 
             'conditions' => [
                 [
@@ -27,9 +26,9 @@ return [
             ],
 
             'payload' => [
-                'message' => "You're registered for {webinar_title} on {webinar_starts_at}. Join here: {webinar_join_url}",
+                'message' => "You're registered for {webinar_title} on {webinar_start_date} at {webinar_start_time}. Join here: {webinar_join_url}",
             ],
-        ]
+        ],
     ],
 
     'opt_ins' => [
@@ -42,9 +41,8 @@ return [
             'payload' => [
                 'message' => 'Thanks for subscribing to receive webinar-related messages! You will receive confirmation details shortly. Reply HELP for help. Message frequency may vary. Msg&data rates may apply. Reply STOP to opt out.',
             ],
-        ]
+        ],
     ],
-
 
     'reminders' => [
         [
@@ -59,7 +57,7 @@ return [
             ],
 
             'payload' => [
-                'message' => '{webinar_title} is 10 days away on {webinar_starts_at}. Join here: {webinar_join_url}',
+                'message' => '{webinar_title} is 10 days away on {webinar_start_date} at {webinar_start_time}. Join here: {webinar_join_url}',
             ],
         ],
         [
@@ -74,7 +72,7 @@ return [
             ],
 
             'payload' => [
-                'message' => '{webinar_title} is 1 week away. It starts {webinar_starts_at}. Join here: {webinar_join_url}',
+                'message' => '{webinar_title} is 1 week away. It starts {webinar_start_date} at {webinar_start_time}. Join here: {webinar_join_url}',
             ],
         ],
         [
@@ -89,10 +87,9 @@ return [
             ],
 
             'payload' => [
-                'message' => 'Reminder: {webinar_title} is tomorrow at {webinar_starts_at}. Join here: {webinar_join_url}',
+                'message' => 'Reminder: {webinar_title} is tomorrow at {webinar_start_time}. Join here: {webinar_join_url}',
             ],
         ],
-
         [
             'dispatch_key' => 'registration_created',
             'timing' => 'scheduled',
@@ -123,7 +120,6 @@ return [
                 'message' => '{webinar_title} starts in 10 minutes. Join here: {webinar_join_url}',
             ],
         ],
-
         [
             'dispatch_key' => 'registration_created',
             'skip_when_join_clicked' => true,
@@ -158,7 +154,7 @@ return [
             'payload' => [
                 'message' => "Thanks for joining {webinar_title}. We'll send your replay and next steps soon.",
             ],
-        ]
+        ],
     ],
 
     'post_missed' => [
@@ -177,7 +173,7 @@ return [
             'payload' => [
                 'message' => "Sorry we missed you for {webinar_title}. We'll follow up with next steps soon.",
             ],
-        ]
+        ],
     ],
 
 ];

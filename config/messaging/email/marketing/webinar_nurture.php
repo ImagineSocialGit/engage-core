@@ -19,6 +19,10 @@ return [
     |
     | campaigns.{campaign_key}.steps.{step_number}
     |
+    | Default campaign copy may use universal Contact tokens. Do not include
+    | runtime-only URL tokens unless the campaign enrollment/start payload
+    | explicitly supplies them.
+    |
     */
 
     'opt_ins' => [
@@ -60,11 +64,7 @@ return [
 
                     'payload' => [
                         'subject' => 'Common questions after the webinar',
-                        'body' => 'Hi {first_name}, after the webinar, many people have follow-up questions about what to do next. If you have a question, just reply and we’ll point you in the right direction.',
-                        'cta' => [
-                            'label' => 'Ask a Question',
-                            'url' => '{contact_url}',
-                        ],
+                        'body' => 'Hi {first_name}, after the webinar, many people have follow-up questions about what to do next. If you have a question, reply to this email and we’ll point you in the right direction.',
                     ],
                 ],
 
@@ -90,11 +90,7 @@ return [
 
                     'payload' => [
                         'subject' => 'Sorry we missed you',
-                        'body' => 'Hi {first_name}, sorry we missed you at the webinar. If the topic is still relevant, you can reply with your biggest question or use the link below to continue.',
-                        'cta' => [
-                            'label' => 'Continue',
-                            'url' => '{next_step_url}',
-                        ],
+                        'body' => 'Hi {first_name}, sorry we missed you at the webinar. If the topic is still relevant, reply with your biggest question and we’ll help you with the next step.',
                     ],
                 ],
 
@@ -105,11 +101,7 @@ return [
 
                     'payload' => [
                         'subject' => 'Want to join the next class instead?',
-                        'body' => 'Hi {first_name}, if the last webinar time did not work, you can join an upcoming class instead.',
-                        'cta' => [
-                            'label' => 'See Upcoming Classes',
-                            'url' => '{webinar_registration_url}',
-                        ],
+                        'body' => 'Hi {first_name}, if the last webinar time did not work, reply to this email and we’ll help you find the next useful class or resource.',
                     ],
                 ],
 

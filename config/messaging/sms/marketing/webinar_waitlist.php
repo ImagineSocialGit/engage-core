@@ -12,7 +12,7 @@ return [
             'queue' => 'notifications',
 
             'payload' => [
-                'message' => 'A new webinar has been scheduled for {webinar_title}. Register here: {registration_url}',
+                'message' => 'A new webinar has been scheduled for {webinar_title}. Register here: {webinar_registration_url}',
             ],
         ],
     ],

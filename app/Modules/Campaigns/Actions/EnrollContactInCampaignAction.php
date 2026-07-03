@@ -67,7 +67,7 @@ class EnrollContactInCampaignAction
             'scope' => $campaign->scope,
             'status' => CampaignEnrollment::STATUS_ACTIVE,
             'current_step' => 0,
-            'start_context' => $startContext,
+            'start_context' => $this->startContextWithPayload($startContext, $payload),
             'exit_conditions' => $exitConditions,
             'started_at' => Carbon::now(),
             'meta' => $meta,
@@ -386,6 +386,31 @@ class EnrollContactInCampaignAction
             'exited_at' => $enrollment->exited_at ?? $now,
             'exit_reason' => $enrollment->exit_reason ?? $reason,
         ])->save();
+    }
+
+
+    /**
+     * @param array<string, mixed>|null $startContext
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>|null
+     */
+    private function startContextWithPayload(?array $startContext, array $payload): ?array
+    {
+        if ($payload === []) {
+            return $startContext;
+        }
+
+        $startContext ??= [];
+        $existingPayload = is_array($startContext['payload'] ?? null)
+            ? $startContext['payload']
+            : [];
+
+        $startContext['payload'] = array_replace_recursive(
+            $existingPayload,
+            $payload,
+        );
+
+        return $startContext;
     }
 
     private function normalizeSegment(string $value): string
