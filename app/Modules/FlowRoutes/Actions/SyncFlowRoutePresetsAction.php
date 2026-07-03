@@ -29,7 +29,7 @@ class SyncFlowRoutePresetsAction
             return $result;
         }
 
-        $preset = config("presets.packages.{$presetKey}");
+        $preset = config("presets.presets.{$presetKey}");
 
         if (! is_array($preset)) {
             $result->error("Preset package [{$presetKey}] does not exist.");
@@ -59,15 +59,31 @@ class SyncFlowRoutePresetsAction
 
     private function normalizePresetKey(?string $presetKey): ?string
     {
-        $presetKey ??= config('presets.default_package');
-
-        if (! is_string($presetKey)) {
-            return null;
+        if (is_string($presetKey) && trim($presetKey) !== '') {
+            return trim($presetKey);
         }
 
-        $presetKey = trim($presetKey);
+        $clientPreset = config('client.preset');
 
-        return $presetKey !== '' ? $presetKey : null;
+        if (is_string($clientPreset) && trim($clientPreset) !== '') {
+            return trim($clientPreset);
+        }
+
+        $defaultPreset = config('presets.default');
+
+        if (is_string($defaultPreset) && trim($defaultPreset) !== '') {
+            return trim($defaultPreset);
+        }
+
+        $presetKeys = array_keys(config('presets.presets', []));
+
+        foreach ($presetKeys as $key) {
+            if (is_string($key) && trim($key) !== '') {
+                return trim($key);
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -77,40 +93,34 @@ class SyncFlowRoutePresetsAction
         string $presetKey,
         FlowRoutePresetSyncResult $result,
     ): array {
-        $group = config("presets.packages.{$presetKey}.groups.flow_routes");
+        $groupKeys = config("presets.presets.{$presetKey}.flow_routes.groups", []);
 
-        if (! is_string($group) || trim($group) === '') {
-            return [];
-        }
-
-        $group = trim($group);
-
-        $flowRouteKeys = config("presets.flow-routes.groups.{$group}");
-
-        if (! is_array($flowRouteKeys)) {
-            $result->error("FlowRoute preset group [{$group}] does not exist.");
-
-            return [];
-        }
-
-        $flowRouteKeys = $this->normalizeStringList($flowRouteKeys);
-
-        if ($flowRouteKeys === []) {
+        if (! is_array($groupKeys) || $groupKeys === []) {
             return [];
         }
 
         $definitions = [];
 
-        foreach ($flowRouteKeys as $flowRouteKey) {
-            $definition = config("presets.flow-routes.definitions.{$flowRouteKey}");
+        foreach ($this->normalizeStringList($groupKeys) as $groupKey) {
+            $flowRouteKeys = config("presets.flow-routes.groups.{$groupKey}");
 
-            if (! is_array($definition)) {
-                $result->error("FlowRoute preset definition [{$flowRouteKey}] does not exist.");
+            if (! is_array($flowRouteKeys)) {
+                $result->error("FlowRoute preset group [{$groupKey}] does not exist.");
 
                 continue;
             }
 
-            $definitions[] = $definition;
+            foreach ($this->normalizeStringList($flowRouteKeys) as $flowRouteKey) {
+                $definition = config("presets.flow-routes.definitions.{$flowRouteKey}");
+
+                if (! is_array($definition)) {
+                    $result->error("FlowRoute preset definition [{$flowRouteKey}] does not exist.");
+
+                    continue;
+                }
+
+                $definitions[] = $definition;
+            }
         }
 
         return $definitions;

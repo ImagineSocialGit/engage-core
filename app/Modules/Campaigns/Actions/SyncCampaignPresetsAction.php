@@ -37,11 +37,27 @@ class SyncCampaignPresetsAction
 
     private function defaultPresetKey(): ?string
     {
-        $presetKey = config('presets.default_package');
+        $presetKey = config('client.preset');
 
-        return is_string($presetKey) && trim($presetKey) !== ''
-            ? trim($presetKey)
-            : null;
+        if (is_string($presetKey) && trim($presetKey) !== '') {
+            return trim($presetKey);
+        }
+
+        $presetKey = config('presets.default');
+
+        if (is_string($presetKey) && trim($presetKey) !== '') {
+            return trim($presetKey);
+        }
+
+        $presetKeys = array_keys(config('presets.presets', []));
+
+        foreach ($presetKeys as $key) {
+            if (is_string($key) && trim($key) !== '') {
+                return trim($key);
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -53,24 +69,26 @@ class SyncCampaignPresetsAction
             return [];
         }
 
-        $campaignGroup = config("presets.packages.{$presetKey}.groups.campaigns");
+        $groupKeys = config("presets.presets.{$presetKey}.campaigns.groups", []);
 
-        if (! is_string($campaignGroup) || trim($campaignGroup) === '') {
+        if (! is_array($groupKeys) || $groupKeys === []) {
             return [];
-        }
-
-        $campaignKeys = config('presets.campaigns.groups.'.trim($campaignGroup));
-
-        if (! is_array($campaignKeys)) {
-            throw new InvalidArgumentException('Campaign preset group ['.trim($campaignGroup).'] does not exist.');
         }
 
         $definitions = [];
 
-        foreach ($this->normalizeStringList($campaignKeys) as $campaignKey) {
-            $definitions[] = CampaignPresetDefinition::fromArray(
-                data: $this->campaignDefinition($campaignKey),
-            );
+        foreach ($this->normalizeStringList($groupKeys) as $groupKey) {
+            $campaignKeys = config('presets.campaigns.groups.'.$groupKey);
+
+            if (! is_array($campaignKeys)) {
+                throw new InvalidArgumentException('Campaign preset group ['.$groupKey.'] does not exist.');
+            }
+
+            foreach ($this->normalizeStringList($campaignKeys) as $campaignKey) {
+                $definitions[] = CampaignPresetDefinition::fromArray(
+                    data: $this->campaignDefinition($campaignKey),
+                );
+            }
         }
 
         return $definitions;

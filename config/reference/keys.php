@@ -85,6 +85,26 @@ return [
             'preferred_purposes' => ['internal'],
             'status' => 'planned',
         ],
+        'broadcast' => [
+            'description' => 'Normal one-time Broadcast messaging and imported-contact permission invitation consent scope.',
+            'preferred_purposes' => ['marketing'],
+            'status' => 'active',
+        ],
+        'campaign' => [
+            'description' => 'Marketing consent scope used by Campaign journeys.',
+            'preferred_purposes' => ['marketing'],
+            'status' => 'active',
+        ],
+        'permission_invitation' => [
+            'description' => 'Transactional imported-contact permission invitation email flow.',
+            'preferred_purposes' => ['transactional'],
+            'status' => 'active',
+        ],
+        'mortgage_homebuyer_nurture' => [
+            'description' => 'Mortgage-specific long-term homebuyer nurture messages.',
+            'preferred_purposes' => ['marketing'],
+            'status' => 'active',
+        ],
     ],
 
     'queues' => [
@@ -172,6 +192,15 @@ return [
             'used_by' => ['campaigns'],
             'recommended_for' => [],
             'status' => 'legacy',
+        ],
+        'imported_contact_permission_invitation' => [
+            'description' => 'One-time imported-contact permission invitation email should be planned.',
+            'used_by' => ['messaging'],
+            'recommended_for' => [
+                'imported-contact opt-in invitation',
+            ],
+            'typical_channel_purpose_scope' => ['email:marketing:broadcast', 'email:transactional:permission_invitation'],
+            'status' => 'active',
         ],
     ],
 
@@ -261,6 +290,11 @@ return [
             'dispatch_key' => 'campaign_step_due',
             'status' => 'recommended',
         ],
+        'imported_contact_permission_invitation' => [
+            'description' => 'One-time imported-contact permission invitation email.',
+            'dispatch_key' => 'imported_contact_permission_invitation',
+            'status' => 'recommended',
+        ],
     ],
 
     'automation_event_keys' => [
@@ -300,6 +334,12 @@ return [
             'description' => 'A task was completed.',
             'status' => 'active',
         ],
+        'permission_invitation.accepted' => [
+            'producer' => 'messaging',
+            'contact_required' => true,
+            'description' => 'An imported-contact permission invitation was accepted.',
+            'status' => 'active',
+        ],
     ],
 
     'campaign_keys' => [
@@ -315,10 +355,10 @@ return [
             'scope' => 'webinar_nurture',
             'status' => 'active',
         ],
-        'long_term_homebuyer_nurture' => [
-            'description' => 'Long-term homebuyer education/re-engagement nurture.',
+        'mortgage_homebuyer_nurture' => [
+            'description' => 'Mortgage-specific long-term homebuyer education/re-engagement nurture.',
             'purpose' => 'marketing',
-            'scope' => 'webinar_nurture',
+            'scope' => 'mortgage_homebuyer_nurture',
             'status' => 'active',
         ],
     ],
