@@ -30,7 +30,7 @@ class LoginController extends Controller
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
             RateLimiter::hit(
                 $this->throttleKey($request),
-                config('security.crm_login.decay_seconds')
+                (int) config('security.crm_login.decay_seconds', 60)
             );
 
             throw ValidationException::withMessages([
