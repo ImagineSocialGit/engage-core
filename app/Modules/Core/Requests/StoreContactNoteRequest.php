@@ -14,7 +14,7 @@ class StoreContactNoteRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'content' => ['required', 'string', 'max:5000'],
+            'body' => ['required', 'string', 'max:5000'],
         ];
     }
 }

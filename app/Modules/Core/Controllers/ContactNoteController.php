@@ -28,7 +28,7 @@ class ContactNoteController extends Controller
         );
 
         $note->update([
-            'content' => $request->validated('content'),
+            'body' => $request->validated('body'),
         ]);
 
         return back()->with(
