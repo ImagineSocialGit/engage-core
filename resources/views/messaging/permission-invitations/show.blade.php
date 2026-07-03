@@ -52,8 +52,8 @@
 
                         <div class="space-y-3">
                             @if(in_array('email', $availableChannels ?? ['email'], true))
-                                <label class="{{ $style['option'] ?? 'block rounded-2xl border border-slate-200 p-4' }}">
-                                    <div class="flex gap-3">
+                                <label class="block w-full {{ $style['option'] ?? 'rounded-2xl border border-slate-200 p-4' }}">
+                                    <div class="flex items-start gap-3">
                                         <input
                                             type="checkbox"
                                             name="channels[]"
@@ -76,8 +76,8 @@
                             @endif
 
                             @if($smsAvailable ?? false)
-                                <label class="{{ $style['option'] ?? 'block rounded-2xl border border-slate-200 p-4' }}">
-                                    <div class="flex gap-3">
+                                <label class="block w-full {{ $style['option'] ?? 'rounded-2xl border border-slate-200 p-4' }}">
+                                    <div class="flex items-start gap-3">
                                         <input
                                             type="checkbox"
                                             name="channels[]"

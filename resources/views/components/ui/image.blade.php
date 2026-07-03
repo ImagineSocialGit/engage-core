@@ -17,7 +17,7 @@
     $widths = $image['sizes'] ?? [320, 640, 960, 1280, 1600];
 
     $cdn = rtrim(config('filesystems.disks.spaces.url'), '/');
-    $clientKey = trim((string) config('app.client_key', env('CLIENT_KEY')), '/');
+    $clientKey = trim((string) (config('app.client_key') ?: config('client.key') ?: env('CLIENT_KEY')), '/');
 
     if ($clientKey === '') {
         throw new RuntimeException('CLIENT_KEY is not configured.');

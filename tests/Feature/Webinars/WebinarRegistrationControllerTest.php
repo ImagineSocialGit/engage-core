@@ -326,6 +326,38 @@ class WebinarRegistrationControllerTest extends TestCase
         ]);
     }
 
+    public function test_show_resolves_public_layout_image_client_key_from_client_config(): void
+    {
+        Config::set('app.client_key', null);
+        Config::set('client.key', 'slam-dunk-crm');
+        Config::set('filesystems.disks.spaces.url', 'https://cdn.example.test');
+
+        Config::set('webinars.content.brand.logo', [
+            'path' => 'brand/logo',
+            'sizes' => [320],
+            'placeholder' => 'brand/logo/placeholder.webp',
+        ]);
+
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'client-key-image-test',
+            'title' => 'Client Key Image Test',
+        ]);
+
+        Webinar::factory()->create([
+            'webinar_series_id' => $series->id,
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $response = $this->get(route('webinar.show', $series->slug));
+
+        $response->assertOk();
+        $response->assertSee(
+            'https://cdn.example.test/slam-dunk-crm/images/brand/logo/320.webp',
+            false
+        );
+    }
+
     private function configureWebinarRegistrationChannelAvailability(): void
     {
         Config::set('messaging.channel_availability.email', [
