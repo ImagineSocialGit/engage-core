@@ -106,7 +106,7 @@
 
                         <input type="hidden" name="canceled_reason" value="Manually canceled">
 
-                        <x-ui.button type="submit" variant="ghost">
+                        <x-ui.button type="submit" variant="outline">
                             Cancel
                         </x-ui.button>
                     </form>
@@ -115,7 +115,7 @@
                         @csrf
                         @method('PATCH')
 
-                        <x-ui.button type="submit" variant="ghost">
+                        <x-ui.button type="submit" variant="outline">
                             Reopen
                         </x-ui.button>
                     </form>
@@ -124,7 +124,7 @@
                         @csrf
                         @method('PATCH')
 
-                        <x-ui.button type="submit" variant="ghost">
+                        <x-ui.button type="submit" variant="outline">
                             Archive
                         </x-ui.button>
                     </form>

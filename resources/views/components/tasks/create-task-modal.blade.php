@@ -220,7 +220,7 @@
             <div class="flex justify-end gap-3 border-t border-slate-200 pt-4">
                 <x-ui.button
                     type="button"
-                    variant="ghost"
+                    variant="outline"
                     x-on:click="taskModalOpen = false"
                 >
                     Cancel
