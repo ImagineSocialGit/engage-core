@@ -187,6 +187,43 @@ When writing message copy:
 
 ## Token source principle
 
+Available tokens come from explicit message data.
+
+Token sources are layered:
+
+```text
+Universal Messaging / Contact message data
+    Always available when the recipient is a Contact.
+
+Producer module message data
+    Available only when that module supplies its data object.
+
+Caller/enrollment/start-context payload
+    Available only when the action that starts the message or journey passes it.
+```
+
+Messaging owns universal Contact-recipient tokens.
+
+Producer modules own module-specific message data objects.
+
+Examples:
+
+```text
+Webinars
+    WebinarMessageData
+
+Scheduling, future
+    SchedulingMessageData
+
+Tasks, future
+    TaskMessageData
+
+Mortgage, future
+    MortgageMessageData
+```
+
+Campaigns do not invent message tokens. Campaigns may carry enrollment/start payload forward and pass it into Messaging, but the payload must come from the producer/caller that enrolled the contact or started the journey.
+
 Available tokens are based on intentional non-meta model fields plus friendly aliases.
 
 Examples:
@@ -206,9 +243,26 @@ Friendly aliases are preferred in client-facing copy:
 {webinar_start_time}
 ```
 
+## Universal Contact tokens
+
+Use these when the recipient is a Contact:
+
+```text
+{first_name}
+{last_name}
+{name}
+{email}
+{phone}
+{contact.first_name}
+{contact.last_name}
+{contact.name}
+{contact.email}
+{contact.phone}
+```
+
 ## Canonical webinar tokens
 
-Use these for registration confirmations/reminders:
+Use these for registration confirmations/reminders when the Webinars dispatch path supplies `WebinarMessageData::fromRegistration(...)`:
 
 ```text
 {first_name}
@@ -226,7 +280,24 @@ Use these for registration confirmations/reminders:
 {cta}
 ```
 
-Use these for post-webinar transactional follow-ups:
+Use these for waitlist availability messages when the Webinars waitlist path supplies `WebinarMessageData::fromWaitlistSignup(...)`:
+
+```text
+{first_name}
+{last_name}
+{name}
+{email}
+{phone}
+{webinar_title}
+{webinar_slug}
+{webinar_start_date}
+{webinar_start_time}
+{webinar_timezone}
+{webinar_registration_url}
+{cta}
+```
+
+Use these for post-webinar transactional follow-ups when Webinars resolves playback/follow-up data:
 
 ```text
 {first_name}
@@ -254,7 +325,7 @@ Use these for basic campaign messages:
 {phone}
 ```
 
-Campaign messages may use additional tokens only when the enrollment caller supplies them through payload/start_context and they are documented for that campaign/context.
+Campaign messages may use additional tokens only when the enrollment caller supplies them through payload/start context and they are documented for that campaign/context.
 
 ## Avoid or replace these tokens
 
@@ -267,7 +338,7 @@ Prefer canonical replacements:
 {registration_url}         -> {webinar_registration_url} or {webinar_join_url}, depending on behavior
 ```
 
-Use only when explicitly supplied:
+Use only when explicitly supplied by runtime payload/start context:
 
 ```text
 {application_url}
@@ -275,6 +346,15 @@ Use only when explicitly supplied:
 {next_step_url}
 {webinar_registration_url}
 ```
+
+Default campaign/nurture configs should not include runtime-only URL tokens unless the default preset also documents and supplies the source payload.
+
+If a requested token is missing, either:
+
+1. add the token to the owning runtime message data object; or
+2. change the copy to use currently documented tokens.
+
+Do not guess URLs in static config.
 
 ## Messaging config locations
 
@@ -375,17 +455,17 @@ Example:
 
                 'payload' => [
                     'subject' => 'Thanks for joining',
-                    'body' => 'Hi {first_name}, thanks for joining the webinar.',
-                    'cta' => [
-                        'label' => 'Continue',
-                        'url' => '{next_step_url}',
-                    ],
+                    'body' => 'Hi {first_name}, thanks for joining the webinar. Reply with your biggest question and we’ll help you with the next step.',
                 ],
             ],
         ],
     ],
 ],
 ```
+
+Do not include CTA URL tokens such as `{next_step_url}`, `{application_url}`, `{contact_url}`, or `{webinar_registration_url}` in default campaign copy unless the campaign enrollment/start path explicitly supplies them.
+
+When a campaign truly needs a CTA, document the source payload and ensure Messaging unresolved-token validation will block sending if the URL is missing.
 
 Campaign Messaging templates should not own campaign timing. Campaign presets own campaign timing.
 
@@ -504,74 +584,6 @@ Before accepting a client config, validate:
 
 Validation should protect authoring mistakes without turning optional style/copy omissions into runtime failures.
 
-
-## Validation severity
-
-Config validation should protect runtime behavior and operator trust without making optional client copy/style omissions brittle.
-
-Use hard errors when the config cannot be safely interpreted or points at unsupported behavior.
-
-Use warnings when the config is understandable but should be reviewed before client/staging use.
-
-### Hard errors
-
-Treat these as hard errors:
-
-- Missing required top-level keys after default/client fallback is applied.
-- Invalid or unknown `channel`, `purpose`, or `scope`.
-- Invalid channel/purpose/scope combinations for the owning surface.
-- Unknown `dispatch_key`, `automation_event_key`, `campaign_key`, `flow_route_key`, `point_type`, or `task_template_key`.
-- A Campaign preset references a Messaging campaign step template that does not exist.
-- A Campaign preset step includes reusable message copy or payload data.
-- A Messaging definition is missing required keys such as `dispatch_key`, `payload_class`, `queue`, `payload`, or valid `timing`.
-- A scheduled Messaging definition has malformed `schedule.type` or `schedule.minutes`.
-- A FlowRoute preset references an unknown point type or missing route point target.
-- A permission invitation config loses the required `email`, `consent`, `content`, or `style` top-level shape after fallback.
-- A permission invitation config removes configured consent scopes or makes SMS opt-in implicit.
-- Runtime-only URLs are hand-authored in static config where runtime services must inject them.
-
-### Warnings
-
-Treat these as warnings:
-
-- Deprecated or discouraged tokens are used where canonical replacements exist.
-- A token is undocumented but may be caller-supplied for a specific campaign/context.
-- Optional public-page `content` or `style` keys are omitted but safe defaults exist.
-- A registry key exists but is marked `planned`, `legacy`, or otherwise not recommended.
-- SMS is configured in runtime/provider settings but hidden from a given UI surface.
-- A template payload is intentionally empty and expected to skip or no-op.
-- Client-specific keys are present but not yet promoted into the default registry.
-- Copy is vertical-specific but lives in a generic/default config instead of a vertical/client scope.
-
-### Operator output
-
-Validation output should include:
-
-- severity: `error` or `warning`
-- config path
-- failing key or token when available
-- plain-English reason
-- suggested fix when the fix is obvious
-
-Example:
-
-```text
-ERROR messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.payload.cta.url
-Token {next_step_url} is caller-supplied but not documented for this campaign context.
-Document the token in config/reference/tokens.php or replace it with a supported token.
-
-WARNING messaging.sms.transactional.webinar.reminders.0.payload.message
-Token {webinar_starts_at} is deprecated. Prefer {webinar_start_date} and {webinar_start_time}.
-```
-
-Validation should be usable before staging smoke tests and before client config handoff. A future command can expose this as:
-
-```bash
-php artisan config:validate-engage
-php artisan config:validate-engage --client=slam-dunk-crm
-```
-
-The command should read default config plus client overrides using the same fallback behavior as runtime code.
 
 ## FlowRoute config shape
 

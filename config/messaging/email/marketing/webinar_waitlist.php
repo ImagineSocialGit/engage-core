@@ -13,7 +13,11 @@ return [
 
             'payload' => [
                 'subject' => 'New webinar scheduled: {webinar_title}',
-                'body' => '',
+                'body' => 'A new webinar session is available. Register here: {webinar_registration_url}',
+                'cta' => [
+                    'label' => 'Register Now',
+                    'url' => '{webinar_registration_url}',
+                ],
             ],
         ],
     ],

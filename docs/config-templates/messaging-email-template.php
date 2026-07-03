@@ -250,6 +250,19 @@ TEXT,
     | In a real config file, keep only the sections that belong to that
     | purpose/scope. Do not mix transactional and marketing definitions in one
     | deployed config file unless that file truly represents that purpose/scope.
+    |
+    | Campaign templates may always use universal Contact tokens when the
+    | recipient is a Contact:
+    |
+    | {first_name}
+    | {last_name}
+    | {name}
+    | {email}
+    | {phone}
+    |
+    | Do not include runtime-only URL tokens such as {next_step_url},
+    | {application_url}, {contact_url}, or {webinar_registration_url} unless
+    | the campaign enrollment/start path explicitly supplies them.
     */
 
     'campaigns' => [
@@ -262,11 +275,7 @@ TEXT,
 
                     'payload' => [
                         'subject' => 'Thanks for joining — here are a few next steps',
-                        'body' => 'Hi {first_name}, thanks for joining the webinar. Reply with your biggest question or use the link below to continue.',
-                        'cta' => [
-                            'label' => 'Continue',
-                            'url' => '{next_step_url}',
-                        ],
+                        'body' => 'Hi {first_name}, thanks for joining the webinar. Reply with your biggest question and we’ll help you with the next step.',
                     ],
                 ],
             ],
@@ -281,11 +290,7 @@ TEXT,
 
                     'payload' => [
                         'subject' => 'Sorry we missed you',
-                        'body' => 'Hi {first_name}, sorry we missed you at the webinar. Reply with your biggest question or use the link below to continue.',
-                        'cta' => [
-                            'label' => 'Continue',
-                            'url' => '{next_step_url}',
-                        ],
+                        'body' => 'Hi {first_name}, sorry we missed you at the webinar. Reply with your biggest question and we’ll help you with the next step.',
                     ],
                 ],
             ],

@@ -29,9 +29,12 @@ class MessageRecipientPayloadResolver
     ): ?array {
         $channel = $this->normalizeChannel($channel);
 
-        $mergedPayload = array_replace_recursive(
-            $definitionPayload,
-            $payload,
+        $mergedPayload = $this->withRecipientTokens(
+            payload: array_replace_recursive(
+                $definitionPayload,
+                $payload,
+            ),
+            recipient: $recipient,
         );
 
         $destination = $this->explicitDestination($mergedPayload)
@@ -86,6 +89,81 @@ class MessageRecipientPayloadResolver
             $recipient instanceof Contact && $channel === MessageChannel::Sms->value => $recipient->phone,
             default => $this->payloadProviderRegistry->destinationForChannel($recipient, $channel),
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function withRecipientTokens(array $payload, Model $recipient): array
+    {
+        $tokens = $this->recipientTokens($recipient);
+
+        if ($tokens === []) {
+            return $payload;
+        }
+
+        return array_replace_recursive(
+            [
+                'tokens' => $tokens,
+                'context' => [
+                    $this->contextKey($recipient) => $tokens[$this->contextKey($recipient)] ?? $recipient->toArray(),
+                ],
+            ],
+            $payload,
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function recipientTokens(Model $recipient): array
+    {
+        if (! $recipient instanceof Contact) {
+            return [];
+        }
+
+        $firstName = $this->nullableString($recipient->getAttribute('first_name'));
+        $lastName = $this->nullableString($recipient->getAttribute('last_name'));
+        $name = $this->nullableString($recipient->getAttribute('name'));
+        $email = $this->nullableString($recipient->getAttribute('email'));
+        $phone = $this->nullableString($recipient->getAttribute('phone'));
+        $status = $this->nullableString($recipient->getAttribute('status'));
+
+        $fullName = trim(implode(' ', array_filter([
+            $firstName,
+            $lastName,
+        ])));
+
+        if ($name === null && $fullName !== '') {
+            $name = $fullName;
+        }
+
+        $contact = [
+            'id' => $recipient->getKey(),
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'name' => $name,
+            'email' => $email,
+            'phone' => $phone,
+            'status' => $status,
+        ];
+
+        return [
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'name' => $name,
+            'email' => $email,
+            'phone' => $phone,
+            'contact' => $contact,
+        ];
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        return is_string($value) && trim($value) !== ''
+            ? trim($value)
+            : null;
     }
 
     /**

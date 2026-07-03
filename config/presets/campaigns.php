@@ -314,6 +314,11 @@ return [
                     'meta' => [
                         'type' => 'message',
                         'temporary' => true,
+                        'message' => [
+                            'channel' => 'email',
+                            'purpose' => 'marketing',
+                            'scope' => 'webinar_nurture_test',
+                        ],
                     ],
                 ],
                 [
@@ -333,6 +338,11 @@ return [
                     'meta' => [
                         'type' => 'message',
                         'temporary' => true,
+                        'message' => [
+                            'channel' => 'email',
+                            'purpose' => 'marketing',
+                            'scope' => 'webinar_nurture_test',
+                        ],
                     ],
                 ],
                 [
@@ -352,6 +362,11 @@ return [
                     'meta' => [
                         'type' => 'message',
                         'temporary' => true,
+                        'message' => [
+                            'channel' => 'email',
+                            'purpose' => 'marketing',
+                            'scope' => 'webinar_nurture_test',
+                        ],
                     ],
                 ],
                 [
@@ -372,6 +387,11 @@ return [
                         'type' => 'message',
                         'temporary' => true,
                         'expected_smoke_result' => 'skip_when_contact_status_is_not_interested',
+                        'message' => [
+                            'channel' => 'email',
+                            'purpose' => 'marketing',
+                            'scope' => 'webinar_nurture_test',
+                        ],
                     ],
                 ],
             ],
@@ -412,6 +432,11 @@ return [
                     'meta' => [
                         'type' => 'message',
                         'temporary' => true,
+                        'message' => [
+                            'channel' => 'sms',
+                            'purpose' => 'marketing',
+                            'scope' => 'webinar_nurture_test',
+                        ],
                     ],
                 ],
                 [
@@ -431,6 +456,11 @@ return [
                     'meta' => [
                         'type' => 'message',
                         'temporary' => true,
+                        'message' => [
+                            'channel' => 'sms',
+                            'purpose' => 'marketing',
+                            'scope' => 'webinar_nurture_test',
+                        ],
                     ],
                 ],
                 [
@@ -450,6 +480,11 @@ return [
                     'meta' => [
                         'type' => 'message',
                         'temporary' => true,
+                        'message' => [
+                            'channel' => 'sms',
+                            'purpose' => 'marketing',
+                            'scope' => 'webinar_nurture_test',
+                        ],
                     ],
                 ],
                 [
@@ -470,6 +505,11 @@ return [
                         'type' => 'message',
                         'temporary' => true,
                         'expected_smoke_result' => 'skip_when_contact_status_is_not_interested',
+                        'message' => [
+                            'channel' => 'sms',
+                            'purpose' => 'marketing',
+                            'scope' => 'webinar_nurture_test',
+                        ],
                     ],
                 ],
             ],

@@ -42,6 +42,19 @@ Rules:
   - broadcast_send for regular one-time Broadcast sends.
   - imported_contact_permission_invitation for the one-time imported-contact opt-in invitation.
 - Do not use marketing_message_sent for new configs.
+- Token ownership is layered:
+  - Universal Contact tokens are available when the recipient is a Contact.
+  - Module-specific tokens are available only when that module supplies its message data object.
+  - Campaign/context URL tokens are available only when the enrollment/start path explicitly supplies them.
+- Universal Contact tokens:
+  - `{first_name}`
+  - `{last_name}`
+  - `{name}`
+  - `{email}`
+  - `{phone}`
+- Do not use runtime-only URL tokens such as `{next_step_url}`, `{application_url}`, `{contact_url}`, or `{webinar_registration_url}` in campaign copy unless the source payload is documented.
+- If client copy requires a missing token, list the required message-data/runtime work separately instead of inventing the token.
+- Messaging should block unresolved tokens before provider send.
 - Commerce/Location requests should improve admin/client convenience; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
 - If a request needs module behavior beyond config, identify the owning module and list required code/seam work separately.
 

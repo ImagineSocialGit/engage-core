@@ -49,11 +49,7 @@ return [
 
                     'payload' => [
                         'subject' => 'Thanks for joining — here are a few next steps',
-                        'body' => 'Hi {first_name}, thanks for joining the webinar. If the topic is still on your mind, reply with your biggest question or use the link below to continue.',
-                        'cta' => [
-                            'label' => 'Continue',
-                            'url' => '{next_step_url}',
-                        ],
+                        'body' => 'Hi {first_name}, thanks for joining the webinar. If the topic is still on your mind, reply with your biggest question and we’ll help you with the next step.',
                     ],
                 ],
 

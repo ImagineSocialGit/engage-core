@@ -1,10 +1,22 @@
 # Engage Core Messaging Token Reference
 
-Tokens are resolved from the payload passed to `DispatchMessageAction`, plus recipient/context data supplied by recipient payload providers.
+Messaging tokens are resolved from:
 
-Do not invent token names unless the caller payload/provider is also updated to supply them.
+1. universal recipient/contact message data supplied by Messaging;
+2. module-specific message data supplied by the producer module;
+3. caller/enrollment/start-context payload explicitly passed into `DispatchMessageAction`.
 
-## Common contact tokens
+Do not invent token names unless the owning runtime payload/data object is also updated to supply them.
+
+Do not use runtime-only URL tokens in static config unless the source path that supplies the token is documented.
+
+## Token ownership model
+
+### Universal Messaging / Contact tokens
+
+Messaging owns universal Contact-recipient tokens.
+
+These should be available whenever the scheduled message recipient is a `Contact`, regardless of whether the message came from Broadcasts, Campaigns, FlowRoutes, Webinars, or another module.
 
 Use these in email/SMS payload text when the recipient is a Contact:
 
@@ -13,7 +25,66 @@ Use these in email/SMS payload text when the recipient is a Contact:
 - `{name}`
 - `{email}`
 - `{phone}`
+- `{contact.first_name}`
+- `{contact.last_name}`
+- `{contact.name}`
+- `{contact.email}`
+- `{contact.phone}`
 
+### Module-specific tokens
+
+Producer modules own module-specific token data objects.
+
+Examples:
+
+```text
+Webinars
+    WebinarMessageData
+
+Scheduling, future
+    SchedulingMessageData
+
+Tasks, future
+    TaskMessageData
+
+Mortgage, future
+    MortgageMessageData
+```
+
+A module-specific token may be used only when that module’s dispatch path supplies the matching message data.
+
+### Campaign/enrollment-context tokens
+
+Campaigns do not invent message tokens.
+
+Campaigns may carry start/enrollment payload forward and pass it into Messaging, but the payload must come from the producer/caller that enrolled the contact or started the journey.
+
+Use campaign/context tokens only when the campaign start context/caller supplies them and the campaign/context documents them.
+
+Examples of campaign/context tokens that must be explicitly supplied:
+
+- `{next_step_url}`
+- `{application_url}`
+- `{contact_url}`
+- `{webinar_registration_url}`
+- `{webinar_playback_url}` when not coming from a Webinars post-event dispatch path
+
+## Unresolved-token behavior
+
+Messaging should detect unresolved `{token}` values before provider send.
+
+Recommended behavior:
+
+- unresolved token in subject: skip/fail before send;
+- unresolved token in `cta.url`: skip/fail before send;
+- unresolved token in `secondary_link.url`: skip/fail before send;
+- unresolved token in SMS message: skip/fail before send;
+- unresolved token in marketing body: skip before send with operator/debug reason;
+- unresolved token in transactional body: fail or skip before send with operator/debug reason.
+
+Do not silently remove lines containing unresolved tokens by default.
+
+Optional sections may be supported later with an explicit config shape such as `optional_sections`, but line removal should be intentional, not automatic.
 
 ## Imported-contact permission invitation tokens
 
@@ -73,12 +144,20 @@ Expected from `WebinarMessageData::fromWaitlistSignup($signup, $webinar)->toArra
 - `{webinar_start_date}`
 - `{webinar_start_time}`
 - `{webinar_timezone}`
-- `{webinar_join_url}`
+- `{webinar_registration_url}`
 - `{cta}` when `payload.cta` exists
+
+Avoid:
+
+- `{registration_url}`
+
+Use:
+
+- `{webinar_registration_url}`
 
 ## Post-webinar transactional tokens
 
-Use these for replay/follow-up messages after playback is resolved:
+Use these for replay/follow-up messages after playback is resolved by Webinars runtime code:
 
 - `{first_name}`
 - `{last_name}`
@@ -104,18 +183,23 @@ Avoid in copy unless explicitly supplied for compatibility:
 
 ## Campaign/nurture tokens
 
-Campaign messages should use tokens available from the Contact payload and campaign start context.
-
-Common current safe tokens:
+Campaign messages may always use universal Contact tokens when the recipient is a Contact:
 
 - `{first_name}`
 - `{last_name}`
 - `{name}`
 - `{email}`
 - `{phone}`
-- `{cta}` when `payload.cta` exists
+- `{contact.first_name}`
+- `{contact.last_name}`
+- `{contact.name}`
+- `{contact.email}`
+- `{contact.phone}`
+- `{cta}` when `payload.cta` exists and the CTA URL resolves
 
-Use these only when the campaign start context/caller supplies them and the campaign/context documents them:
+Campaign messages may use additional tokens only when the enrollment caller supplies them through payload/start context and the campaign/context documents them.
+
+Use these only when explicitly supplied:
 
 - `{webinar_title}`
 - `{webinar_slug}`
@@ -127,6 +211,8 @@ Use these only when the campaign start context/caller supplies them and the camp
 - `{application_url}`
 - `{contact_url}`
 - `{webinar_registration_url}`
+
+Default campaign/nurture configs should not include runtime-only URL tokens unless the default preset also documents and supplies the source payload.
 
 ## Canonical replacements
 

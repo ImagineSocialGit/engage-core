@@ -12,7 +12,7 @@ class EmailConsentRevocationLinkGenerator
         return URL::temporarySignedRoute(
             name: 'messaging.email.unsubscribe',
             expiration: now()->addDays(
-                config('messaging.email.unsubscribe.signed_url_expiration_days', 30)
+                (int) config('messaging.email.unsubscribe.signed_url_expiration_days', 30)
             ),
             parameters: [
                 'contact' => $contact,
@@ -25,7 +25,7 @@ class EmailConsentRevocationLinkGenerator
         return URL::temporarySignedRoute(
             name: 'messaging.email.transactional-opt-out',
             expiration: now()->addDays(
-                config('messaging.email.transactional_opt_out.signed_url_expiration_days', 30)
+                (int) config('messaging.email.transactional_opt_out.signed_url_expiration_days', 30)
             ),
             parameters: [
                 'contact' => $contact,

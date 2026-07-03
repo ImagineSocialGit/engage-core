@@ -57,12 +57,12 @@ return [
 
             'surfaces' => [
                 'broadcasts' => false,
-                'campaigns' => false,
+                'campaigns' => true,
                 'permission_invitations' => false,
-                'webinar_registrations' => false,
-                'webinar_waitlists' => false,
+                'webinar_registrations' => true,
+                'webinar_waitlists' => true,
                 'internal_notifications' => false,
-                'route_send_message_points' => false,
+                'route_send_message_points' => true,
             ],
 
             'purpose_scopes' => [

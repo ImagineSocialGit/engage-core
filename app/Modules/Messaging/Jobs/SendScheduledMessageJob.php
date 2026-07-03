@@ -75,6 +75,12 @@ class SendScheduledMessageJob implements ShouldQueue
         try {
             $payload = $this->resolvePayload($scheduledMessage);
 
+            if ($reason = $this->unresolvedTokenReason($payload)) {
+                $this->markSkipped($scheduledMessage, $reason);
+
+                return;
+            }
+
             match ($scheduledMessage->channel) {
                 MessageChannel::Email->value => $this->sendEmail($payload, $emailMessagingService),
                 MessageChannel::Sms->value => $this->sendSms($payload, $smsMessagingService),
@@ -158,6 +164,49 @@ class SendScheduledMessageJob implements ShouldQueue
         }
 
         return $payload;
+    }
+
+    private function unresolvedTokenReason(EmailMessage|SmsMessage $payload): ?string
+    {
+        if (! method_exists($payload, 'devPayload')) {
+            return null;
+        }
+
+        $tokens = $this->unresolvedTokens($payload->devPayload());
+
+        if ($tokens === []) {
+            return null;
+        }
+
+        return 'Message payload contains unresolved token(s): '.implode(', ', $tokens).'.';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function unresolvedTokens(mixed $value): array
+    {
+        $tokens = [];
+
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                $tokens = array_merge($tokens, $this->unresolvedTokens($item));
+            }
+
+            return array_values(array_unique($tokens));
+        }
+
+        if (! is_string($value) || trim($value) === '') {
+            return [];
+        }
+
+        preg_match_all('/\{[a-zA-Z_][a-zA-Z0-9_.:-]*\}/', $value, $matches);
+
+        foreach ($matches[0] ?? [] as $token) {
+            $tokens[] = $token;
+        }
+
+        return array_values(array_unique($tokens));
     }
 
     private function sendEmail(

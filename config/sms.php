@@ -7,8 +7,14 @@ return [
     'provider' => env('SMS_PROVIDER', 'telnyx'),
 
     'from' => [
-        'transactional' => env('SMS_FROM_TRANSACTIONAL', env('SMS_FROM', env('TWILIO_FROM', env('TELNYX_FROM')))),
-        'marketing' => env('SMS_FROM_MARKETING', env('SMS_FROM', env('TWILIO_FROM', env('TELNYX_FROM')))),
+        'transactional' => env(
+            'SMS_FROM_TRANSACTIONAL',
+            env('TELNYX_FROM_TRANSACTIONAL', env('SMS_FROM', env('TWILIO_FROM', env('TELNYX_FROM'))))
+        ),
+        'marketing' => env(
+            'SMS_FROM_MARKETING',
+            env('TELNYX_FROM_MARKETING', env('SMS_FROM', env('TWILIO_FROM', env('TELNYX_FROM'))))
+        ),
     ],
 
     'providers' => [
