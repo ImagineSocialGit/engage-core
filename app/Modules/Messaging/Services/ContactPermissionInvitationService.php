@@ -8,6 +8,8 @@ use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Support\AutomationEvents\Data\AutomationEventData;
+use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -140,7 +142,12 @@ class ContactPermissionInvitationService
         array $channels,
         Request $request,
     ): ContactPermissionInvitation {
+        if ($invitation->hasBeenAccepted()) {
+            return $invitation;
+        }
+
         $channels = $this->normalizedAcceptedChannels($channels);
+        $scopes = $this->consentScopes();
         $contact = $invitation->contact;
 
         if (! $contact) {
@@ -148,7 +155,7 @@ class ContactPermissionInvitationService
         }
 
         foreach ($channels as $channel) {
-            foreach ($this->consentScopes() as $scope) {
+            foreach ($scopes as $scope) {
                 MessageConsent::query()->updateOrCreate(
                     [
                         'contact_id' => $contact->getKey(),
@@ -180,12 +187,20 @@ class ContactPermissionInvitationService
                     'ip_address' => $request->ip(),
                     'user_agent' => $request->userAgent(),
                     'channels' => $channels,
-                    'scopes' => $this->consentScopes(),
+                    'scopes' => $scopes,
                 ],
             ]),
         ])->save();
 
-        return $invitation->refresh();
+        $invitation = $invitation->refresh();
+
+        $this->emitAcceptedAutomationEvent(
+            invitation: $invitation,
+            channels: $channels,
+            scopes: $scopes,
+        );
+
+        return $invitation;
     }
 
     public function findPublicInvitation(string $token): ?ContactPermissionInvitation
@@ -240,6 +255,44 @@ class ContactPermissionInvitationService
             ->where('channel', ContactPermissionInvitation::CHANNEL_EMAIL)
             ->where('source', ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT)
             ->exists();
+    }
+
+    /**
+     * @param array<int, string> $channels
+     * @param array<int, string> $scopes
+     */
+    private function emitAcceptedAutomationEvent(
+        ContactPermissionInvitation $invitation,
+        array $channels,
+        array $scopes,
+    ): void {
+        event(new AutomationEventRecorded(
+            AutomationEventData::forSubject(
+                eventKey: 'permission_invitation.accepted',
+                subject: $invitation,
+                contactId: $invitation->contact_id,
+                occurredAt: $invitation->accepted_at ?? now(),
+                payload: [
+                    'permission_invitation' => [
+                        'id' => $invitation->getKey(),
+                        'status' => $invitation->status,
+                        'channel' => $invitation->channel,
+                        'source' => $invitation->source,
+                        'accepted_at' => $invitation->accepted_at?->toISOString(),
+                        'accepted_channels' => $channels,
+                        'consent_scopes' => $scopes,
+                        'context_type' => $invitation->context_type,
+                        'context_id' => $invitation->context_id,
+                        'scheduled_message_id' => $invitation->scheduled_message_id,
+                    ],
+                ],
+                meta: [
+                    'source_module' => 'messaging',
+                    'permission_invitation_id' => $invitation->getKey(),
+                    'source' => 'imported_contact_permission_invitation',
+                ],
+            ),
+        ));
     }
 
     /**

@@ -7,7 +7,9 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
+use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -111,6 +113,39 @@ class ContactPermissionInvitationControllerTest extends TestCase
         }
 
         $this->assertSame(2, MessageConsent::query()->count());
+    }
+
+    public function test_accepting_invitation_emits_permission_invitation_accepted_automation_event(): void
+    {
+        Event::fake([AutomationEventRecorded::class]);
+
+        $invitation = $this->invitation();
+
+        $response = $this->post(route('messaging.permission-invitations.store', [
+            'token' => $invitation->token,
+        ]), [
+            'channels' => ['email'],
+        ]);
+
+        $response->assertRedirect(route('messaging.permission-invitations.show', [
+            'token' => $invitation->token,
+        ]));
+
+        $invitation->refresh();
+
+        Event::assertDispatched(
+            AutomationEventRecorded::class,
+            function (AutomationEventRecorded $event) use ($invitation): bool {
+                return $event->event->eventKey === 'permission_invitation.accepted'
+                    && $event->event->contactId === $invitation->contact_id
+                    && $event->event->subjectType === $invitation->getMorphClass()
+                    && $event->event->subjectId === $invitation->getKey()
+                    && ($event->event->payload['permission_invitation']['accepted_channels'] ?? null) === ['email']
+                    && ($event->event->payload['permission_invitation']['consent_scopes'] ?? null) === ['broadcast', 'campaign']
+                    && ($event->event->meta['source_module'] ?? null) === 'messaging'
+                    && ($event->event->meta['source'] ?? null) === 'imported_contact_permission_invitation';
+            },
+        );
     }
 
     public function test_sms_opt_in_is_rejected_when_hidden_for_permission_invitations(): void
@@ -282,6 +317,41 @@ class ContactPermissionInvitationControllerTest extends TestCase
         $this->assertSame(['email'], $invitation->accepted_channels);
         $this->assertNull($invitation->contact->phone);
         $this->assertSame(1, MessageConsent::query()->count());
+    }
+
+    public function test_already_accepted_invitation_does_not_emit_permission_invitation_accepted_automation_event(): void
+    {
+        Event::fake([AutomationEventRecorded::class]);
+
+        $this->enablePermissionInvitationSms();
+
+        $invitation = $this->invitation([
+            'status' => ContactPermissionInvitation::STATUS_ACCEPTED,
+            'accepted_at' => now(),
+            'accepted_channels' => ['email'],
+        ]);
+
+        MessageConsent::query()->create([
+            'contact_id' => $invitation->contact_id,
+            'channel' => MessageChannel::Email->value,
+            'purpose' => MessagePurpose::Marketing->value,
+            'scope' => 'broadcast',
+            'consented_at' => now()->subMinute(),
+            'source' => 'imported_contact_permission_invitation',
+        ]);
+
+        $response = $this->post(route('messaging.permission-invitations.store', [
+            'token' => $invitation->token,
+        ]), [
+            'channels' => ['email', 'sms'],
+            'phone' => '+15555550123',
+        ]);
+
+        $response->assertRedirect(route('messaging.permission-invitations.show', [
+            'token' => $invitation->token,
+        ]));
+
+        Event::assertNotDispatched(AutomationEventRecorded::class);
     }
 
     public function test_acceptance_falls_back_to_broadcast_scope_when_scope_config_is_missing(): void
