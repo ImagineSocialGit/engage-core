@@ -3,10 +3,14 @@
 return [
     'groups' => [
         'webinar_default' => [
+            'webinar_attended_status_transition',
+            'webinar_missed_status_transition',
             'webinar_attended_campaign_enrollment',
             'webinar_missed_campaign_enrollment',
         ],
         'mortgage_default' => [
+            'webinar_attended_status_transition',
+            'webinar_missed_status_transition',
             'webinar_attended_campaign_enrollment',
             'webinar_missed_campaign_enrollment',
             'smoke_webinar_attended_nurture_test_enrollment',
@@ -15,6 +19,100 @@ return [
         ],
     ],
     'definitions' => [
+        'webinar_attended_status_transition' => [
+            'key' => 'webinar_attended_status_transition',
+            'trigger' => [
+                'type' => 'automation_event',
+                'event_key' => 'webinar.attended',
+            ],
+            'name' => 'Webinar Attended Status Transition',
+            'version' => 1,
+            'is_active' => true,
+            'source_version' => 'client_readiness_2026_07',
+            'meta' => [
+                'description' => 'Move contacts who attended a webinar into the attended_webinar workflow status.',
+                'category' => 'webinar',
+                'default_role' => 'status_transition',
+            ],
+            'points' => [
+                [
+                    'key' => 'change_status_to_attended_webinar',
+                    'type' => 'change_status',
+                    'name' => 'Change Status to Attended Webinar',
+                    'description' => 'Move the contact into the attended_webinar status after a webinar.attended event.',
+                    'default_definition' => [
+                        'contact_status_key' => 'attended_webinar',
+                        'reason' => 'webinar_attended_event',
+                        'force' => false,
+                        'on_same_status' => 'skipped',
+                        'meta' => [
+                            'source' => 'flow_route',
+                            'trigger_type' => 'automation_event',
+                            'event_key' => 'webinar.attended',
+                        ],
+                    ],
+                    'default_settings' => [],
+                    'is_active' => true,
+                    'source_version' => 'client_readiness_2026_07',
+                    'meta' => [
+                        'description' => 'Status transition point for attended webinar outcomes.',
+                        'flow_route_point' => [
+                            'description' => 'First and only point in the attended webinar status transition route.',
+                        ],
+                    ],
+                    'sort_order' => 1,
+                    'cancel_conditions' => [],
+                    'is_start' => true,
+                ],
+            ],
+        ],
+        'webinar_missed_status_transition' => [
+            'key' => 'webinar_missed_status_transition',
+            'trigger' => [
+                'type' => 'automation_event',
+                'event_key' => 'webinar.missed',
+            ],
+            'name' => 'Webinar Missed Status Transition',
+            'version' => 1,
+            'is_active' => true,
+            'source_version' => 'client_readiness_2026_07',
+            'meta' => [
+                'description' => 'Move contacts who missed a webinar into the missed_webinar workflow status.',
+                'category' => 'webinar',
+                'default_role' => 'status_transition',
+            ],
+            'points' => [
+                [
+                    'key' => 'change_status_to_missed_webinar',
+                    'type' => 'change_status',
+                    'name' => 'Change Status to Missed Webinar',
+                    'description' => 'Move the contact into the missed_webinar status after a webinar.missed event.',
+                    'default_definition' => [
+                        'contact_status_key' => 'missed_webinar',
+                        'reason' => 'webinar_missed_event',
+                        'force' => false,
+                        'on_same_status' => 'skipped',
+                        'meta' => [
+                            'source' => 'flow_route',
+                            'trigger_type' => 'automation_event',
+                            'event_key' => 'webinar.missed',
+                        ],
+                    ],
+                    'default_settings' => [],
+                    'is_active' => true,
+                    'source_version' => 'client_readiness_2026_07',
+                    'meta' => [
+                        'description' => 'Status transition point for missed webinar outcomes.',
+                        'flow_route_point' => [
+                            'description' => 'First and only point in the missed webinar status transition route.',
+                        ],
+                    ],
+                    'sort_order' => 1,
+                    'cancel_conditions' => [],
+                    'is_start' => true,
+                ],
+            ],
+        ],
         'webinar_attended_campaign_enrollment' => [
             'key' => 'webinar_attended_campaign_enrollment',
             'trigger' => [
@@ -384,3 +482,4 @@ return [
         ],
     ],
 ];
+

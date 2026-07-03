@@ -2,7 +2,11 @@
 
 namespace Tests\Feature\FlowRoutes;
 
+use App\Modules\Core\Models\Contact;
+use App\Modules\Core\Models\ContactStatus;
 use App\Modules\FlowRoutes\Actions\ExecuteCurrentFlowRoutePointAction;
+use App\Modules\FlowRoutes\Actions\StartFlowRoutesFromAutomationEventAction;
+use App\Modules\FlowRoutes\Data\Events\FlowRouteExternalEvent;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Jobs\ResumeFlowRouteProgressJob;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
@@ -14,9 +18,11 @@ use App\Modules\FlowRoutes\PointHandlers\WaitPointHandler;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\SmsPayload;
+use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -176,6 +182,99 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertSame(0, ScheduledMessage::query()->count());
     }
 
+
+    public function test_automation_event_route_can_change_contact_workflow_status(): void
+    {
+        Event::fake([ContactWorkflowStatusChanged::class]);
+
+        $contact = Contact::factory()->create();
+
+        $targetStatus = ContactStatus::query()->create([
+            'key' => 'attended_webinar',
+            'name' => 'Attended Webinar',
+            'is_active' => true,
+        ]);
+
+        $flowRoute = FlowRoute::query()->create([
+            'key' => 'webinar_attended_status_transition',
+            'contact_status_id' => null,
+            'name' => 'Webinar Attended Status Transition',
+            'description' => null,
+            'version' => 1,
+            'trigger_type' => 'automation_event',
+            'trigger_key' => 'webinar.attended',
+            'is_active' => true,
+            'source_version' => 'test',
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        $point = Point::query()->create([
+            'key' => 'change_status_to_attended_webinar',
+            'type' => Point::TYPE_CHANGE_STATUS,
+            'name' => 'Change Status to Attended Webinar',
+            'description' => null,
+            'default_definition' => [],
+            'default_settings' => [],
+            'is_active' => true,
+            'source_version' => 'test',
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        FlowRoutePoint::query()->create([
+            'flow_route_id' => $flowRoute->getKey(),
+            'point_id' => $point->getKey(),
+            'key' => 'change_status_to_attended_webinar',
+            'sort_order' => 10,
+            'is_start' => true,
+            'is_active' => true,
+            'next_flow_route_point_id' => null,
+            'definition' => [
+                'contact_status_key' => 'attended_webinar',
+                'reason' => 'webinar_attended_event',
+                'on_same_status' => 'skipped',
+            ],
+            'settings' => [],
+            'cancel_conditions' => [],
+            'source_version' => 'test',
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        app(StartFlowRoutesFromAutomationEventAction::class)->handle(
+            FlowRouteExternalEvent::make(
+                name: 'webinar.attended',
+                contactId: $contact->getKey(),
+                subjectType: 'webinar_registration',
+                subjectId: 123,
+                occurredAt: now(),
+                payload: [
+                    'webinar_registration' => [
+                        'id' => 123,
+                    ],
+                ],
+            ),
+        );
+
+        $this->assertDatabaseHas('contact_workflow_profiles', [
+            'contact_id' => $contact->getKey(),
+            'contact_status_id' => $targetStatus->getKey(),
+        ]);
+
+        $progress = ContactFlowRouteProgress::query()->first();
+
+        $this->assertNotNull($progress);
+        $this->assertSame($contact->getKey(), $progress->contact_id);
+        $this->assertSame($flowRoute->getKey(), $progress->flow_route_id);
+        $this->assertSame('webinar.attended', $progress->meta['started_from_automation_event']['name'] ?? null);
+
+        Event::assertDispatched(ContactWorkflowStatusChanged::class);
+    }
+
     /**
      * @param array<int, string> $types
      * @return array{
@@ -306,3 +405,4 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         ];
     }
 }
+
