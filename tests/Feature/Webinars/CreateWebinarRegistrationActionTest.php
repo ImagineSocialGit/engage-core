@@ -54,7 +54,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
 
         $dispatchMessage
             ->shouldReceive('handle')
-            ->once()
+            ->twice()
             ->andReturn([]);
 
         app()->instance(
@@ -204,7 +204,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
 
         $dispatchMessage
             ->shouldReceive('handle')
-            ->twice()
+            ->times(4)
             ->andReturn([]);
 
         app()->instance(
@@ -332,7 +332,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
 
         $dispatchMessage
             ->shouldReceive('handle')
-            ->never();
+            ->once();
 
         app()->instance(
             DispatchMessageAction::class,

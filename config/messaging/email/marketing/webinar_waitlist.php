@@ -11,6 +11,13 @@ return [
             'payload_class' => EmailPayload::class,
             'queue' => 'notifications',
 
+            'conditions' => [
+                [
+                    'field' => 'webinar.registration_url',
+                    'operator' => 'filled',
+                ],
+            ],
+
             'payload' => [
                 'subject' => 'New webinar scheduled: {webinar_title}',
                 'body' => 'A new webinar session is available. Register here: {webinar_registration_url}',
@@ -31,7 +38,7 @@ return [
 
             'payload' => [
                 'subject' => 'You’re on the webinar waitlist',
-                'body' => 'Thanks for subscribing to get updates for {webinar_series} availability. We’ll let you know when a new session is available.',
+                'body' => 'Thanks for subscribing to webinar updates. We’ll let you know when a new session is available.',
             ],
         ],
     ],

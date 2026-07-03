@@ -54,7 +54,7 @@ class DispatchPostWebinarFollowUpsAction
 
         if (! data_get($webinar->meta, 'automation_events.webinar_ended_recorded_at')) {
             $this->emitWebinarAutomationEvent->forWebinar(
-                eventKey: 'webinar.ended',
+                eventKey: config('webinars.post_event.automation_events.webinar_ended.event_key', 'webinar.ended'),
                 webinar: $webinar,
                 occurredAt: $webinar->ends_at ?? now(),
                 payload: [
@@ -92,6 +92,8 @@ class DispatchPostWebinarFollowUpsAction
             }
 
             $dispatchKeys = config('webinars.post_event.outcome_messages.dispatch_key', 'webinar_ended');
+            $purpose = $this->normalizedPurpose();
+            $scope = $this->normalizedScope();
 
             $messageData = array_replace_recursive(
                 WebinarMessageData::fromRegistration($registration)->toArray(),
@@ -112,39 +114,87 @@ class DispatchPostWebinarFollowUpsAction
 
             unset($messageData['playback_url']);
 
-            $meta = [
-                'webinar_id' => $webinar->getKey(),
-                'webinar_registration_id' => $registration->getKey(),
-                'webinar_slug' => $registration->webinar_slug,
-                'post_event' => [
-                    'type' => 'transactional_follow_up',
-                    'attended' => filled($registration->attended_at),
-                ],
-            ];
-
-            $this->dispatchMessageAction->handle(
-                recipient: $registration->contact,
-                channel: MessageChannel::Email,
-                purpose: MessagePurpose::Transactional,
-                scope: 'webinar',
-                dispatchKeys: $dispatchKeys,
-                payload: array_replace_recursive(
-                    $messageData,
-                    [
-                        'tokens' => $messageData,
-                        'context' => [
-                            'contact' => $messageData['contact'] ?? $registration->contact->toArray(),
-                            'webinar' => $webinar->toArray(),
-                            'webinar_registration' => $registration->toArray(),
-                            'webinar_series' => $registration->webinar?->webinarSeries?->toArray() ?? [],
-                        ],
+            $payload = array_replace_recursive(
+                $messageData,
+                [
+                    'tokens' => $messageData,
+                    'context' => [
+                        'contact' => $messageData['contact'] ?? $registration->contact->toArray(),
+                        'webinar' => $webinar->toArray(),
+                        'webinar_registration' => $registration->toArray(),
+                        'webinar_series' => $registration->webinar?->webinarSeries?->toArray() ?? [],
                     ],
-                ),
-                context: $registration,
-                triggeredAt: now(),
-                meta: $meta,
+                ],
             );
+
+            foreach ($this->channels() as $channel) {
+                $meta = [
+                    'webinar_id' => $webinar->getKey(),
+                    'webinar_registration_id' => $registration->getKey(),
+                    'webinar_slug' => $registration->webinar_slug,
+                    'post_event' => [
+                        'type' => 'transactional_follow_up',
+                        'attended' => filled($registration->attended_at),
+                    ],
+                ];
+
+                $this->dispatchMessageAction->handle(
+                    recipient: $registration->contact,
+                    channel: $channel,
+                    purpose: $purpose,
+                    scope: $scope,
+                    dispatchKeys: $dispatchKeys,
+                    payload: $payload,
+                    context: $registration,
+                    triggeredAt: now(),
+                    meta: $meta,
+                );
+            }
         }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function channels(): array
+    {
+        $channels = config('webinars.post_event.outcome_messages.channels', [
+            MessageChannel::Email->value,
+        ]);
+
+        if (! is_array($channels)) {
+            $channels = [MessageChannel::Email->value];
+        }
+
+        $allowed = [
+            MessageChannel::Email->value,
+            MessageChannel::Sms->value,
+        ];
+
+        return array_values(array_unique(array_filter(array_map(
+            fn (mixed $channel): ?string => is_string($channel) && in_array(strtolower(trim($channel)), $allowed, true)
+                ? strtolower(trim($channel))
+                : null,
+            $channels,
+        )))) ?: [MessageChannel::Email->value];
+    }
+
+    private function normalizedPurpose(): string
+    {
+        $purpose = config('webinars.post_event.outcome_messages.purpose', MessagePurpose::Transactional->value);
+
+        return is_string($purpose) && trim($purpose) !== ''
+            ? str_replace('-', '_', strtolower(trim($purpose)))
+            : MessagePurpose::Transactional->value;
+    }
+
+    private function normalizedScope(): string
+    {
+        $scope = config('webinars.post_event.outcome_messages.scope', 'webinar');
+
+        return is_string($scope) && trim($scope) !== ''
+            ? str_replace('-', '_', strtolower(trim($scope)))
+            : 'webinar';
     }
 
     /**

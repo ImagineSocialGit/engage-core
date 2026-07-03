@@ -149,6 +149,70 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         Queue::assertPushed(SendScheduledMessageJob::class, 2);
     }
 
+    public function test_it_includes_registration_url_for_waitlist_notification_when_webinar_exists(): void
+    {
+        Queue::fake();
+
+        $this->configureWaitlistMessages();
+
+        $series = $this->createSeries();
+        $webinar = $this->createWebinar($series, [
+            'registration_url' => 'https://example.com/register-now',
+        ]);
+        $contact = $this->createContact([
+            MessageChannel::Email->value,
+        ]);
+
+        $signup = $this->createSignup($series, $contact, [
+            MessageChannel::Email->value,
+        ]);
+
+        app(DispatchWebinarWaitlistMessagesAction::class)->handle($webinar);
+
+        $message = ScheduledMessage::query()
+            ->where('channel', MessageChannel::Email->value)
+            ->where('message_type', 'scheduled_notice')
+            ->first();
+
+        $this->assertNotNull($message);
+        $this->assertSame('A new webinar is available. Register here: {webinar_registration_url}', $message->payload['body']);
+        $this->assertSame('{webinar_registration_url}', $message->payload['cta']['url']);
+        $this->assertSame('https://example.com/register-now', $message->payload['tokens']['webinar_registration_url']);
+
+        $signup->refresh();
+
+        $this->assertNotNull($signup->notified_at);
+    }
+
+    public function test_it_does_not_mark_signup_notified_when_registration_url_is_missing(): void
+    {
+        Queue::fake();
+
+        $this->configureWaitlistMessages();
+
+        $series = $this->createSeries();
+        $webinar = $this->createWebinar($series, [
+            'registration_url' => null,
+        ]);
+        $contact = $this->createContact([
+            MessageChannel::Email->value,
+        ]);
+
+        $signup = $this->createSignup($series, $contact, [
+            MessageChannel::Email->value,
+        ]);
+
+        app(DispatchWebinarWaitlistMessagesAction::class)->handle($webinar);
+
+        $this->assertSame(0, ScheduledMessage::query()->count());
+
+        $signup->refresh();
+
+        $this->assertNull($signup->notified_at);
+
+        Queue::assertNothingPushed();
+    }
+
     public function test_it_does_not_dispatch_sms_when_sms_is_available_but_not_accepted_for_signup(): void
     {
         Queue::fake();
@@ -248,9 +312,19 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
                 'timing' => 'immediate',
                 'payload_class' => EmailPayload::class,
                 'queue' => 'notifications',
+                'conditions' => [
+                    [
+                        'field' => 'webinar.registration_url',
+                        'operator' => 'filled',
+                    ],
+                ],
                 'payload' => [
-                    'subject' => 'New webinar scheduled',
-                    'body' => 'A new webinar is available.',
+                    'subject' => 'New webinar scheduled: {webinar_title}',
+                    'body' => 'A new webinar is available. Register here: {webinar_registration_url}',
+                    'cta' => [
+                        'label' => 'Register Now',
+                        'url' => '{webinar_registration_url}',
+                    ],
                 ],
             ],
         ]);
@@ -261,8 +335,14 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
                 'timing' => 'immediate',
                 'payload_class' => SmsPayload::class,
                 'queue' => 'notifications',
+                'conditions' => [
+                    [
+                        'field' => 'webinar.registration_url',
+                        'operator' => 'filled',
+                    ],
+                ],
                 'payload' => [
-                    'message' => 'A new webinar is available.',
+                    'message' => 'A new webinar is available. Register here: {webinar_registration_url}',
                 ],
             ],
         ]);
@@ -277,7 +357,10 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         ]);
     }
 
-    private function createWebinar(WebinarSeries $series): Webinar
+    /**
+     * @param array<string, mixed> $overrides
+     */
+    private function createWebinar(WebinarSeries $series, array $overrides = []): Webinar
     {
         return Webinar::query()->create([
             'webinar_series_id' => $series->id,
@@ -290,6 +373,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
             'starts_at' => now()->addDays(7),
             'ends_at' => now()->addDays(7)->addHour(),
             'timezone' => 'America/Chicago',
+            ...$overrides,
         ]);
     }
 

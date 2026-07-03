@@ -11,6 +11,13 @@ return [
             'payload_class' => SmsPayload::class,
             'queue' => 'notifications',
 
+            'conditions' => [
+                [
+                    'field' => 'webinar.registration_url',
+                    'operator' => 'filled',
+                ],
+            ],
+
             'payload' => [
                 'message' => 'A new webinar has been scheduled for {webinar_title}. Register here: {webinar_registration_url}',
             ],

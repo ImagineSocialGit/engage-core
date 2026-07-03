@@ -56,8 +56,10 @@ class DispatchWebinarWaitlistMessagesAction
 
         $messageData = WebinarMessageData::fromWaitlistSignup($signup, $webinar)->toArray();
 
+        $scheduledCount = 0;
+
         foreach ($channels as $channel) {
-            $this->dispatchMessageAction->handle(
+            $scheduledCount += count($this->dispatchMessageAction->handle(
                 recipient: $signup->contact,
                 channel: $channel,
                 purpose: MessagePurpose::Marketing,
@@ -75,10 +77,10 @@ class DispatchWebinarWaitlistMessagesAction
                     'webinar_id' => $webinar->getKey(),
                     'webinar_series_id' => $webinar->webinar_series_id,
                 ],
-            );
+            ));
         }
 
-        return true;
+        return $scheduledCount > 0;
     }
 
     /**

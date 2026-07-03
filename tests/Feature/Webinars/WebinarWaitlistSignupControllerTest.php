@@ -6,6 +6,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\MessageConsent;
+use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -122,6 +123,77 @@ class WebinarWaitlistSignupControllerTest extends TestCase
         ]);
 
         $this->assertSame(1, MessageConsent::query()->count());
+    }
+
+    public function test_it_schedules_marketing_waitlist_email_opt_in_without_runtime_webinar_url_tokens(): void
+    {
+        Queue::fake();
+
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'homebuyer-basics',
+            'title' => 'Homebuyer Basics',
+        ]);
+
+        $this->from(route('webinar.show', $series->slug))
+            ->post(route('webinar.waitlist.store', $series->slug), [
+                'first_name' => 'Jeff',
+                'last_name' => 'Yarnall',
+                'email' => 'jeff-opt-in@example.com',
+                'marketing_email_consent' => true,
+                'marketing_sms_consent' => false,
+            ])
+            ->assertRedirect(route('webinar.show', $series->slug))
+            ->assertSessionHasNoErrors();
+
+        $message = ScheduledMessage::query()
+            ->where('channel', MessageChannel::Email->value)
+            ->where('purpose', MessagePurpose::Marketing->value)
+            ->where('scope', 'webinar_waitlist')
+            ->where('message_type', 'opt_in')
+            ->first();
+
+        $this->assertNotNull($message);
+        $this->assertSame('jeff-opt-in@example.com', $message->payload['to']);
+        $this->assertStringNotContainsString('{webinar_registration_url}', $message->payload['body']);
+        $this->assertStringNotContainsString('{webinar_series}', $message->payload['body']);
+    }
+
+    public function test_it_schedules_marketing_waitlist_sms_opt_in_to_contact_phone(): void
+    {
+        Queue::fake();
+
+        $this->enableWebinarWaitlistSms();
+
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'homebuyer-basics',
+            'title' => 'Homebuyer Basics',
+        ]);
+
+        $this->from(route('webinar.show', $series->slug))
+            ->post(route('webinar.waitlist.store', $series->slug), [
+                'first_name' => 'Jeff',
+                'last_name' => 'Yarnall',
+                'email' => 'jeff-sms-opt-in@example.com',
+                'phone' => '(555) 555-0123',
+                'marketing_email_consent' => true,
+                'marketing_sms_consent' => true,
+            ])
+            ->assertRedirect(route('webinar.show', $series->slug))
+            ->assertSessionHasNoErrors();
+
+        $message = ScheduledMessage::query()
+            ->where('channel', MessageChannel::Sms->value)
+            ->where('purpose', MessagePurpose::Marketing->value)
+            ->where('scope', 'webinar_waitlist')
+            ->where('message_type', 'opt_in')
+            ->first();
+
+        $this->assertNotNull($message);
+        $this->assertSame('+15555550123', $message->payload['to']);
+        $this->assertNotSame('jeff-sms-opt-in@example.com', $message->payload['to']);
+        $this->assertStringNotContainsString('{webinar_registration_url}', $message->payload['message']);
     }
 
     public function test_it_shows_success_confirmation_after_waitlist_signup(): void

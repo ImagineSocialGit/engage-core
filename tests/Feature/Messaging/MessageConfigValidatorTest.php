@@ -116,6 +116,59 @@ class MessageConfigValidatorTest extends TestCase
         );
     }
 
+    public function test_it_accepts_waitlist_alert_tokens_and_opt_in_copy_without_registration_url(): void
+    {
+        Config::set('messaging.email.marketing.webinar_waitlist', [
+            'alerts' => [
+                [
+                    'dispatch_key' => 'webinar_added',
+                    'timing' => 'immediate',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'notifications',
+                    'conditions' => [
+                        [
+                            'field' => 'webinar.registration_url',
+                            'operator' => 'filled',
+                        ],
+                    ],
+                    'payload' => [
+                        'subject' => 'New webinar scheduled: {webinar_title}',
+                        'body' => 'A new webinar session is available. Register here: {webinar_registration_url}',
+                        'cta' => [
+                            'label' => 'Register Now',
+                            'url' => '{webinar_registration_url}',
+                        ],
+                    ],
+                ],
+            ],
+
+            'opt_ins' => [
+                [
+                    'dispatch_key' => 'consent_granted',
+                    'timing' => 'immediate',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'opt_in_messages',
+                    'payload' => [
+                        'subject' => 'You’re on the webinar waitlist',
+                        'body' => 'Thanks for subscribing to webinar updates. We’ll let you know when a new session is available.',
+                    ],
+                ],
+            ],
+        ]);
+
+        $issues = app(MessageConfigValidator::class)->validateRoute(
+            channel: 'email',
+            purpose: 'marketing',
+            scope: 'webinar_waitlist',
+            allowedTokens: [
+                'webinar_title',
+                'webinar_registration_url',
+            ],
+        );
+
+        $this->assertSame([], $issues);
+    }
+
     public function test_it_accepts_valid_sms_with_declared_webinar_tokens(): void
     {
         Config::set('messaging.sms.transactional.webinar', [

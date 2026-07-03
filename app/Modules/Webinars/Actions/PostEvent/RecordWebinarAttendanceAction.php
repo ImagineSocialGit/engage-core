@@ -80,7 +80,7 @@ class RecordWebinarAttendanceAction
         string $provider,
         WebinarAttendanceRecord $match,
     ): void {
-        if ($registration->attended_at !== null) {
+        if ($registration->attended_at !== null && $registration->status === 'attended') {
             return;
         }
 
@@ -101,6 +101,7 @@ class RecordWebinarAttendanceAction
             ];
 
             $registration->forceFill([
+                'status' => 'attended',
                 'attended_at' => $attendedAt,
                 'meta' => $meta,
             ])->save();
@@ -117,7 +118,7 @@ class RecordWebinarAttendanceAction
                 }
 
                 $this->emitWebinarAutomationEvent->forRegistration(
-                    eventKey: 'webinar.attended',
+                    eventKey: config('webinars.post_event.automation_events.attended.event_key', 'webinar.attended'),
                     registration: $registration,
                     occurredAt: $attendedAt,
                     payload: [
@@ -142,7 +143,7 @@ class RecordWebinarAttendanceAction
             return;
         }
 
-        if (data_get($registration->meta, 'attendance.status') === 'missed') {
+        if ($registration->status === 'missed' && data_get($registration->meta, 'attendance.status') === 'missed') {
             return;
         }
 
@@ -158,6 +159,7 @@ class RecordWebinarAttendanceAction
             ];
 
             $registration->forceFill([
+                'status' => 'missed',
                 'meta' => $meta,
             ])->save();
 
@@ -173,7 +175,7 @@ class RecordWebinarAttendanceAction
                 }
 
                 $this->emitWebinarAutomationEvent->forRegistration(
-                    eventKey: 'webinar.missed',
+                    eventKey: config('webinars.post_event.automation_events.missed.event_key', 'webinar.missed'),
                     registration: $registration,
                     occurredAt: $recordedAt,
                     payload: [

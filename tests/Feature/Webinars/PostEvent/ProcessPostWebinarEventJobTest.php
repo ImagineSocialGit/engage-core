@@ -83,10 +83,12 @@ class ProcessPostWebinarEventJobTest extends TestCase
         $attendedRegistration->refresh();
         $missedRegistration->refresh();
 
+        $this->assertSame('attended', $attendedRegistration->status);
         $this->assertNotNull($attendedRegistration->attended_at);
         $this->assertSame('attended', data_get($attendedRegistration->meta, 'attendance.status'));
         $this->assertSame('zoom', data_get($attendedRegistration->meta, 'attendance.provider'));
 
+        $this->assertSame('missed', $missedRegistration->status);
         $this->assertNull($missedRegistration->attended_at);
         $this->assertSame('missed', data_get($missedRegistration->meta, 'attendance.status'));
         $this->assertSame('zoom', data_get($missedRegistration->meta, 'attendance.provider'));
@@ -110,6 +112,9 @@ class ProcessPostWebinarEventJobTest extends TestCase
         Config::set('webinars.post_event.outcome_messages', [
             'enabled' => true,
             'dispatch_key' => 'webinar_ended',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'channels' => ['email'],
             'conditions' => [
                 [
                     'field' => 'webinar.playback_url',
@@ -158,19 +163,22 @@ class ProcessPostWebinarEventJobTest extends TestCase
         $this->assertSame('pass123', $webinar->playback_passcode);
         $this->assertNotNull(data_get($webinar->meta, 'normalized.post_event.playback_resolved_at'));
         $this->assertNotNull(data_get($webinar->meta, 'normalized.post_event.attendance_recorded_at'));
+        $this->assertNotNull(data_get($webinar->meta, 'automation_events.webinar_replay_available_recorded_at'));
         $this->assertNotNull(data_get($webinar->meta, 'automation_events.webinar_ended_recorded_at'));
 
         $attendedRegistration->refresh();
         $missedRegistration->refresh();
 
+        $this->assertSame('attended', $attendedRegistration->status);
         $this->assertNotNull($attendedRegistration->attended_at);
         $this->assertSame('attended', data_get($attendedRegistration->meta, 'attendance.status'));
 
+        $this->assertSame('missed', $missedRegistration->status);
         $this->assertNull($missedRegistration->attended_at);
         $this->assertSame('missed', data_get($missedRegistration->meta, 'attendance.status'));
     }
 
-    public function test_it_dispatches_transactional_follow_ups_with_canonical_playback_payload(): void
+    public function test_it_dispatches_transactional_follow_ups_for_configured_channels_with_canonical_playback_payload(): void
     {
         Queue::fake();
 
@@ -188,6 +196,9 @@ class ProcessPostWebinarEventJobTest extends TestCase
         Config::set('webinars.post_event.outcome_messages', [
             'enabled' => true,
             'dispatch_key' => 'webinar_ended',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'channels' => ['email', 'sms'],
             'conditions' => [
                 [
                     'field' => 'webinar.playback_url',
@@ -224,7 +235,7 @@ class ProcessPostWebinarEventJobTest extends TestCase
 
         $this->mock(DispatchMessageAction::class, function (MockInterface $mock) use (&$dispatches): void {
             $mock->shouldReceive('handle')
-                ->twice()
+                ->times(4)
                 ->andReturnUsing(function (...$arguments) use (&$dispatches): array {
                     $dispatches[] = $arguments;
 
@@ -242,13 +253,18 @@ class ProcessPostWebinarEventJobTest extends TestCase
             webinarProviderManager: app(WebinarProviderManager::class),
         );
 
-        $this->assertCount(2, $dispatches);
+        $this->assertCount(4, $dispatches);
+        $this->assertSame([
+            MessageChannel::Email->value,
+            MessageChannel::Sms->value,
+            MessageChannel::Email->value,
+            MessageChannel::Sms->value,
+        ], array_map(fn (array $dispatch): string => $dispatch[1], $dispatches));
 
         foreach ($dispatches as $dispatch) {
             $payload = $dispatch[5];
 
-            $this->assertSame(MessageChannel::Email, $dispatch[1]);
-            $this->assertSame(MessagePurpose::Transactional, $dispatch[2]);
+            $this->assertSame(MessagePurpose::Transactional->value, $dispatch[2]);
             $this->assertSame('webinar', $dispatch[3]);
             $this->assertSame('webinar_ended', $dispatch[4]);
 
@@ -305,10 +321,12 @@ class ProcessPostWebinarEventJobTest extends TestCase
 
         $attendedContact = Contact::factory()->create([
             'email' => 'person@example.com',
+            'phone' => '+15555550101',
         ]);
 
         $missedContact = Contact::factory()->create([
             'email' => 'missed@example.com',
+            'phone' => '+15555550102',
         ]);
 
         $attendedRegistration = WebinarRegistration::factory()

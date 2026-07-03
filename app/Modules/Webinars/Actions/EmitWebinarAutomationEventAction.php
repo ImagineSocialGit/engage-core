@@ -7,7 +7,6 @@ use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Support\AutomationEvents\Data\AutomationEventData;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use Carbon\CarbonInterface;
-use Illuminate\Database\Eloquent\Model;
 
 class EmitWebinarAutomationEventAction
 {
@@ -119,7 +118,17 @@ class EmitWebinarAutomationEventAction
                 'starts_at' => $webinar->starts_at?->toISOString(),
                 'ends_at' => $webinar->ends_at?->toISOString(),
                 'timezone' => $webinar->timezone,
+                'playback_url' => $webinar->playback_url,
+                'playback_passcode' => $webinar->playback_passcode,
+                'playback_token' => $webinar->playback_token,
+                'playback_available' => filled($webinar->playback_url),
                 'meta' => $webinar->meta ?? [],
+            ],
+            'playback' => [
+                'available' => filled($webinar->playback_url),
+                'url' => $webinar->playback_url,
+                'passcode' => $webinar->playback_passcode,
+                'token' => $webinar->playback_token,
             ],
             'webinar_series' => $webinar->webinarSeries?->toArray() ?? [],
         ];

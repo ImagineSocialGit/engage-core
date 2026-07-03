@@ -2,11 +2,16 @@
 
 use App\Modules\Webinars\Actions\PostEvent\DispatchPostWebinarFollowUpsAction;
 use App\Modules\Webinars\Actions\PostEvent\RecordWebinarProviderAttendanceAction;
+use App\Modules\Webinars\Actions\PostEvent\ResolveWebinarPlaybackAction;
 
 return [
     'events' => [
         'webinar.ended' => [
             RecordWebinarProviderAttendanceAction::class,
+        ],
+
+        'webinar.recording_completed' => [
+            ResolveWebinarPlaybackAction::class,
             DispatchPostWebinarFollowUpsAction::class,
         ],
     ],
@@ -19,33 +24,44 @@ return [
     ],
 
     'recordings' => [
-        'enabled' => false,
+        'enabled' => true,
     ],
 
     'outcome_messages' => [
         'enabled' => true,
         'dispatch_key' => 'webinar_ended',
+        'purpose' => 'transactional',
+        'scope' => 'webinar',
+        'channels' => [
+            'email',
+            'sms',
+        ],
 
-        'routes' => [
-            'attended' => [
-                'enabled' => true,
-                'conditions' => [
-                    [
-                        'field' => 'registration.attended_at',
-                        'operator' => 'filled',
-                    ],
-                ],
+        'conditions' => [
+            [
+                'field' => 'webinar.playback_url',
+                'operator' => 'filled',
             ],
+        ],
+    ],
 
-            'missed' => [
-                'enabled' => true,
-                'conditions' => [
-                    [
-                        'field' => 'registration.attended_at',
-                        'operator' => 'blank',
-                    ],
-                ],
-            ],
+    'automation_events' => [
+        'enabled' => true,
+
+        'webinar_ended' => [
+            'event_key' => 'webinar.ended',
+        ],
+
+        'attended' => [
+            'event_key' => 'webinar.attended',
+        ],
+
+        'missed' => [
+            'event_key' => 'webinar.missed',
+        ],
+
+        'replay_available' => [
+            'event_key' => 'webinar.replay_available',
         ],
     ],
 ];

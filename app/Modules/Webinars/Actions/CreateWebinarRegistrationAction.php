@@ -132,7 +132,7 @@ class CreateWebinarRegistrationAction
                     'channel' => MessageChannel::Email,
                     'purpose' => MessagePurpose::Transactional,
                     'scope' => 'webinar',
-                    'dispatch_opt_in_message' => false,
+                    'dispatch_opt_in_message' => true,
                 ],
             ],
 
@@ -141,7 +141,7 @@ class CreateWebinarRegistrationAction
                     'channel' => MessageChannel::Sms,
                     'purpose' => MessagePurpose::Transactional,
                     'scope' => 'webinar',
-                    'dispatch_opt_in_message' => false,
+                    'dispatch_opt_in_message' => true,
                 ],
             ],
 
@@ -209,7 +209,6 @@ class CreateWebinarRegistrationAction
             }
         }
     }
-
 
     /**
      * @return array<int, string>
