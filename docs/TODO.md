@@ -33,6 +33,9 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [ ] Confirm missing optional content/style keys do not break public pages.
 - [ ] Confirm tests are tolerant of client copy changes unless exact copy is the behavior under test.
 - [ ] Confirm unsupported keys are rejected, flagged, or intentionally ignored with clear operator/debug feedback.
+- [ ] Classify config validation findings as hard errors or warnings.
+- [ ] Confirm hard errors block staging/client handoff.
+- [ ] Confirm warnings give useful operator/debug guidance without blocking safe runtime behavior.
 - [ ] Confirm client config overrides preserve unspecified nested defaults where fallback is expected.
 
 ### After each permission-invitation update
@@ -183,6 +186,14 @@ Completed baseline:
   - Broadcast/message tokens.
   - Any public URL tokens.
   - Clarify which tokens are runtime-only and should not be guessed in static config.
+
+- [ ] Add a config validation command.
+  - Suggested command: `php artisan config:validate-engage`.
+  - Validate default configs and optional client configs using runtime fallback rules.
+  - Report hard errors for unsafe/malformed config.
+  - Report warnings for deprecated tokens, review-needed keys, optional omissions, and hidden-but-configured SMS surfaces.
+  - Include config path, severity, reason, and suggested fix when possible.
+  - Start with Messaging, Permission Invitations, Campaign presets, FlowRoute presets, Task presets, and reference registries.
 
 ### SMS toggleability
 

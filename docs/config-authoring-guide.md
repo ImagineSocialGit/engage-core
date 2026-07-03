@@ -505,6 +505,74 @@ Before accepting a client config, validate:
 Validation should protect authoring mistakes without turning optional style/copy omissions into runtime failures.
 
 
+## Validation severity
+
+Config validation should protect runtime behavior and operator trust without making optional client copy/style omissions brittle.
+
+Use hard errors when the config cannot be safely interpreted or points at unsupported behavior.
+
+Use warnings when the config is understandable but should be reviewed before client/staging use.
+
+### Hard errors
+
+Treat these as hard errors:
+
+- Missing required top-level keys after default/client fallback is applied.
+- Invalid or unknown `channel`, `purpose`, or `scope`.
+- Invalid channel/purpose/scope combinations for the owning surface.
+- Unknown `dispatch_key`, `automation_event_key`, `campaign_key`, `flow_route_key`, `point_type`, or `task_template_key`.
+- A Campaign preset references a Messaging campaign step template that does not exist.
+- A Campaign preset step includes reusable message copy or payload data.
+- A Messaging definition is missing required keys such as `dispatch_key`, `payload_class`, `queue`, `payload`, or valid `timing`.
+- A scheduled Messaging definition has malformed `schedule.type` or `schedule.minutes`.
+- A FlowRoute preset references an unknown point type or missing route point target.
+- A permission invitation config loses the required `email`, `consent`, `content`, or `style` top-level shape after fallback.
+- A permission invitation config removes configured consent scopes or makes SMS opt-in implicit.
+- Runtime-only URLs are hand-authored in static config where runtime services must inject them.
+
+### Warnings
+
+Treat these as warnings:
+
+- Deprecated or discouraged tokens are used where canonical replacements exist.
+- A token is undocumented but may be caller-supplied for a specific campaign/context.
+- Optional public-page `content` or `style` keys are omitted but safe defaults exist.
+- A registry key exists but is marked `planned`, `legacy`, or otherwise not recommended.
+- SMS is configured in runtime/provider settings but hidden from a given UI surface.
+- A template payload is intentionally empty and expected to skip or no-op.
+- Client-specific keys are present but not yet promoted into the default registry.
+- Copy is vertical-specific but lives in a generic/default config instead of a vertical/client scope.
+
+### Operator output
+
+Validation output should include:
+
+- severity: `error` or `warning`
+- config path
+- failing key or token when available
+- plain-English reason
+- suggested fix when the fix is obvious
+
+Example:
+
+```text
+ERROR messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.payload.cta.url
+Token {next_step_url} is caller-supplied but not documented for this campaign context.
+Document the token in config/reference/tokens.php or replace it with a supported token.
+
+WARNING messaging.sms.transactional.webinar.reminders.0.payload.message
+Token {webinar_starts_at} is deprecated. Prefer {webinar_start_date} and {webinar_start_time}.
+```
+
+Validation should be usable before staging smoke tests and before client config handoff. A future command can expose this as:
+
+```bash
+php artisan config:validate-engage
+php artisan config:validate-engage --client=slam-dunk-crm
+```
+
+The command should read default config plus client overrides using the same fallback behavior as runtime code.
+
 ## FlowRoute config shape
 
 FlowRoutes should reference public actions/capabilities through point definitions.

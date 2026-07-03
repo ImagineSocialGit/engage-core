@@ -209,6 +209,23 @@ Rules:
 
 Token references are documented in `TOKEN_REFERENCE.md`.
 
+## Config validation posture
+
+Engage Core config validation should distinguish unsafe config from review-needed config.
+
+Hard errors should block staging/client handoff when config cannot be safely interpreted. Examples include missing required keys, unknown registry keys, malformed schedules, invalid channel/purpose/scope combinations, missing Messaging templates referenced by Campaign presets, or permission invitation configs that break email-only one-time sending or explicit SMS opt-in.
+
+Warnings should surface review-needed but interpretable config. Examples include deprecated tokens, optional copy/style omissions with safe defaults, planned or legacy registry keys, caller-supplied tokens that need documentation, SMS configured but hidden for a surface, or vertical-specific copy living in a generic config.
+
+Future validation should be exposed through an operator-facing command such as:
+
+```bash
+php artisan config:validate-engage
+php artisan config:validate-engage --client=client-key
+```
+
+Validation output should include severity, config path, reason, and a suggested fix when obvious.
+
 ## Module and feature scope
 
 Config templates may reference current universal modules, but they should not imply those modules are enabled by default. `config/modules.php` controls feature visibility. Shared schema may exist even when a module is not visible to the client.
