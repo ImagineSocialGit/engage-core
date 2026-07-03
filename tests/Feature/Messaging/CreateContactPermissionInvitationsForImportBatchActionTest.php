@@ -5,11 +5,13 @@ namespace Tests\Feature\Messaging;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Messaging\Actions\CreateContactPermissionInvitationsForImportBatchAction;
+use App\Modules\Messaging\Actions\SkipScheduledMessagesAction;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -165,5 +167,61 @@ class CreateContactPermissionInvitationsForImportBatchActionTest extends TestCas
         ], $result);
 
         $this->assertSame(0, ScheduledMessage::query()->count());
+    }
+
+    public function test_cancelled_pending_permission_invitation_messages_do_not_block_future_scheduling(): void
+    {
+        $importBatch = ContactImportBatch::factory()->create();
+
+        $contact = Contact::factory()->create([
+            'email' => 'imported@example.test',
+            'source' => 'import',
+            'contact_import_batch_id' => $importBatch->id,
+        ]);
+
+        $pendingMessage = ScheduledMessage::factory()->create([
+            'recipient_type' => $contact->getMorphClass(),
+            'recipient_id' => $contact->id,
+            'context_type' => $importBatch->getMorphClass(),
+            'context_id' => $importBatch->id,
+            'channel' => MessageChannel::Email->value,
+            'purpose' => MessagePurpose::Marketing->value,
+            'scope' => 'broadcast',
+            'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'status' => ScheduledMessage::STATUS_PENDING,
+            'meta' => [
+                'consent_policy' => [
+                    'permission_invitation' => [
+                        'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+                        'one_time' => true,
+                    ],
+                ],
+            ],
+        ]);
+
+        $skipped = app(SkipScheduledMessagesAction::class)
+            ->importedContactPermissionInvitationsForImportBatch($importBatch);
+
+        $this->assertSame(1, $skipped);
+
+        $pendingMessage->refresh();
+
+        $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $pendingMessage->status);
+        $this->assertSame('permission_invitation_cancelled', $pendingMessage->skip_reason);
+
+        $result = app(CreateContactPermissionInvitationsForImportBatchAction::class)
+            ->handle($importBatch);
+
+        $this->assertSame([
+            'eligible' => 1,
+            'scheduled' => 1,
+            'skipped' => 0,
+        ], $result);
+
+        $this->assertSame(2, ScheduledMessage::query()->count());
+        $this->assertSame(1, ScheduledMessage::query()->where('status', ScheduledMessage::STATUS_SKIPPED)->count());
+        $this->assertSame(1, ScheduledMessage::query()
+            ->where('status', '!=', ScheduledMessage::STATUS_SKIPPED)
+            ->count());
     }
 }

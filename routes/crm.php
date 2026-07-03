@@ -110,6 +110,10 @@ Route::middleware('auth')->group(function () {
                 ->middleware('module:messaging')
                 ->name('import-batches.permission-invitations.store');
 
+            Route::delete('/import-batches/{contactImportBatch}/permission-invitations', [ContactImportBatchPermissionInvitationController::class, 'destroy'])
+                ->middleware('module:messaging')
+                ->name('import-batches.permission-invitations.destroy');
+
             Route::get('/{contact}', [ContactController::class, 'show'])
                 ->name('show');
 

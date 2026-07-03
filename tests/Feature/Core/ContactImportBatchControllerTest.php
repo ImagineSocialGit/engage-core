@@ -5,6 +5,9 @@ namespace Tests\Feature\Core;
 use App\Models\User;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
+use App\Modules\Messaging\Models\ContactPermissionInvitation;
+use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -96,5 +99,56 @@ class ContactImportBatchControllerTest extends TestCase
         $response->assertOk();
         $response->assertSee('View Imports');
         $response->assertSee(route('crm.contacts.import-batches.index'), false);
+    }
+
+    public function test_it_cancels_pending_permission_invitation_messages_for_an_import_batch(): void
+    {
+        $user = User::factory()->create();
+
+        $importBatch = ContactImportBatch::factory()->create();
+
+        $contact = Contact::factory()->create([
+            'email' => 'imported@example.test',
+            'source' => 'import',
+            'contact_import_batch_id' => $importBatch->id,
+        ]);
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'recipient_type' => $contact->getMorphClass(),
+            'recipient_id' => $contact->id,
+            'context_type' => $importBatch->getMorphClass(),
+            'context_id' => $importBatch->id,
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'broadcast',
+            'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            'status' => ScheduledMessage::STATUS_PENDING,
+            'meta' => [
+                'consent_policy' => [
+                    'permission_invitation' => [
+                        'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+                        'one_time' => true,
+                    ],
+                ],
+            ],
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->delete(route('crm.contacts.import-batches.permission-invitations.destroy', $importBatch));
+
+        $response->assertRedirect(route('crm.contacts.import-batches.show', $importBatch));
+        $response->assertSessionHas('success', '1 pending permission invitation message(s) cancelled.');
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $scheduledMessage->status);
+        $this->assertSame('permission_invitation_cancelled', $scheduledMessage->skip_reason);
+
+        $this->assertDatabaseMissing('contact_permission_invitations', [
+            'contact_id' => $contact->id,
+            'channel' => ContactPermissionInvitation::CHANNEL_EMAIL,
+            'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+        ]);
     }
 }

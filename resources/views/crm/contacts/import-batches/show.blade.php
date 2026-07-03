@@ -45,6 +45,17 @@
             })->count()
             : 0;
 
+        $skippedInvitationCount = $messagingEnabled
+            ? $contactsCollection->filter(function ($contact): bool {
+                $messages = $contact->relationLoaded('scheduledMessages') ? $contact->scheduledMessages : collect();
+
+                return $messages->contains(fn ($message): bool =>
+                    $message->message_type === 'imported_contact_permission_invitation'
+                    && $message->status === 'skipped'
+                );
+            })->count()
+            : 0;
+
         $sentInvitationCount = $messagingEnabled
             ? $contactsCollection->filter(function ($contact): bool {
                 $invitations = $contact->relationLoaded('permissionInvitations') ? $contact->permissionInvitations : collect();
@@ -157,18 +168,34 @@
                     </p>
                 </div>
 
-                @if ($missingEmailConsentCount > 0)
-                    <form
-                        method="POST"
-                        action="{{ route('crm.contacts.import-batches.permission-invitations.store', $importBatch) }}"
-                    >
-                        @csrf
+                <div class="flex flex-wrap items-center gap-2">
+                    @if ($missingEmailConsentCount > 0)
+                        <form
+                            method="POST"
+                            action="{{ route('crm.contacts.import-batches.permission-invitations.store', $importBatch) }}"
+                        >
+                            @csrf
 
-                        <x-ui.button type="submit">
-                            Send Permission Invitations
-                        </x-ui.button>
-                    </form>
-                @endif
+                            <x-ui.button type="submit">
+                                Send Permission Invitations
+                            </x-ui.button>
+                        </form>
+                    @endif
+
+                    @if ($pendingInvitationCount > 0)
+                        <form
+                            method="POST"
+                            action="{{ route('crm.contacts.import-batches.permission-invitations.destroy', $importBatch) }}"
+                        >
+                            @csrf
+                            @method('DELETE')
+
+                            <x-ui.button type="submit">
+                                Cancel Pending Invitations
+                            </x-ui.button>
+                        </form>
+                    @endif
+                </div>
             </div>
 
             @if (session('success'))
@@ -177,7 +204,7 @@
                 </div>
             @endif
 
-            <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 <div class="rounded-xl border border-slate-200 p-4">
                     <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Missing Consent
@@ -193,6 +220,15 @@
                     </dt>
                     <dd class="mt-1 font-medium text-slate-900">
                         {{ $pendingInvitationCount }}
+                    </dd>
+                </div>
+
+                <div class="rounded-xl border border-slate-200 p-4">
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Cancelled
+                    </dt>
+                    <dd class="mt-1 font-medium text-slate-900">
+                        {{ $skippedInvitationCount }}
                     </dd>
                 </div>
 
@@ -425,6 +461,11 @@
                                             $message->message_type === 'imported_contact_permission_invitation'
                                             && $message->status === 'pending'
                                         );
+
+                                        $skippedInvitation = $contactScheduledMessages->first(fn ($message): bool =>
+                                                $message->message_type === 'imported_contact_permission_invitation'
+                                                && $message->status === 'skipped'
+                                            );
                                     @endphp
 
                                     <td class="px-6 py-4">
@@ -443,6 +484,13 @@
                                         @elseif ($pendingInvitation)
                                             <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                                                 Scheduled
+                                            </span>
+                                        @elseif ($skippedInvitation)
+                                            <span
+                                                title="{{ $skippedInvitation->skip_reason }}"
+                                                class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600"
+                                            >
+                                                Cancelled
                                             </span>
                                         @else
                                             <span class="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
