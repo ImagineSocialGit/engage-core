@@ -4,6 +4,7 @@ namespace Tests\Feature\Messaging;
 
 use App\Modules\Messaging\Contracts\Sms\SmsMessage;
 use App\Modules\Messaging\Contracts\Sms\SmsProvider;
+use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Services\DevMessageSink;
 use App\Modules\Messaging\Services\PhoneNumberNormalizer;
 use App\Modules\Messaging\Services\Sms\SmsMessagingService;
@@ -45,6 +46,49 @@ class SmsMessagingServiceTest extends TestCase
         $this->assertSame('Test message', $provider->message);
         $this->assertSame([
             'kind' => 'test_message',
+            'purpose' => 'transactional',
+            'source_ip' => null,
+        ], $provider->meta);
+    }
+
+
+    public function test_it_sends_rendered_sms_body_to_configured_provider(): void
+    {
+        config([
+            'sms.enabled' => true,
+            'sms.provider' => 'telnyx',
+        ]);
+
+        $provider = new FakeSmsProvider('telnyx');
+
+        $service = new SmsMessagingService(
+            devMessageSink: app(DevMessageSink::class),
+            phoneNumberNormalizer: app(PhoneNumberNormalizer::class),
+            smsProviderManager: new SmsProviderManager([
+                'telnyx' => $provider,
+            ]),
+            smsSendGuard: app(SmsSendGuard::class),
+        );
+
+        $service->send(SmsPayload::fromArray([
+            'to' => '(555) 555-0123',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'message' => 'Hi {first_name}, join here: {webinar_join_url}',
+            'tokens' => [
+                'first_name' => 'Jeff',
+                'webinar_join_url' => 'https://example.test/join/abc123',
+            ],
+        ]));
+
+        $this->assertTrue($provider->sent);
+        $this->assertSame('+15555550123', $provider->to);
+        $this->assertSame('Hi Jeff, join here: https://example.test/join/abc123', $provider->message);
+        $this->assertStringNotContainsString('{first_name}', $provider->message);
+        $this->assertStringNotContainsString('{webinar_join_url}', $provider->message);
+        $this->assertSame([
+            'kind' => 'confirmation',
             'purpose' => 'transactional',
             'source_ip' => null,
         ], $provider->meta);

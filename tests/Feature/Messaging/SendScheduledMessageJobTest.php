@@ -13,6 +13,7 @@ use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use App\Modules\Messaging\Services\Email\EmailMessagingService;
 use App\Modules\Messaging\Services\ScheduledMessageGate;
@@ -118,6 +119,72 @@ class SendScheduledMessageJobTest extends TestCase
 
         $this->assertSame('sent', $scheduledMessage->status);
         $this->assertNotNull($scheduledMessage->sent_at);
+
+        Event::assertDispatched(
+            ScheduledMessageSent::class,
+            fn (ScheduledMessageSent $event): bool => $event->scheduledMessage->is($scheduledMessage),
+        );
+    }
+
+
+    public function test_it_sends_provider_ready_rendered_sms_while_stored_payload_remains_tokenized(): void
+    {
+        Event::fake([ScheduledMessageSent::class]);
+
+        $contact = Contact::factory()->create([
+            'phone' => '+15555550123',
+        ]);
+
+        $this->grantConsent($contact, 'sms', 'transactional');
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'recipient_type' => Contact::class,
+            'recipient_id' => $contact->id,
+            'channel' => 'sms',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => SmsPayload::class,
+            'payload' => [
+                'to' => '+15555550123',
+                'message' => 'Hi {first_name}, join here: {webinar_join_url}',
+                'tokens' => [
+                    'first_name' => 'Jeff',
+                    'webinar_join_url' => 'https://example.test/join/abc123',
+                ],
+            ],
+            'status' => ScheduledMessage::STATUS_PENDING,
+            'meta' => [
+                'conditions' => [],
+            ],
+        ]);
+
+        $capturedPayload = null;
+
+        $smsService = Mockery::mock(SmsMessagingService::class);
+        $smsService
+            ->shouldReceive('send')
+            ->once()
+            ->with(Mockery::on(function (SmsMessage $payload) use (&$capturedPayload): bool {
+                $capturedPayload = $payload;
+
+                return $payload instanceof SmsPayload
+                    && $payload->message() === 'Hi Jeff, join here: https://example.test/join/abc123';
+            }));
+
+        app()->instance(SmsMessagingService::class, $smsService);
+
+        $this->handleScheduledMessage($scheduledMessage);
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame(ScheduledMessage::STATUS_SENT, $scheduledMessage->status);
+        $this->assertNotNull($scheduledMessage->sent_at);
+        $this->assertInstanceOf(SmsPayload::class, $capturedPayload);
+        $this->assertSame('Hi Jeff, join here: https://example.test/join/abc123', $capturedPayload->message());
+        $this->assertSame('Hi {first_name}, join here: {webinar_join_url}', $scheduledMessage->payload['message']);
+        $this->assertSame('Jeff', $scheduledMessage->payload['tokens']['first_name']);
+        $this->assertSame('https://example.test/join/abc123', $scheduledMessage->payload['tokens']['webinar_join_url']);
 
         Event::assertDispatched(
             ScheduledMessageSent::class,

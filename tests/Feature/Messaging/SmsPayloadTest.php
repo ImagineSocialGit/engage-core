@@ -199,6 +199,28 @@ class SmsPayloadTest extends TestCase
         );
     }
 
+
+    public function test_dev_payload_contains_rendered_message_and_original_tokens(): void
+    {
+        $payload = SmsPayload::fromArray([
+            'phone' => '+15555555555',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'message' => 'Hi {first_name}, join here: {webinar_join_url}',
+            'tokens' => [
+                'first_name' => 'Jeff',
+                'webinar_join_url' => 'https://example.test/join/abc123',
+            ],
+        ]);
+
+        $dev = $payload->devPayload();
+
+        $this->assertSame('Hi Jeff, join here: https://example.test/join/abc123', $dev['message']);
+        $this->assertSame('Jeff', $dev['tokens']['first_name']);
+        $this->assertSame('https://example.test/join/abc123', $dev['tokens']['webinar_join_url']);
+    }
+
     public function test_it_implements_sms_contract(): void
     {
         Config::set(
