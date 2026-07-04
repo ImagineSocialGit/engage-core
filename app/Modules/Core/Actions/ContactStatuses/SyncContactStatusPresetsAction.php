@@ -25,18 +25,18 @@ class SyncContactStatusPresetsAction
                 'created' => 0,
                 'updated' => 0,
                 'skipped' => 0,
-                'errors' => ['No preset key was provided and config[presets.default] is empty.'],
+                'errors' => ['No preset key was provided and config[presets.default_package] is empty.'],
             ];
         }
 
-        $preset = config("presets.presets.{$presetKey}");
+        $package = config("presets.packages.{$presetKey}");
 
-        if (! is_array($preset)) {
+        if (! is_array($package)) {
             return [
                 'created' => 0,
                 'updated' => 0,
                 'skipped' => 0,
-                'errors' => ["Preset [{$presetKey}] does not exist."],
+                'errors' => ["Preset package [{$presetKey}] does not exist."],
             ];
         }
 
@@ -74,7 +74,7 @@ class SyncContactStatusPresetsAction
 
     private function normalizePresetKey(?string $presetKey): ?string
     {
-        $presetKey ??= config('presets.default');
+        $presetKey ??= config('presets.default_package');
 
         if (! is_string($presetKey)) {
             return null;
@@ -90,10 +90,10 @@ class SyncContactStatusPresetsAction
      */
     private function statusDefinitions(string $presetKey): array
     {
-        $groups = config("presets.presets.{$presetKey}.contact_statuses.groups", []);
+        $groups = config("presets.packages.{$presetKey}.groups.contact_statuses", []);
 
         if (! is_array($groups)) {
-            throw new InvalidArgumentException("Preset [{$presetKey}] contact_statuses.groups must be an array.");
+            throw new InvalidArgumentException("Preset package [{$presetKey}] groups.contact_statuses must be an array.");
         }
 
         $groups = $this->normalizeStringList($groups);
@@ -184,11 +184,18 @@ class SyncContactStatusPresetsAction
     }
 
     /**
-     * @param array<mixed> $values
      * @return array<int, string>
      */
-    private function normalizeStringList(array $values): array
+    private function normalizeStringList(mixed $values): array
     {
+        if (is_string($values)) {
+            $values = [$values];
+        }
+
+        if (! is_array($values)) {
+            return [];
+        }
+
         return array_values(array_unique(array_filter(array_map(
             fn (mixed $value): ?string => is_string($value) && trim($value) !== ''
                 ? trim($value)

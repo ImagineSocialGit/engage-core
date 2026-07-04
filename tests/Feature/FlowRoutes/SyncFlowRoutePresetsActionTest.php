@@ -13,7 +13,6 @@ class SyncFlowRoutePresetsActionTest extends TestCase
 {
     use RefreshDatabase;
 
-
     public function test_it_syncs_webinar_outcome_status_transition_routes(): void
     {
         ContactStatus::query()->create([
@@ -131,4 +130,3 @@ class SyncFlowRoutePresetsActionTest extends TestCase
             ->firstOrFail();
     }
 }
-

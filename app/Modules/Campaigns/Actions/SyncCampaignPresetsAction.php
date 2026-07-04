@@ -43,13 +43,13 @@ class SyncCampaignPresetsAction
             return trim($presetKey);
         }
 
-        $presetKey = config('presets.default');
+        $presetKey = config('presets.default_package');
 
         if (is_string($presetKey) && trim($presetKey) !== '') {
             return trim($presetKey);
         }
 
-        $presetKeys = array_keys(config('presets.presets', []));
+        $presetKeys = array_keys(config('presets.packages', []));
 
         foreach ($presetKeys as $key) {
             if (is_string($key) && trim($key) !== '') {
@@ -69,7 +69,7 @@ class SyncCampaignPresetsAction
             return [];
         }
 
-        $groupKeys = config("presets.presets.{$presetKey}.campaigns.groups", []);
+        $groupKeys = config("presets.packages.{$presetKey}.groups.campaigns", []);
 
         if (! is_array($groupKeys) || $groupKeys === []) {
             return [];
@@ -109,11 +109,18 @@ class SyncCampaignPresetsAction
     }
 
     /**
-     * @param array<mixed> $values
      * @return array<int, string>
      */
-    private function normalizeStringList(array $values): array
+    private function normalizeStringList(mixed $values): array
     {
+        if (is_string($values)) {
+            $values = [$values];
+        }
+
+        if (! is_array($values)) {
+            return [];
+        }
+
         return array_values(array_unique(array_filter(array_map(
             fn (mixed $value): ?string => is_string($value) && trim($value) !== ''
                 ? trim($value)

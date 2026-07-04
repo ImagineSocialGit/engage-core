@@ -18,9 +18,9 @@ return [
     |
     */
 
-    'default' => env('CLIENT_PRESET'),
+    'default_package' => env('CLIENT_PRESET'),
 
-    'presets' => [
+    'packages' => [
 
         'general_contact_engagement' => [
             'modules' => [
@@ -47,24 +47,15 @@ return [
                 ],
             ],
 
-            'contact_statuses' => [
-                'groups' => [
+            'groups' => [
+                'contact_statuses' => [
                     'general_default',
                 ],
-            ],
-
-            'tasks' => [
-                'groups' => [
+                'tasks' => [
                     'general_default',
                 ],
-            ],
-
-            'flow_routes' => [
-                'groups' => [],
-            ],
-
-            'campaigns' => [
-                'groups' => [],
+                'flow_routes' => [],
+                'campaigns' => [],
             ],
         ],
 
@@ -88,24 +79,15 @@ return [
                 ],
             ],
 
-            'contact_statuses' => [
-                'groups' => [
+            'groups' => [
+                'contact_statuses' => [
                     'general_default',
                 ],
-            ],
-
-            'tasks' => [
-                'groups' => [
+                'tasks' => [
                     'task_workspace_default',
                 ],
-            ],
-
-            'flow_routes' => [
-                'groups' => [],
-            ],
-
-            'campaigns' => [
-                'groups' => [],
+                'flow_routes' => [],
+                'campaigns' => [],
             ],
         ],
 
@@ -151,27 +133,18 @@ return [
                 ],
             ],
 
-            'contact_statuses' => [
-                'groups' => [
+            'groups' => [
+                'contact_statuses' => [
                     'webinar_default',
                 ],
-            ],
-
-            'tasks' => [
-                'groups' => [
+                'tasks' => [
                     'general_default',
                     'webinar_default',
                 ],
-            ],
-
-            'flow_routes' => [
-                'groups' => [
+                'flow_routes' => [
                     'webinar_default',
                 ],
-            ],
-
-            'campaigns' => [
-                'groups' => [
+                'campaigns' => [
                     'webinar_default',
                 ],
             ],
@@ -236,27 +209,18 @@ return [
                 ],
             ],
 
-            'contact_statuses' => [
-                'groups' => [
+            'groups' => [
+                'contact_statuses' => [
                     'mortgage_default',
                 ],
-            ],
-
-            'tasks' => [
-                'groups' => [
+                'tasks' => [
                     'general_default',
                     'mortgage_default',
                 ],
-            ],
-
-            'flow_routes' => [
-                'groups' => [
+                'flow_routes' => [
                     'mortgage_default',
                 ],
-            ],
-
-            'campaigns' => [
-                'groups' => [
+                'campaigns' => [
                     'mortgage_default',
                 ],
             ],
@@ -298,24 +262,15 @@ return [
                 ],
             ],
 
-            'contact_statuses' => [
-                'groups' => [
+            'groups' => [
+                'contact_statuses' => [
                     'pet_service_default',
                 ],
-            ],
-
-            'tasks' => [
-                'groups' => [
+                'tasks' => [
                     'general_default',
                 ],
-            ],
-
-            'flow_routes' => [
-                'groups' => [],
-            ],
-
-            'campaigns' => [
-                'groups' => [],
+                'flow_routes' => [],
+                'campaigns' => [],
             ],
         ],
 
@@ -362,24 +317,15 @@ return [
                 ],
             ],
 
-            'contact_statuses' => [
-                'groups' => [
+            'groups' => [
+                'contact_statuses' => [
                     'musician_fan_default',
                 ],
-            ],
-
-            'tasks' => [
-                'groups' => [
+                'tasks' => [
                     'general_default',
                 ],
-            ],
-
-            'flow_routes' => [
-                'groups' => [],
-            ],
-
-            'campaigns' => [
-                'groups' => [],
+                'flow_routes' => [],
+                'campaigns' => [],
             ],
         ],
 

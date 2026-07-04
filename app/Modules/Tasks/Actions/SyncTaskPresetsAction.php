@@ -12,7 +12,7 @@ class SyncTaskPresetsAction
     {
         $result = new TaskPresetSyncResult();
 
-        $groupKeys = config("presets.presets.{$presetKey}.tasks.groups", []);
+        $groupKeys = config("presets.packages.{$presetKey}.groups.tasks", []);
 
         if (! is_array($groupKeys) || $groupKeys === []) {
             return $result;

@@ -29,9 +29,9 @@ class SyncFlowRoutePresetsAction
             return $result;
         }
 
-        $preset = config("presets.presets.{$presetKey}");
+        $package = config("presets.packages.{$presetKey}");
 
-        if (! is_array($preset)) {
+        if (! is_array($package)) {
             $result->error("Preset package [{$presetKey}] does not exist.");
 
             return $result;
@@ -69,15 +69,15 @@ class SyncFlowRoutePresetsAction
             return trim($clientPreset);
         }
 
-        $defaultPreset = config('presets.default');
+        $defaultPackage = config('presets.default_package');
 
-        if (is_string($defaultPreset) && trim($defaultPreset) !== '') {
-            return trim($defaultPreset);
+        if (is_string($defaultPackage) && trim($defaultPackage) !== '') {
+            return trim($defaultPackage);
         }
 
-        $presetKeys = array_keys(config('presets.presets', []));
+        $packageKeys = array_keys(config('presets.packages', []));
 
-        foreach ($presetKeys as $key) {
+        foreach ($packageKeys as $key) {
             if (is_string($key) && trim($key) !== '') {
                 return trim($key);
             }
@@ -93,15 +93,17 @@ class SyncFlowRoutePresetsAction
         string $presetKey,
         FlowRoutePresetSyncResult $result,
     ): array {
-        $groupKeys = config("presets.presets.{$presetKey}.flow_routes.groups", []);
+        $groupKeys = config("presets.packages.{$presetKey}.groups.flow_routes", []);
 
-        if (! is_array($groupKeys) || $groupKeys === []) {
+        $groupKeys = $this->normalizeStringList($groupKeys);
+
+        if ($groupKeys === []) {
             return [];
         }
 
         $definitions = [];
 
-        foreach ($this->normalizeStringList($groupKeys) as $groupKey) {
+        foreach ($groupKeys as $groupKey) {
             $flowRouteKeys = config("presets.flow-routes.groups.{$groupKey}");
 
             if (! is_array($flowRouteKeys)) {
@@ -127,11 +129,18 @@ class SyncFlowRoutePresetsAction
     }
 
     /**
-     * @param array<mixed> $values
      * @return array<int, string>
      */
-    private function normalizeStringList(array $values): array
+    private function normalizeStringList(mixed $values): array
     {
+        if (is_string($values)) {
+            $values = [$values];
+        }
+
+        if (! is_array($values)) {
+            return [];
+        }
+
         return array_values(array_unique(array_filter(array_map(
             fn (mixed $value): ?string => is_string($value) && trim($value) !== ''
                 ? trim($value)

@@ -31,7 +31,7 @@ class SyncPresetsCommand extends Command
             return self::FAILURE;
         }
 
-        $preset = config("presets.presets.{$presetKey}");
+        $preset = config("presets.packages.{$presetKey}");
 
         if (! is_array($preset)) {
             $this->error("Preset [{$presetKey}] does not exist.");
@@ -109,13 +109,13 @@ class SyncPresetsCommand extends Command
             return trim($clientPreset);
         }
 
-        $defaultPreset = config('presets.default');
+        $defaultPreset = config('presets.default_package');
 
         if (is_string($defaultPreset) && trim($defaultPreset) !== '') {
             return trim($defaultPreset);
         }
 
-        $presetKeys = array_keys(config('presets.presets', []));
+        $presetKeys = array_keys(config('presets.packages', []));
 
         $presetKeys = array_values(array_filter(
             $presetKeys,
@@ -163,7 +163,7 @@ class SyncPresetsCommand extends Command
      */
     private function hasConfiguredGroups(array $preset, string $section): bool
     {
-        $groups = $preset[$section]['groups'] ?? null;
+        $groups = data_get($preset, "groups.{$section}");
 
         return is_array($groups) && $groups !== [];
     }
