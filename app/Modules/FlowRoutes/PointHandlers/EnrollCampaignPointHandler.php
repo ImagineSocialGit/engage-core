@@ -3,6 +3,7 @@
 namespace App\Modules\FlowRoutes\PointHandlers;
 
 use App\Modules\Campaigns\Actions\EnrollContactInCampaignAction;
+use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Core\Models\Contact;
 use App\Modules\FlowRoutes\Contracts\PointHandler;
@@ -10,6 +11,7 @@ use App\Modules\FlowRoutes\Data\Points\EnrollCampaignPointDefinition;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Models\Point;
+use InvalidArgumentException;
 use Throwable;
 
 class EnrollCampaignPointHandler implements PointHandler
@@ -54,6 +56,20 @@ class EnrollCampaignPointHandler implements PointHandler
             );
         }
 
+        $campaign = $this->activeCampaign($definition);
+
+        if (! $campaign instanceof Campaign) {
+            return PointExecutionResult::skipped(
+                reason: 'campaign_not_active_or_missing',
+                meta: [
+                    'campaign_key' => $definition->campaignKey,
+                    'enroll_campaign_definition' => $definition->toMetaPayload(),
+                    'flow_route_progress_id' => $context->progress->getKey(),
+                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                ],
+            );
+        }
+
         $existingEnrollment = $this->existingEnrollment($contact, $definition);
 
         if ($existingEnrollment instanceof CampaignEnrollment) {
@@ -74,6 +90,16 @@ class EnrollCampaignPointHandler implements PointHandler
                 startContext: $this->startContext($definition, $context),
                 exitConditions: $this->exitConditions($definition, $context),
             );
+        } catch (InvalidArgumentException $exception) {
+            return PointExecutionResult::skipped(
+                reason: 'campaign_enrollment_not_schedulable',
+                meta: [
+                    'error' => $exception->getMessage(),
+                    'enroll_campaign_definition' => $definition->toMetaPayload(),
+                    'flow_route_progress_id' => $context->progress->getKey(),
+                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                ],
+            );
         } catch (Throwable $exception) {
             return PointExecutionResult::failed(
                 reason: 'enroll_campaign_failed',
@@ -93,6 +119,14 @@ class EnrollCampaignPointHandler implements PointHandler
                 'enroll_campaign_definition' => $definition->toMetaPayload(),
             ],
         );
+    }
+
+    private function activeCampaign(EnrollCampaignPointDefinition $definition): ?Campaign
+    {
+        return Campaign::query()
+            ->active()
+            ->where('key', $definition->campaignKey)
+            ->first();
     }
 
     private function existingEnrollment(

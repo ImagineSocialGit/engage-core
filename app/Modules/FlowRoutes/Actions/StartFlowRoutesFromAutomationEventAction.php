@@ -30,10 +30,22 @@ class StartFlowRoutesFromAutomationEventAction
                     $progress = $this->startProgress($flowRoute, $event);
 
                     if ($progress instanceof ContactFlowRouteProgress) {
-                        $this->executeCurrentFlowRoutePoint->handle($progress);
+                        $this->executeProgressUntilIdle($progress);
                     }
                 }
             });
+    }
+
+    private function executeProgressUntilIdle(ContactFlowRouteProgress $progress): void
+    {
+        $attempts = 0;
+        $result = null;
+
+        do {
+            $result = $this->executeCurrentFlowRoutePoint->handle($progress);
+            $progress->refresh();
+            $attempts++;
+        } while ($attempts < 25 && $result->shouldAdvance() && $progress->isActive());
     }
 
     private function startProgress(

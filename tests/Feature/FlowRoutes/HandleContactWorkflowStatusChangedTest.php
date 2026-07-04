@@ -10,13 +10,14 @@ use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\Point;
 use App\Modules\Workflow\Actions\TransitionContactWorkflowStatusAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class HandleContactWorkflowStatusChangedTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_workflow_status_change_starts_active_flow_route_progress(): void
+    public function test_workflow_status_change_starts_and_executes_flow_route_progress(): void
     {
         $contact = Contact::factory()->create();
 
@@ -41,15 +42,15 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
         ]);
 
         $point = Point::query()->create([
-            'key' => 'wait_one_day',
-            'type' => Point::TYPE_WAIT,
-            'name' => 'Wait One Day',
+            'key' => 'mark_started',
+            'type' => Point::TYPE_NOOP,
+            'name' => 'Mark Started',
         ]);
 
         $flowRoutePoint = FlowRoutePoint::query()->create([
             'flow_route_id' => $flowRoute->id,
             'point_id' => $point->id,
-            'key' => 'wait_one_day',
+            'key' => 'mark_started',
             'sort_order' => 10,
             'is_start' => true,
             'is_active' => true,
@@ -76,9 +77,10 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
         $this->assertSame($contact->id, $progress->contact_id);
         $this->assertSame($status->id, $progress->contact_status_id);
         $this->assertSame($flowRoute->id, $progress->flow_route_id);
-        $this->assertSame($flowRoutePoint->id, $progress->current_flow_route_point_id);
-        $this->assertSame(ContactFlowRouteProgress::STATUS_ACTIVE, $progress->status);
+        $this->assertNull($progress->current_flow_route_point_id);
+        $this->assertSame(ContactFlowRouteProgress::STATUS_COMPLETED, $progress->status);
         $this->assertNotNull($progress->started_at);
+        $this->assertNotNull($progress->completed_at);
         $this->assertSame('test', $progress->meta['started_from_workflow_transition']['source']);
     }
 
@@ -127,20 +129,22 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
         ]);
 
         $oldPoint = Point::query()->create([
-            'key' => 'old_noop',
-            'type' => Point::TYPE_NOOP,
-            'name' => 'Old Noop',
+            'key' => 'old_wait',
+            'type' => Point::TYPE_WAIT,
+            'name' => 'Old Wait',
         ]);
 
         FlowRoutePoint::query()->create([
             'flow_route_id' => $oldRoute->id,
             'point_id' => $oldPoint->id,
-            'key' => 'old_noop',
+            'key' => 'old_wait',
             'sort_order' => 10,
             'is_start' => true,
             'is_active' => true,
             'next_flow_route_point_id' => null,
-            'definition' => [],
+            'definition' => [
+                'seconds' => 3600,
+            ],
             'settings' => [],
             'cancel_conditions' => [],
             'source_version' => null,
@@ -171,6 +175,8 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
             'customized_at' => null,
             'meta' => [],
         ]);
+
+        Queue::fake();
 
         app(TransitionContactWorkflowStatusAction::class)->handle(
             contact: $contact,
@@ -203,8 +209,9 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
         $this->assertNull($oldProgress->waiting_event_key);
         $this->assertNotNull($oldProgress->cancelled_at);
 
-        $this->assertSame(ContactFlowRouteProgress::STATUS_ACTIVE, $newProgress->status);
+        $this->assertSame(ContactFlowRouteProgress::STATUS_COMPLETED, $newProgress->status);
         $this->assertSame($newStatus->id, $newProgress->contact_status_id);
+        $this->assertNotNull($newProgress->completed_at);
     }
 
     public function test_workflow_status_change_without_matching_active_route_only_cancels_existing_progress(): void
@@ -237,20 +244,22 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
         ]);
 
         $point = Point::query()->create([
-            'key' => 'noop',
-            'type' => Point::TYPE_NOOP,
-            'name' => 'Noop',
+            'key' => 'wait_for_next_status',
+            'type' => Point::TYPE_WAIT,
+            'name' => 'Wait For Next Status',
         ]);
 
         FlowRoutePoint::query()->create([
             'flow_route_id' => $route->id,
             'point_id' => $point->id,
-            'key' => 'noop',
+            'key' => 'wait_for_next_status',
             'sort_order' => 10,
             'is_start' => true,
             'is_active' => true,
             'next_flow_route_point_id' => null,
-            'definition' => [],
+            'definition' => [
+                'seconds' => 3600,
+            ],
             'settings' => [],
             'cancel_conditions' => [],
             'source_version' => null,
@@ -258,6 +267,8 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
             'customized_at' => null,
             'meta' => [],
         ]);
+
+        Queue::fake();
 
         app(TransitionContactWorkflowStatusAction::class)->handle(
             contact: $contact,

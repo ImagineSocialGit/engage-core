@@ -109,7 +109,7 @@ class ChangeStatusPointHandler implements PointHandler
             );
         }
 
-        return PointExecutionResult::blocked(
+        return PointExecutionResult::completed(
             reason: 'workflow_status_changed',
             meta: [
                 'contact_workflow_profile_id' => $profile->getKey(),
@@ -120,7 +120,7 @@ class ChangeStatusPointHandler implements PointHandler
                 'flow_route_point_id' => $context->flowRoutePoint->getKey(),
                 'route_handoff' => [
                     'handled_by' => 'ContactWorkflowStatusChanged',
-                    'should_advance_current_progress' => false,
+                    'should_advance_current_progress' => true,
                 ],
             ],
         );

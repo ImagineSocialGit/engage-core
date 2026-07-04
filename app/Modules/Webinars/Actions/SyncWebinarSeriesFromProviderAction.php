@@ -7,6 +7,7 @@ use App\Modules\Webinars\Data\ProviderWebinarData;
 use App\Modules\Webinars\Jobs\NotifyWebinarWaitlistJob;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use App\Modules\Webinars\Services\WebinarProviderManager;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -112,7 +113,13 @@ class SyncWebinarSeriesFromProviderAction
             $this->getNextUpcomingWebinarAction->getForSeries($series)
         );
 
-        if (! $hadUpcomingWebinarBeforeSync && $hasUpcomingWebinarAfterSync) {
+        if (
+            $hasUpcomingWebinarAfterSync
+            && (
+                ! $hadUpcomingWebinarBeforeSync
+                || $this->hasUnnotifiedWaitlistSignups($series)
+            )
+        ) {
             NotifyWebinarWaitlistJob::dispatch($series->id);
         }
 
@@ -123,6 +130,14 @@ class SyncWebinarSeriesFromProviderAction
             'conflicts' => [],
             'missing' => $missing,
         ];
+    }
+
+    private function hasUnnotifiedWaitlistSignups(WebinarSeries $series): bool
+    {
+        return WebinarWaitlistSignup::query()
+            ->where('webinar_series_id', $series->getKey())
+            ->whereNull('notified_at')
+            ->exists();
     }
 
     protected function missingWebinars(

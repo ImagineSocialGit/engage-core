@@ -50,13 +50,32 @@ class ResumeFlowRouteProgressFromEventAction
 
                 $result->recordMatched($prepared->getKey());
 
-                $executionResult = $this->executeCurrentFlowRoutePoint->handle($prepared);
+                $executionResult = $this->executeProgressUntilIdle($prepared);
 
                 $result->recordResumed($executionResult);
             }
         });
 
         return $result;
+    }
+
+    private function executeProgressUntilIdle(ContactFlowRouteProgress $progress): PointExecutionResult
+    {
+        $attempts = 0;
+        $result = null;
+
+        do {
+            $result = $this->executeCurrentFlowRoutePoint->handle($progress);
+            $progress->refresh();
+            $attempts++;
+        } while ($attempts < 25 && $result->shouldAdvance() && $progress->isActive());
+
+        return $result ?? PointExecutionResult::blocked(
+            reason: 'flow_route_progress_not_executed',
+            meta: [
+                'progress_id' => $progress->getKey(),
+            ],
+        );
     }
 
     private function prepareProgressForEventResume(

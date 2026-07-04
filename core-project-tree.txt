@@ -692,6 +692,7 @@
 │       │   │   │       └── webinar.php
 │       │   │   └── sms
 │       │   │       ├── marketing
+│       │   │       │   ├── webinar_nurture.php
 │       │   │       │   ├── webinar.php
 │       │   │       │   └── webinar_waitlist.php
 │       │   │       └── transactional
@@ -792,6 +793,7 @@
 │   │   ├── permission_invitations.php
 │   │   ├── sms
 │   │   │   ├── marketing
+│   │   │   │   ├── webinar_nurture.php
 │   │   │   │   ├── webinar_nurture_test.php
 │   │   │   │   ├── webinar.php
 │   │   │   │   └── webinar_waitlist.php
@@ -1230,4 +1232,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-417 directories, 814 files
+417 directories, 816 files
