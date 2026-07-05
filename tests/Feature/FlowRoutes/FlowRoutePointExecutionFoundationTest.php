@@ -16,8 +16,10 @@ use App\Modules\FlowRoutes\Models\Point;
 use App\Modules\FlowRoutes\PointHandlers\NoopPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\WaitPointHandler;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
+use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\SmsPayload;
+use App\Modules\Tasks\Models\Task;
 use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -182,6 +184,38 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertSame(0, ScheduledMessage::query()->count());
     }
 
+
+
+    public function test_create_task_point_assigns_to_only_active_team_member(): void
+    {
+        $teamMember = TeamMember::factory()->create([
+            'name' => 'Only Member',
+        ]);
+
+        TeamMember::factory()->inactive()->create();
+
+        $setup = $this->createProgressWithPoints([
+            Point::TYPE_CREATE_TASK,
+        ]);
+
+        $setup['flow_route_points'][0]->forceFill([
+            'definition' => [
+                'title' => 'The prospect task',
+                'assigned_to' => 'only_active_team_member',
+                'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+            ],
+        ])->save();
+
+        $result = app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']);
+
+        $this->assertSame(PointExecutionResult::STATUS_COMPLETED, $result->status);
+        $this->assertSame('task_created', $result->reason);
+
+        $task = Task::query()->where('title', 'The prospect task')->firstOrFail();
+
+        $this->assertSame($teamMember->getMorphClass(), $task->assigned_to_type);
+        $this->assertSame($teamMember->id, $task->assigned_to_id);
+    }
 
     public function test_automation_event_route_can_change_contact_workflow_status(): void
     {
@@ -405,4 +439,3 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         ];
     }
 }
-

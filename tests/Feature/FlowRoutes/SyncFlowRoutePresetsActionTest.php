@@ -52,45 +52,27 @@ class SyncFlowRoutePresetsActionTest extends TestCase
 
     public function test_it_syncs_status_triggered_mortgage_flow_routes_with_contact_status_bindings(): void
     {
-        $attendedStatus = ContactStatus::query()->create([
-            'key' => 'attended_webinar',
-            'name' => 'Attended Webinar',
-        ]);
-
-        $inProcessStatus = ContactStatus::query()->create([
-            'key' => 'in_process',
-            'name' => 'In Process',
+        $prospectStatus = ContactStatus::query()->create([
+            'key' => 'prospect',
+            'name' => 'Prospect',
         ]);
 
         app(SyncFlowRoutePresetsAction::class)->handle('mortgage');
 
-        $attendedRoute = FlowRoute::query()
-            ->where('key', 'smoke_attended_webinar_to_in_process')
+        $prospectRoute = FlowRoute::query()
+            ->where('key', 'smoke_prospect_cancel_nurture_and_create_task')
             ->firstOrFail();
 
-        $inProcessRoute = FlowRoute::query()
-            ->where('key', 'smoke_in_process_task_completion_message')
-            ->firstOrFail();
-
-        $this->assertSame(FlowRoute::TRIGGER_CONTACT_STATUS, $attendedRoute->trigger_type);
-        $this->assertSame('attended_webinar', $attendedRoute->trigger_key);
-        $this->assertSame($attendedStatus->id, $attendedRoute->contact_status_id);
-
-        $this->assertSame(FlowRoute::TRIGGER_CONTACT_STATUS, $inProcessRoute->trigger_type);
-        $this->assertSame('in_process', $inProcessRoute->trigger_key);
-        $this->assertSame($inProcessStatus->id, $inProcessRoute->contact_status_id);
+        $this->assertSame(FlowRoute::TRIGGER_CONTACT_STATUS, $prospectRoute->trigger_type);
+        $this->assertSame('prospect', $prospectRoute->trigger_key);
+        $this->assertSame($prospectStatus->id, $prospectRoute->contact_status_id);
     }
 
     public function test_it_syncs_next_point_links_for_multipoint_mortgage_routes(): void
     {
         ContactStatus::query()->create([
-            'key' => 'attended_webinar',
-            'name' => 'Attended Webinar',
-        ]);
-
-        ContactStatus::query()->create([
-            'key' => 'in_process',
-            'name' => 'In Process',
+            'key' => 'prospect',
+            'name' => 'Prospect',
         ]);
 
         app(SyncFlowRoutePresetsAction::class)->handle('mortgage');
@@ -106,20 +88,18 @@ class SyncFlowRoutePresetsActionTest extends TestCase
         $this->assertSame($smsEnrollmentPoint->id, $emailEnrollmentPoint->next_flow_route_point_id);
         $this->assertNull($smsEnrollmentPoint->next_flow_route_point_id);
 
-        $taskRoute = FlowRoute::query()
-            ->where('key', 'smoke_in_process_task_completion_message')
+        $prospectRoute = FlowRoute::query()
+            ->where('key', 'smoke_prospect_cancel_nurture_and_create_task')
             ->firstOrFail();
 
-        $createTaskPoint = $this->flowRoutePoint($taskRoute, 'smoke_create_attended_webinar_review_task');
-        $waitPoint = $this->flowRoutePoint($taskRoute, 'smoke_wait_for_review_task_completed');
-        $emailPoint = $this->flowRoutePoint($taskRoute, 'smoke_send_task_done_email');
-        $smsPoint = $this->flowRoutePoint($taskRoute, 'smoke_send_task_done_sms');
+        $cancelEmailPoint = $this->flowRoutePoint($prospectRoute, 'smoke_cancel_attended_email_nurture');
+        $cancelSmsPoint = $this->flowRoutePoint($prospectRoute, 'smoke_cancel_attended_sms_nurture');
+        $createTaskPoint = $this->flowRoutePoint($prospectRoute, 'smoke_create_prospect_task');
 
-        $this->assertTrue($createTaskPoint->is_start);
-        $this->assertSame($waitPoint->id, $createTaskPoint->next_flow_route_point_id);
-        $this->assertSame($emailPoint->id, $waitPoint->next_flow_route_point_id);
-        $this->assertSame($smsPoint->id, $emailPoint->next_flow_route_point_id);
-        $this->assertNull($smsPoint->next_flow_route_point_id);
+        $this->assertTrue($cancelEmailPoint->is_start);
+        $this->assertSame($cancelSmsPoint->id, $cancelEmailPoint->next_flow_route_point_id);
+        $this->assertSame($createTaskPoint->id, $cancelSmsPoint->next_flow_route_point_id);
+        $this->assertNull($createTaskPoint->next_flow_route_point_id);
     }
 
     private function flowRoutePoint(FlowRoute $flowRoute, string $key): FlowRoutePoint

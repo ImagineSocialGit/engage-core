@@ -10,6 +10,7 @@ use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use App\Modules\Webinars\Support\WebinarJoinLinkGenerator;
 use App\Modules\Webinars\Support\WebinarPlaybackLinkGenerator;
 use App\Modules\Webinars\Support\WebinarRegistrationCancelLinkGenerator;
+use Illuminate\Support\Facades\URL;
 
 readonly class WebinarMessageData extends MessageData
 {
@@ -96,6 +97,7 @@ readonly class WebinarMessageData extends MessageData
             'webinar_platform' => $this->webinar->platform,
             'webinar_join_url' => $this->webinarJoinUrl,
             'webinar_registration_url' => $this->webinar->registration_url,
+            'webinar_waitlist_registration_url' => $this->waitlistRegistrationUrl(),
             'cancel_registration_url' => $cancelRegistrationUrl,
             'webinar_playback_url' => $playbackUrl,
             'webinar_playback_passcode' => $this->webinar->playback_passcode,
@@ -130,6 +132,29 @@ readonly class WebinarMessageData extends MessageData
                 : null,
             webinarJoinUrl: $data['webinar_join_url'] ?? null,
             requestIp: $data['request_ip'] ?? null,
+        );
+    }
+
+    private function waitlistRegistrationUrl(): ?string
+    {
+        if (! $this->waitlistSignup instanceof WebinarWaitlistSignup) {
+            return null;
+        }
+
+        $series = $this->webinar->webinarSeries;
+
+        if (! $series || blank($series->slug)) {
+            return null;
+        }
+
+        return URL::temporarySignedRoute(
+            name: 'webinar.waitlist.register',
+            expiration: now()->addDays((int) config('webinars.waitlist_registration_link_days', 14)),
+            parameters: [
+                'seriesSlug' => $series->slug,
+                'signup' => $this->waitlistSignup->getKey(),
+            ],
+            absolute: false,
         );
     }
 

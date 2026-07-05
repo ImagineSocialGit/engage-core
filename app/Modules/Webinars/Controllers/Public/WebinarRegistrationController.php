@@ -7,6 +7,7 @@ use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Webinars\Actions\CreateWebinarRegistrationAction;
 use App\Modules\Webinars\Actions\GetActiveWebinarSeriesAction;
 use App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction;
+use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use App\Modules\Webinars\Requests\StoreWebinarRegistrationRequest;
 use App\Support\Caching\CacheKey;
 use Illuminate\Http\Response;
@@ -51,10 +52,53 @@ class WebinarRegistrationController extends Controller
         return response($html);
     }
 
+    public function showFromWaitlist(
+        string $seriesSlug,
+        int $signup,
+        GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
+        GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction,
+    ) {
+        $series = $getActiveWebinarSeriesAction->findBySlug($seriesSlug);
+
+        abort_unless($series, 404);
+
+        $webinar = $getNextUpcomingWebinarAction->getForSeries($series);
+
+        abort_unless($webinar, 404);
+
+        $waitlistSignup = WebinarWaitlistSignup::query()
+            ->with('contact')
+            ->whereKey($signup)
+            ->where('webinar_series_id', $series->getKey())
+            ->firstOrFail();
+
+        $contact = $waitlistSignup->contact;
+
+        session()->flashInput([
+            'first_name' => $contact?->first_name,
+            'last_name' => $contact?->last_name,
+            'email' => $contact?->email,
+            'phone' => $contact?->phone,
+        ]);
+
+        return response($this->renderShowPage(
+            $seriesSlug,
+            $getActiveWebinarSeriesAction,
+            $getNextUpcomingWebinarAction,
+            [
+                'first_name' => $contact?->first_name,
+                'last_name' => $contact?->last_name,
+                'email' => $contact?->email,
+                'phone' => $contact?->phone,
+            ],
+        ));
+    }
+
     private function renderShowPage(
         string $seriesSlug,
         GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
-        GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction
+        GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction,
+        array $registrationPrefill = [],
     ): string {
         $series = $getActiveWebinarSeriesAction->findBySlug($seriesSlug);
 
@@ -85,6 +129,7 @@ class WebinarRegistrationController extends Controller
             'series' => $series,
             'page' => $config->content('register', $series->slug, $series->meta ?? []),
             'style' => $config->style('register', $series->slug),
+            'registrationPrefill' => $registrationPrefill,
             'webinarRegistrationChannels' => [
                 'transactional' => $channelAvailability->visibleChannelsForSurface(
                     surface: 'webinar_registrations',

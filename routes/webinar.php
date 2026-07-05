@@ -24,6 +24,11 @@ Route::middleware('module:webinars')->group(function () {
 
     Route::pattern('seriesSlug', '(?!staging-login$)[a-z0-9-]+');
 
+    Route::get('/{seriesSlug}/waitlist/{signup}/register', [WebinarRegistrationController::class, 'showFromWaitlist'])
+        ->middleware(['signed:relative', 'throttle:12,1'])
+        ->whereNumber('signup')
+        ->name('webinar.waitlist.register');
+
     Route::get('/{seriesSlug}', [WebinarRegistrationController::class, 'show'])
         ->name('webinar.show');
 

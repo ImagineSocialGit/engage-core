@@ -149,7 +149,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         Queue::assertPushed(SendScheduledMessageJob::class, 2);
     }
 
-    public function test_it_includes_registration_url_for_waitlist_notification_when_webinar_exists(): void
+    public function test_it_includes_prefilled_registration_url_for_waitlist_notification_when_webinar_exists(): void
     {
         Queue::fake();
 
@@ -175,16 +175,18 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
             ->first();
 
         $this->assertNotNull($message);
-        $this->assertSame('A new webinar is available. Register here: {webinar_registration_url}', $message->payload['body']);
-        $this->assertSame('{webinar_registration_url}', $message->payload['cta']['url']);
-        $this->assertSame('https://example.com/register-now', $message->payload['tokens']['webinar_registration_url']);
+        $this->assertSame('A new webinar is available. Register here: {webinar_waitlist_registration_url}', $message->payload['body']);
+        $this->assertSame('{webinar_waitlist_registration_url}', $message->payload['cta']['url']);
+        $this->assertNotEmpty($message->payload['tokens']['webinar_waitlist_registration_url']);
+        $this->assertStringContainsString(route('webinar.waitlist.register', ['seriesSlug' => $series->slug, 'signup' => $signup->id], false), $message->payload['tokens']['webinar_waitlist_registration_url']);
+        $this->assertStringContainsString('signature=', $message->payload['tokens']['webinar_waitlist_registration_url']);
 
         $signup->refresh();
 
         $this->assertNotNull($signup->notified_at);
     }
 
-    public function test_it_does_not_mark_signup_notified_when_registration_url_is_missing(): void
+    public function test_it_dispatches_prefilled_waitlist_notification_when_provider_registration_url_is_missing(): void
     {
         Queue::fake();
 
@@ -204,13 +206,18 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
 
         app(DispatchWebinarWaitlistMessagesAction::class)->handle($webinar);
 
-        $this->assertSame(0, ScheduledMessage::query()->count());
+        $this->assertSame(1, ScheduledMessage::query()->count());
+
+        $message = ScheduledMessage::query()->first();
+
+        $this->assertNotNull($message);
+        $this->assertNotEmpty($message->payload['tokens']['webinar_waitlist_registration_url']);
 
         $signup->refresh();
 
-        $this->assertNull($signup->notified_at);
+        $this->assertNotNull($signup->notified_at);
 
-        Queue::assertNothingPushed();
+        Queue::assertPushed(SendScheduledMessageJob::class, 1);
     }
 
     public function test_it_does_not_dispatch_sms_when_sms_is_available_but_not_accepted_for_signup(): void
@@ -314,16 +321,16 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
                 'queue' => 'notifications',
                 'conditions' => [
                     [
-                        'field' => 'webinar.registration_url',
+                        'field' => 'webinar_waitlist_registration_url',
                         'operator' => 'filled',
                     ],
                 ],
                 'payload' => [
                     'subject' => 'New webinar scheduled: {webinar_title}',
-                    'body' => 'A new webinar is available. Register here: {webinar_registration_url}',
+                    'body' => 'A new webinar is available. Register here: {webinar_waitlist_registration_url}',
                     'cta' => [
                         'label' => 'Register Now',
-                        'url' => '{webinar_registration_url}',
+                        'url' => '{webinar_waitlist_registration_url}',
                     ],
                 ],
             ],
@@ -337,12 +344,12 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
                 'queue' => 'notifications',
                 'conditions' => [
                     [
-                        'field' => 'webinar.registration_url',
+                        'field' => 'webinar_waitlist_registration_url',
                         'operator' => 'filled',
                     ],
                 ],
                 'payload' => [
-                    'message' => 'A new webinar is available. Register here: {webinar_registration_url}',
+                    'message' => 'A new webinar is available. Register here: {webinar_waitlist_registration_url}',
                 ],
             ],
         ]);

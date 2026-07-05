@@ -3,6 +3,7 @@
     'tokens',
     'series',
     'webinarRegistrationChannels' => [],
+    'registrationPrefill' => [],
 ])
 
 @php
@@ -95,7 +96,7 @@
                             id="first_name"
                             name="first_name"
                             x-ref="firstName"
-                            :value="old('first_name')"
+                            :value="old('first_name', $registrationPrefill['first_name'] ?? null)"
                             :placeholder="$page['fields']['first_name']['placeholder'] ?? 'First name'"
                         />
 
@@ -114,7 +115,7 @@
                         <x-ui.form.input
                             id="last_name"
                             name="last_name"
-                            :value="old('last_name')"
+                            :value="old('last_name', $registrationPrefill['last_name'] ?? null)"
                             :placeholder="$page['fields']['last_name']['placeholder'] ?? 'Last name'"
                         />
 
@@ -136,7 +137,7 @@
                             id="email"
                             name="email"
                             type="email"
-                            :value="old('email')"
+                            :value="old('email', $registrationPrefill['email'] ?? null)"
                             :placeholder="$page['fields']['email']['placeholder'] ?? 'Email address'"
                         />
 
@@ -155,7 +156,7 @@
                         <x-ui.form.input
                             id="phone"
                             name="phone"
-                            :value="old('phone')"
+                            :value="old('phone', $registrationPrefill['phone'] ?? null)"
                             :placeholder="$page['fields']['phone']['placeholder'] ?? 'Phone number'"
                         />
 

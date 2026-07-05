@@ -398,6 +398,7 @@
             :tokens="$tokens"
             :series="$series"
             :webinar-registration-channels="$webinarRegistrationChannels ?? []"
+            :registration-prefill="$registrationPrefill ?? []"
         />
 
     </section>

@@ -7,6 +7,7 @@ use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarSeries;
+use App\Support\Caching\CacheKey;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
@@ -356,6 +357,58 @@ class WebinarRegistrationControllerTest extends TestCase
             'https://cdn.example.test/slam-dunk-crm/images/brand/logo/320.webp',
             false
         );
+    }
+
+
+    public function test_waitlist_registration_page_prefills_registration_form_without_checking_consents(): void
+    {
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'prefill-test',
+            'title' => 'Prefill Test',
+        ]);
+
+        Cache::forget(CacheKey::activeWebinarSeries());
+        Cache::forget(CacheKey::nextUpcomingWebinar($series->slug));
+
+        Webinar::factory()->create([
+            'webinar_series_id' => $series->id,
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $contact = Contact::factory()->create([
+            'first_name' => 'Tess',
+            'last_name' => 'Tester',
+            'email' => 'tess@example.com',
+            'phone' => '+15555550123',
+        ]);
+
+        $signup = \App\Modules\Webinars\Models\WebinarWaitlistSignup::query()->create([
+            'contact_id' => $contact->id,
+            'webinar_series_id' => $series->id,
+            'meta' => [],
+        ]);
+
+        view()->share('errors', new \Illuminate\Support\ViewErrorBag());
+
+        $response = app(\App\Modules\Webinars\Controllers\Public\WebinarRegistrationController::class)
+            ->showFromWaitlist(
+                seriesSlug: $series->slug,
+                signup: $signup->id,
+                getActiveWebinarSeriesAction: app(\App\Modules\Webinars\Actions\GetActiveWebinarSeriesAction::class),
+                getNextUpcomingWebinarAction: app(\App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction::class),
+            );
+
+        $this->assertSame(200, $response->getStatusCode());
+
+        $html = $response->getContent();
+
+        $this->assertStringContainsString('value="Tess"', $html);
+        $this->assertStringContainsString('value="Tester"', $html);
+        $this->assertStringContainsString('value="tess@example.com"', $html);
+        $this->assertStringContainsString('value="+15555550123"', $html);
+        $this->assertStringContainsString('name="transactional_email_consent"', $html);
+        $this->assertStringNotContainsString('name="transactional_email_consent" type="checkbox" value="1" checked', $html);
     }
 
     private function configureWebinarRegistrationChannelAvailability(): void

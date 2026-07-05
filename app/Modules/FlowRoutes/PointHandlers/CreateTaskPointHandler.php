@@ -8,6 +8,7 @@ use App\Modules\FlowRoutes\Data\Points\CreateTaskPointDefinition;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Models\Point;
+use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\Tasks\Actions\CreateTaskAction;
 use App\Modules\Tasks\Models\Task;
 
@@ -40,12 +41,25 @@ class CreateTaskPointHandler implements PointHandler
             );
         }
 
+        $assignee = $this->assignee($definition);
+
+        if (($assignee['failed_reason'] ?? null) !== null) {
+            return PointExecutionResult::failed(
+                reason: $assignee['failed_reason'],
+                meta: [
+                    'create_task_definition' => $definition->toMetaPayload(),
+                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    'point_id' => $context->flowRoutePoint->point_id,
+                ],
+            );
+        }
+
         $task = $this->createTask->handle([
             'related_type' => Contact::class,
             'related_id' => $context->progress->contact_id,
 
-            'assigned_to_type' => $definition->assignedToType,
-            'assigned_to_id' => $definition->assignedToId,
+            'assigned_to_type' => $assignee['assigned_to_type'],
+            'assigned_to_id' => $assignee['assigned_to_id'],
 
             'responsible_party' => $definition->responsibleParty,
             'responsible_type' => $definition->responsibleType,
@@ -87,6 +101,38 @@ class CreateTaskPointHandler implements PointHandler
                 ],
             ],
         );
+    }
+
+    /**
+     * @return array{assigned_to_type: string|null, assigned_to_id: int|null, failed_reason?: string}
+     */
+    private function assignee(CreateTaskPointDefinition $definition): array
+    {
+        if ($definition->assignedTo !== 'only_active_team_member') {
+            return [
+                'assigned_to_type' => $definition->assignedToType,
+                'assigned_to_id' => $definition->assignedToId,
+            ];
+        }
+
+        $teamMembers = TeamMember::query()
+            ->active()
+            ->get();
+
+        if ($teamMembers->count() !== 1) {
+            return [
+                'assigned_to_type' => null,
+                'assigned_to_id' => null,
+                'failed_reason' => 'create_task_only_active_team_member_not_resolved',
+            ];
+        }
+
+        $teamMember = $teamMembers->first();
+
+        return [
+            'assigned_to_type' => $teamMember->getMorphClass(),
+            'assigned_to_id' => $teamMember->getKey(),
+        ];
     }
 
     private function renderText(?string $value, PointExecutionContext $context): ?string
