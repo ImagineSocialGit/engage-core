@@ -42,6 +42,8 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
             'name' => 'Engage Core Marketing',
         ]);
 
+        Config::set('app.webinar_url', 'https://webinar.engagecore.test');
+
         $this->configureWebinarWaitlistChannelAvailability();
     }
 
@@ -178,6 +180,12 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         $this->assertSame('A new webinar is available. Register here: {webinar_waitlist_registration_url}', $message->payload['body']);
         $this->assertSame('{webinar_waitlist_registration_url}', $message->payload['cta']['url']);
         $this->assertNotEmpty($message->payload['tokens']['webinar_waitlist_registration_url']);
+
+        $this->assertStringStartsWith(
+            'https://webinar.engagecore.test/',
+            $message->payload['tokens']['webinar_waitlist_registration_url'],
+        );
+
         $this->assertStringContainsString(route('webinar.waitlist.register', ['seriesSlug' => $series->slug, 'signup' => $signup->id], false), $message->payload['tokens']['webinar_waitlist_registration_url']);
         $this->assertStringContainsString('signature=', $message->payload['tokens']['webinar_waitlist_registration_url']);
 

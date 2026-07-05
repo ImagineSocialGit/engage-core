@@ -68,7 +68,7 @@ class SyncFlowRoutePresetsActionTest extends TestCase
         $this->assertSame($prospectStatus->id, $prospectRoute->contact_status_id);
     }
 
-    public function test_it_syncs_next_point_links_for_multipoint_mortgage_routes(): void
+    public function test_it_syncs_default_attended_nurture_and_prospect_cancellation_routes(): void
     {
         ContactStatus::query()->create([
             'key' => 'prospect',
@@ -77,28 +77,32 @@ class SyncFlowRoutePresetsActionTest extends TestCase
 
         app(SyncFlowRoutePresetsAction::class)->handle('mortgage');
 
-        $nurtureRoute = FlowRoute::query()
+        $attendedRoute = FlowRoute::query()
+            ->where('key', 'webinar_attended_campaign_enrollment')
+            ->firstOrFail();
+
+        $attendedEnrollmentPoint = $this->flowRoutePoint($attendedRoute, 'enroll_webinar_attended_nurture');
+
+        $this->assertTrue($attendedEnrollmentPoint->is_start);
+        $this->assertSame('webinar_attended_nurture', $attendedEnrollmentPoint->definition['campaign_key'] ?? null);
+        $this->assertNull($attendedEnrollmentPoint->next_flow_route_point_id);
+
+        $disabledLegacySmokeRoute = FlowRoute::query()
             ->where('key', 'smoke_webinar_attended_nurture_test_enrollment')
             ->firstOrFail();
 
-        $emailEnrollmentPoint = $this->flowRoutePoint($nurtureRoute, 'enroll_webinar_attended_nurture_email_test');
-        $smsEnrollmentPoint = $this->flowRoutePoint($nurtureRoute, 'enroll_webinar_attended_nurture_sms_test');
-
-        $this->assertTrue($emailEnrollmentPoint->is_start);
-        $this->assertSame($smsEnrollmentPoint->id, $emailEnrollmentPoint->next_flow_route_point_id);
-        $this->assertNull($smsEnrollmentPoint->next_flow_route_point_id);
+        $this->assertFalse((bool) $disabledLegacySmokeRoute->is_active);
 
         $prospectRoute = FlowRoute::query()
             ->where('key', 'smoke_prospect_cancel_nurture_and_create_task')
             ->firstOrFail();
 
-        $cancelEmailPoint = $this->flowRoutePoint($prospectRoute, 'smoke_cancel_attended_email_nurture');
-        $cancelSmsPoint = $this->flowRoutePoint($prospectRoute, 'smoke_cancel_attended_sms_nurture');
+        $cancelPoint = $this->flowRoutePoint($prospectRoute, 'smoke_cancel_attended_email_nurture');
         $createTaskPoint = $this->flowRoutePoint($prospectRoute, 'smoke_create_prospect_task');
 
-        $this->assertTrue($cancelEmailPoint->is_start);
-        $this->assertSame($cancelSmsPoint->id, $cancelEmailPoint->next_flow_route_point_id);
-        $this->assertSame($createTaskPoint->id, $cancelSmsPoint->next_flow_route_point_id);
+        $this->assertTrue($cancelPoint->is_start);
+        $this->assertSame('webinar_attended_nurture', $cancelPoint->definition['campaign_key'] ?? null);
+        $this->assertSame($createTaskPoint->id, $cancelPoint->next_flow_route_point_id);
         $this->assertNull($createTaskPoint->next_flow_route_point_id);
     }
 

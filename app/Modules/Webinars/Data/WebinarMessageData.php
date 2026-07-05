@@ -147,7 +147,7 @@ readonly class WebinarMessageData extends MessageData
             return null;
         }
 
-        return URL::temporarySignedRoute(
+        $path = URL::temporarySignedRoute(
             name: 'webinar.waitlist.register',
             expiration: now()->addDays((int) config('webinars.waitlist_registration_link_days', 14)),
             parameters: [
@@ -156,6 +156,14 @@ readonly class WebinarMessageData extends MessageData
             ],
             absolute: false,
         );
+
+        $baseUrl = rtrim((string) config('app.webinar_url', config('app.url')), '/');
+
+        if ($baseUrl === '') {
+            return $path;
+        }
+
+        return $baseUrl.$path;
     }
 
     public function formattedStart(string $format = 'M j g:i A'): string
