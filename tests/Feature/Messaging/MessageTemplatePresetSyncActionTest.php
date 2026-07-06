@@ -145,4 +145,109 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         $this->assertFalse($preset->is_customized);
         $this->assertNull($preset->customized_at);
     }
+
+    public function test_normal_sync_preserves_existing_assignment_for_same_context(): void
+    {
+        Config::set('messaging.sms', []);
+        Config::set('messaging.email', [
+            'transactional' => [
+                'webinar' => [
+                    'confirmation' => [
+                        'dispatch_key' => 'registration_created',
+                        'timing' => 'immediate',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'confirmation_messages',
+                        'payload' => [
+                            'subject' => 'Config subject',
+                            'body' => 'Config body.',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        app(SyncMessageTemplatePresetsAction::class)->handle();
+
+        $configPreset = MessageTemplatePreset::query()
+            ->where('key', 'email.transactional.webinar.confirmation')
+            ->firstOrFail();
+
+        $customPreset = MessageTemplatePreset::factory()->create([
+            'key' => 'email.transactional.webinar.confirmation.custom',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'confirmation_messages',
+            'dispatch_keys' => ['registration_created'],
+            'payload' => [
+                'subject' => 'Custom subject',
+                'body' => 'Custom body.',
+            ],
+        ]);
+
+        $assignment = $configPreset->assignments()->firstOrFail();
+        $assignment->forceFill([
+            'message_template_preset_id' => $customPreset->getKey(),
+        ])->save();
+
+        $result = app(SyncMessageTemplatePresetsAction::class)->handle();
+
+        $this->assertSame(1, $result['assignments_preserved']);
+        $this->assertSame($customPreset->getKey(), $assignment->refresh()->message_template_preset_id);
+        $this->assertDatabaseCount('message_template_preset_assignments', 1);
+    }
+
+    public function test_force_sync_repoints_existing_assignment_to_config_preset(): void
+    {
+        Config::set('messaging.sms', []);
+        Config::set('messaging.email', [
+            'transactional' => [
+                'webinar' => [
+                    'confirmation' => [
+                        'dispatch_key' => 'registration_created',
+                        'timing' => 'immediate',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'confirmation_messages',
+                        'payload' => [
+                            'subject' => 'Config subject',
+                            'body' => 'Config body.',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        app(SyncMessageTemplatePresetsAction::class)->handle();
+
+        $configPreset = MessageTemplatePreset::query()
+            ->where('key', 'email.transactional.webinar.confirmation')
+            ->firstOrFail();
+
+        $customPreset = MessageTemplatePreset::factory()->create([
+            'key' => 'email.transactional.webinar.confirmation.custom',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'confirmation_messages',
+            'dispatch_keys' => ['registration_created'],
+        ]);
+
+        $assignment = $configPreset->assignments()->firstOrFail();
+        $assignment->forceFill([
+            'message_template_preset_id' => $customPreset->getKey(),
+            'is_active' => false,
+        ])->save();
+
+        $result = app(SyncMessageTemplatePresetsAction::class)->handle(force: true);
+
+        $this->assertSame(1, $result['assignments_updated']);
+        $this->assertSame($configPreset->getKey(), $assignment->refresh()->message_template_preset_id);
+        $this->assertTrue($assignment->is_active);
+        $this->assertDatabaseCount('message_template_preset_assignments', 1);
+    }
+
 }

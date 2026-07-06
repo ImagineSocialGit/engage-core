@@ -143,4 +143,116 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
         $this->assertSame('Config subject', $definitions[0]['payload']['subject']);
         $this->assertSame('messaging.email.transactional.webinar.confirmation', $definitions[0]['config_path']);
     }
+
+    public function test_standard_resolution_uses_newest_active_assignment_for_same_message_context(): void
+    {
+        Config::set('messaging.email.transactional.webinar', [
+            'confirmation' => [
+                'dispatch_key' => 'registration_created',
+                'timing' => 'immediate',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'confirmation_messages',
+                'payload' => [
+                    'subject' => 'Config subject',
+                    'body' => 'Config body.',
+                ],
+            ],
+        ]);
+
+        $oldPreset = MessageTemplatePreset::factory()->create([
+            'key' => 'webinar_registration_confirmation.old',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'confirmation_messages',
+            'dispatch_keys' => ['registration_created'],
+            'payload' => [
+                'subject' => 'Old DB subject',
+                'body' => 'Old DB body.',
+            ],
+        ]);
+
+        $newPreset = MessageTemplatePreset::factory()->create([
+            'key' => 'webinar_registration_confirmation.new',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'confirmation_messages',
+            'dispatch_keys' => ['registration_created'],
+            'payload' => [
+                'subject' => 'New DB subject',
+                'body' => 'New DB body.',
+            ],
+        ]);
+
+        MessageTemplatePresetAssignment::factory()
+            ->forPreset($oldPreset)
+            ->create();
+
+        MessageTemplatePresetAssignment::factory()
+            ->forPreset($newPreset)
+            ->create();
+
+        $definitions = app(MessageDefinitionResolver::class)->resolve(
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+        );
+
+        $this->assertCount(1, $definitions);
+        $this->assertSame('New DB subject', $definitions[0]['payload']['subject']);
+        $this->assertSame($newPreset->getKey(), data_get($definitions[0], 'meta.message_template_preset.id'));
+    }
+
+    public function test_expired_assignment_is_ignored_and_resolution_falls_back_to_config(): void
+    {
+        Config::set('messaging.email.transactional.webinar', [
+            'confirmation' => [
+                'dispatch_key' => 'registration_created',
+                'timing' => 'immediate',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'confirmation_messages',
+                'payload' => [
+                    'subject' => 'Config subject',
+                    'body' => 'Config body.',
+                ],
+            ],
+        ]);
+
+        $preset = MessageTemplatePreset::factory()->create([
+            'key' => 'webinar_registration_confirmation.expired',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'confirmation_messages',
+            'dispatch_keys' => ['registration_created'],
+            'payload' => [
+                'subject' => 'Expired DB subject',
+                'body' => 'Expired DB body.',
+            ],
+        ]);
+
+        MessageTemplatePresetAssignment::factory()
+            ->forPreset($preset)
+            ->create([
+                'ends_at' => now()->subMinute(),
+            ]);
+
+        $definitions = app(MessageDefinitionResolver::class)->resolve(
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+        );
+
+        $this->assertCount(1, $definitions);
+        $this->assertSame('Config subject', $definitions[0]['payload']['subject']);
+        $this->assertSame('messaging.email.transactional.webinar.confirmation', $definitions[0]['config_path']);
+    }
+
 }

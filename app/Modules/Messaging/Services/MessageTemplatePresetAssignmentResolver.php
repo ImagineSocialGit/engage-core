@@ -4,6 +4,8 @@ namespace App\Modules\Messaging\Services;
 
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class MessageTemplatePresetAssignmentResolver
 {
@@ -15,6 +17,7 @@ class MessageTemplatePresetAssignmentResolver
         string $purpose,
         string $scope,
     ): array {
+        /** @var Collection<int, MessageTemplatePresetAssignment> $assignments */
         $assignments = $this->activeBaseQuery($channel, $purpose, $scope)
             ->whereNull('campaign_key')
             ->whereNull('campaign_step')
@@ -22,13 +25,14 @@ class MessageTemplatePresetAssignmentResolver
             ->whereNull('context_id')
             ->with('messageTemplatePreset')
             ->orderBy('message_type')
-            ->orderBy('id')
-            ->get();
+            ->orderByDesc('id')
+            ->get()
+            ->filter(fn (MessageTemplatePresetAssignment $assignment): bool => (bool) $assignment->messageTemplatePreset?->isActive())
+            ->unique(fn (MessageTemplatePresetAssignment $assignment): string => (string) $assignment->message_type)
+            ->values();
 
         return $assignments
-            ->filter(fn (MessageTemplatePresetAssignment $assignment): bool => (bool) $assignment->messageTemplatePreset?->isActive())
             ->map(fn (MessageTemplatePresetAssignment $assignment): array => $assignment->messageTemplatePreset->toMessageDefinition($assignment))
-            ->values()
             ->all();
     }
 
@@ -48,7 +52,7 @@ class MessageTemplatePresetAssignmentResolver
             ->whereNull('context_type')
             ->whereNull('context_id')
             ->with('messageTemplatePreset')
-            ->orderBy('id')
+            ->orderByDesc('id')
             ->get()
             ->first(fn (MessageTemplatePresetAssignment $assignment): bool => (bool) $assignment->messageTemplatePreset?->isActive());
 
@@ -57,11 +61,14 @@ class MessageTemplatePresetAssignmentResolver
             : null;
     }
 
+    /**
+     * @return Builder<MessageTemplatePresetAssignment>
+     */
     private function activeBaseQuery(
         MessageChannel|string $channel,
         string $purpose,
         string $scope,
-    ): \Illuminate\Database\Eloquent\Builder {
+    ): Builder {
         return MessageTemplatePresetAssignment::query()
             ->active()
             ->where('channel', $this->normalizeChannel($channel))

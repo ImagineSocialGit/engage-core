@@ -123,6 +123,7 @@ class DispatchMessageAction
             }
 
             $messageMeta = array_replace_recursive(
+                is_array($definition['meta'] ?? null) ? $definition['meta'] : [],
                 [
                     'queue' => $definition['queue'],
                     'definition_config_path' => $definition['config_path'] ?? null,

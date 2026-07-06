@@ -6,6 +6,8 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
 use App\Modules\Messaging\Models\MessageConsent;
+use App\Modules\Messaging\Models\MessageTemplatePreset;
+use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
@@ -614,6 +616,63 @@ class DispatchMessageActionTest extends TestCase
         $this->assertSame('marketing', $payload->purpose());
     }
     
+
+    public function test_it_stores_message_template_preset_metadata_on_scheduled_message(): void
+    {
+        Queue::fake();
+
+        Config::set('messaging.email.transactional.webinar', [
+            'confirmation' => [
+                'dispatch_key' => 'registration_created',
+                'timing' => 'immediate',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'confirmation_messages',
+                'payload' => [
+                    'subject' => 'Config subject',
+                    'body' => 'Config body.',
+                ],
+            ],
+        ]);
+
+        $preset = MessageTemplatePreset::factory()->create([
+            'key' => 'webinar_registration_confirmation.db',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'confirmation_messages',
+            'dispatch_keys' => ['registration_created'],
+            'payload' => [
+                'subject' => 'DB subject',
+                'body' => 'DB body.',
+            ],
+            'source_config_path' => 'messaging.email.transactional.webinar.confirmation',
+        ]);
+
+        $assignment = MessageTemplatePresetAssignment::factory()
+            ->forPreset($preset)
+            ->create();
+
+        app(DispatchMessageAction::class)->handle(
+            recipient: $this->contactWithConsent(),
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+            dispatchKeys: 'registration_created',
+        );
+
+        $message = ScheduledMessage::query()->first();
+
+        $this->assertNotNull($message);
+        $this->assertSame('DB subject', $message->payload['subject']);
+        $this->assertNull($message->definition_config_path);
+        $this->assertNull($message->meta['definition_config_path']);
+        $this->assertSame($preset->getKey(), data_get($message->meta, 'message_template_preset.id'));
+        $this->assertSame($assignment->getKey(), data_get($message->meta, 'message_template_preset.assignment_id'));
+        $this->assertSame('messaging.email.transactional.webinar.confirmation', data_get($message->meta, 'message_template_preset.source_config_path'));
+    }
+
     private function contactWithConsent(
         string $purpose = 'transactional',
         string $scope = 'webinar',

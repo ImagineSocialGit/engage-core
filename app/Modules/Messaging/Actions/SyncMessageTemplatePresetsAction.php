@@ -10,7 +10,7 @@ use InvalidArgumentException;
 class SyncMessageTemplatePresetsAction
 {
     /**
-     * @return array{created: int, updated: int, customized_skipped: int, assignments_created: int, assignments_preserved: int}
+     * @return array{created: int, updated: int, customized_skipped: int, assignments_created: int, assignments_updated: int, assignments_preserved: int}
      */
     public function handle(bool $force = false): array
     {
@@ -19,6 +19,7 @@ class SyncMessageTemplatePresetsAction
             'updated' => 0,
             'customized_skipped' => 0,
             'assignments_created' => 0,
+            'assignments_updated' => 0,
             'assignments_preserved' => 0,
         ];
 
@@ -44,30 +45,47 @@ class SyncMessageTemplatePresetsAction
                 'message_template_preset_id' => $preset->getKey(),
             ]);
 
-            $assignment = MessageTemplatePresetAssignment::query()
-                ->where('message_template_preset_id', $preset->getKey())
-                ->where('channel', $definition['assignment']['channel'])
-                ->where('purpose', $definition['assignment']['purpose'])
-                ->where('scope', $definition['assignment']['scope'])
-                ->where('message_type', $definition['assignment']['message_type'])
-                ->where('campaign_key', $definition['assignment']['campaign_key'])
-                ->where('campaign_step', $definition['assignment']['campaign_step'])
-                ->whereNull('context_type')
-                ->whereNull('context_id')
-                ->first();
+            $assignment = $this->matchingGlobalAssignment($definition['assignment']);
 
             if (! $assignment instanceof MessageTemplatePresetAssignment) {
                 MessageTemplatePresetAssignment::query()->create($assignmentAttributes);
                 $result['assignments_created']++;
-            } elseif ($force && ! $assignment->is_active) {
-                $assignment->forceFill(['is_active' => true])->save();
-                $result['assignments_preserved']++;
+            } elseif ($force) {
+                $assignment->forceFill(array_replace($assignmentAttributes, [
+                    'is_active' => true,
+                ]))->save();
+
+                $result['assignments_updated']++;
             } else {
                 $result['assignments_preserved']++;
             }
         }
 
         return $result;
+    }
+
+
+    /**
+     * @param array<string, mixed> $assignment
+     */
+    private function matchingGlobalAssignment(array $assignment): ?MessageTemplatePresetAssignment
+    {
+        $query = MessageTemplatePresetAssignment::query()
+            ->where('channel', $assignment['channel'])
+            ->where('purpose', $assignment['purpose'])
+            ->where('scope', $assignment['scope'])
+            ->whereNull('context_type')
+            ->whereNull('context_id');
+
+        foreach (['surface', 'message_type', 'campaign_key', 'campaign_step'] as $column) {
+            if (($assignment[$column] ?? null) === null) {
+                $query->whereNull($column);
+            } else {
+                $query->where($column, $assignment[$column]);
+            }
+        }
+
+        return $query->orderByDesc('is_active')->orderByDesc('id')->first();
     }
 
     /**
