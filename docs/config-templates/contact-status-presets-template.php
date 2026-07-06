@@ -17,6 +17,10 @@ return [
     |
     | Keep statuses generic unless the preset package is explicitly vertical-
     | specific. Use lead/leads in CRM/client-facing names and descriptions.
+    |
+    | Do not split statuses into manual-only or automation-only categories by default.
+    | If a manual status change will trigger selected FlowRoute automation, 
+    | the CRM UI should warn the operator before applying the change.
     */
 
     'groups' => [

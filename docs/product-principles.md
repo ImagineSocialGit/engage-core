@@ -166,6 +166,8 @@ minimal required fields
 module-aware guardrails
 ```
 
+When a simple client action triggers automation, the UI should explain the consequence before the action is confirmed rather than hiding the automation behind technical configuration.
+
 Client-facing UI should avoid:
 
 ```text

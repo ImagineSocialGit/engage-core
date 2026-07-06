@@ -21,6 +21,9 @@ return [
     |
     | FlowRoute preset sync assumes dependencies were synced first:
     | contact_statuses -> tasks -> campaigns -> flow_routes.
+    | 
+    | Preset sync creates available FlowRoute definitions and may create default selected trigger bindings.
+    | Runtime execution should resolve selected routes through FlowRouteTriggerBinding, not by running every active matching route.
     */
 
     'groups' => [

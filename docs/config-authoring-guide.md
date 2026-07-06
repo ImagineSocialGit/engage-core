@@ -19,17 +19,17 @@ Primary references:
 5. Future campaign step variants must reference Messaging-owned template presets/assignments and must not own reusable payload copy.
 6. Messaging template presets own reusable copy and safe DB-editable message payloads.
 7. FlowRoute presets own automation/control-flow routing and point definitions.
-6. Webinar post-event config owns provider event orchestration, not message copy.
-7. Task presets create DB-owned task template definitions only. They do not create live tasks.
-8. Use `lead/leads` in CRM/client-facing copy unless explicitly told otherwise.
-9. Do not invent new keys until checking the key registry.
-10. Do not use undocumented tokens in client-facing message copy.
-11. Avoid backward compatibility/legacy aliases unless explicitly chosen.
-12. Normal Broadcasts require normal Messaging consent. Do not use Broadcasts as a general imported-contact consent bypass.
-13. Imported-contact opt-in invitations are a distinct one-time Messaging flow with configurable public copy/style.
-14. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
-15. Module docs are the source of truth for module ownership and client-facing scope. Configs should not create a module feature that the owning module does not support.
-16. Commerce and Location configs should support admin convenience and integrations; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
+8. Webinar post-event config owns provider event orchestration, not message copy.
+9. Task presets create DB-owned task template definitions only. They do not create live tasks.
+10. Use `lead/leads` in CRM/client-facing copy unless explicitly told otherwise.
+11. Do not invent new keys until checking the key registry.
+12. Do not use undocumented tokens in client-facing message copy.
+13. Avoid backward compatibility/legacy aliases unless explicitly chosen.
+14. Normal Broadcasts require normal Messaging consent. Do not use Broadcasts as a general imported-contact consent bypass.
+15. Imported-contact opt-in invitations are a distinct one-time Messaging flow with configurable public copy/style.
+16. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
+17. Module docs are the source of truth for module ownership and client-facing scope. Configs should not create a module feature that the owning module does not support.
+18. Commerce and Location configs should support admin convenience and integrations; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
 
 ## Before creating a config
 
@@ -672,7 +672,10 @@ Validation should protect authoring mistakes without turning optional style/copy
 
 FlowRoute configs should define available route definitions.
 
-Runtime route selection should eventually happen through `FlowRouteTriggerBinding`, not by assuming every active matching route should run.
+Runtime route selection happens through `FlowRouteTriggerBinding`, not by assuming every active matching route should run.
+
+Contact-status triggers normally select one route per context.
+Automation-event triggers may select multiple routes per context.
 
 `FlowRoute.is_active` means available/allowed.
 

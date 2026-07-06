@@ -127,3 +127,26 @@ Webinar outcome fields such as `registered_at`, `attended_at`, and `cancelled_at
 Those outcome fields are emitted through `AutomationEventRecorded`, then FlowRoutes maps them into `FlowRouteExternalEvent` internally when needed.
 
 Webinars should not decide Campaign, Workflow, task, or FlowRoute orchestration directly.
+
+## Dev/staging testing tools
+
+Webinars may expose local/staging-only CRM testing tools to help operators/developers verify webinar messaging, join-click behavior, attendance outcomes, replay URLs, post-event follow-ups, and downstream FlowRoute behavior without relying on Zoom.
+
+These tools should live behind Webinars-owned CRM controllers such as WebinarDevController and should not be available in production.
+
+Dev testing actions may:
+- list available Messaging definitions for a webinar registration;
+- force-send selected confirmation/reminder definitions through Messaging public actions;
+- simulate join-click behavior through the normal Webinars join resolver;
+- mark one registration attended or missed and emit the normal contact-scoped automation event;
+- set or clear a fake replay URL;
+- dispatch post-webinar follow-ups through the normal post-event action.
+
+Dev testing actions should still use public module seams:
+- Webinars uses DispatchMessageAction for message sends.
+- Webinars emits AutomationEventRecorded for attended/missed outcomes.
+- Webinars does not directly create Campaign enrollments, FlowRoute progress, or ScheduledMessage rows.
+
+The dev UI should behave like an operator console. Actions inside testing modals should use AJAX/fetch where practical so the modal, selected registration, loaded message options, and activity log are not lost after each action.
+
+Sim Join should skip already-queued live reminders when the real definition has skip_when_join_clicked enabled. Manual dev sends are forced sends and may still send a selected reminder afterward so the exact payload can be tested.

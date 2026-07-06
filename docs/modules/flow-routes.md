@@ -93,7 +93,9 @@ Current models:
     FlowRoutePoint
     ContactFlowRouteProgress
 
-A `ContactStatus` or automation event trigger should have one selected FlowRoute binding per context in the first implementation.
+A ContactStatus trigger should usually have one selected FlowRoute binding per context in the first implementation.
+
+Automation-event triggers may have multiple selected FlowRoute bindings per context when multiple independent actions should run from the same event, such as webinar.attended changing status and enrolling an attended nurture campaign.
 
 `FlowRoute.is_active` means the route is available and allowed to run. It does not by itself mean every matching route should execute.
 

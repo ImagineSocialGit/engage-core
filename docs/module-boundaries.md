@@ -156,11 +156,18 @@ FlowRoutes should use DB-owned trigger bindings to decide which route is selecte
 
 A trigger binding means the route is selected for that trigger/context.
 
+Contact-status triggers should normally have one selected FlowRoute binding per context.
+
+Automation-event triggers may have multiple selected FlowRoute bindings per context when multiple independent actions should run from the same event. For example, `webinar.attended` may select one route that changes contact status and another route that enrolls the attended nurture Campaign.
+
 Example:
 
 ```text
 contact_status:prospect
     selected route = Prospect Sales Follow-Up
+
+automation_event:webinar.attended
+    selected routes = Attended Status Transition + Attended Nurture Enrollment
 ```
 
 This intentionally supersedes the older interpretation where matching active FlowRoutes were the selected runtime behavior.
@@ -1582,7 +1589,9 @@ Current models:
     FlowRoutePoint
     ContactFlowRouteProgress
 
-A `ContactStatus` or automation event trigger should have one selected FlowRoute binding per context in the first implementation.
+A ContactStatus trigger should normally have one selected FlowRoute binding per context.
+
+An automation event trigger may have multiple selected FlowRoute bindings per context when multiple independent actions should run from the same event, such as one route changing status and another route enrolling a Campaign.
 
 `FlowRoute.is_active` means the route is available and allowed to run. It does not by itself mean every matching route should execute.
 
@@ -1593,7 +1602,7 @@ Automation-event-triggered FlowRoutes do not require `contact_status_id`.
 Runtime meaning:
 
     ContactStatus may have one selected status-triggered FlowRoute binding per context
-    Automation event keys may have selected event-triggered FlowRoute bindings per context
+    Automation event keys may have one or more selected event-triggered FlowRoute bindings per context
     FlowRoute has many FlowRoutePoints
     FlowRoutePoint belongs to Point
     ContactFlowRouteProgress records active/waiting/completed/cancelled execution state
@@ -1601,6 +1610,8 @@ Runtime meaning:
 FlowRoutes runtime behavior should read DB-owned route/point definitions.
 
 Preset config may create/update DB-owned FlowRoute definitions, but runtime execution should not depend directly on config definitions.
+
+Manual contact-status changes may trigger selected status-based FlowRoutes. The CRM should warn the operator/client before applying a manual status change when a selected FlowRoute will run. This is a UI/awareness guardrail, not a ContactStatus schema distinction. Do not split ContactStatus into manual-only or automation-only categories unless a future workflow proves that policy is needed.
 
 Current point handler capabilities include:
 

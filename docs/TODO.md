@@ -6,6 +6,14 @@ This file is intentionally disposable. Add work here when it is real but not yet
 
 These are repeatable checklists. Run the relevant checklist after a production slice, config update, client setup change, or staging deployment. Do not leave one-off feature work here; put one-off work in the backlog sections below.
 
+### UI Rules
+
+- [ ] Apply the AJAX/preserve-context UI pattern to other CRM row/panel/modal workflows where page reloads would frustrate operators.
+  - Tasks complete/reopen/cancel/archive.
+  - Broadcast recipient/detail actions where applicable.
+  - Campaign enrollment controls where applicable.
+  - FlowRoute selection/testing controls where applicable.
+
 ### After each production code slice
 
 - [ ] Run focused tests for the modules touched by the slice.
@@ -198,17 +206,14 @@ Completed baseline:
 
 ### Runtime-selectable definitions
 
-- [ ] Add DB-backed FlowRoute trigger bindings.
-  - Add `FlowRouteTriggerBinding`.
-  - Add resolver/service for selected route lookup.
-  - Update runtime so `FlowRoute.is_active` means available/allowed, while trigger bindings own selection.
-  - Add CRM selector for status/event route selection.
+Completed FlowRoute baseline:
 
-- [ ] Add FlowRoute owner morph fields.
-  - Add `owner_type`.
-  - Add `owner_id`.
-  - Add `owner_group`.
-  - Do not use Task `responsible_party` for route ownership.
+- DB-backed `FlowRouteTriggerBinding` records select runtime FlowRoute behavior.
+- `FlowRoute.is_active` means available/allowed, while trigger bindings own selection.
+- FlowRoute owner fields exist: `owner_type`, `owner_id`, and `owner_group`.
+- CRM exposes a simple status/event Route Bindings selector.
+- Contact-status triggers are single-selection in the current CRM UI.
+- Automation-event triggers may select multiple routes for the same event.
 
 - [ ] Add Messaging template presets.
   - Add `MessageTemplatePreset`.
@@ -288,6 +293,12 @@ Completed import-batch visibility baseline:
 
 ### FlowRoutes / Routes
 
+- [ ] Add CRM manual status-change confirmation when the selected status has automation attached.
+  - Show the selected Route name.
+  - Summarize major route actions where feasible.
+  - Let the operator cancel or proceed intentionally.
+  - Do not add ContactStatus manual-only or automation-only schema yet.
+
 - [ ] Keep Route builder UX simple.
   - Client should be able to add a Route point and associated tasks quickly.
   - Avoid exposing internal complexity.
@@ -303,6 +314,8 @@ Completed import-batch visibility baseline:
 - [ ] Add public seams for Scheduling, Portal, Forms, Documents, Commerce, or Location only when a concrete consumer/workflow needs them.
 - [ ] Add Commerce/Location contact filter providers only when Broadcasts, Campaigns, Reporting, or another consuming surface actually needs purchase/location targeting.
 - [ ] Keep newly founded universal modules out of Core; use module-owned tables and future public seams instead.
+
+
 
 ### Client self-serve readiness
 

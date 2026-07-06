@@ -214,3 +214,11 @@ Tasks should stay generic.
 Mortgage-specific document collection, LOS milestones, appraisal details, title work, or underwriting state should belong to Mortgage or another vertical/domain module.
 
 Tasks may reference those records through `related` or `responsible` morphs, but Tasks should not own their domain-specific state.
+
+## Future UI/Runtime Guidance
+
+Task row, panel, modal, and tab actions should preserve operator context where practical.
+
+Actions such as complete, reopen, cancel, archive, assign, or create-from-panel should prefer AJAX/fetch-driven updates once the UI supports it, so operators do not lose scroll position, selected tabs, open modals, or the contact/task context after every request.
+
+This is a UX/runtime guidance rule. It does not change Task ownership or lifecycle semantics.

@@ -60,13 +60,18 @@ resolve selected DB-owned options at runtime
 
 Near-term candidates:
 
-- FlowRoute owner morph and trigger bindings.
-- CRM selection for status/event FlowRoutes.
 - Messaging template presets and assignments.
 - Selectable webinar schedule profiles.
 - Campaign channel variants.
+- Task template/default definition UI, if clients/operators need to manage task templates themselves.
+- Guided FlowRoutes route-builder UX later, after selected bindings and safer runtime UI are stable.
 
-These should be implemented as durable client-readiness work, not as smoke-test shortcuts.
+Completed runway pieces:
+
+- FlowRoute owner morph and trigger bindings.
+- CRM selection for status/event FlowRoutes.
+
+The remaining runway pieces should continue to be implemented as durable client-readiness work, not as smoke-test shortcuts.
 
 ## Working roadmap
 
@@ -75,18 +80,17 @@ These should be implemented as durable client-readiness work, not as smoke-test 
 | 1 | Permission invitation accepted automation event decision | 0.25–0.5 session | Decide whether accepted invitations should emit a neutral automation event such as `permission_invitation.accepted`. |
 | 2 | Permission invitation cancellation behavior | 0.5–1 session | Clarify how cancellation/skip/failure should appear for permission-invitation Broadcast bookkeeping and Messaging scheduled messages. |
 | 3 | Config validation guidance | 0.5–1 session | Convert current config-template expectations into practical validation behavior and operator/debug feedback. |
-| 4 | FlowRoute owner morph + trigger bindings | 1–2 sessions | Add route ownership fields, selected trigger bindings, and resolver behavior so active means available and binding means selected. |
-| 5 | CRM FlowRoute selection UI | 1–2 sessions | Simple status/event route dropdowns before a full route builder. |
-| 6 | Messaging template presets + assignments | 2–4 sessions | Sync config-defined message copy into DB-backed presets and allow selected template assignments. |
-| 7 | Selectable webinar schedule profiles | 1–3 sessions | Allow quick swapping of confirmation/reminder/post-event schedules by context. |
-| 8 | Task template/default definition UI | 1–2 sessions, maybe more if polished | Only needed when clients/operators need to manage task templates themselves. Preset sync already creates DB-owned definitions only. |
-| 9 | FlowRoutes route-builder UX | 3–6 sessions | Keep Route builder simple, guided, and client-appropriate. Do not expose raw automation internals as a blank-canvas builder. |
-| 10 | Task-completed FlowRoutes resume behavior | 0.5–1 session | Resume route event-wait points from neutral `task.completed` automation events, not direct Task-specific FlowRoutes listeners. |
-| 11 | Client self-serve readiness audit | 0.5–1 session | Separate controlled beta/operator-assisted readiness from true client self-serve readiness. |
-| 12 | PetServices vertical planning | 0.5–1 session | Plan vertical-owned pet/service concepts without pushing domain fields into Core. |
-| 13 | Music vertical planning | 0.5–1 session | Plan vertical-owned music/fan/product-interest concepts using Commerce, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Scheduling, Portal, and Reporting as needed. |
-| 14 | Feature-specific docs as modules stabilize | Ongoing | Keep module docs current when architecture/operator behavior changes. Do not turn docs into speculative backlog. |
-| 15 | Client config fallback tests | 0.5–1 session | Verify default/client config fallback, numeric-array replacement, optional content/style safety, and copy-tolerant tests. |
+| 4 | Messaging template presets + assignments | 2–4 sessions | Sync config-defined message copy into DB-backed presets and allow selected template assignments. |
+| 5 | Selectable webinar schedule profiles | 1–3 sessions | Allow quick swapping of confirmation/reminder/post-event schedules by context. |
+| 6 | Manual status-change automation warning | 0.5–1 session | Warn operators before a manual status change runs a selected status FlowRoute. This is a UI awareness guardrail, not a ContactStatus schema split. |
+| 7 | Task template/default definition UI | 1–2 sessions, maybe more if polished | Only needed when clients/operators need to manage task templates themselves. Preset sync already creates DB-owned definitions only. |
+| 8 | FlowRoutes route-builder UX | 3–6 sessions | Keep Route builder simple, guided, and client-appropriate. Do not expose raw automation internals as a blank-canvas builder. |
+| 9 | Task-completed FlowRoutes resume behavior | 0.5–1 session | Resume route event-wait points from neutral `task.completed` automation events, not direct Task-specific FlowRoutes listeners. |
+| 10 | Client self-serve readiness audit | 0.5–1 session | Separate controlled beta/operator-assisted readiness from true client self-serve readiness. |
+| 11 | PetServices vertical planning | 0.5–1 session | Plan vertical-owned pet/service concepts without pushing domain fields into Core. |
+| 12 | Music vertical planning | 0.5–1 session | Plan vertical-owned music/fan/product-interest concepts using Commerce, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Scheduling, Portal, and Reporting as needed. |
+| 13 | Feature-specific docs as modules stabilize | Ongoing | Keep module docs current when architecture/operator behavior changes. Do not turn docs into speculative backlog. |
+| 14 | Client config fallback tests | 0.5–1 session | Verify default/client config fallback, numeric-array replacement, optional content/style safety, and copy-tolerant tests. |
 
 ## Recently completed client-readiness items
 
@@ -135,22 +139,46 @@ Completed baseline:
 - Contacts without a usable SMS destination are skipped by Messaging scheduling rather than crashing delivery.
 - Broadcast recipient outcome visibility shows scheduled/skipped/failed counts and recipient skip/failure reasons.
 
+### FlowRoute trigger bindings and CRM selection UI
+
+Completed baseline:
+
+- FlowRoute owner fields exist for operational ownership and grouping.
+- `FlowRoute.is_active` means available/allowed, not selected by itself.
+- Runtime route selection is owned by DB-backed `FlowRouteTriggerBinding` records.
+- Preset sync creates default selected bindings for route definitions that should be active by default.
+- CRM exposes a simple Route Bindings page for selecting status/event route behavior.
+- Contact-status triggers are treated as one selected route per status in the current CRM UI.
+- Automation-event triggers may select multiple routes per event so one producer event can run independent selected routes.
+- Webinar outcome events such as `webinar.attended` and `webinar.missed` can separately change contact status and enroll Campaigns without Webinars importing FlowRoutes or Campaigns.
+- Manual contact-status changes should receive an operator-facing warning when they will run selected status-based automation. That warning is a UI/awareness guardrail, not a new ContactStatus manual/automation-only schema split.
+
+### Webinar dev/staging testing tools
+
+Completed baseline:
+
+- Webinars has a local/staging-only dev controller for testing confirmations, reminders, join-click behavior, attendance outcomes, replay URLs, and post-event follow-ups.
+- CRM exposes a reusable dev-testing modal pattern.
+- Dev modal actions are AJAX-driven so operators/developers do not lose modal state, selected registrations, loaded message options, or activity logs between actions.
+- Dev message sends go through Messaging public actions instead of directly creating ScheduledMessage rows.
+- Simulated join clicks use the normal Webinars join resolver and skip already-queued live reminders when configured.
+- Manual dev sends remain forced sends for payload testing.
+
 ## Recommended next implementation target
 
 The next implementation target should be:
 
 ```text
-FlowRoute owner morph + trigger bindings
+Messaging template presets + assignments
 ```
 
 Reason:
 
-- The staging smoke test proved runtime behavior should be selectable without destructive config swapping.
-- FlowRoutes already own multi-point automation behavior.
-- Trigger bindings give CRM/admin UI a simple way to select which route runs for a status/event/context.
-- This unlocks safe swapping between default, smoke-test, and client-specific route definitions before deeper Campaign/Messaging schedule-profile work.
+- FlowRoute trigger bindings and CRM selection now provide the route-selection side of the runtime-selectable architecture.
+- Messaging still needs DB-backed reusable template presets and assignments so message copy can be synced, selected, and later edited without destructive config swapping.
+- Campaigns, Webinars, FlowRoutes send-message points, and future schedule profiles should resolve selected Messaging templates instead of relying only on static config paths.
 
-The permission invitation accepted automation event decision remains valid backlog, but it is no longer the most direct next step after the smoke-test findings.
+The permission invitation accepted automation event decision remains valid backlog, but Messaging template presets and assignments are now the most direct next step in the runtime-selectable architecture runway.
 
 ## What this roadmap intentionally avoids
 
