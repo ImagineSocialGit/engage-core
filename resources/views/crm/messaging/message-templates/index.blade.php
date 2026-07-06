@@ -379,7 +379,7 @@
                                     <summary class="cursor-pointer text-sm font-extrabold text-slate-950">
                                         Details
                                     </summary>
-                                    <dl class="mt-3 space-y-2 break-words text-xs text-slate-600">
+                                    <dl class="mt-3 space-y-2 wrap-break-word text-xs text-slate-600">
                                         <div>
                                             <dt class="font-bold text-slate-900">Template key</dt>
                                             <dd>{{ $selectedPreset->key }}</dd>
