@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CRM\DashboardController;
 use App\Modules\Broadcasts\Controllers\BroadcastController;
 use App\Modules\Core\Controllers\ContactController;
 use App\Modules\Core\Controllers\ContactImportBatchController;
@@ -14,7 +15,10 @@ use App\Modules\Webinars\Controllers\CRM\WebinarDevController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
-    Route::get('/', [ContactController::class, 'index'])->name('crm.index');
+    Route::get('/', [DashboardController::class, 'index'])->name('crm.index');
+
+    Route::post('/dashboard/acknowledgements', [DashboardController::class, 'acknowledge'])
+        ->name('crm.dashboard.acknowledgements.store');
 
     Route::middleware('module:webinars')->group(function () {
         Route::get('/webinars', [WebinarController::class, 'index'])
@@ -136,6 +140,12 @@ Route::middleware('auth')->group(function () {
         ->prefix('tasks')
         ->name('crm.tasks.')
         ->group(function () {
+            Route::get('/today/print', [DashboardController::class, 'printTasks'])
+                ->name('today.print');
+
+            Route::post('/today/broadcast', [DashboardController::class, 'broadcastTasks'])
+                ->name('today.broadcast');
+
             Route::post('/', [TaskController::class, 'store'])
                 ->name('store');
 

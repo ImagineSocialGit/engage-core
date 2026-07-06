@@ -8,7 +8,9 @@
 │   │   ├── Controllers
 │   │   │   ├── Auth
 │   │   │   │   └── LoginController.php
-│   │   │   └── Controller.php
+│   │   │   ├── Controller.php
+│   │   │   └── CRM
+│   │   │       └── DashboardController.php
 │   │   └── Middleware
 │   │       ├── EnsureModuleEnabled.php
 │   │       └── ForceStagingAccess.php
@@ -39,6 +41,7 @@
 │   │   ├── FailingQueueJob.php
 │   │   └── TestQueueJob.php
 │   ├── Models
+│   │   ├── DashboardAcknowledgement.php
 │   │   └── User.php
 │   ├── Modules
 │   │   ├── Broadcasts
@@ -906,6 +909,7 @@
 │   │   ├── 0001_01_01_000000_create_users_table.php
 │   │   ├── 0001_01_01_000001_create_cache_table.php
 │   │   ├── 0001_01_01_000002_create_jobs_table.php
+│   │   ├── 2026_04_09_000000_create_dashboard_acknowledgements_table.php
 │   │   ├── 2026_04_10_173406_create_team_members_table.php
 │   │   ├── 2026_04_11_174215_create_team_member_notification_preferences_table.php
 │   │   ├── 2026_04_15_195800_create_contact_statuses_table.php
@@ -1125,6 +1129,7 @@
 │       │   │   │   └── webinar-history.blade.php
 │       │   │   └── show.blade.php
 │       │   ├── dashboard.blade.php
+│       │   ├── dashboard-tasks-print.blade.php
 │       │   ├── flow-routes
 │       │   │   └── bindings
 │       │   │       └── index.blade.php
@@ -1189,6 +1194,7 @@
 │   │   │   ├── ContactImportStatusMappingTest.php
 │   │   │   └── ContactLookupControllerTest.php
 │   │   ├── CRM
+│   │   │   ├── DashboardControllerTest.php
 │   │   │   ├── UpdateContactStatusActionTest.php
 │   │   │   └── WebinarSyncTest.php
 │   │   ├── Documents
@@ -1268,4 +1274,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-425 directories, 844 files
+426 directories, 849 files
