@@ -10,6 +10,24 @@ Do not invent token names unless the owning runtime payload/data object is also 
 
 Do not use runtime-only URL tokens in static config unless the source path that supplies the token is documented.
 
+## Message template preset token rules
+
+MessageTemplatePreset records must use the same documented token rules as config-defined templates.
+
+Editing copy in CRM/admin UI does not make new tokens valid.
+
+Token validation should apply to:
+
+```text
+payload.subject
+payload.body
+payload.message
+payload.cta.url
+payload.secondary_link.url
+```
+
+Runtime-only URL tokens must still be supplied by the owning runtime data object or caller payload. A DB-customized template must not guess URLs that the runtime context does not provide.
+
 ## Token ownership model
 
 ### Universal Messaging / Contact tokens

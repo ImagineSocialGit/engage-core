@@ -1,4 +1,3 @@
-
 # Engage Core Config Templates
 
 These files are reference templates for generating default and client config files without drifting shapes.
@@ -11,6 +10,11 @@ Use these rules when converting a client request into config:
 4. Campaign preset steps reference Messaging templates with first-class `channel`, `purpose`, and `scope` keys.
 5. Campaign message templates resolve by `campaign_key + step_number` under:
    `messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}`.
+
+6. Future campaign channel variants must reference Messaging-owned template presets or assignments rather than embedding copy.
+7. Messaging template presets and assignments own selectable/editable reusable message copy.
+8. FlowRoute trigger bindings should select active route behavior; `FlowRoute.is_active` means available/allowed.
+
 6. Do not use `meta.message` for new Campaign preset step message references.
 7. FlowRoute presets own automation/control-flow routing and point definitions.
 8. Webinar post-event config owns provider event orchestration, not message copy.
@@ -25,6 +29,28 @@ Use these rules when converting a client request into config:
 17. Module-specific behavior belongs in the owning module doc. Config templates should not invent unsupported module behavior.
 18. Commerce and Location should be used for client/admin convenience and integrations, not as storefront/GIS replacements.
 
+
+## Runtime-selectable definitions
+
+Future config templates should distinguish between available definitions and active runtime selections.
+
+Config files define available options.
+
+Preset/template sync imports those available options into DB-owned definitions.
+
+CRM/admin UI selects active options through assignments/bindings.
+
+Runtime resolvers read the selected DB-owned assignment/binding.
+
+Examples:
+
+```text
+FlowRouteTriggerBinding selects which FlowRoute runs for a trigger/context.
+MessageTemplatePresetAssignment selects which Messaging template preset is used for a message context.
+Webinar schedule profile assignments select confirmation/reminder/post-event schedules.
+```
+
+Avoid using destructive config swapping as the long-term way to test or change client behavior.
 
 ## Config template files
 

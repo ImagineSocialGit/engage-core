@@ -1,4 +1,3 @@
-
 # Engage Core Config Authoring Guide
 
 This guide is for creating or reviewing Engage Core default configs and client-specific configs.
@@ -17,7 +16,9 @@ Primary references:
 2. Campaign presets own journeys, order, timing, and references to message templates.
 3. Campaign presets do not own or override reusable subject/body/CTA payloads.
 4. Campaign message templates resolve by campaign key and step number, not author-created per-step message names.
-5. FlowRoute presets own automation/control-flow routing and point definitions.
+5. Future campaign step variants must reference Messaging-owned template presets/assignments and must not own reusable payload copy.
+6. Messaging template presets own reusable copy and safe DB-editable message payloads.
+7. FlowRoute presets own automation/control-flow routing and point definitions.
 6. Webinar post-event config owns provider event orchestration, not message copy.
 7. Task presets create DB-owned task template definitions only. They do not create live tasks.
 8. Use `lead/leads` in CRM/client-facing copy unless explicitly told otherwise.
@@ -434,6 +435,52 @@ reminder_10_minute
 reminder_live
 ```
 
+## Messaging template presets
+
+The target architecture stores reusable message definitions in DB-owned Messaging template presets.
+
+Config remains the seed/source for available presets.
+
+CRM/admin UI may later select or edit DB-backed presets.
+
+Use this conceptual split:
+
+```text
+MessageTemplatePreset
+    reusable content/delivery template
+
+MessageTemplatePresetAssignment
+    selected preset for a runtime message context
+```
+
+Examples of preset keys:
+
+```text
+webinar_registration_confirmation.default
+webinar_registration_confirmation.short_test
+webinar_reminder.full_schedule_24h
+webinar_reminder.smoke_fast_5m
+webinar_nurture.attended.default_email_step_1
+webinar_nurture.attended.default_sms_step_1
+```
+
+Assignments should be structured by stable runtime dimensions such as:
+
+```text
+channel
+purpose
+scope
+surface
+message_type
+campaign_key
+campaign_step
+context_type / context_id
+```
+
+Do not replace this with opaque string-path guessing.
+
+Sync should not overwrite DB-customized message copy unless explicitly forced.
+
 ## Campaign Messaging template shape
 
 Campaign message copy still lives in Messaging, but campaign step templates use a nested campaign path:
@@ -475,6 +522,42 @@ So campaign step templates normally omit:
 timing
 schedule
 ```
+
+## Campaign channel variants
+
+Future Campaign presets may define step groups and channel variants.
+
+A step group is a business moment.
+
+A variant is a channel-specific delivery option for that moment.
+
+Variants should include:
+
+```text
+channel
+purpose
+scope
+timing
+message template reference or assignment key
+dependency rules, when needed
+strategy participation
+```
+
+Variants must not include reusable subject/body/message copy.
+
+Initial strategies:
+
+```text
+first_available
+send_all_eligible
+dependency_aware
+```
+
+Use `first_available` when email/SMS are alternatives.
+
+Use `send_all_eligible` when each eligible channel should send.
+
+Use `dependency_aware` when one variant depends on another variant being scheduled or sent.
 
 ## Campaign preset shape
 
@@ -585,6 +668,26 @@ Before accepting a client config, validate:
 Validation should protect authoring mistakes without turning optional style/copy omissions into runtime failures.
 
 
+## Runtime-selectable FlowRoutes
+
+FlowRoute configs should define available route definitions.
+
+Runtime route selection should eventually happen through `FlowRouteTriggerBinding`, not by assuming every active matching route should run.
+
+`FlowRoute.is_active` means available/allowed.
+
+A trigger binding means selected for a trigger/context.
+
+FlowRoute ownership should use:
+
+```text
+owner_type
+owner_id
+owner_group
+```
+
+Do not use Task `responsible_party` for FlowRoute ownership.
+
 ## FlowRoute config shape
 
 FlowRoutes should reference public actions/capabilities through point definitions.
@@ -598,6 +701,25 @@ task.completed -> resume event_wait point, when configured
 ```
 
 Do not make producer modules import FlowRoutes.
+
+## Webinar schedule profiles
+
+Webinar schedule configs may evolve into selectable schedule profiles.
+
+Schedule profiles decide when webinar-owned messages are sent.
+
+Messaging template presets decide what those messages say.
+
+A webinar series or webinar may later choose profiles such as:
+
+```text
+full 10-day schedule
+smoke fast schedule
+last-minute only schedule
+no reminders
+```
+
+Schedule profile configs should reference Messaging template assignments or message types, not embed reusable copy.
 
 ## Post-event config shape
 
@@ -770,11 +892,13 @@ Examples that should remain singular:
 - [ ] Do missing optional content/style keys fall back safely?
 - [ ] Do client config overrides preserve unspecified nested defaults where fallback is expected?
 - [ ] Are Campaign presets free of reusable subject/body/CTA copy?
+- [ ] Do campaign variants reference Messaging-owned template presets/assignments rather than owning copy?
 - [ ] Are Campaign presets free of payload overrides?
 - [ ] Are Campaign preset step message references first-class `channel`, `purpose`, and `scope` keys?
 - [ ] Are new Campaign preset steps free of `meta.message` references?
 - [ ] Are Campaign Messaging templates under `campaigns.{campaign_key}.steps.{step_number}`?
 - [ ] Are normal message configs using the canonical definition shape?
+- [ ] Are DB-backed MessageTemplatePreset and MessageTemplatePresetAssignment rules preserved when applicable?
 - [ ] Are webinar transactional configs using `confirmations`, `opt_ins`, `reminders`, `post_attended`, and `post_missed`?
 - [ ] Are purpose/scope pairs correct?
 - [ ] Are marketing webinar campaigns using `marketing:webinar_nurture`?

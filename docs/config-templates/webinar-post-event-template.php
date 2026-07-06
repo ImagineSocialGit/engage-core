@@ -68,7 +68,7 @@ return [
         'scope' => 'webinar',
         'channels' => [
             'email',
-            // Add 'sms' after SMS config is mirrored and tested.
+            'sms'
         ],
 
         'conditions' => [

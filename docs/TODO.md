@@ -1,4 +1,3 @@
-
 # Engage Core TODO
 
 This file is intentionally disposable. Add work here when it is real but not yet ready for an implementation slice. Delete items as they are completed. Do not treat this as an architectural reference; long-lived decisions belong in `module-boundaries.md` or a feature-specific doc.
@@ -27,8 +26,10 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [ ] Confirm client copy uses documented tokens only.
 - [ ] Confirm runtime-only URLs/tokens are not guessed or hard-coded in static config.
 - [ ] Confirm Campaign presets do not own reusable message payload/copy.
+- [ ] Confirm campaign variants reference Messaging-owned template presets/assignments when variant architecture is used.
 - [ ] Confirm Campaign preset step message references use first-class `channel`, `purpose`, and `scope` keys.
 - [ ] Confirm Messaging templates live under the expected channel/purpose/scope path.
+- [ ] Confirm MessageTemplatePreset sync/assignment rules are preserved when DB-backed templates are involved.
 - [ ] Confirm SMS visibility is controlled by config where the surface exposes channel choices.
 - [ ] Confirm missing optional content/style keys do not break public pages.
 - [ ] Confirm tests are tolerant of client copy changes unless exact copy is the behavior under test.
@@ -194,6 +195,40 @@ Completed baseline:
   - Report warnings for deprecated tokens, review-needed keys, optional omissions, and hidden-but-configured SMS surfaces.
   - Include config path, severity, reason, and suggested fix when possible.
   - Start with Messaging, Permission Invitations, Campaign presets, FlowRoute presets, Task presets, and reference registries.
+
+### Runtime-selectable definitions
+
+- [ ] Add DB-backed FlowRoute trigger bindings.
+  - Add `FlowRouteTriggerBinding`.
+  - Add resolver/service for selected route lookup.
+  - Update runtime so `FlowRoute.is_active` means available/allowed, while trigger bindings own selection.
+  - Add CRM selector for status/event route selection.
+
+- [ ] Add FlowRoute owner morph fields.
+  - Add `owner_type`.
+  - Add `owner_id`.
+  - Add `owner_group`.
+  - Do not use Task `responsible_party` for route ownership.
+
+- [ ] Add Messaging template presets.
+  - Add `MessageTemplatePreset`.
+  - Add `MessageTemplatePresetAssignment`.
+  - Sync config-defined message templates into DB-owned presets.
+  - Let resolvers resolve selected DB presets before config fallback.
+  - Do not overwrite customized DB copy unless explicitly forced.
+
+- [ ] Add selectable webinar schedule profiles.
+  - Confirmation schedules.
+  - Reminder schedules.
+  - Post-event transactional follow-up schedules.
+  - Assign profiles globally, by client, by webinar series, or by webinar when needed.
+
+- [ ] Add Campaign step variant architecture.
+  - Campaign enrollment is the lifecycle.
+  - Campaign step is the business moment.
+  - Step variant is the channel-specific delivery option.
+  - Support `first_available`, `send_all_eligible`, and `dependency_aware`.
+  - Variants reference Messaging templates/assignments and do not own copy.
 
 ### SMS toggleability
 

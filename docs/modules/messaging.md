@@ -1,4 +1,3 @@
-
 # Messaging Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -63,6 +62,112 @@ A definition may omit fields that are inferable from caller context, but adapter
 
 Messaging definitions are reusable templates.
 
+## Message template presets and assignments
+
+Messaging template presets are the DB-owned form of reusable message definitions.
+
+They let config-defined message copy be synced into the database, selected by CRM/admin UI, and edited safely without moving reusable copy into Campaign, Webinar, FlowRoute, or Broadcast internals.
+
+Messaging owns:
+
+```text
+message_template_presets
+message_template_preset_assignments
+```
+
+### MessageTemplatePreset
+
+`MessageTemplatePreset` owns reusable message content and delivery-template fields.
+
+Suggested durable fields:
+
+```text
+id
+key
+name
+description nullable
+channel
+purpose
+scope
+payload_class
+payload json
+tokens json nullable
+status / is_active
+source nullable
+source_version nullable
+is_customized boolean
+last_synced_at nullable
+meta json nullable
+timestamps
+```
+
+Examples:
+
+```text
+webinar_registration_confirmation.default
+webinar_registration_confirmation.short_test
+webinar_reminder.full_schedule_24h
+webinar_nurture.attended.default_email_step_1
+webinar_nurture.attended.default_sms_step_1
+```
+
+### MessageTemplatePresetAssignment
+
+`MessageTemplatePresetAssignment` owns which preset is currently selected for a runtime message context.
+
+Suggested durable fields:
+
+```text
+id
+message_template_preset_id
+channel
+purpose
+scope
+surface nullable
+message_type nullable
+campaign_key nullable
+campaign_step nullable
+context_type nullable
+context_id nullable
+is_active
+starts_at nullable
+ends_at nullable
+meta json nullable
+timestamps
+```
+
+Assignments should support global/default selections and context-specific selections.
+
+Examples:
+
+```text
+campaign + webinar_attended_nurture + step 1 + email
+webinar + reminder_24h + email + WebinarSeries:5
+webinar + post_attended + sms + global default
+```
+
+### Runtime resolution target
+
+Messaging resolvers should eventually resolve message definitions in this order:
+
+```text
+1. Most specific active MessageTemplatePresetAssignment for the runtime context.
+2. Less-specific active assignment for the same channel/purpose/scope/message context.
+3. Synced default MessageTemplatePreset.
+4. Temporary config fallback only during migration.
+```
+
+Long-term runtime should be DB-first. Config should seed/update available presets; it should not remain the only runtime source of reusable message copy.
+
+### Sync/customization rule
+
+Sync may create or update non-customized presets from config.
+
+Sync should not overwrite customized DB copy unless a force option is explicitly used.
+
+Customized fields should remain Messaging-owned and token-validated.
+
+
 ### Messaging channel availability
 
 Messaging owns the canonical channel availability seam.
@@ -98,6 +203,11 @@ Hiding SMS from a surface does not disable SMS runtime safety behavior.
 SMS provider integrations, consent gates, revocations, suppressions, STOP/HELP handling, and send guards remain backend/runtime concerns.
 
 Messaging owns reusable message copy and delivery templates, including subject/body/CTA payloads.
+
+Reusable copy includes campaign nurture messages, webinar confirmation/reminder/post-event messages, waitlist messages, opt-in messages, and internal notification payload templates.
+
+Campaigns, Webinars, and FlowRoutes may reference Messaging templates or assignments, but they should not become the primary home for reusable subject/body/message copy.
+
 
 Campaign-owned message templates live inside Messaging configs under:
 

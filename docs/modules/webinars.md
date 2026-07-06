@@ -28,6 +28,36 @@ Webinars may depend on:
 
 Webinars may use Messaging to send registration confirmations, reminders, opt-ins, and post-webinar transactional follow-ups.
 
+## Selectable webinar schedule profiles
+
+Webinars should eventually support DB-owned selectable schedule profiles for webinar-owned messages.
+
+Schedule profiles decide when webinar lifecycle messages are sent.
+
+Messaging template presets decide what those messages say.
+
+Potential profile categories:
+
+```text
+registration confirmation schedule
+reminder schedule
+post-event transactional follow-up schedule
+```
+
+Possible examples:
+
+```text
+full 10-day schedule
+smoke fast schedule
+last-minute only schedule
+no reminders
+```
+
+Assignments may be global/default or context-specific, such as per webinar series or individual webinar.
+
+A schedule profile should reference dispatch keys, message types, channels, purpose/scope, and Messaging template assignment keys. It should not embed reusable message copy.
+
+
 Post-webinar transactional follow-ups are not campaign nurture.
 
 They may contain replay/recording links and should use:

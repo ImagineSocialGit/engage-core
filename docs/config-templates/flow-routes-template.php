@@ -39,6 +39,9 @@ return [
             'status' => 'active',
             'is_active' => true,
             'source_version' => 1,
+            'owner_type' => null,
+            'owner_id' => null,
+            'owner_group' => 'system',
 
             'trigger' => [
                 'type' => 'automation_event',
@@ -80,6 +83,9 @@ return [
             'status' => 'active',
             'is_active' => true,
             'source_version' => 1,
+            'owner_type' => null,
+            'owner_id' => null,
+            'owner_group' => 'system',
 
             'trigger' => [
                 'type' => 'automation_event',
@@ -121,6 +127,9 @@ return [
             'status' => 'inactive',
             'is_active' => false,
             'source_version' => 1,
+            'owner_type' => null,
+            'owner_id' => null,
+            'owner_group' => 'system',
 
             'trigger' => [
                 'type' => 'manual',

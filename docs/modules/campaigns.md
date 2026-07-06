@@ -1,4 +1,3 @@
-
 # Campaigns Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -59,6 +58,63 @@ Campaigns may schedule messages through Messaging public actions.
 
 Campaign presets define journeys: campaign identity, step order, timing, channel/purpose/scope, and message template references.
 
+## Campaign step groups and channel variants
+
+The target campaign/channel architecture is:
+
+```text
+Campaign enrollment = lifecycle
+Campaign step = business moment
+Campaign step variant = channel-specific delivery option
+```
+
+This allows one campaign enrollment to coordinate email and SMS without creating separate competing campaigns.
+
+Example:
+
+```text
+Campaign: Webinar Attended Nurture
+  Step group 1: Initial follow-up
+    Variant: email
+    Variant: sms
+  Step group 2: Question prompt
+    Variant: email
+    Variant: sms
+```
+
+Campaign step variants should reference Messaging-owned template presets or assignments.
+
+They should not embed reusable subject/body/message copy.
+
+### Channel strategies
+
+Each step group should explicitly define how channel variants interact.
+
+Initial strategies:
+
+```text
+first_available
+send_all_eligible
+dependency_aware
+```
+
+`first_available` means send one eligible variant based on configured channel priority.
+
+Use it when email and SMS are alternatives, such as the same message at the same interval.
+
+`send_all_eligible` means schedule every eligible variant.
+
+Use it when email and SMS are intentionally independent messages.
+
+`dependency_aware` means evaluate variant-level dependency rules before scheduling.
+
+Use it when one channel's message depends on another channel having been scheduled or sent, such as an SMS that references an email.
+
+Do not infer channel behavior from timing alone.
+
+Different unrelated email/SMS messages at the same delay must explicitly choose whether they are independent sends or alternatives.
+
+
 Messaging definitions define message copy and delivery templates.
 
 Campaign presets must not be the primary home for reusable email/SMS copy.
@@ -68,6 +124,11 @@ Campaign presets must not define or override message payloads.
 Campaign message templates are resolved from Messaging by:
 
     channel + purpose + scope + campaign_key + step_number
+
+In the DB-backed target architecture, that context should resolve to a selected `MessageTemplatePresetAssignment`, which then loads the selected `MessageTemplatePreset`.
+
+During migration, config resolution may remain as a fallback.
+
 
 The matching Messaging config path is:
 

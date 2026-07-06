@@ -1,4 +1,3 @@
-
 # Engage Core Module Boundaries
 
 Engage Core is a modular contact engagement platform.
@@ -123,6 +122,72 @@ Provider availability may include dependencies.
 
 SMS code may exist even when SMS UI is hidden. SMS provider integrations, consent handling, STOP/HELP behavior, and runtime gates may remain available while config hides SMS options from Broadcast, Campaign, permission-invitation, or other client/admin builders.
 
+## Runtime-Selectable Definitions
+
+Preset/config sync should create or update available definitions.
+
+Runtime behavior should be selected separately through DB-owned assignments or bindings.
+
+This prevents the system from treating "whatever config was synced last" as the active client behavior.
+
+Preferred shape:
+
+```text
+Config files define available options.
+Sync imports or updates available DB-owned options.
+CRM/admin selections assign the active option for a context.
+Runtime resolvers read the selected DB-owned option.
+```
+
+This pattern applies to:
+
+- FlowRoute trigger selection.
+- Messaging template/message preset selection.
+- Webinar confirmation, reminder, and post-event schedule selection.
+- Campaign/channel strategy selection when campaign step variants are implemented.
+
+Do not use destructive config swapping, temporary smoke-test keys, or broad route activation toggles as the long-term mechanism for choosing client runtime behavior.
+
+### FlowRoute trigger bindings
+
+FlowRoutes should use DB-owned trigger bindings to decide which route is selected for a trigger/context.
+
+`FlowRoute.is_active` means the route is available and allowed to run.
+
+A trigger binding means the route is selected for that trigger/context.
+
+Example:
+
+```text
+contact_status:prospect
+    selected route = Prospect Sales Follow-Up
+```
+
+This intentionally supersedes the older interpretation where matching active FlowRoutes were the selected runtime behavior.
+
+### Messaging template presets
+
+Messaging should store reusable synced/editable message copy as DB-owned template presets.
+
+Message template assignments should choose which preset is active for a channel/purpose/scope/surface/message context.
+
+Campaigns and Webinars should reference Messaging template keys or assignments. They should not embed reusable subject/body/message copy in their own presets.
+
+### FlowRoute ownership
+
+FlowRoutes may have an owner morph for operational ownership:
+
+```text
+owner_type nullable
+owner_id nullable
+owner_group nullable
+```
+
+Use `owner_group` for semantic grouping such as `sales`, `ops`, `compliance`, or `system`.
+
+Do not use `responsible_party` for FlowRoute ownership. `responsible_party` is already a Task-owned concept meaning who or what must perform a manual task action.
+
+
 ## Migration Organization
 
 Shared core and reusable capability-module migrations live in:
@@ -194,6 +259,7 @@ Current ownership:
 | team_member_notification_preferences | InternalNotifications |
 | contact_workflow_profiles | Workflow |
 | flow_routes | FlowRoutes |
+| flow_route_trigger_bindings | FlowRoutes |
 | points | FlowRoutes |
 | flow_route_points | FlowRoutes |
 | contact_flow_route_progress | FlowRoutes |
@@ -204,6 +270,8 @@ Current ownership:
 | scheduled_messages | Messaging |
 | contact_permission_invitations | Messaging |
 | message_suppressions | Messaging |
+| message_template_presets | Messaging |
+| message_template_preset_assignments | Messaging |
 | inbound_messages | InboundMessaging |
 | campaigns | Campaigns |
 | campaign_steps | Campaigns |
@@ -895,6 +963,28 @@ A definition may omit fields that are inferable from caller context, but adapter
 
 Messaging definitions are reusable templates.
 
+Messaging template presets are DB-owned reusable message definitions created from config and optionally edited through CRM/admin UI.
+
+Messaging owns:
+
+```text
+message_template_presets
+message_template_preset_assignments
+```
+
+`MessageTemplatePreset` owns the reusable payload/copy.
+
+`MessageTemplatePresetAssignment` owns which preset is selected for a runtime message context, such as:
+
+```text
+channel + purpose + scope + surface + message_type
+channel + purpose + scope + campaign_key + campaign_step
+channel + purpose + scope + webinar schedule/reminder type
+```
+
+Runtime resolvers may read config during a transition period, but the target architecture is DB-first resolution from selected Messaging template assignments.
+
+
 ### Messaging channel availability
 
 Messaging owns the canonical channel availability seam.
@@ -1492,14 +1582,18 @@ Current models:
     FlowRoutePoint
     ContactFlowRouteProgress
 
-A `ContactStatus` may have at most one active status-triggered FlowRoute.
+A `ContactStatus` or automation event trigger should have one selected FlowRoute binding per context in the first implementation.
+
+`FlowRoute.is_active` means the route is available and allowed to run. It does not by itself mean every matching route should execute.
+
+FlowRoute trigger bindings own runtime selection.
 
 Automation-event-triggered FlowRoutes do not require `contact_status_id`.
 
 Runtime meaning:
 
-    ContactStatus may have one status-triggered FlowRoute
-    Automation event keys may trigger active event-triggered FlowRoutes
+    ContactStatus may have one selected status-triggered FlowRoute binding per context
+    Automation event keys may have selected event-triggered FlowRoute bindings per context
     FlowRoute has many FlowRoutePoints
     FlowRoutePoint belongs to Point
     ContactFlowRouteProgress records active/waiting/completed/cancelled execution state
@@ -1625,6 +1719,25 @@ Campaigns may depend on:
 Campaigns may schedule messages through Messaging public actions.
 
 Campaign presets define journeys: campaign identity, step order, timing, channel/purpose/scope, and message template references.
+
+Campaign step variants are the planned shape for multi-channel campaign coordination.
+
+A Campaign enrollment is the lifecycle.
+
+A Campaign step is the business moment.
+
+A Campaign step variant is a channel-specific delivery option for that moment.
+
+Campaign step variants may use strategies such as:
+
+```text
+first_available
+send_all_eligible
+dependency_aware
+```
+
+Variants must reference Messaging-owned template presets or message template assignments. Variants must not own reusable payload copy.
+
 
 Messaging definitions define message copy and delivery templates.
 
@@ -2043,6 +2156,23 @@ Webinars may depend on:
 - Messaging
 
 Webinars may use Messaging to send registration confirmations, reminders, opt-ins, and post-webinar transactional follow-ups.
+
+Webinar reminder, confirmation, and post-event schedules may become selectable DB-owned schedule profiles.
+
+Webinars should own when webinar lifecycle messages are scheduled.
+
+Messaging should own what those messages say through Messaging template presets and assignments.
+
+A webinar series or webinar may later select schedule profiles for:
+
+```text
+registration confirmations
+reminders
+post-event transactional follow-ups
+```
+
+Those profiles should reference Messaging template assignments instead of embedding reusable copy.
+
 
 Post-webinar transactional follow-ups are not campaign nurture.
 

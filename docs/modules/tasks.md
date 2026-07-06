@@ -169,6 +169,13 @@ Task UI should avoid exposing raw morph internals to users. Admin-facing labels 
     Assigned To = internal tracker/follow-up owner
     Responsible Party = who needs to do the manual thing
 
+Do not reuse Task `responsible_party` for FlowRoute ownership or department grouping.
+
+FlowRoutes should use `owner_type`, `owner_id`, and `owner_group` for route ownership.
+
+When FlowRoutes create Tasks, they should pass Task responsibility fields through `CreateTaskAction` using the Task-owned semantics above.
+
+
 FlowRoutes-created tasks should use:
 
     CreateTaskAction

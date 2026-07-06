@@ -14,6 +14,7 @@ FlowRoutes owns:
 - `FlowRoutePoint`
 - `Point`
 - `ContactFlowRouteProgress`
+- `FlowRouteTriggerBinding`
 - route/point automation behavior
 - active route execution state
 - route cancellation/superseding behavior
@@ -23,6 +24,8 @@ FlowRoutes owns:
 - external event start behavior
 - external event wait/resume behavior
 - FlowRoute preset sync
+- trigger binding selection behavior
+- route owner morph metadata
 
 FlowRoute preset sync assumes required Campaign definitions already exist when a route uses campaign points.
 
@@ -77,6 +80,7 @@ Examples:
 Current tables/models:
 
     flow_routes
+    flow_route_trigger_bindings
     points
     flow_route_points
     contact_flow_route_progress
@@ -84,23 +88,106 @@ Current tables/models:
 Current models:
 
     FlowRoute
+    FlowRouteTriggerBinding
     Point
     FlowRoutePoint
     ContactFlowRouteProgress
 
-A `ContactStatus` may have at most one active status-triggered FlowRoute.
+A `ContactStatus` or automation event trigger should have one selected FlowRoute binding per context in the first implementation.
+
+`FlowRoute.is_active` means the route is available and allowed to run. It does not by itself mean every matching route should execute.
+
+FlowRoute trigger bindings own runtime selection.
 
 Automation-event-triggered FlowRoutes do not require `contact_status_id`.
 
 Runtime meaning:
 
-    ContactStatus may have one status-triggered FlowRoute
-    Automation event keys may trigger active event-triggered FlowRoutes
+    ContactStatus may have one selected status-triggered FlowRoute binding per context
+    Automation event keys may have selected event-triggered FlowRoute bindings per context
     FlowRoute has many FlowRoutePoints
     FlowRoutePoint belongs to Point
     ContactFlowRouteProgress records active/waiting/completed/cancelled execution state
 
 FlowRoutes runtime behavior should read DB-owned route/point definitions.
+
+## Trigger bindings
+
+FlowRoute trigger bindings select which available route runs for a trigger/context.
+
+Initial conceptual table:
+
+```text
+flow_route_trigger_bindings
+- id
+- trigger_type
+- trigger_key
+- flow_route_id
+- context_type nullable
+- context_id nullable
+- is_active
+- meta json nullable
+- timestamps
+```
+
+The first implementation should usually enforce one active selected binding per:
+
+```text
+trigger_type + trigger_key + context_type + context_id
+```
+
+Future implementations may support owner-group-specific or priority/sort-order bindings if a concrete need appears.
+
+Trigger bindings let the CRM expose simple selectors such as:
+
+```text
+Status: Prospect
+Selected route: Prospect Sales Follow-Up
+```
+
+without deleting, overwriting, or toggling off every other available route.
+
+## Route ownership
+
+FlowRoutes may have an owner morph for operational ownership.
+
+Suggested `flow_routes` fields:
+
+```text
+owner_type nullable
+owner_id nullable
+owner_group nullable
+```
+
+`owner_group` is a semantic/admin grouping label such as:
+
+```text
+sales
+ops
+compliance
+system
+```
+
+Do not use `responsible_party` for FlowRoute ownership. `responsible_party` belongs to Tasks and means who or what must perform a manual task action.
+
+## Route points remain the multi-behavior mechanism
+
+A trigger binding should select a route.
+
+The selected route may contain many points.
+
+Example:
+
+```text
+Prospect status changed
+→ selected Prospect route
+    → create task
+    → enroll campaign
+    → notify admin
+```
+
+Those are points in one route, not several unrelated active routes competing for the same trigger.
+
 
 Preset config may create/update DB-owned FlowRoute definitions, but runtime execution should not depend directly on config definitions.
 
