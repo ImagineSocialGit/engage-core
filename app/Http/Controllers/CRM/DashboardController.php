@@ -24,6 +24,7 @@ use Illuminate\View\View;
 class DashboardController extends Controller
 {
     private const TASK_BROADCAST_MESSAGE_TYPE = 'dashboard_task_list';
+    private const UPCOMING_TASKS_ITEM_TYPE = 'upcoming_tasks_week';
 
     public function index(): View
     {
@@ -45,13 +46,14 @@ class DashboardController extends Controller
                 'due_today_tasks' => $taskData['due_today_count'],
                 'lead_replies' => $leadData['recent_count'],
                 'webinar_activity' => $webinarData['recent_count'],
+                'upcoming_week_tasks' => $taskData['upcoming_week_count'],
             ],
             'primaryAction' => $this->primaryAction(
                 tasks: $taskData['items'],
                 leadReplies: $leadData['items'],
-                webinarRegistrations: $webinarData['items'],
             ),
             'taskItems' => $taskData['items']->take(6)->values(),
+            'upcomingTaskSummary' => $taskData['upcoming_summary'],
             'leadItems' => $leadData['items']->take(6)->values(),
             'webinarItems' => $webinarData['items']->take(5)->values(),
             'canBroadcastTaskList' => $this->canBroadcastTaskList(),
@@ -89,7 +91,7 @@ class DashboardController extends Controller
         if ($tasks->isEmpty()) {
             return redirect()
                 ->route('crm.index')
-                ->with('error', 'There are no open tasks to share right now.');
+                ->with('error', 'There are no tasks for today to share right now.');
         }
 
         $teamMembers = TeamMember::query()
@@ -184,9 +186,11 @@ class DashboardController extends Controller
         if (! module_enabled('tasks')) {
             return [
                 'items' => collect(),
+                'upcoming_summary' => null,
                 'attention_count' => 0,
                 'overdue_count' => 0,
                 'due_today_count' => 0,
+                'upcoming_week_count' => 0,
             ];
         }
 
@@ -201,13 +205,25 @@ class DashboardController extends Controller
             ->whereBetween('due_at', [$todayStart, $todayEnd])
             ->count();
 
-        $tasks = $this->taskModels($todayStart, $todayEnd, 10);
+        $todayTasks = $this->taskModels($todayStart, $todayEnd, 10);
+        $upcomingWeekCount = $this->upcomingTaskCount($todayEnd);
+        $upcomingSummaryKey = $this->upcomingTaskSummaryKey();
+
+        if ($upcomingWeekCount > 0 && $this->isDashboardItemAcknowledged(self::UPCOMING_TASKS_ITEM_TYPE, $upcomingSummaryKey)) {
+            $upcomingWeekCount = 0;
+        }
 
         return [
-            'items' => $tasks->map(fn (Task $task): array => $this->taskItem($task, $todayStart, $todayEnd))->values(),
+            'items' => $todayTasks->map(fn (Task $task): array => $this->taskItem($task, $todayStart, $todayEnd))->values(),
+            'upcoming_summary' => $upcomingWeekCount > 0 ? [
+                'type' => self::UPCOMING_TASKS_ITEM_TYPE,
+                'key' => $upcomingSummaryKey,
+                'count' => $upcomingWeekCount,
+            ] : null,
             'attention_count' => $overdueCount + $dueTodayCount,
             'overdue_count' => $overdueCount,
             'due_today_count' => $dueTodayCount,
+            'upcoming_week_count' => $upcomingWeekCount,
         ];
     }
 
@@ -221,11 +237,29 @@ class DashboardController extends Controller
         }
 
         return $this->baseTaskQuery()
+            ->where(function (Builder $query) use ($todayEnd): void {
+                $query
+                    ->whereNull('due_at')
+                    ->orWhere('due_at', '<=', $todayEnd);
+            })
             ->orderByRaw('case when due_at is null then 1 else 0 end')
             ->orderBy('due_at')
             ->latest('id')
             ->limit($limit)
             ->get();
+    }
+
+    private function upcomingTaskCount(Carbon $todayEnd): int
+    {
+        if (! module_enabled('tasks')) {
+            return 0;
+        }
+
+        return $this->baseTaskQuery()
+            ->whereNotNull('due_at')
+            ->where('due_at', '>', $todayEnd)
+            ->where('due_at', '<=', $this->weekEnd())
+            ->count();
     }
 
     private function baseTaskQuery(): Builder
@@ -308,13 +342,11 @@ class DashboardController extends Controller
     /**
      * @param Collection<int, array<string, mixed>> $tasks
      * @param Collection<int, array<string, mixed>> $leadReplies
-     * @param Collection<int, array<string, mixed>> $webinarRegistrations
      * @return array<string, mixed>|null
      */
     private function primaryAction(
         Collection $tasks,
         Collection $leadReplies,
-        Collection $webinarRegistrations,
     ): ?array {
         $overdueTask = $tasks->first(fn (array $item): bool => ($item['priority_reason'] ?? null) === 'overdue');
 
@@ -330,7 +362,7 @@ class DashboardController extends Controller
 
         if ($reply) {
             return [
-                'label' => $reply['href'] ? 'Work next '.config('contacts.labels.singular') : 'Review reply',
+                'label' => $reply['href'] ? 'Review reply' : 'Review message',
                 'href' => $reply['href'],
                 'summary' => 'A recent reply is the clearest '.config('contacts.labels.singular').' to review first.',
             ];
@@ -392,59 +424,6 @@ class DashboardController extends Controller
     }
 
     /**
-     * @return array<string, mixed>
-     */
-    private function leadReplyItem(InboundMessage $message): array
-    {
-        $contact = $message->sender instanceof Contact ? $message->sender : null;
-        $sender = $contact ? $this->contactName($contact) : ($message->from_value ?: 'Unknown sender');
-
-        return [
-            'key' => (string) $message->id,
-            'type' => DashboardAcknowledgement::TYPE_INBOUND_MESSAGE,
-            'sort_at' => $message->received_at ?? $message->created_at,
-            'label' => 'New reply',
-            'tone' => 'blue',
-            'title' => $sender.' replied',
-            'subtitle' => trim(implode(' · ', array_filter([
-                strtoupper($this->enumValue($message->channel)),
-                $this->dateLabel($message->received_at),
-            ]))),
-            'description' => $message->body,
-            'href' => $contact ? route('crm.contacts.show', $contact) : null,
-            'action_label' => $contact ? 'Review reply' : 'Review message',
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function webinarRegistrationItem(WebinarRegistration $registration): array
-    {
-        $contact = $registration->contact;
-        $webinar = $registration->webinar;
-        $contactName = $contact ? $this->contactName($contact) : 'A '.config('contacts.labels.singular');
-
-        return [
-            'key' => (string) $registration->id,
-            'type' => DashboardAcknowledgement::TYPE_WEBINAR_REGISTRATION,
-            'sort_at' => $registration->registered_at ?? $registration->created_at,
-            'label' => 'Webinar signup',
-            'tone' => 'emerald',
-            'title' => $contactName.' registered',
-            'subtitle' => trim(implode(' · ', array_filter([
-                $webinar?->title,
-                $this->dateLabel($registration->registered_at),
-            ]))),
-            'description' => $webinar?->starts_at
-                ? 'Upcoming: '.$this->dateLabel($webinar->starts_at)
-                : 'A new webinar registration came in.',
-            'href' => $contact ? route('crm.contacts.show', $contact) : null,
-            'action_label' => $contact ? 'Open '.config('contacts.labels.singular') : 'Review webinar',
-        ];
-    }
-
-    /**
      * @param Collection<int, Task> $tasks
      * @return array<string, mixed>
      */
@@ -464,7 +443,7 @@ class DashboardController extends Controller
         return [
             'subject' => 'Today’s task list: '.$count.' open '.Str::plural('task', $count),
             'headline' => 'Today’s task list',
-            'preheader' => $count.' open '.Str::plural('task', $count).' need attention or are next in line.',
+            'preheader' => $count.' open '.Str::plural('task', $count).' need attention today.',
             'body' => [
                 'Here is the current task list from the CRM dashboard.',
                 ...$lines,
@@ -527,6 +506,29 @@ class DashboardController extends Controller
             && module_enabled('internal_notifications');
     }
 
+
+    private function isDashboardItemAcknowledged(string $itemType, string $itemKey): bool
+    {
+        $userId = auth()->id();
+
+        if (! $userId) {
+            return false;
+        }
+
+        return DashboardAcknowledgement::query()
+            ->active()
+            ->where('user_id', $userId)
+            ->where('surface', DashboardAcknowledgement::SURFACE_CRM_DASHBOARD)
+            ->where('item_type', DashboardAcknowledgement::normalizeItemType($itemType))
+            ->where('item_key', DashboardAcknowledgement::normalizeItemKey($itemKey))
+            ->exists();
+    }
+
+    private function upcomingTaskSummaryKey(): string
+    {
+        return now(config('client.timezone', config('app.timezone', 'UTC')))->toDateString();
+    }
+
     /**
      * @return array<int, string>
      */
@@ -578,6 +580,14 @@ class DashboardController extends Controller
     private function todayEnd(): Carbon
     {
         return now(config('client.timezone', config('app.timezone', 'UTC')))
+            ->endOfDay()
+            ->utc();
+    }
+
+    private function weekEnd(): Carbon
+    {
+        return now(config('client.timezone', config('app.timezone', 'UTC')))
+            ->endOfWeek()
             ->endOfDay()
             ->utc();
     }

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Messaging\Actions;
 
+use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use Illuminate\Support\Str;
@@ -10,7 +11,7 @@ use InvalidArgumentException;
 class SyncMessageTemplatePresetsAction
 {
     /**
-     * @return array{created: int, updated: int, customized_skipped: int, assignments_created: int, assignments_updated: int, assignments_preserved: int}
+     * @return array{created: int, updated: int, customized_skipped: int, assignments_created: int, assignments_updated: int, assignments_preserved: int, catalog_entries_created: int, catalog_entries_updated: int}
      */
     public function handle(bool $force = false): array
     {
@@ -21,6 +22,8 @@ class SyncMessageTemplatePresetsAction
             'assignments_created' => 0,
             'assignments_updated' => 0,
             'assignments_preserved' => 0,
+            'catalog_entries_created' => 0,
+            'catalog_entries_updated' => 0,
         ];
 
         foreach ($this->definitionsFromConfig() as $definition) {
@@ -59,11 +62,38 @@ class SyncMessageTemplatePresetsAction
             } else {
                 $result['assignments_preserved']++;
             }
+
+            $catalogEntry = $this->syncCatalogEntry($preset, $definition['catalog_entry']);
+            $result[$catalogEntry->wasRecentlyCreated ? 'catalog_entries_created' : 'catalog_entries_updated']++;
         }
 
         return $result;
     }
 
+    /**
+     * @param array<string, mixed> $catalogEntryAttributes
+     */
+    private function syncCatalogEntry(
+        MessageTemplatePreset $preset,
+        array $catalogEntryAttributes,
+    ): MessageTemplateCatalogEntry {
+        $attributes = array_replace($catalogEntryAttributes, [
+            'message_template_preset_id' => $preset->getKey(),
+        ]);
+
+        $catalogEntry = MessageTemplateCatalogEntry::query()
+            ->where('message_template_preset_id', $preset->getKey())
+            ->where('item_key', $attributes['item_key'])
+            ->first();
+
+        if (! $catalogEntry instanceof MessageTemplateCatalogEntry) {
+            return MessageTemplateCatalogEntry::query()->create($attributes);
+        }
+
+        $catalogEntry->forceFill($attributes)->save();
+
+        return $catalogEntry;
+    }
 
     /**
      * @param array<string, mixed> $assignment
@@ -89,7 +119,7 @@ class SyncMessageTemplatePresetsAction
     }
 
     /**
-     * @return iterable<int, array{key: string, preset: array<string, mixed>, assignment: array<string, mixed>}>
+     * @return iterable<int, array{key: string, preset: array<string, mixed>, assignment: array<string, mixed>, catalog_entry: array<string, mixed>}>
      */
     private function definitionsFromConfig(): iterable
     {
@@ -119,7 +149,7 @@ class SyncMessageTemplatePresetsAction
 
     /**
      * @param array<string, mixed> $scopeConfig
-     * @return iterable<int, array{key: string, preset: array<string, mixed>, assignment: array<string, mixed>}>
+     * @return iterable<int, array{key: string, preset: array<string, mixed>, assignment: array<string, mixed>, catalog_entry: array<string, mixed>}>
      */
     private function definitionsFromScope(
         string $channel,
@@ -149,33 +179,40 @@ class SyncMessageTemplatePresetsAction
                 continue;
             }
 
-            $definitionList = array_is_list($definition) ? $definition : [$definition];
+            $isList = array_is_list($definition);
+            $definitionList = $isList ? $definition : [$definition];
+            $needsIndexedMessageType = $isList && count($definitionList) > 1;
 
             foreach ($definitionList as $index => $nestedDefinition) {
                 if (! is_array($nestedDefinition) || ! ($nestedDefinition['enabled'] ?? true)) {
                     continue;
                 }
 
-                $configPath = "{$scopeConfigPath}.{$messageType}".(array_is_list($definition) ? ".{$index}" : '');
+                $configPath = "{$scopeConfigPath}.{$messageType}".($isList ? ".{$index}" : '');
+                $runtimeMessageType = $needsIndexedMessageType
+                    ? $this->indexedMessageType($messageType, $nestedDefinition, (int) $index)
+                    : $messageType;
 
                 yield $this->definitionPayload(
                     definition: $nestedDefinition,
                     channel: $channel,
                     purpose: $purpose,
                     scope: $scope,
-                    messageType: $messageType,
+                    messageType: $runtimeMessageType,
+                    sourceMessageType: $messageType,
                     configPath: $configPath,
                     campaignKey: null,
                     campaignStep: null,
-                    surface: null,
+                    surface: $this->surfaceForScope($scope),
                     campaignTemplate: false,
+                    listIndex: $isList ? (int) $index : null,
                 );
             }
         }
     }
 
     /**
-     * @return iterable<int, array{key: string, preset: array<string, mixed>, assignment: array<string, mixed>}>
+     * @return iterable<int, array{key: string, preset: array<string, mixed>, assignment: array<string, mixed>, catalog_entry: array<string, mixed>}>
      */
     private function campaignDefinitionsFromConfig(
         string $channel,
@@ -193,6 +230,7 @@ class SyncMessageTemplatePresetsAction
                 continue;
             }
 
+            $normalizedCampaignKey = $this->normalizeSegment($campaignKey);
             $steps = $campaign['steps'] ?? null;
 
             if (! is_array($steps)) {
@@ -208,9 +246,8 @@ class SyncMessageTemplatePresetsAction
                     continue;
                 }
 
-                $campaignKey = $this->normalizeSegment($campaignKey);
-                $messageType = "{$campaignKey}_step_{$stepNumber}";
-                $configPath = "{$baseConfigPath}.{$campaignKey}.steps.{$stepNumber}";
+                $messageType = "{$normalizedCampaignKey}_step_{$stepNumber}";
+                $configPath = "{$baseConfigPath}.{$normalizedCampaignKey}.steps.{$stepNumber}";
 
                 yield $this->definitionPayload(
                     definition: $stepDefinition,
@@ -218,11 +255,13 @@ class SyncMessageTemplatePresetsAction
                     purpose: $purpose,
                     scope: $scope,
                     messageType: $messageType,
+                    sourceMessageType: 'campaign_step',
                     configPath: $configPath,
-                    campaignKey: $campaignKey,
+                    campaignKey: $normalizedCampaignKey,
                     campaignStep: $stepNumber,
                     surface: 'campaigns',
                     campaignTemplate: true,
+                    listIndex: null,
                 );
             }
         }
@@ -230,7 +269,7 @@ class SyncMessageTemplatePresetsAction
 
     /**
      * @param array<string, mixed> $definition
-     * @return array{key: string, preset: array<string, mixed>, assignment: array<string, mixed>}
+     * @return array{key: string, preset: array<string, mixed>, assignment: array<string, mixed>, catalog_entry: array<string, mixed>}
      */
     private function definitionPayload(
         array $definition,
@@ -238,13 +277,15 @@ class SyncMessageTemplatePresetsAction
         string $purpose,
         string $scope,
         string $messageType,
+        string $sourceMessageType,
         string $configPath,
         ?string $campaignKey,
         ?int $campaignStep,
         ?string $surface,
         bool $campaignTemplate,
+        ?int $listIndex,
     ): array {
-        $messageType = Str::singular($this->normalizeSegment($messageType));
+        $messageType = $this->normalizeSegment($messageType);
         $dispatchKeys = $this->normalizeDispatchKeys($definition);
         $payload = $definition['payload'] ?? null;
 
@@ -284,6 +325,21 @@ class SyncMessageTemplatePresetsAction
 
         $key = $this->presetKey($configPath);
         $now = now();
+        $catalog = $this->catalogEntryPayload(
+            definition: $definition,
+            channel: $channel,
+            purpose: $purpose,
+            scope: $scope,
+            messageType: $messageType,
+            sourceMessageType: $sourceMessageType,
+            configPath: $configPath,
+            campaignKey: $campaignKey,
+            campaignStep: $campaignStep,
+            surface: $surface,
+            campaignTemplate: $campaignTemplate,
+            listIndex: $listIndex,
+        );
+
         $meta = array_replace_recursive(
             is_array($definition['meta'] ?? null) ? $definition['meta'] : [],
             [
@@ -291,6 +347,13 @@ class SyncMessageTemplatePresetsAction
                     'config_path' => $configPath,
                     'campaign_key' => $campaignKey,
                     'campaign_step' => $campaignStep,
+                ],
+                'catalog' => [
+                    'group_key' => $catalog['group_key'],
+                    'group_label' => $catalog['group_label'],
+                    'item_key' => $catalog['item_key'],
+                    'item_label' => $catalog['item_label'],
+                    'usage_type' => $catalog['usage_type'],
                 ],
             ],
         );
@@ -307,7 +370,7 @@ class SyncMessageTemplatePresetsAction
             'key' => $key,
             'preset' => [
                 'key' => $key,
-                'name' => $this->nameFromKey($key),
+                'name' => $catalog['display_name'],
                 'description' => is_string($definition['description'] ?? null) ? trim($definition['description']) : null,
                 'channel' => $channel,
                 'purpose' => $purpose,
@@ -346,9 +409,111 @@ class SyncMessageTemplatePresetsAction
                 'meta' => [
                     'source' => 'config_sync',
                     'source_config_path' => $configPath,
+                    'catalog' => [
+                        'group_key' => $catalog['group_key'],
+                        'group_label' => $catalog['group_label'],
+                        'item_key' => $catalog['item_key'],
+                        'item_label' => $catalog['item_label'],
+                    ],
+                ],
+            ],
+            'catalog_entry' => $catalog['attributes'],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     * @return array{display_name: string, group_key: string, group_label: string, item_key: string, item_label: string, usage_type: string, attributes: array<string, mixed>}
+     */
+    private function catalogEntryPayload(
+        array $definition,
+        string $channel,
+        string $purpose,
+        string $scope,
+        string $messageType,
+        string $sourceMessageType,
+        string $configPath,
+        ?string $campaignKey,
+        ?int $campaignStep,
+        ?string $surface,
+        bool $campaignTemplate,
+        ?int $listIndex,
+    ): array {
+        if ($campaignTemplate && $campaignKey !== null && $campaignStep !== null) {
+            $moduleKey = 'campaigns';
+            $moduleLabel = 'Campaigns';
+            $groupKey = "campaign:{$campaignKey}";
+            $groupLabel = $this->headline($campaignKey);
+            $itemLabel = 'Step '.$campaignStep.' '.$this->channelLabel($channel);
+            $itemOrder = $campaignStep;
+            $usageType = 'campaign_step';
+        } else {
+            $moduleKey = $this->moduleKeyForScope($scope);
+            $moduleLabel = $this->moduleLabel($moduleKey);
+            $normalizedSourceType = $this->normalizeSegment(Str::singular($sourceMessageType));
+            $groupKey = implode(':', array_filter([$moduleKey, $purpose, $scope, $normalizedSourceType]));
+            $groupLabel = $this->groupLabelForMessageType($scope, $sourceMessageType);
+            $itemLabel = $this->itemLabelForMessage(
+                channel: $channel,
+                sourceMessageType: $sourceMessageType,
+                messageType: $messageType,
+                definition: $definition,
+                listIndex: $listIndex,
+            );
+            $itemOrder = $this->itemOrderForMessage($definition, $listIndex);
+            $usageType = $this->usageTypeForMessage($scope, $sourceMessageType);
+        }
+
+        $itemKey = $this->presetKey($configPath);
+        $displayName = $groupLabel.' — '.$itemLabel;
+
+        return [
+            'display_name' => $displayName,
+            'group_key' => $groupKey,
+            'group_label' => $groupLabel,
+            'item_key' => $itemKey,
+            'item_label' => $itemLabel,
+            'usage_type' => $usageType,
+            'attributes' => [
+                'message_template_preset_id' => null,
+                'channel' => $channel,
+                'purpose' => $purpose,
+                'scope' => $scope,
+                'module_key' => $moduleKey,
+                'module_label' => $moduleLabel,
+                'surface' => $surface,
+                'group_key' => $groupKey,
+                'group_label' => $groupLabel,
+                'item_key' => $itemKey,
+                'item_label' => $itemLabel,
+                'item_order' => $itemOrder,
+                'usage_type' => $usageType,
+                'source' => 'config',
+                'source_config_path' => $configPath,
+                'context_type' => null,
+                'context_id' => null,
+                'is_active' => true,
+                'meta' => [
+                    'message_type' => $messageType,
+                    'source_message_type' => $sourceMessageType,
+                    'campaign_key' => $campaignKey,
+                    'campaign_step' => $campaignStep,
                 ],
             ],
         ];
+    }
+
+    private function indexedMessageType(string $messageType, array $definition, int $index): string
+    {
+        $base = $this->normalizeSegment(Str::singular($messageType));
+
+        if ($base === 'reminder') {
+            $suffix = $this->scheduleSuffix($definition);
+
+            return $suffix !== null ? "reminder_{$suffix}" : "reminder_".($index + 1);
+        }
+
+        return $base.'_'.($index + 1);
     }
 
     /**
@@ -414,14 +579,152 @@ class SyncMessageTemplatePresetsAction
         return array_values(array_unique($tokens));
     }
 
+    private function surfaceForScope(string $scope): ?string
+    {
+        return match ($scope) {
+            'webinar' => 'webinar_registrations',
+            'webinar_waitlist' => 'webinar_waitlists',
+            default => null,
+        };
+    }
+
+    private function moduleKeyForScope(string $scope): string
+    {
+        return str_starts_with($scope, 'webinar') ? 'webinars' : 'messaging';
+    }
+
+    private function moduleLabel(string $moduleKey): string
+    {
+        return match ($moduleKey) {
+            'campaigns' => 'Campaigns',
+            'webinars' => 'Webinars',
+            default => 'Messaging',
+        };
+    }
+
+    private function groupLabelForMessageType(string $scope, string $sourceMessageType): string
+    {
+        $sourceMessageType = $this->normalizeSegment($sourceMessageType);
+
+        return match (true) {
+            $scope === 'webinar' && in_array($sourceMessageType, ['confirmation', 'confirmations'], true) => 'Webinar Confirmations',
+            $scope === 'webinar' && in_array($sourceMessageType, ['opt_in', 'opt_ins'], true) => 'Webinar Opt-Ins',
+            $scope === 'webinar' && in_array($sourceMessageType, ['reminder', 'reminders'], true) => 'Webinar Reminders',
+            $scope === 'webinar' && $sourceMessageType === 'post_attended' => 'Post-Webinar Follow-Up',
+            $scope === 'webinar' && $sourceMessageType === 'post_missed' => 'Post-Webinar Follow-Up',
+            $scope === 'webinar_waitlist' && in_array($sourceMessageType, ['alert', 'alerts'], true) => 'Webinar Waitlist Alerts',
+            $scope === 'webinar_waitlist' && in_array($sourceMessageType, ['opt_in', 'opt_ins'], true) => 'Webinar Waitlist Opt-Ins',
+            default => $this->headline($scope).' — '.$this->headline($sourceMessageType),
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     */
+    private function itemLabelForMessage(
+        string $channel,
+        string $sourceMessageType,
+        string $messageType,
+        array $definition,
+        ?int $listIndex,
+    ): string {
+        if (str_starts_with($messageType, 'reminder_')) {
+            $reminderLabel = $this->reminderLabel($definition);
+
+            return $reminderLabel.' '.$this->channelLabel($channel);
+        }
+
+        $base = match ($this->normalizeSegment($sourceMessageType)) {
+            'confirmation', 'confirmations' => 'Confirmation',
+            'opt_in', 'opt_ins' => 'Opt-In',
+            'alert', 'alerts' => 'Alert',
+            'post_attended' => 'Attended Follow-Up',
+            'post_missed' => 'Missed Follow-Up',
+            default => $this->headline(Str::singular($sourceMessageType)),
+        };
+
+        if ($listIndex !== null && $listIndex > 0) {
+            $base .= ' '.($listIndex + 1);
+        }
+
+        return $base.' '.$this->channelLabel($channel);
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     */
+    private function itemOrderForMessage(array $definition, ?int $listIndex): int
+    {
+        $schedule = is_array($definition['schedule'] ?? null) ? $definition['schedule'] : null;
+
+        if ($schedule !== null && is_int($schedule['minutes'] ?? null)) {
+            return (int) $schedule['minutes'];
+        }
+
+        return $listIndex ?? 0;
+    }
+
+    private function usageTypeForMessage(string $scope, string $sourceMessageType): string
+    {
+        return $this->normalizeSegment($scope.'_'.Str::singular($sourceMessageType));
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     */
+    private function reminderLabel(array $definition): string
+    {
+        $schedule = is_array($definition['schedule'] ?? null) ? $definition['schedule'] : [];
+        $minutes = is_int($schedule['minutes'] ?? null) ? (int) $schedule['minutes'] : null;
+
+        return match ($minutes) {
+            -14400 => '10-Day Reminder',
+            -10080 => '1-Week Reminder',
+            -1440 => '1-Day Reminder',
+            -30 => '30-Minute Reminder',
+            -10 => '10-Minute Reminder',
+            0, 5 => 'Live Reminder',
+            default => $minutes === null
+                ? 'Reminder'
+                : abs($minutes).'-Minute '.($minutes < 0 ? 'Reminder' : 'Live Follow-Up'),
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     */
+    private function scheduleSuffix(array $definition): ?string
+    {
+        $schedule = is_array($definition['schedule'] ?? null) ? $definition['schedule'] : [];
+        $minutes = is_int($schedule['minutes'] ?? null) ? (int) $schedule['minutes'] : null;
+
+        return match ($minutes) {
+            -14400 => '10_day',
+            -10080 => '1_week',
+            -1440 => '1_day',
+            -30 => '30_minute',
+            -10 => '10_minute',
+            0, 5 => 'live',
+            default => $minutes === null ? null : str_replace('-', 'minus_', (string) $minutes).'_minute',
+        };
+    }
+
     private function presetKey(string $configPath): string
     {
         return str_replace('-', '_', strtolower(preg_replace('/^messaging\./', '', $configPath) ?? $configPath));
     }
 
-    private function nameFromKey(string $key): string
+    private function headline(string $value): string
     {
-        return Str::headline(str_replace(['.', '_'], ' ', $key));
+        return Str::headline(str_replace(['.', '_', '-'], ' ', $value));
+    }
+
+    private function channelLabel(string $channel): string
+    {
+        return match ($channel) {
+            'sms' => 'SMS',
+            default => Str::headline($channel),
+        };
     }
 
     private function normalizeSegment(string $value): string

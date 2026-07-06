@@ -20,7 +20,7 @@
                         Message Templates
                     </h2>
                     <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                        Choose a template to review where it is used, preview the copy, and safely edit message text without changing campaign, webinar, or route setup.
+                        Review reusable message copy in one place. Campaigns, webinars, and automatic follow-ups decide when messages send; this page only edits what those messages say.
                     </p>
                 </div>
 
@@ -45,20 +45,37 @@
                 <section class="rounded-3xl border border-slate-200 bg-white shadow-sm">
                     <div class="border-b border-slate-200 px-5 py-4">
                         <h2 class="text-base font-extrabold tracking-tight text-slate-950">
-                            Templates
+                            Template library
                         </h2>
                         <p class="mt-1 text-sm text-slate-500">
-                            Select the message copy you want to review or edit.
+                            Templates are grouped by channel, purpose, and the area where the copy appears.
                         </p>
                     </div>
 
                     <div class="max-h-[42rem] divide-y divide-slate-100 overflow-y-auto">
                         @foreach($groupedPresets as $group => $groupPresets)
-                            <div class="bg-slate-50 px-5 py-2 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
-                                {{ str_replace(':', ' · ', $group) }}
+                            @php
+                                $groupParts = explode(':', $group);
+                                $groupChannel = $groupParts[0] ?? '';
+                                $groupPurpose = $groupParts[1] ?? '';
+                                $groupArea = $groupParts[2] ?? '';
+                                $groupLabel = $groupParts[3] ?? ($groupParts[2] ?? 'Messages');
+                            @endphp
+
+                            <div class="bg-slate-50 px-5 py-3">
+                                <div class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                                    {{ $groupChannel }} · {{ str_replace('_', ' ', $groupPurpose) }} · {{ $groupArea }}
+                                </div>
+                                <div class="mt-1 text-sm font-extrabold text-slate-900">
+                                    {{ $groupLabel }}
+                                </div>
                             </div>
 
                             @foreach($groupPresets as $preset)
+                                @php
+                                    $catalogEntry = $preset->catalogEntries->first();
+                                    $itemLabel = $catalogEntry?->item_label ?: ($preset->message_type ? str_replace('_', ' ', $preset->message_type) : 'Message');
+                                @endphp
                                 <a
                                     href="{{ route('crm.messaging.message-templates.index', ['preset' => $preset->getKey()]) }}"
                                     class="block px-5 py-4 transition hover:bg-slate-50 {{ $selectedPreset && $selectedPreset->is($preset) ? 'bg-indigo-50/70' : '' }}"
@@ -66,10 +83,10 @@
                                     <div class="flex items-start justify-between gap-4">
                                         <div>
                                             <div class="font-bold text-slate-950">
-                                                {{ $preset->name }}
+                                                {{ $itemLabel }}
                                             </div>
                                             <div class="mt-1 text-sm text-slate-500">
-                                                {{ $preset->message_type ? str_replace('_', ' ', $preset->message_type) : 'General message' }}
+                                                {{ $preset->name }}
                                             </div>
                                         </div>
 
@@ -97,6 +114,9 @@
 
                 <section class="rounded-3xl border border-slate-200 bg-white shadow-sm">
                     @if($selectedPreset)
+                        @php
+                            $selectedCatalogEntry = $selectedPreset->catalogEntries->first();
+                        @endphp
                         <div class="border-b border-slate-200 px-6 py-5">
                             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                 <div>
@@ -119,7 +139,7 @@
                                         {{ str_replace('_', ' ', $selectedPreset->purpose) }}
                                     </span>
                                     <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-                                        {{ str_replace('_', ' ', $selectedPreset->scope) }}
+                                        {{ $selectedCatalogEntry?->module_label ?: str_replace('_', ' ', $selectedPreset->scope) }}
                                     </span>
                                 </div>
                             </div>
@@ -136,7 +156,7 @@
 
                                 <div>
                                     <label for="name" class="mb-2 block text-sm font-bold text-slate-900">
-                                        Template name
+                                        Template title
                                     </label>
                                     <input
                                         id="name"
@@ -268,89 +288,55 @@
                             <aside class="space-y-4">
                                 <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                     <h3 class="text-sm font-extrabold text-slate-950">
-                                        Used by
+                                        Template info
                                     </h3>
                                     <dl class="mt-3 space-y-2 text-sm">
                                         <div>
+                                            <dt class="text-slate-500">Group</dt>
+                                            <dd class="font-semibold text-slate-900">{{ $selectedCatalogEntry?->group_label ?: str_replace('_', ' ', $selectedPreset->scope) }}</dd>
+                                        </div>
+                                        <div>
                                             <dt class="text-slate-500">Message</dt>
-                                            <dd class="font-semibold text-slate-900">{{ str_replace('_', ' ', $selectedPreset->message_type ?? 'General') }}</dd>
+                                            <dd class="font-semibold text-slate-900">{{ $selectedCatalogEntry?->item_label ?: str_replace('_', ' ', $selectedPreset->message_type ?? 'General') }}</dd>
                                         </div>
                                         <div>
                                             <dt class="text-slate-500">Selected contexts</dt>
                                             <dd class="font-semibold text-slate-900">{{ $selectedPreset->active_assignments_count }}</dd>
-                                        </div>
-                                        <div>
-                                            <dt class="text-slate-500">Timing</dt>
-                                            <dd class="font-semibold text-slate-900">{{ str_replace('_', ' ', $selectedPreset->timing) }}</dd>
                                         </div>
                                     </dl>
                                 </div>
 
                                 <div class="rounded-2xl border border-slate-200 bg-white p-4">
                                     <h3 class="text-sm font-extrabold text-slate-950">
-                                        Selected for workflows
+                                        Used by
                                     </h3>
                                     <p class="mt-1 text-sm text-slate-500">
-                                        Choose which compatible template this workflow should use. Timing, triggers, and skip rules stay in the workflow or campaign setup.
+                                        This shows where the template is currently selected. Change template selection from the campaign, webinar, or automatic follow-up setup screen.
                                     </p>
 
-                                    @if($selectedPreset->assignments->isEmpty())
-                                        <p class="mt-3 text-sm text-slate-500">
-                                            This template is not currently selected for any workflow.
-                                        </p>
+                                    @if($usageSummaries->isEmpty())
+                                        <div class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                                            This template is available, but nothing is currently using it.
+                                        </div>
                                     @else
-                                        <div class="mt-4 space-y-4">
-                                            @foreach($selectedPreset->assignments as $assignment)
-                                                @php
-                                                    $options = $assignmentOptions->get($assignment->getKey(), collect());
-                                                    $contextLabel = $assignment->campaign_key
-                                                        ? 'Campaign step '.($assignment->campaign_step ?? '?')
-                                                        : 'Message workflow';
-                                                @endphp
-
-                                                <form
-                                                    method="POST"
-                                                    action="{{ route('crm.messaging.message-templates.assignments.update', $assignment) }}"
-                                                    class="rounded-2xl border border-slate-200 bg-slate-50 p-3"
-                                                >
-                                                    @csrf
-                                                    @method('PATCH')
-
-                                                    <div class="text-sm font-bold text-slate-950">
-                                                        {{ $contextLabel }}
+                                        <div class="mt-4 space-y-3">
+                                            @foreach($usageSummaries as $usage)
+                                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                                                    <div class="text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                                                        {{ $usage['module_label'] }}
                                                     </div>
-                                                    <div class="mt-1 text-xs text-slate-500">
-                                                        {{ str_replace('_', ' ', $assignment->surface ?: $assignment->scope) }}
-                                                        @if($assignment->message_type)
-                                                            · {{ str_replace('_', ' ', $assignment->message_type) }}
-                                                        @endif
+                                                    <div class="mt-1 text-sm font-bold text-slate-950">
+                                                        {{ $usage['context_label'] }}
                                                     </div>
-
-                                                    <label for="assignment_{{ $assignment->getKey() }}" class="mt-3 block text-xs font-extrabold uppercase tracking-wide text-slate-500">
-                                                        Active template
-                                                    </label>
-                                                    <select
-                                                        id="assignment_{{ $assignment->getKey() }}"
-                                                        name="message_template_preset_id"
-                                                        class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                                    >
-                                                        @foreach($options as $option)
-                                                            <option value="{{ $option->getKey() }}" @selected((int) $assignment->message_template_preset_id === (int) $option->getKey())>
-                                                                {{ $option->name }}{{ $option->is_customized ? ' — customized' : '' }}
-                                                            </option>
-                                                        @endforeach
-                                                    </select>
-                                                    @error('message_template_preset_id')
-                                                        <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
-                                                    @enderror
-
-                                                    <button
-                                                        type="submit"
-                                                        class="mt-3 inline-flex min-h-10 items-center justify-center rounded-full bg-white px-4 text-xs font-extrabold text-slate-950 ring-1 ring-slate-300 transition hover:bg-slate-100"
-                                                    >
-                                                        Use selected template
-                                                    </button>
-                                                </form>
+                                                    <div class="mt-1 text-sm text-slate-600">
+                                                        {{ $usage['item_label'] }}
+                                                    </div>
+                                                    @if($usage['detail'])
+                                                        <div class="mt-1 text-xs text-slate-500">
+                                                            {{ $usage['detail'] }}
+                                                        </div>
+                                                    @endif
+                                                </div>
                                             @endforeach
                                         </div>
                                     @endif

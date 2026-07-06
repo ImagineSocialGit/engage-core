@@ -4,6 +4,7 @@ namespace Tests\Feature\Messaging;
 
 use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
+use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Payloads\EmailPayload;
@@ -15,7 +16,7 @@ class MessageTemplatePresetControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_index_renders_message_templates_with_business_language(): void
+    public function test_index_renders_message_templates_with_catalog_grouping_and_business_language(): void
     {
         config()->set('modules.enabled', [
             'messaging',
@@ -23,8 +24,8 @@ class MessageTemplatePresetControllerTest extends TestCase
 
         $user = User::factory()->create();
 
-        MessageTemplatePreset::factory()->create([
-            'name' => 'Registration Confirmation',
+        $preset = MessageTemplatePreset::factory()->create([
+            'name' => 'Webinar Confirmations — Confirmation Email',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -37,8 +38,22 @@ class MessageTemplatePresetControllerTest extends TestCase
                 'body' => 'Thanks for registering.',
             ],
             'tokens' => ['first_name'],
-            'source_config_path' => 'messaging.email.transactional.webinar.confirmation',
+            'source_config_path' => 'messaging.email.transactional.webinar.confirmations.0',
         ]);
+
+        MessageTemplateCatalogEntry::factory()
+            ->forPreset($preset)
+            ->create([
+                'module_key' => 'webinars',
+                'module_label' => 'Webinars',
+                'surface' => 'webinar_registrations',
+                'group_key' => 'webinars:transactional:webinar:confirmation',
+                'group_label' => 'Webinar Confirmations',
+                'item_key' => 'email.transactional.webinar.confirmations.0',
+                'item_label' => 'Confirmation Email',
+                'item_order' => 0,
+                'usage_type' => 'webinar_confirmation',
+            ]);
 
         $this->withoutMiddleware(ForceStagingAccess::class);
 
@@ -46,12 +61,82 @@ class MessageTemplatePresetControllerTest extends TestCase
             ->get('http://crm.'.config('app.root_domain').'/message-templates')
             ->assertOk()
             ->assertSee('Message Templates')
-            ->assertSee('Registration Confirmation')
+            ->assertSee('Template library')
+            ->assertSee('Webinars')
+            ->assertSee('Webinar Confirmations')
+            ->assertSee('Confirmation Email')
             ->assertSee('Selected template')
             ->assertSee('Used by')
             ->assertSee('Tokens used')
             ->assertSee('You are registered')
+            ->assertDontSee('Selected for workflows')
+            ->assertDontSee('Use selected template')
             ->assertDontSee('payload_class');
+    }
+
+    public function test_it_shows_read_only_usage_for_selected_template(): void
+    {
+        config()->set('modules.enabled', [
+            'messaging',
+        ]);
+
+        $user = User::factory()->create();
+
+        $preset = MessageTemplatePreset::factory()->create([
+            'name' => 'Mortgage Homebuyer Nurture — Step 2 Email',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'mortgage_homebuyer_nurture',
+            'message_type' => 'mortgage_homebuyer_nurture_step_2',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'marketing',
+            'dispatch_keys' => ['campaign_step_due'],
+        ]);
+
+        MessageTemplateCatalogEntry::factory()
+            ->forPreset($preset)
+            ->create([
+                'module_key' => 'campaigns',
+                'module_label' => 'Campaigns',
+                'surface' => 'campaigns',
+                'group_key' => 'campaign:mortgage_homebuyer_nurture',
+                'group_label' => 'Mortgage Homebuyer Nurture',
+                'item_key' => 'email.marketing.mortgage_homebuyer_nurture.campaigns.mortgage_homebuyer_nurture.steps.2',
+                'item_label' => 'Step 2 Email',
+                'item_order' => 2,
+                'usage_type' => 'campaign_step',
+                'meta' => [
+                    'campaign_key' => 'mortgage_homebuyer_nurture',
+                    'campaign_step' => 2,
+                ],
+            ]);
+
+        MessageTemplatePresetAssignment::factory()
+            ->forPreset($preset)
+            ->forCampaignStep('mortgage_homebuyer_nurture', 2)
+            ->create([
+                'meta' => [
+                    'source' => 'config_sync',
+                    'source_config_path' => 'messaging.email.marketing.mortgage_homebuyer_nurture.campaigns.mortgage_homebuyer_nurture.steps.2',
+                    'catalog' => [
+                        'group_label' => 'Mortgage Homebuyer Nurture',
+                        'item_label' => 'Step 2 Email',
+                    ],
+                ],
+            ]);
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/message-templates?preset='.$preset->getKey())
+            ->assertOk()
+            ->assertSee('Used by')
+            ->assertSee('Campaigns')
+            ->assertSee('Mortgage Homebuyer Nurture')
+            ->assertSee('Step 2 Email')
+            ->assertSee('Change template selection from the campaign, webinar, or automatic follow-up setup screen.')
+            ->assertDontSee('Active template')
+            ->assertDontSee('Use selected template');
     }
 
     public function test_it_updates_email_template_safe_copy_fields(): void
@@ -187,135 +272,4 @@ class MessageTemplatePresetControllerTest extends TestCase
             ])
             ->assertSessionHasErrors(['payload.subject', 'payload.body']);
     }
-    public function test_it_renders_assignment_selector_for_selected_template(): void
-    {
-        config()->set('modules.enabled', [
-            'messaging',
-        ]);
-
-        $user = User::factory()->create();
-
-        $preset = MessageTemplatePreset::factory()->create([
-            'name' => 'Current Confirmation',
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-            'message_type' => 'confirmation',
-            'payload_class' => EmailPayload::class,
-            'queue' => 'confirmation_messages',
-            'dispatch_keys' => ['registration_created'],
-        ]);
-
-        $alternate = MessageTemplatePreset::factory()->customized()->create([
-            'name' => 'Alternate Confirmation',
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-            'message_type' => 'confirmation',
-            'payload_class' => EmailPayload::class,
-            'queue' => 'confirmation_messages',
-            'dispatch_keys' => ['registration_created'],
-        ]);
-
-        MessageTemplatePresetAssignment::factory()
-            ->forPreset($preset)
-            ->create();
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/message-templates?preset='.$preset->getKey())
-            ->assertOk()
-            ->assertSee('Selected for workflows')
-            ->assertSee('Current Confirmation')
-            ->assertSee('Alternate Confirmation')
-            ->assertSee('Timing, triggers, and skip rules stay in the workflow or campaign setup.');
-    }
-
-    public function test_it_updates_selected_template_for_assignment(): void
-    {
-        config()->set('modules.enabled', [
-            'messaging',
-        ]);
-
-        $user = User::factory()->create();
-
-        $current = MessageTemplatePreset::factory()->create([
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-            'message_type' => 'confirmation',
-            'payload_class' => EmailPayload::class,
-            'queue' => 'confirmation_messages',
-            'dispatch_keys' => ['registration_created'],
-        ]);
-
-        $alternate = MessageTemplatePreset::factory()->customized()->create([
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-            'message_type' => 'confirmation',
-            'payload_class' => EmailPayload::class,
-            'queue' => 'confirmation_messages',
-            'dispatch_keys' => ['registration_created'],
-        ]);
-
-        $assignment = MessageTemplatePresetAssignment::factory()
-            ->forPreset($current)
-            ->create();
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->patch('http://crm.'.config('app.root_domain').'/message-templates/assignments/'.$assignment->getKey(), [
-                'message_template_preset_id' => $alternate->getKey(),
-            ])
-            ->assertRedirect(route('crm.messaging.message-templates.index', ['preset' => $alternate->getKey()]));
-
-        $assignment->refresh();
-
-        $this->assertSame($alternate->getKey(), $assignment->message_template_preset_id);
-        $this->assertTrue(data_get($assignment->meta, 'selected_from_crm'));
-    }
-
-    public function test_assignment_update_rejects_incompatible_template(): void
-    {
-        config()->set('modules.enabled', [
-            'messaging',
-        ]);
-
-        $user = User::factory()->create();
-
-        $current = MessageTemplatePreset::factory()->create([
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-            'message_type' => 'confirmation',
-            'payload_class' => EmailPayload::class,
-        ]);
-
-        $wrongContext = MessageTemplatePreset::factory()->create([
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-            'message_type' => 'reminder',
-            'payload_class' => EmailPayload::class,
-        ]);
-
-        $assignment = MessageTemplatePresetAssignment::factory()
-            ->forPreset($current)
-            ->create();
-
-        $this->withoutMiddleware(ForceStagingAccess::class);
-
-        $this->actingAs($user)
-            ->from('http://crm.'.config('app.root_domain').'/message-templates?preset='.$current->getKey())
-            ->patch('http://crm.'.config('app.root_domain').'/message-templates/assignments/'.$assignment->getKey(), [
-                'message_template_preset_id' => $wrongContext->getKey(),
-            ])
-            ->assertSessionHasErrors(['message_template_preset_id']);
-
-        $this->assertSame($current->getKey(), $assignment->refresh()->message_template_preset_id);
-    }
-
 }

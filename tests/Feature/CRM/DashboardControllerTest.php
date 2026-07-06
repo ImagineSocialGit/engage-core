@@ -10,6 +10,7 @@ use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Tasks\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -61,11 +62,12 @@ class DashboardControllerTest extends TestCase
         $response->assertOk();
         $response->assertSee('Today');
         $response->assertSee('You have a clear place to start.');
-        $response->assertSee('Tasks for today');
+        $response->assertSee('Today’s tasks');
         $response->assertSee('Print');
         $response->assertSee('View');
         $response->assertSee('Call Tess about her reply');
         $response->assertSee('Leads needing attention');
+        $response->assertSee('Review reply');
         $response->assertSee('Tess Lead replied');
         $response->assertSee('Webinar activity');
     }
@@ -85,8 +87,10 @@ class DashboardControllerTest extends TestCase
         $response->assertSee('No new webinar activity to review.');
     }
 
-    public function test_it_sorts_open_tasks_by_due_date_then_undated_tasks(): void
+    public function test_it_keeps_future_dated_tasks_out_of_todays_task_list(): void
     {
+        Carbon::setTestNow('2026-07-06 10:00:00');
+
         $user = User::factory()->create();
 
         Task::query()->create([
@@ -119,13 +123,59 @@ class DashboardControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSeeInOrder([
+            'Today’s tasks',
             'Overdue follow-up',
-            'Due tomorrow',
             'Undated follow-up',
+            'Upcoming this week',
         ]);
+        $response->assertSee('1 task due after today.');
+        $response->assertSee('Review later');
+        $response->assertDontSee('Due tomorrow');
+
+        Carbon::setTestNow();
     }
 
-    public function test_it_renders_a_printable_task_list(): void
+    public function test_review_later_acknowledges_the_upcoming_week_summary(): void
+    {
+        Carbon::setTestNow('2026-07-06 10:00:00');
+
+        $user = User::factory()->create();
+
+        Task::query()->create([
+            'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+            'source' => Task::SOURCE_MANUAL,
+            'title' => 'Future follow-up summary item',
+            'status' => Task::STATUS_OPEN,
+            'due_at' => now()->addDay(),
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->post(route('crm.dashboard.acknowledgements.store'), [
+                'item_type' => 'upcoming_tasks_week',
+                'item_key' => '2026-07-06',
+            ])
+            ->assertRedirect(route('crm.index'));
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.index'));
+
+        $response->assertOk();
+        $response->assertDontSee('Upcoming this week');
+        $response->assertDontSee('Future follow-up summary item');
+
+        $this->assertDatabaseHas('dashboard_acknowledgements', [
+            'user_id' => $user->id,
+            'surface' => DashboardAcknowledgement::SURFACE_CRM_DASHBOARD,
+            'item_type' => 'upcoming_tasks_week',
+            'item_key' => '2026-07-06',
+        ]);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_it_renders_a_printable_task_list_without_future_dated_tasks(): void
     {
         $user = User::factory()->create();
 
@@ -137,6 +187,14 @@ class DashboardControllerTest extends TestCase
             'due_at' => now(),
         ]);
 
+        Task::query()->create([
+            'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+            'source' => Task::SOURCE_MANUAL,
+            'title' => 'Do not print tomorrow',
+            'status' => Task::STATUS_OPEN,
+            'due_at' => now()->addDay(),
+        ]);
+
         $response = $this
             ->actingAs($user)
             ->get(route('crm.tasks.today.print'));
@@ -144,6 +202,7 @@ class DashboardControllerTest extends TestCase
         $response->assertOk();
         $response->assertSee('Today’s Task List');
         $response->assertSee('Print this task');
+        $response->assertDontSee('Do not print tomorrow');
     }
 
     public function test_it_broadcasts_the_dashboard_task_list_to_active_team_members(): void

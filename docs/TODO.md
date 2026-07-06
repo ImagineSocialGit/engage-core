@@ -163,6 +163,9 @@ Completed baseline:
   - Use Messaging-owned skip behavior for pending scheduled messages.
   - Do not mutate Messaging scheduled-message internals directly from Broadcasts.
 
+### Internal Messaging
+- Get internal messaging working for dashboard broadcasts of task lists
+
 ### Core contact filters
 
 - [ ] Decide whether Core contact filter normalization should support additional stable Core-owned filters.

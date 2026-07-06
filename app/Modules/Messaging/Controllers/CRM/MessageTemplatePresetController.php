@@ -3,12 +3,12 @@
 namespace App\Modules\Messaging\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
-use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
-use App\Modules\Messaging\Requests\UpdateMessageTemplatePresetAssignmentRequest;
 use App\Modules\Messaging\Requests\UpdateMessageTemplatePresetRequest;
+use App\Modules\Messaging\Services\MessageTemplateUsageResolver;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,9 +17,10 @@ use Illuminate\Support\Collection;
 
 class MessageTemplatePresetController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, MessageTemplateUsageResolver $usageResolver): View
     {
         $presets = MessageTemplatePreset::query()
+            ->with(['catalogEntries' => fn ($query) => $query->active()->orderBy('item_order')->orderBy('item_label')])
             ->withCount(['assignments as active_assignments_count' => fn ($query) => $query->active()])
             ->orderBy('channel')
             ->orderBy('purpose')
@@ -31,27 +32,19 @@ class MessageTemplatePresetController extends Controller
         $selectedPreset = $this->selectedPreset($request, $presets);
 
         if ($selectedPreset instanceof MessageTemplatePreset) {
-            $selectedPreset->load(['assignments' => fn ($query) => $query
-                ->active()
-                ->with('messageTemplatePreset')
-                ->orderBy('surface')
-                ->orderBy('campaign_key')
-                ->orderBy('campaign_step')
-                ->orderBy('message_type')
-                ->orderByDesc('id')]);
+            $selectedPreset->load([
+                'catalogEntries' => fn ($query) => $query->active()->orderBy('item_order')->orderBy('item_label'),
+                'assignments' => fn ($query) => $query->active()->orderBy('surface')->orderBy('campaign_key')->orderBy('campaign_step')->orderBy('message_type'),
+            ]);
         }
 
         return view('crm.messaging.message-templates.index', [
             'presets' => $presets,
             'selectedPreset' => $selectedPreset,
-            'groupedPresets' => $presets->groupBy(fn (MessageTemplatePreset $preset): string => implode(':', [
-                $preset->channel,
-                $preset->purpose,
-                $preset->scope,
-            ])),
+            'groupedPresets' => $this->groupedPresets($presets),
             'editablePayload' => $selectedPreset ? $this->editablePayload($selectedPreset) : [],
             'tokens' => $selectedPreset?->tokens ?? [],
-            'assignmentOptions' => $selectedPreset ? $this->assignmentOptions($selectedPreset) : collect(),
+            'usageSummaries' => $selectedPreset ? $usageResolver->forPreset($selectedPreset) : collect(),
         ]);
     }
 
@@ -59,17 +52,16 @@ class MessageTemplatePresetController extends Controller
         UpdateMessageTemplatePresetRequest $request,
         MessageTemplatePreset $messageTemplatePreset,
     ): RedirectResponse {
+        $payload = array_replace_recursive(
+            $messageTemplatePreset->payload ?? [],
+            $request->safePayload(),
+        );
+
         $messageTemplatePreset->forceFill([
             'name' => $request->validated('name'),
             'description' => $request->validated('description'),
-            'payload' => array_replace_recursive(
-                $messageTemplatePreset->payload ?? [],
-                $request->safePayload(),
-            ),
-            'tokens' => $this->tokensFromPayload(array_replace_recursive(
-                $messageTemplatePreset->payload ?? [],
-                $request->safePayload(),
-            )),
+            'payload' => $payload,
+            'tokens' => $this->tokensFromPayload($payload),
             'is_customized' => true,
             'customized_at' => now(),
         ])->save();
@@ -77,25 +69,6 @@ class MessageTemplatePresetController extends Controller
         return redirect()
             ->route('crm.messaging.message-templates.index', ['preset' => $messageTemplatePreset->getKey()])
             ->with('status', 'Message template updated.');
-    }
-
-    public function updateAssignment(
-        UpdateMessageTemplatePresetAssignmentRequest $request,
-        MessageTemplatePresetAssignment $messageTemplatePresetAssignment,
-    ): RedirectResponse {
-        $selectedPreset = $request->selectedPreset();
-
-        $messageTemplatePresetAssignment->forceFill([
-            'message_template_preset_id' => $selectedPreset->getKey(),
-            'meta' => array_replace_recursive($messageTemplatePresetAssignment->meta ?? [], [
-                'selected_from_crm' => true,
-                'selected_at' => now()->toISOString(),
-            ]),
-        ])->save();
-
-        return redirect()
-            ->route('crm.messaging.message-templates.index', ['preset' => $selectedPreset->getKey()])
-            ->with('status', 'Selected template updated for this workflow.');
     }
 
     private function selectedPreset(Request $request, Collection $presets): ?MessageTemplatePreset
@@ -114,32 +87,29 @@ class MessageTemplatePresetController extends Controller
     }
 
     /**
-     * @return Collection<int, Collection<int, MessageTemplatePreset>>
+     * @param Collection<int, MessageTemplatePreset> $presets
+     * @return Collection<string, Collection<int, MessageTemplatePreset>>
      */
-    private function assignmentOptions(MessageTemplatePreset $selectedPreset): Collection
+    private function groupedPresets(Collection $presets): Collection
     {
-        /** @var Collection<int, MessageTemplatePresetAssignment> $assignments */
-        $assignments = $selectedPreset->assignments;
+        return $presets->groupBy(function (MessageTemplatePreset $preset): string {
+            $catalogEntry = $preset->catalogEntries->first();
 
-        if ($assignments->isEmpty()) {
-            return collect();
-        }
+            if ($catalogEntry instanceof MessageTemplateCatalogEntry) {
+                return implode(':', [
+                    $catalogEntry->channel,
+                    $catalogEntry->purpose,
+                    $catalogEntry->module_label,
+                    $catalogEntry->group_label,
+                ]);
+            }
 
-        $optionSets = collect();
-
-        foreach ($assignments as $assignment) {
-            $optionSets->put($assignment->getKey(), MessageTemplatePreset::query()
-                ->active()
-                ->where('channel', $assignment->channel)
-                ->where('purpose', $assignment->purpose)
-                ->where('scope', $assignment->scope)
-                ->where('message_type', $assignment->message_type)
-                ->orderByDesc('is_customized')
-                ->orderBy('name')
-                ->get());
-        }
-
-        return $optionSets;
+            return implode(':', [
+                $preset->channel,
+                $preset->purpose,
+                str_replace('_', ' ', $preset->scope),
+            ]);
+        });
     }
 
     /**

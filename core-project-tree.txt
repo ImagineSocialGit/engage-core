@@ -403,6 +403,7 @@
 │   │   │   │   ├── ContactPermissionInvitation.php
 │   │   │   │   ├── MessageConsent.php
 │   │   │   │   ├── MessageSuppression.php
+│   │   │   │   ├── MessageTemplateCatalogEntry.php
 │   │   │   │   ├── MessageTemplatePresetAssignment.php
 │   │   │   │   ├── MessageTemplatePreset.php
 │   │   │   │   └── ScheduledMessage.php
@@ -416,7 +417,6 @@
 │   │   │   │   └── MessagingModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   │   ├── StoreContactPermissionInvitationConsentRequest.php
-│   │   │   │   ├── UpdateMessageTemplatePresetAssignmentRequest.php
 │   │   │   │   └── UpdateMessageTemplatePresetRequest.php
 │   │   │   ├── Rules
 │   │   │   │   ├── ConsentRevocationRules.php
@@ -447,6 +447,7 @@
 │   │   │   │   ├── MessageSendTimeResolver.php
 │   │   │   │   ├── MessageSuppressionService.php
 │   │   │   │   ├── MessageTemplatePresetAssignmentResolver.php
+│   │   │   │   ├── MessageTemplateUsageResolver.php
 │   │   │   │   ├── PhoneNumberNormalizer.php
 │   │   │   │   ├── ScheduledMessageGate.php
 │   │   │   │   └── Sms
@@ -888,6 +889,7 @@
 │   │   ├── LocationAreaAssignmentFactory.php
 │   │   ├── LocationAreaFactory.php
 │   │   ├── LocationFactory.php
+│   │   ├── MessageTemplateCatalogEntryFactory.php
 │   │   ├── MessageTemplatePresetAssignmentFactory.php
 │   │   ├── MessageTemplatePresetFactory.php
 │   │   ├── PortalAccessGrantFactory.php
@@ -946,6 +948,7 @@
 │   │   ├── 2026_05_19_211538_create_scheduled_messages_table.php
 │   │   ├── 2026_05_19_211539_create_message_template_presets_table.php
 │   │   ├── 2026_05_19_211540_create_message_template_preset_assignments_table.php
+│   │   ├── 2026_05_19_211541_create_message_template_catalog_entries_table.php
 │   │   ├── 2026_05_19_221010_create_message_suppressions_table.php
 │   │   ├── 2026_06_12_050337_create_campaigns_table.php
 │   │   ├── 2026_06_12_050338_create_campaign_steps_table.php
@@ -1274,4 +1277,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-426 directories, 849 files
+426 directories, 852 files

@@ -69,6 +69,11 @@ class MessageTemplatePreset extends Model
         return $this->hasMany(MessageTemplatePresetAssignment::class);
     }
 
+    public function catalogEntries(): HasMany
+    {
+        return $this->hasMany(MessageTemplateCatalogEntry::class);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query
@@ -133,3 +138,4 @@ class MessageTemplatePreset extends Model
         ));
     }
 }
+

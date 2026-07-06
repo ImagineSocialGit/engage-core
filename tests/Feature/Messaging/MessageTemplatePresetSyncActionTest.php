@@ -56,6 +56,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
 
         $this->assertSame(2, $result['created']);
         $this->assertSame(2, $result['assignments_created']);
+        $this->assertSame(2, $result['catalog_entries_created']);
 
         $confirmation = MessageTemplatePreset::query()
             ->where('key', 'email.transactional.webinar.confirmation')
@@ -68,6 +69,15 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         $this->assertSame(['registration_created'], $confirmation->dispatch_keys);
         $this->assertSame(['first_name'], $confirmation->tokens);
         $this->assertSame('messaging.email.transactional.webinar.confirmation', $confirmation->source_config_path);
+
+        $this->assertDatabaseHas('message_template_catalog_entries', [
+            'message_template_preset_id' => $confirmation->getKey(),
+            'module_key' => 'webinars',
+            'module_label' => 'Webinars',
+            'group_label' => 'Webinar Confirmations',
+            'item_label' => 'Confirmation Email',
+            'usage_type' => 'webinar_confirmation',
+        ]);
 
         $this->assertDatabaseHas('message_template_preset_assignments', [
             'message_template_preset_id' => $confirmation->getKey(),
@@ -85,6 +95,16 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame('webinar_attended_nurture_step_1', $campaignStep->message_type);
+
+        $this->assertDatabaseHas('message_template_catalog_entries', [
+            'message_template_preset_id' => $campaignStep->getKey(),
+            'module_key' => 'campaigns',
+            'module_label' => 'Campaigns',
+            'group_label' => 'Webinar Attended Nurture',
+            'item_label' => 'Step 1 Email',
+            'item_order' => 1,
+            'usage_type' => 'campaign_step',
+        ]);
 
         $this->assertDatabaseHas('message_template_preset_assignments', [
             'message_template_preset_id' => $campaignStep->getKey(),
@@ -250,4 +270,77 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         $this->assertDatabaseCount('message_template_preset_assignments', 1);
     }
 
+
+    public function test_it_syncs_multiple_reminders_as_separate_cataloged_message_types(): void
+    {
+        Config::set('messaging.sms', []);
+        Config::set('messaging.email', [
+            'transactional' => [
+                'webinar' => [
+                    'reminders' => [
+                        [
+                            'dispatch_key' => 'registration_created',
+                            'timing' => 'scheduled',
+                            'payload_class' => EmailPayload::class,
+                            'queue' => 'reminders',
+                            'schedule' => [
+                                'type' => 'anchored',
+                                'minutes' => -30,
+                            ],
+                            'payload' => [
+                                'subject' => '30 minutes',
+                                'body' => 'Join soon, {first_name}.',
+                            ],
+                        ],
+                        [
+                            'dispatch_key' => 'registration_created',
+                            'timing' => 'scheduled',
+                            'payload_class' => EmailPayload::class,
+                            'queue' => 'reminders',
+                            'schedule' => [
+                                'type' => 'anchored',
+                                'minutes' => -10,
+                            ],
+                            'payload' => [
+                                'subject' => '10 minutes',
+                                'body' => 'Join now, {first_name}.',
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $result = app(SyncMessageTemplatePresetsAction::class)->handle();
+
+        $this->assertSame(2, $result['created']);
+        $this->assertSame(2, $result['assignments_created']);
+        $this->assertSame(2, $result['catalog_entries_created']);
+
+        $this->assertDatabaseHas('message_template_presets', [
+            'message_type' => 'reminder_30_minute',
+            'name' => 'Webinar Reminders — 30-Minute Reminder Email',
+        ]);
+
+        $this->assertDatabaseHas('message_template_presets', [
+            'message_type' => 'reminder_10_minute',
+            'name' => 'Webinar Reminders — 10-Minute Reminder Email',
+        ]);
+
+        $this->assertDatabaseHas('message_template_catalog_entries', [
+            'group_label' => 'Webinar Reminders',
+            'item_label' => '30-Minute Reminder Email',
+            'item_order' => -30,
+            'usage_type' => 'webinar_reminder',
+        ]);
+
+        $this->assertDatabaseHas('message_template_catalog_entries', [
+            'group_label' => 'Webinar Reminders',
+            'item_label' => '10-Minute Reminder Email',
+            'item_order' => -10,
+            'usage_type' => 'webinar_reminder',
+        ]);
+    }
+
 }
+

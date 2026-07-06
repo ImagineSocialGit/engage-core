@@ -94,9 +94,6 @@ Route::middleware('auth')->group(function () {
 
             Route::patch('/{messageTemplatePreset}', [MessageTemplatePresetController::class, 'update'])
                 ->name('update');
-
-            Route::patch('/assignments/{messageTemplatePresetAssignment}', [MessageTemplatePresetController::class, 'updateAssignment'])
-                ->name('assignments.update');
         });
 
     Route::middleware('module:flow_routes')
@@ -217,3 +214,4 @@ Route::middleware('auth')->group(function () {
                 ->name('notes.destroy');
         });
 });
+
