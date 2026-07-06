@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Modules\Campaigns\Actions\SyncCampaignPresetsAction;
 use App\Modules\Core\Actions\ContactStatuses\SyncContactStatusPresetsAction;
 use App\Modules\FlowRoutes\Actions\SyncFlowRoutePresetsAction;
+use App\Modules\Messaging\Actions\SyncMessageTemplatePresetsAction;
 use App\Modules\Tasks\Actions\SyncTaskPresetsAction;
 use Illuminate\Console\Command;
 use Throwable;
@@ -13,13 +14,15 @@ class SyncPresetsCommand extends Command
 {
     protected $signature = 'presets:sync
         {preset? : Optional preset key, such as mortgage or webinar_funnel}
-        {--force-flow-routes : Overwrite customized FlowRoutes, Points, and FlowRoutePoints}';
+        {--force-flow-routes : Overwrite customized FlowRoutes, Points, and FlowRoutePoints}
+        {--force-message-templates : Overwrite customized Messaging template presets and reactivate synced assignments}';
 
     protected $description = 'Sync preset-owned database definitions in dependency-safe order.';
 
     public function handle(
         SyncContactStatusPresetsAction $syncContactStatusPresets,
         SyncTaskPresetsAction $syncTaskPresets,
+        SyncMessageTemplatePresetsAction $syncMessageTemplatePresets,
         SyncCampaignPresetsAction $syncCampaignPresets,
         SyncFlowRoutePresetsAction $syncFlowRoutePresets,
     ): int {
@@ -61,6 +64,17 @@ class SyncPresetsCommand extends Command
             } else {
                 $this->line('');
                 $this->warn('Task templates: module disabled or no groups configured; skipped.');
+            }
+
+            if (in_array('messaging', $enabledModules, true)) {
+                $this->renderMessageTemplateResult(
+                    $syncMessageTemplatePresets->handle(
+                        force: (bool) $this->option('force-message-templates'),
+                    ),
+                );
+            } else {
+                $this->line('');
+                $this->warn('Messaging template presets: module disabled; skipped.');
             }
 
             if ($this->shouldSyncSection($preset, 'campaigns', 'campaigns', $enabledModules)) {
@@ -234,6 +248,33 @@ class SyncPresetsCommand extends Command
         foreach ($result->errors as $error) {
             $this->error($error);
         }
+    }
+
+
+    /**
+     * @param array{
+     *     created: int,
+     *     updated: int,
+     *     customized_skipped: int,
+     *     assignments_created: int,
+     *     assignments_preserved: int
+     * } $result
+     */
+    private function renderMessageTemplateResult(array $result): void
+    {
+        $this->line('');
+        $this->info('Messaging template presets');
+
+        $this->table(
+            ['Item', 'Count'],
+            [
+                ['Created', $result['created']],
+                ['Updated', $result['updated']],
+                ['Customized skipped', $result['customized_skipped']],
+                ['Assignments created', $result['assignments_created']],
+                ['Assignments preserved', $result['assignments_preserved']],
+            ],
+        );
     }
 
     private function renderCampaignResult(object $result): void

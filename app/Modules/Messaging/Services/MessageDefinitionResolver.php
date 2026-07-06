@@ -8,6 +8,10 @@ use InvalidArgumentException;
 
 class MessageDefinitionResolver
 {
+    public function __construct(
+        private readonly MessageTemplatePresetAssignmentResolver $assignmentResolver,
+    ) {}
+
     /**
      * Resolve all enabled non-campaign message definitions for a channel/purpose/scope config route.
      *
@@ -26,6 +30,16 @@ class MessageDefinitionResolver
 
         if ($channel === '' || $purpose === '' || $scope === '') {
             return [];
+        }
+
+        $assignedDefinitions = $this->assignmentResolver->resolveDefinitions(
+            channel: $channel,
+            purpose: $purpose,
+            scope: $scope,
+        );
+
+        if ($assignedDefinitions !== []) {
+            return $assignedDefinitions;
         }
 
         $scopeConfigPath = "messaging.{$channel}.{$purpose}.{$scope}";
@@ -95,6 +109,18 @@ class MessageDefinitionResolver
 
         if ($channel === '' || $purpose === '' || $scope === '' || $campaignKey === '' || $stepNumber < 1 || $dispatchKey === '') {
             return null;
+        }
+
+        $assignedDefinition = $this->assignmentResolver->resolveCampaignStep(
+            channel: $channel,
+            purpose: $purpose,
+            scope: $scope,
+            campaignKey: $campaignKey,
+            stepNumber: $stepNumber,
+        );
+
+        if (is_array($assignedDefinition)) {
+            return $assignedDefinition;
         }
 
         $configPath = "messaging.{$channel}.{$purpose}.{$scope}.campaigns.{$campaignKey}.steps.{$stepNumber}";

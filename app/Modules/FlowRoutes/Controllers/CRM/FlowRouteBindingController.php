@@ -11,14 +11,36 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class FlowRouteBindingController extends Controller
 {
     public function index(): View
     {
+        $contactStatuses = $this->activeContactStatuses();
+        $statusNamesByKey = $contactStatuses
+            ->mapWithKeys(fn (ContactStatus $status): array => [$status->key => $status->name])
+            ->all();
+
+        $automationEventBindings = $this->automationEventBindings($statusNamesByKey);
+        $automationEventGroups = $automationEventBindings
+            ->groupBy('module_key')
+            ->map(function (Collection $rows, string $moduleKey): array {
+                return [
+                    'key' => $moduleKey,
+                    'label' => (string) ($rows->first()['module_label'] ?? Str::headline($moduleKey)),
+                    'events' => $rows->values(),
+                ];
+            })
+            ->values();
+
         return view('crm.flow-routes.bindings.index', [
-            'contactStatusBindings' => $this->contactStatusBindings(),
-            'automationEventBindings' => $this->automationEventBindings(),
+            'contactLabel' => [
+                'singular' => (string) config('contacts.labels.singular', 'lead'),
+                'plural' => (string) config('contacts.labels.plural', 'leads'),
+            ],
+            'contactStatusBindings' => $this->contactStatusBindings($contactStatuses, $statusNamesByKey),
+            'automationEventGroups' => $automationEventGroups,
         ]);
     }
 
@@ -47,7 +69,7 @@ class FlowRouteBindingController extends Controller
 
         return redirect()
             ->route('crm.flow-routes.bindings.index')
-            ->with('status', 'Route trigger bindings updated.');
+            ->with('status', 'Automatic follow-ups updated.');
     }
 
     private function updateContactStatusBinding(string $triggerKey, ?int $flowRouteId): void
@@ -133,26 +155,39 @@ class FlowRouteBindingController extends Controller
     }
 
     /**
-     * @return Collection<int, array{
-     *     status: ContactStatus,
-     *     available_routes: Collection<int, FlowRoute>,
-     *     selected_route_id: int|null,
-     *     active_binding_count: int
-     * }>
+     * @return Collection<int, ContactStatus>
      */
-    private function contactStatusBindings(): Collection
+    private function activeContactStatuses(): Collection
     {
         return ContactStatus::query()
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('name')
-            ->get()
-            ->map(function (ContactStatus $status): array {
+            ->get();
+    }
+
+    /**
+     * @param Collection<int, ContactStatus> $contactStatuses
+     * @param array<string, string> $statusNamesByKey
+     * @return Collection<int, array{
+     *     status: ContactStatus,
+     *     available_routes: Collection<int, array<string, mixed>>,
+     *     selected_route_id: int|null,
+     *     selected_route: array<string, mixed>|null,
+     *     active_binding_count: int
+     * }>
+     */
+    private function contactStatusBindings(Collection $contactStatuses, array $statusNamesByKey): Collection
+    {
+        return $contactStatuses
+            ->map(function (ContactStatus $status) use ($statusNamesByKey): array {
                 $availableRoutes = FlowRoute::query()
                     ->active()
                     ->forTrigger(FlowRoute::TRIGGER_CONTACT_STATUS, $status->key)
+                    ->with(['activeFlowRoutePoints.point'])
                     ->orderBy('name')
-                    ->get();
+                    ->get()
+                    ->map(fn (FlowRoute $route): array => $this->routeOption($route, $statusNamesByKey));
 
                 $activeBindings = FlowRouteTriggerBinding::query()
                     ->active()
@@ -163,23 +198,33 @@ class FlowRouteBindingController extends Controller
                     ->orderByDesc('id')
                     ->get();
 
+                $selectedRouteId = $activeBindings->first()?->flow_route_id;
+
                 return [
                     'status' => $status,
                     'available_routes' => $availableRoutes,
-                    'selected_route_id' => $activeBindings->first()?->flow_route_id,
+                    'selected_route_id' => $selectedRouteId,
+                    'selected_route' => $selectedRouteId
+                        ? $availableRoutes->firstWhere('id', (int) $selectedRouteId)
+                        : null,
                     'active_binding_count' => $activeBindings->count(),
                 ];
             });
     }
 
     /**
+     * @param array<string, string> $statusNamesByKey
      * @return Collection<int, array{
      *     event_key: string,
-     *     available_routes: Collection<int, FlowRoute>,
+     *     module_key: string,
+     *     module_label: string,
+     *     label: string,
+     *     description: string,
+     *     available_routes: Collection<int, array<string, mixed>>,
      *     selected_route_ids: array<int, int>
      * }>
      */
-    private function automationEventBindings(): Collection
+    private function automationEventBindings(array $statusNamesByKey): Collection
     {
         return FlowRoute::query()
             ->active()
@@ -191,12 +236,14 @@ class FlowRouteBindingController extends Controller
             ->pluck('trigger_key')
             ->filter(fn (mixed $triggerKey): bool => is_string($triggerKey) && trim($triggerKey) !== '')
             ->values()
-            ->map(function (string $eventKey): array {
+            ->map(function (string $eventKey) use ($statusNamesByKey): array {
                 $availableRoutes = FlowRoute::query()
                     ->active()
                     ->forTrigger(FlowRoute::TRIGGER_AUTOMATION_EVENT, $eventKey)
+                    ->with(['activeFlowRoutePoints.point'])
                     ->orderBy('name')
-                    ->get();
+                    ->get()
+                    ->map(fn (FlowRoute $route): array => $this->routeOption($route, $statusNamesByKey));
 
                 $selectedRouteIds = FlowRouteTriggerBinding::query()
                     ->active()
@@ -207,12 +254,147 @@ class FlowRouteBindingController extends Controller
                     ->map(fn (mixed $flowRouteId): int => (int) $flowRouteId)
                     ->all();
 
+                $eventDisplay = $this->automationEventDisplay($eventKey);
+
                 return [
                     'event_key' => $eventKey,
+                    'module_key' => $eventDisplay['module_key'],
+                    'module_label' => $eventDisplay['module_label'],
+                    'label' => $eventDisplay['label'],
+                    'description' => $eventDisplay['description'],
                     'available_routes' => $availableRoutes,
                     'selected_route_ids' => $selectedRouteIds,
                 ];
             });
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function routeOption(FlowRoute $route, array $statusNamesByKey): array
+    {
+        $points = $route->activeFlowRoutePoints
+            ->sortBy('sort_order')
+            ->values();
+
+        return [
+            'id' => (int) $route->id,
+            'name' => (string) $route->name,
+            'description' => (string) ($route->description ?: data_get($route->meta, 'description', '')),
+            'summary_points' => $points
+                ->map(fn ($routePoint): string => $this->routePointSummary($routePoint, $statusNamesByKey))
+                ->filter()
+                ->values()
+                ->all(),
+            'internal' => [
+                'key' => (string) $route->key,
+                'version' => (int) $route->version,
+                'owner_group' => $route->owner_group ? (string) $route->owner_group : null,
+            ],
+        ];
+    }
+
+    /**
+     * @param mixed $routePoint
+     */
+    private function routePointSummary($routePoint, array $statusNamesByKey): string
+    {
+        $type = (string) ($routePoint->point?->type ?? '');
+        $definition = is_array($routePoint->definition) ? $routePoint->definition : [];
+
+        return match ($type) {
+            'change_status' => $this->changeStatusSummary($definition, $statusNamesByKey),
+            'enroll_campaign' => 'Start the '.$this->humanConfigLabel((string) data_get($definition, 'campaign_key', 'selected')).' follow-up.',
+            'cancel_campaign' => 'Stop the '.$this->humanConfigLabel((string) data_get($definition, 'campaign_key', 'selected')).' follow-up.',
+            'create_task' => 'Create task: '.(string) data_get($definition, 'title', $routePoint->name),
+            'send_message' => 'Send a message.',
+            'wait' => 'Wait before continuing.',
+            'event_wait' => 'Wait until '.$this->humanAutomationEvent((string) data_get($definition, 'event_key', 'the next activity')).'.',
+            'condition', 'branch_evaluate' => 'Check conditions before continuing.',
+            'noop' => 'No action.',
+            default => (string) ($routePoint->description ?: $routePoint->name),
+        };
+    }
+
+    private function changeStatusSummary(array $definition, array $statusNamesByKey): string
+    {
+        $statusKey = (string) data_get($definition, 'contact_status_key', '');
+
+        if ($statusKey === '') {
+            return 'Update the status.';
+        }
+
+        return 'Move the '.config('contacts.labels.singular', 'lead').' to '.($statusNamesByKey[$statusKey] ?? Str::headline($statusKey)).'.';
+    }
+
+    /**
+     * @return array{module_key: string, module_label: string, label: string, description: string}
+     */
+    private function automationEventDisplay(string $eventKey): array
+    {
+        return match ($eventKey) {
+            'webinar.registered' => [
+                'module_key' => 'webinars',
+                'module_label' => 'Webinars',
+                'label' => 'When someone registers for a webinar',
+                'description' => 'Choose what should happen after a lead registers.',
+            ],
+            'webinar.cancelled' => [
+                'module_key' => 'webinars',
+                'module_label' => 'Webinars',
+                'label' => 'When someone cancels a webinar registration',
+                'description' => 'Choose what should happen after a lead cancels.',
+            ],
+            'webinar.attended' => [
+                'module_key' => 'webinars',
+                'module_label' => 'Webinars',
+                'label' => 'When someone attends a webinar',
+                'description' => 'Choose what should happen after a lead attends.',
+            ],
+            'webinar.missed' => [
+                'module_key' => 'webinars',
+                'module_label' => 'Webinars',
+                'label' => 'When someone misses a webinar',
+                'description' => 'Choose what should happen after a lead misses the live event.',
+            ],
+            'webinar.ended' => [
+                'module_key' => 'webinars',
+                'module_label' => 'Webinars',
+                'label' => 'When a webinar ends',
+                'description' => 'Choose what should happen after a webinar ends.',
+            ],
+            default => [
+                'module_key' => Str::before($eventKey, '.') ?: 'other',
+                'module_label' => Str::headline(Str::before($eventKey, '.') ?: 'Other'),
+                'label' => 'When '.Str::of($eventKey)->replace(['.', '_'], ' ')->lower(),
+                'description' => 'Choose what should happen next.',
+            ],
+        };
+    }
+
+    private function humanAutomationEvent(string $eventKey): string
+    {
+        return match ($eventKey) {
+            'webinar.attended' => 'someone attends a webinar',
+            'webinar.missed' => 'someone misses a webinar',
+            'webinar.registered' => 'someone registers for a webinar',
+            'webinar.cancelled' => 'someone cancels a webinar registration',
+            'webinar.ended' => 'a webinar ends',
+            default => Str::of($eventKey)->replace(['.', '_'], ' ')->lower()->toString(),
+        };
+    }
+
+    private function humanConfigLabel(string $value): string
+    {
+        if ($value === '') {
+            return 'selected';
+        }
+
+        return Str::of($value)
+            ->replace(['_', '-'], ' ')
+            ->headline()
+            ->lower()
+            ->toString();
     }
 
     /**

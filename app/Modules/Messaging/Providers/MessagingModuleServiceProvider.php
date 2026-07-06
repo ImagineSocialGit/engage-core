@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Providers;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Console\Commands\SyncMessageTemplatePresetsCommand;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
@@ -56,6 +57,12 @@ class MessagingModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                SyncMessageTemplatePresetsCommand::class,
+            ]);
+        }
+
         Contact::resolveRelationUsing('messageConsents', function (Contact $contact): HasMany {
             return $contact->hasMany(MessageConsent::class);
         });

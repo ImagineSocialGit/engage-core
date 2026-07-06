@@ -153,38 +153,15 @@ A module capability is suspect when it primarily creates a new thing for the cli
 
 ## UX standard
 
-Client-facing UI should prefer:
+Client-facing UI should follow `ui-ux-guide.md`.
+
+The product-level standard is simple:
 
 ```text
-clear actions
-plain business language
-guided steps
-safe defaults
-prebuilt choices
-fast completion
-minimal required fields
-module-aware guardrails
+The client knows what they need to do.
+The interface makes the next step obvious.
+The task can be completed quickly.
+The client does not have to learn a new software category.
 ```
 
-When a simple client action triggers automation, the UI should explain the consequence before the action is confirmed rather than hiding the automation behind technical configuration.
-
-Client-facing UI should avoid:
-
-```text
-blank-canvas builders
-raw schema/config exposure
-unbounded choice
-technical implementation details
-provider-specific jargon
-module-internal terminology
-complex configuration workflows
-```
-
-The ideal client reaction is:
-
-```text
-I have to do X.
-I know where to click.
-I can finish it in a few minutes.
-I did not have to learn a new software category.
-```
+Detailed language rules, reusable UI patterns, automation-warning patterns, and UI review checklists belong in `ui-ux-guide.md`.

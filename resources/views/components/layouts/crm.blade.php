@@ -43,7 +43,7 @@
                             href="{{ route('crm.flow-routes.bindings.index') }}"
                             class="block rounded-lg px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-100"
                         >
-                            Route Bindings
+                            Automatic Follow-ups
                         </a>
                     @endif
 
@@ -71,7 +71,7 @@
                             </h1>
 
                             @if(!empty($subheading ?? null))
-                                <p class="mt-1 text-sm text-slate-500 capitalize">
+                                <p class="mt-1 text-sm text-slate-500">
                                     {{ $subheading }}
                                 </p>
                             @endif

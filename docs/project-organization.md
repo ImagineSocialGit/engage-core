@@ -13,9 +13,11 @@ Vertical modules
 Integrations/adapters
 ```
 
-## Product Principles
+## Product Principles and UI/UX
 
-Engage Core product decisions should also follow `product-principles.md`.
+Engage Core product decisions should follow `product-principles.md`.
+
+Client/operator-facing screens should follow `ui-ux-guide.md`.
 
 The core barometer is:
 
@@ -23,27 +25,7 @@ The core barometer is:
 Can the client realistically complete this task in Engage Core in 10-15 minutes total?
 ```
 
-If yes, the task can be client-facing.
-
-If no, the task should usually be developer/operator work, automated, preconfigured, preset-driven, hidden behind a simpler action, or split into a guided workflow that only asks the client for business decisions they are qualified to make.
-
-Engage Core should make clients feel like:
-
-```text
-I have to do X.
-I know where to click.
-I can finish it in a few minutes.
-I did not have to learn a new software category.
-```
-
-This means universal modules should provide reusable capability foundations while client-facing UX stays action-oriented and preset-driven.
-
-Examples:
-
-```text
-Client-facing: draft a Broadcast, select recipients, schedule an appointment, send an existing form, review a submission.
-Developer/operator-facing: build a form, design a Campaign, configure a FlowRoute, define document requirements, wire integrations.
-```
+Universal modules should provide reusable capability foundations while client-facing UX stays action-oriented, preset-driven, and written in plain business language.
 
 ## Core
 

@@ -8,6 +8,13 @@ These are repeatable checklists. Run the relevant checklist after a production s
 
 ### UI Rules
 
+- [ ] Use `docs/ui-ux-guide.md` when reviewing or refactoring client/operator-facing screens.
+- [ ] Refactor the FlowRoute trigger binding screen into an outcome-oriented Automatic Follow-ups UI.
+  - Use configured lead/contact/customer nouns.
+  - Replace raw status/event terminology with Status and Activity language.
+  - Use a status selector for status-triggered follow-ups.
+  - Use module tabs and human-readable activity names for automation-event follow-ups.
+  - Show consequence previews before save.
 - [ ] Apply the AJAX/preserve-context UI pattern to other CRM row/panel/modal workflows where page reloads would frustrate operators.
   - Tasks complete/reopen/cancel/archive.
   - Broadcast recipient/detail actions where applicable.
@@ -234,6 +241,12 @@ Completed FlowRoute baseline:
   - Step variant is the channel-specific delivery option.
   - Support `first_available`, `send_all_eligible`, and `dependency_aware`.
   - Variants reference Messaging templates/assignments and do not own copy.
+
+- [ ] Make Route selection/building capability-aware.
+  - Hide or disable Campaign point types when Campaigns is not enabled.
+  - Hide or disable Messaging send-message point types when Messaging is not enabled.
+  - Hide or disable Task point types when Tasks is not enabled.
+  - Keep the Route Bindings UI focused on selecting available FlowRoutes, not explaining unavailable module internals.
 
 ### SMS toggleability
 

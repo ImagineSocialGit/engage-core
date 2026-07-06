@@ -252,3 +252,5 @@ For automation-event-started routes, `contact_status_id` and `contact_workflow_p
 That is expected.
 
 It means the route started from an automation event rather than a Workflow status transition.
+
+FlowRoutes may support Campaign, Messaging, Task, and status-related point types, but client-facing Route selection/building must be capability-aware. Point types whose owning modules are disabled should be hidden, disabled, or clearly marked unavailable. Campaign-related points must not appear as selectable client-facing behavior for clients without Campaigns enabled.

@@ -12,6 +12,8 @@ Use `docs/TODO.md` for broader disposable backlog items, repeatable checklists, 
 
 Use `docs/module-boundaries.md` and `docs/modules/*.md` for long-lived architecture and module ownership decisions.
 
+Use `docs/ui-ux-guide.md` for client/operator-facing language, interaction patterns, and UI review rules.
+
 ## Guiding standard
 
 Client-facing work should be real product work, not temporary MVP scaffolding.
@@ -84,7 +86,7 @@ The remaining runway pieces should continue to be implemented as durable client-
 | 5 | Selectable webinar schedule profiles | 1–3 sessions | Allow quick swapping of confirmation/reminder/post-event schedules by context. |
 | 6 | Manual status-change automation warning | 0.5–1 session | Warn operators before a manual status change runs a selected status FlowRoute. This is a UI awareness guardrail, not a ContactStatus schema split. |
 | 7 | Task template/default definition UI | 1–2 sessions, maybe more if polished | Only needed when clients/operators need to manage task templates themselves. Preset sync already creates DB-owned definitions only. |
-| 8 | FlowRoutes route-builder UX | 3–6 sessions | Keep Route builder simple, guided, and client-appropriate. Do not expose raw automation internals as a blank-canvas builder. |
+| 8 | FlowRoutes route-builder UX | 3–6 sessions | Follow `ui-ux-guide.md`: guided, outcome-oriented, and not a blank-canvas automation builder. |
 | 9 | Task-completed FlowRoutes resume behavior | 0.5–1 session | Resume route event-wait points from neutral `task.completed` automation events, not direct Task-specific FlowRoutes listeners. |
 | 10 | Client self-serve readiness audit | 0.5–1 session | Separate controlled beta/operator-assisted readiness from true client self-serve readiness. |
 | 11 | PetServices vertical planning | 0.5–1 session | Plan vertical-owned pet/service concepts without pushing domain fields into Core. |
@@ -189,7 +191,7 @@ Avoid:
 - fake MVP code paths that will be reverted soon;
 - compatibility layers for old shapes unless explicitly chosen;
 - adding module-specific behavior into Core for speed;
-- building blank-canvas client builders before the guided workflow is clear;
+- building blank-canvas client builders before the guided workflow is clear; follow `ui-ux-guide.md` for client-facing patterns;
 - expanding universal modules without a concrete workflow consumer;
 - treating SMS visibility as a provider toggle instead of a Messaging channel-availability decision;
 - making normal Broadcasts a consent bypass;
