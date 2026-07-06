@@ -59,7 +59,8 @@ class FlowRouteBindingControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/flow-routes/bindings')
             ->assertOk()
-            ->assertSee('Route Trigger Bindings')
+            ->assertSee('Automatic Follow-ups')
+            ->assertSee('When this happens, what should happen next?')
             ->assertSee('Prospect Route')
             ->assertSee('Webinar Attended Route')
             ->assertSee('webinar.attended');
