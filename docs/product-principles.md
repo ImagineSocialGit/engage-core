@@ -162,6 +162,10 @@ The client knows what they need to do.
 The interface makes the next step obvious.
 The task can be completed quickly.
 The client does not have to learn a new software category.
+The client never opens the CRM and thinks, “What did I get myself into?”
 ```
 
+Client-facing UI should not make the client feel like they accidentally became a software administrator. Powerful modules should appear as simple summaries, guided actions, presets, and next-step prompts unless the user is intentionally in an operator/developer setup surface.
+
 Detailed language rules, reusable UI patterns, automation-warning patterns, and UI review checklists belong in `ui-ux-guide.md`.
+

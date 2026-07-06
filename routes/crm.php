@@ -7,6 +7,7 @@ use App\Modules\Core\Controllers\ContactLookupController;
 use App\Modules\Core\Controllers\ContactNoteController;
 use App\Modules\FlowRoutes\Controllers\CRM\FlowRouteBindingController;
 use App\Modules\Messaging\Controllers\ContactImportBatchPermissionInvitationController;
+use App\Modules\Messaging\Controllers\CRM\MessageTemplatePresetController;
 use App\Modules\Tasks\Controllers\TaskController;
 use App\Modules\Webinars\Controllers\CRM\WebinarController;
 use App\Modules\Webinars\Controllers\CRM\WebinarDevController;
@@ -79,6 +80,20 @@ Route::middleware('auth')->group(function () {
         Route::post('/webinar-registrations/{registration}/smoke/reset', [WebinarDevController::class, 'resetRegistration'])
             ->name('crm.webinar-registrations.smoke.reset.store');
     });
+
+    Route::middleware('module:messaging')
+        ->prefix('message-templates')
+        ->name('crm.messaging.message-templates.')
+        ->group(function () {
+            Route::get('/', [MessageTemplatePresetController::class, 'index'])
+                ->name('index');
+
+            Route::patch('/{messageTemplatePreset}', [MessageTemplatePresetController::class, 'update'])
+                ->name('update');
+
+            Route::patch('/assignments/{messageTemplatePresetAssignment}', [MessageTemplatePresetController::class, 'updateAssignment'])
+                ->name('assignments.update');
+        });
 
     Route::middleware('module:flow_routes')
         ->prefix('flow-routes')

@@ -1,8 +1,10 @@
+
 @props([
     'related' => null,
     'relatedLabel' => 'Record',
     'teamMembers' => collect(),
     'currentTeamMember' => null,
+    'defaultDueAt' => null,
 ])
 
 @php
@@ -12,6 +14,7 @@
     $currentTeamMemberId = $currentTeamMember ? (string) $currentTeamMember->id : null;
 
     $initialNotifyAssignee = old('notify_assignee');
+    $initialDueAt = old('due_at', $defaultDueAt);
 
     $shouldInitiallyNotify = $initialNotifyAssignee !== null
         ? (bool) $initialNotifyAssignee
@@ -185,7 +188,7 @@
                     id="due_at"
                     name="due_at"
                     type="datetime-local"
-                    :value="old('due_at')"
+                    :value="$initialDueAt"
                 />
 
                 @error('due_at')

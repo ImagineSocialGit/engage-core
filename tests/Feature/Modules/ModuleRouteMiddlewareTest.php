@@ -45,6 +45,32 @@ class ModuleRouteMiddlewareTest extends TestCase
             ->assertOk();
     }
 
+    public function test_disabled_message_templates_module_returns_404_for_crm_message_template_routes(): void
+    {
+        config()->set('modules.enabled', []);
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->withoutMiddleware(ForceStagingAccess::class)
+            ->get('http://crm.'.config('app.root_domain').'/message-templates')
+            ->assertNotFound();
+    }
+
+    public function test_enabled_message_templates_module_allows_crm_message_template_routes(): void
+    {
+        config()->set('modules.enabled', [
+            'messaging',
+        ]);
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->withoutMiddleware(ForceStagingAccess::class)
+            ->get('http://crm.'.config('app.root_domain').'/message-templates')
+            ->assertOk();
+    }
+
     public function test_disabled_flow_routes_module_returns_404_for_crm_route_binding_routes(): void
     {
         config()->set('modules.enabled', [
@@ -84,7 +110,7 @@ class ModuleRouteMiddlewareTest extends TestCase
             'webinars',
         ]);
 
-        $this->withoutMiddleware(\App\Http\Middleware\ForceStagingAccess::class);
+        $this->withoutMiddleware(ForceStagingAccess::class);
 
         $response = $this->post('http://webhooks.'.config('app.root_domain').'/sms/telnyx');
 

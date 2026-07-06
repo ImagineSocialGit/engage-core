@@ -377,6 +377,8 @@
 │   │   │   │       └── SmsProvider.php
 │   │   │   ├── Controllers
 │   │   │   │   ├── ContactImportBatchPermissionInvitationController.php
+│   │   │   │   ├── CRM
+│   │   │   │   │   └── MessageTemplatePresetController.php
 │   │   │   │   └── Public
 │   │   │   │       ├── ConsentRevocationController.php
 │   │   │   │       └── ContactPermissionInvitationController.php
@@ -410,7 +412,9 @@
 │   │   │   ├── Providers
 │   │   │   │   └── MessagingModuleServiceProvider.php
 │   │   │   ├── Requests
-│   │   │   │   └── StoreContactPermissionInvitationConsentRequest.php
+│   │   │   │   ├── StoreContactPermissionInvitationConsentRequest.php
+│   │   │   │   ├── UpdateMessageTemplatePresetAssignmentRequest.php
+│   │   │   │   └── UpdateMessageTemplatePresetRequest.php
 │   │   │   ├── Rules
 │   │   │   │   ├── ConsentRevocationRules.php
 │   │   │   │   └── MessageConsentRules.php
@@ -1124,6 +1128,9 @@
 │       │   ├── flow-routes
 │       │   │   └── bindings
 │       │   │       └── index.blade.php
+│       │   ├── messaging
+│       │   │   └── message-templates
+│       │   │       └── index.blade.php
 │       │   └── webinars
 │       │       └── index.blade.php
 │       ├── email.blade.php
@@ -1222,6 +1229,7 @@
 │   │   │   ├── MessageEligibilityGateTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
 │   │   │   ├── MessageTemplatePresetAssignmentResolverTest.php
+│   │   │   ├── MessageTemplatePresetControllerTest.php
 │   │   │   ├── MessageTemplatePresetSyncActionTest.php
 │   │   │   ├── ScheduleInternalNotificationActionTest.php
 │   │   │   ├── SendScheduledMessageJobTest.php
@@ -1260,4 +1268,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-422 directories, 839 files
+425 directories, 844 files

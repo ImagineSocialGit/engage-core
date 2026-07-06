@@ -3,21 +3,68 @@
 ])
 
 @php
+    $sectionLabels = [
+        'Tasks' => [
+            'title' => 'Needs attention',
+            'description' => 'Open and recent manual follow-up work.',
+            'empty' => 'No manual action needed right now.',
+            'priority' => 10,
+        ],
+        'Workflow' => [
+            'title' => 'Current status',
+            'description' => 'Where this lead sits in the process.',
+            'empty' => 'No current status is available.',
+            'priority' => 20,
+        ],
+        'Routes' => [
+            'title' => 'Automatic follow-ups',
+            'description' => 'Recent or active automated steps for this lead.',
+            'empty' => 'No automatic follow-up is active right now.',
+            'priority' => 30,
+        ],
+        'Scheduled Messages' => [
+            'title' => 'Upcoming messages',
+            'description' => 'Scheduled and recent outbound messages.',
+            'empty' => 'No upcoming messages.',
+            'priority' => 40,
+        ],
+        'Campaigns' => [
+            'title' => 'Campaign follow-up',
+            'description' => 'Current and recent nurture campaign activity.',
+            'empty' => 'No campaign follow-up is active right now.',
+            'priority' => 50,
+        ],
+    ];
+
     $sections = collect($sections)
         ->filter(fn ($section) => filled($section['title'] ?? null))
+        ->map(function ($section) use ($sectionLabels) {
+            $originalTitle = $section['title'] ?? '';
+            $label = $sectionLabels[$originalTitle] ?? null;
+
+            return array_replace($section, [
+                'title' => $label['title'] ?? $originalTitle,
+                'description' => $label['description'] ?? ($section['description'] ?? null),
+                'empty' => $label['empty'] ?? ($section['empty'] ?? 'Nothing to show.'),
+                '_priority' => $label['priority'] ?? 99,
+            ]);
+        })
+        ->sortBy('_priority')
         ->values();
 @endphp
 
 @if($sections->isNotEmpty())
     <x-ui.card class="space-y-4">
-        <div>
-            <h3 class="text-lg font-semibold tracking-tight">
-                Contact Visibility
-            </h3>
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+                <h3 class="text-lg font-semibold tracking-tight">
+                    Lead tracking
+                </h3>
 
-            <p class="text-sm text-slate-500">
-                Read-only debug view of what is happening with this {{ config('contacts.labels.singular') }}.
-            </p>
+                <p class="text-sm text-slate-500">
+                    A quick read on what is happening now, what already happened, and what may happen next.
+                </p>
+            </div>
         </div>
 
         <div class="grid gap-4 lg:grid-cols-2">

@@ -1,104 +1,260 @@
+
+@php
+    $leadSingular = config('contacts.labels.singular');
+    $leadName = $contact->name ?: trim($contact->first_name.' '.$contact->last_name) ?: $contact->email ?: str($leadSingular)->title().' #'.$contact->id;
+    $currentStatus = module_enabled('workflow') ? $contact->workflowProfile?->contactStatus : null;
+    $defaultContactTaskDueAt = now(config('client.timezone', config('app.timezone')))->addDay()->setTime(9, 0)->format('Y-m-d\TH:i');
+    $openTasks = collect($tasks ?? [])
+        ->filter(fn ($task) => $task->status === 'open' && ! $task->archived_at)
+        ->sortBy(fn ($task) => sprintf(
+            '%d-%012d-%012d-%012d',
+            $task->due_at ? 0 : 1,
+            $task->due_at?->timestamp ?? 999999999999,
+            $task->created_at?->timestamp ?? 0,
+            $task->id ?? 0,
+        ))
+        ->values();
+    $nextTask = $openTasks->first();
+    $upNextTask = $openTasks->skip(1)->first();
+    $defaultActivityTab = $openTasks->isNotEmpty() && module_enabled('tasks') ? 'tasks' : 'notes';
+@endphp
+
 <x-layouts.crm
-    :title="config('contacts.labels.singular').' Detail'"
-    :heading="config('contacts.labels.singular').' Detail'"
-    :subheading="config('contacts.labels.singular').' record'"
+    :title="$leadName"
+    :heading="$leadName"
+    subheading="Lead profile and next steps"
 >
-    <div class="space-y-6">
-        <div class="grid gap-6 {{ $contactPanels->isNotEmpty() ? 'lg:grid-cols-3' : '' }}">
-            <div class="{{ $contactPanels->isNotEmpty() ? 'lg:col-span-2' : '' }}">
-                <x-ui.card class="space-y-4">
+    <div
+        class="space-y-6"
+        x-data="{
+            activityTab: new URLSearchParams(window.location.search).get('activity_tab') || @js($defaultActivityTab),
+            messageTab: new URLSearchParams(window.location.search).get('messages_tab') || 'messages',
+            taskModalOpen: @js($errors->has('assigned_to_id') || $errors->has('title') || $errors->has('description') || $errors->has('due_at')),
+        }"
+    >
+        @if(session('success'))
+            <x-ui.feedback.alert type="success">
+                {{ session('success') }}
+            </x-ui.feedback.alert>
+        @endif
+
+        @if(session('error'))
+            <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                {{ session('error') }}
+            </div>
+        @endif
+
+        <div class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
+            <x-ui.card class="space-y-6">
+                <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <p class="text-sm text-slate-500 capitalize">
-                            {{ config('contacts.labels.singular') }} Name
+                        <p class="text-sm font-medium capitalize text-slate-500">
+                            {{ $leadSingular }}
                         </p>
 
-                        <h2 class="text-2xl font-semibold tracking-tight">
-                            {{ $contact->first_name }} {{ $contact->last_name }}
+                        <h2 class="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
+                            {{ $leadName }}
                         </h2>
                     </div>
 
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <p class="text-sm text-slate-500">Email</p>
-                            <p class="font-medium text-slate-900">{{ $contact->email }}</p>
-                        </div>
-
-                        <div>
-                            <p class="text-sm text-slate-500">Phone</p>
-                            <p class="font-medium text-slate-900">
-                                {{ $contact->phone ?: '—' }}
-                            </p>
-                        </div>
+                    <div class="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
+                        {{ $currentStatus?->name ?? 'No status' }}
                     </div>
+                </div>
 
-                    <div class="space-y-3">
-                        <div>
-                            <p class="text-sm text-slate-500">Status</p>
-                            <p class="font-medium text-slate-900">
-                                {{ module_enabled('workflow') ? ($contact->workflowProfile?->contactStatus?->name ?? '—') : '—' }}
-                            </p>
-                        </div>
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    @if($nextTask)
+                        <div class="flex flex-wrap items-start justify-between gap-4">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Next step
+                                </p>
 
-                        @if(module_enabled('workflow'))
-                            <form
-                                method="POST"
-                                action="{{ route('crm.contacts.status.update', $contact) }}"
-                                class="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-end"
-                            >
-                                @csrf
-                                @method('PATCH')
+                                <h3 class="mt-1 text-lg font-semibold text-slate-950">
+                                    {{ $nextTask->title }}
+                                </h3>
 
-                                <div class="flex-1">
-                                    <x-ui.form.label for="contact_status_id">
-                                        Update Status
-                                    </x-ui.form.label>
+                                @if($nextTask->description)
+                                    <p class="mt-1 max-w-3xl text-sm text-slate-600">
+                                        {{ $nextTask->description }}
+                                    </p>
+                                @endif
 
-                                    <select
-                                        id="contact_status_id"
-                                        name="contact_status_id"
-                                        class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                                    >
-                                        @foreach($contactStatuses as $contactStatus)
-                                            <option
-                                                value="{{ $contactStatus->id }}"
-                                                @selected((int) old('contact_status_id', $contact->workflowProfile?->contact_status_id) === (int) $contactStatus->id)
-                                            >
-                                                {{ $contactStatus->name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
+                                <div class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-600">
+                                    <p>
+                                        Owner:
+                                        <span class="font-medium text-slate-900">
+                                            {{ $nextTask->assignedTo?->name ?? 'Unassigned' }}
+                                        </span>
+                                    </p>
 
-                                    @error('contact_status_id')
-                                        <p class="mt-1 text-sm text-red-600">
-                                            {{ $message }}
-                                        </p>
-                                    @enderror
+                                    <p>
+                                        Due:
+                                        <span class="font-medium text-slate-900">
+                                            {{ $nextTask->due_at?->format('M j, Y g:i A') ?? 'No due date' }}
+                                        </span>
+                                    </p>
                                 </div>
+                            </div>
 
-                                <x-ui.button type="submit">
-                                    Update
+                            <div class="flex flex-wrap gap-2">
+                                <form method="POST" action="{{ route('crm.tasks.complete', $nextTask) }}">
+                                    @csrf
+                                    @method('PATCH')
+
+                                    <x-ui.button type="submit" variant="secondary">
+                                        Mark Complete
+                                    </x-ui.button>
+                                </form>
+
+                                <x-ui.button
+                                    type="button"
+                                    variant="outline"
+                                    x-on:click="activityTab = 'notes'; $nextTick(() => document.getElementById('lead-activity')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))"
+                                >
+                                    Add Note
                                 </x-ui.button>
-                            </form>
-                        @endif
-                    </div>
-
-                    @if (data_get($contact->meta, 'import.status_mapping.state') === 'unmapped')
-                        <div>
-                            <p class="text-sm text-slate-500">Import Status Review</p>
-                            <p class="font-medium text-amber-700">
-                                {{ data_get($contact->meta, 'import.original_status') ?: 'Unmapped imported status' }}
-                            </p>
+                            </div>
                         </div>
-                    @elseif (data_get($contact->meta, 'import.original_status'))
-                        <div>
-                            <p class="text-sm text-slate-500">Original Imported Status</p>
-                            <p class="font-medium text-slate-900">
-                                {{ data_get($contact->meta, 'import.original_status') }}
-                            </p>
+
+                        @if($upNextTask)
+                            <div class="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            Up next
+                                        </p>
+
+                                        <p class="mt-1 text-sm font-semibold text-slate-900">
+                                            {{ $upNextTask->title }}
+                                        </p>
+
+                                        <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                                            <span>
+                                                Owner:
+                                                <span class="font-medium text-slate-700">
+                                                    {{ $upNextTask->assignedTo?->name ?? 'Unassigned' }}
+                                                </span>
+                                            </span>
+
+                                            <span>
+                                                Due:
+                                                <span class="font-medium text-slate-700">
+                                                    {{ $upNextTask->due_at?->format('M j, Y g:i A') ?? 'No due date' }}
+                                                </span>
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        class="text-xs font-semibold text-slate-600 underline underline-offset-4 hover:text-slate-900"
+                                        x-on:click="activityTab = 'tasks'; $nextTick(() => document.getElementById('lead-activity')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))"
+                                    >
+                                        View tasks
+                                    </button>
+                                </div>
+                            </div>
+                        @endif
+                    @else
+                        <div class="flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Next step
+                                </p>
+
+                                <h3 class="mt-1 text-lg font-semibold text-slate-950">
+                                    No action needed right now.
+                                </h3>
+
+                                <p class="mt-1 text-sm text-slate-600">
+                                    This {{ $leadSingular }} has no open tasks. Review tracking or add a task if follow-up is needed.
+                                </p>
+                            </div>
+
+                            @if(module_enabled('tasks'))
+                                <x-ui.button
+                                    type="button"
+                                    variant="secondary"
+                                    x-on:click="taskModalOpen = true"
+                                >
+                                    Add Task
+                                </x-ui.button>
+                            @endif
                         </div>
                     @endif
-                </x-ui.card>
-            </div>
+                </div>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <p class="text-sm text-slate-500">Email</p>
+                        <p class="font-medium text-slate-900">{{ $contact->email ?: '—' }}</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm text-slate-500">Phone</p>
+                        <p class="font-medium text-slate-900">{{ $contact->phone ?: '—' }}</p>
+                    </div>
+                </div>
+
+                @if(module_enabled('workflow'))
+                    <form
+                        method="POST"
+                        action="{{ route('crm.contacts.status.update', $contact) }}"
+                        class="rounded-2xl border border-slate-200 bg-white p-4"
+                    >
+                        @csrf
+                        @method('PATCH')
+
+                        <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                            <div>
+                                <x-ui.form.label for="contact_status_id">
+                                    Change status
+                                </x-ui.form.label>
+
+                                <x-ui.form.select id="contact_status_id" name="contact_status_id">
+                                    @foreach($contactStatuses as $contactStatus)
+                                        <option
+                                            value="{{ $contactStatus->id }}"
+                                            @selected((int) old('contact_status_id', $contact->workflowProfile?->contact_status_id) === (int) $contactStatus->id)
+                                        >
+                                            {{ $contactStatus->name }}
+                                        </option>
+                                    @endforeach
+                                </x-ui.form.select>
+
+                                <x-ui.form.error name="contact_status_id" />
+
+                                @if(module_enabled('flow_routes'))
+                                    <p class="mt-2 text-xs text-slate-500">
+                                        Some status changes can start automatic follow-ups. Review the next step after saving.
+                                    </p>
+                                @endif
+                            </div>
+
+                            <x-ui.button type="submit">
+                                Update Status
+                            </x-ui.button>
+                        </div>
+                    </form>
+                @endif
+
+                @if (data_get($contact->meta, 'import.status_mapping.state') === 'unmapped')
+                    <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                        <p class="text-sm font-semibold text-amber-900">Imported status needs review</p>
+                        <p class="mt-1 text-sm text-amber-800">
+                            {{ data_get($contact->meta, 'import.original_status') ?: 'Unmapped imported status' }}
+                        </p>
+                    </div>
+                @elseif (data_get($contact->meta, 'import.original_status'))
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <p class="text-sm text-slate-500">Original imported status</p>
+                        <p class="font-medium text-slate-900">
+                            {{ data_get($contact->meta, 'import.original_status') }}
+                        </p>
+                    </div>
+                @endif
+            </x-ui.card>
 
             @if($contactPanels->isNotEmpty())
                 <div class="space-y-6">
@@ -114,46 +270,69 @@
 
         <x-crm.contact-visibility :sections="$contactVisibilitySections" />
 
-        <div
-            class="grid gap-6"
-            x-data="{
-                tab: 'notes',
-                taskModalOpen: @js($errors->has('assigned_to_id') || $errors->has('title') || $errors->has('description') || $errors->has('due_at')),
-            }"
-        >
+        <div id="lead-activity" class="grid gap-6">
             <x-ui.card class="space-y-4">
                 <div class="flex items-center justify-between gap-4">
-                    <h3 class="text-lg font-semibold tracking-tight">
-                        Activity
-                    </h3>
+                    <div>
+                        <h3 class="text-lg font-semibold tracking-tight">
+                            Activity
+                        </h3>
+
+                        <p class="text-sm text-slate-500">
+                            Add notes and manage manual follow-up tasks.
+                        </p>
+                    </div>
 
                     <div class="flex rounded-xl bg-slate-100 p-1 text-sm font-semibold">
-                        <button
-                            type="button"
-                            x-on:click="tab = 'notes'"
-                            class="rounded-lg px-3 py-1.5"
-                            x-bind:class="tab === 'notes' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
-                        >
-                            Notes
-                        </button>
-
                         @if(module_enabled('tasks'))
                             <button
                                 type="button"
-                                x-on:click="tab = 'tasks'"
+                                x-on:click="activityTab = 'tasks'"
                                 class="rounded-lg px-3 py-1.5"
-                                x-bind:class="tab === 'tasks' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+                                x-bind:class="activityTab === 'tasks' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
                             >
                                 Tasks
                             </button>
                         @endif
+
+                        <button
+                            type="button"
+                            x-on:click="activityTab = 'notes'"
+                            class="rounded-lg px-3 py-1.5"
+                            x-bind:class="activityTab === 'notes' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+                        >
+                            Notes
+                        </button>
                     </div>
                 </div>
 
-                <div x-show="tab === 'notes'" class="space-y-4">
-                    <h3 class="text-lg font-semibold tracking-tight">
-                        Add Note
-                    </h3>
+                @if(module_enabled('tasks'))
+                    <div x-show="activityTab === 'tasks'" class="space-y-4">
+                        <div class="flex items-center justify-between gap-4">
+                            <h4 class="font-semibold tracking-tight">
+                                Tasks
+                            </h4>
+
+                            <x-ui.button
+                                type="button"
+                                x-on:click="taskModalOpen = true"
+                            >
+                                Add Task
+                            </x-ui.button>
+                        </div>
+
+                        <x-tasks.task-list
+                            :tasks="$tasks"
+                            :archived-tasks="$archivedTasks"
+                            :task-view="$taskView"
+                        />
+                    </div>
+                @endif
+
+                <div x-show="activityTab === 'notes'" class="space-y-4">
+                    <h4 class="font-semibold tracking-tight">
+                        Add note
+                    </h4>
 
                     <form
                         method="POST"
@@ -173,11 +352,7 @@
                                 rows="4"
                             >{{ old('body') }}</x-ui.form.textarea>
 
-                            @error('body')
-                                <p class="mt-1 text-sm text-red-600">
-                                    {{ $message }}
-                                </p>
-                            @enderror
+                            <x-ui.form.error name="body" />
                         </div>
 
                         <x-ui.button type="submit">
@@ -191,7 +366,7 @@
                                 x-data="{ editing: false }"
                                 class="rounded-xl border border-slate-200 p-3"
                             >
-                                <div x-show="! editing" class="flex justify-between items-center">
+                                <div x-show="! editing" class="flex justify-between items-center gap-4">
                                     <div class="space-y-2">
                                         <p class="text-slate-800">
                                             {{ $note->body }}
@@ -264,53 +439,28 @@
                         @endforelse
                     </div>
                 </div>
-
-                @if(module_enabled('tasks'))
-                    <div x-show="tab === 'tasks'" class="space-y-4">
-                        <div class="flex items-center justify-between gap-4">
-                            <h3 class="text-lg font-semibold tracking-tight">
-                                Tasks
-                            </h3>
-
-                            <x-ui.button
-                                type="button"
-                                x-on:click="taskModalOpen = true"
-                            >
-                                Add Task
-                            </x-ui.button>
-                        </div>
-
-                        <x-tasks.task-list
-                            :tasks="$tasks"
-                            :archived-tasks="$archivedTasks"
-                            :task-view="$taskView"
-                        />
-                    </div>
-                @endif
             </x-ui.card>
 
             @if(module_enabled('tasks'))
                 <x-tasks.create-task-modal
                     :related="$contact"
-                    related-label="{{ config('contacts.labels.singular') }}"
+                    related-label="{{ $leadSingular }}"
                     :team-members="$teamMembers"
                     :current-team-member="$currentTeamMember"
+                    :default-due-at="$defaultContactTaskDueAt"
                 />
             @endif
         </div>
 
         @if(module_enabled('messaging'))
-        <div
-            x-data="{ tab: new URLSearchParams(window.location.search).get('messages_tab') || 'messages' }"
-        >
             <x-ui.card class="space-y-4">
                 <div>
                     <h3 class="text-lg font-semibold tracking-tight">
-                        Messages
+                        Messages & consent
                     </h3>
 
                     <p class="text-sm text-slate-500">
-                        Sent messages and consent settings for this {{ config('contacts.labels.singular') }}.
+                        See upcoming/recent messages and whether this {{ $leadSingular }} can receive follow-up.
                     </p>
                 </div>
 
@@ -318,9 +468,9 @@
                     <nav class="-mb-px flex gap-6" aria-label="Tabs">
                         <button
                             type="button"
-                            x-on:click="tab = 'messages'"
+                            x-on:click="messageTab = 'messages'"
                             class="border-b-2 px-1 pb-3 text-sm font-semibold"
-                            x-bind:class="tab === 'messages'
+                            x-bind:class="messageTab === 'messages'
                                 ? 'border-indigo-600 text-indigo-600'
                                 : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'"
                         >
@@ -329,32 +479,34 @@
 
                         <button
                             type="button"
-                            x-on:click="tab = 'consents'"
+                            x-on:click="messageTab = 'consents'"
                             class="border-b-2 px-1 pb-3 text-sm font-semibold"
-                            x-bind:class="tab === 'consents'
+                            x-bind:class="messageTab === 'consents'
                                 ? 'border-indigo-600 text-indigo-600'
                                 : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'"
                         >
-                            Consent Settings
+                            Consent
                         </button>
                     </nav>
                 </div>
 
-                <div x-show="tab === 'messages'" class="space-y-3">
+                <div x-show="messageTab === 'messages'" class="space-y-3">
                     @forelse ($scheduledMessages as $message)
-                        <div class="rounded-xl border border-slate-200 p-3">
+                        @php
+                            $channel = str($message->channel)->replace('_', ' ')->title();
+                            $scope = str($message->scope)->replace('_', ' ')->title();
+                            $messageType = str($message->message_type)->replace('_', ' ')->title();
+                        @endphp
+
+                        <div class="rounded-xl border border-slate-200 p-4">
                             <div class="flex items-start justify-between gap-4">
                                 <div>
                                     <p class="font-medium text-slate-900">
-                                        {{ str($message->message_type)->replace('_', ' ')->title() }}
+                                        {{ $scope }} {{ $messageType }} {{ $channel }}
                                     </p>
 
                                     <p class="mt-1 text-sm text-slate-500">
-                                        {{ str($message->channel)->replace('_', ' ')->title() }}
-                                        <span class="text-slate-400">/</span>
-                                        {{ str($message->purpose)->replace('_', ' ')->title() }}
-                                        <span class="text-slate-400">/</span>
-                                        {{ str($message->scope)->replace('_', ' ')->title() }}
+                                        {{ str($message->purpose)->replace('_', ' ')->title() }} follow-up
                                     </p>
                                 </div>
 
@@ -363,25 +515,25 @@
                                 </span>
                             </div>
 
-                            <div class="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-3">
+                            <div class="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
                                 <p>
-                                    Sent:
+                                    Send time:
                                     <span class="font-medium text-slate-700">
                                         {{ $message->send_at?->format('M j, Y g:i A') ?? '—' }}
                                     </span>
                                 </p>
 
                                 <p>
-                                    Queue:
+                                    Channel:
                                     <span class="font-medium text-slate-700">
-                                        {{ data_get($message->meta, 'queue') ? str(data_get($message->meta, 'queue'))->replace('_', ' ')->title() : '—' }}
+                                        {{ $channel }}
                                     </span>
                                 </p>
                             </div>
                         </div>
                     @empty
                         <p class="text-sm text-slate-500">
-                            No sent messages yet.
+                            No messages yet.
                         </p>
                     @endforelse
 
@@ -392,23 +544,24 @@
                     @endif
                 </div>
 
-                <div x-show="tab === 'consents'" class="space-y-4">
+                <div x-show="messageTab === 'consents'" class="space-y-4">
                     <div class="space-y-3">
                         @forelse ($messageConsents as $consent)
-                            <div class="rounded-xl border border-slate-200 p-3">
+                            @php
+                                $channel = str($consent->channel->value)->replace('_', ' ')->title();
+                                $purpose = str($consent->purpose->value)->replace('_', ' ')->title();
+                                $scope = str($consent->scope)->replace('_', ' ')->title();
+                            @endphp
+
+                            <div class="rounded-xl border border-slate-200 p-4">
                                 <div class="flex items-start justify-between gap-4">
                                     <div>
                                         <p class="font-medium text-slate-900">
-                                            {{ str($consent->channel->value)->replace('_', ' ')->title() }}
-                                            <span class="text-slate-400">/</span>
-                                            {{ str($consent->purpose->value)->replace('_', ' ')->title() }}
+                                            Can receive {{ strtolower($scope) }} {{ strtolower($purpose) }} by {{ strtolower($channel) }}
                                         </p>
 
                                         <p class="mt-1 text-sm text-slate-500">
-                                            Scope:
-                                            <span class="font-medium text-slate-700">
-                                                {{ str($consent->scope)->replace('_', ' ')->title() }}
-                                            </span>
+                                            Consented {{ $consent->consented_at?->format('M j, Y g:i A') ?? '—' }}
                                         </p>
                                     </div>
 
@@ -417,21 +570,12 @@
                                     </span>
                                 </div>
 
-                                <div class="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
-                                    <p>
-                                        Consented:
-                                        <span class="font-medium text-slate-700">
-                                            {{ $consent->consented_at?->format('M j, Y g:i A') ?? '—' }}
-                                        </span>
-                                    </p>
-
-                                    <p>
-                                        Source:
-                                        <span class="font-medium text-slate-700">
-                                            {{ $consent->source ? str($consent->source)->replace('_', ' ')->title() : '—' }}
-                                        </span>
-                                    </p>
-                                </div>
+                                <p class="mt-3 text-xs text-slate-500">
+                                    Source:
+                                    <span class="font-medium text-slate-700">
+                                        {{ $consent->source ? str($consent->source)->replace('_', ' ')->title() : '—' }}
+                                    </span>
+                                </p>
                             </div>
                         @empty
                             <p class="text-sm text-slate-500">
@@ -442,25 +586,20 @@
 
                     <div class="border-t border-slate-200 pt-4">
                         <h4 class="text-sm font-semibold text-slate-900">
-                            Revocation History
+                            Revocation history
                         </h4>
 
                         <div class="mt-3 space-y-3">
                             @forelse ($consentRevocations as $revocation)
-                                <div class="rounded-xl border border-slate-200 p-3">
+                                <div class="rounded-xl border border-slate-200 p-4">
                                     <div class="flex items-start justify-between gap-4">
                                         <div>
                                             <p class="font-medium text-slate-900">
-                                                {{ str($revocation->channel->value)->replace('_', ' ')->title() }}
-                                                <span class="text-slate-400">/</span>
-                                                {{ str($revocation->purpose->value)->replace('_', ' ')->title() }}
+                                                {{ str($revocation->channel->value)->replace('_', ' ')->title() }} {{ str($revocation->purpose->value)->replace('_', ' ')->title() }} revoked
                                             </p>
 
                                             <p class="mt-1 text-sm text-slate-500">
-                                                Scope:
-                                                <span class="font-medium text-slate-700">
-                                                    {{ str($revocation->scope)->replace('_', ' ')->title() }}
-                                                </span>
+                                                Scope: {{ str($revocation->scope)->replace('_', ' ')->title() }}
                                             </p>
                                         </div>
 
@@ -501,7 +640,6 @@
                     </div>
                 </div>
             </x-ui.card>
-        </div>
         @endif
     </div>
 </x-layouts.crm>

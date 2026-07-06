@@ -192,6 +192,7 @@ Avoid:
 - compatibility layers for old shapes unless explicitly chosen;
 - adding module-specific behavior into Core for speed;
 - building blank-canvas client builders before the guided workflow is clear; follow `ui-ux-guide.md` for client-facing patterns;
+- building platform-cockpit screens that expose every module, builder, dashboard widget, log, setting, or automation primitive before the next client action is clear;
 - expanding universal modules without a concrete workflow consumer;
 - treating SMS visibility as a provider toggle instead of a Messaging channel-availability decision;
 - making normal Broadcasts a consent bypass;
@@ -211,3 +212,4 @@ When a roadmap item is completed:
 1. Remove it from this file or move it to a completed release note if needed.
 2. Delete or update the related TODO item.
 3. Update module docs only if architecture or durable behavior changed.
+

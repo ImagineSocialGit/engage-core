@@ -9,6 +9,10 @@ These are repeatable checklists. Run the relevant checklist after a production s
 ### UI Rules
 
 - [ ] Use `docs/ui-ux-guide.md` when reviewing or refactoring client/operator-facing screens.
+- [ ] Apply the “no what did I get myself into?” test to every client-facing screen.
+  - The page should make the next action obvious before exposing module detail.
+  - The page should avoid platform-cockpit sprawl: too many modules, widgets, logs, builders, raw keys, and settings at once.
+  - Powerful features should default to summaries, presets, guided choices, and consequence previews.
 - [ ] Refactor the FlowRoute trigger binding screen into an outcome-oriented Automatic Follow-ups UI.
   - Use configured lead/contact/customer nouns.
   - Replace raw status/event terminology with Status and Activity language.
@@ -380,3 +384,4 @@ Completed import-batch visibility baseline:
 - [ ] Add test coverage for client config fallback behavior.
   - Missing optional content/style keys should not break public pages.
   - Client copy changes should not break tests that only need behavioral assertions.
+

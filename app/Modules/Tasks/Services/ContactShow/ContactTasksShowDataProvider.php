@@ -20,14 +20,13 @@ class ContactTasksShowDataProvider implements ContactShowDataProvider
         return [
             'taskView' => $taskView,
 
-            'tasks' => $this->contactTaskQuery($contact)
-                ->unarchived()
-                ->latest()
+            'tasks' => $this->orderedActiveTaskQuery($contact)
                 ->get(),
 
             'archivedTasks' => $this->contactTaskQuery($contact)
                 ->archived()
                 ->latest('archived_at')
+                ->latest('id')
                 ->get(),
 
             'teamMembers' => TeamMember::active()
@@ -38,6 +37,17 @@ class ContactTasksShowDataProvider implements ContactShowDataProvider
                 ->where('user_id', auth()->id())
                 ->first(),
         ];
+    }
+
+    private function orderedActiveTaskQuery(Contact $contact): Builder
+    {
+        return $this->contactTaskQuery($contact)
+            ->unarchived()
+            ->orderByRaw('CASE WHEN status = ? THEN 0 ELSE 1 END', [Task::STATUS_OPEN])
+            ->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('due_at')
+            ->orderBy('created_at')
+            ->orderBy('id');
     }
 
     private function contactTaskQuery(Contact $contact): Builder

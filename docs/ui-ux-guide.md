@@ -20,6 +20,77 @@ I can finish it in a few minutes.
 I did not have to learn a new software category.
 ```
 
+
+## No “what did I get myself into?” screens
+
+A client should never open Engage Core and feel like they accidentally became a software administrator.
+
+The first impression should be:
+
+```text
+I know what needs my attention.
+I can see what is already being handled.
+I know the next safe action.
+```
+
+Not:
+
+```text
+What are workflows, triggers, smart lists, funnels, tags, campaigns, AI agents, execution logs, and settings?
+Which one am I supposed to touch?
+What did I get myself into?
+```
+
+Every client-facing screen should answer, in this order:
+
+```text
+Where am I?
+What matters right now?
+What should I do next?
+What is already being handled automatically?
+Where can I review details if I need them?
+```
+
+Powerful capabilities should default to calm summaries, guided actions, and next-step prompts. The machinery underneath belongs in operator/developer setup, advanced details, or gated debug views.
+
+## Avoid platform-cockpit UI
+
+Do not organize client-facing screens as a cockpit of every feature the platform can technically perform.
+
+A platform-cockpit screen usually exposes too many concepts at once:
+
+```text
+workflow builders;
+triggers;
+smart lists;
+funnels;
+pipelines;
+execution logs;
+tag rules;
+AI tools;
+provider settings;
+message queues;
+raw automation steps;
+admin-only configuration;
+empty dashboard widgets;
+advanced reporting panels.
+```
+
+This makes the client learn the software's internal universe before they can do normal business work.
+
+Engage Core should instead organize screens around business questions:
+
+```text
+Who needs attention today?
+Which lead should I work next?
+What happened with this lead?
+What follow-up is already running?
+What message is about to be sent?
+What decision do I need to make?
+```
+
+When a feature is powerful, expose it through presets, summaries, guided choices, consequence previews, and simple runtime actions. Do not make clients assemble the system from primitives unless they explicitly need operator/admin setup access.
+
 ## Primary rule
 
 Client-facing UI should describe the business action and expected outcome, not the underlying implementation mechanism.
@@ -221,6 +292,33 @@ If the contact show page already uses a status index or status selector pattern,
 Do not introduce a new layout for the same mental model unless the new screen asks a meaningfully different question.
 
 ## Core screen patterns
+
+### Dashboard / today screen pattern
+
+A client dashboard should be decisive, not merely informative.
+
+It should answer:
+
+```text
+What needs my attention today?
+What is overdue or blocked?
+Which lead/task/message should I work next?
+What is already being handled automatically?
+```
+
+Preferred shape:
+
+```text
+Today
+3 leads need attention.
+1 task is overdue.
+2 webinar registrants need follow-up.
+No urgent message issues.
+
+Primary action: Work next lead
+```
+
+Avoid dashboards filled with empty charts, duplicated widgets, broad module panels, generic counts, or filters that do not lead to a clear next action.
 
 ### “When this happens, what should happen next?” pattern
 
@@ -625,7 +723,7 @@ The public preference page should make SMS opt-in explicit and should not imply 
 
 ## Contact show UI
 
-The contact show page is the main client mental model for a person.
+The contact show page is the main client mental model for a person. It should feel like a lead/customer workspace, not a CRM cockpit.
 
 It should answer:
 
@@ -635,23 +733,47 @@ What is their current status?
 What has happened?
 What needs attention?
 What can I do next?
+What is already being handled automatically?
 ```
+
+The top of the page should make the next actionable step obvious.
+
+Good:
+
+```text
+Next step
+Call the lead and record the outcome.
+Owner: Taylor
+Due: Tomorrow 9:00 AM
+
+Up next
+Review application documents.
+```
+
+Also good:
+
+```text
+No action needed right now.
+This lead has no open tasks or blocked follow-ups.
+```
+
+Avoid leading with field folders, raw tags, owner/follower mechanics, module tabs, activity rails, internal IDs, or large debug panels before the user can tell what should happen next.
 
 Module panels should contribute useful summaries, not raw module state dumps.
 
 Good panels:
 
 ```text
-Tasks needing attention
+Needs attention
 Recent messages
 Webinar activity
-Campaign/follow-up status
+Automatic follow-ups
 Documents requested
 Appointments
 Orders/purchases
 ```
 
-Each panel should include an obvious next action when applicable.
+Each panel should include an obvious next action when applicable and should make it clear when no action is currently needed.
 
 ## Form and document UI
 
@@ -730,6 +852,29 @@ Action failed.
 
 Use this section to capture UX problems discovered during review. Move items to `TODO.md` only when they become actionable implementation backlog.
 
+### Platform cockpit screens
+
+Current risk:
+
+```text
+The UI exposes every module, builder, setting, log, tag, trigger, dashboard widget, and provider-adjacent tool as if the client should understand all of it.
+The user sees many available controls but no clear next action.
+The screen teaches the software's architecture instead of the client's business workflow.
+Empty charts and broad counts make the product feel large but not helpful.
+Automation builders expose raw triggers, waits, branches, tags, execution logs, and publish controls before the guided workflow is clear.
+```
+
+Target direction:
+
+```text
+Lead with today's decisions and next actions.
+Use small navigation.
+Hide builders behind guided setup or operator/developer access.
+Expose what is on, what will happen, and what needs attention.
+Show raw internals only in details/debug contexts.
+Prefer preset-backed choices over blank-canvas configuration.
+```
+
 ### Route Trigger Bindings screen
 
 Current issues:
@@ -778,6 +923,8 @@ Are empty states useful and action-oriented?
 Are error states specific enough to fix the problem?
 Does the UI reuse an existing pattern where the mental model is the same?
 Does the UI avoid raw schema/config/event/provider jargon?
+Would a first-time client feel calm rather than overwhelmed?
+Does the screen avoid making the client feel like a software administrator?
 Does the UI preserve context after save where reloads would be frustrating?
 Is this production/client UI, not a reused dev-testing pattern?
 ```

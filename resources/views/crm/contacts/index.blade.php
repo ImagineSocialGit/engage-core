@@ -1,56 +1,19 @@
+@php
+    $leadSingular = config('contacts.labels.singular');
+    $leadPlural = config('contacts.labels.plural');
+@endphp
+
 <x-layouts.crm
-    :title="config('contacts.labels.plural')"
-    :heading="config('contacts.labels.plural')"
-    :subheading="config('contacts.labels.singular').' list'"
+    :title="str($leadPlural)->title()"
+    :heading="str($leadPlural)->title()"
+    subheading="Find the right lead and choose the next step."
 >
-    <div class="space-y-6">
-
-        <div class="flex flex-wrap items-start justify-between gap-4">
-            <div>
-                <h2 class="text-xl font-semibold tracking-tight capitalize">
-                    All {{ config('contacts.labels.plural') }}
-                </h2>
-
-                <p class="mt-1 text-sm text-slate-500">
-                    Create, import, and review {{ strtolower(config('contacts.labels.plural')) }}.
-                </p>
-            </div>
-
-            <div class="flex flex-wrap items-center gap-3">
-                <x-ui.button
-                    href="{{ route('crm.contacts.import-batches.index') }}"
-                    variant="secondary"
-                >
-                    View Imports
-                </x-ui.button>
-
-                <form
-                    method="POST"
-                    action="{{ route('crm.contacts.import.preview') }}"
-                    enctype="multipart/form-data"
-                    class="flex items-center gap-3"
-                >
-                @csrf
-
-                <label class="block">
-                    <span class="sr-only">Choose CSV file</span>
-
-                    <input
-                        type="file"
-                        name="csv"
-                        accept=".csv,text/csv"
-                        required
-                        class="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-700"
-                    />
-                </label>
-
-                    <x-ui.button type="submit">
-                        Import CSV
-                    </x-ui.button>
-                </form>
-            </div>
-        </div>
-
+    <div
+        class="space-y-6"
+        x-data="{
+            addLeadOpen: @js($errors->has('first_name') || $errors->has('last_name') || $errors->has('email') || $errors->has('phone') || $errors->has('contact_status_id')),
+        }"
+    >
         @if (session('success'))
             <x-ui.feedback.alert type="success">
                 {{ session('success') }}
@@ -58,12 +21,62 @@
         @endif
 
         @error('csv')
-            <p class="text-sm text-red-600">
+            <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
                 {{ $message }}
-            </p>
+            </div>
         @enderror
 
-        <x-ui.card>
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+            <div>
+                <h2 class="text-2xl font-semibold tracking-tight text-slate-950 capitalize">
+                    Work your {{ $leadPlural }}
+                </h2>
+
+                <p class="mt-1 max-w-2xl text-sm text-slate-500">
+                    Review who needs attention, open a {{ $leadSingular }}, and update the next step from their profile.
+                </p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+                <x-ui.button
+                    type="button"
+                    variant="secondary"
+                    x-on:click="addLeadOpen = ! addLeadOpen"
+                >
+                    Add {{ str($leadSingular)->title() }}
+                </x-ui.button>
+
+                <x-ui.button
+                    href="{{ route('crm.contacts.import') }}"
+                    variant="secondary"
+                >
+                    Import {{ str($leadPlural)->title() }}
+                </x-ui.button>
+
+                <x-ui.button
+                    href="{{ route('crm.contacts.import-batches.index') }}"
+                    variant="outline"
+                >
+                    View Imports
+                </x-ui.button>
+            </div>
+        </div>
+
+        <x-ui.card
+            x-cloak
+            x-show="addLeadOpen"
+            class="space-y-5"
+        >
+            <div>
+                <h3 class="text-lg font-semibold tracking-tight text-slate-950 capitalize">
+                    Add a {{ $leadSingular }}
+                </h3>
+
+                <p class="mt-1 text-sm text-slate-500">
+                    Add one person manually. Use Import {{ str($leadPlural)->title() }} when you have a CSV list.
+                </p>
+            </div>
+
             <form method="POST" action="{{ route('crm.contacts.store') }}" class="space-y-4">
                 @csrf
 
@@ -129,61 +142,112 @@
                     </div>
                 </div>
 
-                <div>
-                    <x-ui.form.label for="contact_status_id">
-                        Status
-                    </x-ui.form.label>
+                @if(module_enabled('workflow'))
+                    <div>
+                        <x-ui.form.label for="contact_status_id">
+                            Starting status
+                        </x-ui.form.label>
 
-                    <x-ui.form.select id="contact_status_id" name="contact_status_id">
-                        <option value="">Default Status</option>
+                        <x-ui.form.select id="contact_status_id" name="contact_status_id">
+                            <option value="">Use default status</option>
 
-                        @foreach ($contactStatuses as $status)
-                            <option
-                                value="{{ $status->id }}"
-                                @selected((string) old('contact_status_id') === (string) $status->id)
-                            >
-                                {{ $status->name }}
-                            </option>
-                        @endforeach
-                    </x-ui.form.select>
+                            @foreach ($contactStatuses as $status)
+                                <option
+                                    value="{{ $status->id }}"
+                                    @selected((string) old('contact_status_id') === (string) $status->id)
+                                >
+                                    {{ $status->name }}
+                                </option>
+                            @endforeach
+                        </x-ui.form.select>
 
-                    <x-ui.form.error name="contact_status_id" />
-                </div>
+                        <x-ui.form.error name="contact_status_id" />
+                    </div>
+                @endif
 
-                <div>
+                <div class="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4">
                     <x-ui.button type="submit">
-                        Create {{ config('contacts.labels.singular') }}
+                        Create {{ str($leadSingular)->title() }}
                     </x-ui.button>
+
+                    <button
+                        type="button"
+                        class="text-sm font-semibold text-slate-500 hover:text-slate-900"
+                        x-on:click="addLeadOpen = false"
+                    >
+                        Cancel
+                    </button>
                 </div>
             </form>
         </x-ui.card>
 
         <x-ui.card padding="none" class="overflow-hidden">
+            <div class="border-b border-slate-200 px-6 py-4">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <h3 class="text-lg font-semibold tracking-tight text-slate-950 capitalize">
+                            All {{ $leadPlural }}
+                        </h3>
+
+                        <p class="mt-1 text-sm text-slate-500">
+                            Open a {{ $leadSingular }} to review tasks, status, messages, and follow-up activity.
+                        </p>
+                    </div>
+
+                    <div class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                        {{ $contacts->total() }} total
+                    </div>
+                </div>
+            </div>
+
             <div class="divide-y divide-slate-200">
                 @forelse ($contacts as $contact)
+                    @php
+                        $displayName = $contact->name ?: trim($contact->first_name.' '.$contact->last_name) ?: $contact->email ?: str($leadSingular)->title().' #'.$contact->id;
+                        $statusName = $contact->workflowProfile?->contactStatus?->name;
+                    @endphp
+
                     <a
                         href="{{ route('crm.contacts.show', $contact) }}"
                         class="block px-6 py-4 transition hover:bg-slate-50"
                     >
-                        <div class="flex items-center justify-between gap-4">
+                        <div class="grid gap-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(8rem,auto)] md:items-center">
                             <div>
-                                <p class="font-semibold text-slate-900">
-                                    {{ $contact->name }}
+                                <p class="font-semibold text-slate-950">
+                                    {{ $displayName }}
                                 </p>
 
-                                <p class="text-sm text-slate-500">
-                                    {{ $contact->email }}
+                                <p class="mt-1 text-sm text-slate-500">
+                                    {{ collect([$contact->email, $contact->phone])->filter()->join(' · ') ?: 'No contact method saved' }}
                                 </p>
                             </div>
 
-                            <div class="text-sm text-slate-500">
-                                {{ $contact->workflowProfile?->contactStatus?->name ?? '—' }}
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                    Current status
+                                </p>
+
+                                <p class="mt-1 text-sm font-medium text-slate-800">
+                                    {{ $statusName ?: 'No status' }}
+                                </p>
+                            </div>
+
+                            <div class="md:text-right">
+                                <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                                    Open profile
+                                </span>
                             </div>
                         </div>
                     </a>
                 @empty
-                    <div class="px-6 py-8 text-sm text-slate-500">
-                        No {{ strtolower(config('contacts.labels.plural')) }} yet.
+                    <div class="px-6 py-10 text-center">
+                        <p class="text-sm font-medium text-slate-900 capitalize">
+                            No {{ $leadPlural }} yet.
+                        </p>
+
+                        <p class="mt-1 text-sm text-slate-500">
+                            Add one manually or import a CSV list to get started.
+                        </p>
                     </div>
                 @endforelse
             </div>
