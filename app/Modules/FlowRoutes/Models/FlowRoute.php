@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class FlowRoute extends Model
 {
@@ -26,6 +27,9 @@ class FlowRoute extends Model
     protected $fillable = [
         'key',
         'contact_status_id',
+        'owner_type',
+        'owner_id',
+        'owner_group',
         'name',
         'description',
         'version',
@@ -40,6 +44,7 @@ class FlowRoute extends Model
 
     protected $casts = [
         'contact_status_id' => 'integer',
+        'owner_id' => 'integer',
         'version' => 'integer',
         'is_active' => 'boolean',
         'is_customized' => 'boolean',
@@ -50,6 +55,21 @@ class FlowRoute extends Model
     public function contactStatus(): BelongsTo
     {
         return $this->belongsTo(ContactStatus::class);
+    }
+
+    public function owner(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    public function triggerBindings(): HasMany
+    {
+        return $this->hasMany(FlowRouteTriggerBinding::class);
+    }
+
+    public function activeTriggerBindings(): HasMany
+    {
+        return $this->triggerBindings()->active();
     }
 
     public function flowRoutePoints(): HasMany
@@ -109,6 +129,11 @@ class FlowRoute extends Model
     public function scopeForAutomationEvent(Builder $query, string $eventKey): Builder
     {
         return $query->forTrigger(self::TRIGGER_AUTOMATION_EVENT, $eventKey);
+    }
+
+    public function scopeForOwnerGroup(Builder $query, string $ownerGroup): Builder
+    {
+        return $query->where('owner_group', $ownerGroup);
     }
 
     public function scopeCustomized(Builder $query): Builder

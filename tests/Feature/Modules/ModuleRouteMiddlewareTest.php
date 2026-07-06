@@ -45,6 +45,35 @@ class ModuleRouteMiddlewareTest extends TestCase
             ->assertOk();
     }
 
+    public function test_disabled_flow_routes_module_returns_404_for_crm_route_binding_routes(): void
+    {
+        config()->set('modules.enabled', [
+            'workflow',
+        ]);
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->withoutMiddleware(ForceStagingAccess::class)
+            ->get('http://crm.'.config('app.root_domain').'/flow-routes/bindings')
+            ->assertNotFound();
+    }
+
+    public function test_enabled_flow_routes_module_allows_crm_route_binding_routes(): void
+    {
+        config()->set('modules.enabled', [
+            'workflow',
+            'flow_routes',
+        ]);
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->withoutMiddleware(ForceStagingAccess::class)
+            ->get('http://crm.'.config('app.root_domain').'/flow-routes/bindings')
+            ->assertOk();
+    }
+
     public function test_disabled_inbound_messaging_module_returns_404_for_sms_webhook(): void
     {
         config()->set('modules.enabled', [

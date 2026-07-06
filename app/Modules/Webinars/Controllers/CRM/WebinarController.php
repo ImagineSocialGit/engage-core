@@ -2,14 +2,14 @@
 
 namespace App\Modules\Webinars\Controllers\CRM;
 
+use App\Http\Controllers\Controller;
 use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
 use App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction;
 use App\Modules\Webinars\Actions\SyncWebinarSeriesFromProviderAction;
-use App\Http\Controllers\Controller;
-use App\Modules\Webinars\Requests\StoreWebinarSeriesRequest;
-use App\Modules\Webinars\Requests\SyncWebinarSeriesRequest;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Requests\StoreWebinarSeriesRequest;
+use App\Modules\Webinars\Requests\SyncWebinarSeriesRequest;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\RedirectResponse;
@@ -32,7 +32,13 @@ class WebinarController extends Controller
         $showArchived = $request->boolean('archived');
 
         $query = Webinar::query()
-            ->with('webinarSeries');
+            ->with([
+                'webinarSeries',
+                'registrations' => fn ($query) => $query
+                    ->with('contact')
+                    ->latest('registered_at')
+                    ->latest('id'),
+            ]);
 
         if (! $showArchived) {
             $query->where('ends_at', '>', now());
@@ -49,6 +55,8 @@ class WebinarController extends Controller
             'webinars' => $webinars,
             'series' => $series,
             'showArchived' => $showArchived,
+            'webinarDevEnabled' => $this->devTestingAllowed(),
+            'webinarSmokeEnabled' => $this->devTestingAllowed(),
         ]);
     }
 
@@ -134,5 +142,10 @@ class WebinarController extends Controller
         return redirect()
             ->route('crm.webinar-series.index')
             ->with('success', 'Webinar series deleted.');
+    }
+
+    private function devTestingAllowed(): bool
+    {
+        return app()->environment(['local', 'staging']);
     }
 }

@@ -7,6 +7,7 @@ use App\Modules\Core\Models\ContactStatus;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
+use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
 use App\Modules\FlowRoutes\Models\Point;
 use App\Modules\Workflow\Actions\TransitionContactWorkflowStatusAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -40,6 +41,8 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
             'customized_at' => null,
             'meta' => [],
         ]);
+
+        $this->bindRouteToContactStatus($flowRoute, $status);
 
         $point = Point::query()->create([
             'key' => 'mark_started',
@@ -127,6 +130,9 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
             'customized_at' => null,
             'meta' => [],
         ]);
+
+        $this->bindRouteToContactStatus($oldRoute, $oldStatus);
+        $this->bindRouteToContactStatus($newRoute, $newStatus);
 
         $oldPoint = Point::query()->create([
             'key' => 'old_wait',
@@ -243,6 +249,8 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
             'meta' => [],
         ]);
 
+        $this->bindRouteToContactStatus($route, $oldStatus);
+
         $point = Point::query()->create([
             'key' => 'wait_for_next_status',
             'type' => Point::TYPE_WAIT,
@@ -297,7 +305,7 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
             'name' => 'New Lead',
         ]);
 
-        FlowRoute::query()->create([
+        $inactiveRoute = FlowRoute::query()->create([
             'key' => 'inactive_new_lead_route',
             'contact_status_id' => $status->id,
             'name' => 'Inactive New Lead Route',
@@ -312,6 +320,8 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
             'meta' => [],
         ]);
 
+        $this->bindRouteToContactStatus($inactiveRoute, $status);
+
         app(TransitionContactWorkflowStatusAction::class)->handle(
             contact: $contact,
             toStatus: $status,
@@ -321,4 +331,20 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
 
         $this->assertSame(0, ContactFlowRouteProgress::query()->count());
     }
+
+    private function bindRouteToContactStatus(FlowRoute $flowRoute, ContactStatus $status): void
+    {
+        FlowRouteTriggerBinding::query()->create([
+            'trigger_type' => FlowRoute::TRIGGER_CONTACT_STATUS,
+            'trigger_key' => $status->key,
+            'flow_route_id' => $flowRoute->getKey(),
+            'context_type' => null,
+            'context_id' => null,
+            'is_active' => true,
+            'meta' => [
+                'source' => 'test',
+            ],
+        ]);
+    }
+
 }

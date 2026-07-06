@@ -23,6 +23,9 @@ class FlowRoutePresetDefinition
         public readonly int $version = 1,
         public readonly bool $isActive = true,
         public readonly ?string $sourceVersion = null,
+        public readonly ?string $ownerType = null,
+        public readonly ?int $ownerId = null,
+        public readonly ?string $ownerGroup = null,
         public readonly array $trigger = [],
         public readonly array $points = [],
         public readonly array $flowRoutePoints = [],
@@ -68,6 +71,9 @@ class FlowRoutePresetDefinition
             version: self::int($data, 'version') ?? 1,
             isActive: (bool) ($data['is_active'] ?? true),
             sourceVersion: $sourceVersion,
+            ownerType: self::string($data, 'owner_type'),
+            ownerId: self::int($data, 'owner_id'),
+            ownerGroup: self::string($data, 'owner_group'),
             trigger: $trigger,
             points: $points,
             flowRoutePoints: $flowRoutePoints,
@@ -105,6 +111,16 @@ class FlowRoutePresetDefinition
         $triggerKey = trim($triggerKey);
 
         return $triggerKey !== '' ? $triggerKey : null;
+    }
+
+    public function shouldCreateDefaultBinding(): bool
+    {
+        return $this->isActive
+            && in_array($this->triggerType(), [
+                FlowRoute::TRIGGER_CONTACT_STATUS,
+                FlowRoute::TRIGGER_AUTOMATION_EVENT,
+            ], true)
+            && $this->triggerKey() !== null;
     }
 
     /**

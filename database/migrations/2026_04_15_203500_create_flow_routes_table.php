@@ -19,6 +19,9 @@ return new class extends Migration
                 ->constrained()
                 ->cascadeOnDelete();
 
+            $table->nullableMorphs('owner');
+            $table->string('owner_group')->nullable()->index();
+
             $table->string('name');
             $table->text('description')->nullable();
 
@@ -39,10 +42,10 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['key', 'version']);
-            $table->unique(['contact_status_id', 'version']);
 
             $table->index(['contact_status_id', 'is_active']);
             $table->index(['trigger_type', 'trigger_key', 'is_active']);
+            $table->index(['owner_group', 'is_active']);
             $table->index(['key', 'source_version']);
         });
     }

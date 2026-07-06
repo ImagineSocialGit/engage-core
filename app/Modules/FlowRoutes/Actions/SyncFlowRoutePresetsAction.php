@@ -9,6 +9,7 @@ use App\Modules\FlowRoutes\Data\Presets\FlowRoutePresetDefinition;
 use App\Modules\FlowRoutes\Data\Presets\FlowRoutePresetSyncResult;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
+use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
 use App\Modules\FlowRoutes\Models\Point;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -182,6 +183,9 @@ class SyncFlowRoutePresetsAction
                 $flowRoute->forceFill([
                     'key' => $definition->key,
                     'contact_status_id' => $contactStatus?->getKey(),
+                    'owner_type' => $definition->ownerType,
+                    'owner_id' => $definition->ownerId,
+                    'owner_group' => $definition->ownerGroup,
                     'name' => $definition->name,
                     'description' => $definition->description,
                     'version' => $definition->version,
@@ -246,7 +250,67 @@ class SyncFlowRoutePresetsAction
                 pointDefinitions: $definition->flowRoutePoints,
                 result: $result,
             );
+
+            $this->syncDefaultTriggerBinding(
+                flowRoute: $flowRoute,
+                definition: $definition,
+                result: $result,
+                force: $force,
+            );
         });
+    }
+
+    private function syncDefaultTriggerBinding(
+        FlowRoute $flowRoute,
+        FlowRoutePresetDefinition $definition,
+        FlowRoutePresetSyncResult $result,
+        bool $force,
+    ): void {
+        if (! $definition->shouldCreateDefaultBinding()) {
+            return;
+        }
+
+        if (! $flowRoute->is_active) {
+            return;
+        }
+
+        $triggerType = $definition->triggerType();
+        $triggerKey = $definition->triggerKey();
+
+        $binding = FlowRouteTriggerBinding::query()->firstOrNew([
+            'trigger_type' => $triggerType,
+            'trigger_key' => $triggerKey,
+            'flow_route_id' => $flowRoute->getKey(),
+            'context_type' => null,
+            'context_id' => null,
+        ]);
+
+        $wasRecentlyCreated = ! $binding->exists;
+
+        if ($binding->exists && ! $force) {
+            $result->recordSkipped('flow_route_trigger_bindings');
+
+            return;
+        }
+
+        $binding->forceFill([
+            'trigger_type' => $triggerType,
+            'trigger_key' => $triggerKey,
+            'flow_route_id' => $flowRoute->getKey(),
+            'context_type' => null,
+            'context_id' => null,
+            'is_active' => true,
+            'meta' => array_replace_recursive($binding->meta ?? [], [
+                'preset' => [
+                    'client_preset_key' => $definition->presetKey,
+                    'flow_route_key' => $definition->key,
+                    'trigger' => $definition->trigger,
+                    'default_binding' => true,
+                ],
+            ]),
+        ])->save();
+
+        $result->{$wasRecentlyCreated ? 'recordCreated' : 'recordUpdated'}('flow_route_trigger_bindings');
     }
 
     private function syncPoint(

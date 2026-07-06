@@ -6,12 +6,14 @@ use App\Modules\FlowRoutes\Data\Events\FlowRouteExternalEvent;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
+use App\Modules\FlowRoutes\Services\FlowRouteTriggerBindingResolver;
 use Illuminate\Support\Facades\DB;
 
 class StartFlowRoutesFromAutomationEventAction
 {
     public function __construct(
         private readonly ExecuteCurrentFlowRoutePointAction $executeCurrentFlowRoutePoint,
+        private readonly FlowRouteTriggerBindingResolver $flowRouteTriggerBindingResolver,
     ) {}
 
     public function handle(FlowRouteExternalEvent $event): void
@@ -20,20 +22,27 @@ class StartFlowRoutesFromAutomationEventAction
             return;
         }
 
-        FlowRoute::query()
-            ->active()
-            ->forAutomationEvent($event->name)
-            ->with('activeFlowRoutePoints.point')
-            ->orderByDesc('version')
-            ->chunkById(100, function ($flowRoutes) use ($event) {
-                foreach ($flowRoutes as $flowRoute) {
-                    $progress = $this->startProgress($flowRoute, $event);
+        $flowRoutes = $this->flowRouteTriggerBindingResolver
+            ->selectedFlowRoutes(
+                triggerType: FlowRoute::TRIGGER_AUTOMATION_EVENT,
+                triggerKey: $event->name,
+                contextType: $event->subjectType,
+                contextId: $event->subjectId,
+            );
 
-                    if ($progress instanceof ContactFlowRouteProgress) {
-                        $this->executeProgressUntilIdle($progress);
-                    }
-                }
-            });
+        foreach ($flowRoutes as $flowRoute) {
+            if (! $flowRoute instanceof FlowRoute) {
+                continue;
+            }
+
+            $flowRoute->loadMissing('activeFlowRoutePoints.point');
+
+            $progress = $this->startProgress($flowRoute, $event);
+
+            if ($progress instanceof ContactFlowRouteProgress) {
+                $this->executeProgressUntilIdle($progress);
+            }
+        }
     }
 
     private function executeProgressUntilIdle(ContactFlowRouteProgress $progress): void

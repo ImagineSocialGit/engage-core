@@ -12,6 +12,7 @@ use App\Modules\FlowRoutes\Jobs\ResumeFlowRouteProgressJob;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
+use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
 use App\Modules\FlowRoutes\Models\Point;
 use App\Modules\FlowRoutes\PointHandlers\NoopPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\WaitPointHandler;
@@ -277,6 +278,18 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             'is_customized' => false,
             'customized_at' => null,
             'meta' => [],
+        ]);
+
+        FlowRouteTriggerBinding::query()->create([
+            'trigger_type' => FlowRoute::TRIGGER_AUTOMATION_EVENT,
+            'trigger_key' => 'webinar.attended',
+            'flow_route_id' => $flowRoute->getKey(),
+            'context_type' => null,
+            'context_id' => null,
+            'is_active' => true,
+            'meta' => [
+                'source' => 'test',
+            ],
         ]);
 
         app(StartFlowRoutesFromAutomationEventAction::class)->handle(

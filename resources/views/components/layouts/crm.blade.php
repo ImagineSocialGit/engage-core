@@ -38,6 +38,15 @@
                         </a>
                     @endif
 
+                    @if(module_enabled('flow_routes'))
+                        <a
+                            href="{{ route('crm.flow-routes.bindings.index') }}"
+                            class="block rounded-lg px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-100"
+                        >
+                            Route Bindings
+                        </a>
+                    @endif
+
                     <form method="POST" action="/logout" class="">
                         @csrf
 

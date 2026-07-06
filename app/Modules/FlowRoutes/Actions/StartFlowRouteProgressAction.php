@@ -5,10 +5,15 @@ namespace App\Modules\FlowRoutes\Actions;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
+use App\Modules\FlowRoutes\Services\FlowRouteTriggerBindingResolver;
 use App\Modules\Workflow\Data\ContactWorkflowStatusTransition;
 
 class StartFlowRouteProgressAction
 {
+    public function __construct(
+        private readonly FlowRouteTriggerBindingResolver $flowRouteTriggerBindingResolver,
+    ) {}
+
     public function handle(ContactWorkflowStatusTransition $transition): ?ContactFlowRouteProgress
     {
         $flowRoute = $this->activeFlowRouteForTransition($transition);
@@ -45,12 +50,8 @@ class StartFlowRouteProgressAction
 
     private function activeFlowRouteForTransition(ContactWorkflowStatusTransition $transition): ?FlowRoute
     {
-        return FlowRoute::query()
-            ->active()
-            ->forTrigger(FlowRoute::TRIGGER_CONTACT_STATUS)
-            ->forContactStatus($transition->toContactStatusId)
-            ->orderByDesc('version')
-            ->first();
+        return $this->flowRouteTriggerBindingResolver
+            ->selectedFlowRouteForContactStatus($transition->toContactStatusId);
     }
 
     private function startingFlowRoutePoint(FlowRoute $flowRoute): ?FlowRoutePoint

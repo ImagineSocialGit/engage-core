@@ -11,6 +11,7 @@ class FlowRoutePresetSyncResult
         'flow_routes' => 0,
         'points' => 0,
         'flow_route_points' => 0,
+        'flow_route_trigger_bindings' => 0,
     ];
 
     /**
@@ -20,6 +21,7 @@ class FlowRoutePresetSyncResult
         'flow_routes' => 0,
         'points' => 0,
         'flow_route_points' => 0,
+        'flow_route_trigger_bindings' => 0,
     ];
 
     /**
@@ -29,6 +31,7 @@ class FlowRoutePresetSyncResult
         'flow_routes' => 0,
         'points' => 0,
         'flow_route_points' => 0,
+        'flow_route_trigger_bindings' => 0,
     ];
 
     /**

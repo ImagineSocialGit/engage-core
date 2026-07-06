@@ -5,9 +5,11 @@ use App\Modules\Core\Controllers\ContactController;
 use App\Modules\Core\Controllers\ContactImportBatchController;
 use App\Modules\Core\Controllers\ContactLookupController;
 use App\Modules\Core\Controllers\ContactNoteController;
+use App\Modules\FlowRoutes\Controllers\CRM\FlowRouteBindingController;
 use App\Modules\Messaging\Controllers\ContactImportBatchPermissionInvitationController;
 use App\Modules\Tasks\Controllers\TaskController;
 use App\Modules\Webinars\Controllers\CRM\WebinarController;
+use App\Modules\Webinars\Controllers\CRM\WebinarDevController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
@@ -28,7 +30,66 @@ Route::middleware('auth')->group(function () {
 
         Route::delete('/webinar-series/{series}', [WebinarController::class, 'destroySeries'])
             ->name('crm.webinar-series.destroy');
+
+        Route::get('/webinar-registrations/{registration}/dev/message-options', [WebinarDevController::class, 'messageOptions'])
+            ->name('crm.webinar-registrations.dev.message-options.index');
+
+        Route::post('/webinar-registrations/{registration}/dev/messages', [WebinarDevController::class, 'sendRegistrationMessageNow'])
+            ->name('crm.webinar-registrations.dev.messages.store');
+
+        Route::post('/webinar-registrations/{registration}/dev/messages/all', [WebinarDevController::class, 'sendAllRegistrationMessagesNow'])
+            ->name('crm.webinar-registrations.dev.messages.all.store');
+
+        Route::post('/webinar-registrations/{registration}/dev/join', [WebinarDevController::class, 'simulateJoin'])
+            ->name('crm.webinar-registrations.dev.join.store');
+
+        Route::post('/webinars/{webinar}/dev/replay-url', [WebinarDevController::class, 'setReplayUrl'])
+            ->name('crm.webinars.dev.replay-url.store');
+
+        Route::delete('/webinars/{webinar}/dev/replay-url', [WebinarDevController::class, 'clearReplayUrl'])
+            ->name('crm.webinars.dev.replay-url.destroy');
+
+        Route::post('/webinars/{webinar}/dev/follow-ups', [WebinarDevController::class, 'dispatchFollowUps'])
+            ->name('crm.webinars.dev.follow-ups.store');
+
+        Route::post('/webinar-registrations/{registration}/dev/attended', [WebinarDevController::class, 'markRegistrationAttended'])
+            ->name('crm.webinar-registrations.dev.attended.store');
+
+        Route::post('/webinar-registrations/{registration}/dev/missed', [WebinarDevController::class, 'markRegistrationMissed'])
+            ->name('crm.webinar-registrations.dev.missed.store');
+
+        Route::post('/webinar-registrations/{registration}/dev/reset', [WebinarDevController::class, 'resetRegistration'])
+            ->name('crm.webinar-registrations.dev.reset.store');
+
+        Route::post('/webinars/{webinar}/smoke/replay-url', [WebinarDevController::class, 'setReplayUrl'])
+            ->name('crm.webinars.smoke.replay-url.store');
+
+        Route::delete('/webinars/{webinar}/smoke/replay-url', [WebinarDevController::class, 'clearReplayUrl'])
+            ->name('crm.webinars.smoke.replay-url.destroy');
+
+        Route::post('/webinars/{webinar}/smoke/follow-ups', [WebinarDevController::class, 'dispatchFollowUps'])
+            ->name('crm.webinars.smoke.follow-ups.store');
+
+        Route::post('/webinar-registrations/{registration}/smoke/attended', [WebinarDevController::class, 'markRegistrationAttended'])
+            ->name('crm.webinar-registrations.smoke.attended.store');
+
+        Route::post('/webinar-registrations/{registration}/smoke/missed', [WebinarDevController::class, 'markRegistrationMissed'])
+            ->name('crm.webinar-registrations.smoke.missed.store');
+
+        Route::post('/webinar-registrations/{registration}/smoke/reset', [WebinarDevController::class, 'resetRegistration'])
+            ->name('crm.webinar-registrations.smoke.reset.store');
     });
+
+    Route::middleware('module:flow_routes')
+        ->prefix('flow-routes')
+        ->name('crm.flow-routes.')
+        ->group(function () {
+            Route::get('/bindings', [FlowRouteBindingController::class, 'index'])
+                ->name('bindings.index');
+
+            Route::patch('/bindings', [FlowRouteBindingController::class, 'update'])
+                ->name('bindings.update');
+        });
 
     Route::middleware('module:broadcasts')
         ->prefix('broadcasts')
