@@ -6,6 +6,7 @@ use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
 class MessageTemplateUsageResolver
@@ -49,7 +50,7 @@ class MessageTemplateUsageResolver
             'context_label' => $groupLabel,
             'item_label' => $itemLabel,
             'detail' => $this->detail($assignment),
-            'url' => null,
+            'url' => $this->url($assignment),
         ];
     }
 
@@ -131,6 +132,23 @@ class MessageTemplateUsageResolver
         return Str::headline(str_replace('_', ' ', $assignment->message_type ?? $preset->message_type ?? 'Message'));
     }
 
+    private function url(MessageTemplatePresetAssignment $assignment): ?string
+    {
+        if (
+            $assignment->surface === 'campaigns'
+            && $assignment->campaign_key !== null
+            && $assignment->campaign_step !== null
+            && Route::has('crm.campaigns.message-templates.index')
+        ) {
+            return route('crm.campaigns.message-templates.index', [
+                'campaign' => $assignment->campaign_key,
+                'step' => $assignment->campaign_step,
+            ]);
+        }
+
+        return null;
+    }
+
     private function detail(MessageTemplatePresetAssignment $assignment): ?string
     {
         $parts = array_filter([
@@ -141,3 +159,4 @@ class MessageTemplateUsageResolver
         return $parts === [] ? null : implode(' · ', $parts);
     }
 }
+

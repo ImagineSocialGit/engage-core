@@ -136,6 +136,8 @@ Campaigns -> Webinar Attended Nurture -> Step 2 Email
 
 Those catalog entries are for browsing/copy editing only. Campaigns still own the campaign, step order, timing, progression, and enrollment lifecycle.
 
+The Campaign Message Templates CRM surface is the current Campaign-side setup surface for selecting which Messaging template is active for each campaign step. It may link to Message Templates for copy editing, but it should not duplicate reusable message copy editing inside Campaigns.
+
 During migration, config resolution may remain as a fallback.
 
 
@@ -281,6 +283,3 @@ Stop follow-up sequence: Webinar Missed Nurture.
 ```
 
 It should not expose CampaignEnrollment internals or campaign step machinery as primary labels.
-
-
-

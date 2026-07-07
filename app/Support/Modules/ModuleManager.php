@@ -136,6 +136,10 @@ class ModuleManager
             }
         }
 
+        foreach ($this->contextualNavigationItems() as $item) {
+            $items[] = $item;
+        }
+
         usort($items, function (array $a, array $b): int {
             $priority = $a['priority'] <=> $b['priority'];
 
@@ -149,6 +153,31 @@ class ModuleManager
         return array_values($items);
     }
 
+
+    /**
+     * @return array<int, array{module: string, label: string, route: string, href: string, priority: int, class: string}>
+     */
+    private function contextualNavigationItems(): array
+    {
+        $items = [];
+
+        if (
+            $this->enabled('campaigns')
+            && $this->enabled('messaging')
+            && Route::has('crm.campaigns.message-templates.index')
+        ) {
+            $items[] = [
+                'module' => 'campaigns',
+                'label' => 'Campaign Messages',
+                'route' => 'crm.campaigns.message-templates.index',
+                'href' => route('crm.campaigns.message-templates.index'),
+                'priority' => 42,
+                'class' => '',
+            ];
+        }
+
+        return $items;
+    }
 
     /**
      * @param array<string, mixed> $item

@@ -258,12 +258,23 @@ Completed Messaging template baseline:
 - Runtime resolvers prefer selected DB presets before config fallback.
 - Normal sync does not overwrite customized DB copy unless explicitly forced.
 
-- [ ] Polish Message Templates UI using catalog entries.
-  - Filter by channel, purpose, and area/module.
-  - Group related messages such as Campaign steps and Webinar reminders.
-  - Let operators switch between messages/steps inside the selected group.
-  - Keep assignment mutation out of the Templates page.
-  - Show read-only “Used by” links to the owning Campaign/Webinar/Automatic Follow-up setup surface.
+Completed Messaging/Campaign setup UI baseline:
+
+- Message Templates UI uses catalog entries to filter and browse by channel, purpose, area/module, group, and message/step.
+- Message Templates remains copy/review-only and keeps assignment mutation out of the template editor.
+- Message Templates shows read-only “Used by” entries.
+- Campaign Message Templates lets operators select the active Messaging template for each Campaign step.
+- Campaign usage rows can link from Message Templates to the Campaign Message Templates setup surface.
+- Campaign Message Templates links back to Message Templates for copy editing.
+
+- [ ] Build Webinars message/template/schedule setup.
+  - Show confirmation, reminder, waitlist, post-attended, and post-missed contexts.
+  - Show the active selected Messaging template for each context.
+  - Let operators choose compatible `MessageTemplatePreset` records from the Webinars-owned setup surface.
+  - Save/update `MessageTemplatePresetAssignment`.
+  - Link to Message Templates for copy editing.
+  - Preserve config fallback while DB-owned assignments become the primary runtime path.
+  - Keep Webinars responsible for schedule/profile/timing decisions.
 
 - [ ] Add selectable webinar schedule profiles.
   - Confirmation schedules.
@@ -341,6 +352,8 @@ Completed import-batch visibility baseline:
   - `responsible_party` remains action owner; `assigned_to` remains internal follow-up owner/tracker.
 
 ### FlowRoutes / Routes
+
+Current sequence note: handle the Webinars message/template/schedule setup first, then make Automatic Follow-ups / FlowRoutes UX improvements the next implementation focus.
 
 - [ ] Explore Automatic Follow-ups / Route Binding UX before implementation.
   - Audit current binding UI against `docs/ui-ux-guide.md`.
@@ -423,7 +436,3 @@ Completed import-batch visibility baseline:
 - [ ] Add test coverage for client config fallback behavior.
   - Missing optional content/style keys should not break public pages.
   - Client copy changes should not break tests that only need behavioral assertions.
-
-
-
-

@@ -2611,11 +2611,9 @@ Recommended direction:
 3. Add public seams only when a concrete consumer/workflow needs them.
 4. Add contact filters for Commerce or Location only when Broadcasts, Campaigns, Reporting, or another consuming surface needs them.
 5. Treat the dashboard and contact show page as shared orientation surfaces with module-contributed summaries, not module inventories.
-6. Pause Automatic Follow-ups UI implementation long enough to answer product/UX questions about who selects what, what consequences are previewed, and which route details remain diagnostic.
-7. Continue the client-readiness path with permission-invitation accepted-event decisions and config validation guidance.
-8. Regenerate `core-project-tree.txt` from the repo after each structural batch.
+6. Continue the runtime-selectable setup-surface path with Webinars message/template/schedule setup first.
+7. After the Webinars setup slice, improve Automatic Follow-ups / FlowRoutes UX around business-language selection, consequence previews, and diagnostic detail.
+8. Continue the remaining client-readiness path with permission-invitation accepted-event decisions and config validation guidance.
+9. Regenerate `core-project-tree.txt` from the repo after each structural batch.
 
 Do not use this section as a backlog. Actionable items belong in `TODO.md`.
-
-
-

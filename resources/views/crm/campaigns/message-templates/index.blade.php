@@ -25,7 +25,7 @@
                 </div>
 
                 <a
-                    href="{{ route('crm.messaging.message-templates.index', ['area' => 'campaigns']) }}"
+                    href="{{ route('crm.messaging.message-templates.index', ['module' => 'campaigns']) }}"
                     class="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-300 px-5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50"
                 >
                     Edit message copy
@@ -174,7 +174,7 @@
 
                                                 @if($selectedPreset)
                                                     <a
-                                                        href="{{ route('crm.messaging.message-templates.index', ['channel' => $selectedPreset->channel, 'purpose' => $selectedPreset->purpose, 'area' => $selectedCatalogEntry?->module_key, 'preset' => $selectedPreset->getKey()]) }}"
+                                                        href="{{ route('crm.messaging.message-templates.index', ['channel' => $selectedPreset->channel, 'purpose' => $selectedPreset->purpose, 'module' => $selectedCatalogEntry?->module_key, 'preset' => $selectedPreset->getKey()]) }}"
                                                         class="inline-flex min-h-9 items-center justify-center rounded-full border border-slate-300 px-4 text-xs font-extrabold text-slate-700 transition hover:bg-slate-50"
                                                     >
                                                         Edit copy
@@ -241,3 +241,4 @@
         @endif
     </div>
 </x-layouts.crm>
+

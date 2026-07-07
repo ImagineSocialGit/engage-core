@@ -88,10 +88,18 @@ class CampaignMessageTemplateController extends Controller
      */
     private function selectedCampaign(Request $request, Collection $campaigns): ?Campaign
     {
-        $selectedId = $request->integer('campaign');
+        $selectedCampaign = $request->query('campaign');
 
-        if ($selectedId > 0) {
-            $selected = $campaigns->firstWhere('id', $selectedId);
+        if (is_numeric($selectedCampaign) && (int) $selectedCampaign > 0) {
+            $selected = $campaigns->firstWhere('id', (int) $selectedCampaign);
+
+            if ($selected instanceof Campaign) {
+                return $selected;
+            }
+        }
+
+        if (is_string($selectedCampaign) && trim($selectedCampaign) !== '') {
+            $selected = $campaigns->firstWhere('key', $this->normalizeSegment($selectedCampaign));
 
             if ($selected instanceof Campaign) {
                 return $selected;
@@ -107,13 +115,19 @@ class CampaignMessageTemplateController extends Controller
             return null;
         }
 
-        $selectedId = $request->integer('step');
+        $selectedStep = $request->query('step');
 
-        if ($selectedId > 0) {
-            $selected = $campaign->steps->firstWhere('id', $selectedId);
+        if (is_numeric($selectedStep) && (int) $selectedStep > 0) {
+            $selectedById = $campaign->steps->firstWhere('id', (int) $selectedStep);
 
-            if ($selected instanceof CampaignStep) {
-                return $selected;
+            if ($selectedById instanceof CampaignStep) {
+                return $selectedById;
+            }
+
+            $selectedByNumber = $campaign->steps->firstWhere('step_number', (int) $selectedStep);
+
+            if ($selectedByNumber instanceof CampaignStep) {
+                return $selectedByNumber;
             }
         }
 
@@ -211,3 +225,4 @@ class CampaignMessageTemplateController extends Controller
         return str_replace('-', '_', strtolower(trim($value)));
     }
 }
+

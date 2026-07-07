@@ -230,6 +230,21 @@ Automatic Follow-ups / FlowRoutes send-message point editor chooses which messag
 
 The Messaging template page may show read-only usage, such as "Used by Campaigns -> Webinar Attended Nurture -> Step 1," and link to the owning module UI when that UI exists.
 
+Current CRM/admin surfaces:
+
+```text
+Message Templates
+    Messaging-owned copy review and copy editing.
+    Browses catalog entries by channel, purpose, area/module, group, and message/step.
+    Shows read-only usage and links to owning setup surfaces when available.
+
+Campaign Message Templates
+    Campaigns-owned setup surface for choosing the active Messaging template for campaign steps.
+    Links back to Message Templates for copy editing.
+```
+
+Webinar and Automatic Follow-up template selection should follow the same ownership split when their setup surfaces are implemented.
+
 ### Runtime resolution target
 
 Messaging resolvers should eventually resolve message definitions in this order:
@@ -436,6 +451,3 @@ Current import-batch invitation scheduling is Messaging-owned.
 Core may expose the operator entry point on the import batch detail page when Messaging is enabled, but Core must not directly import Messaging actions, services, or models.
 
 Other modules may request this flow through Messaging public services/actions, but they must not create invitation records directly.
-
-
-

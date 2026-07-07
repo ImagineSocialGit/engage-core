@@ -75,22 +75,37 @@ Completed runway pieces:
 - FlowRoute owner morph and trigger bindings.
 - CRM selection for status/event FlowRoutes.
 - Messaging template presets, catalog entries, and DB-first assignment resolution foundation.
+- Message Templates catalog/copy-editing UI using catalog entry grouping.
+- Campaign Message Templates assignment UI and access links for selecting active campaign-step templates.
 
 The remaining runway pieces should continue to be implemented as durable client-readiness work, not as smoke-test shortcuts.
+
+## Near-term sequencing rule
+
+Client-readiness implementation should chase one main item at a time unless two active threads are intentionally isolated by file ownership.
+
+The current sequence is:
+
+```text
+1. Webinars message/template/schedule setup.
+2. Automatic Follow-ups / FlowRoutes UX improvements.
+```
+
+Do not run parallel threads that modify the same controllers, views, routes, services, migrations, or tests unless one thread is paused and rebased onto the other.
 
 ## Working roadmap
 
 | # | Planned item | Rough estimate | Notes |
 | -: | --- | ---: | --- |
-| 1 | Permission invitation accepted automation event decision | 0.25–0.5 session | Decide whether accepted invitations should emit a neutral automation event such as `permission_invitation.accepted`. |
-| 2 | Permission invitation cancellation behavior | 0.5–1 session | Clarify how cancellation/skip/failure should appear for permission-invitation Broadcast bookkeeping and Messaging scheduled messages. |
-| 3 | Config validation guidance | 0.5–1 session | Convert current config-template expectations into practical validation behavior and operator/debug feedback. |
-| 4 | Messaging template UI/UX polish | 1–2 sessions | Use catalog entries to make template browsing grouped by channel, purpose, module/area, group, and message/step. Do not put assignment mutation on the Templates page. |
-| 5 | Selectable webinar schedule profiles | 1–3 sessions | Allow quick swapping of confirmation/reminder/post-event schedules by context. |
+| 1 | Webinar message/template/schedule setup | 1–3 sessions | Build the Webinars-side setup surface for confirmation, reminder, waitlist, and post-event message contexts. Webinars own scheduling/profile decisions; Messaging owns reusable copy, catalog entries, assignments, and delivery infrastructure. |
+| 2 | Automatic Follow-ups / FlowRoutes UX improvements | 1–3 sessions for first product pass | Redesign the current Route Binding surface around business outcomes after the Webinars setup slice. Start with selection/preview UX before route-builder expansion. |
+| 3 | Permission invitation accepted automation event decision | 0.25–0.5 session | Decide whether accepted invitations should emit a neutral automation event such as `permission_invitation.accepted`. |
+| 4 | Permission invitation cancellation behavior | 0.5–1 session | Clarify how cancellation/skip/failure should appear for permission-invitation Broadcast bookkeeping and Messaging scheduled messages. |
+| 5 | Config validation guidance | 0.5–1 session | Convert current config-template expectations into practical validation behavior and operator/debug feedback. |
 | 6 | Manual status-change automation warning | 0.5–1 session | Warn operators before a manual status change runs a selected status FlowRoute. This is a UI awareness guardrail, not a ContactStatus schema split. |
 | 7 | Task template/default definition UI | 1–2 sessions, maybe more if polished | Only needed when clients/operators need to manage task templates themselves. Preset sync already creates DB-owned definitions only. |
-| 8 | Automatic Follow-ups exploration/Q&A | 0.5–1.5 sessions | Audit current FlowRoute binding UX, decide user type/scope, consequence-preview requirements, and what is implementation-ready before redesign. |
-| 9 | FlowRoutes route-builder UX | 3–6 sessions | Only after the exploration pass. Follow `ui-ux-guide.md`: guided, outcome-oriented, and not a blank-canvas automation builder. |
+| 8 | Campaign channel variants | 2–4 sessions | Add step-group/channel-variant support only after the current single-channel campaign-step template selection path remains stable. |
+| 9 | FlowRoutes route-builder UX | 3–6 sessions | Only after the Automatic Follow-ups exploration/product pass. Follow `ui-ux-guide.md`: guided, outcome-oriented, and not a blank-canvas automation builder. |
 | 10 | Task-completed FlowRoutes resume behavior | 0.5–1 session | Resume route event-wait points from neutral `task.completed` automation events, not direct Task-specific FlowRoutes listeners. |
 | 11 | Client self-serve readiness audit | 0.5–1 session | Separate controlled beta/operator-assisted readiness from true client self-serve readiness. |
 | 12 | PetServices vertical planning | 0.5–1 session | Plan vertical-owned pet/service concepts without pushing domain fields into Core. |
@@ -169,7 +184,10 @@ Completed baseline:
 - Template sync creates presets, catalog entries, and default assignments from message configs.
 - Normal sync preserves customized template copy and selected assignments unless forced.
 - Runtime resolution can prefer selected DB templates before config fallback.
-- The Message Templates page should edit/review copy and show read-only usage; selecting which template a Campaign/Webinar/Automatic Follow-up uses belongs on the consuming module's setup screen.
+- The Message Templates page edits/reviews copy, groups catalog entries by channel/purpose/module/group/message, and shows read-only usage.
+- Campaign Message Templates is the Campaign-side setup surface for selecting the active template for each campaign step.
+- Message Templates “Used by” campaign rows may link to Campaign Message Templates, and Campaign Message Templates may link back to Message Templates for copy editing.
+- Selecting which template a Webinar or Automatic Follow-up uses still belongs on that consuming module's setup screen.
 
 ### FlowRoute trigger bindings and CRM selection UI
 
@@ -198,22 +216,33 @@ Completed baseline:
 
 ## Recommended next implementation target
 
-The next implementation target should be an exploration/Q&A thread, not immediate implementation:
+The next implementation target is the Webinars-side message/template/schedule setup slice.
+
+Build this before Automatic Follow-ups / FlowRoutes UX improvements.
+
+Webinars should provide the owning setup surface for webinar message contexts such as:
 
 ```text
-Automatic Follow-ups / FlowRoute binding UX exploration
+registration confirmation
+reminders
+waitlist availability messages
+post-attended transactional follow-up
+post-missed transactional follow-up
 ```
 
-Reason:
+The first durable version should:
 
-- FlowRoute trigger bindings and the current CRM selection UI are functional, but the screen still exposes too much implementation language.
-- The desired UI touches Workflow status changes, automation-event bindings, FlowRoute point summaries, Messaging template assignments, Campaign enrollment, Tasks, and Webinars.
-- Before replacing the page, the team should decide what the surface is allowed to do in its first product version: select prebuilt routes, edit route points, or only preview behavior.
-- Consequence-preview requirements should be documented before changing manual status-change or activity-triggered automation UI.
+- show the current selected Messaging template for each webinar message context;
+- allow selecting a compatible `MessageTemplatePreset`;
+- save/update `MessageTemplatePresetAssignment`;
+- link to Message Templates for copy editing;
+- preserve DB-first resolution with config fallback during migration;
+- keep Webinars responsible for schedule/profile/timing decisions;
+- keep Messaging responsible for reusable copy, catalog entries, assignments, and delivery infrastructure.
 
-Selectable webinar schedule profiles remain a strong next implementation candidate after Automatic Follow-ups product decisions are captured.
+The following implementation target is Automatic Follow-ups / FlowRoutes UX improvements.
 
-Messaging template UI/UX polish can proceed in a dedicated UI/UX thread using `MessageTemplateCatalogEntry` as the browser/grouping foundation.
+That next pass should redesign the current Route Binding surface around business outcomes and consequence previews before expanding into route point editing or a fuller route-builder UI.
 
 ## What this roadmap intentionally avoids
 
@@ -245,7 +274,3 @@ When a roadmap item is completed:
 1. Remove it from this file or move it to a completed release note if needed.
 2. Delete or update the related TODO item.
 3. Update module docs only if architecture or durable behavior changed.
-
-
-
-

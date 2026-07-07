@@ -57,6 +57,7 @@ class CampaignMessageTemplateControllerTest extends TestCase
             ->assertSee('Step 1 Email')
             ->assertSee('Save selection')
             ->assertSee('Edit copy')
+            ->assertSee(route('crm.messaging.message-templates.index', ['module' => 'campaigns']), false)
             ->assertSee('Campaigns decide the journey, timing, and step order')
             ->assertDontSee('Subject')
             ->assertDontSee('Body')
@@ -177,6 +178,37 @@ class CampaignMessageTemplateControllerTest extends TestCase
             ->assertSessionHasErrors(['message_template_preset_id']);
     }
 
+    public function test_index_accepts_campaign_key_and_step_number_for_linking_from_usage(): void
+    {
+        config()->set('modules.enabled', [
+            'campaigns',
+            'messaging',
+        ]);
+
+        $user = User::factory()->create();
+        [$campaign, $step, $preset] = $this->campaignStepWithTemplate();
+
+        MessageTemplatePresetAssignment::factory()
+            ->forPreset($preset)
+            ->forCampaignStep($campaign->key, $step->step_number)
+            ->create([
+                'channel' => 'email',
+                'purpose' => 'marketing',
+                'scope' => 'webinar_nurture',
+                'message_type' => $preset->message_type,
+            ]);
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/campaigns/message-templates?campaign='.$campaign->key.'&step='.$step->step_number)
+            ->assertOk()
+            ->assertSee('Webinar Attended Nurture')
+            ->assertSee('Step 1')
+            ->assertSee('Active template')
+            ->assertSee($preset->name);
+    }
+
     /**
      * @return array{0: Campaign, 1: CampaignStep, 2: MessageTemplatePreset}
      */
@@ -247,3 +279,4 @@ class CampaignMessageTemplateControllerTest extends TestCase
         return $preset;
     }
 }
+

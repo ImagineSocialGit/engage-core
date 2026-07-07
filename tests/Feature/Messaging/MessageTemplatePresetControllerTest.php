@@ -79,6 +79,7 @@ class MessageTemplatePresetControllerTest extends TestCase
     public function test_it_shows_read_only_usage_for_selected_template(): void
     {
         config()->set('modules.enabled', [
+            'campaigns',
             'messaging',
         ]);
 
@@ -168,6 +169,11 @@ class MessageTemplatePresetControllerTest extends TestCase
             ->assertSee('Step 3 Email')
             ->assertSee('Messages in this group')
             ->assertSee('Change template selection from the campaign, webinar, or automatic follow-up setup screen.')
+            ->assertSee('Manage selection')
+            ->assertSee(route('crm.campaigns.message-templates.index', [
+                'campaign' => 'mortgage_homebuyer_nurture',
+                'step' => 2,
+            ]))
             ->assertDontSee('Active template')
             ->assertDontSee('Use selected template');
     }
@@ -314,3 +320,4 @@ class MessageTemplatePresetControllerTest extends TestCase
             ->assertSessionHasErrors(['payload.subject', 'payload.body']);
     }
 }
+

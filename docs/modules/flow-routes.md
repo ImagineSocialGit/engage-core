@@ -118,7 +118,7 @@ FlowRoutes runtime behavior should read DB-owned route/point definitions.
 
 The current trigger binding runtime model is durable enough to support CRM selection, but the client/operator UI should not be redesigned until the product questions are answered.
 
-The next thread for this surface should be an audit and Q&A pass, not a direct implementation pass.
+This is the next implementation focus after the Webinars message/template/schedule setup slice. Start with an audit and Q&A pass before replacing the current UI.
 
 Questions to answer:
 
@@ -277,4 +277,3 @@ That is expected.
 It means the route started from an automation event rather than a Workflow status transition.
 
 FlowRoutes may support Campaign, Messaging, Task, and status-related point types, but client-facing Route selection/building must be capability-aware. Point types whose owning modules are disabled should be hidden, disabled, or clearly marked unavailable. Campaign-related points must not appear as selectable client-facing behavior for clients without Campaigns enabled.
-

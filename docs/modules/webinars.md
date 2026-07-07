@@ -28,19 +28,38 @@ Webinars may depend on:
 
 Webinars may use Messaging to send registration confirmations, reminders, opt-ins, and post-webinar transactional follow-ups.
 
+## Webinar message/template/schedule setup
+
+Webinars should provide the owning setup surface for webinar-owned message contexts.
+
+Messaging template presets decide what those messages say.
+
+Webinars decide when those messages are sent and which webinar context they apply to.
+
+The next Webinars setup surface should support contexts such as:
+
+```text
+registration confirmation
+reminders
+waitlist availability messages
+post-attended transactional follow-up
+post-missed transactional follow-up
+```
+
+That surface should show the current selected Messaging template for each context, allow choosing a compatible `MessageTemplatePreset`, save the selected `MessageTemplatePresetAssignment`, and link back to Message Templates for copy editing.
+
 ## Selectable webinar schedule profiles
 
 Webinars should eventually support DB-owned selectable schedule profiles for webinar-owned messages.
 
 Schedule profiles decide when webinar lifecycle messages are sent.
 
-Messaging template presets decide what those messages say.
-
 Potential profile categories:
 
 ```text
 registration confirmation schedule
 reminder schedule
+waitlist availability schedule
 post-event transactional follow-up schedule
 ```
 
@@ -56,7 +75,6 @@ no reminders
 Assignments may be global/default or context-specific, such as per webinar series or individual webinar.
 
 A schedule profile should reference dispatch keys, message types, channels, purpose/scope, and Messaging template assignment keys. It should not embed reusable message copy.
-
 
 Post-webinar transactional follow-ups are not campaign nurture.
 
@@ -185,5 +203,3 @@ Dev testing actions should still use public module seams:
 The dev UI should behave like an operator console. Actions inside testing modals should use AJAX/fetch where practical so the modal, selected registration, loaded message options, and activity log are not lost after each action.
 
 Sim Join should skip already-queued live reminders when the real definition has skip_when_join_clicked enabled. Manual dev sends are forced sends and may still send a selected reminder afterward so the exact payload can be tested.
-
-

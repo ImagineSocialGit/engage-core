@@ -24,15 +24,26 @@
                     </p>
                 </div>
 
-                <div class="grid gap-2 sm:grid-cols-2 lg:min-w-80">
-                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                        <span class="font-bold text-slate-950">{{ $presets->count() }}</span>
-                        templates synced
+                <div class="space-y-3 lg:min-w-80">
+                    <div class="grid gap-2 sm:grid-cols-2">
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                            <span class="font-bold text-slate-950">{{ $presets->count() }}</span>
+                            templates synced
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                            <span class="font-bold text-slate-950">{{ $catalogGroups->count() }}</span>
+                            template groups
+                        </div>
                     </div>
-                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                        <span class="font-bold text-slate-950">{{ $catalogGroups->count() }}</span>
-                        template groups
-                    </div>
+
+                    @if(function_exists('module_enabled') && module_enabled('campaigns') && \Illuminate\Support\Facades\Route::has('crm.campaigns.message-templates.index'))
+                        <a
+                            href="{{ route('crm.campaigns.message-templates.index') }}"
+                            class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50"
+                        >
+                            Choose campaign templates
+                        </a>
+                    @endif
                 </div>
             </div>
         </section>
@@ -448,6 +459,15 @@
                                                             {{ $usage['detail'] }}
                                                         </div>
                                                     @endif
+
+                                                    @if($usage['url'])
+                                                        <a
+                                                            href="{{ $usage['url'] }}"
+                                                            class="mt-3 inline-flex min-h-8 items-center justify-center rounded-full border border-slate-300 bg-white px-3 text-xs font-extrabold text-slate-700 transition hover:bg-slate-50"
+                                                        >
+                                                            Manage selection
+                                                        </a>
+                                                    @endif
                                                 </div>
                                             @endforeach
                                         </div>
@@ -509,3 +529,4 @@
         @endif
     </div>
 </x-layouts.crm>
+
