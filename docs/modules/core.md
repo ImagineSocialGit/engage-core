@@ -108,3 +108,21 @@ Future module-specific contact filters should be contributed through explicit pr
 Core `ContactController` may ask registries for module-provided data.
 
 Core `ContactController` must not directly import module-specific models/services such as Tasks, Messaging, InboundMessaging, InternalNotifications, Webinars, Campaigns, Mortgage, or FlowRoutes.
+
+
+## Contact show shell
+
+Core owns the contact show shell and generic contact details.
+
+Current implementation direction:
+
+```text
+Core loads generic contact details and notes.
+Workflow status appears only through the Workflow seam when Workflow is enabled.
+Modules contribute contact sections and panels through Core-owned registries.
+Contact show should lead with next action and use module-provided summaries below it.
+```
+
+Core may render module-provided DTOs/arrays/views, but it should not query module tables directly.
+
+

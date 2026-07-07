@@ -87,8 +87,8 @@ Permission invitation emails must use:
 
 ```text
 channel = email
-purpose = marketing
-scope = broadcast
+purpose = transactional
+scope = permission_invitation
 dispatch_key = imported_contact_permission_invitation
 message_type = imported_contact_permission_invitation
 ```
@@ -139,11 +139,13 @@ Scopes are configured at:
 messaging.permission_invitations.consent.scopes
 ```
 
-The default purpose for consent records is:
+The default purpose for consent records created from accepted preferences is:
 
 ```text
 marketing
 ```
+
+The invitation email itself remains transactional because it exists to ask for communication preferences, not to send normal marketing content.
 
 The source is:
 
@@ -244,3 +246,5 @@ Coverage should prove:
 - contacts with required marketing email consent are skipped
 - contacts without email addresses are skipped
 - contacts with `contact_import_batch_id` count as imported for final Messaging send-time enforcement
+
+

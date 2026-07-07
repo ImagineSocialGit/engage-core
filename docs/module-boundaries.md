@@ -94,6 +94,47 @@ Provider availability may include dependencies.
 
 SMS code may exist even when SMS UI is hidden. SMS provider integrations, consent handling, STOP/HELP behavior, and runtime gates may remain available while config hides SMS options from Broadcast, Campaign, permission-invitation, or other client/admin builders.
 
+
+## CRM orientation surfaces
+
+The CRM dashboard and contact show page are shared orientation surfaces.
+
+They may display module-owned information, but they must not become places where Core or the dashboard directly import module internals.
+
+### Dashboard
+
+The dashboard is app-level CRM UI.
+
+Current durable direction:
+
+```text
+Dashboard layout is config-driven.
+Modules contribute panels through a DashboardPanelProvider-style seam.
+Dashboard slots and preset priorities decide what appears first.
+Enabled module visibility controls whether a module contributes anything.
+Actionable work panels may show calm empty states.
+Passive context panels should hide when empty.
+```
+
+A table existing, provider being loadable, or a future module appearing in dashboard config does not make that panel visible. Visibility still follows explicit module enablement and provider registration.
+
+### Contact show
+
+Core owns the contact show shell and generic contact identity/details.
+
+Modules contribute contact-specific data and UI through Core-owned extension points:
+
+```text
+ContactPanelProvider
+ContactPanelRegistry
+ContactShowDataProvider
+ContactShowDataRegistry
+```
+
+Module-contributed contact sections should stay useful and business-facing. They should summarize what happened, what needs attention, what is already handled, and what the next safe action is.
+
+Core must not import module models such as Task, ScheduledMessage, WebinarRegistration, CampaignEnrollment, ContactFlowRouteProgress, or TeamMember just to render a contact page.
+
 ## Runtime-Selectable Definitions
 
 Preset/config sync should create or update available definitions.
@@ -2537,6 +2578,7 @@ Current guardrails should ensure:
 - Messaging does not import InternalNotifications or InboundMessaging.
 - InboundMessaging does not import InternalNotifications.
 - Provider dependency expansion does not accidentally change explicit module visibility.
+- Dashboard panel visibility respects explicit module enablement and preset/slot config.
 - Contact show module visibility respects enabled modules.
 - Producer modules do not import FlowRoutes.
 - `FlowRouteExternalEvent::make(...)` is only called from FlowRoutes-owned code.
@@ -2568,8 +2610,12 @@ Recommended direction:
 2. Keep config templates aligned with the canonical Messaging/Campaign/FlowRoute/Preset shapes.
 3. Add public seams only when a concrete consumer/workflow needs them.
 4. Add contact filters for Commerce or Location only when Broadcasts, Campaigns, Reporting, or another consuming surface needs them.
-5. Continue the client-readiness path with permission-invitation accepted-event decisions and config validation guidance.
-6. Regenerate `core-project-tree.txt` from the repo after each structural batch.
+5. Treat the dashboard and contact show page as shared orientation surfaces with module-contributed summaries, not module inventories.
+6. Pause Automatic Follow-ups UI implementation long enough to answer product/UX questions about who selects what, what consequences are previewed, and which route details remain diagnostic.
+7. Continue the client-readiness path with permission-invitation accepted-event decisions and config validation guidance.
+8. Regenerate `core-project-tree.txt` from the repo after each structural batch.
 
 Do not use this section as a backlog. Actionable items belong in `TODO.md`.
+
+
 

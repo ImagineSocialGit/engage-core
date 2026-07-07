@@ -13,12 +13,15 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - The page should make the next action obvious before exposing module detail.
   - The page should avoid platform-cockpit sprawl: too many modules, widgets, logs, builders, raw keys, and settings at once.
   - Powerful features should default to summaries, presets, guided choices, and consequence previews.
-- [ ] Refactor the FlowRoute trigger binding screen into an outcome-oriented Automatic Follow-ups UI.
+- [ ] Run an Automatic Follow-ups / FlowRoute binding UX exploration before implementation.
+  - Decide whether the first version selects prebuilt routes only, edits route points, or only previews selected behavior.
+  - Decide intended user type: client, operator, developer, or split surfaces.
   - Use configured lead/contact/customer nouns.
   - Replace raw status/event terminology with Status and Activity language.
   - Use a status selector for status-triggered follow-ups.
   - Use module tabs and human-readable activity names for automation-event follow-ups.
-  - Show consequence previews before save.
+  - Define consequence-preview requirements before save and before manual status changes.
+  - Decide which point types are client-safe, operator-only, or developer-only.
 - [ ] Apply the AJAX/preserve-context UI pattern to other CRM row/panel/modal workflows where page reloads would frustrate operators.
   - Tasks complete/reopen/cancel/archive.
   - Broadcast recipient/detail actions where applicable.
@@ -122,6 +125,23 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - Delete completed roadmap items or move them back to TODO when they are no longer near-term.
 
 ## One-off backlog
+
+### CRM dashboard and contact workspace
+
+Completed baseline:
+
+- Dashboard is config-driven by module slots and preset priorities.
+- Modules contribute dashboard panels through provider seams.
+- Empty actionable panels can show calm caught-up states.
+- Empty passive context panels hide.
+- Module tones provide muted dashboard wayfinding.
+- Contact show is a Core-owned shell with module-provided panels and sections.
+- Contact show uses module wayfinding and improved client-facing section labels.
+
+- [ ] Refine dashboard and contact show visuals later after more real usage.
+  - Keep changes calm and action-oriented.
+  - Preserve module tones as wayfinding, not urgency.
+  - Avoid turning either surface into a module cockpit.
 
 ### Permission invitations
 
@@ -322,6 +342,13 @@ Completed import-batch visibility baseline:
 
 ### FlowRoutes / Routes
 
+- [ ] Explore Automatic Follow-ups / Route Binding UX before implementation.
+  - Audit current binding UI against `docs/ui-ux-guide.md`.
+  - Decide whether the page is selection-only, edit-capable, or split into simple/advanced modes.
+  - Define how route point consequences are summarized.
+  - Define what raw keys remain visible as secondary diagnostics.
+  - Define capability-aware behavior when Campaigns, Messaging, Tasks, or Webinars are disabled.
+
 - [ ] Add CRM manual status-change confirmation when the selected status has automation attached.
   - Show the selected Route name.
   - Summarize major route actions where feasible.
@@ -396,5 +423,7 @@ Completed import-batch visibility baseline:
 - [ ] Add test coverage for client config fallback behavior.
   - Missing optional content/style keys should not break public pages.
   - Client copy changes should not break tests that only need behavioral assertions.
+
+
 
 

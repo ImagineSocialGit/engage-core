@@ -215,6 +215,19 @@ Mortgage-specific document collection, LOS milestones, appraisal details, title 
 
 Tasks may reference those records through `related` or `responsible` morphs, but Tasks should not own their domain-specific state.
 
+
+## Automatic Follow-ups task usage
+
+FlowRoutes may create Tasks through Task-owned public actions.
+
+Automatic Follow-ups UI should describe this as a business consequence, such as:
+
+```text
+Create task: Call lead within 1 day.
+```
+
+It should not expose Task morph fields, raw handler names, or `responsible_party` internals as primary labels. FlowRoute ownership should continue to use FlowRoutes-owned owner fields, not Task responsibility fields.
+
 ## Future UI/Runtime Guidance
 
 Task row, panel, modal, and tab actions should preserve operator context where practical.
@@ -222,3 +235,5 @@ Task row, panel, modal, and tab actions should preserve operator context where p
 Actions such as complete, reopen, cancel, archive, assign, or create-from-panel should prefer AJAX/fetch-driven updates once the UI supports it, so operators do not lose scroll position, selected tabs, open modals, or the contact/task context after every request.
 
 This is a UX/runtime guidance rule. It does not change Task ownership or lifecycle semantics.
+
+

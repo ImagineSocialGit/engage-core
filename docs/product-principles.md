@@ -167,5 +167,32 @@ The client never opens the CRM and thinks, “What did I get myself into?”
 
 Client-facing UI should not make the client feel like they accidentally became a software administrator. Powerful modules should appear as simple summaries, guided actions, presets, and next-step prompts unless the user is intentionally in an operator/developer setup surface.
 
+
+## CRM orientation surfaces
+
+The dashboard and contact show page are orientation surfaces, not module inventories.
+
+The dashboard should help the client decide where to start today. It should be config-driven by enabled modules and preset priorities, but the client should experience it as a calm summary of immediate work, recent movement, and safe next action.
+
+The contact show page should feel like a lead/customer workspace. Core owns the shell and generic contact details. Modules may contribute summaries, panels, tasks, messages, webinar history, campaigns, or automatic follow-up visibility, but those contributions should answer business questions instead of exposing module internals.
+
+## Exploration before builders
+
+For powerful setup surfaces, especially Automatic Follow-ups / FlowRoutes, do not jump straight from architecture to UI implementation.
+
+First decide:
+
+```text
+Which decisions belong to the client?
+Which decisions belong to the operator/developer?
+What should be selected from presets?
+What consequences must be previewed before saving?
+Which raw keys or route details are useful only as diagnostics?
+```
+
+A blank-canvas builder is not client-ready just because the underlying module supports many point types. The product direction is guided, preset-backed setup first, with advanced builder detail only where it is deliberately needed.
+
 Detailed language rules, reusable UI patterns, automation-warning patterns, and UI review checklists belong in `ui-ux-guide.md`.
+
+
 

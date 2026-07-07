@@ -65,6 +65,23 @@ Decision test:
 If it is not needed by almost every client install, it probably does not belong in Core.
 ```
 
+
+## Shared CRM Orientation Surfaces
+
+Some CRM surfaces are shared shells rather than feature modules.
+
+### Dashboard
+
+The dashboard is an app-level CRM orientation surface.
+
+It should be driven by config slots, preset priorities, and module-contributed panel providers. It should answer what needs attention today and what is already handled. It should not duplicate the Leads index or become a grid of module widgets.
+
+### Contact show
+
+The contact show page is Core-owned because Core owns generic contact identity and CRM contact pages.
+
+Feature modules contribute contact-specific information through Core-owned registries. Core should not import feature-module models directly to build the page.
+
 ## Universal Modules
 
 Universal modules are reusable capability modules. They may be disabled for many clients, but they are not tied to a single business vertical.
@@ -178,3 +195,5 @@ Avoid:
 ```text
 New Core columns for feature or vertical state
 ```
+
+

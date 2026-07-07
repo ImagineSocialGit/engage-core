@@ -391,6 +391,15 @@ Do not add separate `subject_type` / `subject_id` columns to `scheduled_messages
 Messaging may schedule messages for non-Contact recipients through recipient payload/gate extension points, but it should not own those recipient models or their preferences.
 
 
+
+### Automatic Follow-ups message usage
+
+FlowRoutes may use Messaging through public Messaging actions/services for send-message points.
+
+Automatic Follow-ups UI may eventually allow an operator to choose which Messaging template assignment a send-message point uses. That selection belongs on the consuming setup surface, not primarily on the Messaging template copy editor.
+
+Before implementing that UI, decide whether the first Automatic Follow-ups surface edits send-message points at all or only previews existing selected routes.
+
 ### Imported-contact permission invitations
 
 Messaging owns the one-time imported-contact permission invitation capability.
@@ -427,4 +436,6 @@ Current import-batch invitation scheduling is Messaging-owned.
 Core may expose the operator entry point on the import batch detail page when Messaging is enabled, but Core must not directly import Messaging actions, services, or models.
 
 Other modules may request this flow through Messaging public services/actions, but they must not create invitation records directly.
+
+
 

@@ -268,3 +268,19 @@ That does not make Campaigns depend on the source module.
 
 Campaigns should treat source morphs as context unless an explicit public integration is introduced.
 
+
+## Automatic Follow-ups campaign usage
+
+FlowRoutes may enroll or cancel Campaigns through Campaign-owned public actions.
+
+Automatic Follow-ups UI should describe these as follow-up sequence consequences, such as:
+
+```text
+Start follow-up sequence: Webinar Attended Nurture.
+Stop follow-up sequence: Webinar Missed Nurture.
+```
+
+It should not expose CampaignEnrollment internals or campaign step machinery as primary labels.
+
+
+

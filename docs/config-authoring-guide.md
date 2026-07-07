@@ -694,6 +694,60 @@ Before accepting a client config, validate:
 Validation should protect authoring mistakes without turning optional style/copy omissions into runtime failures.
 
 
+
+## Dashboard layout config
+
+Dashboard layout config owns panel placement, not panel data.
+
+Use `config/modules.php` dashboard config for:
+
+```text
+slots
+slot order
+max panels per slot
+hide_when_empty behavior
+preset-specific panel order
+preset-specific panel priorities
+```
+
+Modules own the code that creates panel data.
+
+Dashboard config should reference stable panel keys such as:
+
+```text
+tasks.today
+inbound_messaging.replies
+webinars.activity
+campaigns.movement
+broadcasts.recent
+```
+
+Do not create DB-owned dashboard layout state unless a concrete client workflow requires runtime customization by an operator.
+
+Do not make disabled modules visible by listing their panels in dashboard config. Panel visibility still follows explicit module enablement and provider registration.
+
+Actionable panels may use `hide_when_empty = false` so the user sees a calm caught-up state. Passive context panels should generally hide when empty.
+
+## Module tone config
+
+Module tones are UI wayfinding config, not semantic state.
+
+Tone entries may provide muted classes for:
+
+```text
+panel
+panel_focus
+item
+item_focus
+jump
+badge
+nav
+rail
+text
+```
+
+Use soft borders, background washes, rings, and badges. Do not use tone config for urgency. Overdue, failed, blocked, skipped, or business-critical states should apply separate severity styling that visually wins over module tone.
+
 ## Runtime-selectable FlowRoutes
 
 FlowRoute configs should define available route definitions.
@@ -716,6 +770,24 @@ owner_group
 ```
 
 Do not use Task `responsible_party` for FlowRoute ownership.
+
+
+### Automatic Follow-ups UX exploration before config expansion
+
+Before adding new author-facing FlowRoute config keys for Automatic Follow-ups UI, answer the product questions for the surface.
+
+Do not add config just to support a premature builder.
+
+Questions to settle first:
+
+```text
+Is the UI selecting existing routes only, editing route points, or both?
+Which route point summaries must be derivable for consequence previews?
+Which route point types are client-safe, operator-only, or developer-only?
+How should module-disabled point types be hidden or explained?
+How should send-message points reference Messaging template assignments?
+How should selected routes be grouped for a business activity such as webinar.attended?
+```
 
 ## FlowRoute config shape
 
@@ -974,4 +1046,6 @@ Client request:
 
 Return complete config files and list any recommended new keys/tokens separately.
 ```
+
+
 

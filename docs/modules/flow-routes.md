@@ -113,6 +113,29 @@ Runtime meaning:
 
 FlowRoutes runtime behavior should read DB-owned route/point definitions.
 
+
+## Automatic Follow-ups UI exploration
+
+The current trigger binding runtime model is durable enough to support CRM selection, but the client/operator UI should not be redesigned until the product questions are answered.
+
+The next thread for this surface should be an audit and Q&A pass, not a direct implementation pass.
+
+Questions to answer:
+
+```text
+Is the first product surface selection-only, route-editing, or split simple/advanced?
+Who is the intended user for each mode?
+How should a selected route's points be summarized into consequences?
+How should status-triggered one-route selection differ from activity-triggered multi-route selection?
+Which point types can be shown to clients?
+Which point types are operator/developer-only?
+How should unavailable module-owned point types appear when a module is disabled?
+Where should send-message point template assignment be edited?
+What confirmation is required before a manual status change starts a selected status route?
+```
+
+Until those answers are captured, keep implementation focused on stable runtime bindings, capability-aware availability, and diagnostics.
+
 ## Trigger bindings
 
 FlowRoute trigger bindings select which available route runs for a trigger/context.
@@ -254,3 +277,4 @@ That is expected.
 It means the route started from an automation event rather than a Workflow status transition.
 
 FlowRoutes may support Campaign, Messaging, Task, and status-related point types, but client-facing Route selection/building must be capability-aware. Point types whose owning modules are disabled should be hidden, disabled, or clearly marked unavailable. Campaign-related points must not appear as selectable client-facing behavior for clients without Campaigns enabled.
+

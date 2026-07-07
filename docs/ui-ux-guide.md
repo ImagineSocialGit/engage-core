@@ -292,6 +292,26 @@ If the contact show page already uses a status index or status selector pattern,
 
 Do not introduce a new layout for the same mental model unless the new screen asks a meaningfully different question.
 
+
+## Visual wayfinding
+
+Module colors are quiet orientation cues, not decoration.
+
+Use muted tints, borders, rings, badges, rails, and background washes to help users recognize which module contributed a card, panel, or section.
+
+Do not use bright module colors as large attention-grabbing blocks. Reserve high-saturation amber/red treatments for true urgency, failed/blocked states, overdue work, or business-critical warnings.
+
+Urgency styling should visually win over module wayfinding.
+
+Examples:
+
+```text
+Tasks panel: soft emerald border/background.
+Inbound messages panel: soft blue border/background.
+Webinars panel: soft stone border/background.
+Overdue task: amber urgency badge regardless of Tasks module tone.
+```
+
 ## Core screen patterns
 
 ### Dashboard / today screen pattern
@@ -319,11 +339,24 @@ No urgent message issues.
 Primary action: Work next lead
 ```
 
+Current implementation direction:
+
+```text
+Dashboard layout is config-driven, not DB-owned layout state.
+Dashboard panels are contributed by enabled modules through panel providers.
+Slots such as immediate work and context are selected by dashboard config and preset overrides.
+Actionable empty states may remain visible when they reassure the user.
+Passive context panels should hide when empty.
+Right-now cards should jump to the panel they summarize.
+```
+
 Avoid dashboards filled with empty charts, duplicated widgets, broad module panels, generic counts, or filters that do not lead to a clear next action.
 
 ### “When this happens, what should happen next?” pattern
 
 Use for automation, routing, follow-ups, event reactions, and status-triggered behavior.
+
+Do not treat this pattern as implementation-ready until the product questions for the specific surface are answered. For Automatic Follow-ups / FlowRoutes, run an exploration/Q&A pass before redesigning the page.
 
 Recommended structure:
 
@@ -509,7 +542,7 @@ One follow-up can run for this status
 More than one follow-up can run for this activity
 ```
 
-The first implementation target should be:
+After the exploration/Q&A pass, the likely target direction is:
 
 ```text
 Automatic Follow-ups
@@ -519,6 +552,8 @@ Tabs:
 1. By Status
 2. By Activity
 ```
+
+Do not treat this as a final spec until the Automatic Follow-ups product questions are answered.
 
 #### By Status
 
@@ -590,6 +625,28 @@ Wait until: Task is completed
 ```
 
 Do not expose handler names such as `enroll_campaign`, `event_wait`, or `branch_evaluate` as primary labels.
+
+
+### Automatic Follow-ups exploration gate
+
+Before implementing the Automatic Follow-ups redesign, answer the product questions first.
+
+Questions to settle:
+
+```text
+Who is the intended user for this surface: client, operator, or developer?
+Is the first version only selecting prebuilt routes, or also editing route point definitions?
+For status-triggered follow-ups, should the user select one route, a bundle of routes, or one route containing multiple points?
+For activity-triggered follow-ups, when should multiple selected routes be visible as separate independent follow-ups?
+How should route consequences be summarized from points?
+Which route point types are safe to expose to clients?
+Which point types are operator-only?
+How should unavailable point types appear when a module is disabled?
+What confirmation is needed before a manual status change runs automation?
+Where should template assignment changes happen for send-message points?
+```
+
+Until those answers are documented, implementation should focus on exploration, vocabulary, information architecture, and consequence-preview rules rather than replacing the binding UI with another incomplete cockpit.
 
 ## Messaging, Broadcasts, and Campaigns UI
 
@@ -763,6 +820,15 @@ The public preference page should make SMS opt-in explicit and should not imply 
 ## Contact show UI
 
 The contact show page is the main client mental model for a person. It should feel like a lead/customer workspace, not a CRM cockpit.
+
+Current implementation direction:
+
+```text
+Core owns the contact show shell and generic contact details.
+Modules contribute data, panels, and visibility sections through Core-owned registries.
+Module-contributed sections should use muted wayfinding tones and client-facing labels.
+The top of the page should lead with the next action before module detail.
+```
 
 It should answer:
 
@@ -967,3 +1033,5 @@ Does the screen avoid making the client feel like a software administrator?
 Does the UI preserve context after save where reloads would be frustrating?
 Is this production/client UI, not a reused dev-testing pattern?
 ```
+
+

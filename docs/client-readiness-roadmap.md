@@ -39,7 +39,7 @@ imported/new contact
 → safe client/operator action
 ```
 
-The imported-contact onboarding and Broadcast visibility foundation is now in place:
+The imported-contact onboarding, Broadcast visibility, dashboard, and contact workspace foundations are now in place:
 
 - Core owns first-class import batch records and CRM import-batch visibility.
 - Broadcasts can target all imported contacts or selected import batches.
@@ -47,6 +47,8 @@ The imported-contact onboarding and Broadcast visibility foundation is now in pl
 - Normal Broadcasts are single-channel email or SMS sends and remain consent-gated through Messaging.
 - SMS Broadcast authoring is available only when Messaging channel availability exposes SMS for the `broadcasts` surface.
 - Broadcast scheduling records recipient outcomes and exposes scheduled/skipped/failed visibility on the Broadcast detail page.
+- The CRM dashboard is config-driven by module slots, panel providers, and preset priorities.
+- The contact show page is a Core-owned workspace shell with module-contributed panels/sections and muted module wayfinding.
 
 ## Architecture runway after staging smoke success
 
@@ -87,18 +89,33 @@ The remaining runway pieces should continue to be implemented as durable client-
 | 5 | Selectable webinar schedule profiles | 1–3 sessions | Allow quick swapping of confirmation/reminder/post-event schedules by context. |
 | 6 | Manual status-change automation warning | 0.5–1 session | Warn operators before a manual status change runs a selected status FlowRoute. This is a UI awareness guardrail, not a ContactStatus schema split. |
 | 7 | Task template/default definition UI | 1–2 sessions, maybe more if polished | Only needed when clients/operators need to manage task templates themselves. Preset sync already creates DB-owned definitions only. |
-| 8 | FlowRoutes route-builder UX | 3–6 sessions | Follow `ui-ux-guide.md`: guided, outcome-oriented, and not a blank-canvas automation builder. |
-| 9 | Task-completed FlowRoutes resume behavior | 0.5–1 session | Resume route event-wait points from neutral `task.completed` automation events, not direct Task-specific FlowRoutes listeners. |
-| 10 | Client self-serve readiness audit | 0.5–1 session | Separate controlled beta/operator-assisted readiness from true client self-serve readiness. |
-| 11 | PetServices vertical planning | 0.5–1 session | Plan vertical-owned pet/service concepts without pushing domain fields into Core. |
-| 12 | Music vertical planning | 0.5–1 session | Plan vertical-owned music/fan/product-interest concepts using Commerce, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Scheduling, Portal, and Reporting as needed. |
-| 13 | Feature-specific docs as modules stabilize | Ongoing | Keep module docs current when architecture/operator behavior changes. Do not turn docs into speculative backlog. |
-| 14 | Client config fallback tests | 0.5–1 session | Verify default/client config fallback, numeric-array replacement, optional content/style safety, and copy-tolerant tests. |
+| 8 | Automatic Follow-ups exploration/Q&A | 0.5–1.5 sessions | Audit current FlowRoute binding UX, decide user type/scope, consequence-preview requirements, and what is implementation-ready before redesign. |
+| 9 | FlowRoutes route-builder UX | 3–6 sessions | Only after the exploration pass. Follow `ui-ux-guide.md`: guided, outcome-oriented, and not a blank-canvas automation builder. |
+| 10 | Task-completed FlowRoutes resume behavior | 0.5–1 session | Resume route event-wait points from neutral `task.completed` automation events, not direct Task-specific FlowRoutes listeners. |
+| 11 | Client self-serve readiness audit | 0.5–1 session | Separate controlled beta/operator-assisted readiness from true client self-serve readiness. |
+| 12 | PetServices vertical planning | 0.5–1 session | Plan vertical-owned pet/service concepts without pushing domain fields into Core. |
+| 13 | Music vertical planning | 0.5–1 session | Plan vertical-owned music/fan/product-interest concepts using Commerce, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Scheduling, Portal, and Reporting as needed. |
+| 14 | Feature-specific docs as modules stabilize | Ongoing | Keep module docs current when architecture/operator behavior changes. Do not turn docs into speculative backlog. |
+| 15 | Client config fallback tests | 0.5–1 session | Verify default/client config fallback, numeric-array replacement, optional content/style safety, and copy-tolerant tests. |
 
 ## Recently completed client-readiness items
 
 These items are no longer the recommended next implementation target, but they explain the current baseline.
 
+
+### CRM dashboard and contact workspace orientation
+
+Completed baseline:
+
+- Dashboard panel selection is config-driven through slots and preset overrides.
+- Enabled modules contribute dashboard panels through provider seams.
+- Disabled modules do not appear just because their tables, providers, or config entries exist.
+- Immediate work panels can show calm caught-up empty states.
+- Passive context panels hide when empty.
+- Module tones provide muted wayfinding for panels, cards, badges, and jumps.
+- Contact show remains a Core-owned shell.
+- Modules contribute contact show data/panels through Core registries.
+- Contact show leads with the next action and uses module labels/tones without turning into a cockpit.
 
 ### Import-time status mapping
 
@@ -181,19 +198,22 @@ Completed baseline:
 
 ## Recommended next implementation target
 
-The next implementation target should be chosen from the remaining runtime-selectable architecture runway:
+The next implementation target should be an exploration/Q&A thread, not immediate implementation:
 
 ```text
-Selectable webinar schedule profiles
+Automatic Follow-ups / FlowRoute binding UX exploration
 ```
 
 Reason:
 
-- FlowRoute trigger bindings and Messaging template preset/catalog/assignment foundations are now in place.
-- Webinars still need selectable confirmation/reminder/post-event schedule profiles so clients/operators can choose when webinar-owned messages send without changing message copy.
-- Messaging should continue to own what those messages say through template presets and assignments.
+- FlowRoute trigger bindings and the current CRM selection UI are functional, but the screen still exposes too much implementation language.
+- The desired UI touches Workflow status changes, automation-event bindings, FlowRoute point summaries, Messaging template assignments, Campaign enrollment, Tasks, and Webinars.
+- Before replacing the page, the team should decide what the surface is allowed to do in its first product version: select prebuilt routes, edit route points, or only preview behavior.
+- Consequence-preview requirements should be documented before changing manual status-change or activity-triggered automation UI.
 
-Messaging template UI/UX polish can proceed in the dedicated UI/UX thread using `MessageTemplateCatalogEntry` as the browser/grouping foundation.
+Selectable webinar schedule profiles remain a strong next implementation candidate after Automatic Follow-ups product decisions are captured.
+
+Messaging template UI/UX polish can proceed in a dedicated UI/UX thread using `MessageTemplateCatalogEntry` as the browser/grouping foundation.
 
 ## What this roadmap intentionally avoids
 
@@ -225,5 +245,7 @@ When a roadmap item is completed:
 1. Remove it from this file or move it to a completed release note if needed.
 2. Delete or update the related TODO item.
 3. Update module docs only if architecture or durable behavior changed.
+
+
 
 

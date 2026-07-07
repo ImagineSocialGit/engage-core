@@ -128,6 +128,41 @@ Those outcome fields are emitted through `AutomationEventRecorded`, then FlowRou
 
 Webinars should not decide Campaign, Workflow, task, or FlowRoute orchestration directly.
 
+
+## CRM visibility
+
+Webinars may contribute CRM visibility through module-owned providers and views.
+
+Current expected surfaces:
+
+```text
+Dashboard context panel for useful webinar activity.
+Contact show webinar history panel.
+```
+
+These surfaces should summarize webinar activity in business terms and hide empty passive context where appropriate. They should not make Webinars decide Campaign, Workflow, Task, or FlowRoute orchestration.
+
+## Automatic Follow-ups webinar usage
+
+Webinar outcomes should continue to emit neutral automation events such as:
+
+```text
+webinar.registered
+webinar.attended
+webinar.missed
+webinar.ended
+```
+
+Automatic Follow-ups UI should translate those event keys into human-readable activity labels, such as:
+
+```text
+Someone registers for a webinar.
+Someone attends a webinar.
+Someone misses a webinar.
+```
+
+Raw event keys may be shown as secondary diagnostic metadata when useful.
+
 ## Dev/staging testing tools
 
 Webinars may expose local/staging-only CRM testing tools to help operators/developers verify webinar messaging, join-click behavior, attendance outcomes, replay URLs, post-event follow-ups, and downstream FlowRoute behavior without relying on Zoom.
@@ -150,3 +185,5 @@ Dev testing actions should still use public module seams:
 The dev UI should behave like an operator console. Actions inside testing modals should use AJAX/fetch where practical so the modal, selected registration, loaded message options, and activity log are not lost after each action.
 
 Sim Join should skip already-queued live reminders when the real definition has skip_when_join_clicked enabled. Manual dev sends are forced sends and may still send a selected reminder afterward so the exact payload can be tested.
+
+
