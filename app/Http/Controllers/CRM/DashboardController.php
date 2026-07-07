@@ -205,11 +205,13 @@ class DashboardController extends Controller
      */
     private function rightNowCards(Collection $workPanels, Collection $contextPanels): array
     {
+        $firstWorkPanel = $workPanels->first();
+
         $cards = [[
             'label' => 'need attention',
             'count' => $workPanels->sum(fn (array $panel): int => (int) ($panel['attention_count'] ?? 0)),
-            'module' => $workPanels->first()['module'] ?? 'core',
-            'target_ref' => $workPanels->first()['target_ref'] ?? null,
+            'module' => is_array($firstWorkPanel) ? ($firstWorkPanel['module'] ?? 'core') : 'core',
+            'target_ref' => is_array($firstWorkPanel) ? ($firstWorkPanel['target_ref'] ?? null) : null,
         ]];
 
         foreach ($workPanels->concat($contextPanels)->take(3) as $panel) {
@@ -391,3 +393,4 @@ class DashboardController extends Controller
         return class_basename($model).' #'.$model->getKey();
     }
 }
+

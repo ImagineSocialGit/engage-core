@@ -391,4 +391,105 @@ class DashboardControllerTest extends TestCase
         $response->assertSee('bg-amber-50', false);
         $response->assertSee('Overdue');
     }
+
+    public function test_disabled_modules_do_not_contribute_dashboard_panels_even_when_configured(): void
+    {
+        Config::set('modules.enabled', [
+            'tasks',
+            'messaging',
+            'internal_notifications',
+        ]);
+
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.index'));
+
+        $response->assertOk();
+        $response->assertSee('data-module-panel="tasks"', false);
+        $response->assertSee('No tasks need your attention today.');
+        $response->assertDontSee('data-module-panel="inbound_messaging"', false);
+        $response->assertDontSee('No lead replies need review.');
+        $response->assertDontSee('data-module-panel="webinars"', false);
+        $response->assertDontSee('Webinar activity');
+    }
+
+    public function test_client_preset_can_disable_context_dashboard_panels(): void
+    {
+        Config::set('client.preset', 'crm_basic');
+
+        $user = User::factory()->create();
+        $contact = Contact::factory()->create(['name' => 'Preset Webinar Lead']);
+        $series = WebinarSeries::factory()->create();
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->id,
+            'title' => 'Preset Hidden Webinar',
+            'starts_at' => now()->addDay(),
+        ]);
+
+        WebinarRegistration::factory()->create([
+            'contact_id' => $contact->id,
+            'webinar_id' => $webinar->id,
+            'registered_at' => now(),
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.index'));
+
+        $response->assertOk();
+        $response->assertSee('data-module-panel="tasks"', false);
+        $response->assertSee('data-module-panel="inbound_messaging"', false);
+        $response->assertDontSee('data-module-panel="webinars"', false);
+        $response->assertDontSee('Preset Hidden Webinar');
+    }
+
+    public function test_client_preset_can_prioritize_one_actionable_panel_over_another(): void
+    {
+        Config::set('client.preset', 'messaging_first');
+
+        $user = User::factory()->create();
+        $contact = Contact::factory()->create(['name' => 'Priority Lead']);
+
+        Task::query()->create([
+            'related_type' => $contact->getMorphClass(),
+            'related_id' => $contact->id,
+            'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+            'source' => Task::SOURCE_MANUAL,
+            'title' => 'Overdue but lower preset priority',
+            'status' => Task::STATUS_OPEN,
+            'due_at' => now()->subDay(),
+        ]);
+
+        InboundMessage::query()->create([
+            'sender_type' => $contact->getMorphClass(),
+            'sender_id' => $contact->id,
+            'client_key' => config('client.key'),
+            'channel' => 'sms',
+            'provider' => 'telnyx',
+            'provider_event_id' => 'event-dashboard-priority-test',
+            'provider_message_id' => 'message-dashboard-priority-test',
+            'from_type' => 'phone',
+            'from_value' => '+15555550123',
+            'to_type' => 'phone',
+            'to_value' => '+15555550999',
+            'body' => 'Please prioritize replies for this preset.',
+            'classification' => InboundMessage::CLASSIFICATION_NORMAL_REPLY,
+            'received_at' => now(),
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.index'));
+
+        $response->assertOk();
+        $response->assertSeeInOrder([
+            'Leads needing attention',
+            'Today’s tasks',
+        ]);
+        $response->assertSee('Priority Lead replied');
+        $response->assertSee('Overdue but lower preset priority');
+    }
+
 }

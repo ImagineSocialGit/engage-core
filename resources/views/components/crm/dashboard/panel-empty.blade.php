@@ -1,16 +1,9 @@
 @props([
-    'panel',
+    'panel' => [],
     'layout' => 'work',
 ])
 
-@php
-    $panel = is_array($panel) ? $panel : [];
-    $wrapperClass = $layout === 'context'
-        ? 'rounded-2xl border border-dashed border-slate-200 p-6 lg:col-span-2'
-        : 'rounded-2xl border border-dashed border-slate-200 p-6 text-center';
-@endphp
-
-<div class="{{ $wrapperClass }}">
+<div class="rounded-2xl border border-dashed border-slate-200 p-6 {{ $layout === 'context' ? 'lg:col-span-2' : 'text-center' }}">
     <p class="font-semibold text-slate-950">
         {{ $panel['empty_title'] ?? ($layout === 'context' ? 'Nothing new here.' : 'Nothing needs attention here.') }}
     </p>

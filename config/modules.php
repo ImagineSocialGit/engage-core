@@ -76,6 +76,68 @@ return [
                 ],
             ],
         ],
+
+        'presets' => [
+            'crm_basic' => [
+                'slots' => [
+                    'immediate_work' => [
+                        'max' => 2,
+                        'panels' => [
+                            'tasks.today',
+                            'inbound_messaging.replies',
+                        ],
+                    ],
+                    'context' => [
+                        'max' => 0,
+                        'panels' => [],
+                    ],
+                ],
+            ],
+
+            'webinar_crm' => [
+                'slots' => [
+                    'immediate_work' => [
+                        'max' => 2,
+                        'panels' => [
+                            'tasks.today',
+                            'inbound_messaging.replies',
+                        ],
+                    ],
+                    'context' => [
+                        'max' => 2,
+                        'panels' => [
+                            'webinars.activity',
+                            'campaigns.movement',
+                            'broadcasts.recent',
+                        ],
+                    ],
+                ],
+            ],
+
+            'messaging_first' => [
+                'slots' => [
+                    'immediate_work' => [
+                        'max' => 2,
+                        'panels' => [
+                            'inbound_messaging.replies',
+                            'tasks.today',
+                        ],
+                        'priorities' => [
+                            'inbound_messaging.replies' => 130,
+                            'tasks.today' => 100,
+                        ],
+                    ],
+                    'context' => [
+                        'max' => 2,
+                        'panels' => [
+                            'broadcasts.recent',
+                            'campaigns.movement',
+                            'webinars.activity',
+                        ],
+                    ],
+                ],
+            ],
+        ],
     ],
 
 
@@ -538,5 +600,6 @@ return [
     ],
 
 ];
+
 
 

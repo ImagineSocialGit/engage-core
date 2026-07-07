@@ -1,27 +1,24 @@
 @props([
-    'panel',
+    'panel' => [],
     'layout' => 'work',
 ])
 
 @php
-    $panel = is_array($panel) ? $panel : [];
-    $panelKey = (string) ($panel['key'] ?? 'dashboard.panel');
-    $module = (string) ($panel['module'] ?? 'core');
-    $targetRef = (string) ($panel['target_ref'] ?? str_replace(['.', '-'], '_', $panelKey).'Panel');
+    $module = $panel['module'] ?? 'core';
     $tone = module_tone($module);
-
+    $targetRef = (string) ($panel['target_ref'] ?? str_replace(['.', '-'], '_', (string) ($panel['key'] ?? 'dashboard_panel')).'Panel');
     $panelBaseClass = 'transition duration-700 ease-out rounded-3xl border p-6 shadow-sm lg:p-7';
-    $panelClass = trim($panelBaseClass.' '.module_tone($module, 'panel'));
-    $panelFocusedClass = trim('scale-[1.01] '.module_tone($module, 'panel_focus'));
-    $panelRestingClass = 'ring-1 ring-transparent';
-    $itemsWrapperClass = $layout === 'context' ? 'mt-5 grid gap-3 lg:grid-cols-2' : 'mt-5 space-y-3';
+    $panelFocusClass = 'scale-[1.01] '.module_tone($module, 'panel_focus');
+    $panelRestClass = 'ring-1 ring-transparent';
+    $itemsGridClass = $layout === 'context' ? 'mt-5 grid gap-3 lg:grid-cols-2' : 'mt-5 space-y-3';
 @endphp
 
 <section
     x-ref="{{ $targetRef }}"
     data-module-panel="{{ $module }}"
-    class="{{ $panelClass }}"
-    :class="focusedPanel === @js($targetRef) ? @js($panelFocusedClass) : @js($panelRestingClass)"
+    data-dashboard-panel="{{ $panel['key'] ?? '' }}"
+    class="{{ $panelBaseClass }} {{ module_tone($module, 'panel') }}"
+    :class="focusedPanel === @js($targetRef) ? @js($panelFocusClass) : @js($panelRestClass)"
 >
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -37,13 +34,13 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-            @if($panelKey === 'tasks.today' && (int) ($panel['overdue_count'] ?? 0) > 0)
+            @if(($panel['key'] ?? null) === 'tasks.today' && (int) ($panel['overdue_count'] ?? 0) > 0)
                 <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200">
                     {{ (int) ($panel['overdue_count'] ?? 0) }} overdue
                 </span>
             @endif
 
-            @if($panelKey === 'tasks.today')
+            @if(($panel['key'] ?? null) === 'tasks.today')
                 <a
                     href="{{ route('crm.tasks.today.print') }}"
                     target="_blank"
@@ -69,29 +66,22 @@
             @foreach(($panel['actions'] ?? []) as $action)
                 @if(filled($action['href'] ?? null))
                     <a href="{{ $action['href'] }}" class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50">
-                        {{ $action['label'] }}
+                        {{ $action['label'] ?? 'Open' }}
                     </a>
                 @endif
             @endforeach
         </div>
     </div>
 
-    <div class="{{ $itemsWrapperClass }}">
+    <div class="{{ $itemsGridClass }}">
         @forelse($panel['items'] ?? [] as $item)
-            <x-crm.dashboard.panel-item
-                :item="$item"
-                :panel-key="$panelKey"
-                :module="$module"
-                :target-ref="$targetRef"
-                :layout="$layout"
-                :tone="$tone"
-            />
+            <x-crm.dashboard.panel-item :panel="$panel" :item="$item" :module="$module" :target-ref="$targetRef" />
         @empty
             <x-crm.dashboard.panel-empty :panel="$panel" :layout="$layout" />
         @endforelse
     </div>
 
-    @if($panelKey === 'tasks.today' && filled($panel['upcoming_summary'] ?? null))
+    @if(($panel['key'] ?? null) === 'tasks.today' && filled($panel['upcoming_summary'] ?? null))
         <div class="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -116,7 +106,7 @@
         </div>
     @endif
 
-    @if($panelKey === 'tasks.today' && ! ($panel['can_broadcast'] ?? false))
+    @if(($panel['key'] ?? null) === 'tasks.today' && ! ($panel['can_broadcast'] ?? false))
         <p class="mt-4 text-xs leading-5 text-slate-400">
             Broadcast becomes available when Team Members, Internal Notifications, and Messaging are enabled. Until then, use Print or View.
         </p>
