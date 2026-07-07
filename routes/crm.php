@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CRM\DashboardController;
 use App\Modules\Broadcasts\Controllers\BroadcastController;
+use App\Modules\Campaigns\Controllers\CRM\CampaignMessageTemplateController;
 use App\Modules\Core\Controllers\ContactController;
 use App\Modules\Core\Controllers\ContactImportBatchController;
 use App\Modules\Core\Controllers\ContactLookupController;
@@ -84,6 +85,19 @@ Route::middleware('auth')->group(function () {
         Route::post('/webinar-registrations/{registration}/smoke/reset', [WebinarDevController::class, 'resetRegistration'])
             ->name('crm.webinar-registrations.smoke.reset.store');
     });
+
+
+
+    Route::middleware(['module:campaigns', 'module:messaging'])
+        ->prefix('campaigns/message-templates')
+        ->name('crm.campaigns.message-templates.')
+        ->group(function () {
+            Route::get('/', [CampaignMessageTemplateController::class, 'index'])
+                ->name('index');
+
+            Route::patch('/steps/{campaignStep}', [CampaignMessageTemplateController::class, 'update'])
+                ->name('update');
+        });
 
     Route::middleware('module:messaging')
         ->prefix('message-templates')
@@ -214,4 +228,3 @@ Route::middleware('auth')->group(function () {
                 ->name('notes.destroy');
         });
 });
-

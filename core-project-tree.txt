@@ -79,6 +79,8 @@
 │   │   │   │       └── SyncCampaignPresetsCommand.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
+│   │   │   │   └── CRM
+│   │   │   │       └── CampaignMessageTemplateController.php
 │   │   │   ├── Data
 │   │   │   │   ├── CampaignPresetDefinition.php
 │   │   │   │   ├── CampaignPresetSyncResult.php
@@ -92,6 +94,7 @@
 │   │   │   ├── Providers
 │   │   │   │   └── CampaignsModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   │   └── UpdateCampaignStepMessageTemplateRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── CampaignMessageDefinitionResolver.php
 │   │   │   │   └── ContactShow
@@ -361,6 +364,7 @@
 │   │   │   └── Support
 │   │   ├── Messaging
 │   │   │   ├── Actions
+│   │   │   │   ├── AssignMessageTemplatePresetAction.php
 │   │   │   │   ├── CreateContactPermissionInvitationsForImportBatchAction.php
 │   │   │   │   ├── DispatchMessageAction.php
 │   │   │   │   ├── GrantMessageConsentAction.php
@@ -878,6 +882,8 @@
 │   │   ├── BookableServiceFactory.php
 │   │   ├── BroadcastFactory.php
 │   │   ├── BroadcastRecipientFactory.php
+│   │   ├── CampaignFactory.php
+│   │   ├── CampaignStepFactory.php
 │   │   ├── CommerceCustomerFactory.php
 │   │   ├── CommerceOrderEventFactory.php
 │   │   ├── CommerceOrderFactory.php
@@ -1135,6 +1141,9 @@
 │       │   │   ├── edit.blade.php
 │       │   │   ├── index.blade.php
 │       │   │   └── show.blade.php
+│       │   ├── campaigns
+│       │   │   └── message-templates
+│       │   │       └── index.blade.php
 │       │   ├── contacts
 │       │   │   ├── import-batches
 │       │   │   │   ├── index.blade.php
@@ -1197,6 +1206,7 @@
 │   │   │   ├── MarkBroadcastRecipientTerminalStatusTest.php
 │   │   │   └── ScheduleBroadcastActionTest.php
 │   │   ├── Campaigns
+│   │   │   ├── CampaignMessageTemplateControllerTest.php
 │   │   │   ├── EnrollContactInCampaignActionTest.php
 │   │   │   ├── ScheduleNextCampaignStepActionTest.php
 │   │   │   └── ScheduleNextCampaignStepAfterScheduledMessageSentTest.php
@@ -1291,4 +1301,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-432 directories, 860 files
+435 directories, 867 files

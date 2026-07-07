@@ -2,12 +2,21 @@
 
 namespace App\Modules\Campaigns\Models;
 
+use Database\Factories\CampaignFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Campaign extends Model
 {
+    use HasFactory;
+
+    protected static function newFactory(): CampaignFactory
+    {
+        return CampaignFactory::new();
+    }
+
     public const STATUS_ACTIVE = 'active';
     public const STATUS_INACTIVE = 'inactive';
     public const STATUS_ARCHIVED = 'archived';

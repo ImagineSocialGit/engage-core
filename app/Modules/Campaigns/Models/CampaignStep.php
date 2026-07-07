@@ -2,12 +2,21 @@
 
 namespace App\Modules\Campaigns\Models;
 
+use Database\Factories\CampaignStepFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CampaignStep extends Model
 {
+    use HasFactory;
+
+    protected static function newFactory(): CampaignStepFactory
+    {
+        return CampaignStepFactory::new();
+    }
+
     protected $fillable = [
         'campaign_id',
         'step_number',
