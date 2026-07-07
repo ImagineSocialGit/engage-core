@@ -146,6 +146,13 @@ class MessageTemplateUsageResolver
             ]);
         }
 
+        if (
+            in_array($assignment->surface, ['webinar_registrations', 'webinar_waitlists'], true)
+            && Route::has('crm.webinars.message-templates.index')
+        ) {
+            return route('crm.webinars.message-templates.index');
+        }
+
         return null;
     }
 
@@ -159,4 +166,5 @@ class MessageTemplateUsageResolver
         return $parts === [] ? null : implode(' · ', $parts);
     }
 }
+
 

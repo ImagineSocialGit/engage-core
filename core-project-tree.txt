@@ -581,7 +581,8 @@
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
 │   │   │   │   │   ├── WebinarController.php
-│   │   │   │   │   └── WebinarDevController.php
+│   │   │   │   │   ├── WebinarDevController.php
+│   │   │   │   │   └── WebinarMessageTemplateController.php
 │   │   │   │   ├── Public
 │   │   │   │   │   ├── WebinarJoinRedirectController.php
 │   │   │   │   │   ├── WebinarPlaybackRedirectController.php
@@ -615,7 +616,8 @@
 │   │   │   │   ├── StoreWebinarRegistrationRequest.php
 │   │   │   │   ├── StoreWebinarSeriesRequest.php
 │   │   │   │   ├── StoreWebinarWaitlistSignupRequest.php
-│   │   │   │   └── SyncWebinarSeriesRequest.php
+│   │   │   │   ├── SyncWebinarSeriesRequest.php
+│   │   │   │   └── UpdateWebinarMessageTemplateRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── ContactPanels
 │   │   │   │   │   └── WebinarContactPanelProvider.php
@@ -1163,7 +1165,9 @@
 │       │   │   └── message-templates
 │       │   │       └── index.blade.php
 │       │   └── webinars
-│       │       └── index.blade.php
+│       │       ├── index.blade.php
+│       │       └── message-templates
+│       │           └── index.blade.php
 │       ├── email.blade.php
 │       ├── messaging
 │       │   ├── permission-invitations
@@ -1291,9 +1295,11 @@
 │   │   │   ├── CreateWebinarRegistrationActionTest.php
 │   │   │   ├── CreateWebinarRegistrationConsentOptInTest.php
 │   │   │   ├── DispatchWebinarRegistrationMessagesActionTest.php
+│   │   │   ├── DispatchWebinarRegistrationMessagesTemplateAssignmentTest.php
 │   │   │   ├── DispatchWebinarWaitlistMessagesActionTest.php
 │   │   │   ├── PostEvent
 │   │   │   │   └── ProcessPostWebinarEventJobTest.php
+│   │   │   ├── WebinarMessageTemplateControllerTest.php
 │   │   │   ├── WebinarRegistrationControllerTest.php
 │   │   │   └── WebinarWaitlistSignupControllerTest.php
 │   │   └── Workflow
@@ -1301,4 +1307,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-435 directories, 867 files
+436 directories, 872 files

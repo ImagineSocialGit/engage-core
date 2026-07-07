@@ -38,15 +38,11 @@ class MessageDefinitionResolver
             scope: $scope,
         );
 
-        if ($assignedDefinitions !== []) {
-            return $assignedDefinitions;
-        }
-
         $scopeConfigPath = "messaging.{$channel}.{$purpose}.{$scope}";
         $definitions = config($scopeConfigPath);
 
         if (! is_array($definitions)) {
-            return [];
+            return $assignedDefinitions;
         }
 
         $resolved = [];
@@ -80,6 +76,25 @@ class MessageDefinitionResolver
                     configPath: "{$scopeConfigPath}.{$messageType}".(array_is_list($definition) ? ".{$index}" : ''),
                 ));
             }
+        }
+
+        if ($assignedDefinitions !== []) {
+            $assignedMessageTypes = array_values(array_unique(array_filter(array_map(
+                fn (array $definition): ?string => is_string($definition['message_type'] ?? null)
+                    ? $this->normalizeSegment($definition['message_type'])
+                    : null,
+                $assignedDefinitions,
+            ))));
+
+            $resolved = collect($resolved)
+                ->reject(fn (array $definition): bool => in_array(
+                    $this->normalizeSegment((string) ($definition['message_type'] ?? '')),
+                    $assignedMessageTypes,
+                    true,
+                ))
+                ->merge($assignedDefinitions)
+                ->values()
+                ->all();
         }
 
         return $resolved;
@@ -346,3 +361,4 @@ class MessageDefinitionResolver
         return str_replace('-', '_', strtolower(trim($value)));
     }
 }
+

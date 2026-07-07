@@ -13,6 +13,7 @@ use App\Modules\Messaging\Controllers\CRM\MessageTemplatePresetController;
 use App\Modules\Tasks\Controllers\TaskController;
 use App\Modules\Webinars\Controllers\CRM\WebinarController;
 use App\Modules\Webinars\Controllers\CRM\WebinarDevController;
+use App\Modules\Webinars\Controllers\CRM\WebinarMessageTemplateController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
@@ -24,6 +25,17 @@ Route::middleware('auth')->group(function () {
     Route::middleware('module:webinars')->group(function () {
         Route::get('/webinars', [WebinarController::class, 'index'])
             ->name('crm.webinar-series.index');
+
+        Route::middleware('module:messaging')
+            ->prefix('webinars/message-templates')
+            ->name('crm.webinars.message-templates.')
+            ->group(function () {
+                Route::get('/', [WebinarMessageTemplateController::class, 'index'])
+                    ->name('index');
+
+                Route::patch('/', [WebinarMessageTemplateController::class, 'update'])
+                    ->name('update');
+            });
 
         Route::post('/webinar-series', [WebinarController::class, 'storeSeries'])
             ->name('crm.webinar-series.store');

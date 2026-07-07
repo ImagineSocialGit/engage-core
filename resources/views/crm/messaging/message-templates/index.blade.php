@@ -1,3 +1,4 @@
+
 <x-layouts.crm
     title="Message Templates"
     heading="Message Templates"
@@ -35,6 +36,15 @@
                             template groups
                         </div>
                     </div>
+
+                    @if(function_exists('module_enabled') && module_enabled('webinars') && \Illuminate\Support\Facades\Route::has('crm.webinars.message-templates.index'))
+                        <a
+                            href="{{ route('crm.webinars.message-templates.index') }}"
+                            class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50"
+                        >
+                            Choose webinar templates
+                        </a>
+                    @endif
 
                     @if(function_exists('module_enabled') && module_enabled('campaigns') && \Illuminate\Support\Facades\Route::has('crm.campaigns.message-templates.index'))
                         <a
@@ -529,4 +539,5 @@
         @endif
     </div>
 </x-layouts.crm>
+
 

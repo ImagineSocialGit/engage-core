@@ -1,3 +1,4 @@
+
 <x-layouts.crm :title="$title" :heading="$heading">
     <div
         class="space-y-6"
@@ -90,6 +91,23 @@
                         </li>
                     @endforeach
                 </ul>
+            </div>
+        @endif
+
+        @if(function_exists('module_enabled') && module_enabled('messaging') && \Illuminate\Support\Facades\Route::has('crm.webinars.message-templates.index'))
+            <div class="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="font-semibold text-slate-950">Webinar messages</p>
+                        <p class="mt-1 text-slate-600">Review the templates used for confirmations, reminders, waitlist alerts, and replay follow-ups before sharing registration links.</p>
+                    </div>
+                    <a
+                        href="{{ route('crm.webinars.message-templates.index') }}"
+                        class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-xs font-extrabold text-slate-700 transition hover:bg-slate-50"
+                    >
+                        Choose templates
+                    </a>
+                </div>
             </div>
         @endif
 
@@ -700,3 +718,4 @@
         </div>
     </div>
 </x-layouts.crm>
+
