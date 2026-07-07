@@ -11,7 +11,7 @@
         @endif
 
         <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
                         Messaging
@@ -24,9 +24,15 @@
                     </p>
                 </div>
 
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    <span class="font-bold text-slate-950">{{ $presets->count() }}</span>
-                    templates synced
+                <div class="grid gap-2 sm:grid-cols-2 lg:min-w-80">
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                        <span class="font-bold text-slate-950">{{ $presets->count() }}</span>
+                        templates synced
+                    </div>
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                        <span class="font-bold text-slate-950">{{ $catalogGroups->count() }}</span>
+                        template groups
+                    </div>
                 </div>
             </div>
         </section>
@@ -41,107 +47,201 @@
                 </p>
             </section>
         @else
-            <div class="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div class="grid gap-6 xl:grid-cols-[minmax(18rem,0.82fr)_minmax(0,1.18fr)]">
                 <section class="rounded-3xl border border-slate-200 bg-white shadow-sm">
                     <div class="border-b border-slate-200 px-5 py-4">
                         <h2 class="text-base font-extrabold tracking-tight text-slate-950">
                             Template library
                         </h2>
                         <p class="mt-1 text-sm text-slate-500">
-                            Templates are grouped by channel, purpose, and the area where the copy appears.
+                            Filter by channel, purpose, and area. Selecting a group shows all related messages together.
                         </p>
                     </div>
 
-                    <div class="max-h-[42rem] divide-y divide-slate-100 overflow-y-auto">
-                        @foreach($groupedPresets as $group => $groupPresets)
-                            @php
-                                $groupParts = explode(':', $group);
-                                $groupChannel = $groupParts[0] ?? '';
-                                $groupPurpose = $groupParts[1] ?? '';
-                                $groupArea = $groupParts[2] ?? '';
-                                $groupLabel = $groupParts[3] ?? ($groupParts[2] ?? 'Messages');
-                            @endphp
-
-                            <div class="bg-slate-50 px-5 py-3">
-                                <div class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
-                                    {{ $groupChannel }} · {{ str_replace('_', ' ', $groupPurpose) }} · {{ $groupArea }}
-                                </div>
-                                <div class="mt-1 text-sm font-extrabold text-slate-900">
-                                    {{ $groupLabel }}
-                                </div>
+                    <form method="GET" action="{{ route('crm.messaging.message-templates.index') }}" class="border-b border-slate-200 bg-slate-50 p-5">
+                        <div class="grid gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
+                            <div>
+                                <label for="channel" class="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                                    Channel
+                                </label>
+                                <select
+                                    id="channel"
+                                    name="channel"
+                                    class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    <option value="">All channels</option>
+                                    @foreach($filterOptions['channels'] as $option)
+                                        <option value="{{ $option['value'] }}" @selected($filters['channel'] === $option['value'])>
+                                            {{ $option['label'] }}
+                                        </option>
+                                    @endforeach
+                                </select>
                             </div>
 
-                            @foreach($groupPresets as $preset)
-                                @php
-                                    $catalogEntry = $preset->catalogEntries->first();
-                                    $itemLabel = $catalogEntry?->item_label ?: ($preset->message_type ? str_replace('_', ' ', $preset->message_type) : 'Message');
-                                @endphp
-                                <a
-                                    href="{{ route('crm.messaging.message-templates.index', ['preset' => $preset->getKey()]) }}"
-                                    class="block px-5 py-4 transition hover:bg-slate-50 {{ $selectedPreset && $selectedPreset->is($preset) ? 'bg-indigo-50/70' : '' }}"
+                            <div>
+                                <label for="purpose" class="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                                    Purpose
+                                </label>
+                                <select
+                                    id="purpose"
+                                    name="purpose"
+                                    class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 >
-                                    <div class="flex items-start justify-between gap-4">
-                                        <div>
-                                            <div class="font-bold text-slate-950">
-                                                {{ $itemLabel }}
-                                            </div>
-                                            <div class="mt-1 text-sm text-slate-500">
-                                                {{ $preset->name }}
-                                            </div>
+                                    <option value="">All purposes</option>
+                                    @foreach($filterOptions['purposes'] as $option)
+                                        <option value="{{ $option['value'] }}" @selected($filters['purpose'] === $option['value'])>
+                                            {{ $option['label'] }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="module" class="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                                    Area
+                                </label>
+                                <select
+                                    id="module"
+                                    name="module"
+                                    class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    <option value="">All areas</option>
+                                    @foreach($filterOptions['modules'] as $option)
+                                        <option value="{{ $option['value'] }}" @selected($filters['module'] === $option['value'])>
+                                            {{ $option['label'] }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 flex flex-wrap items-center gap-3">
+                            <button
+                                type="submit"
+                                class="inline-flex min-h-10 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-extrabold text-white transition hover:bg-slate-800"
+                            >
+                                Filter templates
+                            </button>
+                            @if($filters['channel'] || $filters['purpose'] || $filters['module'])
+                                <a
+                                    href="{{ route('crm.messaging.message-templates.index') }}"
+                                    class="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50"
+                                >
+                                    Clear filters
+                                </a>
+                            @endif
+                        </div>
+                    </form>
+
+                    <div class="max-h-[42rem] divide-y divide-slate-100 overflow-y-auto">
+                        @forelse($catalogGroups as $group)
+                            @php
+                                $firstEntry = $group['entries']->first();
+                                $firstPreset = $firstEntry?->messageTemplatePreset;
+                                $groupUrl = route('crm.messaging.message-templates.index', array_filter([
+                                    'channel' => $filters['channel'],
+                                    'purpose' => $filters['purpose'],
+                                    'module' => $filters['module'],
+                                    'group' => $group['key'],
+                                    'preset' => $firstPreset?->getKey(),
+                                ], static fn ($value) => $value !== null && $value !== ''));
+                                $selected = $selectedGroup && $selectedGroup['key'] === $group['key'];
+                            @endphp
+
+                            <a
+                                href="{{ $groupUrl }}"
+                                class="block px-5 py-4 transition hover:bg-slate-50 {{ $selected ? 'bg-indigo-50/70' : '' }}"
+                            >
+                                <div class="flex items-start justify-between gap-4">
+                                    <div>
+                                        <div class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                                            {{ $group['module_label'] }} · {{ str_replace('_', ' ', $group['purpose']) }} · {{ strtoupper($group['channel']) }}
                                         </div>
-
-                                        <div class="flex shrink-0 flex-col items-end gap-1">
-                                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-slate-600">
-                                                {{ $preset->channel }}
-                                            </span>
-
-                                            @if($preset->is_customized)
-                                                <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
-                                                    Customized
-                                                </span>
-                                            @else
-                                                <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
-                                                    Synced
-                                                </span>
-                                            @endif
+                                        <div class="mt-1 font-extrabold text-slate-950">
+                                            {{ $group['label'] }}
+                                        </div>
+                                        <div class="mt-1 text-sm text-slate-500">
+                                            {{ $group['entries']->count() }} {{ Str::plural('message', $group['entries']->count()) }} in this group
                                         </div>
                                     </div>
-                                </a>
-                            @endforeach
-                        @endforeach
+
+                                    <span class="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
+                                        {{ $group['entries']->count() }}
+                                    </span>
+                                </div>
+                            </a>
+                        @empty
+                            <div class="p-6 text-sm text-slate-600">
+                                No templates match those filters.
+                            </div>
+                        @endforelse
                     </div>
                 </section>
 
                 <section class="rounded-3xl border border-slate-200 bg-white shadow-sm">
-                    @if($selectedPreset)
+                    @if($selectedGroup && $selectedPreset)
                         @php
-                            $selectedCatalogEntry = $selectedPreset->catalogEntries->first();
+                            $selectedCatalogEntry = $selectedPreset->catalogEntries->firstWhere('group_key', $selectedGroup['key'])
+                                ?: $selectedPreset->catalogEntries->first();
+                            $groupQuery = array_filter([
+                                'channel' => $filters['channel'],
+                                'purpose' => $filters['purpose'],
+                                'module' => $filters['module'],
+                                'group' => $selectedGroup['key'],
+                            ], static fn ($value) => $value !== null && $value !== '');
                         @endphp
+
                         <div class="border-b border-slate-200 px-6 py-5">
                             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                 <div>
                                     <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
-                                        Selected template
+                                        Selected group
                                     </p>
-                                    <h2 class="mt-2 text-xl font-extrabold tracking-tight text-slate-950">
-                                        {{ $selectedPreset->name }}
+                                    <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-slate-950">
+                                        {{ $selectedGroup['label'] }}
                                     </h2>
                                     <p class="mt-2 text-sm leading-6 text-slate-600">
-                                        {{ $selectedPreset->description ?: 'Reusable copy for this message context.' }}
+                                        Browse every related message in this group, then edit the copy for the selected message below.
                                     </p>
                                 </div>
 
                                 <div class="flex flex-wrap gap-2">
                                     <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-slate-600">
-                                        {{ $selectedPreset->channel }}
+                                        {{ $selectedGroup['channel'] }}
                                     </span>
                                     <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-                                        {{ str_replace('_', ' ', $selectedPreset->purpose) }}
+                                        {{ str_replace('_', ' ', $selectedGroup['purpose']) }}
                                     </span>
                                     <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-                                        {{ $selectedCatalogEntry?->module_label ?: str_replace('_', ' ', $selectedPreset->scope) }}
+                                        {{ $selectedGroup['module_label'] }}
                                     </span>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="border-b border-slate-200 bg-slate-50 px-6 py-4">
+                            <h3 class="text-sm font-extrabold text-slate-950">
+                                Messages in this group
+                            </h3>
+                            <div class="mt-3 flex gap-2 overflow-x-auto pb-4">
+                                @foreach($selectedGroupEntries as $entry)
+                                    @php
+                                        $entryPreset = $entry->messageTemplatePreset;
+                                    @endphp
+                                    @if($entryPreset)
+                                        <a
+                                            href="{{ route('crm.messaging.message-templates.index', $groupQuery + ['preset' => $entryPreset->getKey()]) }}"
+                                            class="inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-extrabold transition {{ $selectedPreset->is($entryPreset) ? 'border-slate-950 bg-slate-950 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100' }}"
+                                        >
+                                            <span>{{ $entry->item_label }}</span>
+                                            @if($entryPreset->is_customized)
+                                                <span class="rounded-full bg-white/20 px-2 py-0.5 text-[0.65rem] uppercase tracking-wide {{ $selectedPreset->is($entryPreset) ? 'text-white' : 'bg-amber-100 text-amber-800' }}">
+                                                    Custom
+                                                </span>
+                                            @endif
+                                        </a>
+                                    @endif
+                                @endforeach
                             </div>
                         </div>
 
@@ -153,6 +253,18 @@
                             >
                                 @csrf
                                 @method('PATCH')
+
+                                <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                    <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                                        Editing message
+                                    </p>
+                                    <h3 class="mt-1 text-lg font-extrabold text-slate-950">
+                                        {{ $selectedCatalogEntry?->item_label ?: str_replace('_', ' ', $selectedPreset->message_type ?? 'Message') }}
+                                    </h3>
+                                    <p class="mt-1 text-sm text-slate-500">
+                                        {{ $selectedPreset->name }}
+                                    </p>
+                                </div>
 
                                 <div>
                                     <label for="name" class="mb-2 block text-sm font-bold text-slate-900">
@@ -293,7 +405,7 @@
                                     <dl class="mt-3 space-y-2 text-sm">
                                         <div>
                                             <dt class="text-slate-500">Group</dt>
-                                            <dd class="font-semibold text-slate-900">{{ $selectedCatalogEntry?->group_label ?: str_replace('_', ' ', $selectedPreset->scope) }}</dd>
+                                            <dd class="font-semibold text-slate-900">{{ $selectedGroup['label'] }}</dd>
                                         </div>
                                         <div>
                                             <dt class="text-slate-500">Message</dt>
@@ -365,10 +477,14 @@
                                     <summary class="cursor-pointer text-sm font-extrabold text-slate-950">
                                         Details
                                     </summary>
-                                    <dl class="mt-3 space-y-2 wrap-break-word text-xs text-slate-600">
+                                    <dl class="mt-3 space-y-2 break-words text-xs text-slate-600">
                                         <div>
                                             <dt class="font-bold text-slate-900">Template key</dt>
                                             <dd>{{ $selectedPreset->key }}</dd>
+                                        </div>
+                                        <div>
+                                            <dt class="font-bold text-slate-900">Catalog entry</dt>
+                                            <dd>{{ $selectedCatalogEntry?->item_key ?: 'Uncataloged' }}</dd>
                                         </div>
                                         <div>
                                             <dt class="font-bold text-slate-900">Source</dt>
@@ -377,6 +493,15 @@
                                     </dl>
                                 </details>
                             </aside>
+                        </div>
+                    @else
+                        <div class="p-8 text-center">
+                            <h2 class="text-xl font-extrabold tracking-tight text-slate-950">
+                                No template group selected.
+                            </h2>
+                            <p class="mt-2 text-sm leading-6 text-slate-600">
+                                Adjust the filters or clear them to choose a message template group.
+                            </p>
                         </div>
                     @endif
                 </section>

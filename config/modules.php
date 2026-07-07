@@ -380,7 +380,7 @@ return [
         'portal' => [
             'name' => 'Portal',
             'ui' => [
-                'tone' => 'cyan',
+                'tone' => 'pink',
             ],
             'depends_on' => ['core'],
             'providers' => [
@@ -391,7 +391,7 @@ return [
         'forms' => [
             'name' => 'Forms',
             'ui' => [
-                'tone' => 'purple',
+                'tone' => 'teal',
             ],
             'depends_on' => ['core'],
             'providers' => [
@@ -473,7 +473,7 @@ return [
         'broadcasts' => [
             'name' => 'Broadcasts',
             'ui' => [
-                'tone' => 'pink',
+                'tone' => 'purple',
             ],
             'nav' => [
                 'label' => 'Broadcasts',

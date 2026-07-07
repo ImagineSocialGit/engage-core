@@ -62,10 +62,12 @@ class MessageTemplatePresetControllerTest extends TestCase
             ->assertOk()
             ->assertSee('Message Templates')
             ->assertSee('Template library')
+            ->assertSee('Filter templates')
+            ->assertSee('Messages in this group')
             ->assertSee('Webinars')
             ->assertSee('Webinar Confirmations')
             ->assertSee('Confirmation Email')
-            ->assertSee('Selected template')
+            ->assertSee('Selected group')
             ->assertSee('Used by')
             ->assertSee('Tokens used')
             ->assertSee('You are registered')
@@ -111,6 +113,35 @@ class MessageTemplatePresetControllerTest extends TestCase
                 ],
             ]);
 
+        $neighborPreset = MessageTemplatePreset::factory()->create([
+            'name' => 'Mortgage Homebuyer Nurture — Step 3 Email',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'mortgage_homebuyer_nurture',
+            'message_type' => 'mortgage_homebuyer_nurture_step_3',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'marketing',
+            'dispatch_keys' => ['campaign_step_due'],
+        ]);
+
+        MessageTemplateCatalogEntry::factory()
+            ->forPreset($neighborPreset)
+            ->create([
+                'module_key' => 'campaigns',
+                'module_label' => 'Campaigns',
+                'surface' => 'campaigns',
+                'group_key' => 'campaign:mortgage_homebuyer_nurture',
+                'group_label' => 'Mortgage Homebuyer Nurture',
+                'item_key' => 'email.marketing.mortgage_homebuyer_nurture.campaigns.mortgage_homebuyer_nurture.steps.3',
+                'item_label' => 'Step 3 Email',
+                'item_order' => 3,
+                'usage_type' => 'campaign_step',
+                'meta' => [
+                    'campaign_key' => 'mortgage_homebuyer_nurture',
+                    'campaign_step' => 3,
+                ],
+            ]);
+
         MessageTemplatePresetAssignment::factory()
             ->forPreset($preset)
             ->forCampaignStep('mortgage_homebuyer_nurture', 2)
@@ -134,6 +165,8 @@ class MessageTemplatePresetControllerTest extends TestCase
             ->assertSee('Campaigns')
             ->assertSee('Mortgage Homebuyer Nurture')
             ->assertSee('Step 2 Email')
+            ->assertSee('Step 3 Email')
+            ->assertSee('Messages in this group')
             ->assertSee('Change template selection from the campaign, webinar, or automatic follow-up setup screen.')
             ->assertDontSee('Active template')
             ->assertDontSee('Use selected template');
@@ -185,7 +218,11 @@ class MessageTemplatePresetControllerTest extends TestCase
                     'footer' => 'Footer copy.',
                 ],
             ])
-            ->assertRedirect(route('crm.messaging.message-templates.index', ['preset' => $preset->getKey()]));
+            ->assertRedirect(route('crm.messaging.message-templates.index', [
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'preset' => $preset->getKey(),
+            ]));
 
         $preset->refresh();
 
@@ -233,7 +270,11 @@ class MessageTemplatePresetControllerTest extends TestCase
                     'message' => 'Hi {first_name}, your webinar starts soon.',
                 ],
             ])
-            ->assertRedirect(route('crm.messaging.message-templates.index', ['preset' => $preset->getKey()]));
+            ->assertRedirect(route('crm.messaging.message-templates.index', [
+                'channel' => 'sms',
+                'purpose' => 'transactional',
+                'preset' => $preset->getKey(),
+            ]));
 
         $preset->refresh();
 
