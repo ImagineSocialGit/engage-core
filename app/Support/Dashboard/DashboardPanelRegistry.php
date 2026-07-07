@@ -80,8 +80,12 @@ class DashboardPanelRegistry
 
         $count = (int) ($panel['count'] ?? 0);
         $hideWhenEmpty = (bool) ($panel['hide_when_empty'] ?? $slotConfig['hide_when_empty'] ?? false);
+        $items = $panel['items'] ?? [];
+        $hasItems = $items instanceof Collection
+            ? $items->isNotEmpty()
+            : (is_countable($items) && count($items) > 0);
 
-        if ($hideWhenEmpty && $count <= 0 && empty($panel['items'])) {
+        if ($hideWhenEmpty && $count <= 0 && ! $hasItems) {
             return null;
         }
 

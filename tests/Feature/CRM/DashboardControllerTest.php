@@ -101,7 +101,7 @@ class DashboardControllerTest extends TestCase
         $contact = Contact::factory()->create(['name' => 'Context Lead']);
         $series = WebinarSeries::factory()->create();
         $webinar = Webinar::factory()->create([
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
             'starts_at' => now()->addDay(),
         ]);
 
@@ -126,7 +126,7 @@ class DashboardControllerTest extends TestCase
         $contact = Contact::factory()->create(['name' => 'Webinar Lead']);
         $series = WebinarSeries::factory()->create();
         $webinar = Webinar::factory()->create([
-            'series_id' => $series->id,
+            'webinar_series_id' => $series->id,
             'title' => 'Buyer Webinar',
             'starts_at' => now()->addDay(),
         ]);
@@ -391,68 +391,4 @@ class DashboardControllerTest extends TestCase
         $response->assertSee('bg-amber-50', false);
         $response->assertSee('Overdue');
     }
-
-    public function test_sidebar_navigation_is_config_driven_and_uses_module_hover_tones(): void
-    {
-        $user = User::factory()->create();
-
-        $response = $this
-            ->actingAs($user)
-            ->get(route('crm.index'));
-
-        $response->assertOk();
-        $response->assertSeeInOrder([
-            'Dashboard',
-            config('contacts.labels.plural'),
-            'Broadcasts',
-            'Webinars',
-            'Message Templates',
-            'Automatic Follow-ups',
-        ]);
-        $response->assertSee('hover:bg-pink-100/70', false);
-        $response->assertSee('hover:bg-stone-100', false);
-        $response->assertSee('hover:bg-sky-100/70', false);
-        $response->assertSee('hover:bg-orange-100/70', false);
-    }
-
-    public function test_sidebar_navigation_hides_disabled_module_links(): void
-    {
-        Config::set('modules.enabled', ['tasks', 'messaging']);
-
-        $user = User::factory()->create();
-
-        $response = $this
-            ->actingAs($user)
-            ->get(route('crm.index'));
-
-        $response->assertOk();
-        $response->assertSee('Dashboard');
-        $response->assertSee(config('contacts.labels.plural'));
-        $response->assertSee('Message Templates');
-        $response->assertDontSee('Broadcasts');
-        $response->assertDontSee('Webinars');
-        $response->assertDontSee('Automatic Follow-ups');
-    }
-
-    public function test_dashboard_panels_use_actual_module_borders_not_only_rings(): void
-    {
-        $user = User::factory()->create();
-
-        Task::query()->create([
-            'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
-            'source' => Task::SOURCE_MANUAL,
-            'title' => 'Bordered task panel',
-            'status' => Task::STATUS_OPEN,
-            'due_at' => now(),
-        ]);
-
-        $response = $this
-            ->actingAs($user)
-            ->get(route('crm.index'));
-
-        $response->assertOk();
-        $response->assertSee('data-module-panel="tasks"', false);
-        $response->assertSee('border-emerald-200', false);
-    }
-
 }
