@@ -127,6 +127,15 @@ Campaign message templates are resolved from Messaging by:
 
 In the DB-backed target architecture, that context should resolve to a selected `MessageTemplatePresetAssignment`, which then loads the selected `MessageTemplatePreset`.
 
+Messaging may also create `MessageTemplateCatalogEntry` records for campaign step templates so the Messaging template browser can show campaign messages together, such as:
+
+```text
+Campaigns -> Webinar Attended Nurture -> Step 1 Email
+Campaigns -> Webinar Attended Nurture -> Step 2 Email
+```
+
+Those catalog entries are for browsing/copy editing only. Campaigns still own the campaign, step order, timing, progression, and enrollment lifecycle.
+
 During migration, config resolution may remain as a fallback.
 
 
@@ -258,3 +267,4 @@ Campaigns still should schedule/skip delivery through Messaging public actions i
 That does not make Campaigns depend on the source module.
 
 Campaigns should treat source morphs as context unless an explicit public integration is introduced.
+

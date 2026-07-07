@@ -10,24 +10,24 @@ Use these rules when converting a client request into config:
 4. Campaign preset steps reference Messaging templates with first-class `channel`, `purpose`, and `scope` keys.
 5. Campaign message templates resolve by `campaign_key + step_number` under:
    `messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}`.
-
 6. Future campaign channel variants must reference Messaging-owned template presets or assignments rather than embedding copy.
-7. Messaging template presets and assignments own selectable/editable reusable message copy.
-8. FlowRoute trigger bindings should select active route behavior; `FlowRoute.is_active` means available/allowed.
-
-6. Do not use `meta.message` for new Campaign preset step message references.
-7. FlowRoute presets own automation/control-flow routing and point definitions.
-8. Webinar post-event config owns provider event orchestration, not message copy.
-9. Root `config/presets.php` owns preset package composition and sync order.
-10. `config/modules.php` owns enabled modules and dependency visibility.
-11. Use `lead/leads` in CRM/client-facing text unless explicitly told otherwise.
-12. Default webinar configs should be vertical-neutral. Vertical-specific copy belongs in vertical-specific scopes.
-13. SMS capabilities may exist in code even when SMS is hidden in client/admin UI. UI exposure for SMS options should be controlled through Messaging channel availability.
-14. Normal Broadcasts are single-channel sends. Email Broadcasts use `payload.subject` and `payload.body`; SMS Broadcasts use `payload.message`.
-15. Normal Broadcasts require normal Messaging consent. Imported-contact opt-in invitations are a distinct one-time email flow, not a general Broadcast consent bypass.
-16. While a branch is still pre-rollout, replace current branch migrations instead of adding modify-table migrations. After rollout, use normal append-only migrations.
-17. Module-specific behavior belongs in the owning module doc. Config templates should not invent unsupported module behavior.
-18. Commerce and Location should be used for client/admin convenience and integrations, not as storefront/GIS replacements.
+7. Messaging template presets own reusable/editable message copy.
+8. Messaging template catalog entries own browsing/grouping metadata for the template catalog.
+9. Messaging template assignments own selected runtime template choices.
+10. FlowRoute trigger bindings should select active route behavior; `FlowRoute.is_active` means available/allowed.
+11. Do not use `meta.message` for new Campaign preset step message references.
+12. FlowRoute presets own automation/control-flow routing and point definitions.
+13. Webinar post-event config owns provider event orchestration, not message copy.
+14. Root `config/presets.php` owns preset package composition and sync order.
+15. `config/modules.php` owns enabled modules and dependency visibility.
+16. Use `lead/leads` in CRM/client-facing text unless explicitly told otherwise.
+17. Default webinar configs should be vertical-neutral. Vertical-specific copy belongs in vertical-specific scopes.
+18. SMS capabilities may exist in code even when SMS is hidden in client/admin UI. UI exposure for SMS options should be controlled through Messaging channel availability.
+19. Normal Broadcasts are single-channel sends. Email Broadcasts use `payload.subject` and `payload.body`; SMS Broadcasts use `payload.message`.
+20. Normal Broadcasts require normal Messaging consent. Imported-contact opt-in invitations are a distinct one-time email flow, not a general Broadcast consent bypass.
+21. While a branch is still pre-rollout, replace current branch migrations instead of adding modify-table migrations. After rollout, use normal append-only migrations.
+22. Module-specific behavior belongs in the owning module doc. Config templates should not invent unsupported module behavior.
+23. Commerce and Location should be used for client/admin convenience and integrations, not as storefront/GIS replacements.
 
 
 ## Runtime-selectable definitions
@@ -46,6 +46,7 @@ Examples:
 
 ```text
 FlowRouteTriggerBinding selects which FlowRoute runs for a trigger/context.
+MessageTemplateCatalogEntry organizes Messaging templates for browsing by channel, purpose, module/surface, group, and item.
 MessageTemplatePresetAssignment selects which Messaging template preset is used for a message context.
 Webinar schedule profile assignments select confirmation/reminder/post-event schedules.
 ```
@@ -257,3 +258,4 @@ Validation output should include severity, config path, reason, and a suggested 
 Config templates may reference current universal modules, but they should not imply those modules are enabled by default. `config/modules.php` controls feature visibility. Shared schema may exist even when a module is not visible to the client.
 
 When a client asks for purchase-history targeting, service-area targeting, document collection, portal upload, or form/submission behavior, first check the owning module doc before adding config keys or templates.
+

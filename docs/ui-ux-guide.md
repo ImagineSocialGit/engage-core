@@ -224,6 +224,7 @@ Internal names may appear in developer/debug views or compact diagnostic areas, 
 | `webinar.missed` | Someone misses a webinar |
 | Campaign enrollment | Start follow-up sequence |
 | Message template preset | Message template |
+| MessageTemplateCatalogEntry | Template catalog item |
 | MessageTemplatePresetAssignment | Selected template |
 | ScheduledMessage | Scheduled message, reminder, or follow-up |
 | BroadcastRecipient | Recipient |
@@ -649,17 +650,55 @@ meta.message
 
 Template UI should show what the message says and where it is used.
 
+The Messaging template screen is a copy-review and copy-editing surface. It should not be the primary place where an operator chooses which template a Campaign step, Webinar reminder, or Automatic Follow-up uses.
+
+Preferred template browsing path:
+
+```text
+Channel
+Purpose
+Area/module
+Template group
+Message/step within that group
+```
+
+Examples:
+
+```text
+Email -> Marketing -> Campaigns -> Webinar Attended Nurture -> Step 3 Email
+SMS -> Transactional -> Webinars -> Webinar Reminders -> 30-Minute Reminder SMS
+```
+
 Recommended preview:
 
 ```text
-Template name
+Template title
 Channel
 Purpose in plain language
+Area/module
 Used by
 Subject/message preview
 Tokens used
 Last edited/customized state
 ```
+
+The "Used by" panel should be read-only from the template editor. It may link to the owning setup screen when the operator needs to change the active selected template.
+
+Good:
+
+```text
+Used by
+Campaigns -> Webinar Attended Nurture -> Step 3
+View campaign
+```
+
+Bad:
+
+```text
+Use this template for every compatible workflow from the template editor.
+```
+
+Template catalog/group labels should be readable business labels, not raw config paths or generated key strings.
 
 Token validation errors should be actionable:
 

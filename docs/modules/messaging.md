@@ -62,24 +62,38 @@ A definition may omit fields that are inferable from caller context, but adapter
 
 Messaging definitions are reusable templates.
 
-## Message template presets and assignments
+## Message template presets, catalog entries, and assignments
 
 Messaging template presets are the DB-owned form of reusable message definitions.
 
-They let config-defined message copy be synced into the database, selected by CRM/admin UI, and edited safely without moving reusable copy into Campaign, Webinar, FlowRoute, or Broadcast internals.
+They let config-defined message copy be synced into the database and edited safely without moving reusable copy into Campaign, Webinar, FlowRoute, Broadcast, or other consuming-module internals.
 
 Messaging owns:
 
 ```text
 message_template_presets
+message_template_catalog_entries
 message_template_preset_assignments
+```
+
+These three records have distinct responsibilities:
+
+```text
+MessageTemplatePreset
+    reusable message copy and delivery-template fields
+
+MessageTemplateCatalogEntry
+    Messaging-owned catalog/read organization for browsing grouped templates
+
+MessageTemplatePresetAssignment
+    selected preset for a runtime message context
 ```
 
 ### MessageTemplatePreset
 
 `MessageTemplatePreset` owns reusable message content and delivery-template fields.
 
-Suggested durable fields:
+Durable fields include:
 
 ```text
 id
@@ -89,13 +103,21 @@ description nullable
 channel
 purpose
 scope
+message_type nullable
 payload_class
+queue nullable
+dispatch_keys json nullable
+timing
+schedule json nullable
+conditions json nullable
 payload json
 tokens json nullable
 status / is_active
 source nullable
+source_config_path nullable
 source_version nullable
 is_customized boolean
+customized_at nullable
 last_synced_at nullable
 meta json nullable
 timestamps
@@ -104,18 +126,67 @@ timestamps
 Examples:
 
 ```text
-webinar_registration_confirmation.default
-webinar_registration_confirmation.short_test
-webinar_reminder.full_schedule_24h
-webinar_nurture.attended.default_email_step_1
-webinar_nurture.attended.default_sms_step_1
+Email / Transactional / Webinars / Registration Confirmation
+Email / Transactional / Webinars / 30-Minute Reminder
+Email / Marketing / Campaigns / Webinar Attended Nurture / Step 1
+SMS / Marketing / Campaigns / Webinar Attended Nurture / Step 1
 ```
+
+Template names should be readable catalog labels, not raw config paths.
+
+### MessageTemplateCatalogEntry
+
+`MessageTemplateCatalogEntry` owns how a template appears in the Messaging template browser/catalog.
+
+It is a read-organization model, not a runtime behavior model.
+
+It should support browsing and filtering by:
+
+```text
+channel
+purpose
+scope
+module_key / module_label
+surface
+group_key / group_label
+item_key / item_label / item_order
+usage_type
+source / source_config_path
+context_type / context_id nullable
+is_active
+meta json nullable
+```
+
+Examples:
+
+```text
+Email -> Marketing -> Campaigns -> Webinar Attended Nurture -> Step 1 Email
+Email -> Transactional -> Webinars -> Webinar Reminders -> 30-Minute Reminder Email
+SMS -> Marketing -> Campaigns -> Webinar Missed Nurture -> Step 1 SMS
+```
+
+A catalog entry does not decide which template sends, when it sends, or why it sends.
+
+It should not own:
+
+```text
+campaign timing
+webinar reminder schedules
+FlowRoute trigger behavior
+skip rules
+conditions that change runtime behavior
+channel strategy
+```
+
+Those behaviors remain with the owning runtime modules.
+
+Catalog entries exist so Messaging can provide a clean copy-editing and review surface without forcing operators to hunt through Campaign, Webinar, FlowRoute, or config screens just to find message copy.
 
 ### MessageTemplatePresetAssignment
 
 `MessageTemplatePresetAssignment` owns which preset is currently selected for a runtime message context.
 
-Suggested durable fields:
+Durable fields include:
 
 ```text
 id
@@ -142,9 +213,22 @@ Examples:
 
 ```text
 campaign + webinar_attended_nurture + step 1 + email
-webinar + reminder_24h + email + WebinarSeries:5
-webinar + post_attended + sms + global default
+webinar + reminder_30_minute + email + global default
+webinar + post_attended + sms + WebinarSeries:5
+FlowRoute send-message point + selected transactional email template
 ```
+
+Assignment changes should happen from the consuming module's setup surface, not primarily from the Messaging template copy editor.
+
+Examples:
+
+```text
+Campaign step editor chooses which template that campaign step uses.
+Webinar schedule/profile editor chooses which confirmation/reminder/follow-up template applies.
+Automatic Follow-ups / FlowRoutes send-message point editor chooses which message template the point sends.
+```
+
+The Messaging template page may show read-only usage, such as "Used by Campaigns -> Webinar Attended Nurture -> Step 1," and link to the owning module UI when that UI exists.
 
 ### Runtime resolution target
 
@@ -157,16 +241,17 @@ Messaging resolvers should eventually resolve message definitions in this order:
 4. Temporary config fallback only during migration.
 ```
 
-Long-term runtime should be DB-first. Config should seed/update available presets; it should not remain the only runtime source of reusable message copy.
+Long-term runtime should be DB-first. Config should seed/update available presets and catalog entries; it should not remain the only runtime source of reusable message copy.
 
 ### Sync/customization rule
 
-Sync may create or update non-customized presets from config.
+Sync may create or update non-customized presets and catalog entries from config.
 
 Sync should not overwrite customized DB copy unless a force option is explicitly used.
 
-Customized fields should remain Messaging-owned and token-validated.
+Catalog entries are regenerated from source definition context and should stay aligned with the source config/definition shape.
 
+Customized template payload fields remain Messaging-owned and token-validated.
 
 ### Messaging channel availability
 
@@ -342,3 +427,4 @@ Current import-batch invitation scheduling is Messaging-owned.
 Core may expose the operator entry point on the import batch detail page when Messaging is enabled, but Core must not directly import Messaging actions, services, or models.
 
 Other modules may request this flow through Messaging public services/actions, but they must not create invitation records directly.
+

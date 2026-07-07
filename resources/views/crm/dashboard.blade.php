@@ -1,3 +1,4 @@
+
 <x-layouts.crm :title="$title" :heading="$heading" :subheading="$subheading">
     @php
         $attentionCount = (int) ($summary['attention_count'] ?? 0);
@@ -7,6 +8,11 @@
         $upcomingTaskSummary = $upcomingTaskSummary ?? null;
         $upcomingWeekTaskCount = (int) ($upcomingTaskSummary['count'] ?? 0);
 
+        $tasksTone = module_tone('tasks');
+        $leadsTone = module_tone('inbound_messaging');
+        $webinarsTone = module_tone('webinars');
+        $coreTone = module_tone('core');
+
         $badgeClasses = [
             'amber' => 'bg-amber-50 text-amber-800 ring-amber-200',
             'blue' => 'bg-blue-50 text-blue-800 ring-blue-200',
@@ -14,7 +20,7 @@
             'slate' => 'bg-slate-100 text-slate-700 ring-slate-200',
         ];
 
-        $jumpCardClass = 'w-full rounded-xl bg-white p-3 text-left ring-1 ring-slate-200 transition hover:bg-slate-50 hover:ring-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300';
+        $jumpCardBaseClass = 'w-full rounded-xl p-3 text-left ring-1 transition focus:outline-none focus:ring-2';
         $panelClass = 'transition duration-700 ease-out';
     @endphp
 
@@ -85,28 +91,28 @@
                     </div>
                 </div>
 
-                <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                <div class="rounded-2xl p-4 ring-1 {{ $coreTone['item'] ?? 'bg-slate-50 ring-slate-200' }}">
                     <p class="text-sm font-semibold text-slate-900">
                         Right now
                     </p>
 
                     <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
-                        <button type="button" class="{{ $jumpCardClass }}" @click="jumpTo('tasksPanel')">
+                        <button type="button" class="{{ $jumpCardBaseClass }} {{ $tasksTone['jump'] ?? 'bg-white ring-slate-200 hover:bg-slate-50 hover:ring-slate-300 focus:ring-slate-300' }}" @click="jumpTo('tasksPanel')">
                             <div class="text-2xl font-semibold text-slate-950">{{ $attentionCount }}</div>
                             <div class="mt-1 text-xs font-medium text-slate-500">need attention</div>
                         </button>
 
-                        <button type="button" class="{{ $jumpCardClass }}" @click="jumpTo('tasksPanel')">
+                        <button type="button" class="{{ $jumpCardBaseClass }} {{ $tasksTone['jump'] ?? 'bg-white ring-slate-200 hover:bg-slate-50 hover:ring-slate-300 focus:ring-slate-300' }}" @click="jumpTo('tasksPanel')">
                             <div class="text-2xl font-semibold text-slate-950">{{ $taskCount }}</div>
                             <div class="mt-1 text-xs font-medium text-slate-500">tasks due/overdue</div>
                         </button>
 
-                        <button type="button" class="{{ $jumpCardClass }}" @click="jumpTo('leadsPanel')">
+                        <button type="button" class="{{ $jumpCardBaseClass }} {{ $leadsTone['jump'] ?? 'bg-white ring-slate-200 hover:bg-slate-50 hover:ring-slate-300 focus:ring-slate-300' }}" @click="jumpTo('leadsPanel')">
                             <div class="text-2xl font-semibold text-slate-950">{{ $leadReplyCount }}</div>
                             <div class="mt-1 text-xs font-medium text-slate-500">{{ config('contacts.labels.singular') }} replies</div>
                         </button>
 
-                        <button type="button" class="{{ $jumpCardClass }}" @click="jumpTo('webinarsPanel')">
+                        <button type="button" class="{{ $jumpCardBaseClass }} {{ $webinarsTone['jump'] ?? 'bg-white ring-slate-200 hover:bg-slate-50 hover:ring-slate-300 focus:ring-slate-300' }}" @click="jumpTo('webinarsPanel')">
                             <div class="text-2xl font-semibold text-slate-950">{{ $webinarActivityCount }}</div>
                             <div class="mt-1 text-xs font-medium text-slate-500">webinar updates</div>
                         </button>
@@ -118,8 +124,9 @@
         <section class="grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
             <div
                 x-ref="tasksPanel"
-                class="{{ $panelClass }} rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:p-7"
-                :class="focusedPanel === 'tasksPanel' ? 'scale-[1.01] !bg-slate-100 ring-2 ring-slate-400' : 'ring-1 ring-transparent'"
+                data-module-panel="tasks"
+                class="{{ $panelClass }} {{ module_tone('tasks', 'panel') }} rounded-3xl p-6 shadow-sm lg:p-7"
+                :class="focusedPanel === 'tasksPanel' ? 'scale-[1.01] {{ module_tone('tasks', 'pulse') }}' : 'ring-1 ring-transparent'"
             >
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
@@ -171,8 +178,8 @@
                 <div class="mt-5 space-y-3">
                     @forelse($taskItems as $task)
                         <div
-                            class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 transition duration-500"
-                            :class="focusedPanel === 'tasksPanel' ? 'scale-[1.005] !bg-slate-200 ring-slate-400' : ''"
+                            class="rounded-2xl p-4 ring-1 transition duration-500 {{ $tasksTone['item'] ?? 'bg-slate-50 ring-slate-200' }}"
+                            :class="focusedPanel === 'tasksPanel' ? 'scale-[1.005] {{ $tasksTone['item_focus'] ?? '!bg-slate-200 ring-slate-400' }}' : ''"
                         >
                             <div class="flex items-start justify-between gap-4">
                                 <div class="min-w-0">
@@ -217,7 +224,7 @@
                 </div>
 
                 @if(module_enabled('tasks') && $upcomingWeekTaskCount > 0)
-                    <div class="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+                    <div class="mt-5 rounded-2xl border p-4 {{ $tasksTone['item'] ?? 'border-slate-200 bg-white' }}">
                         <div class="flex flex-wrap items-start justify-between gap-3">
                             <div>
                                 <p class="text-sm font-semibold text-slate-950">
@@ -234,7 +241,7 @@
                                 <input type="hidden" name="item_key" value="{{ $upcomingTaskSummary['key'] }}">
                                 <input type="hidden" name="return_to" value="{{ request()->fullUrl() }}">
                                 <button type="submit" class="text-xs font-bold text-slate-600 underline underline-offset-4 hover:text-slate-950">
-                                    Review later
+                                    Hide for today
                                 </button>
                             </form>
                         </div>
@@ -250,8 +257,9 @@
 
             <div
                 x-ref="leadsPanel"
-                class="{{ $panelClass }} rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:p-7"
-                :class="focusedPanel === 'leadsPanel' ? 'scale-[1.01] !bg-slate-100 ring-2 ring-slate-400' : 'ring-1 ring-transparent'"
+                data-module-panel="inbound_messaging"
+                class="{{ $panelClass }} {{ module_tone('inbound_messaging', 'panel') }} rounded-3xl p-6 shadow-sm lg:p-7"
+                :class="focusedPanel === 'leadsPanel' ? 'scale-[1.01] {{ module_tone('inbound_messaging', 'pulse') }}' : 'ring-1 ring-transparent'"
             >
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
@@ -275,8 +283,8 @@
                 <div class="mt-5 space-y-3">
                     @forelse($leadItems as $lead)
                         <div
-                            class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 transition duration-500"
-                            :class="focusedPanel === 'leadsPanel' ? 'scale-[1.005] !bg-slate-200 ring-slate-400' : ''"
+                            class="rounded-2xl p-4 ring-1 transition duration-500 {{ $leadsTone['item'] ?? 'bg-slate-50 ring-slate-200' }}"
+                            :class="focusedPanel === 'leadsPanel' ? 'scale-[1.005] {{ $leadsTone['item_focus'] ?? '!bg-slate-200 ring-slate-400' }}' : ''"
                         >
                             <div class="flex items-start justify-between gap-4">
                                 <div class="min-w-0">
@@ -336,8 +344,9 @@
 
         <section
             x-ref="webinarsPanel"
-            class="{{ $panelClass }} rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:p-7"
-            :class="focusedPanel === 'webinarsPanel' ? 'scale-[1.01] !bg-slate-100 ring-2 ring-slate-400' : 'ring-1 ring-transparent'"
+            data-module-panel="webinars"
+            class="{{ $panelClass }} {{ module_tone('webinars', 'panel') }} rounded-3xl p-6 shadow-sm lg:p-7"
+            :class="focusedPanel === 'webinarsPanel' ? 'scale-[1.01] {{ module_tone('webinars', 'pulse') }}' : 'ring-1 ring-transparent'"
         >
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -363,8 +372,8 @@
             <div class="mt-5 grid gap-3 lg:grid-cols-2">
                 @forelse($webinarItems as $activity)
                     <div
-                        class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 transition duration-500"
-                        :class="focusedPanel === 'webinarsPanel' ? 'scale-[1.005] !bg-slate-200 ring-slate-400' : ''"
+                        class="rounded-2xl p-4 ring-1 transition duration-500 {{ $webinarsTone['item'] ?? 'bg-slate-50 ring-slate-200' }}"
+                        :class="focusedPanel === 'webinarsPanel' ? 'scale-[1.005] {{ $webinarsTone['item_focus'] ?? '!bg-slate-200 ring-slate-400' }}' : ''"
                     >
                         <div class="flex items-start justify-between gap-4">
                             <div class="min-w-0">

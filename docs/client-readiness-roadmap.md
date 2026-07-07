@@ -62,7 +62,7 @@ resolve selected DB-owned options at runtime
 
 Near-term candidates:
 
-- Messaging template presets and assignments.
+- Messaging template presets, catalog entries, and assignments.
 - Selectable webinar schedule profiles.
 - Campaign channel variants.
 - Task template/default definition UI, if clients/operators need to manage task templates themselves.
@@ -72,6 +72,7 @@ Completed runway pieces:
 
 - FlowRoute owner morph and trigger bindings.
 - CRM selection for status/event FlowRoutes.
+- Messaging template presets, catalog entries, and DB-first assignment resolution foundation.
 
 The remaining runway pieces should continue to be implemented as durable client-readiness work, not as smoke-test shortcuts.
 
@@ -82,7 +83,7 @@ The remaining runway pieces should continue to be implemented as durable client-
 | 1 | Permission invitation accepted automation event decision | 0.25–0.5 session | Decide whether accepted invitations should emit a neutral automation event such as `permission_invitation.accepted`. |
 | 2 | Permission invitation cancellation behavior | 0.5–1 session | Clarify how cancellation/skip/failure should appear for permission-invitation Broadcast bookkeeping and Messaging scheduled messages. |
 | 3 | Config validation guidance | 0.5–1 session | Convert current config-template expectations into practical validation behavior and operator/debug feedback. |
-| 4 | Messaging template presets + assignments | 2–4 sessions | Sync config-defined message copy into DB-backed presets and allow selected template assignments. |
+| 4 | Messaging template UI/UX polish | 1–2 sessions | Use catalog entries to make template browsing grouped by channel, purpose, module/area, group, and message/step. Do not put assignment mutation on the Templates page. |
 | 5 | Selectable webinar schedule profiles | 1–3 sessions | Allow quick swapping of confirmation/reminder/post-event schedules by context. |
 | 6 | Manual status-change automation warning | 0.5–1 session | Warn operators before a manual status change runs a selected status FlowRoute. This is a UI awareness guardrail, not a ContactStatus schema split. |
 | 7 | Task template/default definition UI | 1–2 sessions, maybe more if polished | Only needed when clients/operators need to manage task templates themselves. Preset sync already creates DB-owned definitions only. |
@@ -141,6 +142,18 @@ Completed baseline:
 - Contacts without a usable SMS destination are skipped by Messaging scheduling rather than crashing delivery.
 - Broadcast recipient outcome visibility shows scheduled/skipped/failed counts and recipient skip/failure reasons.
 
+### Messaging template presets, catalog entries, and assignments
+
+Completed baseline:
+
+- Messaging owns DB-backed reusable `MessageTemplatePreset` records for synced/editable message copy.
+- Messaging owns `MessageTemplateCatalogEntry` records for template browser organization by channel, purpose, module/area, group, and item.
+- Messaging owns `MessageTemplatePresetAssignment` records for selected runtime template behavior.
+- Template sync creates presets, catalog entries, and default assignments from message configs.
+- Normal sync preserves customized template copy and selected assignments unless forced.
+- Runtime resolution can prefer selected DB templates before config fallback.
+- The Message Templates page should edit/review copy and show read-only usage; selecting which template a Campaign/Webinar/Automatic Follow-up uses belongs on the consuming module's setup screen.
+
 ### FlowRoute trigger bindings and CRM selection UI
 
 Completed baseline:
@@ -168,19 +181,19 @@ Completed baseline:
 
 ## Recommended next implementation target
 
-The next implementation target should be:
+The next implementation target should be chosen from the remaining runtime-selectable architecture runway:
 
 ```text
-Messaging template presets + assignments
+Selectable webinar schedule profiles
 ```
 
 Reason:
 
-- FlowRoute trigger bindings and CRM selection now provide the route-selection side of the runtime-selectable architecture.
-- Messaging still needs DB-backed reusable template presets and assignments so message copy can be synced, selected, and later edited without destructive config swapping.
-- Campaigns, Webinars, FlowRoutes send-message points, and future schedule profiles should resolve selected Messaging templates instead of relying only on static config paths.
+- FlowRoute trigger bindings and Messaging template preset/catalog/assignment foundations are now in place.
+- Webinars still need selectable confirmation/reminder/post-event schedule profiles so clients/operators can choose when webinar-owned messages send without changing message copy.
+- Messaging should continue to own what those messages say through template presets and assignments.
 
-The permission invitation accepted automation event decision remains valid backlog, but Messaging template presets and assignments are now the most direct next step in the runtime-selectable architecture runway.
+Messaging template UI/UX polish can proceed in the dedicated UI/UX thread using `MessageTemplateCatalogEntry` as the browser/grouping foundation.
 
 ## What this roadmap intentionally avoids
 
@@ -212,4 +225,5 @@ When a roadmap item is completed:
 1. Remove it from this file or move it to a completed release note if needed.
 2. Delete or update the related TODO item.
 3. Update module docs only if architecture or durable behavior changed.
+
 

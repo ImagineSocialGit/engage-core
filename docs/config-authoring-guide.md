@@ -18,18 +18,19 @@ Primary references:
 4. Campaign message templates resolve by campaign key and step number, not author-created per-step message names.
 5. Future campaign step variants must reference Messaging-owned template presets/assignments and must not own reusable payload copy.
 6. Messaging template presets own reusable copy and safe DB-editable message payloads.
-7. FlowRoute presets own automation/control-flow routing and point definitions.
-8. Webinar post-event config owns provider event orchestration, not message copy.
-9. Task presets create DB-owned task template definitions only. They do not create live tasks.
-10. Use `lead/leads` in CRM/client-facing copy unless explicitly told otherwise.
-11. Do not invent new keys until checking the key registry.
-12. Do not use undocumented tokens in client-facing message copy.
-13. Avoid backward compatibility/legacy aliases unless explicitly chosen.
-14. Normal Broadcasts require normal Messaging consent. Do not use Broadcasts as a general imported-contact consent bypass.
-15. Imported-contact opt-in invitations are a distinct one-time Messaging flow with configurable public copy/style.
-16. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
-17. Module docs are the source of truth for module ownership and client-facing scope. Configs should not create a module feature that the owning module does not support.
-18. Commerce and Location configs should support admin convenience and integrations; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
+7. Messaging template catalog entries own browsing/grouping metadata for template review; they do not own runtime behavior.
+8. FlowRoute presets own automation/control-flow routing and point definitions.
+9. Webinar post-event config owns provider event orchestration, not message copy.
+10. Task presets create DB-owned task template definitions only. They do not create live tasks.
+11. Use `lead/leads` in CRM/client-facing copy unless explicitly told otherwise.
+12. Do not invent new keys until checking the key registry.
+13. Do not use undocumented tokens in client-facing message copy.
+14. Avoid backward compatibility/legacy aliases unless explicitly chosen.
+15. Normal Broadcasts require normal Messaging consent. Do not use Broadcasts as a general imported-contact consent bypass.
+16. Imported-contact opt-in invitations are a distinct one-time Messaging flow with configurable public copy/style.
+17. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
+18. Module docs are the source of truth for module ownership and client-facing scope. Configs should not create a module feature that the owning module does not support.
+19. Commerce and Location configs should support admin convenience and integrations; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
 
 ## Before creating a config
 
@@ -435,13 +436,11 @@ reminder_10_minute
 reminder_live
 ```
 
-## Messaging template presets
+## Messaging template presets, catalog entries, and assignments
 
 The target architecture stores reusable message definitions in DB-owned Messaging template presets.
 
 Config remains the seed/source for available presets.
-
-CRM/admin UI may later select or edit DB-backed presets.
 
 Use this conceptual split:
 
@@ -449,19 +448,34 @@ Use this conceptual split:
 MessageTemplatePreset
     reusable content/delivery template
 
+MessageTemplateCatalogEntry
+    browsing/grouping record for the Messaging template catalog
+
 MessageTemplatePresetAssignment
     selected preset for a runtime message context
 ```
 
-Examples of preset keys:
+`MessageTemplateCatalogEntry` is not a message group owner and is not a runtime behavior record. It exists so CRM/admin UI can browse related templates cleanly by channel, purpose, module/surface, group, and item.
+
+Examples of catalog paths:
 
 ```text
-webinar_registration_confirmation.default
-webinar_registration_confirmation.short_test
-webinar_reminder.full_schedule_24h
-webinar_reminder.smoke_fast_5m
-webinar_nurture.attended.default_email_step_1
-webinar_nurture.attended.default_sms_step_1
+Email -> Marketing -> Campaigns -> Webinar Attended Nurture -> Step 1 Email
+Email -> Transactional -> Webinars -> Webinar Reminders -> 30-Minute Reminder Email
+SMS -> Marketing -> Campaigns -> Mortgage Homebuyer Nurture -> Step 1 SMS
+```
+
+Catalog entries should be generated from stable source definition context such as:
+
+```text
+channel
+purpose
+scope
+surface
+message_type
+campaign_key
+campaign_step
+source_config_path
 ```
 
 Assignments should be structured by stable runtime dimensions such as:
@@ -480,6 +494,18 @@ context_type / context_id
 Do not replace this with opaque string-path guessing.
 
 Sync should not overwrite DB-customized message copy unless explicitly forced.
+
+Catalog entries may be regenerated from config/source context because they are browsing metadata, not edited message copy.
+
+Template assignment changes belong in the consuming module setup screen when practical:
+
+```text
+Campaign step editor
+Webinar schedule/profile editor
+Automatic Follow-ups / send-message point editor
+```
+
+The Messaging template editor should primarily edit/review reusable copy and show read-only usage links.
 
 ## Campaign Messaging template shape
 
@@ -901,7 +927,7 @@ Examples that should remain singular:
 - [ ] Are new Campaign preset steps free of `meta.message` references?
 - [ ] Are Campaign Messaging templates under `campaigns.{campaign_key}.steps.{step_number}`?
 - [ ] Are normal message configs using the canonical definition shape?
-- [ ] Are DB-backed MessageTemplatePreset and MessageTemplatePresetAssignment rules preserved when applicable?
+- [ ] Are DB-backed MessageTemplatePreset, MessageTemplateCatalogEntry, and MessageTemplatePresetAssignment rules preserved when applicable?
 - [ ] Are webinar transactional configs using `confirmations`, `opt_ins`, `reminders`, `post_attended`, and `post_missed`?
 - [ ] Are purpose/scope pairs correct?
 - [ ] Are marketing webinar campaigns using `marketing:webinar_nurture`?
@@ -948,3 +974,4 @@ Client request:
 
 Return complete config files and list any recommended new keys/tokens separately.
 ```
+

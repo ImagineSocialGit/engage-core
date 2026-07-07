@@ -148,9 +148,11 @@ This intentionally supersedes the older interpretation where matching active Flo
 
 Messaging should store reusable synced/editable message copy as DB-owned template presets.
 
+Message template catalog entries should organize synced/editable templates for browsing and copy review. Catalog entries are read-organization records only; they do not own campaign timing, webinar schedules, FlowRoute trigger behavior, skip rules, or runtime selection.
+
 Message template assignments should choose which preset is active for a channel/purpose/scope/surface/message context.
 
-Campaigns and Webinars should reference Messaging template keys or assignments. They should not embed reusable subject/body/message copy in their own presets.
+Campaigns, Webinars, and FlowRoutes should reference Messaging template keys or assignments. They should not embed reusable subject/body/message copy in their own presets.
 
 ### FlowRoute ownership
 
@@ -250,6 +252,7 @@ Current ownership:
 | contact_permission_invitations | Messaging |
 | message_suppressions | Messaging |
 | message_template_presets | Messaging |
+| message_template_catalog_entries | Messaging |
 | message_template_preset_assignments | Messaging |
 | inbound_messages | InboundMessaging |
 | campaigns | Campaigns |
@@ -948,10 +951,13 @@ Messaging owns:
 
 ```text
 message_template_presets
+message_template_catalog_entries
 message_template_preset_assignments
 ```
 
 `MessageTemplatePreset` owns the reusable payload/copy.
+
+`MessageTemplateCatalogEntry` owns Messaging template catalog/read organization for browsing grouped templates by channel, purpose, module/surface, group, and item. It does not own runtime behavior.
 
 `MessageTemplatePresetAssignment` owns which preset is selected for a runtime message context, such as:
 
@@ -2566,3 +2572,4 @@ Recommended direction:
 6. Regenerate `core-project-tree.txt` from the repo after each structural batch.
 
 Do not use this section as a backlog. Actionable items belong in `TODO.md`.
+

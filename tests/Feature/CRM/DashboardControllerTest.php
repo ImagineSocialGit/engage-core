@@ -129,7 +129,7 @@ class DashboardControllerTest extends TestCase
             'Upcoming this week',
         ]);
         $response->assertSee('1 task due after today.');
-        $response->assertSee('Review later');
+        $response->assertSee('Hide for today');
         $response->assertDontSee('Due tomorrow');
 
         Carbon::setTestNow();
@@ -308,4 +308,27 @@ class DashboardControllerTest extends TestCase
 
         $this->assertTrue($task->fresh()->isOpen());
     }
+
+    public function test_it_renders_muted_module_wayfinding_tones_separately_from_urgency(): void
+    {
+        $user = User::factory()->create();
+
+        Task::query()->create([
+            'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+            'source' => Task::SOURCE_MANUAL,
+            'title' => 'Urgent task with module wayfinding',
+            'status' => Task::STATUS_OPEN,
+            'due_at' => now()->subDay(),
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.index'));
+
+        $response->assertSee('data-module-panel="tasks"', false);
+        $response->assertSee('data-module-panel="inbound_messaging"', false);
+        $response->assertSee('data-module-panel="webinars"', false);
+        $response->assertSee('Overdue');
+    }
+
 }

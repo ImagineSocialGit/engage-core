@@ -229,12 +229,21 @@ Completed FlowRoute baseline:
 - Contact-status triggers are single-selection in the current CRM UI.
 - Automation-event triggers may select multiple routes for the same event.
 
-- [ ] Add Messaging template presets.
-  - Add `MessageTemplatePreset`.
-  - Add `MessageTemplatePresetAssignment`.
-  - Sync config-defined message templates into DB-owned presets.
-  - Let resolvers resolve selected DB presets before config fallback.
-  - Do not overwrite customized DB copy unless explicitly forced.
+Completed Messaging template baseline:
+
+- DB-backed `MessageTemplatePreset` records own synced/editable reusable message copy.
+- DB-backed `MessageTemplateCatalogEntry` records organize templates for browsing by channel, purpose, module/area, group, and item.
+- DB-backed `MessageTemplatePresetAssignment` records own selected runtime template behavior.
+- Sync creates presets, catalog entries, and default assignments from message configs.
+- Runtime resolvers prefer selected DB presets before config fallback.
+- Normal sync does not overwrite customized DB copy unless explicitly forced.
+
+- [ ] Polish Message Templates UI using catalog entries.
+  - Filter by channel, purpose, and area/module.
+  - Group related messages such as Campaign steps and Webinar reminders.
+  - Let operators switch between messages/steps inside the selected group.
+  - Keep assignment mutation out of the Templates page.
+  - Show read-only “Used by” links to the owning Campaign/Webinar/Automatic Follow-up setup surface.
 
 - [ ] Add selectable webinar schedule profiles.
   - Confirmation schedules.
@@ -387,4 +396,5 @@ Completed import-batch visibility baseline:
 - [ ] Add test coverage for client config fallback behavior.
   - Missing optional content/style keys should not break public pages.
   - Client copy changes should not break tests that only need behavioral assertions.
+
 

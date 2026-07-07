@@ -423,6 +423,62 @@ class DashboardController extends Controller
         ];
     }
 
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function leadReplyItem(InboundMessage $message): array
+    {
+        $contact = $message->sender instanceof Contact ? $message->sender : null;
+        $sender = $contact ? $this->contactName($contact) : ($message->from_value ?: 'Unknown sender');
+
+        return [
+            'key' => (string) $message->id,
+            'type' => DashboardAcknowledgement::TYPE_INBOUND_MESSAGE,
+            'sort_at' => $message->received_at ?? $message->created_at,
+            'label' => 'New reply',
+            'tone' => 'blue',
+            'title' => $sender.' replied',
+            'subtitle' => trim(implode(' · ', array_filter([
+                strtoupper($this->enumValue($message->channel)),
+                $this->dateLabel($message->received_at),
+            ]))),
+            'description' => $message->body,
+            'href' => $contact
+                ? route('crm.contacts.show', $contact).'?activity_tab=messages&focus=inbound_message:'.$message->id
+                : null,
+            'action_label' => $contact ? 'Review reply' : 'Review message',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function webinarRegistrationItem(WebinarRegistration $registration): array
+    {
+        $contact = $registration->contact;
+        $webinar = $registration->webinar;
+        $contactName = $contact ? $this->contactName($contact) : 'A '.config('contacts.labels.singular');
+
+        return [
+            'key' => (string) $registration->id,
+            'type' => DashboardAcknowledgement::TYPE_WEBINAR_REGISTRATION,
+            'sort_at' => $registration->registered_at ?? $registration->created_at,
+            'label' => 'Webinar signup',
+            'tone' => 'emerald',
+            'title' => $contactName.' registered',
+            'subtitle' => trim(implode(' · ', array_filter([
+                $webinar?->title,
+                $this->dateLabel($registration->registered_at),
+            ]))),
+            'description' => $webinar?->starts_at
+                ? 'Upcoming: '.$this->dateLabel($webinar->starts_at)
+                : 'A new webinar registration came in.',
+            'href' => $contact ? route('crm.contacts.show', $contact) : null,
+            'action_label' => $contact ? 'Open '.config('contacts.labels.singular') : 'Review webinar',
+        ];
+    }
+
     /**
      * @param Collection<int, Task> $tasks
      * @return array<string, mixed>
@@ -650,3 +706,4 @@ class DashboardController extends Controller
         return class_basename($model).' #'.$model->getKey();
     }
 }
+
