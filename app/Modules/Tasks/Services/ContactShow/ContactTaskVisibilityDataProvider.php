@@ -40,6 +40,7 @@ class ContactTaskVisibilityDataProvider implements ContactShowDataProvider
             'contactVisibilitySections' => [
                 'tasks' => [
                     'title' => 'Tasks',
+                    'module' => 'tasks',
                     'description' => 'Open and recent manual actions/dependencies.',
                     'empty' => 'No active tasks found.',
                     'items' => $tasks->map(fn (Task $task): array => [

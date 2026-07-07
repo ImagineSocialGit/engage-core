@@ -1,4 +1,3 @@
-
 @php
     $leadSingular = config('contacts.labels.singular');
     $leadName = $contact->name ?: trim($contact->first_name.' '.$contact->last_name) ?: $contact->email ?: str($leadSingular)->title().' #'.$contact->id;
@@ -17,6 +16,10 @@
     $nextTask = $openTasks->first();
     $upNextTask = $openTasks->skip(1)->first();
     $defaultActivityTab = $openTasks->isNotEmpty() && module_enabled('tasks') ? 'tasks' : 'notes';
+    $contactPanelClass = 'space-y-6 '.module_tone('core', 'panel');
+    $nextStepTone = module_enabled('tasks') ? module_tone('tasks', 'item') : 'bg-slate-50 border-slate-200';
+    $activityPanelClass = 'space-y-4 '.(module_enabled('tasks') ? module_tone('tasks', 'panel') : module_tone('core', 'panel'));
+    $messagesPanelClass = 'space-y-4 '.module_tone('messaging', 'panel');
 @endphp
 
 <x-layouts.crm
@@ -45,7 +48,7 @@
         @endif
 
         <div class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
-            <x-ui.card class="space-y-6">
+            <x-ui.card class="{{ $contactPanelClass }}" data-module-panel="core">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <p class="text-sm font-medium capitalize text-slate-500">
@@ -62,7 +65,7 @@
                     </div>
                 </div>
 
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div class="rounded-2xl border p-4 {{ $nextStepTone }}" data-module-panel="{{ module_enabled('tasks') ? 'tasks' : 'core' }}">
                     @if($nextTask)
                         <div class="flex flex-wrap items-start justify-between gap-4">
                             <div>
@@ -271,7 +274,7 @@
         <x-crm.contact-visibility :sections="$contactVisibilitySections" />
 
         <div id="lead-activity" class="grid gap-6">
-            <x-ui.card class="space-y-4">
+            <x-ui.card class="{{ $activityPanelClass }}" data-module-panel="{{ module_enabled('tasks') ? 'tasks' : 'core' }}">
                 <div class="flex items-center justify-between gap-4">
                     <div>
                         <h3 class="text-lg font-semibold tracking-tight">
@@ -279,7 +282,7 @@
                         </h3>
 
                         <p class="text-sm text-slate-500">
-                            Add notes and manage manual follow-up tasks.
+                            Capture what happened and manage manual follow-up tasks for this {{ $leadSingular }}.
                         </p>
                     </div>
 
@@ -453,7 +456,7 @@
         </div>
 
         @if(module_enabled('messaging'))
-            <x-ui.card class="space-y-4">
+            <x-ui.card class="{{ $messagesPanelClass }}" data-module-panel="messaging">
                 <div>
                     <h3 class="text-lg font-semibold tracking-tight">
                         Messages & consent
@@ -643,3 +646,4 @@
         @endif
     </div>
 </x-layouts.crm>
+

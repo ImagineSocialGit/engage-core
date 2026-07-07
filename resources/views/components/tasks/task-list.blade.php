@@ -1,4 +1,3 @@
-
 @props([
     'tasks',
     'archivedTasks' => collect(),
@@ -51,7 +50,7 @@
 
 <div class="space-y-3 border-t border-slate-200 pt-4">
     @forelse ($visibleTasks as $task)
-        <div class="rounded-xl border border-slate-200 p-4">
+        <div class="rounded-xl border p-4 {{ module_tone('tasks', 'item') }}">
             <div class="flex items-start justify-between gap-4">
                 <div>
                     <p class="font-semibold text-slate-900">
@@ -145,7 +144,7 @@
             </div>
         </div>
     @empty
-        <div class="rounded-xl border border-dashed border-slate-200 p-6 text-center">
+        <div class="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/30 p-6 text-center">
             <p class="text-sm font-medium text-slate-900">
                 {{ $showingArchived ? 'No archived tasks.' : 'No active tasks.' }}
             </p>
@@ -158,3 +157,4 @@
         </div>
     @endforelse
 </div>
+

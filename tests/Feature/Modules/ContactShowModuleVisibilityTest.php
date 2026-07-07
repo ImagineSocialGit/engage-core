@@ -70,6 +70,57 @@ class ContactShowModuleVisibilityTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/'.config('contacts.routes.plural').'/'.$contact->id)
             ->assertOk()
-            ->assertDontSee('Sent messages and consent settings');
+            ->assertDontSee('Messages & consent')
+            ->assertDontSee('data-module-panel="messaging"', false);
     }
+
+    public function test_contact_show_uses_module_wayfinding_hooks_for_enabled_runtime_sections(): void
+    {
+        config()->set('modules.enabled', [
+            'messaging',
+            'inbound_messaging',
+            'internal_notifications',
+            'tasks',
+            'campaigns',
+            'webinars',
+        ]);
+
+        $user = User::factory()->create();
+        $contact = Contact::factory()->create();
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/'.config('contacts.routes.plural').'/'.$contact->id)
+            ->assertOk()
+            ->assertSee('data-module-panel="core"', false)
+            ->assertSee('data-module-panel="tasks"', false)
+            ->assertSee('data-module-panel="messaging"', false)
+            ->assertSee('data-module-panel="webinars"', false);
+    }
+
+    public function test_contact_show_uses_plain_language_for_follow_up_visibility_sections(): void
+    {
+        config()->set('modules.enabled', [
+            'tasks',
+            'workflow',
+            'flow_routes',
+            'messaging',
+            'campaigns',
+        ]);
+
+        $user = User::factory()->create();
+        $contact = Contact::factory()->create();
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/'.config('contacts.routes.plural').'/'.$contact->id)
+            ->assertOk()
+            ->assertSee('Automatic follow-ups')
+            ->assertSee('Follow-up sequences')
+            ->assertSee('Messages already handled')
+            ->assertDontSee('Routes');
+    }
+
 }

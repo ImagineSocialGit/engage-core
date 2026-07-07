@@ -29,9 +29,10 @@ class ContactRoutesVisibilityDataProvider implements ContactShowDataProvider
         return [
             'contactVisibilitySections' => [
                 'routes' => [
-                    'title' => 'Routes',
-                    'description' => 'Active and recent route progress.',
-                    'empty' => 'No Route progress has been recorded.',
+                    'title' => 'Automatic follow-ups',
+                    'module' => 'flow_routes',
+                    'description' => 'Active and recent automatic follow-up progress.',
+                    'empty' => 'No automatic follow-up progress has been recorded.',
                     'items' => $progresses->map(fn (ContactFlowRouteProgress $progress): array => [
                         'title' => $this->routeName($progress),
                         'subtitle' => $this->currentPointLabel($progress),

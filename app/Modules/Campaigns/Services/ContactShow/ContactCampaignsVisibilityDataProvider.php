@@ -29,9 +29,10 @@ class ContactCampaignsVisibilityDataProvider implements ContactShowDataProvider
         return [
             'contactVisibilitySections' => [
                 'campaigns' => [
-                    'title' => 'Campaigns',
-                    'description' => 'Current and recent campaign enrollments.',
-                    'empty' => 'No campaign enrollments found.',
+                    'title' => 'Follow-up sequences',
+                    'module' => 'campaigns',
+                    'description' => 'Current and recent follow-up sequence activity.',
+                    'empty' => 'No follow-up sequences found.',
                     'items' => $enrollments->map(fn (CampaignEnrollment $enrollment): array => [
                         'title' => $this->campaignName($enrollment),
                         'subtitle' => $enrollment->campaign_key,

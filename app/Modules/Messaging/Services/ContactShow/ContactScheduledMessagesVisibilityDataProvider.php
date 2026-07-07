@@ -51,9 +51,10 @@ class ContactScheduledMessagesVisibilityDataProvider implements ContactShowDataP
         return [
             'contactVisibilitySections' => [
                 'scheduled_messages' => [
-                    'title' => 'Scheduled Messages',
-                    'description' => 'Upcoming scheduled messages and recent outbound delivery records.',
-                    'empty' => 'No scheduled messages found.',
+                    'title' => 'Messages already handled',
+                    'module' => 'messaging',
+                    'description' => 'Upcoming messages and recent outbound delivery records.',
+                    'empty' => 'No scheduled messages or recent delivery records found.',
                     'preview_count' => 1,
                     'items' => $this->items($messages),
                 ],

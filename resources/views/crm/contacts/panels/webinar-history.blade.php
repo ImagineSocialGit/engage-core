@@ -6,20 +6,20 @@
         ->format('M j, Y g:i A');
 @endphp
 
-<x-ui.card class="space-y-4">
+<x-ui.card class="space-y-4 {{ module_tone('webinars', 'panel') }}" data-module-panel="webinars">
     <div>
         <h3 class="text-lg font-semibold tracking-tight">
             {{ $contactPanel->title }}
         </h3>
 
         <p class="text-sm text-slate-500">
-            Recent webinar registrations for this {{ config('contacts.labels.singular') }}.
+            Recent webinar registrations and attendance context for this {{ config('contacts.labels.singular') }}.
         </p>
     </div>
 
     <div class="space-y-3">
         @forelse($registrations as $registration)
-            <div class="rounded-xl border border-slate-200 p-3">
+            <div class="rounded-xl border p-3 {{ module_tone('webinars', 'item') }}">
                 <div class="flex items-start justify-between gap-4">
                     <div>
                         <p class="font-medium text-slate-900">

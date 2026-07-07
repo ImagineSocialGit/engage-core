@@ -23,12 +23,13 @@ class ContactWorkflowVisibilityDataProvider implements ContactShowDataProvider
         return [
             'contactVisibilitySections' => [
                 'workflow' => [
-                    'title' => 'Workflow',
-                    'description' => 'Current workflow/status profile.',
-                    'empty' => 'No workflow profile exists for this contact.',
+                    'title' => 'Status',
+                    'module' => 'workflow',
+                    'description' => 'Current status and owner context.',
+                    'empty' => 'No status profile exists for this contact.',
                     'items' => $profile ? [[
                         'title' => $profile->contactStatus?->name ?? 'No current status',
-                        'subtitle' => 'Current contact workflow profile',
+                        'subtitle' => 'Current status profile',
                         'status' => 'Current',
                         'meta' => [
                             'Status Key' => $profile->contactStatus?->key,

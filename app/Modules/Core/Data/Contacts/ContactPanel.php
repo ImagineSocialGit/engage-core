@@ -10,6 +10,7 @@ final readonly class ContactPanel
         public string $view,
         public array $data = [],
         public int $sort = 100,
+        public string $module = 'core',
     ) {
     }
 }

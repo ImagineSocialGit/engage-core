@@ -28,6 +28,7 @@ class WebinarContactPanelProvider implements ContactPanelProvider
                     'registrations' => $registrations,
                 ],
                 sort: 100,
+                module: 'webinars',
             ),
         ];
     }
