@@ -3,6 +3,7 @@
 namespace App\Support\Modules;
 
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Route;
 
 class ModuleManager
 {
@@ -14,9 +15,16 @@ class ModuleManager
     public function enabledKeys(): array
     {
         $enabled = config('modules.enabled', []);
+        $definitions = $this->definitions();
+
+        $alwaysOnKeys = array_keys(array_filter(
+            $definitions,
+            fn (mixed $definition): bool => is_array($definition)
+                && (bool) ($definition['always_on'] ?? false),
+        ));
 
         if (! is_array($enabled)) {
-            return ['core'];
+            return array_values(array_unique($alwaysOnKeys ?: ['core']));
         }
 
         $keys = array_values(array_filter(
@@ -25,7 +33,7 @@ class ModuleManager
         ));
 
         return array_values(array_unique([
-            'core',
+            ...$alwaysOnKeys,
             ...$keys,
         ]));
     }
@@ -99,6 +107,75 @@ class ModuleManager
     }
 
     /**
+     * @return array<int, array{module: string, label: string, route: string, href: string, priority: int, class: string}>
+     */
+    public function navigationItems(): array
+    {
+        $items = [];
+
+        foreach ($this->enabledDefinitions() as $moduleKey => $definition) {
+            $navItems = $this->normalizeNavigationItems($definition['nav'] ?? []);
+
+            foreach ($navItems as $item) {
+                $route = $item['route'] ?? null;
+
+                if (! is_string($route) || $route === '' || ! Route::has($route)) {
+                    continue;
+                }
+
+                $label = $this->navigationLabel($item, $definition, $moduleKey);
+
+                $items[] = [
+                    'module' => $moduleKey,
+                    'label' => $label,
+                    'route' => $route,
+                    'href' => route($route),
+                    'priority' => (int) ($item['priority'] ?? 100),
+                    'class' => is_string($item['class'] ?? null) ? (string) $item['class'] : '',
+                ];
+            }
+        }
+
+        usort($items, function (array $a, array $b): int {
+            $priority = $a['priority'] <=> $b['priority'];
+
+            if ($priority !== 0) {
+                return $priority;
+            }
+
+            return strnatcasecmp($a['label'], $b['label']);
+        });
+
+        return array_values($items);
+    }
+
+
+    /**
+     * @param array<string, mixed> $item
+     * @param array<string, mixed> $definition
+     */
+    private function navigationLabel(array $item, array $definition, string $moduleKey): string
+    {
+        $labelConfig = $item['label_config'] ?? null;
+
+        if (is_string($labelConfig) && $labelConfig !== '') {
+            $configuredLabel = config($labelConfig);
+
+            if (is_string($configuredLabel) && trim($configuredLabel) !== '') {
+                return trim($configuredLabel);
+            }
+        }
+
+        $label = $item['label'] ?? $definition['name'] ?? $moduleKey;
+
+        if (! is_string($label) || trim($label) === '') {
+            return $moduleKey;
+        }
+
+        return trim($label);
+    }
+
+    /**
      * @return array<class-string>
      */
     public function providers(string $key): array
@@ -123,6 +200,25 @@ class ModuleManager
         }
 
         return array_values(array_unique($providers));
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeNavigationItems(mixed $nav): array
+    {
+        if (! is_array($nav) || $nav === []) {
+            return [];
+        }
+
+        if (array_is_list($nav)) {
+            return array_values(array_filter(
+                $nav,
+                fn (mixed $item): bool => is_array($item),
+            ));
+        }
+
+        return [$nav];
     }
 
     /**

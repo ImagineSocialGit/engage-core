@@ -5,11 +5,13 @@ namespace App\Modules\Tasks\Providers;
 use App\Modules\Tasks\Events\TaskCompleted;
 use App\Modules\Tasks\Listeners\EmitTaskCompletedAutomationEvent;
 use App\Modules\Tasks\Services\AssignedRecipients\TeamMemberTaskAssignedRecipientResolver;
+use App\Modules\Tasks\Services\Dashboard\TodayTasksDashboardPanelProvider;
 use App\Modules\Tasks\Services\ContactShow\ContactTasksShowDataProvider;
 use App\Modules\Tasks\Services\ContactShow\ContactTaskVisibilityDataProvider;
 use App\Modules\Tasks\Services\RelatedSubjects\ContactTaskRelatedSubjectResolver;
 use App\Modules\Tasks\Services\TaskAssignedRecipientsResolver;
 use App\Modules\Tasks\Services\TaskRelatedSubjectResolver;
+use App\Support\Dashboard\DashboardPanelRegistry;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -37,6 +39,10 @@ class TasksModuleServiceProvider extends ServiceProvider
             ContactTasksShowDataProvider::class,
             ContactTaskVisibilityDataProvider::class,
         ], 'core.contact_show_data_providers');
+
+        $this->app->tag([
+            TodayTasksDashboardPanelProvider::class,
+        ], DashboardPanelRegistry::providerTag());
     }
 
     public function boot(): void

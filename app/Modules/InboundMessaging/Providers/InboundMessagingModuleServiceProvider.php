@@ -2,8 +2,10 @@
 
 namespace App\Modules\InboundMessaging\Providers;
 
+use App\Modules\InboundMessaging\Services\Dashboard\LeadRepliesDashboardPanelProvider;
 use App\Modules\InboundMessaging\Services\Email\EmailWebhookHandlerResolver;
 use App\Modules\InboundMessaging\Services\Sms\SmsWebhookHandlerResolver;
+use App\Support\Dashboard\DashboardPanelRegistry;
 use Illuminate\Support\ServiceProvider;
 
 class InboundMessagingModuleServiceProvider extends ServiceProvider
@@ -15,6 +17,10 @@ class InboundMessagingModuleServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(EmailWebhookHandlerResolver::class);
+
+        $this->app->tag([
+            LeadRepliesDashboardPanelProvider::class,
+        ], DashboardPanelRegistry::providerTag());
     }
 
     public function boot(): void

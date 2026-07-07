@@ -61,3 +61,4 @@ if (! function_exists('module_tone')) {
         return is_string($value) ? $value : '';
     }
 }
+

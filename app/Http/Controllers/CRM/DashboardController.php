@@ -5,18 +5,16 @@ namespace App\Http\Controllers\CRM;
 use App\Http\Controllers\Controller;
 use App\Models\DashboardAcknowledgement;
 use App\Modules\Core\Models\Contact;
-use App\Modules\InboundMessaging\Models\InboundMessage;
 use App\Modules\InternalNotifications\Actions\ScheduleInternalNotificationAction;
 use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\InternalNotifications\Services\InternalNotificationRecipient;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Tasks\Models\Task;
-use App\Modules\Webinars\Models\WebinarRegistration;
-use BackedEnum;
+use App\Modules\Tasks\Services\Dashboard\TodayTasksDashboardPanelProvider;
+use App\Support\Dashboard\DashboardPanelRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -24,69 +22,54 @@ use Illuminate\View\View;
 class DashboardController extends Controller
 {
     private const TASK_BROADCAST_MESSAGE_TYPE = 'dashboard_task_list';
-    private const UPCOMING_TASKS_ITEM_TYPE = 'upcoming_tasks_week';
 
-    public function index(): View
+    public function index(Request $request, DashboardPanelRegistry $dashboardPanels): View
     {
-        $todayStart = $this->todayStart();
-        $todayEnd = $this->todayEnd();
-
-        $taskData = $this->taskData($todayStart, $todayEnd);
-        $leadData = $this->leadReplyData();
-        $webinarData = $this->webinarRegistrationData();
+        $panelsBySlot = $dashboardPanels->panelsFor($request);
+        $workPanels = $panelsBySlot->get('immediate_work', collect())->values();
+        $contextPanels = $panelsBySlot->get('context', collect())->values();
+        $allPanels = $workPanels->concat($contextPanels)->values();
 
         return view('crm.dashboard', [
             'title' => 'Dashboard',
             'heading' => 'Today',
             'subheading' => 'A clear place to start, without turning the CRM into a cockpit.',
-            'summary' => [
-                'attention_count' => $this->attentionCount($taskData, $leadData),
-                'task_count' => $taskData['attention_count'],
-                'overdue_tasks' => $taskData['overdue_count'],
-                'due_today_tasks' => $taskData['due_today_count'],
-                'lead_replies' => $leadData['recent_count'],
-                'webinar_activity' => $webinarData['recent_count'],
-                'upcoming_week_tasks' => $taskData['upcoming_week_count'],
-            ],
-            'primaryAction' => $this->primaryAction(
-                tasks: $taskData['items'],
-                leadReplies: $leadData['items'],
-            ),
-            'taskItems' => $taskData['items']->take(6)->values(),
-            'upcomingTaskSummary' => $taskData['upcoming_summary'],
-            'leadItems' => $leadData['items']->take(6)->values(),
-            'webinarItems' => $webinarData['items']->take(5)->values(),
-            'canBroadcastTaskList' => $this->canBroadcastTaskList(),
+            'summary' => $this->summary($allPanels),
+            'primaryAction' => $this->primaryAction($workPanels),
+            'rightNowCards' => $this->rightNowCards($workPanels, $contextPanels),
+            'workPanels' => $workPanels,
+            'contextPanels' => $contextPanels,
         ]);
     }
 
-    public function printTasks(): View
+    public function printTasks(TodayTasksDashboardPanelProvider $tasksPanel): View
     {
-        $todayStart = $this->todayStart();
-        $todayEnd = $this->todayEnd();
-        $tasks = $this->taskModels($todayStart, $todayEnd, 50);
+        $todayStart = $tasksPanel->todayStart();
+        $todayEnd = $tasksPanel->todayEnd();
+        $tasks = $tasksPanel->taskModels($todayEnd, 50);
 
         return view('crm.dashboard-tasks-print', [
             'title' => 'Today’s Task List',
             'printedAt' => now(config('client.timezone', config('app.timezone', 'UTC'))),
             'tasks' => $tasks,
-            'taskItems' => $tasks->map(fn (Task $task): array => $this->taskItem($task, $todayStart, $todayEnd))->values(),
+            'taskItems' => $tasks->map(fn (Task $task): array => $this->printableTaskItem($task, $todayStart, $todayEnd))->values(),
             'overdueCount' => $tasks->filter(fn (Task $task): bool => $task->due_at?->lt($todayStart) ?? false)->count(),
             'dueTodayCount' => $tasks->filter(fn (Task $task): bool => $task->due_at?->betweenIncluded($todayStart, $todayEnd) ?? false)->count(),
         ]);
     }
 
-    public function broadcastTasks(ScheduleInternalNotificationAction $scheduleInternalNotification): RedirectResponse
-    {
+    public function broadcastTasks(
+        ScheduleInternalNotificationAction $scheduleInternalNotification,
+        TodayTasksDashboardPanelProvider $tasksPanel,
+    ): RedirectResponse {
         if (! $this->canBroadcastTaskList()) {
             return redirect()
                 ->route('crm.index')
                 ->with('error', 'Task sharing is available when Tasks, Team Members, Messaging, and Internal Notifications are enabled.');
         }
 
-        $todayStart = $this->todayStart();
-        $todayEnd = $this->todayEnd();
-        $tasks = $this->taskModels($todayStart, $todayEnd, 50);
+        $todayEnd = $tasksPanel->todayEnd();
+        $tasks = $tasksPanel->taskModels($todayEnd, 50);
 
         if ($tasks->isEmpty()) {
             return redirect()
@@ -179,225 +162,72 @@ class DashboardController extends Controller
     }
 
     /**
+     * @param Collection<int, array<string, mixed>> $panels
      * @return array<string, mixed>
      */
-    private function taskData(Carbon $todayStart, Carbon $todayEnd): array
+    private function summary(Collection $panels): array
     {
-        if (! module_enabled('tasks')) {
-            return [
-                'items' => collect(),
-                'upcoming_summary' => null,
-                'attention_count' => 0,
-                'overdue_count' => 0,
-                'due_today_count' => 0,
-                'upcoming_week_count' => 0,
-            ];
-        }
-
-        $baseQuery = $this->baseTaskQuery();
-
-        $overdueCount = (clone $baseQuery)
-            ->whereNotNull('due_at')
-            ->where('due_at', '<', $todayStart)
-            ->count();
-
-        $dueTodayCount = (clone $baseQuery)
-            ->whereBetween('due_at', [$todayStart, $todayEnd])
-            ->count();
-
-        $todayTasks = $this->taskModels($todayStart, $todayEnd, 10);
-        $upcomingWeekCount = $this->upcomingTaskCount($todayEnd);
-        $upcomingSummaryKey = $this->upcomingTaskSummaryKey();
-
-        if ($upcomingWeekCount > 0 && $this->isDashboardItemAcknowledged(self::UPCOMING_TASKS_ITEM_TYPE, $upcomingSummaryKey)) {
-            $upcomingWeekCount = 0;
-        }
+        $panelCounts = $panels
+            ->mapWithKeys(fn (array $panel): array => [
+                (string) $panel['key'] => [
+                    'count' => (int) ($panel['count'] ?? 0),
+                    'attention_count' => (int) ($panel['attention_count'] ?? 0),
+                ],
+            ])
+            ->all();
 
         return [
-            'items' => $todayTasks->map(fn (Task $task): array => $this->taskItem($task, $todayStart, $todayEnd))->values(),
-            'upcoming_summary' => $upcomingWeekCount > 0 ? [
-                'type' => self::UPCOMING_TASKS_ITEM_TYPE,
-                'key' => $upcomingSummaryKey,
-                'count' => $upcomingWeekCount,
-            ] : null,
-            'attention_count' => $overdueCount + $dueTodayCount,
-            'overdue_count' => $overdueCount,
-            'due_today_count' => $dueTodayCount,
-            'upcoming_week_count' => $upcomingWeekCount,
+            'attention_count' => $panels->sum(fn (array $panel): int => (int) ($panel['attention_count'] ?? 0)),
+            'panels' => $panelCounts,
         ];
     }
 
     /**
-     * @return Collection<int, Task>
-     */
-    private function taskModels(Carbon $todayStart, Carbon $todayEnd, int $limit): Collection
-    {
-        if (! module_enabled('tasks')) {
-            return collect();
-        }
-
-        return $this->baseTaskQuery()
-            ->where(function (Builder $query) use ($todayEnd): void {
-                $query
-                    ->whereNull('due_at')
-                    ->orWhere('due_at', '<=', $todayEnd);
-            })
-            ->orderByRaw('case when due_at is null then 1 else 0 end')
-            ->orderBy('due_at')
-            ->latest('id')
-            ->limit($limit)
-            ->get();
-    }
-
-    private function upcomingTaskCount(Carbon $todayEnd): int
-    {
-        if (! module_enabled('tasks')) {
-            return 0;
-        }
-
-        return $this->baseTaskQuery()
-            ->whereNotNull('due_at')
-            ->where('due_at', '>', $todayEnd)
-            ->where('due_at', '<=', $this->weekEnd())
-            ->count();
-    }
-
-    private function baseTaskQuery(): Builder
-    {
-        return Task::query()
-            ->with(['assignedTo', 'related'])
-            ->open()
-            ->unarchived();
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function leadReplyData(): array
-    {
-        if (! module_enabled('inbound_messaging')) {
-            return [
-                'items' => collect(),
-                'recent_count' => 0,
-            ];
-        }
-
-        $acknowledgedIds = $this->acknowledgedItemKeys(DashboardAcknowledgement::TYPE_INBOUND_MESSAGE);
-
-        $baseQuery = InboundMessage::query()
-            ->with('sender')
-            ->where('classification', InboundMessage::CLASSIFICATION_NORMAL_REPLY)
-            ->where('received_at', '>=', now()->subDays(3))
-            ->when($acknowledgedIds !== [], fn (Builder $query) => $query->whereNotIn('id', $acknowledgedIds));
-
-        $recentCount = (clone $baseQuery)->count();
-
-        $replies = (clone $baseQuery)
-            ->latest('received_at')
-            ->latest('id')
-            ->limit(8)
-            ->get();
-
-        return [
-            'items' => $replies->map(fn (InboundMessage $message): array => $this->leadReplyItem($message))->values(),
-            'recent_count' => $recentCount,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function webinarRegistrationData(): array
-    {
-        if (! module_enabled('webinars')) {
-            return [
-                'items' => collect(),
-                'recent_count' => 0,
-            ];
-        }
-
-        $acknowledgedIds = $this->acknowledgedItemKeys(DashboardAcknowledgement::TYPE_WEBINAR_REGISTRATION);
-
-        $baseQuery = WebinarRegistration::query()
-            ->with(['contact', 'webinar.webinarSeries'])
-            ->where('registered_at', '>=', now()->subDays(7))
-            ->when($acknowledgedIds !== [], fn (Builder $query) => $query->whereNotIn('id', $acknowledgedIds));
-
-        $recentCount = (clone $baseQuery)->count();
-
-        $registrations = (clone $baseQuery)
-            ->latest('registered_at')
-            ->latest('id')
-            ->limit(8)
-            ->get();
-
-        return [
-            'items' => $registrations
-                ->map(fn (WebinarRegistration $registration): array => $this->webinarRegistrationItem($registration))
-                ->values(),
-            'recent_count' => $recentCount,
-        ];
-    }
-
-    /**
-     * @param Collection<int, array<string, mixed>> $tasks
-     * @param Collection<int, array<string, mixed>> $leadReplies
+     * @param Collection<int, array<string, mixed>> $workPanels
      * @return array<string, mixed>|null
      */
-    private function primaryAction(
-        Collection $tasks,
-        Collection $leadReplies,
-    ): ?array {
-        $overdueTask = $tasks->first(fn (array $item): bool => ($item['priority_reason'] ?? null) === 'overdue');
-
-        if ($overdueTask) {
-            return [
-                'label' => $overdueTask['href'] ? 'Open overdue task' : 'Review tasks',
-                'href' => $overdueTask['href'],
-                'summary' => 'Start with the overdue task at the top of today’s list.',
+    private function primaryAction(Collection $workPanels): ?array
+    {
+        return $workPanels
+            ->map(fn (array $panel): ?array => $panel['primary_action'] ?? null)
+            ->filter(fn (?array $action): bool => filled($action['href'] ?? null) || filled($action['summary'] ?? null))
+            ->first() ?: [
+                'label' => 'View '.config('contacts.labels.plural'),
+                'href' => route('crm.contacts.index'),
+                'summary' => 'No urgent item is waiting. Review '.config('contacts.labels.plural').' when you are ready.',
             ];
-        }
-
-        $reply = $leadReplies->first();
-
-        if ($reply) {
-            return [
-                'label' => $reply['href'] ? 'Review reply' : 'Review message',
-                'href' => $reply['href'],
-                'summary' => 'A recent reply is the clearest '.config('contacts.labels.singular').' to review first.',
-            ];
-        }
-
-        $dueTodayTask = $tasks->first(fn (array $item): bool => ($item['priority_reason'] ?? null) === 'due_today');
-
-        if ($dueTodayTask) {
-            return [
-                'label' => $dueTodayTask['href'] ? 'Open today’s task' : 'Review tasks',
-                'href' => $dueTodayTask['href'],
-                'summary' => 'Start with the first task due today.',
-            ];
-        }
-
-        return [
-            'label' => 'View '.config('contacts.labels.plural'),
-            'href' => route('crm.contacts.index'),
-            'summary' => 'No urgent item is waiting. Review '.config('contacts.labels.plural').' when you are ready.',
-        ];
     }
 
     /**
-     * @param array<string, mixed> $taskData
-     * @param array<string, mixed> $leadData
+     * @param Collection<int, array<string, mixed>> $workPanels
+     * @param Collection<int, array<string, mixed>> $contextPanels
+     * @return array<int, array<string, mixed>>
      */
-    private function attentionCount(array $taskData, array $leadData): int
+    private function rightNowCards(Collection $workPanels, Collection $contextPanels): array
     {
-        return (int) $taskData['attention_count'] + (int) $leadData['recent_count'];
+        $cards = [[
+            'label' => 'need attention',
+            'count' => $workPanels->sum(fn (array $panel): int => (int) ($panel['attention_count'] ?? 0)),
+            'module' => $workPanels->first()['module'] ?? 'core',
+            'target_ref' => $workPanels->first()['target_ref'] ?? null,
+        ]];
+
+        foreach ($workPanels->concat($contextPanels)->take(3) as $panel) {
+            $cards[] = [
+                'label' => $panel['summary_label'] ?? $panel['title'],
+                'count' => (int) ($panel['count'] ?? 0),
+                'module' => $panel['module'] ?? 'core',
+                'target_ref' => $panel['target_ref'] ?? null,
+            ];
+        }
+
+        return array_slice($cards, 0, 4);
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function taskItem(Task $task, Carbon $todayStart, Carbon $todayEnd): array
+    private function printableTaskItem(Task $task, mixed $todayStart, mixed $todayEnd): array
     {
         $relatedContact = $task->related instanceof Contact ? $task->related : null;
         $dueAt = $task->due_at;
@@ -405,12 +235,7 @@ class DashboardController extends Controller
         $isDueToday = $dueAt && $dueAt->betweenIncluded($todayStart, $todayEnd);
 
         return [
-            'key' => (string) $task->id,
-            'type' => DashboardAcknowledgement::TYPE_TASK,
-            'sort_at' => $dueAt ?? $task->created_at,
-            'priority_reason' => $isOverdue ? 'overdue' : ($isDueToday ? 'due_today' : 'open'),
             'label' => $isOverdue ? 'Overdue' : ($isDueToday ? 'Today' : 'Open'),
-            'tone' => $isOverdue ? 'amber' : 'slate',
             'title' => $task->title,
             'subtitle' => trim(implode(' · ', array_filter([
                 $relatedContact ? $this->contactName($relatedContact) : null,
@@ -418,64 +243,6 @@ class DashboardController extends Controller
                 $task->assignedTo ? 'Owner: '.$this->modelName($task->assignedTo) : 'Unassigned',
             ]))),
             'description' => $task->description,
-            'href' => $relatedContact ? route('crm.contacts.show', $relatedContact) : null,
-            'action_label' => $relatedContact ? 'View' : null,
-        ];
-    }
-
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function leadReplyItem(InboundMessage $message): array
-    {
-        $contact = $message->sender instanceof Contact ? $message->sender : null;
-        $sender = $contact ? $this->contactName($contact) : ($message->from_value ?: 'Unknown sender');
-
-        return [
-            'key' => (string) $message->id,
-            'type' => DashboardAcknowledgement::TYPE_INBOUND_MESSAGE,
-            'sort_at' => $message->received_at ?? $message->created_at,
-            'label' => 'New reply',
-            'tone' => 'blue',
-            'title' => $sender.' replied',
-            'subtitle' => trim(implode(' · ', array_filter([
-                strtoupper($this->enumValue($message->channel)),
-                $this->dateLabel($message->received_at),
-            ]))),
-            'description' => $message->body,
-            'href' => $contact
-                ? route('crm.contacts.show', $contact).'?activity_tab=messages&focus=inbound_message:'.$message->id
-                : null,
-            'action_label' => $contact ? 'Review reply' : 'Review message',
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function webinarRegistrationItem(WebinarRegistration $registration): array
-    {
-        $contact = $registration->contact;
-        $webinar = $registration->webinar;
-        $contactName = $contact ? $this->contactName($contact) : 'A '.config('contacts.labels.singular');
-
-        return [
-            'key' => (string) $registration->id,
-            'type' => DashboardAcknowledgement::TYPE_WEBINAR_REGISTRATION,
-            'sort_at' => $registration->registered_at ?? $registration->created_at,
-            'label' => 'Webinar signup',
-            'tone' => 'emerald',
-            'title' => $contactName.' registered',
-            'subtitle' => trim(implode(' · ', array_filter([
-                $webinar?->title,
-                $this->dateLabel($registration->registered_at),
-            ]))),
-            'description' => $webinar?->starts_at
-                ? 'Upcoming: '.$this->dateLabel($webinar->starts_at)
-                : 'A new webinar registration came in.',
-            'href' => $contact ? route('crm.contacts.show', $contact) : null,
-            'action_label' => $contact ? 'Open '.config('contacts.labels.singular') : 'Review webinar',
         ];
     }
 
@@ -562,50 +329,6 @@ class DashboardController extends Controller
             && module_enabled('internal_notifications');
     }
 
-
-    private function isDashboardItemAcknowledged(string $itemType, string $itemKey): bool
-    {
-        $userId = auth()->id();
-
-        if (! $userId) {
-            return false;
-        }
-
-        return DashboardAcknowledgement::query()
-            ->active()
-            ->where('user_id', $userId)
-            ->where('surface', DashboardAcknowledgement::SURFACE_CRM_DASHBOARD)
-            ->where('item_type', DashboardAcknowledgement::normalizeItemType($itemType))
-            ->where('item_key', DashboardAcknowledgement::normalizeItemKey($itemKey))
-            ->exists();
-    }
-
-    private function upcomingTaskSummaryKey(): string
-    {
-        return now(config('client.timezone', config('app.timezone', 'UTC')))->toDateString();
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function acknowledgedItemKeys(string $itemType): array
-    {
-        $userId = auth()->id();
-
-        if (! $userId) {
-            return [];
-        }
-
-        return DashboardAcknowledgement::query()
-            ->active()
-            ->where('user_id', $userId)
-            ->where('surface', DashboardAcknowledgement::SURFACE_CRM_DASHBOARD)
-            ->where('item_type', DashboardAcknowledgement::normalizeItemType($itemType))
-            ->pluck('item_key')
-            ->values()
-            ->all();
-    }
-
     private function safeReturnTo(?string $returnTo): string
     {
         if (! is_string($returnTo) || trim($returnTo) === '') {
@@ -626,28 +349,6 @@ class DashboardController extends Controller
         return route('crm.index');
     }
 
-    private function todayStart(): Carbon
-    {
-        return now(config('client.timezone', config('app.timezone', 'UTC')))
-            ->startOfDay()
-            ->utc();
-    }
-
-    private function todayEnd(): Carbon
-    {
-        return now(config('client.timezone', config('app.timezone', 'UTC')))
-            ->endOfDay()
-            ->utc();
-    }
-
-    private function weekEnd(): Carbon
-    {
-        return now(config('client.timezone', config('app.timezone', 'UTC')))
-            ->endOfWeek()
-            ->endOfDay()
-            ->utc();
-    }
-
     private function dueLabel(mixed $date): ?string
     {
         if (! $date) {
@@ -666,22 +367,6 @@ class DashboardController extends Controller
         }
 
         return 'Due '.$localDate->format('M j, g:i A');
-    }
-
-    private function dateLabel(mixed $date): ?string
-    {
-        return $date?->copy()
-            ->timezone(config('client.timezone', config('app.timezone', 'UTC')))
-            ->format('M j, g:i A');
-    }
-
-    private function enumValue(mixed $value): string
-    {
-        if ($value instanceof BackedEnum) {
-            return (string) $value->value;
-        }
-
-        return (string) $value;
     }
 
     private function contactName(Contact $contact): string
@@ -706,4 +391,3 @@ class DashboardController extends Controller
         return class_basename($model).' #'.$model->getKey();
     }
 }
-

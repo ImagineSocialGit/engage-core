@@ -1,4 +1,10 @@
 <x-layouts.app :title="$title ?? config('app.name')" :meta-description="$metaDescription ?? null">
+    @php
+        $moduleManager = app(\App\Support\Modules\ModuleManager::class);
+        $navigationItems = $moduleManager->navigationItems();
+        $navBaseClass = 'block rounded-lg px-3 py-2 font-medium text-slate-700 transition focus-visible:outline-none focus-visible:ring-2';
+    @endphp
+
     <div class="min-h-screen bg-slate-50 text-slate-900">
         <div class="flex min-h-screen">
             <aside class="hidden w-64 border-r border-slate-200 bg-white lg:flex lg:flex-col">
@@ -12,61 +18,24 @@
                 </div>
 
                 <nav class="flex-1 space-y-1 px-4 py-4 text-sm">
-                    <a href="/" class="block rounded-lg px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-100">
-                        Dashboard
-                    </a>
-
-                    <a
-                        href="{{ route('crm.contacts.index') }}"
-                        class="block rounded-lg px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-100 capitalize"
-                    >
-                        {{ config('contacts.labels.plural') }}
-                    </a>
-
-                    @if(module_enabled('broadcasts'))
+                    @foreach($navigationItems as $item)
                         <a
-                            href="{{ route('crm.broadcasts.index') }}"
-                            class="block rounded-lg px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-100"
+                            href="{{ $item['href'] }}"
+                            class="{{ $navBaseClass }} {{ module_tone($item['module'], 'nav') }} {{ $item['class'] }}"
                         >
-                            Broadcasts
+                            {{ $item['label'] }}
                         </a>
-                    @endif
+                    @endforeach
 
-                    @if(module_enabled('webinars'))
-                        <a href="/webinars" class="block rounded-lg px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-100">
-                            Webinars
-                        </a>
-                    @endif
-
-                    @if(module_enabled('messaging'))
-                        <a
-                            href="{{ route('crm.messaging.message-templates.index') }}"
-                            class="block rounded-lg px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-100"
-                        >
-                            Message Templates
-                        </a>
-                    @endif
-
-                    @if(module_enabled('flow_routes'))
-                        <a
-                            href="{{ route('crm.flow-routes.bindings.index') }}"
-                            class="block rounded-lg px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-100"
-                        >
-                            Automatic Follow-ups
-                        </a>
-                    @endif
-
-                    <form method="POST" action="/logout" class="">
+                    <form method="POST" action="/logout">
                         @csrf
 
-                        <div class="block">
-                            <button
-                                type="submit"
-                                class="w-full rounded-lg px-3 py-2 text-left text-red-600 hover:text-red-300 transition hover:bg-slate-100 font-bold cursor-pointer"
-                            >
-                                Logout
-                            </button>
-                        </div>
+                        <button
+                            type="submit"
+                            class="w-full rounded-lg px-3 py-2 text-left font-bold text-red-600 transition hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+                        >
+                            Logout
+                        </button>
                     </form>
                 </nav>
             </aside>

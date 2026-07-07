@@ -9,6 +9,9 @@ use App\Modules\InboundMessaging\Models\InboundMessage;
 use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
@@ -19,7 +22,7 @@ class DashboardControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_renders_a_daily_command_center(): void
+    public function test_it_renders_a_daily_command_center_from_registered_dashboard_panels(): void
     {
         $user = User::factory()->create();
 
@@ -35,7 +38,7 @@ class DashboardControllerTest extends TestCase
             'source' => Task::SOURCE_MANUAL,
             'title' => 'Call Tess about her reply',
             'status' => Task::STATUS_OPEN,
-            'due_at' => now()->subHour(),
+            'due_at' => now()->subDay(),
         ]);
 
         InboundMessage::query()->create([
@@ -62,6 +65,8 @@ class DashboardControllerTest extends TestCase
         $response->assertOk();
         $response->assertSee('Today');
         $response->assertSee('You have a clear place to start.');
+        $response->assertSee('data-module-panel="tasks"', false);
+        $response->assertSee('data-module-panel="inbound_messaging"', false);
         $response->assertSee('Today’s tasks');
         $response->assertSee('Print');
         $response->assertSee('View');
@@ -69,10 +74,10 @@ class DashboardControllerTest extends TestCase
         $response->assertSee('Leads needing attention');
         $response->assertSee('Review reply');
         $response->assertSee('Tess Lead replied');
-        $response->assertSee('Webinar activity');
+        $response->assertSee('Overdue');
     }
 
-    public function test_it_renders_a_caught_up_state_when_nothing_needs_attention(): void
+    public function test_it_renders_a_caught_up_state_for_enabled_actionable_panels(): void
     {
         $user = User::factory()->create();
 
@@ -84,7 +89,63 @@ class DashboardControllerTest extends TestCase
         $response->assertSee('You have a clear place to start.');
         $response->assertSee('No tasks need your attention today.');
         $response->assertSee('No lead replies need review.');
-        $response->assertSee('No new webinar activity to review.');
+        $response->assertDontSee('No new webinar activity to review.');
+        $response->assertDontSee('data-module-panel="webinars"', false);
+    }
+
+    public function test_configured_dashboard_slots_control_context_panels_when_modules_are_available(): void
+    {
+        Config::set('modules.dashboard.slots.context.panels', []);
+
+        $user = User::factory()->create();
+        $contact = Contact::factory()->create(['name' => 'Context Lead']);
+        $series = WebinarSeries::factory()->create();
+        $webinar = Webinar::factory()->create([
+            'series_id' => $series->id,
+            'starts_at' => now()->addDay(),
+        ]);
+
+        WebinarRegistration::factory()->create([
+            'contact_id' => $contact->id,
+            'webinar_id' => $webinar->id,
+            'registered_at' => now(),
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.index'));
+
+        $response->assertOk();
+        $response->assertDontSee('Webinar activity');
+        $response->assertDontSee('data-module-panel="webinars"', false);
+    }
+
+    public function test_context_panels_appear_when_configured_and_they_have_useful_activity(): void
+    {
+        $user = User::factory()->create();
+        $contact = Contact::factory()->create(['name' => 'Webinar Lead']);
+        $series = WebinarSeries::factory()->create();
+        $webinar = Webinar::factory()->create([
+            'series_id' => $series->id,
+            'title' => 'Buyer Webinar',
+            'starts_at' => now()->addDay(),
+        ]);
+
+        WebinarRegistration::factory()->create([
+            'contact_id' => $contact->id,
+            'webinar_id' => $webinar->id,
+            'registered_at' => now(),
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.index'));
+
+        $response->assertOk();
+        $response->assertSee('data-module-panel="webinars"', false);
+        $response->assertSee('Webinar activity');
+        $response->assertSee('Webinar Lead registered');
+        $response->assertSee('Buyer Webinar');
     }
 
     public function test_it_keeps_future_dated_tasks_out_of_todays_task_list(): void
@@ -135,7 +196,7 @@ class DashboardControllerTest extends TestCase
         Carbon::setTestNow();
     }
 
-    public function test_review_later_acknowledges_the_upcoming_week_summary(): void
+    public function test_hide_for_today_acknowledges_the_upcoming_week_summary(): void
     {
         Carbon::setTestNow('2026-07-06 10:00:00');
 
@@ -263,7 +324,7 @@ class DashboardControllerTest extends TestCase
             'source' => Task::SOURCE_MANUAL,
             'title' => 'Still open after acknowledgement',
             'status' => Task::STATUS_OPEN,
-            'due_at' => now()->subHour(),
+            'due_at' => now()->subDay(),
         ]);
 
         $message = InboundMessage::query()->create([
@@ -309,14 +370,14 @@ class DashboardControllerTest extends TestCase
         $this->assertTrue($task->fresh()->isOpen());
     }
 
-    public function test_it_renders_muted_module_wayfinding_tones_separately_from_urgency(): void
+    public function test_it_renders_muted_module_wayfinding_hooks_separately_from_urgency(): void
     {
         $user = User::factory()->create();
 
         Task::query()->create([
             'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
             'source' => Task::SOURCE_MANUAL,
-            'title' => 'Urgent task with module wayfinding',
+            'title' => 'Urgent follow-up',
             'status' => Task::STATUS_OPEN,
             'due_at' => now()->subDay(),
         ]);
@@ -325,10 +386,73 @@ class DashboardControllerTest extends TestCase
             ->actingAs($user)
             ->get(route('crm.index'));
 
+        $response->assertOk();
         $response->assertSee('data-module-panel="tasks"', false);
-        $response->assertSee('data-module-panel="inbound_messaging"', false);
-        $response->assertSee('data-module-panel="webinars"', false);
+        $response->assertSee('bg-amber-50', false);
         $response->assertSee('Overdue');
+    }
+
+    public function test_sidebar_navigation_is_config_driven_and_uses_module_hover_tones(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.index'));
+
+        $response->assertOk();
+        $response->assertSeeInOrder([
+            'Dashboard',
+            config('contacts.labels.plural'),
+            'Broadcasts',
+            'Webinars',
+            'Message Templates',
+            'Automatic Follow-ups',
+        ]);
+        $response->assertSee('hover:bg-pink-100/70', false);
+        $response->assertSee('hover:bg-stone-100', false);
+        $response->assertSee('hover:bg-sky-100/70', false);
+        $response->assertSee('hover:bg-orange-100/70', false);
+    }
+
+    public function test_sidebar_navigation_hides_disabled_module_links(): void
+    {
+        Config::set('modules.enabled', ['tasks', 'messaging']);
+
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.index'));
+
+        $response->assertOk();
+        $response->assertSee('Dashboard');
+        $response->assertSee(config('contacts.labels.plural'));
+        $response->assertSee('Message Templates');
+        $response->assertDontSee('Broadcasts');
+        $response->assertDontSee('Webinars');
+        $response->assertDontSee('Automatic Follow-ups');
+    }
+
+    public function test_dashboard_panels_use_actual_module_borders_not_only_rings(): void
+    {
+        $user = User::factory()->create();
+
+        Task::query()->create([
+            'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+            'source' => Task::SOURCE_MANUAL,
+            'title' => 'Bordered task panel',
+            'status' => Task::STATUS_OPEN,
+            'due_at' => now(),
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.index'));
+
+        $response->assertOk();
+        $response->assertSee('data-module-panel="tasks"', false);
+        $response->assertSee('border-emerald-200', false);
     }
 
 }

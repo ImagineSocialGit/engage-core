@@ -4,6 +4,8 @@ namespace App\Modules\Webinars\Providers;
 
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Webinars\Services\ContactPanels\WebinarContactPanelProvider;
+use App\Modules\Webinars\Services\Dashboard\WebinarActivityDashboardPanelProvider;
+use App\Support\Dashboard\DashboardPanelRegistry;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -13,7 +15,9 @@ class WebinarsModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->tag([
+            WebinarActivityDashboardPanelProvider::class,
+        ], DashboardPanelRegistry::providerTag());
     }
 
     public function boot(): void
