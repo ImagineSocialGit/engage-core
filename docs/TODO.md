@@ -121,8 +121,53 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [ ] Keep `docs/client-readiness-roadmap.md` current as the focused client-readiness implementation roadmap.
   - Use `TODO.md` for disposable backlog/checklists.
   - Use the roadmap for implementation order and session planning.
+  - Use the pre-prod schema-discovery ordering lens until schemas are stable enough for production rollout.
+  - Prioritize remaining work by DB/schema impact first, code/module-seam impact second, and UI/UX polish third.
   - Do not treat roadmap items as temporary MVP shortcuts.
   - Delete completed roadmap items or move them back to TODO when they are no longer near-term.
+
+## Pre-prod schema-discovery phase tracking
+
+Use this as a disposable checklist mirror of the roadmap sequence. Keep the roadmap as the source of truth for implementation order and update this section as phases are completed, deferred, or split.
+
+- [ ] Phase 1 — Webinar schedule profiles.
+  - Decide DB-owned profiles/items vs config-only for first rollout.
+  - Decide global/client/series/webinar attachment point.
+  - Preserve already-scheduled message stability.
+- [ ] Phase 2 — Campaign channel variants.
+  - Decide whether `campaign_step_variants` or equivalent schema is needed.
+  - Keep variants from owning reusable copy.
+- [ ] Phase 3 — Task templates / task defaults.
+  - Audit `task_templates` fields for generated/manual tasks.
+  - Build task template UI only if needed.
+- [ ] Phase 4 — FlowRoutes event-wait / task-completed resume behavior.
+  - Resume from neutral `task.completed` automation events.
+  - Add wait-correlation schema only if existing progress metadata is insufficient.
+- [ ] Phase 5 — Config validation / setup validation.
+  - Start command/service-based unless persistent validation records are proven necessary.
+- [ ] Phase 6 — Permission invitation accepted automation event.
+  - Decide whether to emit `permission_invitation.accepted`.
+- [ ] Phase 7 — Permission invitation cancellation / skip / failure bookkeeping.
+  - Clarify durable lifecycle visibility across Messaging scheduled messages and Broadcast bookkeeping.
+- [ ] Phase 8 — Webinar message readiness check.
+  - Add computed readiness only unless durable setup state is proven necessary.
+- [ ] Phase 9 — Manual status-change automation warning.
+  - Add consequence warning without splitting ContactStatus schema.
+- [ ] Phase 10 — Automatic Follow-ups / FlowRoutes UX polish.
+  - Use business outcomes, consequence previews, and secondary diagnostics.
+- [ ] Phase 11 — Dashboard / contact workspace polish audit.
+  - Add persisted preferences/acknowledgements only when real workflows require them.
+- [ ] Phase 12 — FOSS-informed module schema audit.
+  - Split by module group rather than one monster branch.
+
+Deferred launch hardening:
+
+- [ ] DB Snapshot / Export Safety Tool.
+  - Do not build during active pre-prod schema discovery unless real data preservation becomes necessary.
+  - Build when schemas are stabilizing and production rollout is near.
+  - Keep command-line only; no CRM UI.
+  - SQL dump should be the primary restore safety net.
+  - JSONL table exports should be for inspection, diffing, selective recovery, and debugging.
 
 ## One-off backlog
 
@@ -267,14 +312,15 @@ Completed Messaging/Campaign setup UI baseline:
 - Campaign usage rows can link from Message Templates to the Campaign Message Templates setup surface.
 - Campaign Message Templates links back to Message Templates for copy editing.
 
-- [ ] Build Webinars message/template/schedule setup.
-  - Show confirmation, reminder, waitlist, post-attended, and post-missed contexts.
-  - Show the active selected Messaging template for each context.
-  - Let operators choose compatible `MessageTemplatePreset` records from the Webinars-owned setup surface.
-  - Save/update `MessageTemplatePresetAssignment`.
-  - Link to Message Templates for copy editing.
-  - Preserve config fallback while DB-owned assignments become the primary runtime path.
-  - Keep Webinars responsible for schedule/profile/timing decisions.
+Completed Webinars message setup baseline:
+
+- Webinars has a functional Webinars-owned message setup surface.
+- The surface covers confirmation, reminder, waitlist availability, post-attended, and post-missed contexts.
+- Operators can choose compatible Messaging template presets from the Webinars-owned surface.
+- Selection saves through `MessageTemplatePresetAssignment`.
+- Copy editing remains on Message Templates.
+- Runtime resolution preserves DB-first assignment behavior with config fallback.
+- This baseline is functional, not UX-polished.
 
 - [ ] Add selectable webinar schedule profiles.
   - Confirmation schedules.

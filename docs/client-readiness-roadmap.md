@@ -80,38 +80,88 @@ Completed runway pieces:
 
 The remaining runway pieces should continue to be implemented as durable client-readiness work, not as smoke-test shortcuts.
 
+## Pre-prod schema-discovery ordering lens
+
+Before production rollout, prioritize the remaining client-readiness work by its likelihood of revealing durable table, migration, or module-boundary changes.
+
+This is not a separate product track and not a reason to build temporary scaffolding. It is a temporary pre-production ordering lens for finishing real client-readiness work while branch migrations can still be replaced safely.
+
+Use this priority order when choosing the next phase:
+
+1. Likelihood of directly impacting DB/schema.
+2. Likelihood of impacting codebase architecture, module seams, public actions/services, events, or runtime resolvers.
+3. UI/UX polish.
+
+UI/UX polish can still reveal missing persisted concepts, such as acknowledgements, catalog records, saved preferences, or setup-state records. It is simply less likely to reveal schema changes than unresolved runtime-definition, schedule, variant, task, or route-resume behavior.
+
+Current schema-discovery sequence:
+
+| Phase | Item | Primary discovery risk | Notes |
+| -: | --- | --- | --- |
+| 1 | Webinar schedule profiles | DB/schema | Decide whether webinar-owned message timing needs DB-owned profiles/items and whether profiles attach globally, by series, or by webinar. |
+| 2 | Campaign channel variants | DB/schema | Decide whether campaign steps need channel-specific variants and delivery strategies before production. |
+| 3 | Task templates / task defaults | DB/schema | Confirm task template fields can support generated/manual task creation from presets, FlowRoutes, and vertical modules. |
+| 4 | FlowRoutes event-wait / task-completed resume behavior | DB/schema + architecture | Confirm existing route progress metadata can safely resume from neutral `task.completed` events, or add wait-correlation records. |
+| 5 | Config validation / setup validation | Architecture | Add validation/reporting for unsafe config, unsupported keys, invalid tokens, and missing runtime references before client handoff. |
+| 6 | Permission invitation accepted automation event | Architecture | Decide whether accepted invitations emit a neutral event such as `permission_invitation.accepted` without Messaging depending on consumers. |
+| 7 | Permission invitation cancellation / skip / failure bookkeeping | DB/schema + architecture | Clarify durable lifecycle state across permission invitations, Broadcast bookkeeping, and Messaging scheduled messages. |
+| 8 | Webinar message readiness check | Architecture + operator safety | Add computed readiness visibility for webinar message setup without persisting setup state unless a concrete need appears. |
+| 9 | Manual status-change automation warning | Operator safety | Warn before manual status changes run selected status-based FlowRoutes; avoid schema unless audit/acknowledgement state is proven necessary. |
+| 10 | Automatic Follow-ups / FlowRoutes UX polish | UI/UX + architecture | Redesign Route Binding around business outcomes, consequence previews, and client/operator language after runtime behavior is safer. |
+| 11 | Dashboard / contact workspace polish audit | UI/UX + possible schema | Review orientation surfaces after core runtime pieces settle; add persisted preferences/acknowledgements only when needed. |
+| 12 | FOSS-informed module schema audit | DB/schema audit | Compare Engage Core modules against mature FOSS patterns to identify likely missing persisted concepts before production. |
+
+Run each phase on its own branch when practical. At the end of each phase, bring this context forward into the next branch:
+
+```text
+what changed
+schema decision made
+files touched
+tests added/updated
+what was intentionally deferred
+new docs/TODO changes
+follow-up risks for later phases
+```
+
+Deferred launch hardening:
+
+- DB Snapshot / Export Safety Tool.
+
+Do not build DB snapshot/export tooling during active pre-production schema discovery unless real data preservation becomes necessary. While the product is not yet in production, schema-heavy phases may replace branch migrations and reset local/staging data as needed. Add command-line SQL/JSONL snapshot tooling when schemas are stabilizing and production rollout is near.
+
 ## Near-term sequencing rule
 
 Client-readiness implementation should chase one main item at a time unless two active threads are intentionally isolated by file ownership.
 
-The current sequence is:
+The current sequence is the pre-prod schema-discovery sequence above.
 
-```text
-1. Webinars message/template/schedule setup.
-2. Automatic Follow-ups / FlowRoutes UX improvements.
-```
+Start with Webinar schedule profiles, then continue through Campaign channel variants, Task template/default checks, FlowRoutes event-wait/task-completed resume behavior, and the remaining phases in order unless a concrete client need changes the risk ranking.
 
 Do not run parallel threads that modify the same controllers, views, routes, services, migrations, or tests unless one thread is paused and rebased onto the other.
 
 ## Working roadmap
 
+Use the pre-prod schema-discovery sequence as the current implementation order.
+
 | # | Planned item | Rough estimate | Notes |
 | -: | --- | ---: | --- |
-| 1 | Webinar message/template/schedule setup | 1–3 sessions | Build the Webinars-side setup surface for confirmation, reminder, waitlist, and post-event message contexts. Webinars own scheduling/profile decisions; Messaging owns reusable copy, catalog entries, assignments, and delivery infrastructure. |
-| 2 | Automatic Follow-ups / FlowRoutes UX improvements | 1–3 sessions for first product pass | Redesign the current Route Binding surface around business outcomes after the Webinars setup slice. Start with selection/preview UX before route-builder expansion. |
-| 3 | Permission invitation accepted automation event decision | 0.25–0.5 session | Decide whether accepted invitations should emit a neutral automation event such as `permission_invitation.accepted`. |
-| 4 | Permission invitation cancellation behavior | 0.5–1 session | Clarify how cancellation/skip/failure should appear for permission-invitation Broadcast bookkeeping and Messaging scheduled messages. |
-| 5 | Config validation guidance | 0.5–1 session | Convert current config-template expectations into practical validation behavior and operator/debug feedback. |
-| 6 | Manual status-change automation warning | 0.5–1 session | Warn operators before a manual status change runs a selected status FlowRoute. This is a UI awareness guardrail, not a ContactStatus schema split. |
-| 7 | Task template/default definition UI | 1–2 sessions, maybe more if polished | Only needed when clients/operators need to manage task templates themselves. Preset sync already creates DB-owned definitions only. |
-| 8 | Campaign channel variants | 2–4 sessions | Add step-group/channel-variant support only after the current single-channel campaign-step template selection path remains stable. |
-| 9 | FlowRoutes route-builder UX | 3–6 sessions | Only after the Automatic Follow-ups exploration/product pass. Follow `ui-ux-guide.md`: guided, outcome-oriented, and not a blank-canvas automation builder. |
-| 10 | Task-completed FlowRoutes resume behavior | 0.5–1 session | Resume route event-wait points from neutral `task.completed` automation events, not direct Task-specific FlowRoutes listeners. |
-| 11 | Client self-serve readiness audit | 0.5–1 session | Separate controlled beta/operator-assisted readiness from true client self-serve readiness. |
-| 12 | PetServices vertical planning | 0.5–1 session | Plan vertical-owned pet/service concepts without pushing domain fields into Core. |
-| 13 | Music vertical planning | 0.5–1 session | Plan vertical-owned music/fan/product-interest concepts using Commerce, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Scheduling, Portal, and Reporting as needed. |
-| 14 | Feature-specific docs as modules stabilize | Ongoing | Keep module docs current when architecture/operator behavior changes. Do not turn docs into speculative backlog. |
-| 15 | Client config fallback tests | 0.5–1 session | Verify default/client config fallback, numeric-array replacement, optional content/style safety, and copy-tolerant tests. |
+| 1 | Webinar schedule profiles | 1–3 sessions | Highest remaining Webinars-side schema question. Decide DB-owned profiles/items vs config-only, and whether selection attaches globally, by webinar series, or by webinar. |
+| 2 | Campaign channel variants | 2–4 sessions | Decide whether Campaign steps need channel-specific variants and strategy fields before production. Variants must reference Messaging-owned templates/assignments and must not own copy. |
+| 3 | Task templates / task defaults | 1–2 sessions | Audit whether `task_templates` supports generated/manual tasks well enough for FlowRoutes and vertical modules. Build UI only if needed. |
+| 4 | FlowRoutes event-wait / task-completed resume behavior | 0.5–1.5 sessions | Resume route event-wait points from neutral `task.completed` automation events, not direct Task-specific FlowRoutes listeners. Confirm whether existing progress metadata is enough. |
+| 5 | Config validation / setup validation | 0.5–1.5 sessions | Convert config-template expectations into practical validation behavior and operator/debug feedback. Prefer command/service-based validation first. |
+| 6 | Permission invitation accepted automation event decision | 0.25–0.5 session | Decide whether accepted invitations should emit a neutral automation event such as `permission_invitation.accepted`. |
+| 7 | Permission invitation cancellation behavior | 0.5–1 session | Clarify how cancellation/skip/failure should appear for permission-invitation Broadcast bookkeeping and Messaging scheduled messages. |
+| 8 | Webinar message readiness check | 0.5–1 session | Computed readiness summary for Webinars message setup. Do not persist readiness/acknowledgement state unless the implementation proves a durable concept is missing. |
+| 9 | Manual status-change automation warning | 0.5–1 session | Warn operators before a manual status change runs a selected status FlowRoute. This is a UI awareness guardrail, not a ContactStatus schema split. |
+| 10 | Automatic Follow-ups / FlowRoutes UX polish | 1–3 sessions for first product pass | Redesign the current Route Binding surface around business outcomes and consequence previews before route-builder expansion. |
+| 11 | Dashboard / contact workspace polish audit | 1–2 sessions | Review shared orientation surfaces after runtime behavior settles. Add persisted state only for proven needs such as acknowledgements or preferences. |
+| 12 | FOSS-informed module schema audit | 2–6 sessions, split by module group | Compare Engage Core module tables against mature FOSS patterns to catch likely missing persisted concepts before production. |
+| Deferred | DB Snapshot / Export Safety Tool | 0.5–1.5 sessions near launch | Command-line SQL/JSONL snapshot tooling for production/launch hardening. Do not build during active pre-prod schema discovery unless real data preservation becomes necessary. |
+| Ongoing | Feature-specific docs as modules stabilize | Ongoing | Keep module docs current when architecture/operator behavior changes. Do not turn docs into speculative backlog. |
+| Later | Client self-serve readiness audit | 0.5–1 session | Separate controlled beta/operator-assisted readiness from true client self-serve readiness. |
+| Later | PetServices vertical planning | 0.5–1 session | Plan vertical-owned pet/service concepts without pushing domain fields into Core. |
+| Later | Music vertical planning | 0.5–1 session | Plan vertical-owned music/fan/product-interest concepts using universal modules as needed. |
 
 ## Recently completed client-readiness items
 
@@ -189,6 +239,19 @@ Completed baseline:
 - Message Templates “Used by” campaign rows may link to Campaign Message Templates, and Campaign Message Templates may link back to Message Templates for copy editing.
 - Selecting which template a Webinar or Automatic Follow-up uses still belongs on that consuming module's setup screen.
 
+
+### Webinars message/template setup
+
+Completed functional baseline:
+
+- Webinars has a Webinars-owned message setup surface for registration confirmations, reminders, waitlist availability messages, post-attended transactional follow-ups, and post-missed transactional follow-ups.
+- The surface shows the currently selected Messaging template per webinar message context.
+- Operators can choose compatible `MessageTemplatePreset` records from the Webinars setup surface.
+- Selection saves through `MessageTemplatePresetAssignment` while copy editing remains on the Message Templates page.
+- Runtime resolution remains DB-first with config fallback so existing registration confirmation/reminder behavior is preserved during migration.
+- This is a functional setup UI, not the final UX-polished communication-plan experience.
+- Schedule/profile/timing selection remains a Webinars-owned follow-up item.
+
 ### FlowRoute trigger bindings and CRM selection UI
 
 Completed baseline:
@@ -216,33 +279,32 @@ Completed baseline:
 
 ## Recommended next implementation target
 
-The next implementation target is the Webinars-side message/template/schedule setup slice.
+The next implementation target is Webinar schedule profiles.
 
-Build this before Automatic Follow-ups / FlowRoutes UX improvements.
+The purpose of this phase is to decide whether webinar-owned message timing needs DB-owned schedule profile records before production, or whether config-only timing remains sufficient for the first rollout.
 
-Webinars should provide the owning setup surface for webinar message contexts such as:
+Questions to settle:
 
 ```text
-registration confirmation
-reminders
-waitlist availability messages
-post-attended transactional follow-up
-post-missed transactional follow-up
+Are schedule profiles DB-owned or config-only for now?
+Do profiles attach globally, by client, by webinar series, or by webinar?
+Do confirmations, reminders, waitlist availability messages, and post-event transactional follow-ups share one profile model or separate profile categories?
+Do schedule profile items reference message_type, template assignment context, channel/purpose/scope, or a normalized schedule item key?
+Can existing scheduled messages remain stable once created while future registrations use the newly selected profile?
 ```
 
-The first durable version should:
+Likely schema candidates:
 
-- show the current selected Messaging template for each webinar message context;
-- allow selecting a compatible `MessageTemplatePreset`;
-- save/update `MessageTemplatePresetAssignment`;
-- link to Message Templates for copy editing;
-- preserve DB-first resolution with config fallback during migration;
-- keep Webinars responsible for schedule/profile/timing decisions;
-- keep Messaging responsible for reusable copy, catalog entries, assignments, and delivery infrastructure.
+```text
+webinar_schedule_profiles
+webinar_schedule_profile_items
+webinar_series.schedule_profile_id
+webinars.schedule_profile_id
+```
 
-The following implementation target is Automatic Follow-ups / FlowRoutes UX improvements.
+Prefer a small durable decision over a polished UI. If a schema change is needed, make it before production. If config-only is enough for first rollout, document that decision and move to Campaign channel variants.
 
-That next pass should redesign the current Route Binding surface around business outcomes and consequence previews before expanding into route point editing or a fuller route-builder UI.
+Automatic Follow-ups / FlowRoutes UX polish remains later in the schema-discovery sequence. Do not start it until the higher-risk schedule, variant, task-template, route-resume, config-validation, and permission-invitation pieces are settled or deliberately deferred.
 
 ## What this roadmap intentionally avoids
 
