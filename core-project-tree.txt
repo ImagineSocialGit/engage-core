@@ -303,6 +303,8 @@
 │   │   │   │   └── InboundMessagingModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
+│   │   │   │   ├── Dashboard
+│   │   │   │   │   └── LeadRepliesDashboardPanelProvider.php
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailWebhookHandlerResolver.php
 │   │   │   │   │   └── EmailWebhookPayload.php
@@ -541,6 +543,8 @@
 │   │   │   │   ├── ContactShow
 │   │   │   │   │   ├── ContactTasksShowDataProvider.php
 │   │   │   │   │   └── ContactTaskVisibilityDataProvider.php
+│   │   │   │   ├── Dashboard
+│   │   │   │   │   └── TodayTasksDashboardPanelProvider.php
 │   │   │   │   ├── RelatedSubjects
 │   │   │   │   │   └── ContactTaskRelatedSubjectResolver.php
 │   │   │   │   ├── TaskAssignedRecipientsResolver.php
@@ -611,6 +615,8 @@
 │   │   │   ├── Services
 │   │   │   │   ├── ContactPanels
 │   │   │   │   │   └── WebinarContactPanelProvider.php
+│   │   │   │   ├── Dashboard
+│   │   │   │   │   └── WebinarActivityDashboardPanelProvider.php
 │   │   │   │   └── WebinarProviderManager.php
 │   │   │   └── Support
 │   │   │       ├── WebinarJoinLinkGenerator.php
@@ -654,6 +660,10 @@
 │       │   └── CacheKey.php
 │       ├── Clients
 │       │   └── ViewResolver.php
+│       ├── Dashboard
+│       │   ├── Contracts
+│       │   │   └── DashboardPanelProvider.php
+│       │   └── DashboardPanelRegistry.php
 │       └── Modules
 │           └── ModuleManager.php
 ├── artisan
@@ -1078,6 +1088,10 @@
 │       │   ├── crm
 │       │   │   ├── contact-picker.blade.php
 │       │   │   ├── contact-visibility.blade.php
+│       │   │   ├── dashboard
+│       │   │   │   ├── panel.blade.php
+│       │   │   │   ├── panel-empty.blade.php
+│       │   │   │   └── panel-item.blade.php
 │       │   │   └── dev-testing-modal.blade.php
 │       │   ├── head.blade.php
 │       │   ├── hero.blade.php
@@ -1277,4 +1291,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-426 directories, 852 files
+432 directories, 860 files
