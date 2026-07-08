@@ -9,11 +9,16 @@ use App\Modules\Campaigns\Models\CampaignStepVariant;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\FlowRoutes\Actions\ExecuteCurrentFlowRoutePointAction;
+use App\Modules\FlowRoutes\Actions\ResumeContactFlowRouteProgressAction;
 use App\Modules\FlowRoutes\Actions\StartFlowRoutesFromAutomationEventAction;
 use App\Modules\FlowRoutes\Data\Events\FlowRouteExternalEvent;
+use App\Modules\FlowRoutes\Contracts\PointHandler;
+use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Jobs\ResumeFlowRouteProgressJob;
+use App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
+use App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
@@ -119,6 +124,152 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertNull($setup['progress']->waiting_event_key);
 
         Queue::assertPushed(ResumeFlowRouteProgressJob::class);
+    }
+
+    public function test_blocked_point_result_does_not_complete_or_advance_plan_item(): void
+    {
+        app()->instance(
+            PointHandlerRegistry::class,
+            new PointHandlerRegistry([
+                new class implements \App\Modules\FlowRoutes\Contracts\PointHandler {
+                    public function type(): string
+                    {
+                        return Point::TYPE_CONDITION;
+                    }
+
+                    public function handle(\App\Modules\FlowRoutes\Data\Points\PointExecutionContext $context): PointExecutionResult
+                    {
+                        return PointExecutionResult::blocked(
+                            reason: 'test_point_blocked',
+                            meta: [
+                                'flow_routes' => $context->flowRouteProvenance(),
+                                'test' => true,
+                            ],
+                        );
+                    }
+                },
+            ]),
+        );
+
+        $setup = $this->createProgressWithPoints([
+            Point::TYPE_CONDITION,
+            Point::TYPE_NOOP,
+        ]);
+
+        $result = app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']);
+
+        $this->assertSame(PointExecutionResult::STATUS_BLOCKED, $result->status);
+        $this->assertSame('test_point_blocked', $result->reason);
+
+        $setup['progress']->refresh();
+
+        $this->assertSame(ContactFlowRouteProgress::STATUS_ACTIVE, $setup['progress']->status);
+        $this->assertSame($setup['flow_route_points'][0]->getKey(), $setup['progress']->current_flow_route_point_id);
+        $this->assertNull($setup['progress']->completed_at);
+        $this->assertNull($setup['progress']->failed_at);
+        $this->assertNull($setup['progress']->cancelled_at);
+
+        $planItem = \App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem::query()
+            ->where('contact_flow_route_progress_id', $setup['progress']->getKey())
+            ->where('flow_route_point_id', $setup['flow_route_points'][0]->getKey())
+            ->firstOrFail();
+
+        $this->assertSame(\App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem::STATUS_BLOCKED, $planItem->status);
+        $this->assertSame('test_point_blocked', $planItem->result_reason);
+        $this->assertNull($planItem->completed_at);
+        $this->assertNull($planItem->skipped_at);
+        $this->assertNull($planItem->failed_at);
+
+        $nextPlanItem = \App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem::query()
+            ->where('contact_flow_route_progress_id', $setup['progress']->getKey())
+            ->where('flow_route_point_id', $setup['flow_route_points'][1]->getKey())
+            ->firstOrFail();
+
+        $this->assertSame(\App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem::STATUS_PENDING, $nextPlanItem->status);
+
+        $progressItem = \App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem::query()
+            ->where('contact_flow_route_progress_id', $setup['progress']->getKey())
+            ->where('flow_route_point_id', $setup['flow_route_points'][0]->getKey())
+            ->firstOrFail();
+
+        $this->assertSame(\App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem::STATUS_BLOCKED, $progressItem->status);
+        $this->assertSame('test_point_blocked', $progressItem->result_reason);
+        $this->assertNull($progressItem->completed_at);
+        $this->assertNull($progressItem->skipped_at);
+        $this->assertNull($progressItem->failed_at);
+
+        $this->assertSame(0, \App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem::query()
+            ->where('contact_flow_route_progress_id', $setup['progress']->getKey())
+            ->where('flow_route_point_id', $setup['flow_route_points'][1]->getKey())
+            ->count());
+    }
+
+    public function test_timed_resume_clears_stale_wait_fields_after_wait_point_resumes(): void
+    {
+        Queue::fake();
+
+        $setup = $this->createProgressWithPoints([
+            Point::TYPE_WAIT,
+            Point::TYPE_NOOP,
+        ]);
+
+        $setup['flow_route_points'][0]->forceFill([
+            'definition' => [
+                'seconds' => 1,
+            ],
+        ])->save();
+
+        $initialResult = app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']);
+
+        $this->assertSame(PointExecutionResult::STATUS_WAITING, $initialResult->status);
+
+        $progress = $setup['progress']->refresh();
+
+        $this->assertSame(ContactFlowRouteProgress::STATUS_WAITING, $progress->status);
+        $this->assertNotNull($progress->resume_at);
+        $this->assertArrayHasKey('waiting', $progress->meta ?? []);
+
+        $this->travel(2)->seconds();
+
+        try {
+            $result = app(\App\Modules\FlowRoutes\Actions\ResumeContactFlowRouteProgressAction::class)
+                ->handle($progress, now());
+
+            $this->assertSame(PointExecutionResult::STATUS_COMPLETED, $result->status);
+
+            $progress->refresh();
+
+            $this->assertSame(ContactFlowRouteProgress::STATUS_ACTIVE, $progress->status);
+            $this->assertSame($setup['flow_route_points'][1]->getKey(), $progress->current_flow_route_point_id);
+            $this->assertNull($progress->resume_at);
+            $this->assertNull($progress->waiting_event_key);
+            $this->assertArrayNotHasKey('waiting', $progress->meta ?? []);
+            $this->assertSame('wait_point_due', $result->reason);
+
+            $waitPlanItem = \App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem::query()
+                ->where('contact_flow_route_progress_id', $progress->getKey())
+                ->where('flow_route_point_id', $setup['flow_route_points'][0]->getKey())
+                ->firstOrFail();
+
+            $this->assertSame(\App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem::STATUS_COMPLETED, $waitPlanItem->status);
+            $this->assertNull($waitPlanItem->resume_at);
+            $this->assertNull($waitPlanItem->waiting_event_key);
+
+            $waitProgressItem = \App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem::query()
+                ->where('contact_flow_route_progress_id', $progress->getKey())
+                ->where('flow_route_point_id', $setup['flow_route_points'][0]->getKey())
+                ->latest('id')
+                ->firstOrFail();
+
+            $this->assertSame(\App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem::STATUS_COMPLETED, $waitProgressItem->status);
+            $this->assertNull($waitProgressItem->resume_at);
+            $this->assertNull($waitProgressItem->waiting_event_key);
+
+            $this->assertIsArray($progress->meta['resume_attempts'] ?? null);
+            $this->assertIsArray($progress->meta['last_resume_attempt'] ?? null);
+        } finally {
+            $this->travelBack();
+        }
     }
 
     public function test_unknown_point_type_fails_progress(): void

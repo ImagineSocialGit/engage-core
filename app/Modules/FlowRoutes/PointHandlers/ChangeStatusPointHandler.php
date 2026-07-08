@@ -38,6 +38,7 @@ class ChangeStatusPointHandler implements PointHandler
                     'flow_route_progress_id' => $context->progress->getKey(),
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
                     'point_id' => $context->flowRoutePoint->point_id,
+                    'flow_routes' => $context->flowRouteProvenance(),
                 ],
             );
         }
@@ -51,6 +52,7 @@ class ChangeStatusPointHandler implements PointHandler
                     'contact_id' => $context->progress->contact_id,
                     'flow_route_progress_id' => $context->progress->getKey(),
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    'flow_routes' => $context->flowRouteProvenance(),
                 ],
             );
         }
@@ -64,6 +66,7 @@ class ChangeStatusPointHandler implements PointHandler
                     'change_status_definition' => $definition->toMetaPayload(),
                     'flow_route_progress_id' => $context->progress->getKey(),
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    'flow_routes' => $context->flowRouteProvenance(),
                 ],
             );
         }
@@ -105,6 +108,7 @@ class ChangeStatusPointHandler implements PointHandler
                     'change_status_definition' => $definition->toMetaPayload(),
                     'flow_route_progress_id' => $context->progress->getKey(),
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    'flow_routes' => $context->flowRouteProvenance(),
                 ],
             );
         }
@@ -118,6 +122,7 @@ class ChangeStatusPointHandler implements PointHandler
                 'change_status_definition' => $definition->toMetaPayload(),
                 'flow_route_progress_id' => $context->progress->getKey(),
                 'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                'flow_routes' => $context->flowRouteProvenance(),
                 'route_handoff' => [
                     'handled_by' => 'ContactWorkflowStatusChanged',
                     'should_advance_current_progress' => true,
@@ -152,6 +157,7 @@ class ChangeStatusPointHandler implements PointHandler
             'change_status_definition' => $definition->toMetaPayload(),
             'flow_route_progress_id' => $context->progress->getKey(),
             'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+            'flow_routes' => $context->flowRouteProvenance(),
         ];
 
         return match ($definition->onSameStatus) {
@@ -177,3 +183,4 @@ class ChangeStatusPointHandler implements PointHandler
         };
     }
 }
+

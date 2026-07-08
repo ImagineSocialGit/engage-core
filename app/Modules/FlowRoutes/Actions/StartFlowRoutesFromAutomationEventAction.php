@@ -87,7 +87,7 @@ class StartFlowRoutesFromAutomationEventAction
                 'flow_route_id' => $flowRoute->getKey(),
                 'current_flow_route_point_id' => $currentFlowRoutePoint?->getKey(),
                 'status' => ContactFlowRouteProgress::STATUS_ACTIVE,
-                'started_at' => $event->occurredAt,
+                'started_at' => $event->occurredAt ?? now(),
                 'meta' => [
                     'started_from_automation_event' => $event->toMetaPayload(),
                 ],
@@ -115,3 +115,4 @@ class StartFlowRoutesFromAutomationEventAction
             ->first();
     }
 }
+

@@ -14,6 +14,7 @@ class ContactFlowRouteProgressItem extends Model
 
     public const STATUS_STARTED = 'started';
     public const STATUS_WAITING = 'waiting';
+    public const STATUS_BLOCKED = 'blocked';
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_SKIPPED = 'skipped';
     public const STATUS_CANCELLED = 'cancelled';
@@ -116,6 +117,11 @@ class ContactFlowRouteProgressItem extends Model
         return $query->where('status', self::STATUS_WAITING);
     }
 
+    public function scopeBlocked(Builder $query): Builder
+    {
+        return $query->where('status', self::STATUS_BLOCKED);
+    }
+
     public function scopeTerminal(Builder $query): Builder
     {
         return $query->whereIn('status', [
@@ -141,3 +147,4 @@ class ContactFlowRouteProgressItem extends Model
             ->where('resume_at', '<=', now());
     }
 }
+

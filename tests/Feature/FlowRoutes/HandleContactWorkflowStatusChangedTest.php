@@ -4,7 +4,9 @@ namespace Tests\Feature\FlowRoutes;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactStatus;
+use App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
+use App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
@@ -214,6 +216,25 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
         $this->assertNull($oldProgress->resume_at);
         $this->assertNull($oldProgress->waiting_event_key);
         $this->assertNotNull($oldProgress->cancelled_at);
+        $this->assertArrayNotHasKey('waiting', $oldProgress->meta ?? []);
+
+        $oldPlanItem = ContactFlowRoutePlanItem::query()
+            ->where('contact_flow_route_progress_id', $oldProgress->getKey())
+            ->firstOrFail();
+
+        $oldProgressItem = ContactFlowRouteProgressItem::query()
+            ->where('contact_flow_route_progress_id', $oldProgress->getKey())
+            ->firstOrFail();
+
+        $this->assertSame(ContactFlowRoutePlanItem::STATUS_CANCELLED, $oldPlanItem->status);
+        $this->assertSame('workflow_status_changed', $oldPlanItem->result_reason);
+        $this->assertNull($oldPlanItem->resume_at);
+        $this->assertNull($oldPlanItem->waiting_event_key);
+
+        $this->assertSame(ContactFlowRouteProgressItem::STATUS_CANCELLED, $oldProgressItem->status);
+        $this->assertSame('workflow_status_changed', $oldProgressItem->result_reason);
+        $this->assertNull($oldProgressItem->resume_at);
+        $this->assertNull($oldProgressItem->waiting_event_key);
 
         $this->assertSame(ContactFlowRouteProgress::STATUS_COMPLETED, $newProgress->status);
         $this->assertSame($newStatus->id, $newProgress->contact_status_id);
@@ -294,6 +315,143 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
 
         $this->assertSame(1, ContactFlowRouteProgress::query()->superseded()->count());
         $this->assertSame(0, ContactFlowRouteProgress::query()->active()->count());
+    }
+
+    public function test_change_status_route_continues_to_next_point_without_superseding_itself(): void
+    {
+        $contact = Contact::factory()->create();
+
+        $fromStatus = ContactStatus::query()->create([
+            'key' => 'phase_4b_from_status',
+            'name' => 'Phase 4B From Status',
+            'is_active' => true,
+        ]);
+
+        $toStatus = ContactStatus::query()->create([
+            'key' => 'phase_4b_to_status',
+            'name' => 'Phase 4B To Status',
+            'is_active' => true,
+        ]);
+
+        $flowRoute = FlowRoute::query()->create([
+            'key' => 'phase_4b_change_status_handoff',
+            'contact_status_id' => $fromStatus->getKey(),
+            'name' => 'Phase 4B Change Status Handoff',
+            'description' => null,
+            'version' => 1,
+            'trigger_type' => FlowRoute::TRIGGER_CONTACT_STATUS,
+            'trigger_key' => $fromStatus->key,
+            'is_active' => true,
+            'source_version' => 'test',
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        $this->bindRouteToContactStatus($flowRoute, $fromStatus);
+
+        $changeStatusPoint = Point::query()->create([
+            'key' => 'phase_4b_change_status',
+            'type' => Point::TYPE_CHANGE_STATUS,
+            'name' => 'Change Status',
+            'description' => null,
+            'default_definition' => [],
+            'default_settings' => [],
+            'is_active' => true,
+            'source_version' => 'test',
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        $noopPoint = Point::query()->create([
+            'key' => 'phase_4b_after_change_status_noop',
+            'type' => Point::TYPE_NOOP,
+            'name' => 'After Change Status Noop',
+            'description' => null,
+            'default_definition' => [],
+            'default_settings' => [],
+            'is_active' => true,
+            'source_version' => 'test',
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        $noopRoutePoint = FlowRoutePoint::query()->create([
+            'flow_route_id' => $flowRoute->getKey(),
+            'point_id' => $noopPoint->getKey(),
+            'key' => 'after_change_status_noop',
+            'sort_order' => 20,
+            'is_start' => false,
+            'is_active' => true,
+            'next_flow_route_point_id' => null,
+            'definition' => [],
+            'settings' => [],
+            'cancel_conditions' => [],
+            'source_version' => 'test',
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        FlowRoutePoint::query()->create([
+            'flow_route_id' => $flowRoute->getKey(),
+            'point_id' => $changeStatusPoint->getKey(),
+            'key' => 'change_status_to_phase_4b_to_status',
+            'sort_order' => 10,
+            'is_start' => true,
+            'is_active' => true,
+            'next_flow_route_point_id' => $noopRoutePoint->getKey(),
+            'definition' => [
+                'contact_status_key' => $toStatus->key,
+                'reason' => 'phase_4b_change_status_handoff_test',
+                'on_same_status' => 'skipped',
+                'force' => false,
+            ],
+            'settings' => [],
+            'cancel_conditions' => [],
+            'source_version' => 'test',
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        app(TransitionContactWorkflowStatusAction::class)->handle(
+            contact: $contact,
+            toStatus: $fromStatus,
+            reason: 'manual_update',
+            source: 'test',
+        );
+
+        $progresses = ContactFlowRouteProgress::query()
+            ->where('flow_route_id', $flowRoute->getKey())
+            ->get();
+
+        $this->assertCount(1, $progresses);
+
+        $progress = $progresses->first();
+
+        $this->assertNotNull($progress);
+        $this->assertSame(ContactFlowRouteProgress::STATUS_COMPLETED, $progress->status);
+        $this->assertNull($progress->current_flow_route_point_id);
+
+        $profile = \App\Modules\Workflow\Models\ContactWorkflowProfile::query()
+            ->where('contact_id', $contact->getKey())
+            ->firstOrFail();
+
+        $this->assertSame($toStatus->getKey(), $profile->contact_status_id);
+        $this->assertSame(0, ContactFlowRouteProgress::query()->superseded()->count());
+
+        $this->assertSame(2, \App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem::query()
+            ->where('contact_flow_route_progress_id', $progress->getKey())
+            ->where('status', \App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem::STATUS_COMPLETED)
+            ->count());
+
+        $this->assertSame(2, \App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem::query()
+            ->where('contact_flow_route_progress_id', $progress->getKey())
+            ->where('status', \App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem::STATUS_COMPLETED)
+            ->count());
     }
 
     public function test_inactive_route_does_not_start_progress(): void

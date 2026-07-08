@@ -19,7 +19,7 @@ return new class extends Migration
                 ->constrained()
                 ->cascadeOnDelete();
 
-            $table->nullableMorphs('context');
+            $table->nullableMorphs('context', 'frtb_context_morph_idx');
 
             $table->boolean('is_active')->default(true)->index();
 
@@ -38,3 +38,4 @@ return new class extends Migration
         Schema::dropIfExists('flow_route_trigger_bindings');
     }
 };
+

@@ -22,7 +22,12 @@ class HandleContactWorkflowStatusChangedAction
         }
 
         $progress = DB::transaction(function () use ($transition) {
-            $this->cancelActiveFlowRouteProgress->handle($transition);
+            $originatingProgressId = $this->originatingFlowRouteProgressId($transition);
+
+            $this->cancelActiveFlowRouteProgress->handle(
+                transition: $transition,
+                exceptProgressId: $originatingProgressId,
+            );
 
             return $this->startFlowRouteProgress->handle($transition);
         });
@@ -53,5 +58,12 @@ class HandleContactWorkflowStatusChangedAction
                 'progress_id' => $progress->getKey(),
             ],
         );
+    }
+
+    private function originatingFlowRouteProgressId(ContactWorkflowStatusTransition $transition): ?int
+    {
+        $value = $transition->meta['flow_route']['flow_route_progress_id'] ?? null;
+
+        return is_numeric($value) ? (int) $value : null;
     }
 }

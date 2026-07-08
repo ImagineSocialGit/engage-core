@@ -25,10 +25,12 @@ class CreateContactFlowRoutePlanAction
             }
 
             $flowRoute ??= FlowRoute::query()
-                ->with(['activeFlowRoutePoints.point', 'activeFlowRoutePoints.capability'])
                 ->findOrFail($progress->flow_route_id);
 
-            $flowRoute->loadMissing(['activeFlowRoutePoints.point', 'activeFlowRoutePoints.capability']);
+            $flowRoutePoints = $flowRoute->activeFlowRoutePoints()
+                ->with(['point', 'capability'])
+                ->ordered()
+                ->get();
 
             $now = Carbon::now();
 
@@ -53,7 +55,7 @@ class CreateContactFlowRoutePlanAction
             $sequence = 1;
 
             /** @var FlowRoutePoint $flowRoutePoint */
-            foreach ($flowRoute->activeFlowRoutePoints as $flowRoutePoint) {
+            foreach ($flowRoutePoints as $flowRoutePoint) {
                 if (! $flowRoutePoint->point || ! $flowRoutePoint->point->is_active) {
                     continue;
                 }

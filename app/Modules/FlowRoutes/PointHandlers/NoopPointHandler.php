@@ -21,6 +21,7 @@ class NoopPointHandler implements PointHandler
             meta: [
                 'point_id' => $context->flowRoutePoint->point_id,
                 'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                'flow_routes' => $context->flowRouteProvenance(),
             ],
         );
     }

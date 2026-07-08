@@ -26,6 +26,7 @@ class WaitPointHandler implements PointHandler
                     'wait' => array_replace_recursive($waitingState, [
                         'checked_at' => $now->toISOString(),
                     ]),
+                    'flow_routes' => $context->flowRouteProvenance(),
                 ]);
             }
 
@@ -33,6 +34,7 @@ class WaitPointHandler implements PointHandler
                 'wait' => array_replace_recursive($waitingState, [
                     'resumed_at' => $now->toISOString(),
                 ]),
+                'flow_routes' => $context->flowRouteProvenance(),
             ]);
         }
 
@@ -62,6 +64,8 @@ class WaitPointHandler implements PointHandler
                 'resume_at' => $definition->resumeAt?->toISOString(),
                 'definition' => $definition->toMetaPayload(),
             ],
+            'flow_routes' => $context->flowRouteProvenance(),
         ]);
     }
 }
+

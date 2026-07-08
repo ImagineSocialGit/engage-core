@@ -34,6 +34,7 @@ class ConditionPointHandler implements PointHandler
                     'condition_definition' => $definition->toMetaPayload(),
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
                     'point_id' => $context->flowRoutePoint->point_id,
+                    'flow_routes' => $context->flowRouteProvenance(),
                 ],
             );
         }
@@ -52,6 +53,7 @@ class ConditionPointHandler implements PointHandler
                 'condition_evaluation' => $evaluation->toMetaPayload(),
                 'flow_route_point_id' => $context->flowRoutePoint->getKey(),
                 'point_id' => $context->flowRoutePoint->point_id,
+                'flow_routes' => $context->flowRouteProvenance(),
             ],
         );
     }

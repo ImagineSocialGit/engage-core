@@ -108,8 +108,12 @@ class ScheduleMessageAction
             'campaign_key' => $scheduledMessage->meta['campaign_key'] ?? null,
             'campaign_step' => $scheduledMessage->meta['campaign_step'] ?? null,
             'flow_route_progress_id' => $scheduledMessage->flow_route_progress_id,
+            'flow_route_plan_id' => $scheduledMessage->flow_route_plan_id,
             'flow_route_plan_item_id' => $scheduledMessage->flow_route_plan_item_id,
             'flow_route_progress_item_id' => $scheduledMessage->flow_route_progress_item_id,
+            'flow_route_id' => $scheduledMessage->flow_route_id,
+            'flow_route_point_id' => $scheduledMessage->flow_route_point_id,
+            'flow_route_capability_id' => $scheduledMessage->flow_route_capability_id,
         ], fn (mixed $value): bool => $value !== null && $value !== []);
     }
 
@@ -127,3 +131,4 @@ class ScheduleMessageAction
     private function nullableString(mixed $value): ?string { return is_string($value) && trim($value) !== '' ? trim($value) : null; }
     private function nullableInt(mixed $value): ?int { return is_numeric($value) ? (int) $value : null; }
 }
+

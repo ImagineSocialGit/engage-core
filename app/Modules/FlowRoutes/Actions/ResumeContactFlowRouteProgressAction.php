@@ -5,6 +5,7 @@ namespace App\Modules\FlowRoutes\Actions;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
+use App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -52,20 +53,41 @@ class ResumeContactFlowRouteProgressAction
 
             $waitingPlanItemId = $this->nullableInt($progress->waitingState()['flow_route_plan_item_id'] ?? null);
 
+            $waitingProgressItemId = $this->nullableInt($progress->waitingState()['flow_route_progress_item_id'] ?? null);
+
             if ($waitingPlanItemId !== null) {
                 ContactFlowRoutePlanItem::query()
                     ->whereKey($waitingPlanItemId)
                     ->where('contact_flow_route_progress_id', $progress->getKey())
                     ->where('status', ContactFlowRoutePlanItem::STATUS_WAITING)
-                    ->update(['status' => ContactFlowRoutePlanItem::STATUS_ACTIVE]);
+                    ->update([
+                        'status' => ContactFlowRoutePlanItem::STATUS_ACTIVE,
+                        'resume_at' => null,
+                        'waiting_event_key' => null,
+                    ]);
+            }
+
+            if ($waitingProgressItemId !== null) {
+                ContactFlowRouteProgressItem::query()
+                    ->whereKey($waitingProgressItemId)
+                    ->where('contact_flow_route_progress_id', $progress->getKey())
+                    ->where('status', ContactFlowRouteProgressItem::STATUS_WAITING)
+                    ->update([
+                        'status' => ContactFlowRouteProgressItem::STATUS_COMPLETED,
+                        'completed_at' => $now,
+                        'resume_at' => null,
+                        'waiting_event_key' => null,
+                        'result_reason' => 'timed_wait_resumed',
+                    ]);
             }
 
             $meta = $progress->meta ?? [];
+            $waitingState = $progress->waitingState();
             $resumeAttempts = is_array($meta['resume_attempts'] ?? null) ? $meta['resume_attempts'] : [];
             $resumeAttempts[] = [
                 'attempted_at' => $now->toISOString(),
                 'resume_at' => $progress->resume_at?->toISOString(),
-                'waiting' => $progress->waitingState(),
+                'waiting' => $waitingState,
             ];
 
             $meta['resume_attempts'] = array_slice($resumeAttempts, -50);
@@ -73,6 +95,8 @@ class ResumeContactFlowRouteProgressAction
 
             $progress->forceFill([
                 'status' => ContactFlowRouteProgress::STATUS_ACTIVE,
+                'resume_at' => null,
+                'waiting_event_key' => null,
                 'meta' => $meta,
             ])->save();
 
@@ -91,3 +115,4 @@ class ResumeContactFlowRouteProgressAction
         return is_numeric($value) ? (int) $value : null;
     }
 }
+

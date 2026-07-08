@@ -312,6 +312,7 @@ class ExecuteCurrentFlowRoutePointAction
         $progressItemStatus = match ($result->status) {
             PointExecutionResult::STATUS_WAITING => ContactFlowRouteProgressItem::STATUS_WAITING,
             PointExecutionResult::STATUS_SKIPPED => ContactFlowRouteProgressItem::STATUS_SKIPPED,
+            PointExecutionResult::STATUS_BLOCKED => ContactFlowRouteProgressItem::STATUS_BLOCKED,
             PointExecutionResult::STATUS_FAILED => ContactFlowRouteProgressItem::STATUS_FAILED,
             default => ContactFlowRouteProgressItem::STATUS_COMPLETED,
         };
@@ -319,6 +320,7 @@ class ExecuteCurrentFlowRoutePointAction
         $planItemStatus = match ($result->status) {
             PointExecutionResult::STATUS_WAITING => ContactFlowRoutePlanItem::STATUS_WAITING,
             PointExecutionResult::STATUS_SKIPPED => ContactFlowRoutePlanItem::STATUS_SKIPPED,
+            PointExecutionResult::STATUS_BLOCKED => ContactFlowRoutePlanItem::STATUS_BLOCKED,
             PointExecutionResult::STATUS_FAILED => ContactFlowRoutePlanItem::STATUS_FAILED,
             default => ContactFlowRoutePlanItem::STATUS_COMPLETED,
         };
@@ -441,3 +443,4 @@ class ExecuteCurrentFlowRoutePointAction
         ])->save();
     }
 }
+

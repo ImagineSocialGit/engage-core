@@ -83,7 +83,7 @@ class SendMessagePointHandler implements PointHandler
 
         if ($context->progressItem) {
             $context->progressItem->forceFill([
-                'created_subject_type' => ScheduledMessage::class,
+                'created_subject_type' => $scheduledMessages[0]->getMorphClass(),
                 'created_subject_id' => $scheduledMessages[0]->getKey(),
                 'correlation_key' => 'scheduled_message.id',
                 'correlation_type' => 'scheduled_message',
@@ -181,3 +181,4 @@ class SendMessagePointHandler implements PointHandler
         };
     }
 }
+
