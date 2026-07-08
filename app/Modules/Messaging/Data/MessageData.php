@@ -22,6 +22,8 @@ readonly class MessageData
         $name = $this->stringValue($this->contact->name);
         $email = $this->stringValue($this->contact->email);
         $phone = $this->stringValue($this->contact->phone);
+        $source = $this->stringValue($this->contact->source);
+        $subsource = $this->stringValue($this->contact->subsource);
 
         if ($name === '') {
             $name = trim(implode(' ', array_filter([$firstName !== 'there' ? $firstName : null, $lastName])));
@@ -34,6 +36,8 @@ readonly class MessageData
             'name' => $name,
             'email' => $email,
             'phone' => $phone,
+            'source' => $source,
+            'subsource' => $subsource,
         ];
 
         return [
@@ -45,6 +49,8 @@ readonly class MessageData
             'name' => $name,
             'email' => $email,
             'phone' => $phone,
+            'source' => $source,
+            'subsource' => $subsource,
 
             'request_ip' => $this->requestIp,
         ];

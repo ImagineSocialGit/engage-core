@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Services;
 
 use App\Modules\Messaging\Enums\MessageChannel;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -84,15 +85,15 @@ class MessageDefinitionResolver
                 $assignedDefinitions,
             ))));
 
-            $assignedMessageTypesWithoutSource = array_values(array_unique(array_filter(array_map(
-                fn (array $definition): ?string => $this->definitionSourceConfigPath($definition) === null && is_string($definition['message_type'] ?? null)
+            $assignedMessageTypes = array_values(array_unique(array_filter(array_map(
+                fn (array $definition): ?string => is_string($definition['message_type'] ?? null)
                     ? $this->normalizeSegment($definition['message_type'])
                     : null,
                 $assignedDefinitions,
             ))));
 
             $resolved = collect($resolved)
-                ->reject(function (array $definition) use ($assignedSourceConfigPaths, $assignedMessageTypesWithoutSource): bool {
+                ->reject(function (array $definition) use ($assignedSourceConfigPaths, $assignedMessageTypes): bool {
                     $sourceConfigPath = $this->definitionSourceConfigPath($definition);
 
                     if ($sourceConfigPath !== null && in_array($sourceConfigPath, $assignedSourceConfigPaths, true)) {
@@ -101,7 +102,7 @@ class MessageDefinitionResolver
 
                     return in_array(
                         $this->normalizeSegment((string) ($definition['message_type'] ?? '')),
-                        $assignedMessageTypesWithoutSource,
+                        $assignedMessageTypes,
                         true,
                     );
                 })
@@ -114,10 +115,10 @@ class MessageDefinitionResolver
     }
 
     /**
-     * Resolve a Campaign-owned step template from the Messaging template library.
+     * Resolve a Campaign-owned step-variant template from the Messaging template library.
      *
-     * Config path:
-     * messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
+     * Campaign templates are variant-only. The required config fallback path is:
+     * messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
      *
      * @return array<string, mixed>|null
      */
@@ -128,14 +129,19 @@ class MessageDefinitionResolver
         string $campaignKey,
         int $stepNumber,
         string $dispatchKey,
+        ?string $variantKey = null,
+        ?string $variantSourceConfigPath = null,
+        ?Model $context = null,
     ): ?array {
         $channel = $this->normalizeChannel($channel);
         $purpose = $this->normalizeSegment($purpose);
         $scope = $this->normalizeSegment($scope);
         $campaignKey = $this->normalizeSegment($campaignKey);
         $dispatchKey = $this->normalizeSegment($dispatchKey);
+        $variantKey = $this->normalizeNullableSegment($variantKey);
+        $variantSourceConfigPath = $this->nullableString($variantSourceConfigPath);
 
-        if ($channel === '' || $purpose === '' || $scope === '' || $campaignKey === '' || $stepNumber < 1 || $dispatchKey === '') {
+        if ($channel === '' || $purpose === '' || $scope === '' || $campaignKey === '' || $stepNumber < 1 || $dispatchKey === '' || $variantKey === null) {
             return null;
         }
 
@@ -145,20 +151,25 @@ class MessageDefinitionResolver
             scope: $scope,
             campaignKey: $campaignKey,
             stepNumber: $stepNumber,
+            variantKey: $variantKey,
+            sourceConfigPath: $variantSourceConfigPath,
+            context: $context,
         );
 
         if (is_array($assignedDefinition)) {
-            return $assignedDefinition;
+            return $this->withCampaignTemplateMeta(
+                definition: $assignedDefinition,
+                campaignKey: $campaignKey,
+                stepNumber: $stepNumber,
+                variantKey: $variantKey,
+                variantSourceConfigPath: $variantSourceConfigPath,
+            );
         }
 
-        $configPath = "messaging.{$channel}.{$purpose}.{$scope}.campaigns.{$campaignKey}.steps.{$stepNumber}";
+        $configPath = "messaging.{$channel}.{$purpose}.{$scope}.campaigns.{$campaignKey}.steps.{$stepNumber}.variants.{$variantKey}";
         $definition = config($configPath);
 
-        if (! is_array($definition)) {
-            return null;
-        }
-
-        if (! ($definition['enabled'] ?? true)) {
+        if (! is_array($definition) || ! ($definition['enabled'] ?? true)) {
             return null;
         }
 
@@ -175,18 +186,45 @@ class MessageDefinitionResolver
             configPath: $configPath,
         );
 
-        $hydrated['meta'] = array_replace_recursive($hydrated['meta'] ?? [], [
-            'campaign_template' => [
-                'campaign_key' => $campaignKey,
-                'step_number' => $stepNumber,
-            ],
-        ]);
-
-        return $this->validateCampaignStepDefinition($hydrated);
+        return $this->validateCampaignStepDefinition($this->withCampaignTemplateMeta(
+            definition: $hydrated,
+            campaignKey: $campaignKey,
+            stepNumber: $stepNumber,
+            variantKey: $variantKey,
+            variantSourceConfigPath: $variantSourceConfigPath,
+        ));
     }
 
     /**
-     * @param  array<string, mixed>  $definition
+     * @param array<string, mixed> $definition
+     * @return array<string, mixed>
+     */
+    private function withCampaignTemplateMeta(
+        array $definition,
+        string $campaignKey,
+        int $stepNumber,
+        ?string $variantKey,
+        ?string $variantSourceConfigPath,
+    ): array {
+        return array_replace_recursive($definition, [
+            'campaign_key' => $campaignKey,
+            'step' => $stepNumber,
+            'variant' => $variantKey,
+            'campaign_step_variant_key' => $variantKey,
+            'campaign_step_variant_source_config_path' => $variantSourceConfigPath,
+            'meta' => [
+                'campaign_template' => array_filter([
+                    'campaign_key' => $campaignKey,
+                    'step_number' => $stepNumber,
+                    'campaign_step_variant_key' => $variantKey,
+                    'campaign_step_variant_source_config_path' => $variantSourceConfigPath,
+                ], fn (mixed $value): bool => $value !== null),
+            ],
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $definition
      * @return array<string, mixed>
      */
     private function hydrateDefinitionFromPath(
@@ -227,7 +265,7 @@ class MessageDefinitionResolver
     }
 
     /**
-     * @param  array<string, mixed>  $definition
+     * @param array<string, mixed> $definition
      * @return array<string, mixed>
      */
     private function validateDefinition(array $definition): array
@@ -279,38 +317,42 @@ class MessageDefinitionResolver
      * Campaigns own the actual step timing/schedule and overlay it before
      * dispatching through Messaging.
      *
-     * @param  array<string, mixed>  $definition
+     * @param array<string, mixed> $definition
      * @return array<string, mixed>
      */
     private function validateCampaignStepDefinition(array $definition): array
     {
+        $definitionLabel = is_string($definition['config_path'] ?? null) && trim((string) $definition['config_path']) !== ''
+            ? $definition['config_path']
+            : 'assigned campaign message definition';
+
         foreach (['payload_class', 'queue', 'payload', 'dispatch_keys'] as $requiredKey) {
             if (! array_key_exists($requiredKey, $definition)) {
-                throw new InvalidArgumentException("Campaign message definition [{$definition['config_path']}] is missing [{$requiredKey}].");
+                throw new InvalidArgumentException("Campaign message definition [{$definitionLabel}] is missing [{$requiredKey}].");
             }
         }
 
         foreach (['payload_class', 'queue'] as $requiredStringKey) {
             if (! is_string($definition[$requiredStringKey]) || trim($definition[$requiredStringKey]) === '') {
-                throw new InvalidArgumentException("Campaign message definition [{$definition['config_path']}] has invalid [{$requiredStringKey}].");
+                throw new InvalidArgumentException("Campaign message definition [{$definitionLabel}] has invalid [{$requiredStringKey}].");
             }
         }
 
         if (! is_array($definition['payload'])) {
-            throw new InvalidArgumentException("Campaign message definition [{$definition['config_path']}] has invalid [payload].");
+            throw new InvalidArgumentException("Campaign message definition [{$definitionLabel}] has invalid [payload].");
         }
 
         if (array_key_exists('conditions', $definition) && ! is_array($definition['conditions'])) {
-            throw new InvalidArgumentException("Campaign message definition [{$definition['config_path']}] has invalid [conditions].");
+            throw new InvalidArgumentException("Campaign message definition [{$definitionLabel}] has invalid [conditions].");
         }
 
         if (! is_array($definition['dispatch_keys']) || $definition['dispatch_keys'] === []) {
-            throw new InvalidArgumentException("Campaign message definition [{$definition['config_path']}] has invalid [dispatch_keys].");
+            throw new InvalidArgumentException("Campaign message definition [{$definitionLabel}] has invalid [dispatch_keys].");
         }
 
         foreach ($definition['dispatch_keys'] as $dispatchKey) {
             if (! is_string($dispatchKey) || trim($dispatchKey) === '') {
-                throw new InvalidArgumentException("Campaign message definition [{$definition['config_path']}] has invalid [dispatch_keys].");
+                throw new InvalidArgumentException("Campaign message definition [{$definitionLabel}] has invalid [dispatch_keys].");
             }
         }
 
@@ -318,7 +360,7 @@ class MessageDefinitionResolver
     }
 
     /**
-     * @param  array<string, mixed>  $definition
+     * @param array<string, mixed> $definition
      */
     private function validateSchedule(array $definition): void
     {
@@ -339,7 +381,7 @@ class MessageDefinitionResolver
     }
 
     /**
-     * @param  array<string, mixed>  $definition
+     * @param array<string, mixed> $definition
      * @return array<int, string>
      */
     private function normalizeDispatchKeys(array $definition): array
@@ -362,7 +404,6 @@ class MessageDefinitionResolver
         ))));
     }
 
-
     /**
      * @param array<string, mixed> $definition
      */
@@ -370,6 +411,7 @@ class MessageDefinitionResolver
     {
         $sourceConfigPath = $definition['source_config_path']
             ?? data_get($definition, 'meta.seed.config_path')
+            ?? data_get($definition, 'meta.message_template_assignment.source_config_path')
             ?? data_get($definition, 'meta.message_template_preset.source_config_path')
             ?? $definition['config_path']
             ?? null;
@@ -386,8 +428,28 @@ class MessageDefinitionResolver
             : strtolower(trim($channel));
     }
 
+    private function normalizeNullableSegment(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return $this->normalizeSegment($value);
+    }
+
     private function normalizeSegment(string $value): string
     {
         return str_replace('-', '_', strtolower(trim($value)));
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
     }
 }

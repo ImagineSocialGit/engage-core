@@ -7,13 +7,14 @@ use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use InvalidArgumentException;
 use Tests\TestCase;
 
 class MessageTemplatePresetSyncActionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_syncs_message_configs_into_presets_and_assignments(): void
+    public function test_it_syncs_message_configs_into_presets_assignments_and_variant_campaign_catalog_entries(): void
     {
         Config::set('messaging.sms', []);
         Config::set('messaging.email', [
@@ -37,12 +38,16 @@ class MessageTemplatePresetSyncActionTest extends TestCase
                         'webinar_attended_nurture' => [
                             'steps' => [
                                 1 => [
-                                    'dispatch_key' => 'campaign_step_due',
-                                    'payload_class' => EmailPayload::class,
-                                    'queue' => 'marketing',
-                                    'payload' => [
-                                        'subject' => 'Thanks for joining',
-                                        'body' => 'Hi {first_name}, reply with your biggest question.',
+                                    'variants' => [
+                                        'email' => [
+                                            'dispatch_key' => 'campaign_step_due',
+                                            'payload_class' => EmailPayload::class,
+                                            'queue' => 'marketing',
+                                            'payload' => [
+                                                'subject' => 'Thanks for joining',
+                                                'body' => 'Hi {first_name}, reply with your biggest question.',
+                                            ],
+                                        ],
                                     ],
                                 ],
                             ],
@@ -70,51 +75,65 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         $this->assertSame(['first_name'], $confirmation->tokens);
         $this->assertSame('messaging.email.transactional.webinar.confirmation', $confirmation->source_config_path);
 
-        $this->assertDatabaseHas('message_template_catalog_entries', [
-            'message_template_preset_id' => $confirmation->getKey(),
-            'module_key' => 'webinars',
-            'module_label' => 'Webinars',
-            'group_label' => 'Webinar Confirmations',
-            'item_label' => 'Confirmation Email',
-            'usage_type' => 'webinar_confirmation',
-        ]);
-
-        $this->assertDatabaseHas('message_template_preset_assignments', [
-            'message_template_preset_id' => $confirmation->getKey(),
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-            'message_type' => 'confirmation',
-            'campaign_key' => null,
-            'campaign_step' => null,
-            'is_active' => true,
-        ]);
-
-        $campaignStep = MessageTemplatePreset::query()
-            ->where('key', 'email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1')
+        $campaignVariant = MessageTemplatePreset::query()
+            ->where('key', 'email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email')
             ->firstOrFail();
 
-        $this->assertSame('webinar_attended_nurture_step_1', $campaignStep->message_type);
+        $this->assertSame('webinar_attended_nurture_step_1', $campaignVariant->message_type);
+        $this->assertSame('messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email', $campaignVariant->source_config_path);
 
         $this->assertDatabaseHas('message_template_catalog_entries', [
-            'message_template_preset_id' => $campaignStep->getKey(),
+            'message_template_preset_id' => $campaignVariant->getKey(),
             'module_key' => 'campaigns',
             'module_label' => 'Campaigns',
             'group_label' => 'Webinar Attended Nurture',
             'item_label' => 'Step 1 Email',
             'item_order' => 1,
             'usage_type' => 'campaign_step',
+            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
         ]);
 
         $this->assertDatabaseHas('message_template_preset_assignments', [
-            'message_template_preset_id' => $campaignStep->getKey(),
+            'message_template_preset_id' => $campaignVariant->getKey(),
             'surface' => 'campaigns',
             'campaign_key' => 'webinar_attended_nurture',
             'campaign_step' => 1,
+            'campaign_step_variant_key' => 'email',
+            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
             'is_active' => true,
         ]);
     }
 
+    public function test_it_rejects_legacy_step_level_campaign_message_templates(): void
+    {
+        Config::set('messaging.sms', []);
+        Config::set('messaging.email', [
+            'marketing' => [
+                'webinar_nurture' => [
+                    'campaigns' => [
+                        'webinar_attended_nurture' => [
+                            'steps' => [
+                                1 => [
+                                    'dispatch_key' => 'campaign_step_due',
+                                    'payload_class' => EmailPayload::class,
+                                    'queue' => 'marketing',
+                                    'payload' => [
+                                        'subject' => 'Legacy subject',
+                                        'body' => 'Legacy body.',
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('must define variant templates under [variants]');
+
+        app(SyncMessageTemplatePresetsAction::class)->handle();
+    }
 
     public function test_it_keeps_list_based_message_types_generic_and_distinguishes_by_source_config_path(): void
     {
@@ -419,3 +438,5 @@ class MessageTemplatePresetSyncActionTest extends TestCase
     }
 
 }
+
+

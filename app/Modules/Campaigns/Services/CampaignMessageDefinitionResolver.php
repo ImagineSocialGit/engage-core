@@ -4,6 +4,7 @@ namespace App\Modules\Campaigns\Services;
 
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignStep;
+use App\Modules\Campaigns\Models\CampaignStepVariant;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\MessageDefinitionResolver;
 use InvalidArgumentException;
@@ -18,9 +19,13 @@ class CampaignMessageDefinitionResolver
     /**
      * @return array<string, mixed>
      */
-    public function resolve(Campaign $campaign, CampaignStep $step): array
+    public function resolve(Campaign $campaign, CampaignStep $step, ?CampaignStepVariant $variant = null): array
     {
-        $reference = $this->reference($campaign, $step);
+        if (! $variant instanceof CampaignStepVariant) {
+            throw new InvalidArgumentException('Campaign message definitions require a campaign step variant.');
+        }
+
+        $reference = $this->reference($campaign, $step, $variant);
 
         if (! $this->messageChannelAvailability->isVisibleForSurface(
             channel: $reference['channel'],
@@ -32,12 +37,13 @@ class CampaignMessageDefinitionResolver
                 campaign: $campaign,
                 step: $step,
                 reference: $reference,
+                variant: $variant,
             );
         }
 
-        $definition = $this->findMessagingDefinition($reference, $step);
+        $definition = $this->findMessagingDefinition($reference, $step, $variant);
 
-        $schedule = $this->messageSchedule($step);
+        $schedule = $this->messageSchedule($step, $variant);
         $payload = $this->payload($definition);
         $skipReason = $this->skipReason($definition);
 
@@ -46,21 +52,28 @@ class CampaignMessageDefinitionResolver
             'purpose' => $reference['purpose'],
             'scope' => $reference['scope'],
             'dispatch_keys' => [$reference['dispatch_key']],
-            'conditions' => $this->conditions($step),
+            'conditions' => $this->conditions($step, $variant),
             'payload' => $payload,
             'campaign_key' => $campaign->key,
             'step' => $step->step_number,
-            'skip_when_join_clicked' => (bool) data_get($step->meta ?? [], 'skip_when_join_clicked', false),
-            'notification_type' => data_get($step->meta ?? [], 'notification_type'),
+            'variant' => $reference['variant_key'],
+            'campaign_step_variant_key' => $reference['variant_key'],
+            'campaign_step_variant_source_config_path' => $reference['variant_source_config_path'],
+            'skip_when_join_clicked' => (bool) data_get($variant?->meta ?? $step->meta ?? [], 'skip_when_join_clicked', false),
+            'notification_type' => data_get($variant?->meta ?? $step->meta ?? [], 'notification_type'),
             'meta' => array_replace_recursive(
                 $definition['meta'] ?? [],
                 [
-                    'campaign' => [
+                    'campaign' => array_filter([
                         'campaign_id' => $campaign->id,
                         'campaign_key' => $campaign->key,
                         'campaign_step_id' => $step->id,
                         'campaign_step' => $step->step_number,
-                    ],
+                        'campaign_step_variant_id' => $variant?->exists ? $variant->id : null,
+                        'campaign_step_variant_key' => $reference['variant_key'],
+                        'campaign_step_variant_source_config_path' => $reference['variant_source_config_path'],
+                        'campaign_step_variant_source_version' => $variant?->source_version,
+                    ], fn (mixed $value): bool => $value !== null),
                 ],
             ),
         ]);
@@ -84,20 +97,28 @@ class CampaignMessageDefinitionResolver
      *     dispatch_key: string,
      *     campaign_key: string,
      *     step_number: int,
+     *     variant_key: string|null,
+     *     variant_source_config_path: string|null,
      *     channel: string,
      *     purpose: string,
      *     scope: string
      * }
      */
-    public function reference(Campaign $campaign, CampaignStep $step): array
+    public function reference(Campaign $campaign, CampaignStep $step, ?CampaignStepVariant $variant = null): array
     {
+        if (! $variant instanceof CampaignStepVariant) {
+            throw new InvalidArgumentException('Campaign message references require a campaign step variant.');
+        }
+
         return [
-            'dispatch_key' => $this->normalizeSegment($step->dispatch_key),
+            'dispatch_key' => $this->normalizeSegment($variant?->dispatch_key ?? $step->dispatch_key),
             'campaign_key' => $this->normalizeSegment($campaign->key),
             'step_number' => (int) $step->step_number,
-            'channel' => $this->normalizeSegment($step->channel),
-            'purpose' => $this->normalizeSegment($step->purpose),
-            'scope' => $this->normalizeSegment($step->scope),
+            'variant_key' => $variant instanceof CampaignStepVariant ? $this->normalizeSegment($variant->key) : null,
+            'variant_source_config_path' => $this->nullableString($variant?->source_config_path),
+            'channel' => $this->normalizeSegment($variant?->channel ?? $step->channel),
+            'purpose' => $this->normalizeSegment($variant?->purpose ?? $step->purpose),
+            'scope' => $this->normalizeSegment($variant?->scope ?? $step->scope),
         ];
     }
 
@@ -106,13 +127,15 @@ class CampaignMessageDefinitionResolver
      *     dispatch_key: string,
      *     campaign_key: string,
      *     step_number: int,
+     *     variant_key: string|null,
+     *     variant_source_config_path: string|null,
      *     channel: string,
      *     purpose: string,
      *     scope: string
      * } $reference
      * @return array<string, mixed>
      */
-    private function findMessagingDefinition(array $reference, CampaignStep $step): array
+    private function findMessagingDefinition(array $reference, CampaignStep $step, ?CampaignStepVariant $variant): array
     {
         $definition = $this->messageDefinitionResolver->resolveCampaignStep(
             channel: $reference['channel'],
@@ -121,6 +144,9 @@ class CampaignMessageDefinitionResolver
             campaignKey: $reference['campaign_key'],
             stepNumber: $reference['step_number'],
             dispatchKey: $reference['dispatch_key'],
+            variantKey: $reference['variant_key'],
+            variantSourceConfigPath: $reference['variant_source_config_path'],
+            context: $variant instanceof CampaignStepVariant && $variant->exists ? $variant : null,
         );
 
         if (is_array($definition)) {
@@ -129,14 +155,16 @@ class CampaignMessageDefinitionResolver
 
         throw new InvalidArgumentException(
             'Messaging campaign step definition not found for campaign step ['.$step->id.'] using ['.
-            implode(':', [
+            implode(':', array_filter([
                 $reference['channel'],
                 $reference['purpose'],
                 $reference['scope'],
                 $reference['campaign_key'],
                 'step_'.$reference['step_number'],
+                $reference['variant_key'] ? 'variant_'.$reference['variant_key'] : null,
+                $reference['variant_source_config_path'],
                 $reference['dispatch_key'],
-            ]).
+            ])).
             '].'
         );
     }
@@ -146,6 +174,8 @@ class CampaignMessageDefinitionResolver
      *     dispatch_key: string,
      *     campaign_key: string,
      *     step_number: int,
+     *     variant_key: string|null,
+     *     variant_source_config_path: string|null,
      *     channel: string,
      *     purpose: string,
      *     scope: string
@@ -156,25 +186,33 @@ class CampaignMessageDefinitionResolver
         Campaign $campaign,
         CampaignStep $step,
         array $reference,
+        ?CampaignStepVariant $variant,
     ): array {
         return [
             'channel' => $reference['channel'],
             'purpose' => $reference['purpose'],
             'scope' => $reference['scope'],
             'dispatch_keys' => [$reference['dispatch_key']],
-            'conditions' => $this->conditions($step),
+            'conditions' => $this->conditions($step, $variant),
             'payload' => [],
             'campaign_key' => $campaign->key,
             'step' => $step->step_number,
-            'skip_when_join_clicked' => (bool) data_get($step->meta ?? [], 'skip_when_join_clicked', false),
-            'notification_type' => data_get($step->meta ?? [], 'notification_type'),
+            'variant' => $reference['variant_key'],
+            'campaign_step_variant_key' => $reference['variant_key'],
+            'campaign_step_variant_source_config_path' => $reference['variant_source_config_path'],
+            'skip_when_join_clicked' => (bool) data_get($variant?->meta ?? $step->meta ?? [], 'skip_when_join_clicked', false),
+            'notification_type' => data_get($variant?->meta ?? $step->meta ?? [], 'notification_type'),
             'meta' => [
-                'campaign' => [
+                'campaign' => array_filter([
                     'campaign_id' => $campaign->id,
                     'campaign_key' => $campaign->key,
                     'campaign_step_id' => $step->id,
                     'campaign_step' => $step->step_number,
-                ],
+                    'campaign_step_variant_id' => $variant?->exists ? $variant->id : null,
+                    'campaign_step_variant_key' => $reference['variant_key'],
+                    'campaign_step_variant_source_config_path' => $reference['variant_source_config_path'],
+                    'campaign_step_variant_source_version' => $variant?->source_version,
+                ], fn (mixed $value): bool => $value !== null),
                 'campaign_skip_reason' => 'campaign_channel_unavailable',
             ],
         ];
@@ -208,8 +246,24 @@ class CampaignMessageDefinitionResolver
     /**
      * @return array{timing: string, schedule: array<string, mixed>|null}|null
      */
-    private function messageSchedule(CampaignStep $step): ?array
+    private function messageSchedule(CampaignStep $step, ?CampaignStepVariant $variant): ?array
     {
+        $criteria = $variant instanceof CampaignStepVariant && is_array($variant->criteria)
+            ? $variant->criteria
+            : [];
+
+        $timing = data_get($criteria, 'timing');
+
+        if (is_array($timing)) {
+            return $this->normalizeTiming($timing);
+        }
+
+        $schedule = data_get($criteria, 'schedule');
+
+        if (is_array($schedule)) {
+            return $this->normalizeTiming($schedule);
+        }
+
         $timing = data_get($step->criteria ?? [], 'timing');
 
         if (is_array($timing)) {
@@ -276,15 +330,30 @@ class CampaignMessageDefinitionResolver
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function conditions(CampaignStep $step): array
+    private function conditions(CampaignStep $step, ?CampaignStepVariant $variant): array
     {
-        $conditions = data_get($step->criteria ?? [], 'conditions', []);
+        $stepConditions = data_get($step->criteria ?? [], 'conditions', []);
+        $variantConditions = data_get($variant?->criteria ?? [], 'conditions', []);
 
-        return is_array($conditions) ? $conditions : [];
+        return array_values(array_merge(
+            is_array($stepConditions) ? $stepConditions : [],
+            is_array($variantConditions) ? $variantConditions : [],
+        ));
     }
 
     private function normalizeSegment(string $value): string
     {
         return str_replace('-', '_', strtolower(trim($value)));
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
     }
 }

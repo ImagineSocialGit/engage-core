@@ -88,3 +88,4 @@ class Campaign extends Model
         return $this->is_active && $this->status === self::STATUS_ACTIVE;
     }
 }
+

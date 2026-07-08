@@ -65,6 +65,10 @@ class CampaignPresetDefinition
 
     private static function nullableString(mixed $value): ?string
     {
+        if (is_int($value) || is_float($value)) {
+            $value = (string) $value;
+        }
+
         if (! is_string($value)) {
             return null;
         }

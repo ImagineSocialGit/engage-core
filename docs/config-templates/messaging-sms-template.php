@@ -28,7 +28,7 @@ return [
     |
     | Campaign SMS templates use the same structure as email campaign templates:
     |
-    | campaigns.{campaign_key}.steps.{step_number}
+    | campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
     |
     | Webinar SMS reminder definitions should not invent schedule-specific
     | message types such as reminder_30_minute. Use the canonical reminders
@@ -190,12 +190,16 @@ return [
         'webinar_attended_nurture' => [
             'steps' => [
                 1 => [
-                    'dispatch_key' => 'campaign_step_due',
-                    'payload_class' => SmsPayload::class,
-                    'queue' => 'marketing',
+                    'variants' => [
+                        'sms' => [
+                            'dispatch_key' => 'campaign_step_due',
+                            'payload_class' => SmsPayload::class,
+                            'queue' => 'marketing',
 
-                    'payload' => [
-                        'message' => 'Hi {first_name}, thanks again for joining. Reply with your biggest question.',
+                            'payload' => [
+                                'message' => 'Hi {first_name}, thanks again for joining. Reply with your biggest question.',
+                            ],
+                        ],
                     ],
                 ],
             ],
@@ -203,5 +207,3 @@ return [
     ],
 
 ];
-
-

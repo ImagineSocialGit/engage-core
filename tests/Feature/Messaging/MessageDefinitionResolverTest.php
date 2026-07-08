@@ -265,3 +265,4 @@ class MessageDefinitionResolverTest extends TestCase
         );
     }
 }
+

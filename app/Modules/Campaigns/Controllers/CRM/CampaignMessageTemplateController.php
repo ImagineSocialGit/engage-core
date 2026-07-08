@@ -5,6 +5,7 @@ namespace App\Modules\Campaigns\Controllers\CRM;
 use App\Http\Controllers\Controller;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignStep;
+use App\Modules\Campaigns\Models\CampaignStepVariant;
 use App\Modules\Campaigns\Requests\UpdateCampaignStepMessageTemplateRequest;
 use App\Modules\Messaging\Actions\AssignMessageTemplatePresetAction;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
@@ -20,7 +21,9 @@ class CampaignMessageTemplateController extends Controller
     {
         $campaigns = Campaign::query()
             ->with([
-                'steps' => fn ($query) => $query->active()->orderBy('step_number'),
+                'steps' => fn ($query) => $query->active()->with([
+                    'variants' => fn ($query) => $query->active()->orderBy('sort_order')->orderBy('id'),
+                ])->orderBy('step_number'),
             ])
             ->active()
             ->orderBy('name')
@@ -28,10 +31,13 @@ class CampaignMessageTemplateController extends Controller
 
         $selectedCampaign = $this->selectedCampaign($request, $campaigns);
         $selectedCampaign?->loadMissing([
-            'steps' => fn ($query) => $query->active()->orderBy('step_number'),
+            'steps' => fn ($query) => $query->active()->with([
+                'variants' => fn ($query) => $query->active()->orderBy('sort_order')->orderBy('id'),
+            ])->orderBy('step_number'),
         ]);
 
         $selectedStep = $this->selectedStep($request, $selectedCampaign);
+
         $currentAssignments = $selectedCampaign instanceof Campaign
             ? $this->currentAssignmentsForCampaign($selectedCampaign)
             : collect();
@@ -41,8 +47,8 @@ class CampaignMessageTemplateController extends Controller
             'selectedCampaign' => $selectedCampaign,
             'selectedStep' => $selectedStep,
             'currentAssignments' => $currentAssignments,
-            'templateOptionsByStep' => $selectedCampaign instanceof Campaign
-                ? $this->templateOptionsByStep($selectedCampaign)
+            'templateOptionsByVariant' => $selectedCampaign instanceof Campaign
+                ? $this->templateOptionsByVariant($selectedCampaign)
                 : collect(),
         ]);
     }
@@ -53,17 +59,21 @@ class CampaignMessageTemplateController extends Controller
         AssignMessageTemplatePresetAction $assignTemplatePreset,
     ): RedirectResponse {
         $campaignStep->loadMissing('campaign');
+
+        $variant = $request->campaignStepVariant();
         $preset = $request->messageTemplatePreset();
 
         $assignTemplatePreset->handle(
             preset: $preset,
-            channel: $campaignStep->channel,
-            purpose: $campaignStep->purpose,
-            scope: $campaignStep->scope,
+            channel: $variant->channel,
+            purpose: $variant->purpose,
+            scope: $variant->scope,
             surface: 'campaigns',
             messageType: $preset->message_type,
             campaignKey: $campaignStep->campaign?->key,
             campaignStep: (int) $campaignStep->step_number,
+            campaignStepVariantKey: $variant->key,
+            sourceConfigPath: $variant->source_config_path,
             meta: [
                 'source' => 'crm_campaign_message_template_assignment',
                 'campaign' => [
@@ -71,6 +81,9 @@ class CampaignMessageTemplateController extends Controller
                     'campaign_key' => $campaignStep->campaign?->key,
                     'campaign_step_id' => $campaignStep->id,
                     'campaign_step' => (int) $campaignStep->step_number,
+                    'campaign_step_variant_id' => $variant->id,
+                    'campaign_step_variant_key' => $variant->key,
+                    'campaign_step_variant_source_config_path' => $variant->source_config_path,
                 ],
             ],
         );
@@ -79,6 +92,7 @@ class CampaignMessageTemplateController extends Controller
             ->route('crm.campaigns.message-templates.index', array_filter([
                 'campaign' => $campaignStep->campaign_id,
                 'step' => $campaignStep->id,
+                'variant' => $variant->id,
             ]))
             ->with('status', 'Campaign message template updated.');
     }
@@ -156,21 +170,27 @@ class CampaignMessageTemplateController extends Controller
                 $assignment->purpose,
                 $assignment->scope,
                 $assignment->campaign_step,
+                $assignment->campaign_step_variant_key ?? '',
+                $assignment->source_config_path ?? '',
             ]))
             ->keyBy(fn (MessageTemplatePresetAssignment $assignment): string => $this->assignmentKey(
                 channel: $assignment->channel,
                 purpose: $assignment->purpose,
                 scope: $assignment->scope,
                 stepNumber: (int) $assignment->campaign_step,
+                variantKey: $assignment->campaign_step_variant_key,
+                sourceConfigPath: $assignment->source_config_path,
             ));
     }
 
     /**
      * @return Collection<string, Collection<int, MessageTemplateCatalogEntry>>
      */
-    private function templateOptionsByStep(Campaign $campaign): Collection
+    private function templateOptionsByVariant(Campaign $campaign): Collection
     {
-        $campaign->loadMissing('steps');
+        $campaign->loadMissing([
+            'steps.variants' => fn ($query) => $query->active()->orderBy('sort_order')->orderBy('id'),
+        ]);
 
         $options = collect();
 
@@ -179,44 +199,68 @@ class CampaignMessageTemplateController extends Controller
                 continue;
             }
 
-            $entries = MessageTemplateCatalogEntry::query()
-                ->active()
-                ->with('messageTemplatePreset')
-                ->where('usage_type', 'campaign_step')
-                ->where('channel', $step->channel)
-                ->where('purpose', $step->purpose)
-                ->where('scope', $step->scope)
-                ->where('meta->campaign_key', $campaign->key)
-                ->where('meta->campaign_step', (int) $step->step_number)
-                ->orderBy('item_order')
-                ->orderBy('item_label')
-                ->get()
-                ->filter(fn (MessageTemplateCatalogEntry $entry): bool => (bool) $entry->messageTemplatePreset?->isActive())
-                ->values();
+            foreach ($step->variants as $variant) {
+                if (! $variant instanceof CampaignStepVariant) {
+                    continue;
+                }
 
-            $options->put($this->stepKey($step), $entries);
+                $entries = MessageTemplateCatalogEntry::query()
+                    ->active()
+                    ->with('messageTemplatePreset')
+                    ->where('usage_type', 'campaign_step')
+                    ->where('channel', $variant->channel)
+                    ->where('purpose', $variant->purpose)
+                    ->where('scope', $variant->scope)
+                    ->where('meta->campaign_key', $campaign->key)
+                    ->where('meta->campaign_step', (int) $step->step_number)
+                    ->where(function ($query) use ($variant): void {
+                        $query->where('meta->campaign_step_variant_key', $variant->key);
+
+                        if (is_string($variant->source_config_path) && trim($variant->source_config_path) !== '') {
+                            $query->orWhere('source_config_path', $variant->source_config_path)
+                                ->orWhere('meta->campaign_step_variant_source_config_path', $variant->source_config_path);
+                        }
+                    })
+                    ->orderBy('item_order')
+                    ->orderBy('item_label')
+                    ->get()
+                    ->filter(fn (MessageTemplateCatalogEntry $entry): bool => (bool) $entry->messageTemplatePreset?->isActive())
+                    ->values();
+
+                $options->put($this->variantKey($step, $variant), $entries);
+            }
         }
 
         return $options;
     }
 
-    private function stepKey(CampaignStep $step): string
+    private function variantKey(CampaignStep $step, CampaignStepVariant $variant): string
     {
         return $this->assignmentKey(
-            channel: $step->channel,
-            purpose: $step->purpose,
-            scope: $step->scope,
+            channel: $variant->channel,
+            purpose: $variant->purpose,
+            scope: $variant->scope,
             stepNumber: (int) $step->step_number,
+            variantKey: $variant->key,
+            sourceConfigPath: $variant->source_config_path,
         );
     }
 
-    private function assignmentKey(string $channel, string $purpose, string $scope, int $stepNumber): string
-    {
+    private function assignmentKey(
+        string $channel,
+        string $purpose,
+        string $scope,
+        int $stepNumber,
+        ?string $variantKey,
+        ?string $sourceConfigPath,
+    ): string {
         return implode(':', [
             $this->normalizeSegment($channel),
             $this->normalizeSegment($purpose),
             $this->normalizeSegment($scope),
             $stepNumber,
+            $variantKey !== null ? $this->normalizeSegment($variantKey) : '',
+            is_string($sourceConfigPath) ? trim($sourceConfigPath) : '',
         ]);
     }
 
@@ -225,4 +269,3 @@ class CampaignMessageTemplateController extends Controller
         return str_replace('-', '_', strtolower(trim($value)));
     }
 }
-

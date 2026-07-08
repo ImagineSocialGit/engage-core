@@ -21,6 +21,8 @@ class MessageTemplatePresetAssignmentFactory extends Factory
             'message_type' => 'confirmation',
             'campaign_key' => null,
             'campaign_step' => null,
+            'campaign_step_variant_key' => null,
+            'source_config_path' => null,
             'context_type' => null,
             'context_id' => null,
             'is_active' => true,
@@ -45,8 +47,29 @@ class MessageTemplatePresetAssignmentFactory extends Factory
     {
         return $this->state(fn () => [
             'surface' => 'campaigns',
-            'campaign_key' => $campaignKey,
+            'campaign_key' => $this->normalizeSegment($campaignKey),
             'campaign_step' => $stepNumber,
+            'campaign_step_variant_key' => null,
         ]);
+    }
+
+    public function forCampaignStepVariant(
+        string $campaignKey,
+        int $stepNumber,
+        string $variantKey,
+        ?string $sourceConfigPath = null,
+    ): static {
+        return $this->state(fn () => [
+            'surface' => 'campaigns',
+            'campaign_key' => $this->normalizeSegment($campaignKey),
+            'campaign_step' => $stepNumber,
+            'campaign_step_variant_key' => $this->normalizeSegment($variantKey),
+            'source_config_path' => $sourceConfigPath,
+        ]);
+    }
+
+    private function normalizeSegment(string $value): string
+    {
+        return str_replace('-', '_', strtolower(trim($value)));
     }
 }

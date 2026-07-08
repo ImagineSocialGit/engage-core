@@ -5,9 +5,7 @@ namespace App\Modules\Campaigns\Actions;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Models\CampaignStep;
-use App\Modules\Campaigns\Services\CampaignMessageDefinitionResolver;
 use App\Modules\Core\Models\Contact;
-use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -16,8 +14,7 @@ use InvalidArgumentException;
 class EnrollContactInCampaignAction
 {
     public function __construct(
-        private readonly DispatchMessageAction $dispatchMessageAction,
-        private readonly CampaignMessageDefinitionResolver $campaignMessageDefinitionResolver,
+        private readonly ScheduleCampaignStepMessagesAction $scheduleCampaignStepMessagesAction,
     ) {}
 
     /**
@@ -176,12 +173,12 @@ class EnrollContactInCampaignAction
                 continue;
             }
 
-            $scheduledMessage = $this->scheduleMessageStep(
+            $scheduledMessage = $this->scheduleCampaignStepMessagesAction->handle(
                 enrollment: $enrollment,
                 campaign: $campaign,
                 step: $step,
                 contact: $contact,
-                source: $source,
+                context: $source,
                 payload: $payload,
                 meta: $meta,
             );
@@ -220,126 +217,6 @@ class EnrollContactInCampaignAction
         }
 
         return $query->first();
-    }
-
-    /**
-     * @param array<string, mixed> $payload
-     * @param array<string, mixed>|null $meta
-     */
-    private function scheduleMessageStep(
-        CampaignEnrollment $enrollment,
-        Campaign $campaign,
-        CampaignStep $step,
-        Contact $contact,
-        ?Model $source,
-        array $payload,
-        ?array $meta,
-    ): ?ScheduledMessage {
-        $definition = $this->campaignMessageDefinitionResolver->resolve(
-            campaign: $campaign,
-            step: $step,
-        );
-
-        $attempt = [
-            'attempted_at' => now()->toISOString(),
-            'reference' => $this->campaignMessageDefinitionResolver->reference(
-                campaign: $campaign,
-                step: $step,
-            ),
-            'definition_config_path' => $definition['config_path'] ?? null,
-            'definition' => [
-                'dispatch_keys' => $definition['dispatch_keys'] ?? [],
-                'message_type' => $definition['message_type'] ?? null,
-                'channel' => $definition['channel'] ?? null,
-                'purpose' => $definition['purpose'] ?? null,
-                'scope' => $definition['scope'] ?? null,
-                'timing' => $definition['timing'] ?? null,
-                'schedule' => $definition['schedule'] ?? null,
-                'conditions' => $definition['conditions'] ?? [],
-            ],
-        ];
-
-        $skipReason = data_get($definition, 'meta.campaign_skip_reason');
-
-        if (is_string($skipReason) && trim($skipReason) !== '') {
-            $this->recordMessageScheduleAttempt(
-                enrollment: $enrollment,
-                step: $step,
-                attempt: $attempt + [
-                    'result' => 'not_scheduled',
-                    'reason' => $skipReason,
-                ],
-            );
-
-            return null;
-        }
-
-        $scheduledMessages = $this->dispatchMessageAction->handle(
-            recipient: $contact,
-            channel: $definition['channel'],
-            purpose: $definition['purpose'],
-            scope: $definition['scope'],
-            dispatchKeys: $definition['dispatch_keys'],
-            payload: $payload,
-            context: $source,
-            meta: array_replace_recursive([
-                'campaign_enrollment_id' => $enrollment->id,
-                'campaign_id' => $campaign->id,
-                'campaign_key' => $campaign->key,
-                'campaign_step_id' => $step->id,
-                'campaign_step' => $step->step_number,
-            ], $meta ?? []),
-            criteria: [
-                'campaign_key' => $campaign->key,
-                'step' => $step->step_number,
-            ],
-            definitions: [$definition],
-        );
-
-        $scheduledMessage = $scheduledMessages[0] ?? null;
-
-        if (! $scheduledMessage instanceof ScheduledMessage) {
-            $this->recordMessageScheduleAttempt(
-                enrollment: $enrollment,
-                step: $step,
-                attempt: $attempt + [
-                    'result' => 'not_scheduled',
-                ],
-            );
-
-            return null;
-        }
-
-        $this->recordMessageScheduleAttempt(
-            enrollment: $enrollment,
-            step: $step,
-            attempt: $attempt + [
-                'result' => 'scheduled',
-                'scheduled_message_id' => $scheduledMessage->id,
-            ],
-        );
-
-        return $scheduledMessage;
-    }
-
-    /**
-     * @param array<string, mixed> $attempt
-     */
-    private function recordMessageScheduleAttempt(
-        CampaignEnrollment $enrollment,
-        CampaignStep $step,
-        array $attempt,
-    ): void {
-        $meta = $enrollment->meta ?? [];
-
-        $meta['last_message_schedule_attempt'] = array_replace_recursive($attempt, [
-            'campaign_step_id' => $step->id,
-            'step' => $step->step_number,
-        ]);
-
-        $enrollment->forceFill([
-            'meta' => $meta,
-        ])->save();
     }
 
     private function stepType(CampaignStep $step): string
@@ -387,7 +264,6 @@ class EnrollContactInCampaignAction
             'exit_reason' => $enrollment->exit_reason ?? $reason,
         ])->save();
     }
-
 
     /**
      * @param array<string, mixed>|null $startContext

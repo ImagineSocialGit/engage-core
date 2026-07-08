@@ -15,8 +15,8 @@ Primary references:
 1. Messaging configs own reusable message copy and delivery templates.
 2. Campaign presets own journeys, order, timing, and references to message templates.
 3. Campaign presets do not own or override reusable subject/body/CTA payloads.
-4. Campaign message templates resolve by campaign key and step number, not author-created per-step message names.
-5. Future campaign step variants must reference Messaging-owned template presets/assignments and must not own reusable payload copy.
+4. Campaign message templates resolve by campaign key, step number, and variant key, not author-created per-step message names.
+5. Campaign step variants must reference Messaging-owned template presets/assignments and must not own reusable payload copy.
 6. Messaging template presets own reusable copy and safe DB-editable message payloads.
 7. Messaging template catalog entries own browsing/grouping metadata for template review; they do not own runtime behavior.
 8. FlowRoute presets own automation/control-flow routing and point definitions.
@@ -25,7 +25,7 @@ Primary references:
 11. Use `lead/leads` in CRM/client-facing copy unless explicitly told otherwise.
 12. Do not invent new keys until checking the key registry.
 13. Do not use undocumented tokens in client-facing message copy.
-14. Avoid backward compatibility/legacy aliases unless explicitly chosen.
+14. Avoid backward compatibility/legacy aliases. Campaign messaging must not preserve step-level fallback shapes.
 15. Normal Broadcasts require normal Messaging consent. Do not use Broadcasts as a general imported-contact consent bypass.
 16. Imported-contact opt-in invitations are a distinct one-time Messaging flow with configurable public copy/style.
 17. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
@@ -116,7 +116,7 @@ Client asks: “Send a five-email attended nurture sequence.”
 Use existing dispatch_key: campaign_step_due
 Create/update campaign steps in the campaign preset.
 Create/update matching Messaging templates under:
-marketing:webinar_nurture campaigns.{campaign_key}.steps.{step_number}
+marketing:webinar_nurture campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
 
 Client asks: “When someone attends, enroll them in follow-up.”
 Use automation_event_key: webinar.attended
@@ -506,6 +506,7 @@ surface
 message_type
 campaign_key
 campaign_step
+campaign_step_variant_key
 source_config_path
 ```
 
@@ -519,6 +520,8 @@ surface
 message_type
 campaign_key
 campaign_step
+campaign_step_variant_key
+source_config_path
 context_type / context_id
 ```
 
@@ -540,10 +543,10 @@ The Messaging template editor should primarily edit/review reusable copy and sho
 
 ## Campaign Messaging template shape
 
-Campaign message copy still lives in Messaging, but campaign step templates use a nested campaign path:
+Campaign message copy still lives in Messaging, but campaign step variant templates use a nested campaign path:
 
 ```text
-messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
+messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
 ```
 
 Example:
@@ -553,13 +556,17 @@ Example:
     'webinar_attended_nurture' => [
         'steps' => [
             1 => [
-                'dispatch_key' => 'campaign_step_due',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'marketing',
+                'variants' => [
+                    'email' => [
+                        'dispatch_key' => 'campaign_step_due',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'marketing',
 
-                'payload' => [
-                    'subject' => 'Thanks for joining',
-                    'body' => 'Hi {first_name}, thanks for joining the webinar. Reply with your biggest question and we’ll help you with the next step.',
+                        'payload' => [
+                            'subject' => 'Thanks for joining',
+                            'body' => 'Hi {first_name}, thanks for joining the webinar. Reply with your biggest question and we’ll help you with the next step.',
+                        ],
+                    ],
                 ],
             ],
         ],
@@ -582,23 +589,26 @@ schedule
 
 ## Campaign channel variants
 
-Future Campaign presets may define step groups and channel variants.
+Campaign presets may define step channel variants.
 
-A step group is a business moment.
+A campaign step is a business moment.
 
-A variant is a channel-specific delivery option for that moment.
+A variant is a channel-specific delivery option for that step.
 
 Variants should include:
 
 ```text
+key
+name
+sort_order
+dispatch_key
 channel
 purpose
 scope
-timing
-message template reference or assignment key
 dependency rules, when needed
-strategy participation
 ```
+
+Step timing stays on the campaign step. Step-level `variant_strategy` decides how variants participate.
 
 Variants must not include reusable subject/body/message copy.
 
@@ -631,9 +641,13 @@ Campaign presets must not define reusable message copy.
 
 Campaign presets must not define or override payloads.
 
-Campaign preset steps reference Messaging templates with first-class step keys:
+Campaign preset steps define business moments, timing, and variant strategy.
+
+Campaign preset variants reference Messaging templates with first-class variant keys:
 
 ```text
+key
+dispatch_key
 channel
 purpose
 scope
@@ -644,7 +658,7 @@ Do not use `meta.message` for new Campaign preset step message references.
 Campaign messages resolve by:
 
 ```text
-channel + purpose + scope + campaign_key + step_number
+channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key
 ```
 
 Example:
@@ -653,16 +667,25 @@ Example:
 [
     'step_number' => 1,
     'name' => 'Attended thank-you and next step',
-    'dispatch_key' => 'campaign_step_due',
-    'channel' => 'email',
-    'purpose' => 'marketing',
-    'scope' => 'webinar_nurture',
     'is_active' => true,
+    'variant_strategy' => 'first_available',
 
     'criteria' => [
         'timing' => [
             'type' => 'delay',
             'hours' => 2,
+        ],
+    ],
+
+    'variants' => [
+        [
+            'key' => 'email',
+            'name' => 'Email follow-up',
+            'sort_order' => 0,
+            'dispatch_key' => 'campaign_step_due',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar_nurture',
         ],
     ],
 
@@ -1030,9 +1053,9 @@ Examples that should remain singular:
 - [ ] Are Campaign presets free of reusable subject/body/CTA copy?
 - [ ] Do campaign variants reference Messaging-owned template presets/assignments rather than owning copy?
 - [ ] Are Campaign presets free of payload overrides?
-- [ ] Are Campaign preset step message references first-class `channel`, `purpose`, and `scope` keys?
+- [ ] Are Campaign preset variant message references first-class `key`, `dispatch_key`, `channel`, `purpose`, and `scope` keys?
 - [ ] Are new Campaign preset steps free of `meta.message` references?
-- [ ] Are Campaign Messaging templates under `campaigns.{campaign_key}.steps.{step_number}`?
+- [ ] Are Campaign Messaging templates under `campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}`?
 - [ ] Are normal message configs using the canonical definition shape?
 - [ ] Are DB-backed MessageTemplatePreset, MessageTemplateCatalogEntry, and MessageTemplatePresetAssignment rules preserved when applicable?
 - [ ] Are webinar transactional configs using `confirmations`, `opt_ins`, `reminders`, `post_attended`, and `post_missed`?
@@ -1063,9 +1086,10 @@ Rules:
 - Messaging configs own reusable message copy.
 - Campaign presets own journeys/timing/template references.
 - Campaign presets must not own or override payloads.
-- Campaign preset steps reference Messaging templates with first-class channel/purpose/scope keys.
-- Do not use meta.message for new Campaign preset step message references.
-- Campaign message templates resolve by campaign_key + step_number.
+- Campaign preset steps define business moments, timing, and variant_strategy.
+- Campaign preset variants reference Messaging templates with first-class key/dispatch_key/channel/purpose/scope keys.
+- Do not use meta.message for new Campaign preset step or variant message references.
+- Campaign message templates resolve by campaign_key + step_number + campaign_step_variant_key.
 - FlowRoute presets own automation/control flow.
 - Webinar post-event config owns provider orchestration, not message copy.
 - Default webinar copy should be vertical-neutral.
@@ -1081,6 +1105,5 @@ Client request:
 
 Return complete config files and list any recommended new keys/tokens separately.
 ```
-
 
 

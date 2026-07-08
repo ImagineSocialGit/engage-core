@@ -39,9 +39,13 @@ class SyncCampaignPresetsCommand extends Command
                 ['Steps created', $result->stepsCreated],
                 ['Steps updated', $result->stepsUpdated],
                 ['Steps skipped', $result->stepsSkipped],
+                ['Variants created', $result->variantsCreated],
+                ['Variants updated', $result->variantsUpdated],
+                ['Variants skipped', $result->variantsSkipped],
             ],
         );
 
         return self::SUCCESS;
     }
 }
+

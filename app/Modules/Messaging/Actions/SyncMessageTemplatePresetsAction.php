@@ -107,18 +107,19 @@ class SyncMessageTemplatePresetsAction
             ->whereNull('context_type')
             ->whereNull('context_id');
 
-        foreach (['surface', 'message_type', 'campaign_key', 'campaign_step'] as $column) {
+        foreach ([
+            'surface',
+            'message_type',
+            'campaign_key',
+            'campaign_step',
+            'campaign_step_variant_key',
+            'source_config_path',
+        ] as $column) {
             if (($assignment[$column] ?? null) === null) {
                 $query->whereNull($column);
             } else {
                 $query->where($column, $assignment[$column]);
             }
-        }
-
-        $sourceConfigPath = data_get($assignment, 'meta.source_config_path');
-
-        if (is_string($sourceConfigPath) && trim($sourceConfigPath) !== '') {
-            $query->where('meta->source_config_path', trim($sourceConfigPath));
         }
 
         return $query->orderByDesc('is_active')->orderByDesc('id')->first();
@@ -205,6 +206,7 @@ class SyncMessageTemplatePresetsAction
                     configPath: $configPath,
                     campaignKey: null,
                     campaignStep: null,
+                    campaignStepVariantKey: null,
                     surface: $this->surfaceForScope($scope),
                     campaignTemplate: false,
                     listIndex: $isList ? (int) $index : null,
@@ -248,23 +250,41 @@ class SyncMessageTemplatePresetsAction
                     continue;
                 }
 
-                $messageType = "{$normalizedCampaignKey}_step_{$stepNumber}";
-                $configPath = "{$baseConfigPath}.{$normalizedCampaignKey}.steps.{$stepNumber}";
+                $variants = $stepDefinition['variants'] ?? null;
 
-                yield $this->definitionPayload(
-                    definition: $stepDefinition,
-                    channel: $channel,
-                    purpose: $purpose,
-                    scope: $scope,
-                    messageType: $messageType,
-                    sourceMessageType: 'campaign_step',
-                    configPath: $configPath,
-                    campaignKey: $normalizedCampaignKey,
-                    campaignStep: $stepNumber,
-                    surface: 'campaigns',
-                    campaignTemplate: true,
-                    listIndex: null,
-                );
+                if (! is_array($variants) || $variants === []) {
+                    throw new InvalidArgumentException("Campaign message template source [{$baseConfigPath}.{$normalizedCampaignKey}.steps.{$stepNumber}] must define variant templates under [variants].");
+                }
+
+                foreach ($variants as $variantKey => $variantDefinition) {
+                    if (! is_string($variantKey) || trim($variantKey) === '' || ! is_array($variantDefinition)) {
+                        continue;
+                    }
+
+                    if (! ($variantDefinition['enabled'] ?? true)) {
+                        continue;
+                    }
+
+                    $normalizedVariantKey = $this->normalizeSegment($variantKey);
+                    $messageType = "{$normalizedCampaignKey}_step_{$stepNumber}";
+                    $configPath = "{$baseConfigPath}.{$normalizedCampaignKey}.steps.{$stepNumber}.variants.{$normalizedVariantKey}";
+
+                    yield $this->definitionPayload(
+                        definition: $variantDefinition,
+                        channel: $channel,
+                        purpose: $purpose,
+                        scope: $scope,
+                        messageType: $messageType,
+                        sourceMessageType: 'campaign_step',
+                        configPath: $configPath,
+                        campaignKey: $normalizedCampaignKey,
+                        campaignStep: $stepNumber,
+                        campaignStepVariantKey: $normalizedVariantKey,
+                        surface: 'campaigns',
+                        campaignTemplate: true,
+                        listIndex: null,
+                    );
+                }
             }
         }
     }
@@ -283,6 +303,7 @@ class SyncMessageTemplatePresetsAction
         string $configPath,
         ?string $campaignKey,
         ?int $campaignStep,
+        ?string $campaignStepVariantKey,
         ?string $surface,
         bool $campaignTemplate,
         ?int $listIndex,
@@ -337,6 +358,7 @@ class SyncMessageTemplatePresetsAction
             configPath: $configPath,
             campaignKey: $campaignKey,
             campaignStep: $campaignStep,
+            campaignStepVariantKey: $campaignStepVariantKey,
             surface: $surface,
             campaignTemplate: $campaignTemplate,
             listIndex: $listIndex,
@@ -349,6 +371,7 @@ class SyncMessageTemplatePresetsAction
                     'config_path' => $configPath,
                     'campaign_key' => $campaignKey,
                     'campaign_step' => $campaignStep,
+                    'campaign_step_variant_key' => $campaignStepVariantKey,
                 ],
                 'catalog' => [
                     'group_key' => $catalog['group_key'],
@@ -403,6 +426,8 @@ class SyncMessageTemplatePresetsAction
                 'message_type' => $messageType,
                 'campaign_key' => $campaignKey,
                 'campaign_step' => $campaignStep,
+                'campaign_step_variant_key' => $campaignStepVariantKey,
+                'source_config_path' => $configPath,
                 'context_type' => null,
                 'context_id' => null,
                 'is_active' => true,
@@ -411,6 +436,7 @@ class SyncMessageTemplatePresetsAction
                 'meta' => [
                     'source' => 'config_sync',
                     'source_config_path' => $configPath,
+                    'campaign_step_variant_key' => $campaignStepVariantKey,
                     'catalog' => [
                         'group_key' => $catalog['group_key'],
                         'group_label' => $catalog['group_label'],
@@ -437,11 +463,12 @@ class SyncMessageTemplatePresetsAction
         string $configPath,
         ?string $campaignKey,
         ?int $campaignStep,
+        ?string $campaignStepVariantKey,
         ?string $surface,
         bool $campaignTemplate,
         ?int $listIndex,
     ): array {
-        if ($campaignTemplate && $campaignKey !== null && $campaignStep !== null) {
+        if ($campaignTemplate && $campaignKey !== null && $campaignStep !== null && $campaignStepVariantKey !== null) {
             $moduleKey = 'campaigns';
             $moduleLabel = 'Campaigns';
             $groupKey = "campaign:{$campaignKey}";
@@ -500,6 +527,7 @@ class SyncMessageTemplatePresetsAction
                     'source_message_type' => $sourceMessageType,
                     'campaign_key' => $campaignKey,
                     'campaign_step' => $campaignStep,
+                    'campaign_step_variant_key' => $campaignStepVariantKey,
                 ],
             ],
         ];

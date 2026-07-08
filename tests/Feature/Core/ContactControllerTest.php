@@ -38,7 +38,8 @@ class ContactControllerTest extends TestCase
         $response->assertOk();
         $response->assertSee('Jane Lead');
         $response->assertSee('jane@example.test');
-        $response->assertSee('Create '.config('contacts.labels.singular'));
+        $response->assertSee('Add '.str(config('contacts.labels.singular'))->title());
+        $response->assertSee('Create '.str(config('contacts.labels.singular'))->title());
         $response->assertSee('name="email"', false);
         $response->assertSee('name="contact_status_id"', false);
 

@@ -2,33 +2,34 @@
 
 namespace App\Modules\Campaigns\Models;
 
-use Database\Factories\CampaignStepFactory;
+use Database\Factories\CampaignStepVariantFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class CampaignStep extends Model
+class CampaignStepVariant extends Model
 {
     use HasFactory;
 
-    protected static function newFactory(): CampaignStepFactory
+    protected static function newFactory(): CampaignStepVariantFactory
     {
-        return CampaignStepFactory::new();
+        return CampaignStepVariantFactory::new();
     }
 
     protected $fillable = [
-        'campaign_id',
-        'step_number',
+        'campaign_step_id',
+        'key',
         'name',
+        'sort_order',
         'dispatch_key',
         'channel',
         'purpose',
         'scope',
-        'variant_strategy',
         'is_active',
         'criteria',
+        'dependency_rules',
+        'source_config_path',
         'source_version',
         'is_customized',
         'customized_at',
@@ -38,30 +39,20 @@ class CampaignStep extends Model
     protected function casts(): array
     {
         return [
-            'campaign_id' => 'integer',
-            'step_number' => 'integer',
-            'variant_strategy' => 'string',
+            'campaign_step_id' => 'integer',
+            'sort_order' => 'integer',
             'is_active' => 'boolean',
             'criteria' => 'array',
+            'dependency_rules' => 'array',
             'is_customized' => 'boolean',
             'customized_at' => 'datetime',
             'meta' => 'array',
         ];
     }
 
-    public function campaign(): BelongsTo
+    public function campaignStep(): BelongsTo
     {
-        return $this->belongsTo(Campaign::class);
-    }
-
-    public function variants(): HasMany
-    {
-        return $this->hasMany(CampaignStepVariant::class)->orderBy('sort_order')->orderBy('id');
-    }
-
-    public function activeVariants(): HasMany
-    {
-        return $this->variants()->where('is_active', true);
+        return $this->belongsTo(CampaignStep::class);
     }
 
     public function scopeActive(Builder $query): Builder
@@ -79,4 +70,3 @@ class CampaignStep extends Model
         return $query->where('is_customized', false);
     }
 }
-

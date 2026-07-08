@@ -5,8 +5,10 @@ namespace App\Modules\Campaigns\Actions;
 use App\Modules\Campaigns\Data\CampaignPresetDefinition;
 use App\Modules\Campaigns\Data\CampaignPresetSyncResult;
 use App\Modules\Campaigns\Data\CampaignStepPresetDefinition;
+use App\Modules\Campaigns\Data\CampaignStepVariantPresetDefinition;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignStep;
+use App\Modules\Campaigns\Models\CampaignStepVariant;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -123,7 +125,7 @@ class SyncCampaignPresetsAction
 
         return array_values(array_unique(array_filter(array_map(
             fn (mixed $value): ?string => is_string($value) && trim($value) !== ''
-                ? trim($value)
+                ? $this->normalizeSegment($value)
                 : null,
             $values,
         ))));
@@ -134,18 +136,18 @@ class SyncCampaignPresetsAction
         CampaignPresetSyncResult $result,
     ): Campaign {
         $campaign = Campaign::query()
-            ->where('key', $definition->key)
+            ->where('key', $this->normalizeSegment($definition->key))
             ->first();
 
         if (! $campaign instanceof Campaign) {
-            $campaign = Campaign::create([
-                'key' => $definition->key,
+            $campaign = Campaign::query()->create([
+                'key' => $this->normalizeSegment($definition->key),
                 'name' => $definition->name,
                 'description' => $definition->description,
                 'channel' => $this->normalizeSegment($definition->channel),
                 'purpose' => $this->normalizeSegment($definition->purpose),
                 'scope' => $this->normalizeSegment($definition->scope),
-                'status' => $definition->status,
+                'status' => $this->normalizeSegment($definition->status),
                 'is_active' => $definition->isActive,
                 'source_version' => $definition->sourceVersion,
                 'is_customized' => false,
@@ -170,7 +172,7 @@ class SyncCampaignPresetsAction
             'channel' => $this->normalizeSegment($definition->channel),
             'purpose' => $this->normalizeSegment($definition->purpose),
             'scope' => $this->normalizeSegment($definition->scope),
-            'status' => $definition->status,
+            'status' => $this->normalizeSegment($definition->status),
             'is_active' => $definition->isActive,
             'source_version' => $definition->sourceVersion,
             'meta' => $definition->meta,
@@ -188,11 +190,11 @@ class SyncCampaignPresetsAction
     ): void {
         if ($campaign->is_customized) {
             foreach ($definition->steps as $stepDefinition) {
-                $this->syncStep(
-                    campaign: $campaign,
-                    definition: $stepDefinition,
-                    result: $result,
-                );
+                $result->recordStepSkipped();
+
+                foreach ($stepDefinition->variants as $variantDefinition) {
+                    $result->recordVariantSkipped();
+                }
             }
 
             return;
@@ -209,11 +211,19 @@ class SyncCampaignPresetsAction
                 $activeStepNumbers !== [],
                 fn ($query) => $query->whereNotIn('step_number', $activeStepNumbers),
             )
+            ->where('is_customized', false)
             ->delete();
 
         foreach ($definition->steps as $stepDefinition) {
-            $this->syncStep(
+            $step = $this->syncStep(
                 campaign: $campaign,
+                definition: $stepDefinition,
+                result: $result,
+            );
+
+            $this->syncVariants(
+                campaign: $campaign,
+                step: $step,
                 definition: $stepDefinition,
                 result: $result,
             );
@@ -236,7 +246,7 @@ class SyncCampaignPresetsAction
         );
 
         if (! $step instanceof CampaignStep) {
-            $step = CampaignStep::create([
+            $step = CampaignStep::query()->create([
                 'campaign_id' => $campaign->id,
                 'step_number' => $definition->stepNumber,
                 'name' => $definition->name,
@@ -244,6 +254,7 @@ class SyncCampaignPresetsAction
                 'channel' => $message['channel'],
                 'purpose' => $message['purpose'],
                 'scope' => $message['scope'],
+                'variant_strategy' => $this->normalizeSegment($definition->variantStrategy),
                 'is_active' => $definition->isActive,
                 'criteria' => $definition->criteria,
                 'source_version' => $definition->sourceVersion,
@@ -257,7 +268,7 @@ class SyncCampaignPresetsAction
             return $step;
         }
 
-        if ($step->is_customized || $campaign->is_customized) {
+        if ($step->is_customized) {
             $result->recordStepSkipped();
 
             return $step;
@@ -269,6 +280,7 @@ class SyncCampaignPresetsAction
             'channel' => $message['channel'],
             'purpose' => $message['purpose'],
             'scope' => $message['scope'],
+            'variant_strategy' => $this->normalizeSegment($definition->variantStrategy),
             'is_active' => $definition->isActive,
             'criteria' => $definition->criteria,
             'source_version' => $definition->sourceVersion,
@@ -278,6 +290,108 @@ class SyncCampaignPresetsAction
         $result->recordStepUpdated();
 
         return $step;
+    }
+
+    private function syncVariants(
+        Campaign $campaign,
+        CampaignStep $step,
+        CampaignStepPresetDefinition $definition,
+        CampaignPresetSyncResult $result,
+    ): void {
+        if ($step->is_customized) {
+            foreach ($definition->variants as $variantDefinition) {
+                $result->recordVariantSkipped();
+            }
+
+            return;
+        }
+
+        $activeVariantKeys = array_values(array_unique(array_map(
+            fn (CampaignStepVariantPresetDefinition $variantDefinition): string => $this->normalizeSegment($variantDefinition->key),
+            $definition->variants,
+        )));
+
+        CampaignStepVariant::query()
+            ->where('campaign_step_id', $step->id)
+            ->when(
+                $activeVariantKeys !== [],
+                fn ($query) => $query->whereNotIn('key', $activeVariantKeys),
+            )
+            ->where('is_customized', false)
+            ->delete();
+
+        foreach ($definition->variants as $variantDefinition) {
+            $this->syncVariant(
+                step: $step,
+                definition: $variantDefinition,
+                result: $result,
+            );
+        }
+    }
+
+    private function syncVariant(
+        CampaignStep $step,
+        CampaignStepVariantPresetDefinition $definition,
+        CampaignPresetSyncResult $result,
+    ): CampaignStepVariant {
+        $variant = CampaignStepVariant::query()
+            ->where('campaign_step_id', $step->id)
+            ->where('key', $this->normalizeSegment($definition->key))
+            ->first();
+
+        if (! $variant instanceof CampaignStepVariant) {
+            $variant = CampaignStepVariant::query()->create($this->variantAttributes(
+                step: $step,
+                definition: $definition,
+            ) + [
+                'is_customized' => false,
+                'customized_at' => null,
+            ]);
+
+            $result->recordVariantCreated();
+
+            return $variant;
+        }
+
+        if ($variant->is_customized) {
+            $result->recordVariantSkipped();
+
+            return $variant;
+        }
+
+        $variant->forceFill($this->variantAttributes(
+            step: $step,
+            definition: $definition,
+        ))->save();
+
+        $result->recordVariantUpdated();
+
+        return $variant;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function variantAttributes(
+        CampaignStep $step,
+        CampaignStepVariantPresetDefinition $definition,
+    ): array {
+        return [
+            'campaign_step_id' => $step->id,
+            'key' => $this->normalizeSegment($definition->key),
+            'name' => $definition->name,
+            'sort_order' => $definition->sortOrder,
+            'dispatch_key' => $this->normalizeSegment($definition->dispatchKey),
+            'channel' => $this->normalizeSegment($definition->channel),
+            'purpose' => $this->normalizeSegment($definition->purpose),
+            'scope' => $this->normalizeSegment($definition->scope),
+            'is_active' => $definition->isActive,
+            'criteria' => $definition->criteria,
+            'dependency_rules' => $definition->dependencyRules,
+            'source_config_path' => $definition->sourceConfigPath,
+            'source_version' => $definition->sourceVersion,
+            'meta' => $definition->meta,
+        ];
     }
 
     /**

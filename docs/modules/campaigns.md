@@ -56,7 +56,7 @@ Campaigns may depend on:
 
 Campaigns may schedule messages through Messaging public actions.
 
-Campaign presets define journeys: campaign identity, step order, timing, channel/purpose/scope, and message template references.
+Campaign presets define journeys: campaign identity, step order, step timing, channel strategy, and message template references through variants.
 
 ## Campaign step groups and channel variants
 
@@ -121,9 +121,9 @@ Campaign presets must not be the primary home for reusable email/SMS copy.
 
 Campaign presets must not define or override message payloads.
 
-Campaign message templates are resolved from Messaging by:
+Campaign variant templates are resolved from Messaging by:
 
-    channel + purpose + scope + campaign_key + step_number
+    channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key
 
 In the DB-backed target architecture, that context should resolve to a selected `MessageTemplatePresetAssignment`, which then loads the selected `MessageTemplatePreset`.
 
@@ -138,29 +138,32 @@ Those catalog entries are for browsing/copy editing only. Campaigns still own th
 
 The Campaign Message Templates CRM surface is the current Campaign-side setup surface for selecting which Messaging template is active for each campaign step. It may link to Message Templates for copy editing, but it should not duplicate reusable message copy editing inside Campaigns.
 
-During migration, config resolution may remain as a fallback.
+Campaign runtime should use variant-specific DB assignments first. Variant-specific config may seed/sync available templates, but step-level campaign template fallback is not supported.
 
 
 The matching Messaging config path is:
 
-    messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
+    messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
 
-Campaign preset steps should reference the message template context only through first-class step fields:
+Campaign preset steps should define the business moment and strategy.
 
+Campaign preset variants should reference the message template context through first-class variant fields:
+
+    key
     dispatch_key
     channel
     purpose
     scope
 
-Do not use `meta.message` as the canonical CampaignStep message reference.
+Do not use `meta.message` as the canonical CampaignStep or CampaignStepVariant message reference.
 
-`campaign_steps.channel`, `campaign_steps.purpose`, and `campaign_steps.scope` are first-class template-reference fields.
+`campaign_step_variants.channel`, `campaign_step_variants.purpose`, and `campaign_step_variants.scope` are first-class template-reference fields. Step-level channel/purpose/scope fields may remain as summary/debug defaults, but campaign delivery references belong on variants.
 
 `campaign_steps.meta` may keep non-routing/debug metadata such as:
 
     type = message
 
-The campaign key and step number come from the Campaign/CampaignStep definition.
+The campaign key and step number come from the Campaign/CampaignStep definition. The variant key comes from CampaignStepVariant.
 
 Do not require authors to invent per-step `message_type` names for campaign journey steps.
 
@@ -206,12 +209,14 @@ Current tables/models:
 
     campaigns
     campaign_steps
+    campaign_step_variants
     campaign_enrollments
 
 Current models:
 
     Campaign
     CampaignStep
+    CampaignStepVariant
     CampaignEnrollment
 
 Use generic lifecycle fields such as:
@@ -283,3 +288,5 @@ Stop follow-up sequence: Webinar Missed Nurture.
 ```
 
 It should not expose CampaignEnrollment internals or campaign step machinery as primary labels.
+
+

@@ -673,6 +673,96 @@ class DispatchMessageActionTest extends TestCase
         $this->assertSame('messaging.email.transactional.webinar.confirmation', data_get($message->meta, 'message_template_preset.source_config_path'));
     }
 
+
+    public function test_it_does_not_persist_automatic_model_context_in_scheduled_payload(): void
+    {
+        Queue::fake();
+
+        Config::set('messaging.email.transactional.webinar', [
+            'confirmation' => [
+                'dispatch_key' => 'registration_created',
+                'conditions' => [
+                    'contact.source' => 'webinar',
+                ],
+                'timing' => 'immediate',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'confirmation_messages',
+                'payload' => [
+                    'subject' => 'Registered',
+                    'body' => 'Hello {first_name}',
+                ],
+            ],
+        ]);
+
+        $contact = $this->contactWithConsent(attributes: [
+            'source' => 'webinar',
+            'subsource' => 'phase_2_payload_hygiene',
+        ]);
+
+        app(DispatchMessageAction::class)->handle(
+            recipient: $contact,
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+            dispatchKeys: 'registration_created',
+        );
+
+        $message = ScheduledMessage::query()->first();
+
+        $this->assertNotNull($message);
+        $this->assertSame('Registered', $message->payload['subject']);
+        $this->assertSame('Jeff', $message->payload['first_name']);
+        $this->assertSame('person@example.com', $message->payload['to']);
+        $this->assertArrayNotHasKey('context', $message->payload);
+        $this->assertArrayNotHasKey('created_at', $message->payload['tokens']['contact'] ?? []);
+        $this->assertArrayNotHasKey('updated_at', $message->payload['tokens']['contact'] ?? []);
+        $this->assertSame('webinar', $message->payload['tokens']['contact']['source'] ?? null);
+    }
+
+    public function test_it_preserves_explicit_compact_runtime_context_for_condition_checks(): void
+    {
+        Queue::fake();
+
+        Config::set('messaging.email.transactional.webinar', [
+            'follow_up' => [
+                'dispatch_key' => 'webinar_ended',
+                'conditions' => [
+                    'webinar.outcome' => 'attended',
+                ],
+                'timing' => 'immediate',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'notifications',
+                'payload' => [
+                    'subject' => 'Follow up',
+                    'body' => 'Thanks for attending.',
+                ],
+            ],
+        ]);
+
+        app(DispatchMessageAction::class)->handle(
+            recipient: $this->contactWithConsent(),
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+            dispatchKeys: 'webinar_ended',
+            payload: [
+                'runtime_context' => [
+                    'webinar' => [
+                        'outcome' => 'attended',
+                        'id' => 123,
+                    ],
+                ],
+            ],
+        );
+
+        $message = ScheduledMessage::query()->first();
+
+        $this->assertNotNull($message);
+        $this->assertSame('Follow up', $message->payload['subject']);
+        $this->assertSame('attended', data_get($message->payload, 'runtime_context.webinar.outcome'));
+        $this->assertSame(123, data_get($message->payload, 'runtime_context.webinar.id'));
+    }
+
     private function contactWithConsent(
         string $purpose = 'transactional',
         string $scope = 'webinar',
@@ -680,6 +770,7 @@ class DispatchMessageActionTest extends TestCase
         string $channel = 'email',
     ): Contact {
         $contact = Contact::factory()->create([
+            'first_name' => 'Jeff',
             'email' => 'person@example.com',
             ...$attributes,
         ]);
@@ -703,3 +794,5 @@ class DispatchMessageActionTest extends TestCase
         parent::tearDown();
     }
 }
+
+

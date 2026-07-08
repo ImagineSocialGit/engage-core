@@ -5,6 +5,7 @@ namespace App\Modules\Messaging\Services;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Data\MessageData;
 use App\Modules\Messaging\Enums\MessageChannel;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
@@ -45,7 +46,7 @@ class MessageRecipientPayloadResolver
             return null;
         }
 
-        return array_replace_recursive(
+        return $this->sanitizeSendPayload(array_replace_recursive(
             $mergedPayload,
             [
                 'to' => trim($destination),
@@ -56,7 +57,7 @@ class MessageRecipientPayloadResolver
                 'scope' => $scope,
                 'message_type' => $messageType,
             ],
-        );
+        ));
     }
 
     /**
@@ -114,9 +115,6 @@ class MessageRecipientPayloadResolver
                 'email' => $tokens['email'] ?? '',
                 'phone' => $tokens['phone'] ?? '',
                 'tokens' => $tokens,
-                'context' => [
-                    $this->contextKey($recipient) => $tokens[$this->contextKey($recipient)] ?? $recipient->toArray(),
-                ],
             ],
             $payload,
         );
@@ -131,7 +129,50 @@ class MessageRecipientPayloadResolver
             return [];
         }
 
-        return (new MessageData($recipient))->toArray();
+        return $this->compactContactTokens((new MessageData($recipient))->toArray());
+    }
+
+    /**
+     * @param array<string, mixed> $tokens
+     * @return array<string, mixed>
+     */
+    private function compactContactTokens(array $tokens): array
+    {
+        $compact = [];
+
+        foreach (['contact_id', 'first_name', 'last_name', 'name', 'email', 'phone', 'source', 'subsource', 'status'] as $key) {
+            if (array_key_exists($key, $tokens)) {
+                $compact[$key] = $this->sanitizeScalarValue($tokens[$key]);
+            }
+        }
+
+        $compact['contact'] = [];
+
+        if (is_array($tokens['contact'] ?? null)) {
+            foreach (['id', 'first_name', 'last_name', 'name', 'email', 'phone', 'source', 'subsource', 'status'] as $key) {
+                if (array_key_exists($key, $tokens['contact'])) {
+                    $compact['contact'][$key] = $this->sanitizeScalarValue($tokens['contact'][$key]);
+                }
+            }
+        }
+
+        foreach ([
+            'id' => 'contact_id',
+            'first_name' => 'first_name',
+            'last_name' => 'last_name',
+            'name' => 'name',
+            'email' => 'email',
+            'phone' => 'phone',
+            'source' => 'source',
+            'subsource' => 'subsource',
+            'status' => 'status',
+        ] as $contactKey => $tokenKey) {
+            if (! array_key_exists($contactKey, $compact['contact']) && array_key_exists($tokenKey, $compact)) {
+                $compact['contact'][$contactKey] = $compact[$tokenKey];
+            }
+        }
+
+        return array_filter($compact, fn (mixed $value): bool => $value !== null && $value !== []);
     }
 
     /**
@@ -162,6 +203,73 @@ class MessageRecipientPayloadResolver
         }
 
         return null;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function sanitizeSendPayload(array $payload): array
+    {
+        $sanitized = [];
+
+        foreach ($payload as $key => $value) {
+            if (! is_string($key) || trim($key) === '') {
+                continue;
+            }
+
+            $value = $this->sanitizePayloadValue($value);
+
+            if ($value !== null) {
+                $sanitized[$key] = $value;
+            }
+        }
+
+        return $sanitized;
+    }
+
+    private function sanitizePayloadValue(mixed $value): mixed
+    {
+        if ($value instanceof Model) {
+            return null;
+        }
+
+        if ($value instanceof DateTimeInterface) {
+            return $value->format(DateTimeInterface::ATOM);
+        }
+
+        if (is_scalar($value) || $value === null) {
+            return $value;
+        }
+
+        if (! is_array($value)) {
+            return null;
+        }
+
+        $sanitized = [];
+
+        foreach ($value as $key => $item) {
+            if (! is_int($key) && ! is_string($key)) {
+                continue;
+            }
+
+            $item = $this->sanitizePayloadValue($item);
+
+            if ($item !== null) {
+                $sanitized[$key] = $item;
+            }
+        }
+
+        return $sanitized;
+    }
+
+    private function sanitizeScalarValue(mixed $value): mixed
+    {
+        if ($value instanceof DateTimeInterface) {
+            return $value->format(DateTimeInterface::ATOM);
+        }
+
+        return is_scalar($value) || $value === null ? $value : null;
     }
 
     private function contextKey(Model $model): string

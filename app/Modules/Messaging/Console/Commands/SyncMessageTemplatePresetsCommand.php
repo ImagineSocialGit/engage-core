@@ -18,12 +18,15 @@ class SyncMessageTemplatePresetsCommand extends Command
         );
 
         $this->components->info(sprintf(
-            'Message template presets synced. Created: %d. Updated: %d. Customized skipped: %d. Assignments created: %d. Assignments preserved: %d.',
+            'Message template presets synced. Created: %d. Updated: %d. Customized skipped: %d. Assignments created: %d. Assignments updated: %d. Assignments preserved: %d. Catalog entries created: %d. Catalog entries updated: %d.',
             $result['created'],
             $result['updated'],
             $result['customized_skipped'],
             $result['assignments_created'],
+            $result['assignments_updated'],
             $result['assignments_preserved'],
+            $result['catalog_entries_created'],
+            $result['catalog_entries_updated'],
         ));
 
         return self::SUCCESS;

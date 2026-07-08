@@ -6,6 +6,7 @@ use App\Modules\Campaigns\Console\Commands\SyncCampaignPresetsCommand;
 use App\Modules\Campaigns\Listeners\ScheduleNextCampaignStepAfterScheduledMessageSent;
 use App\Modules\Campaigns\Services\ContactShow\ContactCampaignsVisibilityDataProvider;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
+use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -22,6 +23,11 @@ class CampaignsModuleServiceProvider extends ServiceProvider
     {
         Event::listen(
             ScheduledMessageSent::class,
+            ScheduleNextCampaignStepAfterScheduledMessageSent::class,
+        );
+
+        Event::listen(
+            ScheduledMessageSkipped::class,
             ScheduleNextCampaignStepAfterScheduledMessageSent::class,
         );
 

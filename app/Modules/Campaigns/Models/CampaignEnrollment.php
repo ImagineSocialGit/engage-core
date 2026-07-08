@@ -113,3 +113,4 @@ class CampaignEnrollment extends Model
         return $this->status === self::STATUS_COMPLETED;
     }
 }
+

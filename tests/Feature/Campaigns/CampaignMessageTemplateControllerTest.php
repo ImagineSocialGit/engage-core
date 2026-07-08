@@ -6,10 +6,12 @@ use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignStep;
+use App\Modules\Campaigns\Models\CampaignStepVariant;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Services\MessageDefinitionResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -18,7 +20,7 @@ class CampaignMessageTemplateControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_index_renders_campaign_steps_and_template_selection_without_copy_editing(): void
+    public function test_index_renders_campaign_step_variants_and_template_selection_without_copy_editing(): void
     {
         config()->set('modules.enabled', [
             'campaigns',
@@ -26,16 +28,16 @@ class CampaignMessageTemplateControllerTest extends TestCase
         ]);
 
         $user = User::factory()->create();
-        [$campaign, $step, $preset] = $this->campaignStepWithTemplate();
+        [$campaign, $step, $emailVariant, $emailPreset] = $this->campaignStepVariantWithTemplate();
 
         MessageTemplatePresetAssignment::factory()
-            ->forPreset($preset)
-            ->forCampaignStep($campaign->key, $step->step_number)
+            ->forPreset($emailPreset)
+            ->forCampaignStepVariant($campaign->key, $step->step_number, $emailVariant->key, $emailVariant->source_config_path)
             ->create([
                 'channel' => 'email',
                 'purpose' => 'marketing',
                 'scope' => 'webinar_nurture',
-                'message_type' => $preset->message_type,
+                'message_type' => $emailPreset->message_type,
                 'meta' => [
                     'catalog' => [
                         'group_label' => 'Webinar Attended Nurture',
@@ -53,18 +55,20 @@ class CampaignMessageTemplateControllerTest extends TestCase
             ->assertSee('Message selection')
             ->assertSee('Webinar Attended Nurture')
             ->assertSee('Step 1')
+            ->assertSee('Delivery options')
+            ->assertSee('Email follow-up')
             ->assertSee('Active template')
             ->assertSee('Step 1 Email')
             ->assertSee('Save selection')
             ->assertSee('Edit copy')
             ->assertSee(route('crm.messaging.message-templates.index', ['module' => 'campaigns']), false)
-            ->assertSee('Campaigns decide the journey, timing, and step order')
+            ->assertSee('Campaigns decide the journey, business moments, timing, and step order')
             ->assertDontSee('Subject')
             ->assertDontSee('Body')
             ->assertDontSee('Template title');
     }
 
-    public function test_it_updates_the_selected_template_for_a_campaign_step(): void
+    public function test_it_updates_the_selected_template_for_a_campaign_step_variant(): void
     {
         config()->set('modules.enabled', [
             'campaigns',
@@ -72,9 +76,9 @@ class CampaignMessageTemplateControllerTest extends TestCase
         ]);
 
         $user = User::factory()->create();
-        [$campaign, $step, $oldPreset] = $this->campaignStepWithTemplate();
-        $newPreset = $this->templateForCampaignStep($campaign, $step, [
-            'key' => 'email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variant',
+        [$campaign, $step, $emailVariant, $oldPreset] = $this->campaignStepVariantWithTemplate();
+        $newPreset = $this->templateForCampaignStepVariant($campaign, $step, $emailVariant, [
+            'key' => 'email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email.alternate',
             'name' => 'Webinar Attended Nurture — Alternate Step 1 Email',
             'payload' => [
                 'subject' => 'Alternate subject',
@@ -84,7 +88,7 @@ class CampaignMessageTemplateControllerTest extends TestCase
 
         MessageTemplatePresetAssignment::factory()
             ->forPreset($oldPreset)
-            ->forCampaignStep($campaign->key, $step->step_number)
+            ->forCampaignStepVariant($campaign->key, $step->step_number, $emailVariant->key, $emailVariant->source_config_path)
             ->create([
                 'channel' => 'email',
                 'purpose' => 'marketing',
@@ -96,11 +100,13 @@ class CampaignMessageTemplateControllerTest extends TestCase
 
         $this->actingAs($user)
             ->patch('http://crm.'.config('app.root_domain').'/campaigns/message-templates/steps/'.$step->getKey(), [
+                'campaign_step_variant_id' => $emailVariant->getKey(),
                 'message_template_preset_id' => $newPreset->getKey(),
             ])
             ->assertRedirect(route('crm.campaigns.message-templates.index', [
                 'campaign' => $campaign->getKey(),
                 'step' => $step->getKey(),
+                'variant' => $emailVariant->getKey(),
             ]));
 
         $this->assertDatabaseHas('message_template_preset_assignments', [
@@ -111,6 +117,8 @@ class CampaignMessageTemplateControllerTest extends TestCase
             'surface' => 'campaigns',
             'campaign_key' => 'webinar_attended_nurture',
             'campaign_step' => 1,
+            'campaign_step_variant_key' => 'email',
+            'source_config_path' => 'presets.campaigns.definitions.webinar_attended_nurture.steps.1.variants.email',
             'is_active' => true,
         ]);
 
@@ -121,6 +129,8 @@ class CampaignMessageTemplateControllerTest extends TestCase
             campaignKey: 'webinar_attended_nurture',
             stepNumber: 1,
             dispatchKey: 'campaign_step_due',
+            variantKey: 'email',
+            variantSourceConfigPath: $emailVariant->source_config_path,
         );
 
         $this->assertIsArray($definition);
@@ -128,7 +138,7 @@ class CampaignMessageTemplateControllerTest extends TestCase
         $this->assertNull($definition['config_path']);
     }
 
-    public function test_it_rejects_a_template_that_is_not_cataloged_for_the_campaign_step(): void
+    public function test_it_rejects_a_template_that_is_not_cataloged_for_the_campaign_step_variant(): void
     {
         config()->set('modules.enabled', [
             'campaigns',
@@ -136,16 +146,16 @@ class CampaignMessageTemplateControllerTest extends TestCase
         ]);
 
         $user = User::factory()->create();
-        [$campaign, $step] = $this->campaignStepWithTemplate();
+        [$campaign, $step, $emailVariant] = $this->campaignStepVariantWithTemplate();
 
         $wrongPreset = MessageTemplatePreset::factory()->create([
-            'key' => 'email.marketing.webinar_nurture.campaigns.other_campaign.steps.1',
-            'name' => 'Other Campaign — Step 1 Email',
-            'channel' => 'email',
+            'key' => 'sms.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.sms',
+            'name' => 'SMS Variant Template',
+            'channel' => 'sms',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
-            'message_type' => 'other_campaign_step_1',
-            'payload_class' => EmailPayload::class,
+            'message_type' => 'webinar_attended_nurture_step_1',
+            'payload_class' => SmsPayload::class,
             'queue' => 'marketing',
             'dispatch_keys' => ['campaign_step_due'],
         ]);
@@ -156,15 +166,18 @@ class CampaignMessageTemplateControllerTest extends TestCase
                 'module_key' => 'campaigns',
                 'module_label' => 'Campaigns',
                 'surface' => 'campaigns',
-                'group_key' => 'campaign:other_campaign',
-                'group_label' => 'Other Campaign',
-                'item_key' => 'email.marketing.webinar_nurture.campaigns.other_campaign.steps.1',
-                'item_label' => 'Step 1 Email',
+                'group_key' => 'campaign:webinar_attended_nurture',
+                'group_label' => 'Webinar Attended Nurture',
+                'item_key' => $wrongPreset->key,
+                'item_label' => 'Step 1 SMS',
                 'item_order' => 1,
                 'usage_type' => 'campaign_step',
+                'source_config_path' => 'messaging.sms.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.sms',
                 'meta' => [
-                    'campaign_key' => 'other_campaign',
+                    'campaign_key' => 'webinar_attended_nurture',
                     'campaign_step' => 1,
+                    'campaign_step_variant_key' => 'sms',
+                    'campaign_step_variant_source_config_path' => 'presets.campaigns.definitions.webinar_attended_nurture.steps.1.variants.sms',
                 ],
             ]);
 
@@ -173,6 +186,7 @@ class CampaignMessageTemplateControllerTest extends TestCase
         $this->actingAs($user)
             ->from('http://crm.'.config('app.root_domain').'/campaigns/message-templates?campaign='.$campaign->getKey().'&step='.$step->getKey())
             ->patch('http://crm.'.config('app.root_domain').'/campaigns/message-templates/steps/'.$step->getKey(), [
+                'campaign_step_variant_id' => $emailVariant->getKey(),
                 'message_template_preset_id' => $wrongPreset->getKey(),
             ])
             ->assertSessionHasErrors(['message_template_preset_id']);
@@ -186,11 +200,11 @@ class CampaignMessageTemplateControllerTest extends TestCase
         ]);
 
         $user = User::factory()->create();
-        [$campaign, $step, $preset] = $this->campaignStepWithTemplate();
+        [$campaign, $step, $emailVariant, $preset] = $this->campaignStepVariantWithTemplate();
 
         MessageTemplatePresetAssignment::factory()
             ->forPreset($preset)
-            ->forCampaignStep($campaign->key, $step->step_number)
+            ->forCampaignStepVariant($campaign->key, $step->step_number, $emailVariant->key, $emailVariant->source_config_path)
             ->create([
                 'channel' => 'email',
                 'purpose' => 'marketing',
@@ -205,14 +219,15 @@ class CampaignMessageTemplateControllerTest extends TestCase
             ->assertOk()
             ->assertSee('Webinar Attended Nurture')
             ->assertSee('Step 1')
+            ->assertSee('Email follow-up')
             ->assertSee('Active template')
             ->assertSee($preset->name);
     }
 
     /**
-     * @return array{0: Campaign, 1: CampaignStep, 2: MessageTemplatePreset}
+     * @return array{0: Campaign, 1: CampaignStep, 2: CampaignStepVariant, 3: MessageTemplatePreset}
      */
-    private function campaignStepWithTemplate(): array
+    private function campaignStepVariantWithTemplate(): array
     {
         $campaign = Campaign::factory()->create([
             'key' => 'webinar_attended_nurture',
@@ -228,24 +243,41 @@ class CampaignMessageTemplateControllerTest extends TestCase
                 'step_number' => 1,
                 'name' => 'Step 1',
                 'dispatch_key' => 'campaign_step_due',
+                'variant_strategy' => 'send_all_eligible',
             ]);
 
-        $preset = $this->templateForCampaignStep($campaign, $step);
+        $emailVariant = CampaignStepVariant::factory()->create([
+            'campaign_step_id' => $step->id,
+            'key' => 'email',
+            'name' => 'Email follow-up',
+            'sort_order' => 0,
+            'dispatch_key' => 'campaign_step_due',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar_nurture',
+            'source_config_path' => 'presets.campaigns.definitions.webinar_attended_nurture.steps.1.variants.email',
+        ]);
 
-        return [$campaign, $step, $preset];
+        $preset = $this->templateForCampaignStepVariant($campaign, $step, $emailVariant);
+
+        return [$campaign, $step, $emailVariant, $preset];
     }
 
     /**
      * @param array<string, mixed> $overrides
      */
-    private function templateForCampaignStep(Campaign $campaign, CampaignStep $step, array $overrides = []): MessageTemplatePreset
-    {
+    private function templateForCampaignStepVariant(
+        Campaign $campaign,
+        CampaignStep $step,
+        CampaignStepVariant $variant,
+        array $overrides = [],
+    ): MessageTemplatePreset {
         $preset = MessageTemplatePreset::factory()->create(array_replace_recursive([
-            'key' => 'email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.'.$step->step_number.'.'.uniqid(),
-            'name' => 'Webinar Attended Nurture — Step '.$step->step_number.' Email',
-            'channel' => $step->channel,
-            'purpose' => $step->purpose,
-            'scope' => $step->scope,
+            'key' => 'email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.'.$step->step_number.'.variants.'.$variant->key.'.'.uniqid(),
+            'name' => 'Webinar Attended Nurture — Step '.$step->step_number.' '.ucfirst($variant->key),
+            'channel' => $variant->channel,
+            'purpose' => $variant->purpose,
+            'scope' => $variant->scope,
             'message_type' => $campaign->key.'_step_'.$step->step_number,
             'payload_class' => EmailPayload::class,
             'queue' => 'marketing',
@@ -254,7 +286,7 @@ class CampaignMessageTemplateControllerTest extends TestCase
                 'subject' => 'Step '.$step->step_number,
                 'body' => 'Message '.$step->step_number.'.',
             ],
-            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.'.$campaign->key.'.steps.'.$step->step_number,
+            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.'.$campaign->key.'.steps.'.$step->step_number.'.variants.'.$variant->key,
         ], $overrides));
 
         MessageTemplateCatalogEntry::factory()
@@ -266,17 +298,20 @@ class CampaignMessageTemplateControllerTest extends TestCase
                 'group_key' => 'campaign:'.$campaign->key,
                 'group_label' => $campaign->name,
                 'item_key' => $preset->key,
-                'item_label' => 'Step '.$step->step_number.' Email',
+                'item_label' => 'Step '.$step->step_number.' '.ucfirst($variant->key),
                 'item_order' => $step->step_number,
                 'usage_type' => 'campaign_step',
                 'source_config_path' => $preset->source_config_path,
                 'meta' => [
                     'campaign_key' => $campaign->key,
                     'campaign_step' => $step->step_number,
+                    'campaign_step_variant_key' => $variant->key,
+                    'campaign_step_variant_source_config_path' => $variant->source_config_path,
                 ],
             ]);
 
         return $preset;
     }
 }
+
 

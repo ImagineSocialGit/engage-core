@@ -197,7 +197,7 @@ This pattern applies to:
 - FlowRoute trigger selection.
 - Messaging template/message preset selection.
 - Webinar confirmation, reminder, waitlist, and post-event schedule-profile selection.
-- Campaign/channel strategy selection when campaign step variants are implemented.
+- Campaign/channel strategy selection through DB-owned campaign step variants.
 
 Do not use destructive config swapping, temporary smoke-test keys, or broad route activation toggles as the long-term mechanism for choosing client runtime behavior.
 
@@ -231,7 +231,7 @@ Messaging should store reusable synced/editable message copy as DB-owned templat
 
 Message template catalog entries should organize synced/editable templates for browsing and copy review. Catalog entries are read-organization records only; they do not own campaign timing, webinar schedules, FlowRoute trigger behavior, skip rules, or runtime selection.
 
-Message template assignments should choose which preset is active for a channel/purpose/scope/surface/message context.
+Message template assignments should choose which preset is active for a channel/purpose/scope/surface/message context. Campaign-specific assignments may include campaign key, step number, variant key, and source config path so variants are selected by durable runtime identity rather than broad step-level guesses.
 
 Campaigns, Webinars, and FlowRoutes should reference Messaging template keys or assignments. They should not embed reusable subject/body/message copy in their own presets.
 
@@ -338,6 +338,7 @@ Current ownership:
 | inbound_messages | InboundMessaging |
 | campaigns | Campaigns |
 | campaign_steps | Campaigns |
+| campaign_step_variants | Campaigns |
 | campaign_enrollments | Campaigns |
 | broadcasts | Broadcasts |
 | broadcast_recipients | Broadcasts |
@@ -1046,11 +1047,11 @@ message_template_preset_assignments
 
 ```text
 channel + purpose + scope + surface + message_type
-channel + purpose + scope + campaign_key + campaign_step
+channel + purpose + scope + campaign_key + campaign_step + campaign_step_variant_key
 channel + purpose + scope + surface + message_type, with source/template identity where multiple schedule slots share one message_type
 ```
 
-Runtime resolvers may read config during a transition period, but the target architecture is DB-first resolution from selected Messaging template assignments.
+Runtime resolvers should prefer DB-owned assignments. Variant-specific config remains the seed/source for available Messaging templates, not a step-level runtime fallback.
 
 
 ### Messaging channel availability
@@ -1093,19 +1094,19 @@ Messaging owns reusable message copy and delivery templates, including subject/b
 
 Campaign-owned message templates live inside Messaging configs under:
 
-    campaigns.{campaign_key}.steps.{step_number}
+    campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
 
 Those campaign message templates are resolved by:
 
-    channel + purpose + scope + campaign_key + step_number
+    channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key
 
 Campaign presets should not duplicate reusable message copy.
 
 Campaign presets should not define or override payloads.
 
-Campaign presets own journey identity, step order, and step timing.
+Campaign presets own journey identity, step order, step timing, and variant strategy.
 
-Messaging owns the delivery template for the campaign step.
+Messaging owns the delivery template for the campaign step variant.
 
 Post-webinar transactional follow-ups should use the same Messaging definition shape as confirmations, reminders, opt-ins, and campaign message templates.
 
@@ -1792,9 +1793,7 @@ Campaigns may depend on:
 
 Campaigns may schedule messages through Messaging public actions.
 
-Campaign presets define journeys: campaign identity, step order, timing, channel/purpose/scope, and message template references.
-
-Campaign step variants are the planned shape for multi-channel campaign coordination.
+Campaign presets define journeys: campaign identity, step order, step timing, channel strategy, and message template references through variants.
 
 A Campaign enrollment is the lifecycle.
 
@@ -1819,30 +1818,29 @@ Campaign presets must not be the primary home for reusable email/SMS copy.
 
 Campaign presets must not define or override message payloads.
 
-Campaign message templates are resolved from Messaging by:
+Campaign variant templates are resolved from Messaging by:
 
-    channel + purpose + scope + campaign_key + step_number
+    channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key
 
 The matching Messaging config path is:
 
-    messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
+    messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
 
-Campaign preset steps should reference the message template context only through first-class step fields:
+Campaign preset steps own step identity, timing, and `variant_strategy`.
 
+Campaign preset variants own template-reference fields:
+
+    key
     dispatch_key
     channel
     purpose
     scope
 
-Do not use `meta.message` as the canonical CampaignStep message reference.
+Do not use `meta.message` as the canonical CampaignStep or CampaignStepVariant message reference.
 
-`campaign_steps.channel`, `campaign_steps.purpose`, and `campaign_steps.scope` are first-class template-reference fields.
+`campaign_step_variants.channel`, `campaign_step_variants.purpose`, and `campaign_step_variants.scope` are first-class template-reference fields. Step-level channel/purpose/scope fields may remain as summary/debug defaults, but campaign delivery references belong on variants.
 
-`campaign_steps.meta` may keep non-routing/debug metadata such as:
-
-    type = message
-
-The campaign key and step number come from the Campaign/CampaignStep definition.
+The campaign key and step number come from the Campaign/CampaignStep definition; the variant key comes from CampaignStepVariant.
 
 Do not require authors to invent per-step `message_type` names for campaign journey steps.
 
@@ -1888,12 +1886,14 @@ Current tables/models:
 
     campaigns
     campaign_steps
+    campaign_step_variants
     campaign_enrollments
 
 Current models:
 
     Campaign
     CampaignStep
+    CampaignStepVariant
     CampaignEnrollment
 
 Use generic lifecycle fields such as:
@@ -2661,3 +2661,5 @@ Recommended direction:
 9. Regenerate `core-project-tree.txt` from the repo after each structural batch.
 
 Do not use this section as a backlog. Actionable items belong in `TODO.md`.
+
+

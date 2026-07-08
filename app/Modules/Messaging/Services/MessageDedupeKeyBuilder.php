@@ -16,25 +16,44 @@ class MessageDedupeKeyBuilder
         ?Model $context,
         Carbon $sendAt,
     ): string {
+        $identity = [
+            'recipient_type' => $recipient->getMorphClass(),
+            'recipient_id' => $recipient->getKey(),
+            'channel' => $definition['channel'] ?? null,
+            'purpose' => $definition['purpose'] ?? null,
+            'scope' => $definition['scope'] ?? null,
+            'message_type' => $definition['message_type'] ?? null,
+            'campaign_key' => $definition['campaign_key'] ?? null,
+            'campaign_step' => $definition['step'] ?? null,
+            'campaign_step_variant_key' => $definition['variant']
+                ?? $definition['campaign_step_variant_key']
+                ?? data_get($definition, 'meta.campaign.campaign_step_variant_key'),
+            'campaign_step_variant_source_config_path' => $definition['campaign_step_variant_source_config_path']
+                ?? data_get($definition, 'meta.campaign.campaign_step_variant_source_config_path'),
+            'definition_config_path' => $definition['config_path']
+                ?? $definition['definition_config_path']
+                ?? data_get($definition, 'meta.definition_config_path'),
+            'message_template_preset_id' => data_get($definition, 'meta.message_template_preset.id'),
+            'message_template_assignment_id' => data_get($definition, 'meta.message_template_preset.assignment_id'),
+            'timing' => $definition['timing'] ?? null,
+            'schedule_type' => $definition['schedule']['type'] ?? null,
+            'schedule_minutes' => $definition['schedule']['minutes'] ?? null,
+            'send_at' => $sendAt->toISOString(),
+            'context_type' => $context?->getMorphClass(),
+            'context_id' => $context?->getKey(),
+        ];
+
+        $fingerprint = hash('sha256', json_encode($identity, JSON_THROW_ON_ERROR));
+
         return implode(':', array_filter([
             'message',
-            $recipient->getMorphClass(),
+            class_basename($recipient->getMorphClass()),
             $recipient->getKey(),
-            $definition['channel'],
-            $definition['purpose'],
-            $definition['scope'],
-            $definition['message_type'],
-
-            $definition['campaign_key'] ?? null,
-            $definition['step'] ?? null,
-
-            $definition['timing'] ?? null,
-            $definition['schedule']['type'] ?? null,
-            $definition['schedule']['minutes'] ?? null,
-            $sendAt->toISOString(),
-
-            $context?->getMorphClass(),
-            $context?->getKey(),
+            $definition['channel'] ?? null,
+            $definition['purpose'] ?? null,
+            $definition['scope'] ?? null,
+            $definition['message_type'] ?? null,
+            substr($fingerprint, 0, 32),
         ], fn (mixed $value): bool => $value !== null && $value !== ''));
     }
 }

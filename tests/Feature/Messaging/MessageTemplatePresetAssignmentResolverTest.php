@@ -61,19 +61,23 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
         $this->assertSame($preset->getKey(), data_get($definitions[0], 'meta.message_template_preset.id'));
     }
 
-    public function test_campaign_step_resolution_prefers_active_assignment_before_config(): void
+    public function test_campaign_step_variant_resolution_prefers_active_assignment_before_config(): void
     {
         Config::set('messaging.email.marketing.webinar_nurture', [
             'campaigns' => [
                 'webinar_attended_nurture' => [
                     'steps' => [
                         1 => [
-                            'dispatch_key' => 'campaign_step_due',
-                            'payload_class' => EmailPayload::class,
-                            'queue' => 'marketing',
-                            'payload' => [
-                                'subject' => 'Config campaign subject',
-                                'body' => 'Config campaign body.',
+                            'variants' => [
+                                'email' => [
+                                    'dispatch_key' => 'campaign_step_due',
+                                    'payload_class' => EmailPayload::class,
+                                    'queue' => 'marketing',
+                                    'payload' => [
+                                        'subject' => 'Config campaign subject',
+                                        'body' => 'Config campaign body.',
+                                    ],
+                                ],
                             ],
                         ],
                     ],
@@ -94,12 +98,12 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
                 'subject' => 'DB campaign subject',
                 'body' => 'DB campaign body.',
             ],
-            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1',
+            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
         ]);
 
         MessageTemplatePresetAssignment::factory()
             ->forPreset($preset)
-            ->forCampaignStep('webinar_attended_nurture', 1)
+            ->forCampaignStepVariant('webinar_attended_nurture', 1, 'email', $preset->source_config_path)
             ->create();
 
         $definition = app(MessageDefinitionResolver::class)->resolveCampaignStep(
@@ -109,12 +113,15 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
             campaignKey: 'webinar_attended_nurture',
             stepNumber: 1,
             dispatchKey: 'campaign_step_due',
+            variantKey: 'email',
+            variantSourceConfigPath: $preset->source_config_path,
         );
 
         $this->assertIsArray($definition);
         $this->assertSame('DB campaign subject', $definition['payload']['subject']);
         $this->assertSame('webinar_attended_nurture', $definition['campaign_key']);
         $this->assertSame(1, $definition['step']);
+        $this->assertSame('email', $definition['variant']);
         $this->assertNull($definition['config_path']);
     }
 
@@ -256,3 +263,5 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
     }
 
 }
+
+

@@ -212,23 +212,45 @@ Assignments should support global/default selections and context-specific select
 Examples:
 
 ```text
-campaign + webinar_attended_nurture + step 1 + email
+campaign + webinar_attended_nurture + step 1 + variant email
 webinar + reminder_30_minute + email + global default
 webinar + post_attended + sms + WebinarSeries:5
 FlowRoute send-message point + selected transactional email template
 ```
+
+
+Campaign-specific assignments should include stable variant identity when variants are involved:
+
+```text
+channel
+purpose
+scope
+surface = campaigns
+campaign_key
+campaign_step
+campaign_step_variant_key
+source_config_path
+```
+
+`source_config_path` should point at the concrete template source, such as:
+
+```text
+messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email
+```
+
+This keeps variant-specific assignments distinct even when variants share the same campaign key, step number, dispatch key, and broad message type.
 
 Assignment changes should happen from the consuming module's setup surface, not primarily from the Messaging template copy editor.
 
 Examples:
 
 ```text
-Campaign step editor chooses which template that campaign step uses.
+Campaign step editor chooses which template each campaign step variant uses.
 Webinar schedule/profile editor chooses which confirmation/reminder/follow-up template applies.
 Automatic Follow-ups / FlowRoutes send-message point editor chooses which message template the point sends.
 ```
 
-The Messaging template page may show read-only usage, such as "Used by Campaigns -> Webinar Attended Nurture -> Step 1," and link to the owning module UI when that UI exists.
+The Messaging template page may show read-only usage, such as "Used by Campaigns -> Webinar Attended Nurture -> Step 1 Email," and link to the owning module UI when that UI exists.
 
 Current CRM/admin surfaces:
 
@@ -239,7 +261,7 @@ Message Templates
     Shows read-only usage and links to owning setup surfaces when available.
 
 Campaign Message Templates
-    Campaigns-owned setup surface for choosing the active Messaging template for campaign steps.
+    Campaigns-owned setup surface for choosing the active Messaging template for campaign step variants.
     Links back to Message Templates for copy editing.
 ```
 
@@ -253,7 +275,7 @@ Messaging resolvers should eventually resolve message definitions in this order:
 1. Most specific active MessageTemplatePresetAssignment for the runtime context.
 2. Less-specific active assignment for the same channel/purpose/scope/message context.
 3. Synced default MessageTemplatePreset.
-4. Temporary config fallback only during migration.
+4. Variant-specific config seed/source fallback only where explicitly supported by the resolver.
 ```
 
 Long-term runtime should be DB-first. Config should seed/update available presets and catalog entries; it should not remain the only runtime source of reusable message copy.
@@ -311,11 +333,11 @@ Campaigns, Webinars, and FlowRoutes may reference Messaging templates or assignm
 
 Campaign-owned message templates live inside Messaging configs under:
 
-    campaigns.{campaign_key}.steps.{step_number}
+    campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
 
 Those campaign message templates are resolved by:
 
-    channel + purpose + scope + campaign_key + step_number
+    channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key
 
 Campaign presets should not duplicate reusable message copy.
 
@@ -451,3 +473,5 @@ Current import-batch invitation scheduling is Messaging-owned.
 Core may expose the operator entry point on the import batch detail page when Messaging is enabled, but Core must not directly import Messaging actions, services, or models.
 
 Other modules may request this flow through Messaging public services/actions, but they must not create invitation records directly.
+
+

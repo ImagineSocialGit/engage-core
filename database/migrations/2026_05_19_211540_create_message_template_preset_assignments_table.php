@@ -27,6 +27,8 @@ return new class extends Migration
 
             $table->string('campaign_key', 128)->nullable()->index();
             $table->unsignedInteger('campaign_step')->nullable()->index();
+            $table->string('campaign_step_variant_key', 128)->nullable();
+            $table->string('source_config_path', 191)->nullable();
 
             $table->string('context_type', 191)->nullable();
             $table->unsignedBigInteger('context_id')->nullable();
@@ -58,6 +60,18 @@ return new class extends Migration
                 'purpose',
                 'scope',
             ], 'mtpa_campaign_ctx_idx');
+
+            $table->index([
+                'campaign_key',
+                'campaign_step',
+                'campaign_step_variant_key',
+                'channel',
+                'purpose',
+                'scope',
+            ], 'mtpa_campaign_variant_ctx_idx');
+
+            $table->index('campaign_step_variant_key', 'mtpa_variant_key_idx');
+            $table->index('source_config_path', 'mtpa_source_path_idx');
         });
     }
 

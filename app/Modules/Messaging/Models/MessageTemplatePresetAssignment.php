@@ -27,6 +27,8 @@ class MessageTemplatePresetAssignment extends Model
         'message_type',
         'campaign_key',
         'campaign_step',
+        'campaign_step_variant_key',
+        'source_config_path',
         'context_type',
         'context_id',
         'is_active',

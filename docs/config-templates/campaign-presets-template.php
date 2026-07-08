@@ -17,7 +17,8 @@ return [
     | - campaign identity
     | - step order
     | - step timing
-    | - message template references
+    | - variant strategy
+    | - message template references through variants
     |
     | Messaging configs own:
     | - reusable message copy
@@ -28,7 +29,9 @@ return [
     | Campaign presets must not own reusable subject/body copy.
     | Campaign presets must not define or override payloads.
     |
-    | Campaign preset steps reference Messaging templates with first-class:
+    | Campaign preset variants reference Messaging templates with first-class:
+    | - key
+    | - dispatch_key
     | - channel
     | - purpose
     | - scope
@@ -37,7 +40,7 @@ return [
     |
     | Campaign message templates resolve by:
     |
-    | messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
+    | messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
     */
 
     'groups' => [
@@ -73,16 +76,38 @@ return [
                 [
                     'step_number' => 1,
                     'name' => 'Attended thank-you and next step',
-                    'dispatch_key' => 'campaign_step_due',
-                    'channel' => 'email',
-                    'purpose' => 'marketing',
-                    'scope' => 'webinar_nurture',
                     'is_active' => true,
+                    'variant_strategy' => 'first_available',
 
                     'criteria' => [
                         'timing' => [
                             'type' => 'delay',
                             'hours' => 2,
+                        ],
+                    ],
+
+                    'variants' => [
+                        [
+                            'key' => 'email',
+                            'name' => 'Email follow-up',
+                            'sort_order' => 0,
+                            'dispatch_key' => 'campaign_step_due',
+                            'channel' => 'email',
+                            'purpose' => 'marketing',
+                            'scope' => 'webinar_nurture',
+                        ],
+
+                        // Add only when the SMS Messaging template exists and
+                        // the campaigns surface exposes SMS through Messaging
+                        // channel availability.
+                        [
+                            'key' => 'sms',
+                            'name' => 'SMS follow-up',
+                            'sort_order' => 1,
+                            'dispatch_key' => 'campaign_step_due',
+                            'channel' => 'sms',
+                            'purpose' => 'marketing',
+                            'scope' => 'webinar_nurture',
                         ],
                     ],
 
@@ -94,16 +119,25 @@ return [
                 [
                     'step_number' => 2,
                     'name' => 'Common next-step questions',
-                    'dispatch_key' => 'campaign_step_due',
-                    'channel' => 'email',
-                    'purpose' => 'marketing',
-                    'scope' => 'webinar_nurture',
                     'is_active' => true,
+                    'variant_strategy' => 'first_available',
 
                     'criteria' => [
                         'timing' => [
                             'type' => 'delay',
                             'days' => 3,
+                        ],
+                    ],
+
+                    'variants' => [
+                        [
+                            'key' => 'email',
+                            'name' => 'Email follow-up',
+                            'sort_order' => 0,
+                            'dispatch_key' => 'campaign_step_due',
+                            'channel' => 'email',
+                            'purpose' => 'marketing',
+                            'scope' => 'webinar_nurture',
                         ],
                     ],
 
@@ -132,16 +166,25 @@ return [
                 [
                     'step_number' => 1,
                     'name' => 'Missed webinar next step',
-                    'dispatch_key' => 'campaign_step_due',
-                    'channel' => 'email',
-                    'purpose' => 'marketing',
-                    'scope' => 'webinar_nurture',
                     'is_active' => true,
+                    'variant_strategy' => 'first_available',
 
                     'criteria' => [
                         'timing' => [
                             'type' => 'delay',
                             'hours' => 2,
+                        ],
+                    ],
+
+                    'variants' => [
+                        [
+                            'key' => 'email',
+                            'name' => 'Email follow-up',
+                            'sort_order' => 0,
+                            'dispatch_key' => 'campaign_step_due',
+                            'channel' => 'email',
+                            'purpose' => 'marketing',
+                            'scope' => 'webinar_nurture',
                         ],
                     ],
 
@@ -170,16 +213,25 @@ return [
                 [
                     'step_number' => 1,
                     'name' => 'Preparation basics',
-                    'dispatch_key' => 'campaign_step_due',
-                    'channel' => 'email',
-                    'purpose' => 'marketing',
-                    'scope' => 'mortgage_homebuyer_nurture',
                     'is_active' => true,
+                    'variant_strategy' => 'first_available',
 
                     'criteria' => [
                         'timing' => [
                             'type' => 'delay',
                             'days' => 14,
+                        ],
+                    ],
+
+                    'variants' => [
+                        [
+                            'key' => 'email',
+                            'name' => 'Email follow-up',
+                            'sort_order' => 0,
+                            'dispatch_key' => 'campaign_step_due',
+                            'channel' => 'email',
+                            'purpose' => 'marketing',
+                            'scope' => 'mortgage_homebuyer_nurture',
                         ],
                     ],
 

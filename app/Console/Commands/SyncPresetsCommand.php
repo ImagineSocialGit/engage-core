@@ -271,7 +271,10 @@ class SyncPresetsCommand extends Command
      *     updated: int,
      *     customized_skipped: int,
      *     assignments_created: int,
-     *     assignments_preserved: int
+     *     assignments_updated: int,
+     *     assignments_preserved: int,
+     *     catalog_entries_created: int,
+     *     catalog_entries_updated: int
      * } $result
      */
     private function renderMessageTemplateResult(array $result): void
@@ -286,7 +289,10 @@ class SyncPresetsCommand extends Command
                 ['Updated', $result['updated']],
                 ['Customized skipped', $result['customized_skipped']],
                 ['Assignments created', $result['assignments_created']],
+                ['Assignments updated', $result['assignments_updated']],
                 ['Assignments preserved', $result['assignments_preserved']],
+                ['Catalog entries created', $result['catalog_entries_created']],
+                ['Catalog entries updated', $result['catalog_entries_updated']],
             ],
         );
     }
@@ -332,6 +338,9 @@ class SyncPresetsCommand extends Command
                 ['Steps created', $result->stepsCreated],
                 ['Steps updated', $result->stepsUpdated],
                 ['Steps skipped', $result->stepsSkipped],
+                ['Variants created', $result->variantsCreated],
+                ['Variants updated', $result->variantsUpdated],
+                ['Variants skipped', $result->variantsSkipped],
             ],
         );
     }

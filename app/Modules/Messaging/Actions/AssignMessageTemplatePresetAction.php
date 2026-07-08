@@ -21,6 +21,8 @@ class AssignMessageTemplatePresetAction
         ?string $messageType = null,
         ?string $campaignKey = null,
         ?int $campaignStep = null,
+        ?string $campaignStepVariantKey = null,
+        ?string $sourceConfigPath = null,
         ?Model $context = null,
         array $meta = [],
     ): MessageTemplatePresetAssignment {
@@ -32,6 +34,8 @@ class AssignMessageTemplatePresetAction
             'message_type' => $messageType !== null ? $this->normalizeSegment($messageType) : $preset->message_type,
             'campaign_key' => $campaignKey !== null ? $this->normalizeSegment($campaignKey) : null,
             'campaign_step' => $campaignStep,
+            'campaign_step_variant_key' => $campaignStepVariantKey !== null ? $this->normalizeSegment($campaignStepVariantKey) : null,
+            'source_config_path' => $sourceConfigPath !== null ? $this->nullableString($sourceConfigPath) : null,
             'context_type' => $context?->getMorphClass(),
             'context_id' => $context?->getKey(),
         ];
@@ -47,7 +51,7 @@ class AssignMessageTemplatePresetAction
             'is_active' => true,
             'starts_at' => null,
             'ends_at' => null,
-            'meta' => array_replace_recursive($assignment->meta ?? [], $this->assignmentMeta($preset, $meta)),
+            'meta' => array_replace_recursive($assignment->meta ?? [], $this->assignmentMeta($preset, $attributes, $meta)),
         ])->save();
 
         return $assignment;
@@ -63,7 +67,16 @@ class AssignMessageTemplatePresetAction
             ->where('purpose', $attributes['purpose'])
             ->where('scope', $attributes['scope']);
 
-        foreach (['surface', 'message_type', 'campaign_key', 'campaign_step', 'context_type', 'context_id'] as $column) {
+        foreach ([
+            'surface',
+            'message_type',
+            'campaign_key',
+            'campaign_step',
+            'campaign_step_variant_key',
+            'source_config_path',
+            'context_type',
+            'context_id',
+        ] as $column) {
             if (($attributes[$column] ?? null) === null) {
                 $query->whereNull($column);
             } else {
@@ -75,10 +88,11 @@ class AssignMessageTemplatePresetAction
     }
 
     /**
+     * @param array<string, mixed> $attributes
      * @param array<string, mixed> $meta
      * @return array<string, mixed>
      */
-    private function assignmentMeta(MessageTemplatePreset $preset, array $meta): array
+    private function assignmentMeta(MessageTemplatePreset $preset, array $attributes, array $meta): array
     {
         $catalogEntry = $preset->catalogEntries()
             ->active()
@@ -96,7 +110,8 @@ class AssignMessageTemplatePresetAction
 
         return array_replace_recursive([
             'source' => 'crm_assignment',
-            'source_config_path' => $preset->source_config_path,
+            'source_config_path' => $attributes['source_config_path'] ?? $preset->source_config_path,
+            'campaign_step_variant_key' => $attributes['campaign_step_variant_key'] ?? null,
             'assigned_at' => now()->toISOString(),
             'catalog' => $catalogMeta,
         ], $meta);
@@ -105,5 +120,16 @@ class AssignMessageTemplatePresetAction
     private function normalizeSegment(string $value): string
     {
         return str_replace('-', '_', strtolower(trim($value)));
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
     }
 }

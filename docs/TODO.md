@@ -53,8 +53,8 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [ ] Confirm runtime-only URLs/tokens are not guessed or hard-coded in static config.
 - [ ] Confirm Campaign presets do not own reusable message payload/copy.
 - [ ] Confirm campaign variants reference Messaging-owned template presets/assignments when variant architecture is used.
-- [ ] Confirm Campaign preset step message references use first-class `channel`, `purpose`, and `scope` keys.
-- [ ] Confirm Messaging templates live under the expected channel/purpose/scope path.
+- [ ] Confirm Campaign preset variants use first-class `key`, `dispatch_key`, `channel`, `purpose`, and `scope` keys.
+- [ ] Confirm Messaging templates live under the expected channel/purpose/scope path, including campaign `steps.{step}.variants.{variant_key}` paths where applicable.
 - [ ] Confirm MessageTemplatePreset sync/assignment rules are preserved when DB-backed templates are involved.
 - [ ] Confirm SMS visibility is controlled by config where the surface exposes channel choices.
 - [ ] Confirm missing optional content/style keys do not break public pages.
@@ -139,9 +139,11 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Profiles may be selected by webinar series or individual webinar, with a default fallback.
   - Existing scheduled messages remain stable after creation.
   - Webinar scheduled-message payloads must remain compact; schedule profile/source identity belongs in metadata.
-- [ ] Phase 2 — Campaign channel variants.
-  - Decide whether `campaign_step_variants` or equivalent schema is needed.
-  - Keep variants from owning reusable copy.
+- [x] Phase 2 — Campaign channel variants.
+  - DB-owned `campaign_step_variants` are the durable variant path.
+  - Campaign steps are business moments; variants are channel-specific delivery options.
+  - Variants do not own reusable copy.
+  - Scheduled-message payloads stay compact; campaign/step/variant identity belongs in metadata.
 - [ ] Phase 3 — Task templates / task defaults.
   - Audit `task_templates` fields for generated/manual tasks.
   - Build task template UI only if needed.
@@ -313,7 +315,7 @@ Completed Messaging/Campaign setup UI baseline:
 - Message Templates UI uses catalog entries to filter and browse by channel, purpose, area/module, group, and message/step.
 - Message Templates remains copy/review-only and keeps assignment mutation out of the template editor.
 - Message Templates shows read-only “Used by” entries.
-- Campaign Message Templates lets operators select the active Messaging template for each Campaign step.
+- Campaign Message Templates lets operators select the active Messaging template for each Campaign step variant.
 - Campaign usage rows can link from Message Templates to the Campaign Message Templates setup surface.
 - Campaign Message Templates links back to Message Templates for copy editing.
 
@@ -334,11 +336,11 @@ Completed Webinar schedule profile baseline:
 - Schedule profile items own schedule-slot identity; Messaging template presets own reusable copy.
 - Future polish may improve the setup UI, but the schema question is settled for the current pre-production branch.
 
-- [ ] Add Campaign step variant architecture.
+- [x] Add Campaign step variant architecture.
   - Campaign enrollment is the lifecycle.
   - Campaign step is the business moment.
   - Step variant is the channel-specific delivery option.
-  - Support `first_available`, `send_all_eligible`, and `dependency_aware`.
+  - Supports `first_available`, `send_all_eligible`, and `dependency_aware`.
   - Variants reference Messaging templates/assignments and do not own copy.
 
 - [ ] Make Route selection/building capability-aware.

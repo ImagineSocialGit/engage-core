@@ -72,6 +72,7 @@
 │   │   │   ├── Actions
 │   │   │   │   ├── CancelCampaignEnrollmentAction.php
 │   │   │   │   ├── EnrollContactInCampaignAction.php
+│   │   │   │   ├── ScheduleCampaignStepMessagesAction.php
 │   │   │   │   ├── ScheduleNextCampaignStepAction.php
 │   │   │   │   └── SyncCampaignPresetsAction.php
 │   │   │   ├── Console
@@ -84,13 +85,15 @@
 │   │   │   ├── Data
 │   │   │   │   ├── CampaignPresetDefinition.php
 │   │   │   │   ├── CampaignPresetSyncResult.php
-│   │   │   │   └── CampaignStepPresetDefinition.php
+│   │   │   │   ├── CampaignStepPresetDefinition.php
+│   │   │   │   └── CampaignStepVariantPresetDefinition.php
 │   │   │   ├── Listeners
 │   │   │   │   └── ScheduleNextCampaignStepAfterScheduledMessageSent.php
 │   │   │   ├── Models
 │   │   │   │   ├── CampaignEnrollment.php
 │   │   │   │   ├── Campaign.php
-│   │   │   │   └── CampaignStep.php
+│   │   │   │   ├── CampaignStep.php
+│   │   │   │   └── CampaignStepVariant.php
 │   │   │   ├── Providers
 │   │   │   │   └── CampaignsModuleServiceProvider.php
 │   │   │   ├── Requests
@@ -732,18 +735,11 @@
 │       │   ├── messaging
 │       │   │   ├── email
 │       │   │   │   ├── marketing
-│       │   │   │   │   ├── webinar_nurture.php
-│       │   │   │   │   └── webinar_waitlist.php
 │       │   │   │   └── transactional
-│       │   │   │       └── webinar.php
 │       │   │   └── sms
 │       │   │       ├── marketing
-│       │   │       │   ├── webinar_nurture.php
-│       │   │       │   └── webinar_waitlist.php
 │       │   │       └── transactional
-│       │   │           └── webinar.php
 │       │   ├── presets
-│       │   │   └── campaigns.php
 │       │   ├── theme.php
 │       │   └── webinars
 │       │       ├── content.php
@@ -797,13 +793,6 @@
 │       │   │   └── raw
 │       │   │       └── dark_logo.png
 │       │   └── views
-│       │       ├── email.blade.php
-│       │       └── emails
-│       │           └── webinars
-│       │               ├── post-follow-up.blade.php
-│       │               ├── registration-confirmation.blade.php
-│       │               ├── reminder.blade.php
-│       │               └── waitlist-scheduled.blade.php
 │       └── scripts
 │           ├── build-image-manifest.php
 │           ├── process-images.sh
@@ -827,7 +816,6 @@
 │   ├── messaging
 │   │   ├── email
 │   │   │   ├── marketing
-│   │   │   │   ├── mortgage_homebuyer_nurture.php
 │   │   │   │   ├── webinar_nurture.php
 │   │   │   │   ├── webinar_nurture_test.php
 │   │   │   │   └── webinar_waitlist.php
@@ -895,6 +883,7 @@
 │   │   ├── BroadcastRecipientFactory.php
 │   │   ├── CampaignFactory.php
 │   │   ├── CampaignStepFactory.php
+│   │   ├── CampaignStepVariantFactory.php
 │   │   ├── CommerceCustomerFactory.php
 │   │   ├── CommerceOrderEventFactory.php
 │   │   ├── CommerceOrderFactory.php
@@ -1224,6 +1213,9 @@
 │   │   │   └── ScheduleBroadcastActionTest.php
 │   │   ├── Campaigns
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
+│   │   │   ├── CampaignStepVariantsTest.php
+│   │   │   ├── CampaignVariantPresetSyncSpecificityTest.php
+│   │   │   ├── CampaignVariantSchedulingDurabilityTest.php
 │   │   │   ├── EnrollContactInCampaignActionTest.php
 │   │   │   ├── ScheduleNextCampaignStepActionTest.php
 │   │   │   └── ScheduleNextCampaignStepAfterScheduledMessageSentTest.php
@@ -1263,6 +1255,7 @@
 │   │   ├── Location
 │   │   │   └── LocationFoundationTest.php
 │   │   ├── Messaging
+│   │   │   ├── CampaignVariantTemplateAssignmentResolutionTest.php
 │   │   │   ├── ConditionCheckerTest.php
 │   │   │   ├── ConsentRevocationControllerTest.php
 │   │   │   ├── ContactPermissionInvitationControllerTest.php
@@ -1321,4 +1314,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-438 directories, 884 files
+436 directories, 879 files

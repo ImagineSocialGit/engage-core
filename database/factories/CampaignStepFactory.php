@@ -20,6 +20,7 @@ class CampaignStepFactory extends Factory
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
+            'variant_strategy' => 'first_available',
             'is_active' => true,
             'criteria' => [
                 'timing' => [
@@ -46,3 +47,5 @@ class CampaignStepFactory extends Factory
         ]);
     }
 }
+
+

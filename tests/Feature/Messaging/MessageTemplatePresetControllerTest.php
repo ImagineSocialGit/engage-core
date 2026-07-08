@@ -104,13 +104,14 @@ class MessageTemplatePresetControllerTest extends TestCase
                 'surface' => 'campaigns',
                 'group_key' => 'campaign:mortgage_homebuyer_nurture',
                 'group_label' => 'Mortgage Homebuyer Nurture',
-                'item_key' => 'email.marketing.mortgage_homebuyer_nurture.campaigns.mortgage_homebuyer_nurture.steps.2',
+                'item_key' => 'email.marketing.mortgage_homebuyer_nurture.campaigns.mortgage_homebuyer_nurture.steps.2.variants.email',
                 'item_label' => 'Step 2 Email',
                 'item_order' => 2,
                 'usage_type' => 'campaign_step',
                 'meta' => [
                     'campaign_key' => 'mortgage_homebuyer_nurture',
                     'campaign_step' => 2,
+                    'campaign_step_variant_key' => 'email',
                 ],
             ]);
 
@@ -133,23 +134,25 @@ class MessageTemplatePresetControllerTest extends TestCase
                 'surface' => 'campaigns',
                 'group_key' => 'campaign:mortgage_homebuyer_nurture',
                 'group_label' => 'Mortgage Homebuyer Nurture',
-                'item_key' => 'email.marketing.mortgage_homebuyer_nurture.campaigns.mortgage_homebuyer_nurture.steps.3',
+                'item_key' => 'email.marketing.mortgage_homebuyer_nurture.campaigns.mortgage_homebuyer_nurture.steps.3.variants.email',
                 'item_label' => 'Step 3 Email',
                 'item_order' => 3,
                 'usage_type' => 'campaign_step',
                 'meta' => [
                     'campaign_key' => 'mortgage_homebuyer_nurture',
                     'campaign_step' => 3,
+                    'campaign_step_variant_key' => 'email',
                 ],
             ]);
 
         MessageTemplatePresetAssignment::factory()
             ->forPreset($preset)
-            ->forCampaignStep('mortgage_homebuyer_nurture', 2)
+            ->forCampaignStepVariant('mortgage_homebuyer_nurture', 2, 'email', 'messaging.email.marketing.mortgage_homebuyer_nurture.campaigns.mortgage_homebuyer_nurture.steps.2.variants.email')
             ->create([
                 'meta' => [
                     'source' => 'config_sync',
-                    'source_config_path' => 'messaging.email.marketing.mortgage_homebuyer_nurture.campaigns.mortgage_homebuyer_nurture.steps.2',
+                    'source_config_path' => 'messaging.email.marketing.mortgage_homebuyer_nurture.campaigns.mortgage_homebuyer_nurture.steps.2.variants.email',
+                    'campaign_step_variant_key' => 'email',
                     'catalog' => [
                         'group_label' => 'Mortgage Homebuyer Nurture',
                         'item_label' => 'Step 2 Email',

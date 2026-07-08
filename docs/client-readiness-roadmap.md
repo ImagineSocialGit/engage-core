@@ -64,10 +64,9 @@ resolve selected DB-owned options at runtime
 
 Near-term candidates:
 
-- Messaging template presets, catalog entries, and assignments.
-- Selectable webinar schedule profiles.
-- Campaign channel variants.
 - Task template/default definition UI, if clients/operators need to manage task templates themselves.
+- FlowRoutes event-wait and task-completed resume behavior.
+- Config/setup validation for unsafe config, unsupported keys, invalid tokens, and missing runtime references.
 - Guided FlowRoutes route-builder UX later, after selected bindings and safer runtime UI are stable.
 
 Completed runway pieces:
@@ -76,7 +75,9 @@ Completed runway pieces:
 - CRM selection for status/event FlowRoutes.
 - Messaging template presets, catalog entries, and DB-first assignment resolution foundation.
 - Message Templates catalog/copy-editing UI using catalog entry grouping.
-- Campaign Message Templates assignment UI and access links for selecting active campaign-step templates.
+- Webinar schedule profiles for selectable webinar lifecycle timing.
+- Campaign channel variants, including DB-owned campaign step variants and variant-specific template assignment.
+- Campaign Message Templates assignment UI and access links for selecting active campaign-step-variant templates.
 
 The remaining runway pieces should continue to be implemented as durable client-readiness work, not as smoke-test shortcuts.
 
@@ -99,7 +100,7 @@ Current schema-discovery sequence:
 | Phase | Item | Primary discovery risk | Notes |
 | -: | --- | --- | --- |
 | 1 | Webinar schedule profiles | Completed | DB-owned profiles/items exist. Profiles can be selected by webinar series or individual webinar, with a default fallback. |
-| 2 | Campaign channel variants | DB/schema | Decide whether campaign steps need channel-specific variants and delivery strategies before production. |
+| 2 | Campaign channel variants | Completed | DB-owned `campaign_step_variants` exist. Campaign steps are business moments; variants are channel-specific delivery options. |
 | 3 | Task templates / task defaults | DB/schema | Confirm task template fields can support generated/manual task creation from presets, FlowRoutes, and vertical modules. |
 | 4 | FlowRoutes event-wait / task-completed resume behavior | DB/schema + architecture | Confirm existing route progress metadata can safely resume from neutral `task.completed` events, or add wait-correlation records. |
 | 5 | Config validation / setup validation | Architecture | Add validation/reporting for unsafe config, unsupported keys, invalid tokens, and missing runtime references before client handoff. |
@@ -135,7 +136,7 @@ Client-readiness implementation should chase one main item at a time unless two 
 
 The current sequence is the pre-prod schema-discovery sequence above.
 
-Continue with Campaign channel variants, then Task template/default checks, FlowRoutes event-wait/task-completed resume behavior, and the remaining phases in order unless a concrete client need changes the risk ranking.
+Continue with Task template/default checks, FlowRoutes event-wait/task-completed resume behavior, and the remaining phases in order unless a concrete client need changes the risk ranking.
 
 Do not run parallel threads that modify the same controllers, views, routes, services, migrations, or tests unless one thread is paused and rebased onto the other.
 
@@ -146,7 +147,7 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | # | Planned item | Rough estimate | Notes |
 | -: | --- | ---: | --- |
 | 1 | Webinar schedule profiles | Completed | DB-owned `webinar_schedule_profiles` and `webinar_schedule_profile_items` are the durable schedule-selection path. Series and webinars may select profiles; existing scheduled messages remain stable. |
-| 2 | Campaign channel variants | 2–4 sessions | Decide whether Campaign steps need channel-specific variants and strategy fields before production. Variants must reference Messaging-owned templates/assignments and must not own copy. |
+| 2 | Campaign channel variants | Completed | DB-owned variants are the durable channel-coordination path. Steps own business moment and strategy; variants own channel/purpose/scope/dispatch references and do not own copy. |
 | 3 | Task templates / task defaults | 1–2 sessions | Audit whether `task_templates` supports generated/manual tasks well enough for FlowRoutes and vertical modules. Build UI only if needed. |
 | 4 | FlowRoutes event-wait / task-completed resume behavior | 0.5–1.5 sessions | Resume route event-wait points from neutral `task.completed` automation events, not direct Task-specific FlowRoutes listeners. Confirm whether existing progress metadata is enough. |
 | 5 | Config validation / setup validation | 0.5–1.5 sessions | Convert config-template expectations into practical validation behavior and operator/debug feedback. Prefer command/service-based validation first. |
@@ -293,34 +294,15 @@ Completed baseline:
 
 ## Recommended next implementation target
 
-The next implementation target is Campaign channel variants.
+The next implementation target is Task templates / task defaults.
 
-Webinar schedule profiles are now the completed Phase 1 baseline. The schema decision is DB-owned profiles/items, selectable by webinar series or individual webinar with a default fallback. Schedule profile items own the schedule-slot identity while Messaging template presets own reusable copy. Existing scheduled messages remain stable once created; future registrations use the currently resolved schedule profile.
+Webinar schedule profiles are now the completed Phase 1 baseline. The schema decision is DB-owned profiles/items, selectable by webinar series or individual webinar with a default fallback. Schedule profile items own schedule-slot identity while Messaging template presets own reusable copy. Existing scheduled messages remain stable once created; future registrations use the currently resolved schedule profile.
 
-Phase 2 should decide whether Campaign steps need durable channel-variant records before production.
+Campaign channel variants are now the completed Phase 2 baseline. The schema decision is DB-owned `campaign_step_variants`. Campaign steps are business moments. Variants are channel-specific delivery options. Messaging template assignments may resolve to a specific variant through campaign key, step number, variant key, and source config path. Campaign-generated scheduled messages keep campaign/step/variant identity in metadata while keeping payloads compact.
 
-Questions to settle:
+Task templates / task defaults should now answer whether the existing `task_templates` shape supports generated and manual task creation well enough for FlowRoutes and vertical modules before production. Build a UI only if the audit proves clients/operators need to manage task templates themselves.
 
-```text
-Do Campaign steps need DB-owned channel variants or is the current single-channel step shape enough for first rollout?
-Should variants be stored as first-class rows, JSON on campaign_steps, or deferred until a concrete client workflow needs them?
-Which strategies are needed first: first_available, send_all_eligible, or dependency_aware?
-How do variants reference Messaging-owned templates/assignments without owning reusable copy?
-How does Campaign scheduling keep already-scheduled messages stable if an operator changes a step or variant later?
-```
-
-Likely schema candidates:
-
-```text
-webinar_schedule_profiles
-webinar_schedule_profile_items
-webinar_series.schedule_profile_id
-webinars.schedule_profile_id
-```
-
-Prefer a small durable decision over a polished UI. If a schema change is needed, make it before production. If config-only is enough for first rollout, document that decision and move to Campaign channel variants.
-
-Automatic Follow-ups / FlowRoutes UX polish remains later in the schema-discovery sequence. Do not start it until the higher-risk schedule, variant, task-template, route-resume, config-validation, and permission-invitation pieces are settled or deliberately deferred.
+Automatic Follow-ups / FlowRoutes UX polish remains later in the schema-discovery sequence. Do not start it until the higher-risk task-template, route-resume, config-validation, and permission-invitation pieces are settled or deliberately deferred.
 
 ## What this roadmap intentionally avoids
 
@@ -329,7 +311,7 @@ This roadmap should not be used to justify temporary shortcuts.
 Avoid:
 
 - fake MVP code paths that will be reverted soon;
-- compatibility layers for old shapes unless explicitly chosen;
+- compatibility layers for old campaign/message shapes;
 - adding module-specific behavior into Core for speed;
 - building blank-canvas client builders before the guided workflow is clear; follow `ui-ux-guide.md` for client-facing patterns;
 - building platform-cockpit screens that expose every module, builder, dashboard widget, log, setting, or automation primitive before the next client action is clear;
@@ -352,3 +334,22 @@ When a roadmap item is completed:
 1. Remove it from this file or move it to a completed release note if needed.
 2. Delete or update the related TODO item.
 3. Update module docs only if architecture or durable behavior changed.
+
+
+
+
+### Campaign channel variants
+
+Completed baseline:
+
+- Campaigns owns DB-backed `CampaignStepVariant` records.
+- Campaign enrollment remains the lifecycle.
+- Campaign step is the business moment.
+- Campaign step variant is the channel-specific delivery option for that moment.
+- `campaign_steps.variant_strategy` controls `first_available`, `send_all_eligible`, or `dependency_aware` behavior.
+- Variants reference Messaging-owned templates/assignments through channel, purpose, scope, campaign key, step number, and optional variant context.
+- Variants do not own reusable subject/body/message copy.
+- Campaign messaging is variant-only. A campaign message template must live under `steps.{step_number}.variants.{variant_key}` and a campaign step without variants is incomplete config.
+- Campaign-generated scheduled-message payloads remain compact; campaign/step/variant identity belongs in `scheduled_messages.meta`.
+
+

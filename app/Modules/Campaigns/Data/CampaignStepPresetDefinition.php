@@ -9,18 +9,21 @@ class CampaignStepPresetDefinition
     /**
      * @param array<string, mixed> $criteria
      * @param array<string, mixed> $meta
+     * @param array<int, CampaignStepVariantPresetDefinition> $variants
      */
     public function __construct(
         public readonly int $stepNumber,
         public readonly ?string $name,
         public readonly string $dispatchKey,
-        public readonly ?string $channel = null,
-        public readonly ?string $purpose = null,
-        public readonly ?string $scope = null,
-        public readonly bool $isActive = true,
-        public readonly array $criteria = [],
-        public readonly ?string $sourceVersion = null,
-        public readonly array $meta = [],
+        public readonly ?string $channel,
+        public readonly ?string $purpose,
+        public readonly ?string $scope,
+        public readonly string $variantStrategy,
+        public readonly bool $isActive,
+        public readonly array $criteria,
+        public readonly ?string $sourceVersion,
+        public readonly array $meta,
+        public readonly array $variants,
     ) {}
 
     /**
@@ -29,81 +32,79 @@ class CampaignStepPresetDefinition
     public static function fromArray(array $data): self
     {
         $stepNumber = (int) ($data['step_number'] ?? 0);
-        $dispatchKey = self::requiredString($data['dispatch_key'] ?? null, 'campaign step dispatch_key');
 
         if ($stepNumber < 1) {
-            throw new InvalidArgumentException('Campaign step step_number must be greater than zero.');
+            throw new InvalidArgumentException('Campaign preset steps require a positive step_number.');
+        }
+
+        $dispatchKey = self::optionalString($data['dispatch_key'] ?? null) ?? 'campaign_step_due';
+        $channel = self::optionalString($data['channel'] ?? null);
+        $purpose = self::optionalString($data['purpose'] ?? null);
+        $scope = self::optionalString($data['scope'] ?? null);
+
+        $variants = is_array($data['variants'] ?? null) ? $data['variants'] : [];
+
+        if ($variants === []) {
+            throw new InvalidArgumentException('Campaign message steps must define at least one variant.');
+        }
+
+        $variantDefinitions = array_map(
+            fn (array $variant): CampaignStepVariantPresetDefinition => CampaignStepVariantPresetDefinition::fromArray(
+                data: $variant,
+                stepNumber: $stepNumber,
+                fallbackDispatchKey: $dispatchKey,
+                fallbackChannel: $channel,
+                fallbackPurpose: $purpose,
+                fallbackScope: $scope,
+                fallbackSourceVersion: self::optionalString($data['source_version'] ?? null),
+            ),
+            array_values(array_filter($variants, 'is_array')),
+        );
+
+        if ($variantDefinitions === []) {
+            throw new InvalidArgumentException('Campaign message steps must define at least one valid variant.');
         }
 
         return new self(
             stepNumber: $stepNumber,
-            name: self::nullableString($data['name'] ?? null),
-            dispatchKey: $dispatchKey,
-            channel: self::nullableString($data['channel'] ?? null),
-            purpose: self::nullableString($data['purpose'] ?? null),
-            scope: self::nullableString($data['scope'] ?? null),
+            name: self::optionalString($data['name'] ?? null),
+            dispatchKey: self::normalizeSegment($dispatchKey),
+            channel: $channel !== null ? self::normalizeSegment($channel) : null,
+            purpose: $purpose !== null ? self::normalizeSegment($purpose) : null,
+            scope: $scope !== null ? self::normalizeSegment($scope) : null,
+            variantStrategy: self::variantStrategy($data['variant_strategy'] ?? 'first_available'),
             isActive: (bool) ($data['is_active'] ?? true),
-            criteria: self::criteria($data),
-            sourceVersion: self::nullableString($data['source_version'] ?? null),
-            meta: self::meta($data),
+            criteria: is_array($data['criteria'] ?? null) ? $data['criteria'] : [],
+            sourceVersion: self::optionalString($data['source_version'] ?? null),
+            meta: is_array($data['meta'] ?? null) ? $data['meta'] : [],
+            variants: $variantDefinitions,
         );
     }
 
-    /**
-     * @param array<string, mixed> $data
-     * @return array<string, mixed>
-     */
-    private static function criteria(array $data): array
+    private static function variantStrategy(mixed $value): string
     {
-        $criteria = is_array($data['criteria'] ?? null) ? $data['criteria'] : [];
+        $strategy = is_string($value) && trim($value) !== ''
+            ? self::normalizeSegment($value)
+            : 'first_available';
 
-        foreach (['timing', 'schedule', 'conditions'] as $key) {
-            if (array_key_exists($key, $data) && is_array($data[$key])) {
-                $criteria[$key] = $data[$key];
-            }
-        }
-
-        return $criteria;
+        return in_array($strategy, ['first_available', 'send_all_eligible', 'dependency_aware'], true)
+            ? $strategy
+            : 'first_available';
     }
 
-    /**
-     * @param array<string, mixed> $data
-     * @return array<string, mixed>
-     */
-    private static function meta(array $data): array
+    private static function optionalString(mixed $value): ?string
     {
-        $meta = is_array($data['meta'] ?? null) ? $data['meta'] : [];
-
-        $type = self::nullableString($data['type'] ?? null)
-            ?? self::nullableString($meta['type'] ?? null)
-            ?? 'message';
-
-        $meta['type'] = $type;
-
-        if (array_key_exists('eligibility_failure', $data) && is_array($data['eligibility_failure'])) {
-            $meta['eligibility_failure'] = $data['eligibility_failure'];
+        if (is_int($value) || is_float($value)) {
+            $value = (string) $value;
         }
 
-        return $meta;
+        return is_string($value) && trim($value) !== ''
+            ? trim($value)
+            : null;
     }
 
-    private static function requiredString(mixed $value, string $field): string
+    private static function normalizeSegment(string $value): string
     {
-        if (! is_string($value) || trim($value) === '') {
-            throw new InvalidArgumentException('Missing required '.$field.'.');
-        }
-
-        return trim($value);
-    }
-
-    private static function nullableString(mixed $value): ?string
-    {
-        if (! is_string($value)) {
-            return null;
-        }
-
-        $value = trim($value);
-
-        return $value !== '' ? $value : null;
+        return str_replace('-', '_', strtolower(trim($value)));
     }
 }
