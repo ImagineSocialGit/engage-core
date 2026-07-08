@@ -23,8 +23,12 @@ return [
     | config/messaging/email/marketing/mortgage_homebuyer_nurture.php
     | config/messaging/email/marketing/webinar_waitlist.php
     |
-    | Non-campaign top-level keys are message types. They become
-    | message_type at runtime.
+    | Non-campaign top-level keys describe message definition groups. For
+    | list-based groups such as confirmations or reminders, the reusable runtime
+    | message_type may be singularized, such as confirmation or reminder.
+    | Multiple reminder definitions may therefore share message_type = reminder;
+    | source_config_path and owning module schedule-profile item keys identify
+    | the exact schedule slot.
     |
     | Campaign message templates live under:
     |
@@ -298,3 +302,5 @@ TEXT,
     ],
 
 ];
+
+

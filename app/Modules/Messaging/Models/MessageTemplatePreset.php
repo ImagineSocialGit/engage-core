@@ -119,6 +119,7 @@ class MessageTemplatePreset extends Model
             'step' => $assignment?->campaign_step,
             'notification_type' => $meta['notification_type'] ?? null,
             'skip_when_join_clicked' => (bool) ($meta['skip_when_join_clicked'] ?? false),
+            'source_config_path' => $this->source_config_path,
             'meta' => $meta,
         ], static fn (mixed $value): bool => $value !== null);
 
@@ -138,4 +139,3 @@ class MessageTemplatePreset extends Model
         ));
     }
 }
-

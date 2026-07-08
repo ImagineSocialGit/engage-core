@@ -30,7 +30,8 @@ Primary references:
 16. Imported-contact opt-in invitations are a distinct one-time Messaging flow with configurable public copy/style.
 17. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
 18. Module docs are the source of truth for module ownership and client-facing scope. Configs should not create a module feature that the owning module does not support.
-19. Commerce and Location configs should support admin convenience and integrations; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
+19. Runtime artifact payloads must stay compact. Configs and module data objects should not cause full Eloquent model arrays or loaded relationship graphs to be stored in scheduled messages, automation events, route progress, task metadata, or other persisted runtime artifacts.
+20. Commerce and Location configs should support admin convenience and integrations; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
 
 ## Before creating a config
 
@@ -245,6 +246,36 @@ Friendly aliases are preferred in client-facing copy:
 {webinar_start_time}
 ```
 
+
+## Runtime artifact payload hygiene
+
+Configs and message data objects should produce compact runtime payloads.
+
+Persisted runtime artifacts include scheduled messages, automation-event payloads, FlowRoute progress/context data, task metadata, broadcast recipient metadata, inbound/outbound message metadata, and provider event records.
+
+Use compact data in those artifacts:
+
+```text
+IDs
+scalar token values
+compact context arrays
+source_config_path
+definition_config_path
+stable debug/source metadata
+```
+
+Avoid accidental object snapshots:
+
+```text
+$model->toArray() with loaded relationships
+full Eloquent model arrays
+profile/item collections
+provider_settings
+large raw provider blobs outside explicit raw columns
+```
+
+For Messaging scheduled messages, put send-ready payload fields and compact tokens in `payload`. Put source/profile/template/debug identity in `meta`.
+
 ## Universal Contact tokens
 
 Use these when the recipient is a Contact:
@@ -423,7 +454,7 @@ post_attended
 post_missed
 ```
 
-Do not mix old named reminder keys with the canonical `reminders` array.
+Do not mix old named reminder keys with the canonical `reminders` array. Multiple reminder definitions should remain generic reusable message definitions. The synced Messaging preset may keep `message_type = reminder` for each reminder definition while `source_config_path` distinguishes the source definition. The webinar schedule profile item owns the schedule slot identity.
 
 Avoid:
 
@@ -805,13 +836,13 @@ Do not make producer modules import FlowRoutes.
 
 ## Webinar schedule profiles
 
-Webinar schedule configs may evolve into selectable schedule profiles.
+Webinar schedule configs seed selectable DB-owned schedule profiles.
 
 Schedule profiles decide when webinar-owned messages are sent.
 
 Messaging template presets decide what those messages say.
 
-A webinar series or webinar may later choose profiles such as:
+A webinar series or webinar may choose profiles such as:
 
 ```text
 full 10-day schedule
@@ -820,7 +851,11 @@ last-minute only schedule
 no reminders
 ```
 
-Schedule profile configs should reference Messaging template assignments or message types, not embed reusable copy.
+Schedule profile configs should reference dispatch keys, channels, purposes, scopes, surfaces, message types, and source config paths. They should not embed reusable copy.
+
+Use schedule profile item keys to identify slots such as a 30-minute reminder or live reminder. Do not create schedule-specific Messaging message types such as `reminder_30_minute`; use `message_type = reminder` with a stable `source_config_path` and schedule profile item key instead.
+
+Schedule profile/source identity belongs in scheduled-message metadata. Scheduled-message payloads should store only send-ready payload fields, compact token maps, and compact context arrays.
 
 ## Post-event config shape
 

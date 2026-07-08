@@ -575,7 +575,11 @@
 │   │   │   │   │   └── ResolveWebinarPlaybackAction.php
 │   │   │   │   ├── ResolveWebinarJoinUrlAction.php
 │   │   │   │   ├── ResolveWebinarPlaybackUrlAction.php
+│   │   │   │   ├── SyncWebinarScheduleProfilesAction.php
 │   │   │   │   └── SyncWebinarSeriesFromProviderAction.php
+│   │   │   ├── Console
+│   │   │   │   └── Commands
+│   │   │   │       └── SyncWebinarScheduleProfilesCommand.php
 │   │   │   ├── Contracts
 │   │   │   │   └── WebinarProvider.php
 │   │   │   ├── Controllers
@@ -608,6 +612,8 @@
 │   │   │   ├── Models
 │   │   │   │   ├── Webinar.php
 │   │   │   │   ├── WebinarRegistration.php
+│   │   │   │   ├── WebinarScheduleProfileItem.php
+│   │   │   │   ├── WebinarScheduleProfile.php
 │   │   │   │   ├── WebinarSeries.php
 │   │   │   │   └── WebinarWaitlistSignup.php
 │   │   │   ├── Providers
@@ -617,13 +623,16 @@
 │   │   │   │   ├── StoreWebinarSeriesRequest.php
 │   │   │   │   ├── StoreWebinarWaitlistSignupRequest.php
 │   │   │   │   ├── SyncWebinarSeriesRequest.php
-│   │   │   │   └── UpdateWebinarMessageTemplateRequest.php
+│   │   │   │   ├── UpdateWebinarMessageTemplateRequest.php
+│   │   │   │   └── UpdateWebinarSeriesScheduleProfileRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── ContactPanels
 │   │   │   │   │   └── WebinarContactPanelProvider.php
 │   │   │   │   ├── Dashboard
 │   │   │   │   │   └── WebinarActivityDashboardPanelProvider.php
-│   │   │   │   └── WebinarProviderManager.php
+│   │   │   │   ├── WebinarProviderManager.php
+│   │   │   │   ├── WebinarScheduleProfileDefinitionResolver.php
+│   │   │   │   └── WebinarScheduleProfileResolver.php
 │   │   │   └── Support
 │   │   │       ├── WebinarJoinLinkGenerator.php
 │   │   │       ├── WebinarPlaybackLinkGenerator.php
@@ -923,6 +932,8 @@
 │   │   ├── UserFactory.php
 │   │   ├── WebinarFactory.php
 │   │   ├── WebinarRegistrationFactory.php
+│   │   ├── WebinarScheduleProfileFactory.php
+│   │   ├── WebinarScheduleProfileItemFactory.php
 │   │   ├── WebinarSeriesFactory.php
 │   │   └── WebinarWaitlistSignupFactory.php
 │   ├── migrations
@@ -973,6 +984,7 @@
 │   │   ├── 2026_06_12_050339_create_campaign_enrollments_table.php
 │   │   ├── 2026_06_12_065258_create_broadcasts_table.php
 │   │   ├── 2026_06_12_065311_create_broadcast_recipients_table.php
+│   │   ├── 2026_06_18_203546_create_webinar_schedule_profiles_table.php
 │   │   ├── 2026_06_18_203547_create_webinar_series_table.php
 │   │   ├── 2026_06_19_203548_create_webinars_table.php
 │   │   ├── 2026_06_19_203549_create_webinar_registrations_table.php
@@ -1013,7 +1025,8 @@
 │   │   ├── README.md
 │   │   ├── task-presets-template.php
 │   │   ├── TOKEN_REFERENCE.md
-│   │   └── webinar-post-event-template.php
+│   │   ├── webinar-post-event-template.php
+│   │   └── webinar-schedule-profiles-template.php
 │   ├── module-boundaries.md
 │   ├── modules
 │   │   ├── broadcasts.md
@@ -1301,10 +1314,11 @@
 │   │   │   │   └── ProcessPostWebinarEventJobTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
 │   │   │   ├── WebinarRegistrationControllerTest.php
+│   │   │   ├── WebinarScheduleProfileTest.php
 │   │   │   └── WebinarWaitlistSignupControllerTest.php
 │   │   └── Workflow
 │   │       └── TransitionContactWorkflowStatusActionTest.php
 │   └── TestCase.php
 └── vite.config.js
 
-436 directories, 872 files
+438 directories, 884 files

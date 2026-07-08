@@ -79,19 +79,32 @@ class MessageDefinitionResolver
         }
 
         if ($assignedDefinitions !== []) {
-            $assignedMessageTypes = array_values(array_unique(array_filter(array_map(
-                fn (array $definition): ?string => is_string($definition['message_type'] ?? null)
+            $assignedSourceConfigPaths = array_values(array_unique(array_filter(array_map(
+                fn (array $definition): ?string => $this->definitionSourceConfigPath($definition),
+                $assignedDefinitions,
+            ))));
+
+            $assignedMessageTypesWithoutSource = array_values(array_unique(array_filter(array_map(
+                fn (array $definition): ?string => $this->definitionSourceConfigPath($definition) === null && is_string($definition['message_type'] ?? null)
                     ? $this->normalizeSegment($definition['message_type'])
                     : null,
                 $assignedDefinitions,
             ))));
 
             $resolved = collect($resolved)
-                ->reject(fn (array $definition): bool => in_array(
-                    $this->normalizeSegment((string) ($definition['message_type'] ?? '')),
-                    $assignedMessageTypes,
-                    true,
-                ))
+                ->reject(function (array $definition) use ($assignedSourceConfigPaths, $assignedMessageTypesWithoutSource): bool {
+                    $sourceConfigPath = $this->definitionSourceConfigPath($definition);
+
+                    if ($sourceConfigPath !== null && in_array($sourceConfigPath, $assignedSourceConfigPaths, true)) {
+                        return true;
+                    }
+
+                    return in_array(
+                        $this->normalizeSegment((string) ($definition['message_type'] ?? '')),
+                        $assignedMessageTypesWithoutSource,
+                        true,
+                    );
+                })
                 ->merge($assignedDefinitions)
                 ->values()
                 ->all();
@@ -349,6 +362,23 @@ class MessageDefinitionResolver
         ))));
     }
 
+
+    /**
+     * @param array<string, mixed> $definition
+     */
+    private function definitionSourceConfigPath(array $definition): ?string
+    {
+        $sourceConfigPath = $definition['source_config_path']
+            ?? data_get($definition, 'meta.seed.config_path')
+            ?? data_get($definition, 'meta.message_template_preset.source_config_path')
+            ?? $definition['config_path']
+            ?? null;
+
+        return is_string($sourceConfigPath) && trim($sourceConfigPath) !== ''
+            ? trim($sourceConfigPath)
+            : null;
+    }
+
     private function normalizeChannel(MessageChannel|string $channel): string
     {
         return $channel instanceof MessageChannel
@@ -361,4 +391,3 @@ class MessageDefinitionResolver
         return str_replace('-', '_', strtolower(trim($value)));
     }
 }
-

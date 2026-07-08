@@ -46,6 +46,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/webinar-series/{series}/fix-active', [WebinarController::class, 'fixActive'])
             ->name('crm.webinar-series.fix-active');
 
+        Route::patch('/webinar-series/{series}/schedule-profile', [WebinarController::class, 'updateSeriesScheduleProfile'])
+            ->name('crm.webinar-series.schedule-profile.update');
+
         Route::delete('/webinar-series/{series}', [WebinarController::class, 'destroySeries'])
             ->name('crm.webinar-series.destroy');
 
@@ -240,3 +243,4 @@ Route::middleware('auth')->group(function () {
                 ->name('notes.destroy');
         });
 });
+

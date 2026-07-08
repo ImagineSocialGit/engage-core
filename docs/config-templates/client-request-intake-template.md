@@ -21,6 +21,9 @@ Rules:
   messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
 - FlowRoute presets own automation/control-flow routing.
 - Webinar post-event config owns provider orchestration, not message copy.
+- Webinar schedule profile configs own webinar message timing/slot identity, not message copy.
+- Schedule profile items may share generic Messaging message types such as `reminder`; use item keys and source config paths for schedule-slot identity instead of schedule-specific message types like `reminder_30_minute`.
+- Persisted runtime payloads should be compact. Do not store full Eloquent model arrays or loaded relationship graphs in scheduled message payloads, automation events, route progress, task metadata, or broadcast/inbound metadata unless that column is explicitly a raw provider payload.
 - Default webinar configs should be vertical-neutral.
 - Vertical-specific copy belongs in vertical-specific scopes such as marketing:mortgage_homebuyer_nurture.
 - Email first. SMS may mirror after email passes, but SMS visibility in UI should be config-toggleable per client/surface.
@@ -79,3 +82,4 @@ Return complete config files only, using the same structural shapes as the templ
 List any recommended new keys/tokens separately.
 If the request requires unsupported module behavior, list the needed module/seam work separately instead of inventing config keys.
 ```
+

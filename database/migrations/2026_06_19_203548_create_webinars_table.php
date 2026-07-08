@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -16,6 +17,10 @@ return new class extends Migration
             $table->id();
 
             $table->foreignIdFor(WebinarSeries::class)->nullable()->constrained('webinar_series')->nullOnDelete();
+            $table->foreignIdFor(WebinarScheduleProfile::class)
+                ->nullable()
+                ->constrained('webinar_schedule_profiles')
+                ->nullOnDelete();
 
             $table->string('title');
             $table->string('slug')->unique();
@@ -51,3 +56,4 @@ return new class extends Migration
         Schema::dropIfExists('webinars');
     }
 };
+

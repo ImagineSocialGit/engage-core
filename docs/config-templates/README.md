@@ -18,7 +18,9 @@ Use these rules when converting a client request into config:
 11. Do not use `meta.message` for new Campaign preset step message references.
 12. FlowRoute presets own automation/control-flow routing and point definitions.
 13. Webinar post-event config owns provider event orchestration, not message copy.
-14. Root `config/presets.php` owns preset package composition and sync order.
+14. Webinar schedule profile configs own webinar lifecycle timing/slot identity, not message copy.
+15. Runtime artifact payloads should stay compact: send payloads and token maps should not include full model arrays, loaded relationships, schedule profile item collections, provider settings, or large raw blobs unless the column is explicitly for raw provider data.
+16. Root `config/presets.php` owns preset package composition and sync order.
 15. `config/modules.php` owns enabled modules and dependency visibility.
 16. Use `lead/leads` in CRM/client-facing text unless explicitly told otherwise.
 17. Default webinar configs should be vertical-neutral. Vertical-specific copy belongs in vertical-specific scopes.
@@ -48,7 +50,7 @@ Examples:
 FlowRouteTriggerBinding selects which FlowRoute runs for a trigger/context.
 MessageTemplateCatalogEntry organizes Messaging templates for browsing by channel, purpose, module/surface, group, and item.
 MessageTemplatePresetAssignment selects which Messaging template preset is used for a message context.
-Webinar schedule profile assignments select confirmation/reminder/post-event schedules.
+Webinar schedule profile assignments select confirmation/reminder/waitlist/post-event schedules.
 ```
 
 Avoid using destructive config swapping as the long-term way to test or change client behavior.
@@ -70,6 +72,7 @@ permission-invitations-template.php
 presets-root-template.php
 task-presets-template.php
 webinar-post-event-template.php
+webinar-schedule-profiles-template.php
 ```
 
 `permission-invitations-template.php` is the config shape for `config/messaging/permission_invitations.php`. The broader feature/process reference remains `docs/permission-invitations.md`.
@@ -130,6 +133,36 @@ Campaign-authored timing values:
 
 Campaign step timing is authored in Campaign presets and normalized before dispatching through Messaging.
 
+
+
+## Runtime artifact payload hygiene
+
+Configs and templates should produce compact runtime artifacts.
+
+Persisted runtime artifacts include scheduled messages, automation events, FlowRoute progress/context data, task metadata, broadcast recipient metadata, inbound/outbound message metadata, and provider event records.
+
+Store compact data:
+
+```text
+IDs
+scalar token values
+compact context arrays
+source_config_path
+definition_config_path
+stable debug/source metadata
+```
+
+Do not store accidental hydrated object graphs:
+
+```text
+full Eloquent model arrays
+loaded relationship graphs
+profile/item collections
+provider_settings
+large raw blobs outside explicit raw columns
+```
+
+For Messaging scheduled messages, `payload` should contain send-ready payload fields and compact token/context maps. Source/profile/template/debug identity belongs in `meta`.
 
 ## Client override and validation expectations
 
@@ -258,4 +291,6 @@ Validation output should include severity, config path, reason, and a suggested 
 Config templates may reference current universal modules, but they should not imply those modules are enabled by default. `config/modules.php` controls feature visibility. Shared schema may exist even when a module is not visible to the client.
 
 When a client asks for purchase-history targeting, service-area targeting, document collection, portal upload, or form/submission behavior, first check the owning module doc before adding config keys or templates.
+
+
 

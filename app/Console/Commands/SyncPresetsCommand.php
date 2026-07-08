@@ -7,6 +7,7 @@ use App\Modules\Core\Actions\ContactStatuses\SyncContactStatusPresetsAction;
 use App\Modules\FlowRoutes\Actions\SyncFlowRoutePresetsAction;
 use App\Modules\Messaging\Actions\SyncMessageTemplatePresetsAction;
 use App\Modules\Tasks\Actions\SyncTaskPresetsAction;
+use App\Modules\Webinars\Actions\SyncWebinarScheduleProfilesAction;
 use Illuminate\Console\Command;
 use Throwable;
 
@@ -15,13 +16,15 @@ class SyncPresetsCommand extends Command
     protected $signature = 'presets:sync
         {preset? : Optional preset key, such as mortgage or webinar_funnel}
         {--force-flow-routes : Overwrite customized FlowRoutes, Points, and FlowRoutePoints}
-        {--force-message-templates : Overwrite customized Messaging template presets and reactivate synced assignments}';
+        {--force-message-templates : Overwrite customized Messaging template presets and reactivate synced assignments}
+        {--force-webinar-schedule-profiles : Reserved for future customized webinar schedule profile handling}';
 
     protected $description = 'Sync preset-owned database definitions in dependency-safe order.';
 
     public function handle(
         SyncContactStatusPresetsAction $syncContactStatusPresets,
         SyncTaskPresetsAction $syncTaskPresets,
+        SyncWebinarScheduleProfilesAction $syncWebinarScheduleProfiles,
         SyncMessageTemplatePresetsAction $syncMessageTemplatePresets,
         SyncCampaignPresetsAction $syncCampaignPresets,
         SyncFlowRoutePresetsAction $syncFlowRoutePresets,
@@ -75,6 +78,17 @@ class SyncPresetsCommand extends Command
             } else {
                 $this->line('');
                 $this->warn('Messaging template presets: module disabled; skipped.');
+            }
+
+            if (in_array('webinars', $enabledModules, true)) {
+                $this->renderWebinarScheduleProfileResult(
+                    $syncWebinarScheduleProfiles->handle(
+                        force: (bool) $this->option('force-webinar-schedule-profiles'),
+                    ),
+                );
+            } else {
+                $this->line('');
+                $this->warn('Webinar schedule profiles: module disabled; skipped.');
             }
 
             if ($this->shouldSyncSection($preset, 'campaigns', 'campaigns', $enabledModules)) {
@@ -273,6 +287,33 @@ class SyncPresetsCommand extends Command
                 ['Customized skipped', $result['customized_skipped']],
                 ['Assignments created', $result['assignments_created']],
                 ['Assignments preserved', $result['assignments_preserved']],
+            ],
+        );
+    }
+
+
+    /**
+     * @param array{
+     *     profiles_created: int,
+     *     profiles_updated: int,
+     *     items_created: int,
+     *     items_updated: int,
+     *     items_disabled: int
+     * } $result
+     */
+    private function renderWebinarScheduleProfileResult(array $result): void
+    {
+        $this->line('');
+        $this->info('Webinar schedule profiles');
+
+        $this->table(
+            ['Item', 'Count'],
+            [
+                ['Profiles created', $result['profiles_created']],
+                ['Profiles updated', $result['profiles_updated']],
+                ['Items created', $result['items_created']],
+                ['Items updated', $result['items_updated']],
+                ['Items disabled', $result['items_disabled']],
             ],
         );
     }

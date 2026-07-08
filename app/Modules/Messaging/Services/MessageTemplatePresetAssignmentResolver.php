@@ -28,7 +28,7 @@ class MessageTemplatePresetAssignmentResolver
             ->orderByDesc('id')
             ->get()
             ->filter(fn (MessageTemplatePresetAssignment $assignment): bool => (bool) $assignment->messageTemplatePreset?->isActive())
-            ->unique(fn (MessageTemplatePresetAssignment $assignment): string => (string) $assignment->message_type)
+            ->unique(fn (MessageTemplatePresetAssignment $assignment): string => $this->assignmentDefinitionKey($assignment))
             ->values();
 
         return $assignments
@@ -74,6 +74,20 @@ class MessageTemplatePresetAssignmentResolver
             ->where('channel', $this->normalizeChannel($channel))
             ->where('purpose', $this->normalizeSegment($purpose))
             ->where('scope', $this->normalizeSegment($scope));
+    }
+
+
+    private function assignmentDefinitionKey(MessageTemplatePresetAssignment $assignment): string
+    {
+        $sourceConfigPath = data_get($assignment->meta, 'source_config_path')
+            ?? $assignment->messageTemplatePreset?->source_config_path;
+
+        return implode('|', [
+            (string) $assignment->message_type,
+            is_string($sourceConfigPath) ? trim($sourceConfigPath) : '',
+            (string) ($assignment->campaign_key ?? ''),
+            (string) ($assignment->campaign_step ?? ''),
+        ]);
     }
 
     private function normalizeChannel(MessageChannel|string $channel): string

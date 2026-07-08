@@ -79,12 +79,13 @@ readonly class WebinarMessageData extends MessageData
         return [
             ...parent::toArray(),
 
-            'webinar_registration' => $this->registration?->toArray() ?? [],
-            'webinar_waitlist_signup' => $this->waitlistSignup?->toArray() ?? [],
-            'webinar' => $this->webinar->toArray(),
-            'webinar_series' => $webinarSeries?->toArray() ?? [],
+            'webinar_registration' => $this->compactRegistration(),
+            'webinar_waitlist_signup' => $this->compactWaitlistSignup(),
+            'webinar' => $this->compactWebinar($timezone),
+            'webinar_series' => $this->compactWebinarSeries($webinarSeries),
 
             'registration_id' => $this->registration?->getKey(),
+            'webinar_registration_id' => $this->registration?->getKey(),
             'registration_attended_at' => $this->registration?->attended_at?->toIso8601String(),
             'waitlist_signup_id' => $this->waitlistSignup?->getKey(),
 
@@ -133,6 +134,88 @@ readonly class WebinarMessageData extends MessageData
             webinarJoinUrl: $data['webinar_join_url'] ?? null,
             requestIp: $data['request_ip'] ?? null,
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function compactRegistration(): array
+    {
+        if (! $this->registration instanceof WebinarRegistration) {
+            return [];
+        }
+
+        return [
+            'id' => $this->registration->getKey(),
+            'contact_id' => $this->registration->contact_id,
+            'webinar_id' => $this->registration->webinar_id,
+            'webinar_slug' => $this->registration->webinar_slug,
+            'status' => $this->registration->status,
+            'source' => $this->registration->source,
+            'registered_at' => $this->registration->registered_at?->toIso8601String(),
+            'attended_at' => $this->registration->attended_at?->toIso8601String(),
+            'cancelled_at' => $this->registration->cancelled_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function compactWaitlistSignup(): array
+    {
+        if (! $this->waitlistSignup instanceof WebinarWaitlistSignup) {
+            return [];
+        }
+
+        return [
+            'id' => $this->waitlistSignup->getKey(),
+            'contact_id' => $this->waitlistSignup->contact_id,
+            'webinar_series_id' => $this->waitlistSignup->webinar_series_id,
+            'source_page' => $this->waitlistSignup->source_page,
+            'notified_at' => $this->waitlistSignup->notified_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function compactWebinar(string $timezone): array
+    {
+        return [
+            'id' => $this->webinar->getKey(),
+            'webinar_series_id' => $this->webinar->webinar_series_id,
+            'webinar_schedule_profile_id' => $this->webinar->webinar_schedule_profile_id,
+            'title' => $this->webinar->title,
+            'slug' => $this->webinar->slug,
+            'status' => $this->webinar->status,
+            'platform' => $this->webinar->platform,
+            'external_id' => $this->webinar->external_id,
+            'timezone' => $timezone,
+            'starts_at' => $this->webinar->starts_at?->toIso8601String(),
+            'ends_at' => $this->webinar->ends_at?->toIso8601String(),
+            'description' => $this->webinar->description,
+            'registration_url' => $this->webinar->registration_url,
+            'playback_url' => $this->webinar->playback_url,
+            'playback_passcode' => $this->webinar->playback_passcode,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function compactWebinarSeries(mixed $webinarSeries): array
+    {
+        if (! $webinarSeries) {
+            return [];
+        }
+
+        return [
+            'id' => $webinarSeries->getKey(),
+            'webinar_schedule_profile_id' => $webinarSeries->webinar_schedule_profile_id,
+            'title' => $webinarSeries->title,
+            'slug' => $webinarSeries->slug,
+            'status' => $webinarSeries->status,
+        ];
     }
 
     private function waitlistRegistrationUrl(): ?string

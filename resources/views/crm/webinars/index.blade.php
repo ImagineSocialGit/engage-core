@@ -1,4 +1,3 @@
-
 <x-layouts.crm :title="$title" :heading="$heading">
     <div
         class="space-y-6"
@@ -691,24 +690,65 @@
 
                         <div class="mt-4 space-y-2">
                             @foreach($series as $seriesItem)
-                                <div class="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                    <span>{{ $seriesItem->title }}</span>
+                                <div class="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-700">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p class="font-semibold text-slate-900">{{ $seriesItem->title }}</p>
+                                            <p class="mt-1 text-xs text-slate-500">
+                                                Schedule: {{ $seriesItem->webinarScheduleProfile?->name ?? (($scheduleProfiles ?? collect())->firstWhere('is_default', true)?->name ?? 'Default profile') }}
+                                            </p>
+                                        </div>
 
-                                    <form
-                                        method="POST"
-                                        action="{{ route('crm.webinar-series.destroy', $seriesItem) }}"
-                                        onsubmit="return confirm('Delete this webinar series? This cannot be undone.');"
-                                    >
-                                        @csrf
-                                        @method('DELETE')
-
-                                        <button
-                                            type="submit"
-                                            class="text-xs font-semibold text-red-600 hover:text-red-800"
+                                        <form
+                                            method="POST"
+                                            action="{{ route('crm.webinar-series.destroy', $seriesItem) }}"
+                                            onsubmit="return confirm('Delete this webinar series? This cannot be undone.');"
                                         >
-                                            Delete
-                                        </button>
-                                    </form>
+                                            @csrf
+                                            @method('DELETE')
+
+                                            <button
+                                                type="submit"
+                                                class="text-xs font-semibold text-red-600 hover:text-red-800"
+                                            >
+                                                Delete
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    @if(($scheduleProfiles ?? collect())->isNotEmpty())
+                                        <form
+                                            method="POST"
+                                            action="{{ route('crm.webinar-series.schedule-profile.update', $seriesItem) }}"
+                                            class="mt-3 flex gap-2"
+                                        >
+                                            @csrf
+                                            @method('PATCH')
+
+                                            <select
+                                                name="webinar_schedule_profile_id"
+                                                class="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-0"
+                                                aria-label="Webinar schedule profile for {{ $seriesItem->title }}"
+                                            >
+                                                <option value="">Use default profile</option>
+                                                @foreach($scheduleProfiles as $scheduleProfile)
+                                                    <option
+                                                        value="{{ $scheduleProfile->getKey() }}"
+                                                        @selected((int) $seriesItem->webinar_schedule_profile_id === (int) $scheduleProfile->getKey())
+                                                    >
+                                                        {{ $scheduleProfile->name }}{{ $scheduleProfile->is_default ? ' (default)' : '' }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+
+                                            <button
+                                                type="submit"
+                                                class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                            >
+                                                Save
+                                            </button>
+                                        </form>
+                                    @endif
                                 </div>
                             @endforeach
                         </div>
@@ -718,4 +758,5 @@
         </div>
     </div>
 </x-layouts.crm>
+
 

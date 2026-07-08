@@ -6,6 +6,8 @@ use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
+use App\Modules\Messaging\Services\MessageDefinitionResolver;
+use App\Modules\Webinars\Services\WebinarScheduleProfileDefinitionResolver;
 use App\Modules\Webinars\Data\WebinarMessageData;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarWaitlistSignup;
@@ -19,6 +21,8 @@ class DispatchWebinarWaitlistMessagesAction
     public function __construct(
         private readonly DispatchMessageAction $dispatchMessageAction,
         private readonly MessageChannelAvailability $messageChannelAvailability,
+        private readonly MessageDefinitionResolver $messageDefinitionResolver,
+        private readonly WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
     ) {}
 
     public function handle(Webinar $webinar): void
@@ -59,6 +63,21 @@ class DispatchWebinarWaitlistMessagesAction
         $scheduledCount = 0;
 
         foreach ($channels as $channel) {
+            $definitions = $this->scheduleProfileDefinitionResolver->applyForWebinar(
+                webinar: $webinar,
+                definitions: $this->messageDefinitionResolver->resolve(
+                    channel: $channel,
+                    purpose: MessagePurpose::Marketing->value,
+                    scope: self::SCOPE,
+                ),
+                dispatchKeys: 'webinar_added',
+                surface: self::SURFACE,
+            );
+
+            if ($definitions === []) {
+                continue;
+            }
+
             $scheduledCount += count($this->dispatchMessageAction->handle(
                 recipient: $signup->contact,
                 channel: $channel,
@@ -67,16 +86,23 @@ class DispatchWebinarWaitlistMessagesAction
                 dispatchKeys: 'webinar_added',
                 payload: [
                     'tokens' => $messageData,
-                    'context' => $messageData,
+                    'context' => [
+                        'contact' => $messageData['contact'] ?? [],
+                        'webinar_waitlist_signup' => $messageData['webinar_waitlist_signup'] ?? [],
+                        'webinar' => $messageData['webinar'] ?? [],
+                        'webinar_series' => $messageData['webinar_series'] ?? [],
+                    ],
                 ],
                 context: $signup,
                 triggeredAt: now(),
                 anchor: $webinar->starts_at,
                 meta: [
+                    'webinar_schedule_profile_applied' => true,
                     'webinar_waitlist_signup_id' => $signup->getKey(),
                     'webinar_id' => $webinar->getKey(),
                     'webinar_series_id' => $webinar->webinar_series_id,
                 ],
+                definitions: $definitions,
             ));
         }
 
@@ -106,3 +132,4 @@ class DispatchWebinarWaitlistMessagesAction
             ->all();
     }
 }
+

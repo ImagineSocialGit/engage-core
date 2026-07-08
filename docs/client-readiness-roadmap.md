@@ -98,7 +98,7 @@ Current schema-discovery sequence:
 
 | Phase | Item | Primary discovery risk | Notes |
 | -: | --- | --- | --- |
-| 1 | Webinar schedule profiles | DB/schema | Decide whether webinar-owned message timing needs DB-owned profiles/items and whether profiles attach globally, by series, or by webinar. |
+| 1 | Webinar schedule profiles | Completed | DB-owned profiles/items exist. Profiles can be selected by webinar series or individual webinar, with a default fallback. |
 | 2 | Campaign channel variants | DB/schema | Decide whether campaign steps need channel-specific variants and delivery strategies before production. |
 | 3 | Task templates / task defaults | DB/schema | Confirm task template fields can support generated/manual task creation from presets, FlowRoutes, and vertical modules. |
 | 4 | FlowRoutes event-wait / task-completed resume behavior | DB/schema + architecture | Confirm existing route progress metadata can safely resume from neutral `task.completed` events, or add wait-correlation records. |
@@ -135,7 +135,7 @@ Client-readiness implementation should chase one main item at a time unless two 
 
 The current sequence is the pre-prod schema-discovery sequence above.
 
-Start with Webinar schedule profiles, then continue through Campaign channel variants, Task template/default checks, FlowRoutes event-wait/task-completed resume behavior, and the remaining phases in order unless a concrete client need changes the risk ranking.
+Continue with Campaign channel variants, then Task template/default checks, FlowRoutes event-wait/task-completed resume behavior, and the remaining phases in order unless a concrete client need changes the risk ranking.
 
 Do not run parallel threads that modify the same controllers, views, routes, services, migrations, or tests unless one thread is paused and rebased onto the other.
 
@@ -145,7 +145,7 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 
 | # | Planned item | Rough estimate | Notes |
 | -: | --- | ---: | --- |
-| 1 | Webinar schedule profiles | 1–3 sessions | Highest remaining Webinars-side schema question. Decide DB-owned profiles/items vs config-only, and whether selection attaches globally, by webinar series, or by webinar. |
+| 1 | Webinar schedule profiles | Completed | DB-owned `webinar_schedule_profiles` and `webinar_schedule_profile_items` are the durable schedule-selection path. Series and webinars may select profiles; existing scheduled messages remain stable. |
 | 2 | Campaign channel variants | 2–4 sessions | Decide whether Campaign steps need channel-specific variants and strategy fields before production. Variants must reference Messaging-owned templates/assignments and must not own copy. |
 | 3 | Task templates / task defaults | 1–2 sessions | Audit whether `task_templates` supports generated/manual tasks well enough for FlowRoutes and vertical modules. Build UI only if needed. |
 | 4 | FlowRoutes event-wait / task-completed resume behavior | 0.5–1.5 sessions | Resume route event-wait points from neutral `task.completed` automation events, not direct Task-specific FlowRoutes listeners. Confirm whether existing progress metadata is enough. |
@@ -240,6 +240,20 @@ Completed baseline:
 - Selecting which template a Webinar or Automatic Follow-up uses still belongs on that consuming module's setup screen.
 
 
+
+### Webinar schedule profiles
+
+Completed baseline:
+
+- Webinars owns DB-backed `WebinarScheduleProfile` and `WebinarScheduleProfileItem` records.
+- Schedule profiles decide when webinar lifecycle messages are sent; Messaging template presets decide what those messages say.
+- Profiles can be selected at the webinar series or webinar level, with an active default fallback.
+- Schedule profile items reference stable runtime dimensions such as channel, purpose, scope, surface, message type, dispatch key, and source config path.
+- Multiple reminder slots may share `message_type = reminder`; the schedule profile item key/source config path owns the slot identity.
+- Existing scheduled messages are not rewritten retroactively when a profile or template assignment changes.
+- Webinar dispatch payloads store compact token/context data. Schedule profile identity belongs in scheduled-message metadata, not as a hydrated profile/items object graph inside `scheduled_messages.payload`.
+- Tests include payload-shape checks so full Eloquent relationship graphs do not leak into scheduled-message payloads.
+
 ### Webinars message/template setup
 
 Completed functional baseline:
@@ -279,18 +293,20 @@ Completed baseline:
 
 ## Recommended next implementation target
 
-The next implementation target is Webinar schedule profiles.
+The next implementation target is Campaign channel variants.
 
-The purpose of this phase is to decide whether webinar-owned message timing needs DB-owned schedule profile records before production, or whether config-only timing remains sufficient for the first rollout.
+Webinar schedule profiles are now the completed Phase 1 baseline. The schema decision is DB-owned profiles/items, selectable by webinar series or individual webinar with a default fallback. Schedule profile items own the schedule-slot identity while Messaging template presets own reusable copy. Existing scheduled messages remain stable once created; future registrations use the currently resolved schedule profile.
+
+Phase 2 should decide whether Campaign steps need durable channel-variant records before production.
 
 Questions to settle:
 
 ```text
-Are schedule profiles DB-owned or config-only for now?
-Do profiles attach globally, by client, by webinar series, or by webinar?
-Do confirmations, reminders, waitlist availability messages, and post-event transactional follow-ups share one profile model or separate profile categories?
-Do schedule profile items reference message_type, template assignment context, channel/purpose/scope, or a normalized schedule item key?
-Can existing scheduled messages remain stable once created while future registrations use the newly selected profile?
+Do Campaign steps need DB-owned channel variants or is the current single-channel step shape enough for first rollout?
+Should variants be stored as first-class rows, JSON on campaign_steps, or deferred until a concrete client workflow needs them?
+Which strategies are needed first: first_available, send_all_eligible, or dependency_aware?
+How do variants reference Messaging-owned templates/assignments without owning reusable copy?
+How does Campaign scheduling keep already-scheduled messages stable if an operator changes a step or variant later?
 ```
 
 Likely schema candidates:

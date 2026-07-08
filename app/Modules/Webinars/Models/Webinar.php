@@ -20,6 +20,7 @@ class Webinar extends Model
 
     protected $fillable = [
         'webinar_series_id',
+        'webinar_schedule_profile_id',
         'title',
         'slug',
         'platform',
@@ -52,6 +53,7 @@ class Webinar extends Model
                 'starts_at',
                 'ends_at',
                 'webinar_series_id',
+        'webinar_schedule_profile_id',
                 'registration_url',
                 'join_url',
                 'timezone',
@@ -72,6 +74,11 @@ class Webinar extends Model
         return $this->belongsTo(WebinarSeries::class);
     }
 
+    public function webinarScheduleProfile(): BelongsTo
+    {
+        return $this->belongsTo(WebinarScheduleProfile::class);
+    }
+
     public function registrations(): HasMany
     {
         return $this->hasMany(WebinarRegistration::class);
@@ -83,3 +90,4 @@ class Webinar extends Model
     }
 
 }
+

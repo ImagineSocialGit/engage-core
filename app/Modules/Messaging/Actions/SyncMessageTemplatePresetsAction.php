@@ -115,6 +115,12 @@ class SyncMessageTemplatePresetsAction
             }
         }
 
+        $sourceConfigPath = data_get($assignment, 'meta.source_config_path');
+
+        if (is_string($sourceConfigPath) && trim($sourceConfigPath) !== '') {
+            $query->where('meta->source_config_path', trim($sourceConfigPath));
+        }
+
         return $query->orderByDesc('is_active')->orderByDesc('id')->first();
     }
 
@@ -181,7 +187,7 @@ class SyncMessageTemplatePresetsAction
 
             $isList = array_is_list($definition);
             $definitionList = $isList ? $definition : [$definition];
-            $needsIndexedMessageType = $isList && count($definitionList) > 1;
+            $runtimeMessageType = Str::singular($this->normalizeSegment($messageType));
 
             foreach ($definitionList as $index => $nestedDefinition) {
                 if (! is_array($nestedDefinition) || ! ($nestedDefinition['enabled'] ?? true)) {
@@ -189,10 +195,6 @@ class SyncMessageTemplatePresetsAction
                 }
 
                 $configPath = "{$scopeConfigPath}.{$messageType}".($isList ? ".{$index}" : '');
-                $runtimeMessageType = $needsIndexedMessageType
-                    ? $this->indexedMessageType($messageType, $nestedDefinition, (int) $index)
-                    : $messageType;
-
                 yield $this->definitionPayload(
                     definition: $nestedDefinition,
                     channel: $channel,
@@ -503,19 +505,6 @@ class SyncMessageTemplatePresetsAction
         ];
     }
 
-    private function indexedMessageType(string $messageType, array $definition, int $index): string
-    {
-        $base = $this->normalizeSegment(Str::singular($messageType));
-
-        if ($base === 'reminder') {
-            $suffix = $this->scheduleSuffix($definition);
-
-            return $suffix !== null ? "reminder_{$suffix}" : "reminder_".($index + 1);
-        }
-
-        return $base.'_'.($index + 1);
-    }
-
     /**
      * @param array<string, mixed>|null $schedule
      */
@@ -628,12 +617,6 @@ class SyncMessageTemplatePresetsAction
         array $definition,
         ?int $listIndex,
     ): string {
-        if (str_starts_with($messageType, 'reminder_')) {
-            $reminderLabel = $this->reminderLabel($definition);
-
-            return $reminderLabel.' '.$this->channelLabel($channel);
-        }
-
         $base = match ($this->normalizeSegment($sourceMessageType)) {
             'confirmation', 'confirmations' => 'Confirmation',
             'opt_in', 'opt_ins' => 'Opt-In',
@@ -655,58 +638,12 @@ class SyncMessageTemplatePresetsAction
      */
     private function itemOrderForMessage(array $definition, ?int $listIndex): int
     {
-        $schedule = is_array($definition['schedule'] ?? null) ? $definition['schedule'] : null;
-
-        if ($schedule !== null && is_int($schedule['minutes'] ?? null)) {
-            return (int) $schedule['minutes'];
-        }
-
         return $listIndex ?? 0;
     }
 
     private function usageTypeForMessage(string $scope, string $sourceMessageType): string
     {
         return $this->normalizeSegment($scope.'_'.Str::singular($sourceMessageType));
-    }
-
-    /**
-     * @param array<string, mixed> $definition
-     */
-    private function reminderLabel(array $definition): string
-    {
-        $schedule = is_array($definition['schedule'] ?? null) ? $definition['schedule'] : [];
-        $minutes = is_int($schedule['minutes'] ?? null) ? (int) $schedule['minutes'] : null;
-
-        return match ($minutes) {
-            -14400 => '10-Day Reminder',
-            -10080 => '1-Week Reminder',
-            -1440 => '1-Day Reminder',
-            -30 => '30-Minute Reminder',
-            -10 => '10-Minute Reminder',
-            0, 5 => 'Live Reminder',
-            default => $minutes === null
-                ? 'Reminder'
-                : abs($minutes).'-Minute '.($minutes < 0 ? 'Reminder' : 'Live Follow-Up'),
-        };
-    }
-
-    /**
-     * @param array<string, mixed> $definition
-     */
-    private function scheduleSuffix(array $definition): ?string
-    {
-        $schedule = is_array($definition['schedule'] ?? null) ? $definition['schedule'] : [];
-        $minutes = is_int($schedule['minutes'] ?? null) ? (int) $schedule['minutes'] : null;
-
-        return match ($minutes) {
-            -14400 => '10_day',
-            -10080 => '1_week',
-            -1440 => '1_day',
-            -30 => '30_minute',
-            -10 => '10_minute',
-            0, 5 => 'live',
-            default => $minutes === null ? null : str_replace('-', 'minus_', (string) $minutes).'_minute',
-        };
     }
 
     private function presetKey(string $configPath): string

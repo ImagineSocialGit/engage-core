@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -19,6 +20,11 @@ return new class extends Migration
 
             $table->string('status')->default('active')->index();
 
+            $table->foreignIdFor(WebinarScheduleProfile::class)
+                ->nullable()
+                ->constrained('webinar_schedule_profiles')
+                ->nullOnDelete();
+
             $table->json('meta')->nullable();
 
             $table->timestamps();
@@ -33,3 +39,4 @@ return new class extends Migration
         Schema::dropIfExists('webinar_series');
     }
 };
+

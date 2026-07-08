@@ -15,6 +15,7 @@ Webinars owns:
 - webinar follow-ups
 - webinar attendance recording
 - webinar post-event behavior
+- webinar schedule profiles and schedule profile items
 - webinar contact panels
 
 Zoom is not a module.
@@ -30,13 +31,13 @@ Webinars may use Messaging to send registration confirmations, reminders, opt-in
 
 ## Webinar message/template/schedule setup
 
-Webinars should provide the owning setup surface for webinar-owned message contexts.
+Webinars provides the owning setup surface for webinar-owned message contexts.
 
 Messaging template presets decide what those messages say.
 
 Webinars decide when those messages are sent and which webinar context they apply to.
 
-The next Webinars setup surface should support contexts such as:
+The Webinars setup surface should support contexts such as:
 
 ```text
 registration confirmation
@@ -46,15 +47,15 @@ post-attended transactional follow-up
 post-missed transactional follow-up
 ```
 
-That surface should show the current selected Messaging template for each context, allow choosing a compatible `MessageTemplatePreset`, save the selected `MessageTemplatePresetAssignment`, and link back to Message Templates for copy editing.
+That surface should show the current selected Messaging template for each context, allow choosing a compatible `MessageTemplatePreset`, save the selected `MessageTemplatePresetAssignment`, and link back to Message Templates for copy editing. Schedule selection remains Webinars-owned and separate from copy editing.
 
 ## Selectable webinar schedule profiles
 
-Webinars should eventually support DB-owned selectable schedule profiles for webinar-owned messages.
+Webinars supports DB-owned selectable schedule profiles for webinar-owned messages.
 
-Schedule profiles decide when webinar lifecycle messages are sent.
+Schedule profiles decide when webinar lifecycle messages are sent. Messaging template presets decide what those messages say.
 
-Potential profile categories:
+Profile items may cover categories such as:
 
 ```text
 registration confirmation schedule
@@ -72,9 +73,13 @@ last-minute only schedule
 no reminders
 ```
 
-Assignments may be global/default or context-specific, such as per webinar series or individual webinar.
+Assignments may be default/global or context-specific. The current durable selection points are webinar series and individual webinar, with individual webinar selection taking precedence over series selection.
 
-A schedule profile should reference dispatch keys, message types, channels, purpose/scope, and Messaging template assignment keys. It should not embed reusable message copy.
+A schedule profile item references runtime dimensions such as dispatch key, message type, channel, purpose, scope, surface, source config path, timing, schedule, conditions, and metadata. It should not embed reusable message copy.
+
+Multiple reminder slots may share the same reusable Messaging behavior, for example `message_type = reminder`. The schedule profile item key and source config path identify the specific reminder slot, such as 30 minutes before start. Messaging should not encode reminder timing into schedule-specific message types such as `reminder_30_minute`.
+
+Scheduled-message payloads created by Webinars must remain compact. They should include send-ready payload fields, compact token maps, and compact context arrays. They must not include full Eloquent model arrays, loaded relationships, webinar schedule profile objects, or profile item collections. Schedule profile/source identity belongs in scheduled-message metadata.
 
 Post-webinar transactional follow-ups are not campaign nurture.
 

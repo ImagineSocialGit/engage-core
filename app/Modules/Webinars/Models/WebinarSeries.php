@@ -22,6 +22,7 @@ class WebinarSeries extends Model
         'title',
         'slug',
         'status',
+        'webinar_schedule_profile_id',
         'meta',
     ];
 
@@ -42,6 +43,7 @@ class WebinarSeries extends Model
                 'slug',
                 'title',
                 'status',
+        'webinar_schedule_profile_id',
                 'meta',
             ])) {
                 return;
@@ -60,5 +62,10 @@ class WebinarSeries extends Model
     public function webinars(): HasMany
     {
         return $this->hasMany(Webinar::class, 'webinar_series_id');
+    }
+
+    public function webinarScheduleProfile(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(WebinarScheduleProfile::class);
     }
 }

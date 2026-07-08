@@ -7,6 +7,8 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\MessageEligibilityGate;
+use App\Modules\Messaging\Services\MessageDefinitionResolver;
+use App\Modules\Webinars\Services\WebinarScheduleProfileDefinitionResolver;
 use App\Modules\Webinars\Data\WebinarMessageData;
 use App\Modules\Webinars\Models\WebinarRegistration;
 
@@ -18,6 +20,8 @@ class DispatchWebinarRegistrationMessagesAction
         private readonly DispatchMessageAction $dispatchMessageAction,
         private readonly MessageEligibilityGate $messageEligibilityGate,
         private readonly MessageChannelAvailability $messageChannelAvailability,
+        private readonly MessageDefinitionResolver $messageDefinitionResolver,
+        private readonly WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
     ) {}
 
     public function handle(WebinarRegistration $registration): void
@@ -44,6 +48,21 @@ class DispatchWebinarRegistrationMessagesAction
                 continue;
             }
 
+            $definitions = $this->scheduleProfileDefinitionResolver->applyForWebinar(
+                webinar: $registration->webinar,
+                definitions: $this->messageDefinitionResolver->resolve(
+                    channel: $channel,
+                    purpose: MessagePurpose::Transactional->value,
+                    scope: self::SCOPE,
+                ),
+                dispatchKeys: 'registration_created',
+                surface: 'webinar_registrations',
+            );
+
+            if ($definitions === []) {
+                continue;
+            }
+
             $this->dispatchMessageAction->handle(
                 recipient: $registration->contact,
                 channel: $channel,
@@ -53,20 +72,22 @@ class DispatchWebinarRegistrationMessagesAction
                 payload: [
                     'tokens' => $messageData,
                     'context' => [
-                        'contact' => $registration->contact->toArray(),
-                        'webinar_registration' => $registration->toArray(),
-                        'webinar' => $registration->webinar?->toArray() ?? [],
-                        'webinar_series' => $registration->webinar?->webinarSeries?->toArray() ?? [],
+                        'contact' => $messageData['contact'] ?? [],
+                        'webinar_registration' => $messageData['webinar_registration'] ?? [],
+                        'webinar' => $messageData['webinar'] ?? [],
+                        'webinar_series' => $messageData['webinar_series'] ?? [],
                     ],
                 ],
                 context: $registration,
                 triggeredAt: $registration->registered_at ?? now(),
                 anchor: $registration->webinar?->starts_at,
                 meta: [
+                    'webinar_schedule_profile_applied' => true,
                     'webinar_registration_id' => $registration->getKey(),
                     'webinar_id' => $registration->webinar_id,
                     'webinar_slug' => $registration->webinar_slug,
                 ],
+                definitions: $definitions,
             );
         }
     }

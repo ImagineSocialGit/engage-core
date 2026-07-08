@@ -135,6 +135,46 @@ Module-contributed contact sections should stay useful and business-facing. They
 
 Core must not import module models such as Task, ScheduledMessage, WebinarRegistration, CampaignEnrollment, ContactFlowRouteProgress, or TeamMember just to render a contact page.
 
+
+## Runtime Artifact Payload Hygiene
+
+Runtime artifacts are records persisted for later execution, delivery, debugging, or automation. Examples include scheduled messages, automation events, FlowRoute progress/context data, task metadata, broadcast recipient metadata, inbound/outbound message metadata, and provider event records.
+
+These artifacts should store compact, intentional data:
+
+```text
+IDs and morph references
+scalar token values
+compact context arrays
+source_config_path / definition_config_path
+stable debug/source metadata
+raw provider payloads only in columns explicitly meant for raw provider data
+```
+
+They should not store accidental hydrated object graphs:
+
+```text
+full Eloquent model arrays
+loaded relationship graphs
+profile/item collections
+provider_settings
+large raw blobs in send payloads
+module-owned records copied wholesale into another module's runtime payload
+```
+
+A module may pass compact DTO/data-object arrays to another module's public action. It should not pass `Model::toArray()` output into persisted runtime payloads unless the receiving table is explicitly designed to snapshot that exact model shape.
+
+For Messaging scheduled messages:
+
+```text
+scheduled_messages.recipient_type / recipient_id = who receives the message
+scheduled_messages.context_type / context_id = what domain record the message is about
+scheduled_messages.payload = send-ready payload + compact tokens/context
+scheduled_messages.meta = source/debug/schedule/profile/template identity
+```
+
+Module completion tests should include payload-shape checks when a module writes scheduled messages, automation events, route progress, task metadata, or other persisted runtime artifacts.
+
 ## Runtime-Selectable Definitions
 
 Preset/config sync should create or update available definitions.
@@ -156,7 +196,7 @@ This pattern applies to:
 
 - FlowRoute trigger selection.
 - Messaging template/message preset selection.
-- Webinar confirmation, reminder, and post-event schedule selection.
+- Webinar confirmation, reminder, waitlist, and post-event schedule-profile selection.
 - Campaign/channel strategy selection when campaign step variants are implemented.
 
 Do not use destructive config swapping, temporary smoke-test keys, or broad route activation toggles as the long-term mechanism for choosing client runtime behavior.
@@ -305,6 +345,8 @@ Current ownership:
 | webinars | Webinars |
 | webinar_registrations | Webinars |
 | webinar_waitlist_signups | Webinars |
+| webinar_schedule_profiles | Webinars |
+| webinar_schedule_profile_items | Webinars |
 | mortgage_stages | Mortgage |
 | contact_mortgage_profiles | Mortgage |
 
@@ -1005,7 +1047,7 @@ message_template_preset_assignments
 ```text
 channel + purpose + scope + surface + message_type
 channel + purpose + scope + campaign_key + campaign_step
-channel + purpose + scope + webinar schedule/reminder type
+channel + purpose + scope + surface + message_type, with source/template identity where multiple schedule slots share one message_type
 ```
 
 Runtime resolvers may read config during a transition period, but the target architecture is DB-first resolution from selected Messaging template assignments.
@@ -1066,6 +1108,8 @@ Campaign presets own journey identity, step order, and step timing.
 Messaging owns the delivery template for the campaign step.
 
 Post-webinar transactional follow-ups should use the same Messaging definition shape as confirmations, reminders, opt-ins, and campaign message templates.
+
+Webinars owns DB-backed `webinar_schedule_profiles` and `webinar_schedule_profile_items`. Schedule profiles decide timing and slot enablement for webinar-owned lifecycle messages. Messaging template presets decide reusable copy. Multiple schedule slots may share a generic `message_type` such as `reminder`; schedule profile item keys and source config paths identify the specific slot. Webinars may place compact schedule/profile identity in scheduled-message metadata, but should not place hydrated schedule profile objects or item collections in scheduled-message payloads.
 
 
 Good:

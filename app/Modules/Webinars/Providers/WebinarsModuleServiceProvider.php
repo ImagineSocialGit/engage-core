@@ -3,6 +3,7 @@
 namespace App\Modules\Webinars\Providers;
 
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
+use App\Modules\Webinars\Console\Commands\SyncWebinarScheduleProfilesCommand;
 use App\Modules\Webinars\Services\ContactPanels\WebinarContactPanelProvider;
 use App\Modules\Webinars\Services\Dashboard\WebinarActivityDashboardPanelProvider;
 use App\Support\Dashboard\DashboardPanelRegistry;
@@ -22,6 +23,12 @@ class WebinarsModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                SyncWebinarScheduleProfilesCommand::class,
+            ]);
+        }
+
         $this->app->make(ContactPanelRegistry::class)
             ->register(WebinarContactPanelProvider::class, 'webinars');
 
@@ -89,3 +96,4 @@ class WebinarsModuleServiceProvider extends ServiceProvider
         };
     }
 }
+

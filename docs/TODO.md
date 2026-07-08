@@ -39,6 +39,10 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [ ] Confirm production code changes are architectural fixes, not test-shaped legacy preservation.
 - [ ] Confirm no new direct cross-module model/table writes were introduced where a public action/service should be used.
 - [ ] Confirm migrations are replacements, not modify-table migrations, while this branch remains pre-rollout.
+- [ ] Run a runtime artifact payload hygiene audit for touched modules.
+  - Check persisted payload/meta columns such as `scheduled_messages.payload`, `scheduled_messages.meta`, automation-event payloads, FlowRoute progress/context data, task metadata, broadcast recipient metadata, and inbound/outbound message metadata.
+  - Confirm payloads store IDs, scalar fields, compact token maps, source/config identifiers, and stable debug metadata.
+  - Confirm payloads do not store full Eloquent model arrays, loaded relationships, profile/item collections, provider settings, or large raw blobs unless the table/column is explicitly meant to preserve raw provider data.
 - [ ] Run `php artisan optimize:clear` after config, route, provider, or view changes.
 - [ ] Update docs only when the architecture or operator/client behavior changed.
 
@@ -130,10 +134,11 @@ These are repeatable checklists. Run the relevant checklist after a production s
 
 Use this as a disposable checklist mirror of the roadmap sequence. Keep the roadmap as the source of truth for implementation order and update this section as phases are completed, deferred, or split.
 
-- [ ] Phase 1 — Webinar schedule profiles.
-  - Decide DB-owned profiles/items vs config-only for first rollout.
-  - Decide global/client/series/webinar attachment point.
-  - Preserve already-scheduled message stability.
+- [x] Phase 1 — Webinar schedule profiles.
+  - DB-owned profiles/items are the selected schedule path.
+  - Profiles may be selected by webinar series or individual webinar, with a default fallback.
+  - Existing scheduled messages remain stable after creation.
+  - Webinar scheduled-message payloads must remain compact; schedule profile/source identity belongs in metadata.
 - [ ] Phase 2 — Campaign channel variants.
   - Decide whether `campaign_step_variants` or equivalent schema is needed.
   - Keep variants from owning reusable copy.
@@ -322,11 +327,12 @@ Completed Webinars message setup baseline:
 - Runtime resolution preserves DB-first assignment behavior with config fallback.
 - This baseline is functional, not UX-polished.
 
-- [ ] Add selectable webinar schedule profiles.
-  - Confirmation schedules.
-  - Reminder schedules.
-  - Post-event transactional follow-up schedules.
-  - Assign profiles globally, by client, by webinar series, or by webinar when needed.
+Completed Webinar schedule profile baseline:
+
+- DB-backed schedule profiles/items exist for webinar-owned message timing.
+- Series and webinars can select a schedule profile.
+- Schedule profile items own schedule-slot identity; Messaging template presets own reusable copy.
+- Future polish may improve the setup UI, but the schema question is settled for the current pre-production branch.
 
 - [ ] Add Campaign step variant architecture.
   - Campaign enrollment is the lifecycle.

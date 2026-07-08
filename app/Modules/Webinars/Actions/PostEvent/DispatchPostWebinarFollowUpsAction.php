@@ -6,11 +6,13 @@ use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Services\ConditionChecker;
+use App\Modules\Messaging\Services\MessageDefinitionResolver;
 use App\Modules\Webinars\Actions\EmitWebinarAutomationEventAction;
 use App\Modules\Webinars\Contracts\WebinarProvider;
 use App\Modules\Webinars\Data\WebinarMessageData;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Services\WebinarScheduleProfileDefinitionResolver;
 
 class DispatchPostWebinarFollowUpsAction
 {
@@ -18,6 +20,8 @@ class DispatchPostWebinarFollowUpsAction
         private readonly ConditionChecker $conditionChecker,
         private readonly DispatchMessageAction $dispatchMessageAction,
         private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
+        private readonly MessageDefinitionResolver $messageDefinitionResolver,
+        private readonly WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
     ) {}
 
     public function execute(
@@ -104,11 +108,6 @@ class DispatchPostWebinarFollowUpsAction
                     'webinar_title' => $webinar->title,
                     'webinar_playback_url' => $webinar->playback_url,
                     'registration_attended_at' => $registration->attended_at?->toIso8601String(),
-                    'context' => [
-                        'webinar' => $webinar->toArray(),
-                        'webinar_registration' => $registration->toArray(),
-                        'webinar_series' => $registration->webinar?->webinarSeries?->toArray() ?? [],
-                    ],
                 ],
             );
 
@@ -119,10 +118,10 @@ class DispatchPostWebinarFollowUpsAction
                 [
                     'tokens' => $messageData,
                     'context' => [
-                        'contact' => $messageData['contact'] ?? $registration->contact->toArray(),
-                        'webinar' => $webinar->toArray(),
-                        'webinar_registration' => $registration->toArray(),
-                        'webinar_series' => $registration->webinar?->webinarSeries?->toArray() ?? [],
+                        'contact' => $messageData['contact'] ?? [],
+                        'webinar' => $messageData['webinar'] ?? [],
+                        'webinar_registration' => $messageData['webinar_registration'] ?? [],
+                        'webinar_series' => $messageData['webinar_series'] ?? [],
                     ],
                 ],
             );
@@ -138,6 +137,21 @@ class DispatchPostWebinarFollowUpsAction
                     ],
                 ];
 
+                $definitions = $this->scheduleProfileDefinitionResolver->applyForWebinar(
+                    webinar: $webinar,
+                    definitions: $this->messageDefinitionResolver->resolve(
+                        channel: $channel,
+                        purpose: $purpose,
+                        scope: $scope,
+                    ),
+                    dispatchKeys: $dispatchKeys,
+                    surface: 'webinar_registrations',
+                );
+
+                if ($definitions === []) {
+                    continue;
+                }
+
                 $this->dispatchMessageAction->handle(
                     recipient: $registration->contact,
                     channel: $channel,
@@ -147,7 +161,8 @@ class DispatchPostWebinarFollowUpsAction
                     payload: $payload,
                     context: $registration,
                     triggeredAt: now(),
-                    meta: $meta,
+                    meta: $meta + ['webinar_schedule_profile_applied' => true],
+                    definitions: $definitions,
                 );
             }
         }
@@ -224,3 +239,4 @@ class DispatchPostWebinarFollowUpsAction
         return $webinar->fresh() ?? $webinar;
     }
 }
+

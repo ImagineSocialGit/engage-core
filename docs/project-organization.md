@@ -98,7 +98,7 @@ Universal modules are reusable capability modules. They may be disabled for many
 | FlowRoutes | Automation/control-flow routes, route points, waits, event waits, route progress. |
 | Campaigns | Enrolled multi-step message journeys and campaign progression. |
 | Broadcasts | One-time/batch sends and recipient bookkeeping. |
-| Webinars | Webinar series, webinars, registrations, waitlists, provider behavior, attendance, replay/follow-up orchestration. |
+| Webinars | Webinar series, webinars, registrations, waitlists, schedule profiles, provider behavior, attendance, replay/follow-up orchestration. |
 | Reporting | Reporting queries, dashboards, data objects, and report surfaces. |
 | Scheduling | Appointments, availability, optional saved appointment places, booking/reschedule/cancel behavior, appointment reminders. |
 | Portal | External/customer accounts, portal auth, account invitations, contact-account links, customer-facing shell. |

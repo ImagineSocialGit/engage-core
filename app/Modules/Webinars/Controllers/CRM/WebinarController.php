@@ -10,6 +10,8 @@ use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Modules\Webinars\Requests\StoreWebinarSeriesRequest;
 use App\Modules\Webinars\Requests\SyncWebinarSeriesRequest;
+use App\Modules\Webinars\Requests\UpdateWebinarSeriesScheduleProfileRequest;
+use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\RedirectResponse;
@@ -26,7 +28,14 @@ class WebinarController extends Controller
     public function index(Request $request): View
     {
         $series = WebinarSeries::query()
+            ->with('webinarScheduleProfile')
             ->orderBy('title')
+            ->get();
+
+        $scheduleProfiles = WebinarScheduleProfile::query()
+            ->active()
+            ->orderByDesc('is_default')
+            ->orderBy('name')
             ->get();
 
         $showArchived = $request->boolean('archived');
@@ -54,6 +63,7 @@ class WebinarController extends Controller
             'heading' => 'Webinars',
             'webinars' => $webinars,
             'series' => $series,
+            'scheduleProfiles' => $scheduleProfiles,
             'showArchived' => $showArchived,
             'webinarDevEnabled' => $this->devTestingAllowed(),
             'webinarSmokeEnabled' => $this->devTestingAllowed(),
@@ -125,6 +135,20 @@ class WebinarController extends Controller
             ->with('success', 'Upcoming webinar cache refreshed.');
     }
 
+
+    public function updateSeriesScheduleProfile(
+        UpdateWebinarSeriesScheduleProfileRequest $request,
+        WebinarSeries $series,
+    ): RedirectResponse {
+        $series->forceFill([
+            'webinar_schedule_profile_id' => $request->validated('webinar_schedule_profile_id'),
+        ])->save();
+
+        return redirect()
+            ->route('crm.webinar-series.index')
+            ->with('success', 'Webinar schedule profile updated.');
+    }
+
     public function destroySeries(WebinarSeries $series): RedirectResponse
     {
         if (Webinar::query()->where('webinar_series_id', $series->id)->exists()) {
@@ -149,3 +173,4 @@ class WebinarController extends Controller
         return app()->environment(['local', 'staging']);
     }
 }
+

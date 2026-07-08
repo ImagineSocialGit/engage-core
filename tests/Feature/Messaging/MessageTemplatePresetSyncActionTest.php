@@ -115,6 +115,70 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         ]);
     }
 
+
+    public function test_it_keeps_list_based_message_types_generic_and_distinguishes_by_source_config_path(): void
+    {
+        Config::set('messaging.sms', []);
+        Config::set('messaging.email', [
+            'transactional' => [
+                'webinar' => [
+                    'reminders' => [
+                        [
+                            'dispatch_key' => 'registration_created',
+                            'timing' => 'scheduled',
+                            'schedule' => ['type' => 'anchored', 'minutes' => -1440],
+                            'payload_class' => EmailPayload::class,
+                            'queue' => 'reminders',
+                            'payload' => [
+                                'subject' => 'Tomorrow',
+                                'body' => 'Starts tomorrow.',
+                            ],
+                        ],
+                        [
+                            'dispatch_key' => 'registration_created',
+                            'timing' => 'scheduled',
+                            'schedule' => ['type' => 'anchored', 'minutes' => -30],
+                            'payload_class' => EmailPayload::class,
+                            'queue' => 'reminders',
+                            'payload' => [
+                                'subject' => 'Soon',
+                                'body' => 'Starts soon.',
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $result = app(SyncMessageTemplatePresetsAction::class)->handle();
+
+        $this->assertSame(2, $result['created']);
+        $this->assertSame(2, $result['assignments_created']);
+
+        $presets = MessageTemplatePreset::query()
+            ->where('scope', 'webinar')
+            ->orderBy('source_config_path')
+            ->get();
+
+        $this->assertSame([
+            'messaging.email.transactional.webinar.reminders.0',
+            'messaging.email.transactional.webinar.reminders.1',
+        ], $presets->pluck('source_config_path')->all());
+
+        $this->assertSame(['reminder', 'reminder'], $presets->pluck('message_type')->all());
+        $this->assertDatabaseMissing('message_template_presets', ['message_type' => 'reminder_1_day']);
+        $this->assertDatabaseMissing('message_template_presets', ['message_type' => 'reminder_30_minute']);
+
+        $this->assertDatabaseHas('message_template_preset_assignments', [
+            'message_template_preset_id' => $presets[0]->getKey(),
+            'message_type' => 'reminder',
+        ]);
+        $this->assertDatabaseHas('message_template_preset_assignments', [
+            'message_template_preset_id' => $presets[1]->getKey(),
+            'message_type' => 'reminder',
+        ]);
+    }
+
     public function test_it_does_not_overwrite_customized_presets_unless_forced(): void
     {
         Config::set('messaging.sms', []);
@@ -271,7 +335,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
     }
 
 
-    public function test_it_syncs_multiple_reminders_as_separate_cataloged_message_types(): void
+    public function test_it_syncs_multiple_reminders_as_separate_presets_without_schedule_specific_message_types(): void
     {
         Config::set('messaging.sms', []);
         Config::set('messaging.email', [
@@ -318,29 +382,40 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         $this->assertSame(2, $result['catalog_entries_created']);
 
         $this->assertDatabaseHas('message_template_presets', [
-            'message_type' => 'reminder_30_minute',
-            'name' => 'Webinar Reminders — 30-Minute Reminder Email',
+            'message_type' => 'reminder',
+            'name' => 'Webinar Reminders — Reminder Email',
+            'source_config_path' => 'messaging.email.transactional.webinar.reminders.0',
         ]);
 
         $this->assertDatabaseHas('message_template_presets', [
+            'message_type' => 'reminder',
+            'name' => 'Webinar Reminders — Reminder 2 Email',
+            'source_config_path' => 'messaging.email.transactional.webinar.reminders.1',
+        ]);
+
+        $this->assertDatabaseMissing('message_template_presets', [
+            'message_type' => 'reminder_30_minute',
+        ]);
+
+        $this->assertDatabaseMissing('message_template_presets', [
             'message_type' => 'reminder_10_minute',
-            'name' => 'Webinar Reminders — 10-Minute Reminder Email',
         ]);
 
         $this->assertDatabaseHas('message_template_catalog_entries', [
             'group_label' => 'Webinar Reminders',
-            'item_label' => '30-Minute Reminder Email',
-            'item_order' => -30,
+            'item_label' => 'Reminder Email',
+            'item_order' => 0,
             'usage_type' => 'webinar_reminder',
+            'source_config_path' => 'messaging.email.transactional.webinar.reminders.0',
         ]);
 
         $this->assertDatabaseHas('message_template_catalog_entries', [
             'group_label' => 'Webinar Reminders',
-            'item_label' => '10-Minute Reminder Email',
-            'item_order' => -10,
+            'item_label' => 'Reminder 2 Email',
+            'item_order' => 1,
             'usage_type' => 'webinar_reminder',
+            'source_config_path' => 'messaging.email.transactional.webinar.reminders.1',
         ]);
     }
 
 }
-

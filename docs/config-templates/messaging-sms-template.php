@@ -30,6 +30,10 @@ return [
     |
     | campaigns.{campaign_key}.steps.{step_number}
     |
+    | Webinar SMS reminder definitions should not invent schedule-specific
+    | message types such as reminder_30_minute. Use the canonical reminders
+    | array; Webinars schedule profiles own timing/slot identity.
+    |
     | Campaign presets own timing. Campaign SMS templates own only delivery
     | template fields such as payload_class, queue, and payload.
     |
@@ -199,3 +203,5 @@ return [
     ],
 
 ];
+
+
