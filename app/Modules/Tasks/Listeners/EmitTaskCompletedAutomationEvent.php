@@ -50,13 +50,13 @@ class EmitTaskCompletedAutomationEvent
                         'meta' => $task->meta ?? [],
                     ],
                 ],
-                meta: [
-                    'source_module' => 'tasks',
-                    'task_id' => $task->id,
-                    'flow_route_progress_id' => $task->flow_route_progress_id,
-                    'flow_route_plan_item_id' => $task->flow_route_plan_item_id,
-                    'flow_route_progress_item_id' => $task->flow_route_progress_item_id,
-                ],
+                meta: array_replace(
+                    [
+                        'source_module' => 'tasks',
+                        'task_id' => $task->id,
+                    ],
+                    $this->flowRouteMeta($task),
+                ),
             ),
         ));
     }
@@ -71,5 +71,30 @@ class EmitTaskCompletedAutomationEvent
     private function isContactMorph(?string $type): bool
     {
         return $type && in_array($type, array_unique([Contact::class, (new Contact())->getMorphClass()]), true);
+    }
+
+    private function flowRouteMeta(Task $task): array
+    {
+        $flowRoute = [
+            'flow_route_progress_id' => $task->flow_route_progress_id,
+            'flow_route_plan_id' => $task->flow_route_plan_id,
+            'flow_route_plan_item_id' => $task->flow_route_plan_item_id,
+            'flow_route_progress_item_id' => $task->flow_route_progress_item_id,
+            'flow_route_id' => $task->flow_route_id,
+            'flow_route_point_id' => $task->flow_route_point_id,
+            'flow_route_capability_id' => $task->flow_route_capability_id,
+        ];
+
+        $presentFlowRoute = array_filter(
+            $flowRoute,
+            fn (mixed $value): bool => $value !== null,
+        );
+
+        return $presentFlowRoute === []
+            ? $flowRoute
+            : [
+                ...$flowRoute,
+                'flow_route' => $presentFlowRoute,
+            ];
     }
 }

@@ -399,4 +399,187 @@ class RuntimeTaskBehaviorTest extends TestCase
 
         $this->assertCount(0, $digests);
     }
+
+    public function test_task_completed_automation_meta_includes_full_flow_route_provenance(): void
+    {
+        Event::fake([
+            AutomationEventRecorded::class,
+        ]);
+
+        $contact = Contact::factory()->create();
+
+        $flowRoute = $this->createFlowRouteProvenance($contact);
+
+        $task = Task::factory()
+            ->relatedTo($contact)
+            ->completed()
+            ->create([
+                'flow_route_progress_id' => $flowRoute['progress']->getKey(),
+                'flow_route_plan_id' => $flowRoute['plan']->getKey(),
+                'flow_route_plan_item_id' => $flowRoute['plan_item']->getKey(),
+                'flow_route_progress_item_id' => $flowRoute['progress_item']->getKey(),
+                'flow_route_id' => $flowRoute['flow_route']->getKey(),
+                'flow_route_point_id' => $flowRoute['flow_route_point']->getKey(),
+                'flow_route_capability_id' => $flowRoute['capability_id'],
+            ]);
+
+        app(EmitTaskCompletedAutomationEvent::class)->handle(
+            new TaskCompleted($task),
+        );
+
+        Event::assertDispatched(
+            AutomationEventRecorded::class,
+            function (AutomationEventRecorded $event) use ($flowRoute): bool {
+                return data_get($event->event->meta, 'flow_route_progress_id') === $flowRoute['progress']->getKey()
+                    && data_get($event->event->meta, 'flow_route_plan_id') === $flowRoute['plan']->getKey()
+                    && data_get($event->event->meta, 'flow_route_plan_item_id') === $flowRoute['plan_item']->getKey()
+                    && data_get($event->event->meta, 'flow_route_progress_item_id') === $flowRoute['progress_item']->getKey()
+                    && data_get($event->event->meta, 'flow_route_id') === $flowRoute['flow_route']->getKey()
+                    && data_get($event->event->meta, 'flow_route_point_id') === $flowRoute['flow_route_point']->getKey()
+                    && data_get($event->event->meta, 'flow_route_capability_id') === $flowRoute['capability_id']
+                    && data_get($event->event->meta, 'flow_route.flow_route_progress_id') === $flowRoute['progress']->getKey()
+                    && data_get($event->event->meta, 'flow_route.flow_route_plan_id') === $flowRoute['plan']->getKey()
+                    && data_get($event->event->meta, 'flow_route.flow_route_plan_item_id') === $flowRoute['plan_item']->getKey()
+                    && data_get($event->event->meta, 'flow_route.flow_route_progress_item_id') === $flowRoute['progress_item']->getKey()
+                    && data_get($event->event->meta, 'flow_route.flow_route_id') === $flowRoute['flow_route']->getKey()
+                    && data_get($event->event->meta, 'flow_route.flow_route_point_id') === $flowRoute['flow_route_point']->getKey()
+                    && data_get($event->event->meta, 'flow_route.flow_route_capability_id') === null;
+            },
+        );
+    }
+
+    private function createFlowRouteProvenance(Contact $contact): array
+    {
+        $status = \App\Modules\Core\Models\ContactStatus::query()->create([
+            'key' => 'test_flow_route_status_'.uniqid(),
+            'name' => 'Test Flow Route Status',
+            'is_active' => true,
+        ]);
+
+        $flowRoute = \App\Modules\FlowRoutes\Models\FlowRoute::query()->create([
+            'key' => 'test_flow_route_'.uniqid(),
+            'contact_status_id' => $status->getKey(),
+            'name' => 'Test Flow Route',
+            'description' => null,
+            'version' => 1,
+            'trigger_type' => \App\Modules\FlowRoutes\Models\FlowRoute::TRIGGER_CONTACT_STATUS,
+            'trigger_key' => $status->key,
+            'is_active' => true,
+            'source_version' => 'test',
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        $point = \App\Modules\FlowRoutes\Models\Point::query()->create([
+            'key' => 'test_point_'.uniqid(),
+            'type' => \App\Modules\FlowRoutes\Models\Point::TYPE_NOOP,
+            'name' => 'Test Point',
+            'description' => null,
+            'default_definition' => [],
+            'default_settings' => [],
+            'is_active' => true,
+            'source_version' => 'test',
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        $flowRoutePoint = \App\Modules\FlowRoutes\Models\FlowRoutePoint::query()->create([
+            'flow_route_id' => $flowRoute->getKey(),
+            'point_id' => $point->getKey(),
+            'flow_route_capability_id' => null,
+            'key' => 'test_flow_route_point',
+            'sort_order' => 10,
+            'is_start' => true,
+            'is_active' => true,
+            'next_flow_route_point_id' => null,
+            'definition' => [],
+            'settings' => [],
+            'cancel_conditions' => [],
+            'source_version' => 'test',
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        $progress = \App\Modules\FlowRoutes\Models\ContactFlowRouteProgress::query()->create([
+            'contact_id' => $contact->getKey(),
+            'contact_status_id' => $status->getKey(),
+            'contact_workflow_profile_id' => null,
+            'subject_type' => $contact->getMorphClass(),
+            'subject_id' => $contact->getKey(),
+            'flow_route_id' => $flowRoute->getKey(),
+            'current_flow_route_point_id' => $flowRoutePoint->getKey(),
+            'status' => \App\Modules\FlowRoutes\Models\ContactFlowRouteProgress::STATUS_ACTIVE,
+            'started_at' => now(),
+            'meta' => [],
+        ]);
+
+        $plan = \App\Modules\FlowRoutes\Models\ContactFlowRoutePlan::query()->create([
+            'contact_flow_route_progress_id' => $progress->getKey(),
+            'contact_id' => $contact->getKey(),
+            'subject_type' => $contact->getMorphClass(),
+            'subject_id' => $contact->getKey(),
+            'flow_route_id' => $flowRoute->getKey(),
+            'status' => \App\Modules\FlowRoutes\Models\ContactFlowRoutePlan::STATUS_ACTIVE,
+            'source' => \App\Modules\FlowRoutes\Models\ContactFlowRoutePlan::SOURCE_TEMPLATE,
+            'flow_route_version' => 1,
+            'snapshot_at' => now(),
+            'started_at' => now(),
+            'route_snapshot' => [],
+            'meta' => [],
+        ]);
+
+        $planItem = \App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem::query()->create([
+            'contact_flow_route_progress_id' => $progress->getKey(),
+            'contact_flow_route_plan_id' => $plan->getKey(),
+            'flow_route_id' => $flowRoute->getKey(),
+            'flow_route_point_id' => $flowRoutePoint->getKey(),
+            'point_id' => $point->getKey(),
+            'flow_route_capability_id' => null,
+            'key' => 'test_flow_route_plan_item',
+            'point_type' => $point->type,
+            'sort_order' => 10,
+            'sequence' => 1,
+            'attempt' => 1,
+            'source' => \App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem::SOURCE_TEMPLATE,
+            'status' => \App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem::STATUS_COMPLETED,
+            'definition_snapshot' => [],
+            'settings_snapshot' => [],
+            'cancel_conditions_snapshot' => [],
+            'started_at' => now(),
+            'completed_at' => now(),
+            'meta' => [],
+        ]);
+
+        $progressItem = \App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem::query()->create([
+            'contact_flow_route_progress_id' => $progress->getKey(),
+            'contact_flow_route_plan_id' => $plan->getKey(),
+            'contact_flow_route_plan_item_id' => $planItem->getKey(),
+            'flow_route_id' => $flowRoute->getKey(),
+            'flow_route_point_id' => $flowRoutePoint->getKey(),
+            'point_id' => $point->getKey(),
+            'flow_route_capability_id' => null,
+            'key' => 'test_flow_route_progress_item',
+            'point_type' => $point->type,
+            'sequence' => 1,
+            'attempt' => 1,
+            'status' => \App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem::STATUS_COMPLETED,
+            'started_at' => now(),
+            'completed_at' => now(),
+            'meta' => [],
+        ]);
+
+        return [
+            'progress' => $progress,
+            'plan' => $plan,
+            'plan_item' => $planItem,
+            'progress_item' => $progressItem,
+            'flow_route' => $flowRoute,
+            'flow_route_point' => $flowRoutePoint,
+            'capability_id' => null,
+        ];
+    }
+
 }
