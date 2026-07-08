@@ -2689,7 +2689,8 @@ Current guardrails should ensure:
 - Provider dependency expansion does not accidentally change explicit module visibility.
 - Dashboard panel visibility respects explicit module enablement and preset/slot config.
 - Contact show module visibility respects enabled modules.
-- Producer modules do not import FlowRoutes.
+- Producer modules do not import FlowRoutes runtime internals, construct `FlowRouteExternalEvent`, or call FlowRoutes execution/resume actions directly.
+- Intentional FlowRoutes provenance relationships on artifact models are allowed when a module owns route-created artifacts, such as `ScheduledMessage` and `CampaignEnrollment`.
 - `FlowRouteExternalEvent::make(...)` is only called from FlowRoutes-owned code.
 - FlowRoutes does not listen directly to producer-specific events such as TaskCompleted or Webinar-specific outcomes.
 - Automation-worthy producer outcomes use `AutomationEventRecorded`.
@@ -2794,7 +2795,7 @@ ContactWorkflowProfile::update(...)
 
 ## FlowRoutes capability catalog standard
 
-FlowRoutes should have DB-owned capability and capability binding records before production.
+FlowRoutes has DB-owned capability and capability binding records for backend/schema readiness. These records are the durable foundation for authoring, validation, labels, supported subjects, and module/client/context availability.
 
 The capability catalog exists because route authoring and validation must eventually be dynamic across universal and vertical modules. Operators should be able to see which actions/events/conditions/waits are available for a client, a module set, and a subject type without FlowRoutes importing private module internals.
 

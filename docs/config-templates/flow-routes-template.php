@@ -124,6 +124,11 @@ return [
             ],
         ],
 
+        // Example only. Do not activate this preset until Phase 5 implements
+        // task.completed event_wait resume with specific route progress, plan item,
+        // progress item, created Task identity, template identity, and subject-context
+        // correlation. Broad contact-only task.completed waits are unsafe.
+
         'task_completed_resume_example' => [
             'key' => 'task_completed_resume_example',
             'name' => 'Task Completed Resume Example',
