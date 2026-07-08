@@ -825,21 +825,17 @@
 │   │   ├── email
 │   │   │   ├── marketing
 │   │   │   │   ├── webinar_nurture.php
-│   │   │   │   ├── webinar_nurture_test.php
 │   │   │   │   └── webinar_waitlist.php
 │   │   │   └── transactional
-│   │   │       ├── route_test.php
 │   │   │       └── webinar.php
 │   │   ├── email.php
 │   │   ├── permission_invitations.php
 │   │   ├── sms
 │   │   │   ├── marketing
 │   │   │   │   ├── webinar_nurture.php
-│   │   │   │   ├── webinar_nurture_test.php
 │   │   │   │   ├── webinar.php
 │   │   │   │   └── webinar_waitlist.php
 │   │   │   └── transactional
-│   │   │       ├── route_test.php
 │   │   │       └── webinar.php
 │   │   └── sms.php
 │   ├── messaging.php
@@ -1335,4 +1331,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-436 directories, 900 files
+436 directories, 896 files

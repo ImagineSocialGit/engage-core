@@ -1,3 +1,4 @@
+
 <?php
 
 return [
@@ -28,6 +29,11 @@ return [
     |
     | Campaign presets must not own reusable subject/body copy.
     | Campaign presets must not define or override payloads.
+    |
+    | Preset sync has no Campaign force mode right now. Normal Campaign sync
+    | updates non-customized Campaigns/Steps/Variants, removes stale
+    | non-customized steps/variants, and preserves customized records.
+    | Do not rely on presets:sync as a destructive Campaign reset.
     |
     | Campaign preset variants reference Messaging templates with first-class:
     | - key

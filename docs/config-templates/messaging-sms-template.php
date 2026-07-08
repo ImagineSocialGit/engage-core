@@ -1,3 +1,4 @@
+
 <?php
 
 use App\Modules\Messaging\Payloads\SmsPayload;
@@ -29,6 +30,9 @@ return [
     | Campaign SMS templates use the same structure as email campaign templates:
     |
     | campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
+    |
+    | Campaign SMS templates resolve by channel + purpose + scope + campaign_key
+    | + step_number + campaign_step_variant_key.
     |
     | Webinar SMS reminder definitions should not invent schedule-specific
     | message types such as reminder_30_minute. Use the canonical reminders

@@ -20,7 +20,7 @@ class SyncPresetsCommand extends Command
         {--force-message-templates : Overwrite customized Messaging template presets and reactivate synced assignments}
         {--force-webinar-schedule-profiles : Reserved for future customized webinar schedule profile handling}';
 
-    protected $description = 'Sync preset-owned database definitions in dependency-safe order.';
+    protected $description = 'Sync preset-owned database definitions in dependency-safe order. Campaign sync intentionally preserves customized records and has no force mode.';
 
     public function handle(
         SyncContactStatusPresetsAction $syncContactStatusPresets,
@@ -334,6 +334,7 @@ class SyncPresetsCommand extends Command
     {
         $this->line('');
         $this->info('Campaigns');
+        $this->line('Force mode: not supported. Customized Campaigns, Steps, and Variants are preserved.');
 
         $this->table(
             ['Item', 'Count'],

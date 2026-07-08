@@ -150,7 +150,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             'marketing:webinar_nurture' => true,
         ]);
 
-        config()->set('messaging.sms.marketing.webinar_nurture.route_test', [
+        config()->set('messaging.sms.marketing.webinar_nurture.route_send_messages', [
             [
                 'dispatch_key' => 'route_send_message_test',
                 'channel' => 'sms',
@@ -191,8 +191,6 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertNull($setup['progress']->current_flow_route_point_id);
         $this->assertSame(0, ScheduledMessage::query()->count());
     }
-
-
 
     public function test_create_task_point_assigns_to_only_active_team_member(): void
     {

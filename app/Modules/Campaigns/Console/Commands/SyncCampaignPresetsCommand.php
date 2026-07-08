@@ -10,7 +10,7 @@ class SyncCampaignPresetsCommand extends Command
 {
     protected $signature = 'campaigns:sync-presets {preset? : Optional preset key, such as mortgage or webinar_funnel}';
 
-    protected $description = 'Sync campaign preset definitions into database-owned Campaign and CampaignStep records.';
+    protected $description = 'Sync campaign preset definitions into database-owned Campaign, CampaignStep, and CampaignStepVariant records. Customized records are preserved; no force mode is supported.';
 
     public function handle(SyncCampaignPresetsAction $syncCampaignPresets): int
     {
@@ -29,6 +29,7 @@ class SyncCampaignPresetsCommand extends Command
         }
 
         $this->info('Campaign presets synced.');
+        $this->line('Force mode: not supported. Customized Campaigns, Steps, and Variants are preserved.');
 
         $this->table(
             ['Item', 'Count'],
@@ -48,4 +49,3 @@ class SyncCampaignPresetsCommand extends Command
         return self::SUCCESS;
     }
 }
-

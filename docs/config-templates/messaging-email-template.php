@@ -1,3 +1,4 @@
+
 <?php
 
 use App\Modules\Messaging\Payloads\EmailPayload;
@@ -33,6 +34,9 @@ return [
     | Campaign message templates live under:
     |
     | campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
+    |
+    | Campaign templates resolve by channel + purpose + scope + campaign_key
+    | + step_number + campaign_step_variant_key.
     |
     | Campaign templates do not own timing/schedule. Campaign presets own
     | campaign step timing and overlay timing before dispatching.

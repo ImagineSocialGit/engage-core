@@ -15,28 +15,34 @@ return [
         'webinar_attended_nurture' => [
             'key' => 'webinar_attended_nurture',
             'name' => 'Webinar Attended Nurture',
-            'description' => 'Temporary staging smoke-test marketing nurture sequence for leads who attended a webinar but have not yet taken the next step. Restore the normal sequence after smoke testing.',
+            'description' => 'Default marketing nurture sequence for leads who attended a webinar and should receive follow-up after the transactional replay/thank-you message.',
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => 'active',
             'is_active' => true,
-            'source_version' => '1',
+            'source_version' => '2',
             'meta' => [
                 'domain' => 'webinar',
-                'strategy' => 'staging_smoke_short_interval',
-                'temporary' => true,
-                'notes' => 'This temporarily replaces the default attended nurture for staging smoke testing. Restore the normal default after smoke testing.',
+                'strategy' => 'email_primary_sms_supplemental',
+                'notes' => 'Transactional thank-you/replay delivery belongs to Webinars. This campaign handles later marketing nurture only.',
             ],
             'steps' => [
                 [
                     'step_number' => 1,
-                    'name' => 'Smoke attended step 1',
+                    'name' => 'Attended webinar next step',
                     'variant_strategy' => 'send_all_eligible',
                     'is_active' => true,
-                    'source_version' => '1',
-                    'criteria' => ['timing' => ['type' => 'delay', 'minutes' => 10]],
-                    'meta' => ['type' => 'message', 'temporary' => true],
+                    'source_version' => '2',
+                    'criteria' => [
+                        'timing' => [
+                            'type' => 'delay',
+                            'hours' => 2,
+                        ],
+                    ],
+                    'meta' => [
+                        'type' => 'message',
+                    ],
                     'variants' => [
                         [
                             'key' => 'email',
@@ -62,12 +68,19 @@ return [
                 ],
                 [
                     'step_number' => 2,
-                    'name' => 'Smoke attended step 2',
+                    'name' => 'Attended webinar common questions',
                     'variant_strategy' => 'send_all_eligible',
                     'is_active' => true,
-                    'source_version' => '1',
-                    'criteria' => ['timing' => ['type' => 'delay', 'minutes' => 2]],
-                    'meta' => ['type' => 'message', 'temporary' => true],
+                    'source_version' => '2',
+                    'criteria' => [
+                        'timing' => [
+                            'type' => 'delay',
+                            'days' => 3,
+                        ],
+                    ],
+                    'meta' => [
+                        'type' => 'message',
+                    ],
                     'variants' => [
                         [
                             'key' => 'email',
@@ -83,12 +96,19 @@ return [
                 ],
                 [
                     'step_number' => 3,
-                    'name' => 'Smoke attended step 3',
+                    'name' => 'Attended webinar long-term handoff',
                     'variant_strategy' => 'send_all_eligible',
                     'is_active' => true,
-                    'source_version' => '1',
-                    'criteria' => ['timing' => ['type' => 'delay', 'minutes' => 2]],
-                    'meta' => ['type' => 'message', 'temporary' => true],
+                    'source_version' => '2',
+                    'criteria' => [
+                        'timing' => [
+                            'type' => 'delay',
+                            'days' => 7,
+                        ],
+                    ],
+                    'meta' => [
+                        'type' => 'message',
+                    ],
                     'variants' => [
                         [
                             'key' => 'email',
@@ -99,48 +119,6 @@ return [
                             'dispatch_key' => 'campaign_step_due',
                             'is_active' => true,
                             'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.3.variants.email',
-                        ],
-                    ],
-                ],
-                [
-                    'step_number' => 4,
-                    'name' => 'Smoke attended step 4',
-                    'variant_strategy' => 'send_all_eligible',
-                    'is_active' => true,
-                    'source_version' => '1',
-                    'criteria' => ['timing' => ['type' => 'delay', 'minutes' => 2]],
-                    'meta' => ['type' => 'message', 'temporary' => true],
-                    'variants' => [
-                        [
-                            'key' => 'email',
-                            'name' => 'Email follow-up',
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                            'dispatch_key' => 'campaign_step_due',
-                            'is_active' => true,
-                            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.4.variants.email',
-                        ],
-                    ],
-                ],
-                [
-                    'step_number' => 5,
-                    'name' => 'Smoke attended step 5',
-                    'variant_strategy' => 'send_all_eligible',
-                    'is_active' => true,
-                    'source_version' => '1',
-                    'criteria' => ['timing' => ['type' => 'delay', 'minutes' => 2]],
-                    'meta' => ['type' => 'message', 'temporary' => true],
-                    'variants' => [
-                        [
-                            'key' => 'email',
-                            'name' => 'Email follow-up',
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                            'dispatch_key' => 'campaign_step_due',
-                            'is_active' => true,
-                            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.5.variants.email',
                         ],
                     ],
                 ],
@@ -168,8 +146,15 @@ return [
                     'variant_strategy' => 'send_all_eligible',
                     'is_active' => true,
                     'source_version' => '1',
-                    'criteria' => ['timing' => ['type' => 'delay', 'hours' => 2]],
-                    'meta' => ['type' => 'message'],
+                    'criteria' => [
+                        'timing' => [
+                            'type' => 'delay',
+                            'hours' => 2,
+                        ],
+                    ],
+                    'meta' => [
+                        'type' => 'message',
+                    ],
                     'variants' => [
                         [
                             'key' => 'email',
@@ -199,8 +184,15 @@ return [
                     'variant_strategy' => 'send_all_eligible',
                     'is_active' => true,
                     'source_version' => '1',
-                    'criteria' => ['timing' => ['type' => 'delay', 'days' => 3]],
-                    'meta' => ['type' => 'message'],
+                    'criteria' => [
+                        'timing' => [
+                            'type' => 'delay',
+                            'days' => 3,
+                        ],
+                    ],
+                    'meta' => [
+                        'type' => 'message',
+                    ],
                     'variants' => [
                         [
                             'key' => 'email',
@@ -220,8 +212,15 @@ return [
                     'variant_strategy' => 'send_all_eligible',
                     'is_active' => true,
                     'source_version' => '1',
-                    'criteria' => ['timing' => ['type' => 'delay', 'days' => 7]],
-                    'meta' => ['type' => 'message'],
+                    'criteria' => [
+                        'timing' => [
+                            'type' => 'delay',
+                            'days' => 7,
+                        ],
+                    ],
+                    'meta' => [
+                        'type' => 'message',
+                    ],
                     'variants' => [
                         [
                             'key' => 'email',

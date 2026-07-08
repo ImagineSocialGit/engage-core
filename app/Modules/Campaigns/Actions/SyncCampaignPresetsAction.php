@@ -14,6 +14,14 @@ use InvalidArgumentException;
 
 class SyncCampaignPresetsAction
 {
+    /**
+     * Campaign preset sync intentionally has no force mode.
+     *
+     * Campaigns, Steps, and Variants may be customized by operators/clients,
+     * so normal preset sync preserves customized records and only updates
+     * non-customized preset-owned records. Add a force mode only as a
+     * deliberate Campaigns feature, not as part of default preset cleanup.
+     */
     public function handle(?string $presetKey = null): CampaignPresetSyncResult
     {
         $presetKey ??= $this->defaultPresetKey();

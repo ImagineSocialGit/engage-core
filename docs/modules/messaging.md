@@ -1,3 +1,4 @@
+
 # Messaging Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -198,6 +199,8 @@ surface nullable
 message_type nullable
 campaign_key nullable
 campaign_step nullable
+campaign_step_variant_key nullable
+source_config_path nullable
 context_type nullable
 context_id nullable
 is_active
@@ -279,6 +282,15 @@ Messaging resolvers should eventually resolve message definitions in this order:
 ```
 
 Long-term runtime should be DB-first. Config should seed/update available presets and catalog entries; it should not remain the only runtime source of reusable message copy.
+
+
+For Campaign runtime contexts, assignment and fallback resolution must include the variant key when variants are involved:
+
+```text
+channel + purpose + scope + campaign_key + campaign_step + campaign_step_variant_key
+```
+
+Step-only Campaign assignment wording is legacy compatibility language only. New Campaign template references and assignments should be variant-aware.
 
 ### Sync/customization rule
 

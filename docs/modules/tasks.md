@@ -1,3 +1,4 @@
+
 # Tasks Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -203,6 +204,12 @@ task_template_key
 ```
 
 `task_template_id` links to the current DB template when available. `task_template_key` preserves the durable stable key for debugging, historical context, and null-on-delete cases.
+
+This split is intentional. `tasks.task_template_id` should be treated as a soft/current database reference to the template that existed when the live task was created. It may be nullable and should not be the only historical identity for the task.
+
+`tasks.task_template_key` is the durable historical identity. It should remain available for debugging, reporting, provenance, route correlation, and future template deletion/replacement scenarios.
+
+Do not add a hard foreign-key constraint from live tasks to task templates unless a later audit proves that deleting or replacing task templates should be blocked by historical task rows. Current direction is that historical tasks should survive template cleanup, template replacement, and template re-sync safely.
 
 Task completion automation events should include enough task identity and structured FlowRoutes provenance for FlowRoutes to resume a specific waiting route progress/plan/progress item. Broad contact-only task completion matching is unsafe.
 

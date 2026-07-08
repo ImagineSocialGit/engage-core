@@ -1,3 +1,4 @@
+
 # Campaigns Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -141,8 +142,10 @@ Supported dependency states should be explicit:
 
 ```text
 scheduled
+pending
 sent
 skipped
+failed
 terminal
 ```
 
@@ -363,6 +366,25 @@ flow_route_capability_id
 `source_type` / `source_id` answers what domain thing caused or contextualized the enrollment. The FlowRoutes provenance fields answer which route instance/plan item created or controlled the enrollment. These are related but not interchangeable.
 
 Campaigns should not import FlowRoutes runtime internals. FlowRoutes should not mutate CampaignEnrollment internals directly.
+
+
+## Campaign preset sync force behavior
+
+Campaign preset sync intentionally does not currently expose a force mode.
+
+Normal sync behavior is authoritative for non-customized Campaign definitions, CampaignSteps, and CampaignStepVariants. It may create/update non-customized records and remove stale non-customized steps/variants when a preset definition changes.
+
+Customized Campaigns, customized CampaignSteps, and customized CampaignStepVariants are preserved and skipped.
+
+Do not treat `presets:sync` or `campaigns:sync-presets` as destructive Campaign reset tools. If a future production-support workflow needs a Campaign force mode, design that deliberately with clear command naming, operator warnings, and tests for destructive overwrite semantics.
+
+Current decision:
+
+```text
+No --force-campaigns option.
+No implicit destructive Campaign reset during global preset sync.
+Customized Campaign structures are preserved.
+```
 
 ## Automatic Follow-ups campaign usage
 
