@@ -521,6 +521,7 @@
 │   │   │   ├── Actions
 │   │   │   │   ├── BuildTaskDigestsAction.php
 │   │   │   │   ├── CreateTaskAction.php
+│   │   │   │   ├── CreateTaskFromTemplateAction.php
 │   │   │   │   ├── NotifyAssignedTaskRecipientsAction.php
 │   │   │   │   ├── SendTaskDigestNotificationsAction.php
 │   │   │   │   └── SyncTaskPresetsAction.php
@@ -958,7 +959,8 @@
 │   │   ├── 2026_04_15_203510_create_points_table.php
 │   │   ├── 2026_04_15_203520_create_flow_route_points_table.php
 │   │   ├── 2026_04_15_203530_create_contact_flow_route_progress_table.php
-│   │   ├── 2026_04_15_203545_create_tasks_table.php
+│   │   ├── 2026_04_15_203544_create_tasks_table.php
+│   │   ├── 2026_04_15_203545_create_task_templates_table.php
 │   │   ├── 2026_04_15_203546_create_notes_table.php
 │   │   ├── 2026_05_15_215534_create_message_consents_table.php
 │   │   ├── 2026_05_15_215834_create_consent_revocations_table.php
@@ -978,7 +980,6 @@
 │   │   ├── 2026_06_19_203548_create_webinars_table.php
 │   │   ├── 2026_06_19_203549_create_webinar_registrations_table.php
 │   │   ├── 2026_06_20_155410_create_webinar_waitlist_signups_table.php
-│   │   ├── 2026_06_29_000000_create_task_templates_table.php
 │   │   ├── 2026_07_01_000001_create_contact_permission_invitations_table.php
 │   │   ├── 2026_07_02_000001_create_document_requirement_definitions_table.php
 │   │   ├── 2026_07_02_000002_create_document_requests_table.php
@@ -1044,7 +1045,7 @@
 │   ├── project-organization.md
 │   ├── TODO.md
 │   └── ui-ux-guide.md
-├── engage-core-requested-files.txt
+├── file_dumps
 ├── package.json
 ├── package-lock.json
 ├── phpunit.xml
@@ -1315,4 +1316,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-436 directories, 880 files
+437 directories, 880 files

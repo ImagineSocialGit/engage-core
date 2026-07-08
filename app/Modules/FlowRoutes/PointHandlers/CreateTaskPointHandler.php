@@ -8,14 +8,18 @@ use App\Modules\FlowRoutes\Data\Points\CreateTaskPointDefinition;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Models\Point;
-use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\Tasks\Actions\CreateTaskAction;
+use App\Modules\Tasks\Actions\CreateTaskFromTemplateAction;
 use App\Modules\Tasks\Models\Task;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use InvalidArgumentException;
+use Throwable;
 
 class CreateTaskPointHandler implements PointHandler
 {
     public function __construct(
         private readonly CreateTaskAction $createTask,
+        private readonly CreateTaskFromTemplateAction $createTaskFromTemplate,
     ) {}
 
     public function type(): string
@@ -41,46 +45,42 @@ class CreateTaskPointHandler implements PointHandler
             );
         }
 
-        $assignee = $this->assignee($definition);
+        $data = $this->taskData($definition, $context);
 
-        if (($assignee['failed_reason'] ?? null) !== null) {
+        try {
+            $task = $definition->taskTemplateKey !== null
+                ? $this->createTaskFromTemplate->handle($definition->taskTemplateKey, $data)
+                : $this->createTask->handle($data);
+        } catch (ModelNotFoundException $exception) {
             return PointExecutionResult::failed(
-                reason: $assignee['failed_reason'],
+                reason: 'task_template_not_found',
                 meta: [
                     'create_task_definition' => $definition->toMetaPayload(),
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
                     'point_id' => $context->flowRoutePoint->point_id,
                 ],
             );
-        }
-
-        $task = $this->createTask->handle([
-            'related_type' => Contact::class,
-            'related_id' => $context->progress->contact_id,
-
-            'assigned_to_type' => $assignee['assigned_to_type'],
-            'assigned_to_id' => $assignee['assigned_to_id'],
-
-            'responsible_party' => $definition->responsibleParty,
-            'responsible_type' => $definition->responsibleType,
-            'responsible_id' => $definition->responsibleId,
-
-            'source' => Task::SOURCE_MODULE,
-            'title' => $this->renderText($definition->title, $context),
-            'description' => $this->renderText($definition->description, $context),
-            'due_at' => $this->dueAt($definition, $context),
-            'priority' => $definition->priority,
-            'meta' => [
-                'created_by' => [
-                    'module' => 'flow_routes',
-                    'flow_route_progress_id' => $context->progress->getKey(),
-                    'flow_route_id' => $context->progress->flow_route_id,
+        } catch (InvalidArgumentException $exception) {
+            return PointExecutionResult::failed(
+                reason: $exception->getMessage(),
+                meta: [
+                    'create_task_definition' => $definition->toMetaPayload(),
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
                     'point_id' => $context->flowRoutePoint->point_id,
                 ],
-                'definition' => $definition->meta,
-            ],
-        ]);
+            );
+        } catch (Throwable $exception) {
+            return PointExecutionResult::failed(
+                reason: 'create_task_failed',
+                meta: [
+                    'create_task_definition' => $definition->toMetaPayload(),
+                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    'point_id' => $context->flowRoutePoint->point_id,
+                    'exception_class' => $exception::class,
+                    'exception_message' => $exception->getMessage(),
+                ],
+            );
+        }
 
         return PointExecutionResult::completed(
             reason: 'task_created',
@@ -98,41 +98,49 @@ class CreateTaskPointHandler implements PointHandler
                     'title' => $task->title,
                     'status' => $task->status,
                     'due_at' => $task->due_at?->toISOString(),
+                    'task_template_key' => $task->meta['task_template']['key'] ?? null,
                 ],
             ],
         );
     }
 
     /**
-     * @return array{assigned_to_type: string|null, assigned_to_id: int|null, failed_reason?: string}
+     * @return array<string, mixed>
      */
-    private function assignee(CreateTaskPointDefinition $definition): array
-    {
-        if ($definition->assignedTo !== 'only_active_team_member') {
-            return [
-                'assigned_to_type' => $definition->assignedToType,
-                'assigned_to_id' => $definition->assignedToId,
-            ];
-        }
+    private function taskData(
+        CreateTaskPointDefinition $definition,
+        PointExecutionContext $context,
+    ): array {
 
-        $teamMembers = TeamMember::query()
-            ->active()
-            ->get();
+        return array_filter([
+            'related_type' => Contact::class,
+            'related_id' => $context->progress->contact_id,
 
-        if ($teamMembers->count() !== 1) {
-            return [
-                'assigned_to_type' => null,
-                'assigned_to_id' => null,
-                'failed_reason' => 'create_task_only_active_team_member_not_resolved',
-            ];
-        }
+            'assigned_to_type' => $definition->assignedToType,
+            'assigned_to_id' => $definition->assignedToId,
+            'assigned_to_strategy' => $definition->assignedToStrategy ?? $definition->assignedTo,
 
-        $teamMember = $teamMembers->first();
+            'responsible_party' => $definition->responsibleParty,
+            'responsible_type' => $definition->responsibleType,
+            'responsible_id' => $definition->responsibleId,
 
-        return [
-            'assigned_to_type' => $teamMember->getMorphClass(),
-            'assigned_to_id' => $teamMember->getKey(),
-        ];
+            'source' => Task::SOURCE_MODULE,
+            'title' => $this->renderText($definition->title, $context),
+            'description' => $this->renderText($definition->description, $context),
+            'due_at' => $this->dueAt($definition, $context),
+            'due_offset_minutes' => $definition->dueOffsetMinutes,
+            'priority' => $definition->priority,
+            'meta' => [
+                'created_by' => [
+                    'module' => 'flow_routes',
+                    'flow_route_progress_id' => $context->progress->getKey(),
+                    'flow_route_id' => $context->progress->flow_route_id,
+                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    'point_id' => $context->flowRoutePoint->point_id,
+                ],
+                'definition' => $definition->meta,
+            ],
+        ], fn (mixed $value): bool => $value !== null);
     }
 
     private function renderText(?string $value, PointExecutionContext $context): ?string

@@ -5,6 +5,8 @@ namespace App\Modules\Tasks\Actions;
 use App\Modules\Core\Models\Contact;
 use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Models\TaskTemplate;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use InvalidArgumentException;
@@ -25,6 +27,7 @@ class CreateTaskAction
         [$assignedToType, $assignedToId] = $this->assignedToMorphPair(
             assignedToType: $data['assigned_to_type'] ?? null,
             assignedToId: $data['assigned_to_id'] ?? null,
+            assignedToStrategy: $data['assigned_to_strategy'] ?? $data['assigned_to'] ?? null,
         );
 
         $responsibleParty = $this->responsibleParty($data['responsible_party'] ?? null);
@@ -51,7 +54,7 @@ class CreateTaskAction
             'source' => $data['source'] ?? Task::SOURCE_SYSTEM,
             'title' => $this->requiredString($data['title'] ?? null, 'title'),
             'description' => $data['description'] ?? null,
-            'due_at' => $data['due_at'] ?? null,
+            'due_at' => $data['due_at'] ?? $this->dueAt($data['due_offset_minutes'] ?? null),
             'status' => $data['status'] ?? Task::STATUS_OPEN,
             'priority' => $data['priority'] ?? null,
             'meta' => $data['meta'] ?? null,
@@ -64,16 +67,44 @@ class CreateTaskAction
     private function assignedToMorphPair(
         mixed $assignedToType,
         mixed $assignedToId,
+        mixed $assignedToStrategy = null,
     ): array {
         $id = $this->nullableInt($assignedToId);
 
-        if ($id === null) {
+        if ($id !== null) {
+            return [
+                $this->morphType($assignedToType) ?? $this->morphType(TeamMember::class),
+                $id,
+            ];
+        }
+
+        $strategy = is_string($assignedToStrategy) ? trim($assignedToStrategy) : null;
+
+        if ($strategy === null || $strategy === '') {
             return [null, null];
         }
 
+        if ($strategy === TaskTemplate::ASSIGNED_TO_STRATEGY_UNASSIGNED) {
+            return [null, null];
+        }
+
+        if ($strategy !== TaskTemplate::ASSIGNED_TO_STRATEGY_ONLY_ACTIVE_TEAM_MEMBER) {
+            throw new InvalidArgumentException("Invalid task assignment strategy [{$strategy}].");
+        }
+
+        $teamMembers = TeamMember::query()
+            ->active()
+            ->get();
+
+        if ($teamMembers->count() !== 1) {
+            throw new InvalidArgumentException('create_task_only_active_team_member_not_resolved');
+        }
+
+        $teamMember = $teamMembers->first();
+
         return [
-            $this->morphType($assignedToType) ?? $this->morphType(TeamMember::class),
-            $id,
+            $teamMember->getMorphClass(),
+            $teamMember->getKey(),
         ];
     }
 
@@ -158,6 +189,17 @@ class CreateTaskAction
     private function nullableInt(mixed $value): ?int
     {
         return is_numeric($value) ? (int) $value : null;
+    }
+
+    private function dueAt(mixed $dueOffsetMinutes): ?CarbonImmutable
+    {
+        $minutes = $this->nullableInt($dueOffsetMinutes);
+
+        if ($minutes === null) {
+            return null;
+        }
+
+        return CarbonImmutable::now('UTC')->addMinutes($minutes);
     }
 
     private function morphType(mixed $value): ?string

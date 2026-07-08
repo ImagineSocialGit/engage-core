@@ -18,14 +18,27 @@ class TaskTemplateFactory extends Factory
         return [
             'key' => fake()->unique()->slug(3),
             'group_key' => 'general_default',
+            'source' => TaskTemplate::SOURCE_PRESET,
+            'source_version' => 'test',
+            'owner_group' => null,
+            'category' => null,
             'name' => fake()->sentence(3),
             'title' => fake()->sentence(4),
             'description' => fake()->optional()->sentence(),
             'task_description' => fake()->optional()->paragraph(),
+            'assigned_to_type' => null,
+            'assigned_to_id' => null,
+            'assigned_to_strategy' => null,
             'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+            'responsible_type' => null,
+            'responsible_id' => null,
             'priority' => null,
-            'due_offset_days' => fake()->optional()->numberBetween(1, 14),
+            'due_offset_minutes' => fake()->optional()->numberBetween(60, 20160),
+            'related_subject' => null,
+            'defaults' => null,
             'is_active' => true,
+            'is_customized' => false,
+            'customized_at' => null,
             'meta' => null,
         ];
     }
@@ -51,10 +64,25 @@ class TaskTemplateFactory extends Factory
         ]);
     }
 
+    public function assignedToOnlyActiveTeamMember(): self
+    {
+        return $this->state([
+            'assigned_to_strategy' => TaskTemplate::ASSIGNED_TO_STRATEGY_ONLY_ACTIVE_TEAM_MEMBER,
+        ]);
+    }
+
     public function inactive(): self
     {
         return $this->state([
             'is_active' => false,
+        ]);
+    }
+
+    public function customized(): self
+    {
+        return $this->state([
+            'is_customized' => true,
+            'customized_at' => now(),
         ]);
     }
 }

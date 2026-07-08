@@ -165,7 +165,7 @@ return [
                     'type' => 'create_task',
                     'name' => 'Create The Prospect Task',
                     'description' => 'Create and assign the prospect task after attended campaign cancellation.',
-                    'default_definition' => ['title' => 'The prospect task', 'description' => 'Smoke test prospect task created automatically after the contact status changes to Prospect.', 'assigned_to' => 'only_active_team_member', 'responsible_party' => 'internal', 'priority' => 'normal', 'meta' => ['source' => 'flow_route_staging_smoke', 'temporary' => true]],
+                    'default_definition' => ['task_template_key' => 'mortgage.call_lead', 'title' => 'The prospect task', 'description' => 'Smoke test prospect task created automatically after the contact status changes to Prospect.', 'assigned_to_strategy' => 'only_active_team_member', 'responsible_party' => 'internal', 'priority' => 'normal', 'meta' => ['source' => 'flow_route_staging_smoke', 'temporary' => true]],
                     'default_settings' => [],
                     'is_active' => true,
                     'source_version' => 'staging_smoke_2026_07',
@@ -177,3 +177,4 @@ return [
         ],
     ],
 ];
+

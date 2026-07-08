@@ -14,7 +14,13 @@ return [
     | Task presets create/update DB-owned task templates only.
     | They must not create live tasks.
     |
-    | Runtime task creation should use CreateTaskAction.
+    | Runtime task creation should use CreateTaskAction or
+    | CreateTaskFromTemplateAction.
+    |
+    | due_offset_minutes is the canonical delay field for task templates.
+    | due_offset_days may be accepted by legacy/adapted config paths, but new
+    | presets should use due_offset_minutes so sub-day task defaults can be
+    | represented without adding parallel timing semantics.
     */
 
     'groups' => [
@@ -26,14 +32,22 @@ return [
 
     'definitions' => [
         'call_lead' => [
-            'key' => 'call_lead',
             'title' => 'Call lead',
+            'name' => 'Call lead',
             'description' => 'Call the lead and record the outcome.',
+            'task_description' => 'Call the lead, record the outcome, and update the contact notes.',
             'priority' => 'normal',
             'responsible_party' => 'internal',
+            'assigned_to_strategy' => 'unassigned',
             'source' => 'preset',
+            'source_version' => '2026_07_phase_3',
+            'owner_group' => 'sales',
+            'category' => 'follow_up',
             'is_active' => true,
-            'source_version' => 1,
+            'due_offset_minutes' => 1440,
+            'related_subject' => [
+                'default' => 'current_contact',
+            ],
             'defaults' => [
                 'due' => [
                     'type' => 'delay',
@@ -44,14 +58,19 @@ return [
         ],
 
         'review_lead_notes' => [
-            'key' => 'review_lead_notes',
             'title' => 'Review lead notes',
+            'name' => 'Review lead notes',
             'description' => 'Review lead history and determine the next best action.',
+            'task_description' => null,
             'priority' => 'normal',
             'responsible_party' => 'internal',
+            'assigned_to_strategy' => 'unassigned',
             'source' => 'preset',
+            'source_version' => '2026_07_phase_3',
+            'owner_group' => 'sales',
+            'category' => 'review',
             'is_active' => true,
-            'source_version' => 1,
+            'due_offset_minutes' => 2880,
             'defaults' => [],
             'meta' => [],
         ],

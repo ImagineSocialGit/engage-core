@@ -11,7 +11,9 @@ class TaskPresetSyncResult
     public function __construct(
         public int $created = 0,
         public int $updated = 0,
+        public int $removed = 0,
         public int $skipped = 0,
+        public int $customizedSkipped = 0,
         public array $warnings = [],
         public array $errors = [],
     ) {}
@@ -26,8 +28,19 @@ class TaskPresetSyncResult
         $this->updated++;
     }
 
+    public function removed(): void
+    {
+        $this->removed++;
+    }
+
     public function skipped(): void
     {
+        $this->skipped++;
+    }
+
+    public function customizedSkipped(): void
+    {
+        $this->customizedSkipped++;
         $this->skipped++;
     }
 

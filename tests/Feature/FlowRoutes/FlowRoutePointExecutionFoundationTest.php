@@ -21,6 +21,7 @@ use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Models\TaskTemplate;
 use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -216,6 +217,69 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
         $this->assertSame($teamMember->getMorphClass(), $task->assigned_to_type);
         $this->assertSame($teamMember->id, $task->assigned_to_id);
+    }
+
+    public function test_inline_create_task_point_due_offset_minutes_sets_due_at(): void
+    {
+        $setup = $this->createProgressWithPoints([
+            Point::TYPE_CREATE_TASK,
+        ]);
+
+        $setup['flow_route_points'][0]->forceFill([
+            'definition' => [
+                'title' => 'Due offset task',
+                'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+                'due_offset_minutes' => 45,
+            ],
+        ])->save();
+
+        $result = app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']);
+
+        $this->assertSame(PointExecutionResult::STATUS_COMPLETED, $result->status);
+        $this->assertSame('task_created', $result->reason);
+
+        $task = Task::query()->where('title', 'Due offset task')->firstOrFail();
+
+        $this->assertNotNull($task->due_at);
+        $this->assertTrue($task->due_at->between(
+            now()->addMinutes(44),
+            now()->addMinutes(46),
+        ));
+    }
+
+    public function test_create_task_point_can_create_task_from_template_key(): void
+    {
+        TaskTemplate::factory()->create([
+            'key' => 'route.follow_up',
+            'title' => 'Template route task',
+            'task_description' => 'Created from template.',
+            'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+            'priority' => 'high',
+            'due_offset_minutes' => 30,
+        ]);
+
+        $setup = $this->createProgressWithPoints([
+            Point::TYPE_CREATE_TASK,
+        ]);
+
+        $setup['flow_route_points'][0]->forceFill([
+            'definition' => [
+                'task_template_key' => 'route.follow_up',
+            ],
+        ])->save();
+
+        $result = app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']);
+
+        $this->assertSame(PointExecutionResult::STATUS_COMPLETED, $result->status);
+        $this->assertSame('task_created', $result->reason);
+
+        $task = Task::query()->where('title', 'Template route task')->firstOrFail();
+
+        $this->assertSame('Created from template.', $task->description);
+        $this->assertSame('high', $task->priority);
+        $this->assertSame('route.follow_up', $task->meta['task_template']['key']);
+        $this->assertSame($setup['progress']->getKey(), $task->meta['created_by']['flow_route_progress_id']);
+        $this->assertNotNull($task->due_at);
     }
 
     public function test_automation_event_route_can_change_contact_workflow_status(): void
@@ -452,3 +516,4 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         ];
     }
 }
+

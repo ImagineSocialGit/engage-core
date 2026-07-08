@@ -25,9 +25,11 @@ Tasks may depend on:
 
 - Core, for Contact-owned task association and generic identity.
 
-Tasks should remain standalone-capable with Core only.
+Tasks should remain standalone-capable with Core only for core task creation, lifecycle, template/default behavior, and contact-related visibility.
 
-InternalNotifications and Messaging are optional consumers/capabilities for notifications and digests. Tasks must not require them for its core model or lifecycle.
+Current assignment behavior may resolve active `TeamMember` records when InternalNotifications is installed and enabled, because TeamMember is the current internal assignee model. That is an optional assignment/notification capability path, not a requirement for Tasks to create, complete, reopen, cancel, archive, restore, or display basic tasks.
+
+InternalNotifications and Messaging are optional consumers/capabilities for assignment notifications and digests. Tasks must not require them for its core model, lifecycle, or template/default behavior.
 
 Tasks does not own:
 

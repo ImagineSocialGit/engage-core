@@ -16,6 +16,7 @@ class SyncPresetsCommand extends Command
     protected $signature = 'presets:sync
         {preset? : Optional preset key, such as mortgage or webinar_funnel}
         {--force-flow-routes : Overwrite customized FlowRoutes, Points, and FlowRoutePoints}
+        {--force-tasks : Overwrite customized task templates}
         {--force-message-templates : Overwrite customized Messaging template presets and reactivate synced assignments}
         {--force-webinar-schedule-profiles : Reserved for future customized webinar schedule profile handling}';
 
@@ -62,7 +63,10 @@ class SyncPresetsCommand extends Command
 
             if ($this->shouldSyncSection($preset, 'tasks', 'tasks', $enabledModules)) {
                 $this->renderTaskResult(
-                    $syncTaskPresets->handle($presetKey),
+                    $syncTaskPresets->handle(
+                        presetKey: $presetKey,
+                        force: (bool) $this->option('force-tasks'),
+                    ),
                 );
             } else {
                 $this->line('');
@@ -251,6 +255,8 @@ class SyncPresetsCommand extends Command
             [
                 ['Created', $result->created],
                 ['Updated', $result->updated],
+                ['Removed stale', $result->removed ?? 0],
+                ['Customized skipped', $result->customizedSkipped ?? 0],
                 ['Skipped', $result->skipped],
             ],
         );

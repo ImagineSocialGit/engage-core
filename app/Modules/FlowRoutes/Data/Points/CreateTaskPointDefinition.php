@@ -3,6 +3,7 @@
 namespace App\Modules\FlowRoutes\Data\Points;
 
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Models\TaskTemplate;
 
 class CreateTaskPointDefinition
 {
@@ -11,14 +12,17 @@ class CreateTaskPointDefinition
      */
     public function __construct(
         public readonly ?string $title,
+        public readonly ?string $taskTemplateKey = null,
         public readonly ?int $assignedToId = null,
         public readonly ?string $assignedToType = null,
         public readonly ?string $assignedTo = null,
+        public readonly ?string $assignedToStrategy = null,
         public readonly ?string $responsibleParty = null,
         public readonly ?string $responsibleType = null,
         public readonly ?int $responsibleId = null,
         public readonly ?string $description = null,
         public readonly mixed $dueAt = null,
+        public readonly ?int $dueOffsetMinutes = null,
         public readonly ?string $priority = null,
         public readonly ?string $invalidReason = null,
         public readonly array $meta = [],
@@ -33,51 +37,35 @@ class CreateTaskPointDefinition
         $source = array_replace_recursive($definition, $settings);
 
         $title = self::string($source, 'title');
+        $taskTemplateKey = self::string($source, 'task_template_key')
+            ?? self::string($source, 'template_key');
         $responsibleParty = self::string($source, 'responsible_party')
-            ?? Task::RESPONSIBLE_PARTY_INTERNAL;
+            ?? ($taskTemplateKey === null ? Task::RESPONSIBLE_PARTY_INTERNAL : null);
+        $assignedToStrategy = self::string($source, 'assigned_to_strategy')
+            ?? self::string($source, 'assigned_to');
 
-        if ($title === null) {
-            return new self(
-                title: null,
-                assignedToId: self::int($source, 'assigned_to_id'),
-                assignedToType: self::string($source, 'assigned_to_type'),
-                assignedTo: self::string($source, 'assigned_to'),
-                responsibleParty: $responsibleParty,
-                responsibleType: self::string($source, 'responsible_type'),
-                responsibleId: self::int($source, 'responsible_id'),
-                invalidReason: 'create_task_missing_title',
-                meta: self::meta($source),
-            );
-        }
-
-        if (! in_array($responsibleParty, Task::RESPONSIBLE_PARTY_OPTIONS, true)) {
-            return new self(
-                title: $title,
-                assignedToId: self::int($source, 'assigned_to_id'),
-                assignedToType: self::string($source, 'assigned_to_type'),
-                assignedTo: self::string($source, 'assigned_to'),
-                responsibleParty: $responsibleParty,
-                responsibleType: self::string($source, 'responsible_type'),
-                responsibleId: self::int($source, 'responsible_id'),
-                description: self::string($source, 'description'),
-                dueAt: $source['due_at'] ?? null,
-                priority: self::string($source, 'priority'),
-                invalidReason: 'create_task_invalid_responsible_party',
-                meta: self::meta($source),
-            );
-        }
+        $invalidReason = match (true) {
+            $title === null && $taskTemplateKey === null => 'create_task_missing_title_or_template',
+            $responsibleParty !== null && ! in_array($responsibleParty, Task::RESPONSIBLE_PARTY_OPTIONS, true) => 'create_task_invalid_responsible_party',
+            $assignedToStrategy !== null && ! in_array($assignedToStrategy, TaskTemplate::ASSIGNED_TO_STRATEGIES, true) => 'create_task_invalid_assigned_to_strategy',
+            default => null,
+        };
 
         return new self(
             title: $title,
+            taskTemplateKey: $taskTemplateKey,
             assignedToId: self::int($source, 'assigned_to_id'),
             assignedToType: self::string($source, 'assigned_to_type'),
-                assignedTo: self::string($source, 'assigned_to'),
+            assignedTo: self::string($source, 'assigned_to'),
+            assignedToStrategy: $assignedToStrategy,
             responsibleParty: $responsibleParty,
             responsibleType: self::string($source, 'responsible_type'),
             responsibleId: self::int($source, 'responsible_id'),
             description: self::string($source, 'description'),
             dueAt: $source['due_at'] ?? null,
+            dueOffsetMinutes: self::dueOffsetMinutes($source),
             priority: self::string($source, 'priority'),
+            invalidReason: $invalidReason,
             meta: self::meta($source),
         );
     }
@@ -85,8 +73,10 @@ class CreateTaskPointDefinition
     public function isValid(): bool
     {
         return $this->invalidReason === null
-            && is_string($this->title)
-            && trim($this->title) !== '';
+            && (
+                (is_string($this->title) && trim($this->title) !== '')
+                || (is_string($this->taskTemplateKey) && trim($this->taskTemplateKey) !== '')
+            );
     }
 
     /**
@@ -95,15 +85,18 @@ class CreateTaskPointDefinition
     public function toMetaPayload(): array
     {
         return [
+            'task_template_key' => $this->taskTemplateKey,
             'title' => $this->title,
             'assigned_to_id' => $this->assignedToId,
             'assigned_to_type' => $this->assignedToType,
             'assigned_to' => $this->assignedTo,
+            'assigned_to_strategy' => $this->assignedToStrategy,
             'responsible_party' => $this->responsibleParty,
             'responsible_type' => $this->responsibleType,
             'responsible_id' => $this->responsibleId,
             'description' => $this->description,
             'due_at' => $this->dueAt,
+            'due_offset_minutes' => $this->dueOffsetMinutes,
             'priority' => $this->priority,
             'meta' => $this->meta,
         ];
@@ -133,6 +126,22 @@ class CreateTaskPointDefinition
         $value = $source[$key] ?? null;
 
         return is_numeric($value) ? (int) $value : null;
+    }
+
+    /**
+     * @param array<string, mixed> $source
+     */
+    private static function dueOffsetMinutes(array $source): ?int
+    {
+        $minutes = self::int($source, 'due_offset_minutes');
+
+        if ($minutes !== null) {
+            return $minutes;
+        }
+
+        $days = self::int($source, 'due_offset_days');
+
+        return $days !== null ? $days * 1440 : null;
     }
 
     /**

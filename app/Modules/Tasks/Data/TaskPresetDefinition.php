@@ -3,10 +3,13 @@
 namespace App\Modules\Tasks\Data;
 
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Models\TaskTemplate;
 
 class TaskPresetDefinition
 {
     /**
+     * @param array<string, mixed>|null $relatedSubject
+     * @param array<string, mixed>|null $defaults
      * @param array<string, mixed> $meta
      */
     public function __construct(
@@ -17,9 +20,20 @@ class TaskPresetDefinition
         public readonly ?string $description,
         public readonly ?string $taskDescription,
         public readonly string $responsibleParty,
+        public readonly ?string $responsibleType,
+        public readonly ?int $responsibleId,
+        public readonly ?string $assignedToType,
+        public readonly ?int $assignedToId,
+        public readonly ?string $assignedToStrategy,
         public readonly ?string $priority,
-        public readonly ?int $dueOffsetDays,
+        public readonly ?int $dueOffsetMinutes,
+        public readonly string $source,
+        public readonly ?string $sourceVersion,
+        public readonly ?string $ownerGroup,
+        public readonly ?string $category,
         public readonly bool $isActive,
+        public readonly ?array $relatedSubject = null,
+        public readonly ?array $defaults = null,
         public readonly array $meta = [],
         public readonly ?string $invalidReason = null,
     ) {}
@@ -32,31 +46,18 @@ class TaskPresetDefinition
         $responsibleParty = self::string($data, 'responsible_party')
             ?? Task::RESPONSIBLE_PARTY_INTERNAL;
 
-        if (! in_array($responsibleParty, Task::RESPONSIBLE_PARTY_OPTIONS, true)) {
-            return new self(
-                groupKey: $groupKey,
-                key: self::string($data, 'key'),
-                name: self::string($data, 'name'),
-                title: self::string($data, 'title'),
-                description: self::string($data, 'description'),
-                taskDescription: self::string($data, 'task_description'),
-                responsibleParty: $responsibleParty,
-                priority: self::string($data, 'priority'),
-                dueOffsetDays: self::nullableInt($data, 'due_offset_days'),
-                isActive: self::bool($data, 'is_active', true),
-                meta: self::meta($data),
-                invalidReason: 'invalid_responsible_party',
-            );
-        }
+        $assignedToStrategy = self::string($data, 'assigned_to_strategy')
+            ?? self::string($data, 'assigned_to');
 
         $key = self::string($data, 'key');
-        $name = self::string($data, 'name');
         $title = self::string($data, 'title');
+        $name = self::string($data, 'name') ?? $title;
 
         $invalidReason = match (true) {
             $key === null => 'missing_key',
-            $name === null => 'missing_name',
             $title === null => 'missing_title',
+            ! in_array($responsibleParty, Task::RESPONSIBLE_PARTY_OPTIONS, true) => 'invalid_responsible_party',
+            $assignedToStrategy !== null && ! in_array($assignedToStrategy, TaskTemplate::ASSIGNED_TO_STRATEGIES, true) => 'invalid_assigned_to_strategy',
             default => null,
         };
 
@@ -68,9 +69,20 @@ class TaskPresetDefinition
             description: self::string($data, 'description'),
             taskDescription: self::string($data, 'task_description'),
             responsibleParty: $responsibleParty,
+            responsibleType: self::string($data, 'responsible_type'),
+            responsibleId: self::nullableInt($data, 'responsible_id'),
+            assignedToType: self::string($data, 'assigned_to_type'),
+            assignedToId: self::nullableInt($data, 'assigned_to_id'),
+            assignedToStrategy: $assignedToStrategy,
             priority: self::string($data, 'priority'),
-            dueOffsetDays: self::nullableInt($data, 'due_offset_days'),
+            dueOffsetMinutes: self::dueOffsetMinutes($data),
+            source: self::string($data, 'source') ?? TaskTemplate::SOURCE_PRESET,
+            sourceVersion: self::string($data, 'source_version') ?? self::string($data, 'version'),
+            ownerGroup: self::string($data, 'owner_group'),
+            category: self::string($data, 'category'),
             isActive: self::bool($data, 'is_active', true),
+            relatedSubject: self::arrayOrNull($data, 'related_subject'),
+            defaults: self::arrayOrNull($data, 'defaults'),
             meta: self::meta($data),
             invalidReason: $invalidReason,
         );
@@ -91,13 +103,24 @@ class TaskPresetDefinition
     {
         return [
             'group_key' => $this->groupKey,
+            'source' => $this->source,
+            'source_version' => $this->sourceVersion,
+            'owner_group' => $this->ownerGroup,
+            'category' => $this->category,
             'name' => $this->name,
             'title' => $this->title,
             'description' => $this->description,
             'task_description' => $this->taskDescription,
+            'assigned_to_type' => $this->assignedToType,
+            'assigned_to_id' => $this->assignedToId,
+            'assigned_to_strategy' => $this->assignedToStrategy,
             'responsible_party' => $this->responsibleParty,
+            'responsible_type' => $this->responsibleType,
+            'responsible_id' => $this->responsibleId,
             'priority' => $this->priority,
-            'due_offset_days' => $this->dueOffsetDays,
+            'due_offset_minutes' => $this->dueOffsetMinutes,
+            'related_subject' => $this->relatedSubject,
+            'defaults' => $this->defaults,
             'is_active' => $this->isActive,
             'meta' => $this->meta,
         ];
@@ -109,6 +132,10 @@ class TaskPresetDefinition
     private static function string(array $data, string $key): ?string
     {
         $value = $data[$key] ?? null;
+
+        if (is_int($value) || is_float($value)) {
+            $value = (string) $value;
+        }
 
         if (! is_string($value)) {
             return null;
@@ -137,6 +164,49 @@ class TaskPresetDefinition
         $value = $data[$key] ?? $default;
 
         return is_bool($value) ? $value : filter_var($value, FILTER_VALIDATE_BOOL);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function dueOffsetMinutes(array $data): ?int
+    {
+        $minutes = self::nullableInt($data, 'due_offset_minutes');
+
+        if ($minutes !== null) {
+            return $minutes;
+        }
+
+        $days = self::nullableInt($data, 'due_offset_days');
+
+        if ($days !== null) {
+            return $days * 1440;
+        }
+
+        $due = $data['defaults']['due'] ?? null;
+
+        if (! is_array($due)) {
+            return null;
+        }
+
+        $minutes = is_numeric($due['minutes'] ?? null) ? (int) $due['minutes'] : 0;
+        $hours = is_numeric($due['hours'] ?? null) ? (int) $due['hours'] : 0;
+        $days = is_numeric($due['days'] ?? null) ? (int) $due['days'] : 0;
+
+        $total = $minutes + ($hours * 60) + ($days * 1440);
+
+        return $total > 0 ? $total : null;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>|null
+     */
+    private static function arrayOrNull(array $data, string $key): ?array
+    {
+        $value = $data[$key] ?? null;
+
+        return is_array($value) ? $value : null;
     }
 
     /**
