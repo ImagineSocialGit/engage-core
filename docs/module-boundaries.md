@@ -1056,11 +1056,11 @@ Messaging owns reusable message copy and delivery templates, including subject/b
 
 Campaign-owned message templates live inside Messaging configs under:
 
-    campaigns.{campaign_key}.steps.{step_number}
+    campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
 
 Those campaign message templates are resolved by:
 
-    channel + purpose + scope + campaign_key + step_number
+    channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key
 
 Campaign presets should not duplicate reusable message copy.
 
@@ -1602,16 +1602,28 @@ Examples:
 Current tables/models:
 
     flow_routes
+    flow_route_trigger_bindings
     points
     flow_route_points
     contact_flow_route_progress
+    contact_flow_route_plans
+    contact_flow_route_plan_items
+    contact_flow_route_progress_items
+    flow_route_capabilities
+    flow_route_capability_bindings
 
 Current models:
 
     FlowRoute
+    FlowRouteTriggerBinding
     Point
     FlowRoutePoint
     ContactFlowRouteProgress
+    ContactFlowRoutePlan
+    ContactFlowRoutePlanItem
+    ContactFlowRouteProgressItem
+    FlowRouteCapability
+    FlowRouteCapabilityBinding
 
 A ContactStatus trigger should normally have one selected FlowRoute binding per context.
 
@@ -1700,7 +1712,7 @@ It means the route started from an automation event rather than a Workflow statu
 
 ## FlowRoutes route instance and capability hardening
 
-Before production, FlowRoutes should use first-class schema for route instances, route plans, route plan items, progress/execution items, and capability discovery instead of pushing these concepts into `meta`.
+FlowRoutes uses first-class schema for route instances, route plans, route plan items, progress/execution items, and capability discovery instead of pushing these concepts into `meta`.
 
 The durable layer split is:
 
@@ -1724,7 +1736,7 @@ FlowRouteCapability / FlowRouteCapabilityBinding
     Durable capability catalog and context/client/module binding layer for available actions, waits, conditions, events, labels, input schema, output context, and supported subject types.
 ```
 
-`contact_flow_route_progress` should support:
+`contact_flow_route_progress` supports:
 
 ```text
 subject_type nullable
@@ -1733,7 +1745,7 @@ subject_id nullable
 
 Subject scoping lets one contact have separate live route instances for records such as appointments, document requests, form submissions, portal invitations, commerce orders, mortgage files, pets/dogs, or music-specific subjects.
 
-A reusable route template may change over time. A live route instance should execute from its instance plan so template edits do not unexpectedly mutate active route paths. Operators may later insert, repeat, skip, cancel, delay, or replace plan items for one contact/subject without changing the reusable template.
+A reusable route template may change over time. A live route instance executes from its instance plan so template edits do not unexpectedly mutate active route paths. Operators may later insert, repeat, skip, cancel, delay, or replace plan items for one contact/subject without changing the reusable template when Route Management UX supports those operations.
 
 FlowRoutes-created artifacts should use the same first-class provenance shape across modules:
 
@@ -1873,14 +1885,15 @@ Campaign presets must not define or override message payloads.
 
 Campaign message templates are resolved from Messaging by:
 
-    channel + purpose + scope + campaign_key + step_number
+    channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key
 
 The matching Messaging config path is:
 
-    messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
+    messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
 
-Campaign preset steps should reference the message template context only through first-class step fields:
+Campaign preset step variants should reference the message template context only through first-class variant fields:
 
+    key
     dispatch_key
     channel
     purpose
@@ -2833,7 +2846,7 @@ A reusable FlowRoute definition is the route template/default automation plan.
 
 A live contact/subject moving through that route is a route instance.
 
-Before production, FlowRoutes needs an explicit schema decision for whether active route instances execute directly from mutable route templates or from contact/subject-specific plan snapshots.
+Phase 4B made the explicit schema decision that active route instances execute from contact/subject-specific plan snapshots rather than directly from mutable route templates.
 
 The motivating case:
 
@@ -2845,7 +2858,7 @@ The operator needs to add more appointments or repeat a final behavior check.
 That adjustment must affect only this contact/dog route instance, not the reusable template.
 ```
 
-Durable concepts to audit:
+Durable implemented concepts:
 
 ```text
 FlowRoute template/definition = reusable default automation plan.
@@ -2853,30 +2866,18 @@ ContactFlowRouteProgress / route instance = this contact/subject moving through 
 Route instance plan/adjustment = contact-specific or subject-specific modification without changing the template.
 ```
 
-Possible names/concepts:
+Implemented schema includes:
 
 ```text
-FlowRoutePlan
-FlowRoutePlanItem
+ContactFlowRouteProgress with optional subject scoping
+ContactFlowRoutePlan
+ContactFlowRoutePlanItem
 ContactFlowRouteProgressItem
-ContactFlowRouteProgressAdjustment
-Route instance snapshot
+Route definition/settings snapshots for active instance execution
+Structured FlowRoutes provenance on route-created artifacts
 ```
 
-Schema questions for the FlowRoutes audit:
-
-```text
-Should ContactFlowRouteProgress support subject_type / subject_id?
-Should route execution snapshot route points into progress items when a route starts?
-Should live route instances execute from the mutable template, or from a plan snapshot?
-Should operators be able to insert/repeat/skip/cancel specific plan items for one contact/subject?
-Should each plan item track source = template/manual/vertical/automation?
-Should plan items store config_snapshot json so template changes do not unexpectedly mutate active instances?
-Should event waits and task completion resume a specific plan item rather than only a raw route point?
-Should appointments/tasks/messages created by route points attach back to the specific progress item?
-```
-
-The Phase 4A audit proved that route instance plan tables are required before production. Implement this schema before Phase 5 task-completed resume so runtime correlation does not become meta-heavy.
+The Phase 4A audit proved that route instance plan tables were required before production, and Phase 4B implemented the backend foundation before Phase 5 task-completed resume so runtime correlation does not become meta-heavy.
 
 ## Shared available-field/token registry direction
 
@@ -2925,3 +2926,4 @@ Campaigns invents webinar URL fields without the enrollment caller supplying the
 ```
 
 Treat available-field validation as setup/config-validation work before every editor receives polished autocomplete.
+

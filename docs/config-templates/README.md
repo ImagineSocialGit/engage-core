@@ -52,7 +52,7 @@ client/{client-key}/config/reference/tokens.php
 messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
 ```
 
-- Campaign message templates resolve by campaign key, step number, and variant key, not author-created per-step message names.
+- Campaign message templates resolve by channel, purpose, scope, campaign key, step number, and variant key, not author-created per-step message names.
 - Campaign step variants must reference Messaging-owned templates/assignments and must not own reusable copy.
 - FlowRoute presets own automation/control-flow routing and point definitions.
 - Webinar post-event config owns provider orchestration, not reusable message copy.
@@ -160,7 +160,7 @@ Rules:
 - Campaign preset variants reference Messaging templates with first-class key/dispatch_key/channel/purpose/scope keys.
 - Campaign dependency-aware variants must use explicit sibling variant dependency rules.
 - Do not use meta.message for new Campaign preset step or variant message references.
-- Campaign message templates resolve by campaign_key + step_number + campaign_step_variant_key.
+- Campaign message templates resolve by channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key.
 - FlowRoute presets own automation/control flow.
 - Webinar post-event config owns provider orchestration, not message copy.
 - Default webinar copy should be vertical-neutral.
@@ -176,3 +176,4 @@ Client request:
 
 Return complete config files and list any recommended new keys/tokens separately.
 ```
+

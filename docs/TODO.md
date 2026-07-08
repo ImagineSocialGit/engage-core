@@ -161,17 +161,21 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Decide whether operators can insert/repeat/skip/cancel route instance plan items for one contact/subject.
   - Decide how event waits, task completion, appointment completion, document completion, etc. resume specific plan items.
   - Audit conclusion: subject-scoped route instances, route instance plans/items, progress/execution items, capability catalog/bindings, and uniform artifact provenance are required before production.
-- [ ] Phase 4B — FlowRoutes schema hardening.
-  - Add `subject_type` / `subject_id` to `contact_flow_route_progress`.
-  - Add `contact_flow_route_plans`.
-  - Add `contact_flow_route_plan_items`.
-  - Add `contact_flow_route_progress_items`.
-  - Add `flow_route_capabilities`.
-  - Add `flow_route_capability_bindings`.
-  - Add uniform FlowRoutes provenance fields to route-created artifacts: Tasks, ScheduledMessages, and CampaignEnrollments.
-  - Ensure future modules use the same provenance pattern when FlowRoutes creates Scheduling appointments, Document requests, Form requests/submissions, Portal invitations/access grants, Commerce records, or vertical-owned artifacts.
-  - Keep module-owned business behavior behind public actions/services/contracts.
-  - Do not build the polished Route Management UX in this phase.
+- [x] Phase 4B — FlowRoutes schema hardening.
+  - Added `subject_type` / `subject_id` to `contact_flow_route_progress`.
+  - Added `contact_flow_route_plans`.
+  - Added `contact_flow_route_plan_items`.
+  - Added `contact_flow_route_progress_items`.
+  - Added `flow_route_capabilities`.
+  - Added `flow_route_capability_bindings`.
+  - Added uniform FlowRoutes provenance fields to route-created artifacts: Tasks, ScheduledMessages, and CampaignEnrollments.
+  - Hardened blocked/cancelled/superseded runtime behavior so open plan/progress items do not remain successful-looking or resumable incorrectly.
+  - Normalized route wait/resume metadata and automation-event started_at fallback behavior.
+  - Added full structured FlowRoutes provenance to task-completed automation/debug paths where applicable.
+  - Added producer-level provenance tests and boundary guardrails for FlowRoutes internals.
+  - Confirmed future modules should use the same provenance pattern when FlowRoutes creates Scheduling appointments, Document requests, Form requests/submissions, Portal invitations/access grants, Commerce records, or vertical-owned artifacts.
+  - Kept module-owned business behavior behind public actions/services/contracts.
+  - Deferred polished Route Management UX, CRM provenance/debug views, and Automatic Follow-ups UX polish.
 - [ ] Phase 5 — FlowRoutes event-wait / task-completed resume implementation.
   - Implement after Phase 4B schema hardening because resume behavior must target route progress/plan/progress items.
   - Resume from neutral `task.completed` `AutomationEventRecorded` events.
@@ -345,3 +349,4 @@ These notes are intentionally retained while the schema-discovery phases continu
 - [ ] Hide technical specs behind details/debug affordances.
 - [ ] Replace raw timing such as `Delay 10 minutes` with human-readable schedule summaries.
 - [ ] Clean up repeated dropdown labels such as `Step 1 Email — Webinar Attended Nurture — Step 1 Email`.
+

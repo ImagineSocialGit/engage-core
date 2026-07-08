@@ -82,7 +82,7 @@ Examples:
     webinar.missed -> FlowRoutes event-triggered route -> enroll_campaign(webinar_missed_nurture)
     task.completed -> FlowRoutes event_wait resume, if configured
 
-Current/target tables/models:
+Current tables/models:
 
     flow_routes
     flow_route_trigger_bindings
@@ -95,7 +95,7 @@ Current/target tables/models:
     flow_route_capabilities
     flow_route_capability_bindings
 
-Current/target models:
+Current models:
 
     FlowRoute
     FlowRouteTriggerBinding
@@ -294,48 +294,13 @@ It means the route started from an automation event rather than a Workflow statu
 FlowRoutes may support Campaign, Messaging, Task, and status-related point types, but client-facing Route selection/building must be capability-aware. Point types whose owning modules are disabled should be hidden, disabled, or clearly marked unavailable. Campaign-related points must not appear as selectable client-facing behavior for clients without Campaigns enabled.
 
 
-## Relationship, capability, and instance-plan audit
+## Relationship, capability, and instance-plan status
 
-The Phase 4A audit is complete. It confirmed that FlowRoutes should harden schema before production for subject-scoped route instances, instance-specific route plans, plan items, progress/execution items, capability catalog/bindings, and route-created artifact provenance.
+The Phase 4A audit and Phase 4B implementation are complete for backend/schema readiness. FlowRoutes now has subject-scoped route instances, instance-specific route plans, plan items, progress/execution items, capability catalog/bindings, and route-created artifact provenance.
 
-This must happen before task-completed event-wait resume behavior, because resume behavior must target a specific route instance plan/progress item rather than only a raw reusable route point.
+This foundation exists before Phase 5 task-completed event-wait resume behavior so resume behavior can target a specific route instance plan/progress item rather than only a raw reusable route point.
 
-The audit must map FlowRoutes against every current/planned universal and vertical module and decide, for each module:
-
-```text
-Does the module produce automation events?
-Does the module expose public actions FlowRoutes may call?
-Does the module contribute point handlers?
-Does the module contribute route presets?
-Does the module contribute task templates?
-Does the module contribute capability metadata/labels/contextual hints?
-Does the module expose records that routes can be scoped to through subject morphs?
-```
-
-Modules to include:
-
-```text
-Messaging
-InboundMessaging
-InternalNotifications
-Tasks
-Workflow
-Campaigns
-Broadcasts
-Webinars
-Reporting
-Scheduling
-Portal
-Forms
-Documents
-Commerce
-Location
-Mortgage
-PetServices
-Music
-```
-
-The audit should preserve these rules:
+The implemented model preserves these rules:
 
 - Producer modules should not import FlowRoutes.
 - FlowRoutes should not import producer module private internals.
@@ -346,7 +311,7 @@ The audit should preserve these rules:
 
 ## FlowRoute capabilities
 
-FlowRoutes should use DB-owned capability and capability binding records as the durable authoring/validation layer.
+FlowRoutes uses DB-owned capability and capability binding records as the durable authoring/validation layer.
 
 The runtime path remains:
 
@@ -364,22 +329,13 @@ Capabilities do not give FlowRoutes permission to mutate another module's privat
 
 ## TaskTemplate requirement for create_task points
 
-Task templates are required foundation for durable FlowRoutes `create_task` behavior.
+Task templates are the durable foundation for reusable FlowRoutes `create_task` behavior.
 
-FlowRoutes `create_task` points should not hardcode every reusable task shape inline forever.
+FlowRoutes `create_task` points may reference DB-owned `TaskTemplate` records by stable key, then create live tasks through Tasks-owned public actions. Inline create_task definitions remain supported for route-specific cases.
 
-Phase 3 must settle how `create_task` points reference DB-owned `TaskTemplate` records.
+Tasks remains the owner of task creation, assignment strategy, responsibility fields, related subject handling, due offsets, and task lifecycle behavior. FlowRoutes passes task intent and route provenance; it does not write Task internals directly.
 
-Questions to settle before deeper FlowRoutes runtime work:
-
-```text
-Can a create_task point reference a TaskTemplate by id or stable key?
-Does TaskTemplate contain enough fields for title/body/default due offsets/assigned_to/responsible_party/related subject rules?
-Should FlowRoute point config override template defaults for one route?
-Should route presets reference task template keys while runtime resolves DB records?
-Should vertical modules contribute task templates without Tasks becoming vertical-specific?
-Should customized TaskTemplates be preserved during sync?
-```
+`tasks.task_template_id` may be treated as a soft/current DB reference while `task_template_key` preserves durable historical identity for route-created tasks.
 
 ## Route template vs route instance plan
 
@@ -400,7 +356,7 @@ The adjustment affects only that contact/dog route instance.
 The reusable route template remains unchanged.
 ```
 
-Target schema/concepts:
+Current schema/concepts:
 
 ```text
 ContactFlowRouteProgress
@@ -416,15 +372,16 @@ ContactFlowRouteProgressItem
     execution attempt/result for a plan item; stores waiting/resume/correlation/result state and created-artifact references.
 ```
 
-Implementation requirements:
+Implemented requirements and durable rules:
 
 ```text
 ContactFlowRouteProgress supports subject_type / subject_id.
 Route start creates a ContactFlowRoutePlan and plan items from the selected FlowRoute template.
 Runtime execution advances through plan items, not only mutable FlowRoutePoint records.
 Plan items store definition/settings snapshots so template edits do not unexpectedly mutate active route instances.
-Operators may later insert/repeat/skip/cancel specific plan items for one contact/subject.
-Event waits and task completion resume a specific plan/progress item.
+Blocked, cancelled, and superseded route behavior should leave plan/progress items in accurate non-success states.
+Operators may later insert/repeat/skip/cancel specific plan items for one contact/subject when Route Management UX supports it.
+Phase 5 event waits and task completion should resume a specific plan/progress item.
 Tasks/messages/campaign enrollments/appointments/documents/forms/portal records created by route points attach back through standard FlowRoutes provenance fields.
 ```
 
@@ -443,7 +400,7 @@ flow_route_point_id
 flow_route_capability_id
 ```
 
-Initial targets:
+Current targets:
 
 ```text
 tasks
@@ -466,7 +423,7 @@ The owning module still owns lifecycle and business state. FlowRoutes owns route
 
 ## Event-wait and task-completed resume implementation
 
-Implement task-completed resume after the relationship/capability/instance-plan audit.
+Implement task-completed resume in Phase 5 on top of the completed relationship/capability/instance-plan foundation.
 
 Target behavior:
 
@@ -539,3 +496,4 @@ Manage the automatic routes that create tasks, send messages, update statuses, a
 ```
 
 Phase 4 should audit whether point handlers/capabilities need label and hint metadata from module providers so Route Management can explain available actions without importing module internals.
+
