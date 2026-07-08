@@ -1054,4 +1054,288 @@ Does the UI preserve context after save where reloads would be frustrating?
 Is this production/client UI, not a reused dev-testing pattern?
 ```
 
+## Reusable field/token insertion
 
+Many Engage Core screens ask operators to write reusable copy or instructions that can include dynamic values from a contact, webinar, campaign enrollment, task, form submission, document request, route context, or vertical subject.
+
+Do not make users memorize token syntax.
+
+Use client-facing language such as:
+
+```text
+Insert field
+Add field
+Available fields
+```
+
+Avoid making `token` the primary UI word unless the surface is explicitly developer/admin-facing.
+
+Preferred interaction:
+
+```text
+The user is typing in an input or textarea.
+The cursor/focus stays exactly where they are typing.
+They click Add field / Insert field.
+An autocomplete opens at the current cursor position.
+They type a friendly search term such as fir.
+The picker suggests First name.
+Selecting it inserts the hidden token syntax at the cursor.
+```
+
+The UI should show friendly labels, examples, and categories. The stored value should use a stable hidden syntax that is unambiguous and unlikely to conflict with normal user copy.
+
+Default hidden syntax:
+
+```text
+{{ first_name }}
+{{ webinar_title }}
+{{ contact.email }}
+```
+
+The runtime may normalize this into the current internal token syntax when needed, but the UI should avoid requiring users to manually type braces or exact keys.
+
+Do not invent available fields in the UI. Available fields should come from a shared provider/registry that knows the current authoring context.
+
+Examples of context-specific field groups:
+
+```text
+Contact fields
+Webinar fields
+Campaign fields
+Task fields
+Route fields
+Form fields
+Document fields
+Commerce fields
+Vertical subject fields
+```
+
+When a field is unavailable for the current context, it should not appear as a normal selectable option. If it appears for education/debugging, it must clearly explain why it cannot be used there.
+
+Authoring surfaces that should eventually use this pattern:
+
+```text
+Message Templates
+Broadcast authoring
+Campaign message templates
+Webinar message setup/copy links
+Task templates
+Route send-message points
+Form confirmation messages
+Document request/reminder messages
+Permission invitation copy
+```
+
+This is UX first, but it may require a real shared available-field/token registry. Treat that registry and validation as setup/config-validation work before polishing every editor.
+
+## Contextual hints
+
+Use contextual hints to help operators understand what a field, setting, or navigation item does without turning the screen into documentation.
+
+Preferred behavior:
+
+```text
+A small hint icon, dotted underline, or subtle help affordance appears near the label.
+Hovering or focusing for a brief moment shows one plain-language explanation.
+Keyboard focus should reveal the same help as hover.
+```
+
+Hints should answer:
+
+```text
+What does this do?
+When would I use it?
+What happens if I change it?
+```
+
+Hints should not expose schema names, raw config keys, event keys, class names, or implementation details as the primary explanation.
+
+Good:
+
+```text
+Route Management
+Choose what automatic actions happen after important contact activity.
+```
+
+Bad:
+
+```text
+Manage FlowRouteTriggerBinding records for automation_event and contact_status triggers.
+```
+
+Hints are not a replacement for consequence previews. If changing a setting triggers messages, tasks, status changes, route execution, campaign enrollment, or cancellation, show a clear preview before save.
+
+## Preserve context for inline CRM actions
+
+CRM workflows should avoid unnecessary full-page reloads when an operator is acting inside a focused context such as a dashboard panel, task list, modal, contact panel, setup checklist, or row action menu.
+
+When an action is small, localized, and reversible or easily confirmed, prefer an inline/AJAX-style interaction that preserves the operator's current position, filters, selected record, modal state, and visible feedback.
+
+Good candidates include:
+
+```text
+completing or reopening a task
+cancelling, archiving, restoring, or reassigning a task
+sending a focused task broadcast
+loading contextual action options inside a modal
+marking a setup/readiness item reviewed
+refreshing a panel after a successful action
+simulating/testing module behavior in local/staging tools
+```
+
+The interaction should provide clear feedback in place, such as:
+
+```text
+row/card state update
+subtle success message
+refreshed count
+inline activity log
+visible validation error near the field/action
+```
+
+It should not make the operator hunt back to where they were.
+
+Full-page submits are still acceptable when the action naturally changes the whole page context, requires a multi-step confirmation flow, creates a new primary record, or is not worth adding client-side complexity yet.
+
+This is a UX pattern first, not a schema requirement. Only add persisted state when the workflow proves that user-specific selections, filters, acknowledgements, dismissals, saved views, or selected batches need to survive beyond the current page session.
+
+## Route Management language
+
+FlowRoutes is the internal module/domain name.
+
+Client/operator-facing UI may use simpler Route language when it helps the mental model.
+
+Preferred public labels:
+
+```text
+Routes
+Route Management
+Automatic routes
+Route points
+Automatic actions
+What happens next
+```
+
+Avoid making `FlowRoutes`, `FlowRouteTriggerBinding`, `automation_event`, `event_wait`, or raw event keys the primary client-facing language.
+
+A sidebar item such as `Route Management` should use a concise contextual hint:
+
+```text
+Choose what automatic actions happen after important contact activity.
+```
+
+Alternative hint copy:
+
+```text
+Manage the automatic routes that create tasks, send messages, update statuses, and start follow-up sequences.
+```
+
+Use `FlowRoutes` in developer/module docs where precise ownership matters. Use `Routes` or `Route Management` in client/operator navigation and product copy when the screen is about selecting or understanding automatic behavior.
+
+## Broadcast authoring direction
+
+Broadcasts should stay simpler than Campaigns.
+
+The Broadcast authoring UI should lead operators through one clear one-time send, not a platform cockpit.
+
+Recommended direction:
+
+```text
+1. Choose channel.
+2. Write the channel-specific message payload.
+3. Choose recipients.
+4. Review duplicate-send protection and schedule/send.
+```
+
+Channel choice should shape the payload form:
+
+```text
+Email -> subject + body
+SMS -> message
+```
+
+Imported-contact opt-in invitations should not receive equal weight with normal Broadcast authoring. They are a distinct Messaging-owned one-time permission flow and should be exposed as a secondary action such as:
+
+```text
+Send opt-in invitation to imported contacts
+```
+
+When no contacts are eligible for the opt-in invitation, hide or disable the import-batch/options area and explain that there are no eligible contacts to invite.
+
+Duplicate-send protection is useful but secondary. Prefer a collapsed `Avoid duplicate sends` section with a short summary of what is currently selected.
+
+A future `Make a new broadcast from this` action is useful for repeating a prior Broadcast with a new channel or audience. Add lineage fields such as `cloned_from_broadcast_id` only if audit/debug/product needs prove that lineage should be persisted.
+
+## Campaign message-step presentation
+
+Campaign UI should describe business meaning before technical machinery.
+
+Prefer:
+
+```text
+Message steps
+Step 1
+Step 2
+Available channels
+When it sends
+```
+
+Avoid making `delivery options`, `variant strategy`, `dispatch key`, `message_type`, `purpose`, `scope`, or config paths primary labels.
+
+A campaign list/card should make the basic shape easy to understand:
+
+```text
+5 message steps
+Email + SMS available
+Starts after webinar attendance
+```
+
+Each campaign step should be collapsible. The collapsed state should show only the most useful information:
+
+```text
+step number
+title/business moment
+available channel badges
+human-readable timing summary
+current selected template health/readiness
+```
+
+Technical details belong behind a details popover, disclosure, or developer/debug mode.
+
+Timing must be translated from internal schedule values into user expectations.
+
+Good:
+
+```text
+Sends 10 days after the webinar.
+Sends 2 weeks after the previous message.
+Sends immediately after someone attends.
+Sends when this route reaches the step.
+```
+
+Bad:
+
+```text
+Delay 10 minutes
+schedule.type = delay
+criteria.timing.days = 3
+```
+
+Dropdown labels should avoid repeated machine context.
+
+Bad:
+
+```text
+Step 1 Email — Webinar Attended Nurture — Step 1 Email
+```
+
+Better:
+
+```text
+Email follow-up
+SMS follow-up
+Attended thank-you email
+Missed webinar replay email
+```
+
+Keep raw campaign/template/config identity available only where it helps diagnostics.

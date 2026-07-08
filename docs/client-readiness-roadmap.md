@@ -80,7 +80,7 @@ Remaining near-term candidates:
 - Task templates/defaults for FlowRoutes-created tasks and module-contributed tasks.
 - FlowRoutes relationship, capability, and instance-plan audit.
 - FlowRoutes event-wait/task-completed resume implementation.
-- Config/setup validation across presets, route points, module capabilities, and templates.
+- Config/setup validation across presets, route points, module capabilities, available fields/tokens, and templates.
 - Permission invitation accepted/cancelled/skip/failure behavior.
 - Webinar message readiness checks.
 - Manual status-change automation warnings.
@@ -109,9 +109,9 @@ Current schema-discovery sequence:
 | 1 | Webinar schedule profiles | Complete | DB/schema | DB-owned webinar schedule profiles/items exist. Series/webinars can select profiles with fallback. Webinars owns timing/slot identity. Messaging owns reusable copy/templates. Scheduled-message payloads stay compact; schedule/profile/template/debug identity belongs in meta. |
 | 2 | Campaign channel variants | Complete | DB/schema | DB-owned campaign step variants exist. Campaign enrollment is lifecycle, campaign step is the business moment, and campaign step variant is the channel-specific delivery option. Variant strategy and dependency-aware scheduling are hardened. Scheduled-message payloads stay compact; campaign/step/variant/template/debug identity belongs in meta. |
 | 3 | Task templates / task defaults | Next | DB/schema | Task templates are required foundation for FlowRoutes `create_task` points. Audit/implement DB-owned reusable task definitions before deeper FlowRoutes runtime work. |
-| 4 | FlowRoutes relationship, capability, and instance-plan audit | Planned | DB/schema + architecture | Map FlowRoutes against every universal and vertical module. Decide producer events, public actions, contributed point handlers, route presets, task templates, capability metadata, subject morphs, route instance plans, and whether active instances need snapshots/adjustments. |
+| 4 | FlowRoutes relationship, capability, and instance-plan audit | Planned | DB/schema + architecture | Map FlowRoutes against every universal and vertical module. Decide producer events, public actions, contributed point handlers, route presets, task templates, capability metadata/labels, client-facing Route terminology, subject morphs, route instance plans, and whether active instances need snapshots/adjustments. |
 | 5 | FlowRoutes event-wait / task-completed resume implementation | Planned | DB/schema + runtime | Implement after Phase 4 because resume behavior may need subject-scoped route instance plan items/snapshots rather than raw route points only. Resume from neutral `task.completed` automation events. |
-| 6 | Config validation / setup validation | Planned | Architecture + safety | Validate task presets, FlowRoute presets, task-template refs, route point types, module capability references, vertical references, campaign refs, messaging/template refs, unsupported point/module combinations, and route instance/snapshot assumptions. Prefer command/service-based validation first. |
+| 6 | Config validation / setup validation | Planned | Architecture + safety | Validate task presets, FlowRoute presets, task-template refs, route point types, module capability references, available field/token references, vertical references, campaign refs, messaging/template refs, unsupported point/module combinations, and route instance/snapshot assumptions. Prefer command/service-based validation first. |
 | 7 | Permission invitation accepted automation event | Planned | Architecture | Decide whether accepted invitations emit `permission_invitation.accepted` without Messaging depending on consumers. |
 | 8 | Permission invitation cancellation / skip / failure bookkeeping | Planned | DB/schema + architecture | Clarify durable lifecycle visibility across permission invitations, Broadcast bookkeeping, and Messaging scheduled messages. |
 | 9 | Webinar message readiness check | Planned | Architecture + operator safety | Add computed readiness visibility for webinar message setup without persisting setup state unless a concrete need appears. |
@@ -157,9 +157,9 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | 1 | Webinar schedule profiles | Complete | DB-owned `webinar_schedule_profiles` and `webinar_schedule_profile_items` are the durable schedule-selection path. Series and webinars may select profiles; existing scheduled messages remain stable. |
 | 2 | Campaign channel variants | Complete | DB-owned `campaign_step_variants` are the durable channel-coordination path. Steps own business moment and strategy; variants own channel/purpose/scope/dispatch references and do not own copy. |
 | 3 | Task templates / task defaults | 1–2 sessions | Audit whether `task_templates` supports generated/manual tasks well enough for FlowRoutes and vertical modules. Confirm FlowRoutes `create_task` points can reference `TaskTemplate` records. Build UI only if needed. |
-| 4 | FlowRoutes relationship, capability, and instance-plan audit | 1–3 sessions | Map FlowRoutes against every current/planned universal and vertical module. Decide producer seams, public actions, contributed point handlers, route presets, task templates, capability metadata, subject morphs, instance plans, snapshots, and per-contact/subject adjustments. |
+| 4 | FlowRoutes relationship, capability, and instance-plan audit | 1–3 sessions | Map FlowRoutes against every current/planned universal and vertical module. Decide producer seams, public actions, contributed point handlers, route presets, task templates, capability metadata/labels, client-facing Route terminology, subject morphs, instance plans, snapshots, and per-contact/subject adjustments. |
 | 5 | FlowRoutes event-wait / task-completed resume implementation | 0.5–1.5 sessions | Resume from neutral `task.completed` automation events after the Phase 4 runtime model is settled. Do not add Task-specific FlowRoutes listeners. Add wait-correlation schema only if existing progress/plan metadata is insufficient. |
-| 6 | Config validation / setup validation | 0.5–1.5 sessions | Convert config-template expectations into practical validation behavior and operator/debug feedback. Validate task presets, FlowRoute presets, task-template refs, route point types, module capability refs, vertical refs, campaign refs, Messaging template refs, unsupported point/module combinations, and route instance/snapshot assumptions. Prefer command/service-based validation first. |
+| 6 | Config validation / setup validation | 0.5–1.5 sessions | Convert config-template expectations into practical validation behavior and operator/debug feedback. Validate task presets, FlowRoute presets, task-template refs, route point types, module capability refs, available field/token refs, vertical refs, campaign refs, Messaging template refs, unsupported point/module combinations, and route instance/snapshot assumptions. Prefer command/service-based validation first. |
 | 7 | Permission invitation accepted automation event decision | 0.25–0.5 session | Decide whether accepted invitations should emit a neutral automation event such as `permission_invitation.accepted`. |
 | 8 | Permission invitation cancellation behavior | 0.5–1 session | Clarify how cancellation/skip/failure should appear for permission-invitation Broadcast bookkeeping and Messaging scheduled messages. |
 | 9 | Webinar message readiness check | 0.5–1 session | Computed readiness summary for Webinars message setup. Do not persist readiness/acknowledgement state unless the implementation proves a durable concept is missing. |
@@ -340,7 +340,7 @@ The following implementation target is Phase 4: FlowRoutes relationship, capabil
 
 Do not jump directly to event-wait/task-completed resume implementation until the Phase 4 audit settles whether resume behavior needs route instance plan items/snapshots rather than raw route points only.
 
-Automatic Follow-ups / FlowRoutes UX polish remains later in the schema-discovery sequence. Do not start it until the higher-risk schedule, variant, task-template, FlowRoutes capability/instance-plan, route-resume, config-validation, and permission-invitation pieces are settled or deliberately deferred.
+Automatic Follow-ups / FlowRoutes UX polish remains later in the schema-discovery sequence. Its language should use client-facing Route/Route Management terminology, but the full polish pass should wait until capability labels and instance behavior are settled. Do not start it until the higher-risk schedule, variant, task-template, FlowRoutes capability/instance-plan, route-resume, config-validation, and permission-invitation pieces are settled or deliberately deferred.
 
 ## What this roadmap intentionally avoids
 
@@ -373,3 +373,44 @@ When a roadmap item is completed:
 1. Remove it from this file or move it to a completed release note if needed.
 2. Delete or update the related TODO item.
 3. Update module docs only if architecture or durable behavior changed.
+
+## UX notes captured before polish
+
+The following UX notes are intentionally captured now but should not reorder Phase 3 unless implementation reveals schema risk.
+
+Schema/code-sensitive notes:
+
+```text
+Shared available-field/token picker
+    May require a provider/registry source of truth and validation by message/context.
+    Track primarily in Phase 6 config/setup validation.
+
+Route terminology and capability labels
+    Route Management / Routes language should be audited during Phase 4 because labels may come from module capability metadata.
+
+Human-readable schedule summaries
+    Campaigns, Webinars, and FlowRoutes need schedule summary helpers that translate internal timing into user expectations.
+    This is likely code/service work, not table design, unless persisted schedule-summary metadata is proven necessary.
+```
+
+Later UX polish notes:
+
+```text
+Broadcasts
+    Make opt-in invitations secondary to normal Broadcast authoring.
+    Hide opt-in options/import batches when eligible count is zero.
+    Collapse Avoid Duplicate Sends.
+    Consider a channel -> payload -> recipients/review authoring flow.
+    Add Make a new broadcast from this when useful.
+
+Campaigns
+    Replace delivery-options language with message-step/channel language.
+    Collapse campaign steps by default.
+    Hide technical specs behind details/debug affordances.
+    Use human-readable timing such as Sends 10 days after webinar.
+    Clean up repeated dropdown labels.
+
+Routes
+    Use Route Management / Routes in client-facing navigation.
+    Use contextual hints to explain automatic actions in plain language.
+```

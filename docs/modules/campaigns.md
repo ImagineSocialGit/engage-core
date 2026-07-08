@@ -356,3 +356,105 @@ Stop follow-up sequence: Webinar Missed Nurture.
 
 It should not expose CampaignEnrollment internals or campaign step machinery as primary labels.
 
+## CRM presentation and labels
+
+Campaign UI should describe the business journey before technical machinery.
+
+Use client/operator-facing language such as:
+
+```text
+Message steps
+Step 1
+Step 2
+Available channels
+When it sends
+```
+
+Avoid making these primary labels:
+
+```text
+delivery options
+variant strategy
+dispatch key
+message_type
+purpose
+scope
+config path
+```
+
+`Delivery options` is technically accurate for channel variants, but it is not intuitive enough as a primary campaign label. Most operators understand `message steps` more quickly.
+
+A campaign card/list item should make the campaign shape obvious:
+
+```text
+5 message steps
+Email + SMS available
+Starts after webinar attendance
+```
+
+Each campaign step should be collapsible. The collapsed state should show only the most useful information:
+
+```text
+step number
+title/business moment
+available channel badges
+human-readable timing summary
+selected template/readiness state
+```
+
+Technical specs should live behind details/debug affordances.
+
+Dropdown labels should avoid repeated machine context.
+
+Bad:
+
+```text
+Step 1 Email — Webinar Attended Nurture — Step 1 Email
+```
+
+Better:
+
+```text
+Email follow-up
+SMS follow-up
+Attended thank-you email
+Missed webinar replay email
+```
+
+Raw IDs, derived message types, dispatch keys, and config paths should remain available for diagnostics but should not be the primary operator view.
+
+## Human-readable campaign timing
+
+Campaign timing should be shown in business language.
+
+Good examples:
+
+```text
+Sends 10 days after the webinar.
+Sends 2 weeks after the previous message.
+Sends 2 hours after attendance.
+Sends immediately when this campaign starts.
+```
+
+Avoid exposing raw timing as the main label:
+
+```text
+Delay 10 minutes
+criteria.timing.days = 3
+schedule.type = delay
+```
+
+Campaigns may store canonical timing in `criteria.timing` and normalize to Messaging schedule definitions at runtime. UI should use a schedule summary service/helper that understands the business anchor.
+
+Likely summary inputs:
+
+```text
+campaign start context
+step number
+previous step/variant context
+criteria.timing
+variant strategy
+source event or route point, when available
+```
+
+Do not persist summary text unless a concrete reporting/audit reason appears. Prefer deriving it from the canonical step/variant timing definition.

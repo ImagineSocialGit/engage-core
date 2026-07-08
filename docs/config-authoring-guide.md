@@ -1,4 +1,3 @@
-
 # Engage Core Config Authoring Guide
 
 This guide is for creating or reviewing Engage Core default configs and client-specific configs.
@@ -687,7 +686,7 @@ Before accepting a client config, validate:
 - Required top-level keys for that config type are present or supplied by default fallback.
 - Unsupported keys are rejected, flagged, or intentionally ignored with clear operator/debug feedback.
 - Dispatch keys exist in `config/reference/keys.php` or the client key registry.
-- Tokens exist in `config/reference/tokens.php` or the client token registry.
+- Tokens/available fields exist in `config/reference/tokens.php`, the client token registry, or the owning module's available-field provider.
 - Runtime-only URLs are supplied by runtime payloads/services and are not guessed in static config.
 - SMS channel visibility uses Messaging channel availability for the relevant surface instead of one-off provider checks.
 - Permission invitation configs preserve email-only bypass sending, explicit SMS opt-in, and configured consent scopes.
@@ -989,7 +988,7 @@ Examples that should remain singular:
 
 - [ ] Does every config key exist in the key registry or client key registry?
 - [ ] Are unsupported keys rejected, flagged, or intentionally ignored with clear operator/debug feedback?
-- [ ] Does every token exist in the token registry or client token registry?
+- [ ] Does every token/available field exist in the token registry, client token registry, or owning module available-field provider?
 - [ ] Are runtime-only URLs/tokens supplied by runtime payloads/services instead of static config guesses?
 - [ ] Do missing optional content/style keys fall back safely?
 - [ ] Do client config overrides preserve unspecified nested defaults where fallback is expected?
@@ -1145,3 +1144,95 @@ attach an appointment/task/message back to one route instance plan item
 ```
 
 If a preset needs those capabilities, the implementation should happen after the FlowRoutes relationship, capability, and instance-plan audit.
+
+## Available field/token picker and validation
+
+Authoring UI should not make operators memorize token syntax.
+
+Client/operator screens should prefer labels such as:
+
+```text
+Insert field
+Add field
+Available fields
+```
+
+instead of making `token` the primary word.
+
+The stored syntax should be stable, explicit, and unlikely to conflict with normal copy. Preferred UI insertion syntax:
+
+```text
+{{ first_name }}
+{{ webinar_title }}
+{{ contact.email }}
+```
+
+Runtime may normalize this to the internal token format before validation/rendering, but the source of truth must remain context-aware.
+
+Available fields should come from explicit sources:
+
+```text
+Universal Contact/recipient message data
+Owning module message data objects
+Caller/enrollment/start-context payload
+Module-provided available-field registries/providers
+Client token registries for documented client-specific extensions
+```
+
+Do not invent a selectable field in UI or config unless the owning runtime payload/data object/provider can actually supply it.
+
+Phase 6 config/setup validation should check:
+
+```text
+field/token exists for the current context
+field/token is supplied by the runtime path that will send/render the content
+runtime-only URL fields are supplied by runtime payload/service, not guessed in static config
+DB-customized template copy follows the same token rules as config copy
+unsupported fields produce actionable validation messages
+```
+
+Potential provider shape to audit later:
+
+```text
+AvailableFieldProvider
+AvailableFieldRegistry
+AvailableFieldContext
+AvailableFieldOption
+```
+
+Do not build a polished autocomplete editor before the available-field source of truth and validation behavior are settled.
+
+## Human-readable schedule summaries
+
+Config may store timing in canonical runtime shapes, but client/operator UI should show timing in business language.
+
+Examples:
+
+```text
+Sends 10 days after the webinar.
+Sends 2 weeks after the previous message.
+Sends immediately after someone attends.
+Sends when this route reaches the step.
+```
+
+Avoid exposing raw runtime timing as the primary label:
+
+```text
+Delay 10 minutes
+schedule.type = delay
+criteria.timing.days = 3
+```
+
+Campaigns, Webinars, and FlowRoutes may each need schedule-summary helpers because their anchors differ.
+
+Potential summary inputs:
+
+```text
+schedule type
+delay/offset amount
+anchor source
+previous step / route point / webinar start / event occurrence
+business context label
+```
+
+Do not persist schedule summary text unless a concrete reason appears. Prefer deriving it from the canonical schedule/profile/criteria definition.

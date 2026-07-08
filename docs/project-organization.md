@@ -195,5 +195,3 @@ Avoid:
 ```text
 New Core columns for feature or vertical state
 ```
-
-

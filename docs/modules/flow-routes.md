@@ -1,13 +1,12 @@
-
 # FlowRoutes Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
 
 FlowRoutes is optional and depends on Workflow.
 
-Use the term `FlowRoutes`.
+Use the term `FlowRoutes` in developer/module docs where precise ownership matters.
 
-Do not casually call this domain “flows,” because that creates confusion with Workflow.
+Do not casually call this domain “flows,” because that creates confusion with Workflow. Client/operator-facing UI may use `Routes` or `Route Management` when the screen is explaining automatic actions in plain language.
 
 FlowRoutes owns:
 
@@ -294,7 +293,7 @@ Does the module expose public actions FlowRoutes may call?
 Does the module contribute point handlers?
 Does the module contribute route presets?
 Does the module contribute task templates?
-Does the module contribute capability metadata/labels?
+Does the module contribute capability metadata/labels/contextual hints?
 Does the module expose records that routes can be scoped to through subject morphs?
 ```
 
@@ -451,3 +450,45 @@ flow_route_id
 flow_route_point_id or plan_item_id
 contact_flow_route_progress_id
 ```
+
+## Client-facing Route Management terminology
+
+`FlowRoutes` remains the module/domain name.
+
+Client/operator-facing UI may use simpler Route language when that improves comprehension.
+
+Preferred public labels:
+
+```text
+Routes
+Route Management
+Automatic routes
+Route points
+Automatic actions
+What happens next
+```
+
+Avoid making these the primary client-facing labels:
+
+```text
+FlowRouteTriggerBinding
+automation_event
+event_wait
+FlowRouteExternalEvent
+raw event keys
+point handler config
+```
+
+A navigation item such as `Route Management` may use a contextual hint like:
+
+```text
+Choose what automatic actions happen after important contact activity.
+```
+
+or:
+
+```text
+Manage the automatic routes that create tasks, send messages, update statuses, and start follow-up sequences.
+```
+
+Phase 4 should audit whether point handlers/capabilities need label and hint metadata from module providers so Route Management can explain available actions without importing module internals.

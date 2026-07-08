@@ -11,7 +11,7 @@ Rules:
 - Integrations live under app/Integrations.
 - Use lead/leads, not borrower/borrowers, in CRM/client-facing text unless explicitly told otherwise.
 - Do not preserve old behavior by default.
-- Do not invent columns, runtime features, unsupported module behavior, or undocumented tokens.
+- Do not invent columns, runtime features, unsupported module behavior, undocumented tokens, or available fields.
 - Messaging configs own reusable message copy and delivery templates.
 - Campaign presets own journey/order/timing/template references.
 - Campaign presets do not own payload/copy and do not override payload/copy.
@@ -58,6 +58,7 @@ Rules:
 - Do not use runtime-only URL tokens such as `{next_step_url}`, `{application_url}`, `{contact_url}`, or `{webinar_registration_url}` in campaign copy unless the source payload is documented.
 - If client copy requires a missing token, list the required message-data/runtime work separately instead of inventing the token.
 - Messaging should block unresolved tokens before provider send.
+- Authoring UI may expose tokens as friendly available fields, but the field must still come from a documented runtime payload/provider/registry.
 - Commerce/Location requests should improve admin/client convenience; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
 - If a request needs module behavior beyond config, identify the owning module and list required code/seam work separately.
 
@@ -82,4 +83,3 @@ Return complete config files only, using the same structural shapes as the templ
 List any recommended new keys/tokens separately.
 If the request requires unsupported module behavior, list the needed module/seam work separately instead of inventing config keys.
 ```
-

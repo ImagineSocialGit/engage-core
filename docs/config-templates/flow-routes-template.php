@@ -12,6 +12,7 @@ return [
     | client/{client-key}/config/presets/flow-routes.php, if client override exists
     |
     | FlowRoutes own automation/control flow.
+    | Client/operator UI may call this Route Management or Routes, but config and code should keep the FlowRoutes domain name precise.
     | Producer modules must not import FlowRoutes.
     | Producer modules emit AutomationEventRecorded.
     | FlowRoutes listens and maps automation events internally.

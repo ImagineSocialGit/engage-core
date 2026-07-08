@@ -246,5 +246,3 @@ Coverage should prove:
 - contacts with required marketing email consent are skipped
 - contacts without email addresses are skipped
 - contacts with `contact_import_batch_id` count as imported for final Messaging send-time enforcement
-
-

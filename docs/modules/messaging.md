@@ -474,4 +474,35 @@ Core may expose the operator entry point on the import batch detail page when Me
 
 Other modules may request this flow through Messaging public services/actions, but they must not create invitation records directly.
 
+## Available field/token picker support
 
+Messaging owns universal Contact-recipient message fields and the reusable template/runtime validation path.
+
+Client/operator editors should eventually expose an `Insert field` / `Add field` interaction instead of requiring users to memorize token syntax.
+
+Messaging should not become the owner of every module-specific field.
+
+Preferred ownership:
+
+```text
+Messaging contributes universal Contact/recipient fields.
+Webinars contributes webinar fields.
+Tasks contributes task fields.
+Documents contributes document fields.
+Forms contributes form fields.
+Commerce contributes commerce fields.
+Vertical modules contribute vertical subject fields.
+```
+
+Potential public seam to audit:
+
+```text
+AvailableFieldProvider
+AvailableFieldRegistry
+AvailableFieldContext
+AvailableFieldOption
+```
+
+Message template validation should apply to DB-customized templates as well as config-synced templates. Editing copy in CRM/admin UI does not make an unsupported token valid.
+
+Fields should be filtered by authoring/runtime context so operators cannot insert a field that will be unavailable when the message sends.

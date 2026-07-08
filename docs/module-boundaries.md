@@ -1,4 +1,3 @@
-
 # Engage Core Module Boundaries
 
 Engage Core is a modular contact engagement platform.
@@ -2772,3 +2771,51 @@ Should appointments/tasks/messages created by route points attach back to the sp
 Do not implement route instance plan tables before the Phase 4 audit proves the right shape.
 
 But route instance adjustment is now a first-class schema-discovery concern before production.
+
+## Shared available-field/token registry direction
+
+Many modules author reusable copy, task descriptions, instructions, route send-message points, or other text that may include dynamic fields.
+
+The long-term source of truth for available fields should be provider/registry based rather than hardcoded separately in every UI.
+
+Potential consumers:
+
+```text
+Messaging templates
+Broadcast authoring
+Campaign message templates
+Webinar message setup
+Task templates
+FlowRoute send-message points
+Forms confirmations
+Document requests/reminders
+Permission invitations
+Vertical modules
+```
+
+The registry should preserve module ownership:
+
+```text
+Messaging owns universal Contact/recipient message fields.
+Producer modules own their context-specific fields.
+Vertical modules own vertical-specific subject fields.
+Campaigns may pass start/enrollment context but should not invent producer tokens.
+```
+
+Good:
+
+```text
+Webinars contributes webinar_title and webinar_start_time for webinar message contexts.
+Tasks contributes task_title and task_due_date for task notification contexts.
+PetServices contributes pet_name only for pet-scoped contexts.
+```
+
+Bad:
+
+```text
+Core hardcodes every module and vertical token.
+Messaging guesses provider/module fields that the runtime cannot supply.
+Campaigns invents webinar URL fields without the enrollment caller supplying them.
+```
+
+Treat available-field validation as setup/config-validation work before every editor receives polished autocomplete.

@@ -1,4 +1,3 @@
-
 # Broadcasts Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -219,3 +218,49 @@ For now, operators should create separate single-channel Broadcasts and use prio
 Do not add multi-step progression, enrollment lifecycle, or journey logic to Broadcasts.
 
 If a send needs multiple sequenced steps, it belongs in Campaigns, not Broadcasts.
+
+## CRM authoring UX direction
+
+Broadcasts should stay simpler than Campaigns.
+
+The authoring UI should guide one clear one-time send.
+
+Recommended flow:
+
+```text
+1. Choose channel.
+2. Write the channel-specific payload.
+3. Choose recipients.
+4. Review duplicate-send protection and schedule/send.
+```
+
+The selected channel should shape the payload:
+
+```text
+Email Broadcast
+    subject
+    body
+
+SMS Broadcast
+    message
+```
+
+Imported-contact opt-in invitations should not receive equal visual weight with normal Broadcast authoring.
+
+They are a distinct Messaging-owned one-time permission flow. Expose them as a secondary action such as:
+
+```text
+Send opt-in invitation to imported contacts
+```
+
+When no contacts are eligible for the opt-in invitation, the UI should not show the full option/import-batch selection area. It should instead show a calm explanation that no imported contacts are eligible for invitation.
+
+`Avoid Duplicate Sends` is useful but secondary. Prefer a collapsed section with a short summary unless the operator is actively changing exclusions.
+
+A future action such as:
+
+```text
+Make a new broadcast from this
+```
+
+is useful for repeating a prior Broadcast to a different channel or audience. This can likely be a clone action without schema. Add lineage such as `cloned_from_broadcast_id` only if audit/debug/reporting needs prove lineage should be persisted.

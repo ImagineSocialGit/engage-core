@@ -1,4 +1,3 @@
-
 # Core Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -124,5 +123,3 @@ Contact show should lead with next action and use module-provided summaries belo
 ```
 
 Core may render module-provided DTOs/arrays/views, but it should not query module tables directly.
-
-

@@ -193,6 +193,3 @@ Which raw keys or route details are useful only as diagnostics?
 A blank-canvas builder is not client-ready just because the underlying module supports many point types. The product direction is guided, preset-backed setup first, with advanced builder detail only where it is deliberately needed.
 
 Detailed language rules, reusable UI patterns, automation-warning patterns, and UI review checklists belong in `ui-ux-guide.md`.
-
-
-

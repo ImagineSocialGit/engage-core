@@ -232,3 +232,23 @@ task.reopened
 Only emit events after Tasks records its own state.
 
 Tasks must not import FlowRoutes, Campaigns, Webinars, Documents, Scheduling, or vertical modules to trigger downstream behavior.
+
+## Task template field insertion
+
+Task template titles, descriptions, instructions, and future notification copy may eventually support dynamic fields.
+
+Task-specific editors should follow the shared `Insert field` / available-field picker pattern once the registry/validation work exists.
+
+Potential task fields:
+
+```text
+task_title
+task_description
+task_due_date
+task_priority
+task_responsible_party
+related contact fields
+related subject fields, when present
+```
+
+Do not make Phase 3 depend on a polished token picker. Phase 3 should first prove the DB-owned task-template/default shape. The field picker belongs to shared authoring UX and Phase 6 validation unless the task-template schema audit proves a missing persisted field/source concept.

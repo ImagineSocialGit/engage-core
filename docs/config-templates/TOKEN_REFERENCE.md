@@ -240,3 +240,19 @@ Prefer these replacements:
 - `{webinar_replay_url}` -> `{webinar_playback_url}`
 - `{playback_url}` -> `{webinar_playback_url}`
 - `{registration_url}` -> `{webinar_registration_url}` or `{webinar_join_url}`, depending on behavior
+
+## Available field picker direction
+
+Client/operator editors should eventually expose available tokens as friendly fields through an `Insert field` / `Add field` interaction.
+
+The picker should show friendly labels and insert stable syntax such as:
+
+```text
+{{ first_name }}
+{{ webinar_title }}
+{{ contact.email }}
+```
+
+The runtime may normalize this to the current internal token syntax, but validation must still use the documented token/field source of truth.
+
+Do not add a field to the picker unless the current message/context can actually supply it.

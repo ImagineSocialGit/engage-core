@@ -153,7 +153,7 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Decide which modules contribute task templates.
   - Decide which modules contribute capability metadata/labels.
   - Decide which modules expose records that routes can be scoped to through subject morphs.
-  - Decide how FlowRoutes knows which point types/capabilities are available without importing modules directly.
+  - Decide how FlowRoutes knows which point types/capabilities/labels are available without importing modules directly.
   - Decide whether provider/registry/config is enough or DB-owned capability/binding tables are needed.
   - Decide whether `ContactFlowRouteProgress` needs `subject_type` / `subject_id`.
   - Decide whether reusable FlowRoute templates should seed contact/subject-specific route plans.
@@ -173,6 +173,7 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Validate task template refs.
   - Validate route point types.
   - Validate module capability references.
+  - Validate available field/token references by authoring context.
   - Validate vertical references.
   - Validate campaign refs.
   - Validate messaging/template refs.
@@ -277,3 +278,58 @@ Remaining polish audit:
 - [ ] Add test coverage for client config fallback behavior.
   - Missing optional content/style keys should not break public pages.
   - Client copy changes should not break tests that only need behavioral assertions.
+
+## Captured UX polish backlog
+
+These notes are intentionally retained while the schema-discovery phases continue. Do not pull them ahead of higher schema-risk work unless implementation proves a missing table, registry, provider, or runtime service is needed.
+
+### Shared field/token insertion
+
+- [ ] Add a shared available-field/token picker pattern for message/template/config authoring surfaces.
+  - Use client-facing language such as `Insert field` or `Add field`, not `token`, on normal operator screens.
+  - Preserve cursor/focus in the input/textarea when the picker opens.
+  - Provide autocomplete search from available fields for the current context.
+  - Insert stable hidden syntax such as `{{ first_name }}` or normalize to the current runtime token format.
+  - Do not let users select fields that the current message/context cannot resolve.
+  - Treat the available-field source of truth as Phase 6 validation/registry work.
+
+### Contextual hints
+
+- [ ] Add a reusable hover/focus hint pattern for confusing fields, settings, and navigation items.
+  - Hints should explain what the setting does in plain language.
+  - Hints should not expose schema/config/event keys as the main explanation.
+  - Hints do not replace consequence previews for automation-triggering changes.
+
+### Route Management / Routes language
+
+- [ ] During Phase 4, decide public/client-facing FlowRoutes terminology.
+  - Candidate navigation label: `Route Management`.
+  - Candidate plain-language hint: `Choose what automatic actions happen after important contact activity.`
+  - Keep `FlowRoutes` in developer/module docs where precision matters.
+
+### Broadcasts UX polish
+
+- [ ] Make imported-contact opt-in invitations secondary to normal Broadcast authoring.
+  - Consider a button such as `Send opt-in invitation to imported contacts`.
+  - Do not show opt-in options/import batches when eligible invitation count is zero.
+- [ ] Collapse `Avoid Duplicate Sends` by default with a clear summary.
+- [ ] Explore a guided Broadcast authoring flow:
+  - channel;
+  - channel-specific payload;
+  - recipients;
+  - duplicate protection/review.
+- [ ] Add `Make a new broadcast from this` when useful for repeating a Broadcast to a new channel/audience.
+  - Add lineage schema such as `cloned_from_broadcast_id` only if audit/debug/product needs prove it.
+
+### Campaigns UX polish
+
+- [ ] Replace `delivery options` wording with clearer `message steps` and channel wording.
+- [ ] Collapse campaign steps by default.
+- [ ] Show only the most useful collapsed step information:
+  - step number/title;
+  - available channel badges;
+  - human-readable timing;
+  - selected template readiness.
+- [ ] Hide technical specs behind details/debug affordances.
+- [ ] Replace raw timing such as `Delay 10 minutes` with human-readable schedule summaries.
+- [ ] Clean up repeated dropdown labels such as `Step 1 Email — Webinar Attended Nurture — Step 1 Email`.
