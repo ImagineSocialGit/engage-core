@@ -3,7 +3,10 @@
 namespace Tests\Feature\Modules;
 
 use App\Support\Modules\ModuleManager;
+use FilesystemIterator;
 use Illuminate\Support\Str;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Tests\TestCase;
 
 class ModuleDependencyBoundaryTest extends TestCase
@@ -60,7 +63,6 @@ class ModuleDependencyBoundaryTest extends TestCase
         $this->assertModuleDoesNotImport('Messaging', [
             'Broadcasts',
             'Campaigns',
-            'FlowRoutes',
             'Forms',
             'InboundMessaging',
             'InternalNotifications',
@@ -70,6 +72,10 @@ class ModuleDependencyBoundaryTest extends TestCase
             'Tasks',
             'Webinars',
             'Workflow',
+        ]);
+
+        $this->assertOnlyAllowedImports('Messaging', 'App\\Modules\\FlowRoutes\\', [
+            'app/Modules/Messaging/Models/ScheduledMessage.php',
         ]);
     }
 
@@ -156,7 +162,6 @@ class ModuleDependencyBoundaryTest extends TestCase
     {
         $this->assertModuleDoesNotImport('Campaigns', [
             'Broadcasts',
-            'FlowRoutes',
             'Mortgage',
             'Webinars',
             'Workflow',
@@ -168,6 +173,10 @@ class ModuleDependencyBoundaryTest extends TestCase
             'Mortgage',
             'Webinars',
             'Workflow',
+        ]);
+
+        $this->assertOnlyAllowedImports('Campaigns', 'App\\Modules\\FlowRoutes\\', [
+            'app/Modules/Campaigns/Models/CampaignEnrollment.php',
         ]);
     }
 
@@ -193,6 +202,79 @@ class ModuleDependencyBoundaryTest extends TestCase
                 'App\\Modules\\Messaging\\Services\\MessageDedupeKeyBuilder',
             ],
         );
+    }
+
+    public function test_flow_route_external_event_is_only_created_inside_flow_routes(): void
+    {
+        foreach ($this->modulePhpFilesExcept('FlowRoutes') as $file) {
+            $contents = file_get_contents($file);
+
+            $this->assertStringNotContainsString(
+                'FlowRouteExternalEvent::make',
+                $contents,
+                "FlowRouteExternalEvent::make must stay inside FlowRoutes. Found in [{$file}].",
+            );
+
+            $this->assertStringNotContainsString(
+                'App\\Modules\\FlowRoutes\\Data\\Events\\FlowRouteExternalEvent',
+                $contents,
+                "Producer modules must not import FlowRouteExternalEvent. Found in [{$file}].",
+            );
+        }
+    }
+
+    public function test_flow_routes_provider_only_listens_to_workflow_and_generic_automation_events(): void
+    {
+        $provider = base_path('app/Modules/FlowRoutes/Providers/FlowRoutesModuleServiceProvider.php');
+
+        $contents = file_get_contents($provider);
+
+        $this->assertStringContainsString('ContactWorkflowStatusChanged::class', $contents);
+        $this->assertStringContainsString('AutomationEventRecorded::class', $contents);
+
+        foreach ([
+            'TaskCompleted::class',
+            'WebinarRegistered::class',
+            'WebinarCancelled::class',
+            'WebinarAttended::class',
+            'WebinarMissed::class',
+            'WebinarEnded::class',
+            'WebinarOutcomeRecorded::class',
+            'BroadcastSent::class',
+            'BroadcastSkipped::class',
+            'BroadcastFailed::class',
+            'CampaignEnrollmentStarted::class',
+            'CampaignEnrollmentCompleted::class',
+            'CampaignEnrollmentCancelled::class',
+            'MortgageStageChanged::class',
+        ] as $forbiddenListenerReference) {
+            $this->assertStringNotContainsString(
+                $forbiddenListenerReference,
+                $contents,
+                "FlowRoutes provider should not listen directly to producer-specific events [{$forbiddenListenerReference}].",
+            );
+        }
+    }
+
+    public function test_tasks_do_not_import_flow_route_runtime_internals(): void
+    {
+        foreach ($this->modulePhpFiles('Tasks') as $file) {
+            $contents = file_get_contents($file);
+
+            foreach ([
+                'App\\Modules\\FlowRoutes\\Data\\Events\\FlowRouteExternalEvent',
+                'App\\Modules\\FlowRoutes\\Actions\\ResumeFlowRouteProgressFromEventAction',
+                'App\\Modules\\FlowRoutes\\Actions\\StartFlowRoutesFromAutomationEventAction',
+                'App\\Modules\\FlowRoutes\\Actions\\HandleContactWorkflowStatusChangedAction',
+                'FlowRouteExternalEvent::make',
+            ] as $forbiddenReference) {
+                $this->assertStringNotContainsString(
+                    $forbiddenReference,
+                    $contents,
+                    "Tasks must emit neutral automation events, not call FlowRoutes runtime internals. Found [{$forbiddenReference}] in [{$file}].",
+                );
+            }
+        }
     }
 
     /**
@@ -266,6 +348,32 @@ class ModuleDependencyBoundaryTest extends TestCase
     }
 
     /**
+     * @param  array<int, string>  $allowedFiles
+     */
+    private function assertOnlyAllowedImports(string $module, string $needle, array $allowedFiles): void
+    {
+        $violations = [];
+
+        foreach ($this->modulePhpFiles($module) as $file) {
+            $contents = file_get_contents($file);
+
+            if (! str_contains($contents, $needle)) {
+                continue;
+            }
+
+            $relativePath = str_replace(base_path().'/', '', $file);
+
+            if (! in_array($relativePath, $allowedFiles, true)) {
+                $violations[] = $relativePath.' imports '.$needle;
+            }
+        }
+
+        sort($violations);
+
+        $this->assertSame([], $violations);
+    }
+
+    /**
      * @return array<int, string>
      */
     private function phpFiles(string $path): array
@@ -296,4 +404,71 @@ class ModuleDependencyBoundaryTest extends TestCase
 
         return $files;
     }
+
+    private function modulePhpFiles(string $module): array
+    {
+        $path = base_path("app/Modules/{$module}");
+
+        if (! is_dir($path)) {
+            return [];
+        }
+
+        $files = [];
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
+        );
+
+        foreach ($iterator as $file) {
+            if (! $file->isFile()) {
+                continue;
+            }
+
+            if ($file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $files[] = $file->getPathname();
+        }
+
+        sort($files);
+
+        return $files;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function modulePhpFilesExcept(string $excludedModule): array
+    {
+        $modulesPath = base_path('app/Modules');
+
+        if (! is_dir($modulesPath)) {
+            return [];
+        }
+
+        $files = [];
+
+        foreach (scandir($modulesPath) ?: [] as $module) {
+            if ($module === '.' || $module === '..' || $module === $excludedModule) {
+                continue;
+            }
+
+            $modulePath = $modulesPath.'/'.$module;
+
+            if (! is_dir($modulePath)) {
+                continue;
+            }
+
+            $files = [
+                ...$files,
+                ...$this->modulePhpFiles($module),
+            ];
+        }
+
+        sort($files);
+
+        return $files;
+    }
+
 }
