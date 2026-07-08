@@ -1,3 +1,4 @@
+
 # Engage Core Config Authoring Guide
 
 This guide is for creating or reviewing Engage Core default configs and client-specific configs.
@@ -15,8 +16,8 @@ Primary references:
 1. Messaging configs own reusable message copy and delivery templates.
 2. Campaign presets own journeys, order, timing, and references to message templates.
 3. Campaign presets do not own or override reusable subject/body/CTA payloads.
-4. Campaign message templates resolve by campaign key, step number, and variant key, not author-created per-step message names.
-5. Campaign step variants must reference Messaging-owned template presets/assignments and must not own reusable payload copy.
+4. Campaign message templates resolve by campaign key and step number, not author-created per-step message names.
+5. Future campaign step variants must reference Messaging-owned template presets/assignments and must not own reusable payload copy.
 6. Messaging template presets own reusable copy and safe DB-editable message payloads.
 7. Messaging template catalog entries own browsing/grouping metadata for template review; they do not own runtime behavior.
 8. FlowRoute presets own automation/control-flow routing and point definitions.
@@ -25,13 +26,12 @@ Primary references:
 11. Use `lead/leads` in CRM/client-facing copy unless explicitly told otherwise.
 12. Do not invent new keys until checking the key registry.
 13. Do not use undocumented tokens in client-facing message copy.
-14. Avoid backward compatibility/legacy aliases. Campaign messaging must not preserve step-level fallback shapes.
+14. Avoid backward compatibility/legacy aliases unless explicitly chosen.
 15. Normal Broadcasts require normal Messaging consent. Do not use Broadcasts as a general imported-contact consent bypass.
 16. Imported-contact opt-in invitations are a distinct one-time Messaging flow with configurable public copy/style.
 17. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
 18. Module docs are the source of truth for module ownership and client-facing scope. Configs should not create a module feature that the owning module does not support.
-19. Runtime artifact payloads must stay compact. Configs and module data objects should not cause full Eloquent model arrays or loaded relationship graphs to be stored in scheduled messages, automation events, route progress, task metadata, or other persisted runtime artifacts.
-20. Commerce and Location configs should support admin convenience and integrations; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
+19. Commerce and Location configs should support admin convenience and integrations; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
 
 ## Before creating a config
 
@@ -116,7 +116,7 @@ Client asks: “Send a five-email attended nurture sequence.”
 Use existing dispatch_key: campaign_step_due
 Create/update campaign steps in the campaign preset.
 Create/update matching Messaging templates under:
-marketing:webinar_nurture campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
+marketing:webinar_nurture campaigns.{campaign_key}.steps.{step_number}
 
 Client asks: “When someone attends, enroll them in follow-up.”
 Use automation_event_key: webinar.attended
@@ -245,36 +245,6 @@ Friendly aliases are preferred in client-facing copy:
 {webinar_start_date}
 {webinar_start_time}
 ```
-
-
-## Runtime artifact payload hygiene
-
-Configs and message data objects should produce compact runtime payloads.
-
-Persisted runtime artifacts include scheduled messages, automation-event payloads, FlowRoute progress/context data, task metadata, broadcast recipient metadata, inbound/outbound message metadata, and provider event records.
-
-Use compact data in those artifacts:
-
-```text
-IDs
-scalar token values
-compact context arrays
-source_config_path
-definition_config_path
-stable debug/source metadata
-```
-
-Avoid accidental object snapshots:
-
-```text
-$model->toArray() with loaded relationships
-full Eloquent model arrays
-profile/item collections
-provider_settings
-large raw provider blobs outside explicit raw columns
-```
-
-For Messaging scheduled messages, put send-ready payload fields and compact tokens in `payload`. Put source/profile/template/debug identity in `meta`.
 
 ## Universal Contact tokens
 
@@ -454,7 +424,7 @@ post_attended
 post_missed
 ```
 
-Do not mix old named reminder keys with the canonical `reminders` array. Multiple reminder definitions should remain generic reusable message definitions. The synced Messaging preset may keep `message_type = reminder` for each reminder definition while `source_config_path` distinguishes the source definition. The webinar schedule profile item owns the schedule slot identity.
+Do not mix old named reminder keys with the canonical `reminders` array.
 
 Avoid:
 
@@ -506,7 +476,6 @@ surface
 message_type
 campaign_key
 campaign_step
-campaign_step_variant_key
 source_config_path
 ```
 
@@ -520,8 +489,6 @@ surface
 message_type
 campaign_key
 campaign_step
-campaign_step_variant_key
-source_config_path
 context_type / context_id
 ```
 
@@ -543,10 +510,10 @@ The Messaging template editor should primarily edit/review reusable copy and sho
 
 ## Campaign Messaging template shape
 
-Campaign message copy still lives in Messaging, but campaign step variant templates use a nested campaign path:
+Campaign message copy still lives in Messaging, but campaign step templates use a nested campaign path:
 
 ```text
-messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
+messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
 ```
 
 Example:
@@ -556,17 +523,13 @@ Example:
     'webinar_attended_nurture' => [
         'steps' => [
             1 => [
-                'variants' => [
-                    'email' => [
-                        'dispatch_key' => 'campaign_step_due',
-                        'payload_class' => EmailPayload::class,
-                        'queue' => 'marketing',
+                'dispatch_key' => 'campaign_step_due',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'marketing',
 
-                        'payload' => [
-                            'subject' => 'Thanks for joining',
-                            'body' => 'Hi {first_name}, thanks for joining the webinar. Reply with your biggest question and we’ll help you with the next step.',
-                        ],
-                    ],
+                'payload' => [
+                    'subject' => 'Thanks for joining',
+                    'body' => 'Hi {first_name}, thanks for joining the webinar. Reply with your biggest question and we’ll help you with the next step.',
                 ],
             ],
         ],
@@ -589,26 +552,23 @@ schedule
 
 ## Campaign channel variants
 
-Campaign presets may define step channel variants.
+Future Campaign presets may define step groups and channel variants.
 
-A campaign step is a business moment.
+A step group is a business moment.
 
-A variant is a channel-specific delivery option for that step.
+A variant is a channel-specific delivery option for that moment.
 
 Variants should include:
 
 ```text
-key
-name
-sort_order
-dispatch_key
 channel
 purpose
 scope
+timing
+message template reference or assignment key
 dependency rules, when needed
+strategy participation
 ```
-
-Step timing stays on the campaign step. Step-level `variant_strategy` decides how variants participate.
 
 Variants must not include reusable subject/body/message copy.
 
@@ -641,13 +601,9 @@ Campaign presets must not define reusable message copy.
 
 Campaign presets must not define or override payloads.
 
-Campaign preset steps define business moments, timing, and variant strategy.
-
-Campaign preset variants reference Messaging templates with first-class variant keys:
+Campaign preset steps reference Messaging templates with first-class step keys:
 
 ```text
-key
-dispatch_key
 channel
 purpose
 scope
@@ -658,7 +614,7 @@ Do not use `meta.message` for new Campaign preset step message references.
 Campaign messages resolve by:
 
 ```text
-channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key
+channel + purpose + scope + campaign_key + step_number
 ```
 
 Example:
@@ -667,25 +623,16 @@ Example:
 [
     'step_number' => 1,
     'name' => 'Attended thank-you and next step',
+    'dispatch_key' => 'campaign_step_due',
+    'channel' => 'email',
+    'purpose' => 'marketing',
+    'scope' => 'webinar_nurture',
     'is_active' => true,
-    'variant_strategy' => 'first_available',
 
     'criteria' => [
         'timing' => [
             'type' => 'delay',
             'hours' => 2,
-        ],
-    ],
-
-    'variants' => [
-        [
-            'key' => 'email',
-            'name' => 'Email follow-up',
-            'sort_order' => 0,
-            'dispatch_key' => 'campaign_step_due',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar_nurture',
         ],
     ],
 
@@ -859,13 +806,13 @@ Do not make producer modules import FlowRoutes.
 
 ## Webinar schedule profiles
 
-Webinar schedule configs seed selectable DB-owned schedule profiles.
+Webinar schedule configs may evolve into selectable schedule profiles.
 
 Schedule profiles decide when webinar-owned messages are sent.
 
 Messaging template presets decide what those messages say.
 
-A webinar series or webinar may choose profiles such as:
+A webinar series or webinar may later choose profiles such as:
 
 ```text
 full 10-day schedule
@@ -874,11 +821,7 @@ last-minute only schedule
 no reminders
 ```
 
-Schedule profile configs should reference dispatch keys, channels, purposes, scopes, surfaces, message types, and source config paths. They should not embed reusable copy.
-
-Use schedule profile item keys to identify slots such as a 30-minute reminder or live reminder. Do not create schedule-specific Messaging message types such as `reminder_30_minute`; use `message_type = reminder` with a stable `source_config_path` and schedule profile item key instead.
-
-Schedule profile/source identity belongs in scheduled-message metadata. Scheduled-message payloads should store only send-ready payload fields, compact token maps, and compact context arrays.
+Schedule profile configs should reference Messaging template assignments or message types, not embed reusable copy.
 
 ## Post-event config shape
 
@@ -1053,9 +996,9 @@ Examples that should remain singular:
 - [ ] Are Campaign presets free of reusable subject/body/CTA copy?
 - [ ] Do campaign variants reference Messaging-owned template presets/assignments rather than owning copy?
 - [ ] Are Campaign presets free of payload overrides?
-- [ ] Are Campaign preset variant message references first-class `key`, `dispatch_key`, `channel`, `purpose`, and `scope` keys?
+- [ ] Are Campaign preset step message references first-class `channel`, `purpose`, and `scope` keys?
 - [ ] Are new Campaign preset steps free of `meta.message` references?
-- [ ] Are Campaign Messaging templates under `campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}`?
+- [ ] Are Campaign Messaging templates under `campaigns.{campaign_key}.steps.{step_number}`?
 - [ ] Are normal message configs using the canonical definition shape?
 - [ ] Are DB-backed MessageTemplatePreset, MessageTemplateCatalogEntry, and MessageTemplatePresetAssignment rules preserved when applicable?
 - [ ] Are webinar transactional configs using `confirmations`, `opt_ins`, `reminders`, `post_attended`, and `post_missed`?
@@ -1086,10 +1029,9 @@ Rules:
 - Messaging configs own reusable message copy.
 - Campaign presets own journeys/timing/template references.
 - Campaign presets must not own or override payloads.
-- Campaign preset steps define business moments, timing, and variant_strategy.
-- Campaign preset variants reference Messaging templates with first-class key/dispatch_key/channel/purpose/scope keys.
-- Do not use meta.message for new Campaign preset step or variant message references.
-- Campaign message templates resolve by campaign_key + step_number + campaign_step_variant_key.
+- Campaign preset steps reference Messaging templates with first-class channel/purpose/scope keys.
+- Do not use meta.message for new Campaign preset step message references.
+- Campaign message templates resolve by campaign_key + step_number.
 - FlowRoute presets own automation/control flow.
 - Webinar post-event config owns provider orchestration, not message copy.
 - Default webinar copy should be vertical-neutral.
@@ -1107,3 +1049,99 @@ Return complete config files and list any recommended new keys/tokens separately
 ```
 
 
+
+
+
+## Task and FlowRoutes preset validation additions
+
+Task presets create DB-owned task template definitions only. They do not create live tasks.
+
+Task templates must remain generic and reusable. Vertical modules may contribute task template presets, labels, and defaults without making Tasks vertical-specific.
+
+FlowRoute presets own automation/control-flow route definitions and point definitions.
+
+FlowRoute `create_task` points should reference TaskTemplate records or stable task template keys once task-template support is confirmed.
+
+FlowRoute presets should call other module capabilities through public actions/services/contracts, not private table internals.
+
+FlowRoute point capabilities should prefer provider/registry/config seams first. Add DB-owned capability/binding tables only when runtime selection or durable vertical references require them.
+
+Route instance plan/snapshot assumptions must be validated before presets rely on per-contact/subject route adjustments.
+
+Config/setup validation should check:
+
+```text
+Task preset shape.
+Task template references from FlowRoute presets.
+FlowRoute point types.
+Module capability references.
+Vertical references.
+Campaign references.
+Messaging template references.
+Unsupported point/module combinations.
+Route instance/snapshot assumptions when FlowRoute plans are introduced.
+```
+
+Validation should classify findings as hard errors or warnings.
+
+Hard errors should block preset sync, staging handoff, or client launch when runtime behavior would be unsafe.
+
+Warnings should provide useful operator/debug guidance without blocking safe runtime behavior.
+
+Prefer command/service-based validation first. Do not add persistent validation result tables unless a concrete workflow proves that persisted validation runs/findings are needed.
+
+## FlowRoutes capability reference rule
+
+Do not invent durable FlowRoutes capability references before proving they are needed.
+
+The default preset authoring shape is:
+
+```text
+point type
+handler key
+public action/service contract
+optional module key
+optional task template key
+optional message/campaign/template reference
+```
+
+Avoid route preset shapes that require FlowRoutes to know vertical private model/table details.
+
+Good:
+
+```text
+point: create_task
+task_template_key: pet_services.final_behavior_check
+```
+
+Good:
+
+```text
+point: enroll_campaign
+campaign_key: webinar_attended_nurture
+```
+
+Bad:
+
+```text
+point: create_pet_behavior_appointment
+pet_behavior_goal_id: 123
+```
+
+unless Phase 4 proves a DB-owned vertical capability/binding table is needed.
+
+## Route instance/snapshot validation rule
+
+If route presets or vertical presets assume per-contact/subject route adjustments, validation must check whether the runtime model supports those assumptions.
+
+Before route instance plans exist, presets should avoid requiring behavior like:
+
+```text
+insert one extra step into this contact/subject route only
+repeat this route point for one dog/contact only
+skip/cancel one plan item without changing the route template
+resume a specific plan item from task.completed
+attach an appointment/task/message back to one route instance plan item
+```
+
+If a preset needs those capabilities, the implementation should happen after the FlowRoutes relationship, capability, and instance-plan audit.

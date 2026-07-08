@@ -14,6 +14,7 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - The page should avoid platform-cockpit sprawl: too many modules, widgets, logs, builders, raw keys, and settings at once.
   - Powerful features should default to summaries, presets, guided choices, and consequence previews.
 - [ ] Run an Automatic Follow-ups / FlowRoute binding UX exploration before implementation.
+  - Do not start UX polish until the FlowRoutes capability/instance-plan/runtime model is settled.
   - Decide whether the first version selects prebuilt routes only, edits route points, or only previews selected behavior.
   - Decide intended user type: client, operator, developer, or split surfaces.
   - Use configured lead/contact/customer nouns.
@@ -39,10 +40,6 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [ ] Confirm production code changes are architectural fixes, not test-shaped legacy preservation.
 - [ ] Confirm no new direct cross-module model/table writes were introduced where a public action/service should be used.
 - [ ] Confirm migrations are replacements, not modify-table migrations, while this branch remains pre-rollout.
-- [ ] Run a runtime artifact payload hygiene audit for touched modules.
-  - Check persisted payload/meta columns such as `scheduled_messages.payload`, `scheduled_messages.meta`, automation-event payloads, FlowRoute progress/context data, task metadata, broadcast recipient metadata, and inbound/outbound message metadata.
-  - Confirm payloads store IDs, scalar fields, compact token maps, source/config identifiers, and stable debug metadata.
-  - Confirm payloads do not store full Eloquent model arrays, loaded relationships, profile/item collections, provider settings, or large raw blobs unless the table/column is explicitly meant to preserve raw provider data.
 - [ ] Run `php artisan optimize:clear` after config, route, provider, or view changes.
 - [ ] Update docs only when the architecture or operator/client behavior changed.
 
@@ -53,9 +50,11 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [ ] Confirm runtime-only URLs/tokens are not guessed or hard-coded in static config.
 - [ ] Confirm Campaign presets do not own reusable message payload/copy.
 - [ ] Confirm campaign variants reference Messaging-owned template presets/assignments when variant architecture is used.
-- [ ] Confirm Campaign preset variants use first-class `key`, `dispatch_key`, `channel`, `purpose`, and `scope` keys.
-- [ ] Confirm Messaging templates live under the expected channel/purpose/scope path, including campaign `steps.{step}.variants.{variant_key}` paths where applicable.
+- [ ] Confirm Campaign preset step message references use first-class `channel`, `purpose`, and `scope` keys.
+- [ ] Confirm Messaging templates live under the expected channel/purpose/scope path.
 - [ ] Confirm MessageTemplatePreset sync/assignment rules are preserved when DB-backed templates are involved.
+- [ ] Confirm Task presets create DB-owned task template definitions only and do not create live tasks.
+- [ ] Confirm FlowRoute presets use public action/service/capability references rather than private module internals.
 - [ ] Confirm SMS visibility is controlled by config where the surface exposes channel choices.
 - [ ] Confirm missing optional content/style keys do not break public pages.
 - [ ] Confirm tests are tolerant of client copy changes unless exact copy is the behavior under test.
@@ -103,23 +102,6 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [ ] Confirm provider credentials/config are present for enabled providers.
 - [ ] Confirm queue workers/Horizon are running if scheduled/send behavior is being tested.
 
-### Staging smoke test checklist
-
-- [ ] Create/import at least one test contact.
-- [ ] Confirm Core contact lookup/contact picker works where used.
-- [ ] Create a regular Broadcast draft and confirm it remains consent-gated.
-- [ ] Create an imported-contact opt-in invitation and confirm it is separate from normal Broadcasts.
-- [ ] Send/schedule the opt-in invitation to an imported test contact.
-- [ ] Confirm the invitation email renders the CTA/link correctly.
-- [ ] Open the public preference page from the email link.
-- [ ] Confirm email-only opt-in creates the expected consent records.
-- [ ] Confirm SMS opt-in requires and stores a phone number when SMS is enabled.
-- [ ] Confirm re-opening an accepted invitation shows the accepted state.
-- [ ] Confirm repeat invitation attempts are blocked by the one-time invitation record.
-- [ ] Confirm cancellation/skip/failure states remain understandable in Broadcast and ScheduledMessage views.
-- [ ] Confirm Broadcast detail pages show scheduled/skipped/failed recipient outcome visibility and useful skip/failure reasons.
-- [ ] Confirm prior-Broadcast exclusions prevent duplicate outreach across related single-channel Broadcasts.
-
 ### Roadmap tracking
 
 - [ ] Keep `docs/client-readiness-roadmap.md` current as the focused client-readiness implementation roadmap.
@@ -135,36 +117,88 @@ These are repeatable checklists. Run the relevant checklist after a production s
 Use this as a disposable checklist mirror of the roadmap sequence. Keep the roadmap as the source of truth for implementation order and update this section as phases are completed, deferred, or split.
 
 - [x] Phase 1 — Webinar schedule profiles.
-  - DB-owned profiles/items are the selected schedule path.
-  - Profiles may be selected by webinar series or individual webinar, with a default fallback.
-  - Existing scheduled messages remain stable after creation.
-  - Webinar scheduled-message payloads must remain compact; schedule profile/source identity belongs in metadata.
+  - DB-owned profiles/items exist.
+  - Series/webinars can select profiles with default fallback.
+  - Webinars owns timing/slot identity.
+  - Messaging owns reusable copy/templates.
+  - Scheduled-message payloads stay compact; schedule/profile/template/debug identity belongs in meta.
 - [x] Phase 2 — Campaign channel variants.
-  - DB-owned `campaign_step_variants` are the durable variant path.
-  - Campaign steps are business moments; variants are channel-specific delivery options.
-  - Variants do not own reusable copy.
-  - Scheduled-message payloads stay compact; campaign/step/variant identity belongs in metadata.
+  - DB-owned campaign step variants exist.
+  - Campaign enrollment is lifecycle.
+  - Campaign step is the business moment.
+  - Campaign step variant is the channel-specific delivery option.
+  - `send_all_eligible` schedules multiple eligible variants.
+  - `dependency_aware` is hardened for same-enrollment/same-step sibling variant states.
+  - Supported dependency states include scheduled, pending, sent, skipped, failed, and terminal.
+  - Dependency checks consider same-pass scheduled siblings and persisted ScheduledMessage records.
+  - Dependency checks are scoped to the same campaign enrollment, same campaign step, and required variant key.
+  - Preset sync creates variants, removes stale non-customized variants, preserves customized stale variants, and protects customized campaigns.
+  - Campaign scheduled-message payloads stay compact; campaign/step/variant/template/debug identity belongs in meta.
 - [ ] Phase 3 — Task templates / task defaults.
-  - Audit `task_templates` fields for generated/manual tasks.
+  - Audit `task_templates` table/model shape for generated/manual tasks.
+  - Confirm FlowRoutes `create_task` points can reference `TaskTemplate` records.
+  - Confirm task templates can define title/body/default due offsets/assigned_to/responsible_party/related-subject rules.
+  - Confirm task templates are generic enough for PetServices, Mortgage, Music, Webinars, Documents, Scheduling, etc.
+  - Confirm task template preset sync creates DB-owned default task templates only and does not create live tasks.
+  - Confirm customized templates are preserved.
+  - Decide whether direct template reference is enough or whether template assignment/selection is needed.
   - Build task template UI only if needed.
-- [ ] Phase 4 — FlowRoutes event-wait / task-completed resume behavior.
-  - Resume from neutral `task.completed` automation events.
-  - Add wait-correlation schema only if existing progress metadata is insufficient.
-- [ ] Phase 5 — Config validation / setup validation.
-  - Start command/service-based unless persistent validation records are proven necessary.
-- [ ] Phase 6 — Permission invitation accepted automation event.
-  - Decide whether to emit `permission_invitation.accepted`.
-- [ ] Phase 7 — Permission invitation cancellation / skip / failure bookkeeping.
-  - Clarify durable lifecycle visibility across Messaging scheduled messages and Broadcast bookkeeping.
-- [ ] Phase 8 — Webinar message readiness check.
-  - Add computed readiness only unless durable setup state is proven necessary.
-- [ ] Phase 9 — Manual status-change automation warning.
-  - Add consequence warning without splitting ContactStatus schema.
-- [ ] Phase 10 — Automatic Follow-ups / FlowRoutes UX polish.
-  - Use business outcomes, consequence previews, and secondary diagnostics.
-- [ ] Phase 11 — Dashboard / contact workspace polish audit.
-  - Add persisted preferences/acknowledgements only when real workflows require them.
-- [ ] Phase 12 — FOSS-informed module schema audit.
+- [ ] Phase 4 — FlowRoutes relationship, capability, and instance-plan audit.
+  - Map FlowRoutes against current universal modules: Messaging, InboundMessaging, InternalNotifications, Tasks, Workflow, Campaigns, Broadcasts, Webinars, Reporting, Scheduling, Portal, Forms, Documents, Commerce, Location.
+  - Map FlowRoutes against vertical/planned vertical modules: Mortgage, PetServices, Music.
+  - Decide which modules produce automation events.
+  - Decide which modules expose public actions FlowRoutes may call.
+  - Decide which modules contribute point handlers.
+  - Decide which modules contribute route presets.
+  - Decide which modules contribute task templates.
+  - Decide which modules contribute capability metadata/labels.
+  - Decide which modules expose records that routes can be scoped to through subject morphs.
+  - Decide how FlowRoutes knows which point types/capabilities are available without importing modules directly.
+  - Decide whether provider/registry/config is enough or DB-owned capability/binding tables are needed.
+  - Decide whether `ContactFlowRouteProgress` needs `subject_type` / `subject_id`.
+  - Decide whether reusable FlowRoute templates should seed contact/subject-specific route plans.
+  - Decide whether active route plans need plan item snapshots so template edits do not unexpectedly change live instances.
+  - Decide whether operators can insert/repeat/skip/cancel route instance plan items for one contact/subject.
+  - Decide how event waits, task completion, appointment completion, document completion, etc. resume specific plan items.
+  - Do not add a vertical/point reconciliation table unless the audit proves registry/config/provider seams are insufficient.
+- [ ] Phase 5 — FlowRoutes event-wait / task-completed resume implementation.
+  - Implement after Phase 4 because resume behavior may need route instance plan items/snapshots.
+  - Resume from neutral `task.completed` `AutomationEventRecorded` events.
+  - Do not add Task-specific FlowRoutes listeners.
+  - FlowRoutes listens to generic `AutomationEventRecorded` and resumes matching event_wait/progress/plan items internally.
+  - Add wait-correlation schema only if existing progress/plan metadata is insufficient.
+- [ ] Phase 6 — Config validation / setup validation.
+  - Validate Task presets.
+  - Validate FlowRoute presets.
+  - Validate task template refs.
+  - Validate route point types.
+  - Validate module capability references.
+  - Validate vertical references.
+  - Validate campaign refs.
+  - Validate messaging/template refs.
+  - Validate unsupported point/module combinations.
+  - Validate route instance/snapshot assumptions if applicable.
+  - Prefer command/service-based validation first unless persistent validation records are proven necessary.
+- [ ] Phase 7 — Permission invitation accepted automation event.
+  - Decide whether accepted invitations should emit `permission_invitation.accepted`.
+  - Keep Messaging independent from consumers.
+- [ ] Phase 8 — Permission invitation cancellation / skip / failure bookkeeping.
+  - Clarify durable lifecycle visibility across permission invitations, Broadcast bookkeeping, and Messaging scheduled messages.
+- [ ] Phase 9 — Webinar message readiness check.
+  - Add computed readiness visibility for webinar message setup without persisting setup state unless a concrete need appears.
+- [ ] Phase 10 — Manual status-change automation warning.
+  - Warn operators before manual status changes run selected status FlowRoutes.
+  - Keep this as a UI/awareness guardrail, not a ContactStatus schema split.
+- [ ] Phase 11 — Automatic Follow-ups / FlowRoutes UX polish.
+  - Do not start until the FlowRoutes capability/instance-plan/runtime model is settled.
+  - Redesign Route Binding / Automatic Follow-ups around business outcomes, consequence previews, and client/operator language.
+  - Let the UX be informed by actual route capabilities and instance behavior.
+- [ ] Phase 12 — Dashboard / contact workspace polish audit.
+  - Review orientation surfaces after core runtime pieces settle.
+  - Add persisted preferences/acknowledgements only if proven necessary.
+- [ ] Phase 13 — FOSS-informed module schema audit.
+  - Compare module schemas against mature FOSS patterns to catch likely missing persisted concepts before production.
+  - Pull FlowRoutes-specific FOSS/OSS pattern review earlier into Phase 4 if useful.
   - Split by module group rather than one monster branch.
 
 Deferred launch hardening:
@@ -190,262 +224,17 @@ Completed baseline:
 - Contact show is a Core-owned shell with module-provided panels and sections.
 - Contact show uses module wayfinding and improved client-facing section labels.
 
-- [ ] Refine dashboard and contact show visuals later after more real usage.
-  - Keep changes calm and action-oriented.
-  - Preserve module tones as wayfinding, not urgency.
-  - Avoid turning either surface into a module cockpit.
+Remaining polish audit:
 
-### Permission invitations
-
-Completed baseline:
-
-- Imported-contact permission invitations can be scheduled from Core import batch detail pages when Messaging is enabled.
-- Messaging owns the import-batch scheduling action, eligibility checks, scheduled-message creation, send-time invitation claiming, token injection, public preference handling, and consent creation.
-- The one-time invitation send remains email-only.
-- Repeat scheduling is blocked when a contact already has a pending/sent imported-contact permission invitation scheduled message or an imported-contact email permission invitation row.
-- The import batch detail page shows current-page permission invitation visibility for imported contacts.
-
-- [ ] Add/refine public opt-in tests as needed after UI polish.
-  - Invalid token returns 404.
-  - Email-only consent creates expected rows.
-  - SMS consent requires a phone number.
-  - Email + SMS consent creates expected rows.
-  - Already accepted invitation cannot create duplicate consent rows.
-  - Accepted page is copy-config tolerant.
-
-- [ ] Consider whether accepted invitations should emit a neutral automation event later.
-  - Example: `permission_invitation.accepted`.
-  - Consumers could update contact status, create a task, enroll a campaign, or notify the team.
-  - Do not make Messaging depend on those consumers.
-
-### Broadcasts
-
-Completed baseline:
-
-- Regular Broadcast creation/editing supports email or SMS when Messaging channel availability exposes the channel for the `broadcasts` surface.
-- Broadcasts remain single-channel.
-- Permission invitation Broadcasts remain email-only.
-- Email Broadcast payloads use `subject` and `body`.
-- SMS Broadcast payloads use `message`.
-- SMS Broadcast scheduling hydrates recipient phone, channel, purpose, scope, and message type through Messaging.
-- Broadcast detail pages show recipient outcome counts and per-recipient skip/failure reasons.
-
-- [ ] Revisit Broadcast cancellation/completion lifecycle if operator visibility needs more polish after staging smoke tests.
-  - Keep Broadcast recipient state as Broadcast bookkeeping.
-  - Use Messaging-owned skip behavior for pending scheduled messages.
-  - Do not mutate Messaging scheduled-message internals directly from Broadcasts.
-
-### Internal Messaging
-- Get internal messaging working for dashboard broadcasts of task lists
-
-### Core contact filters
-
-- [ ] Decide whether Core contact filter normalization should support additional stable Core-owned filters.
-  - Status, tags, source, subsource, last activity/contacted timestamps.
-  - Avoid adding feature-specific filters directly to Core.
-  - Future module-specific filters should use explicit provider/registry seams.
-
-### Client config and templates
-
-- [ ] Audit all current config/config types that clients can override.
-  - Content configs.
-  - Styling configs.
-  - Token-bearing configs.
-  - Messaging configs.
-  - Campaign configs.
-  - Broadcast-related configs.
-  - Permission invitation configs.
-  - FlowRoute/Route configs.
-  - Task template configs.
-  - Contact status configs.
-  - Any public-page/view configs.
-
-- [ ] Create standard templates for every supported client-facing config type.
-  - Each template should show every supported key.
-  - Each template should include safe defaults.
-  - Each template should document allowed tokens.
-  - Each template should avoid stale/legacy aliases unless explicitly retained.
-
-- [ ] Build a clear “future client setup” config checklist.
-  - Which files are required.
-  - Which files are optional.
-  - Which files are vertical-specific.
-  - Which files are provider-specific.
-  - Which files are safe for nontechnical editing.
-
-- [ ] Make token documentation exhaustive and current.
-  - Permission invitation tokens.
-  - Contact tokens.
-  - Webinar tokens.
-  - Campaign tokens.
-  - Broadcast/message tokens.
-  - Any public URL tokens.
-  - Clarify which tokens are runtime-only and should not be guessed in static config.
-
-- [ ] Add a config validation command.
-  - Suggested command: `php artisan config:validate-engage`.
-  - Validate default configs and optional client configs using runtime fallback rules.
-  - Report hard errors for unsafe/malformed config.
-  - Report warnings for deprecated tokens, review-needed keys, optional omissions, and hidden-but-configured SMS surfaces.
-  - Include config path, severity, reason, and suggested fix when possible.
-  - Start with Messaging, Permission Invitations, Campaign presets, FlowRoute presets, Task presets, and reference registries.
-
-### Runtime-selectable definitions
-
-Completed FlowRoute baseline:
-
-- DB-backed `FlowRouteTriggerBinding` records select runtime FlowRoute behavior.
-- `FlowRoute.is_active` means available/allowed, while trigger bindings own selection.
-- FlowRoute owner fields exist: `owner_type`, `owner_id`, and `owner_group`.
-- CRM exposes a simple status/event Route Bindings selector.
-- Contact-status triggers are single-selection in the current CRM UI.
-- Automation-event triggers may select multiple routes for the same event.
-
-Completed Messaging template baseline:
-
-- DB-backed `MessageTemplatePreset` records own synced/editable reusable message copy.
-- DB-backed `MessageTemplateCatalogEntry` records organize templates for browsing by channel, purpose, module/area, group, and item.
-- DB-backed `MessageTemplatePresetAssignment` records own selected runtime template behavior.
-- Sync creates presets, catalog entries, and default assignments from message configs.
-- Runtime resolvers prefer selected DB presets before config fallback.
-- Normal sync does not overwrite customized DB copy unless explicitly forced.
-
-Completed Messaging/Campaign setup UI baseline:
-
-- Message Templates UI uses catalog entries to filter and browse by channel, purpose, area/module, group, and message/step.
-- Message Templates remains copy/review-only and keeps assignment mutation out of the template editor.
-- Message Templates shows read-only “Used by” entries.
-- Campaign Message Templates lets operators select the active Messaging template for each Campaign step variant.
-- Campaign usage rows can link from Message Templates to the Campaign Message Templates setup surface.
-- Campaign Message Templates links back to Message Templates for copy editing.
-
-Completed Webinars message setup baseline:
-
-- Webinars has a functional Webinars-owned message setup surface.
-- The surface covers confirmation, reminder, waitlist availability, post-attended, and post-missed contexts.
-- Operators can choose compatible Messaging template presets from the Webinars-owned surface.
-- Selection saves through `MessageTemplatePresetAssignment`.
-- Copy editing remains on Message Templates.
-- Runtime resolution preserves DB-first assignment behavior with config fallback.
-- This baseline is functional, not UX-polished.
-
-Completed Webinar schedule profile baseline:
-
-- DB-backed schedule profiles/items exist for webinar-owned message timing.
-- Series and webinars can select a schedule profile.
-- Schedule profile items own schedule-slot identity; Messaging template presets own reusable copy.
-- Future polish may improve the setup UI, but the schema question is settled for the current pre-production branch.
-
-- [x] Add Campaign step variant architecture.
-  - Campaign enrollment is the lifecycle.
-  - Campaign step is the business moment.
-  - Step variant is the channel-specific delivery option.
-  - Supports `first_available`, `send_all_eligible`, and `dependency_aware`.
-  - Variants reference Messaging templates/assignments and do not own copy.
-
-- [ ] Make Route selection/building capability-aware.
-  - Hide or disable Campaign point types when Campaigns is not enabled.
-  - Hide or disable Messaging send-message point types when Messaging is not enabled.
-  - Hide or disable Task point types when Tasks is not enabled.
-  - Keep the Route Bindings UI focused on selecting available FlowRoutes, not explaining unavailable module internals.
-
-### SMS toggleability
-
-Completed baseline:
-
-- Messaging owns canonical channel availability rules.
-- SMS code/runtime capability can exist while SMS is hidden from client/admin UI surfaces.
-- Broadcast builder uses Messaging channel availability for the `broadcasts` surface.
-- Permission invitations remain email-only for the one-time bypass send.
-- SMS opt-in remains explicit on the public preference page when exposed by config and requires a phone number.
-- Hiding SMS from a UI surface does not remove backend protections.
-
-- [ ] Wire Messaging channel availability into future channel-choice builder UIs as they are added.
-  - Campaign builder.
-  - FlowRoute/Route send-message point builder.
-  - Internal notification preference UI.
-  - Show channel preference controls only when more than one channel is available for that surface.
-
-- [ ] Add operator/debug validation around unsupported channel/surface combinations as config validation matures.
-
-### Imports and contact onboarding
-
-Completed import-time status mapping baseline:
-
-- Import preview can map incoming legacy/client status values to active Core `ContactStatus` records.
-- Original imported status values are preserved in contact metadata.
-- Unmapped statuses are flagged for review instead of silently assigning the wrong status.
-- Missing status values are tracked separately from unmapped values.
-- Current contact status assignment still flows through the Workflow-owned status profile seam when Workflow is enabled.
-
-Completed import-batch visibility baseline:
-
-- `contact_import_batches` exists as a first-class Core model/table.
-- Core provides simple CRM list/detail visibility for import batches.
-- Broadcasts can target selected import batches through `recipient_filter.type = import_batch`.
-- Broadcast recipient-filter display can link to Core-owned import-batch detail pages.
-- Broadcasts consume import batches but do not own import-batch management.
-
-### Automation/event seams
-
-- [ ] Revisit neutral automation events after permission invitations are stable.
-  - Accepted invitation could emit a generic event.
-  - Task completion could advance FlowRoutes.
-  - Webinar ended could trigger admin/team tasks.
-  - Keep the middle seam neutral; avoid making producer modules aware of consumers.
-
-### Tasks
-
-- [ ] Build or refine UI for task templates/default definitions if needed.
-  - Preset sync creates DB-owned/default task template definitions only.
-  - No live tasks are created by preset sync.
-  - This is not beta-blocking unless clients need to manage task templates themselves.
-
-- [ ] Keep Tasks standalone-capable.
-  - Tasks can be related to contacts but must not require contacts.
-  - `responsible_party` remains action owner; `assigned_to` remains internal follow-up owner/tracker.
-
-### FlowRoutes / Routes
-
-Current sequence note: handle the Webinars message/template/schedule setup first, then make Automatic Follow-ups / FlowRoutes UX improvements the next implementation focus.
-
-- [ ] Explore Automatic Follow-ups / Route Binding UX before implementation.
-  - Audit current binding UI against `docs/ui-ux-guide.md`.
-  - Decide whether the page is selection-only, edit-capable, or split into simple/advanced modes.
-  - Define how route point consequences are summarized.
-  - Define what raw keys remain visible as secondary diagnostics.
-  - Define capability-aware behavior when Campaigns, Messaging, Tasks, or Webinars are disabled.
-
-- [ ] Add CRM manual status-change confirmation when the selected status has automation attached.
-  - Show the selected Route name.
-  - Summarize major route actions where feasible.
-  - Let the operator cancel or proceed intentionally.
-  - Do not add ContactStatus manual-only or automation-only schema yet.
-
-- [ ] Keep Route builder UX simple.
-  - Client should be able to add a Route point and associated tasks quickly.
-  - Avoid exposing internal complexity.
-  - FlowRoutes should not model every campaign email/text as separate points.
-  - This is not beta-blocking unless beta clients need to build or edit Routes themselves.
-
-- [ ] Later: make FlowRoutes respond to task completion through neutral events.
-  - FlowRoutes should advance when a related route task is completed.
-  - It should ignore unrelated task changes.
-
-### Universal module foundations
-
-- [ ] Add public seams for Scheduling, Portal, Forms, Documents, Commerce, or Location only when a concrete consumer/workflow needs them.
-- [ ] Add Commerce/Location contact filter providers only when Broadcasts, Campaigns, Reporting, or another consuming surface actually needs purchase/location targeting.
-- [ ] Keep newly founded universal modules out of Core; use module-owned tables and future public seams instead.
-
-
+- [ ] Review shared orientation surfaces after runtime behavior settles.
+- [ ] Add persisted preferences/acknowledgements only when real workflows require them.
+- [ ] Avoid turning dashboard/contact workspace into a platform cockpit.
 
 ### Client self-serve readiness
 
 - [ ] Do not treat controlled beta readiness as full client self-serve readiness.
   - Controlled beta can assume operator-assisted setup/configuration.
   - Full self-serve requires more polished builders, safer config validation, clearer import review tools, and stronger client-facing admin UX.
-
 - [ ] Identify which admin surfaces must exist before clients can operate without developer/operator help.
   - Route builder/editor.
   - Campaign/template management.
@@ -462,25 +251,23 @@ Current sequence note: handle the Webinars message/template/schedule setup first
   - Consume Portal for customer access.
   - Consume Forms for dog intake forms.
   - Consume Documents for vaccination records, waivers, and other uploads.
+  - Contribute vertical-specific route presets/task templates/capability labels through public seams.
   - Keep pet-specific fields out of Core contacts.
-
 - [ ] Plan the Music vertical module.
   - Own music-specific fan/customer meaning, release/fan campaign strategy, music product interest categories, and music-specific segmentation rules.
   - Consume Commerce for Shopify/purchase facts.
   - Consume Location later for show-radius targeting if needed.
   - Consume Campaigns, Broadcasts, Messaging, and FlowRoutes for fan communication/automation.
+  - Contribute vertical-specific route presets/task templates/capability labels through public seams.
   - Keep music-specific purchase/interest state out of Core contacts unless represented through a proper universal module relation.
 
 ### Documentation maintenance
 
 - [ ] Regenerate `core-project-tree.txt` from the repo after structural module/file changes.
   - Do not hand-maintain it.
-  - Include new Messaging permission invitation controller/request/model/service/views/tests/migrations.
-
 - [ ] Keep `module-boundaries.md` architectural, not a backlog.
   - Move actionable backlog items into this TODO file.
   - Delete completed TODOs instead of accumulating historical notes.
-
 - [ ] Add/update feature-specific docs when a feature crosses module boundaries.
   - Permission invitations already has a dedicated doc.
   - Similar docs may be useful for Broadcasts, Campaigns, FlowRoutes, Tasks, and Imports once each stabilizes.

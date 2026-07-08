@@ -1,3 +1,4 @@
+
 # Engage Core Module Boundaries
 
 Engage Core is a modular contact engagement platform.
@@ -135,46 +136,6 @@ Module-contributed contact sections should stay useful and business-facing. They
 
 Core must not import module models such as Task, ScheduledMessage, WebinarRegistration, CampaignEnrollment, ContactFlowRouteProgress, or TeamMember just to render a contact page.
 
-
-## Runtime Artifact Payload Hygiene
-
-Runtime artifacts are records persisted for later execution, delivery, debugging, or automation. Examples include scheduled messages, automation events, FlowRoute progress/context data, task metadata, broadcast recipient metadata, inbound/outbound message metadata, and provider event records.
-
-These artifacts should store compact, intentional data:
-
-```text
-IDs and morph references
-scalar token values
-compact context arrays
-source_config_path / definition_config_path
-stable debug/source metadata
-raw provider payloads only in columns explicitly meant for raw provider data
-```
-
-They should not store accidental hydrated object graphs:
-
-```text
-full Eloquent model arrays
-loaded relationship graphs
-profile/item collections
-provider_settings
-large raw blobs in send payloads
-module-owned records copied wholesale into another module's runtime payload
-```
-
-A module may pass compact DTO/data-object arrays to another module's public action. It should not pass `Model::toArray()` output into persisted runtime payloads unless the receiving table is explicitly designed to snapshot that exact model shape.
-
-For Messaging scheduled messages:
-
-```text
-scheduled_messages.recipient_type / recipient_id = who receives the message
-scheduled_messages.context_type / context_id = what domain record the message is about
-scheduled_messages.payload = send-ready payload + compact tokens/context
-scheduled_messages.meta = source/debug/schedule/profile/template identity
-```
-
-Module completion tests should include payload-shape checks when a module writes scheduled messages, automation events, route progress, task metadata, or other persisted runtime artifacts.
-
 ## Runtime-Selectable Definitions
 
 Preset/config sync should create or update available definitions.
@@ -196,8 +157,8 @@ This pattern applies to:
 
 - FlowRoute trigger selection.
 - Messaging template/message preset selection.
-- Webinar confirmation, reminder, waitlist, and post-event schedule-profile selection.
-- Campaign/channel strategy selection through DB-owned campaign step variants.
+- Webinar confirmation, reminder, and post-event schedule selection.
+- Campaign/channel strategy selection when campaign step variants are implemented.
 
 Do not use destructive config swapping, temporary smoke-test keys, or broad route activation toggles as the long-term mechanism for choosing client runtime behavior.
 
@@ -231,7 +192,7 @@ Messaging should store reusable synced/editable message copy as DB-owned templat
 
 Message template catalog entries should organize synced/editable templates for browsing and copy review. Catalog entries are read-organization records only; they do not own campaign timing, webinar schedules, FlowRoute trigger behavior, skip rules, or runtime selection.
 
-Message template assignments should choose which preset is active for a channel/purpose/scope/surface/message context. Campaign-specific assignments may include campaign key, step number, variant key, and source config path so variants are selected by durable runtime identity rather than broad step-level guesses.
+Message template assignments should choose which preset is active for a channel/purpose/scope/surface/message context.
 
 Campaigns, Webinars, and FlowRoutes should reference Messaging template keys or assignments. They should not embed reusable subject/body/message copy in their own presets.
 
@@ -338,7 +299,6 @@ Current ownership:
 | inbound_messages | InboundMessaging |
 | campaigns | Campaigns |
 | campaign_steps | Campaigns |
-| campaign_step_variants | Campaigns |
 | campaign_enrollments | Campaigns |
 | broadcasts | Broadcasts |
 | broadcast_recipients | Broadcasts |
@@ -346,8 +306,6 @@ Current ownership:
 | webinars | Webinars |
 | webinar_registrations | Webinars |
 | webinar_waitlist_signups | Webinars |
-| webinar_schedule_profiles | Webinars |
-| webinar_schedule_profile_items | Webinars |
 | mortgage_stages | Mortgage |
 | contact_mortgage_profiles | Mortgage |
 
@@ -1047,11 +1005,11 @@ message_template_preset_assignments
 
 ```text
 channel + purpose + scope + surface + message_type
-channel + purpose + scope + campaign_key + campaign_step + campaign_step_variant_key
-channel + purpose + scope + surface + message_type, with source/template identity where multiple schedule slots share one message_type
+channel + purpose + scope + campaign_key + campaign_step
+channel + purpose + scope + webinar schedule/reminder type
 ```
 
-Runtime resolvers should prefer DB-owned assignments. Variant-specific config remains the seed/source for available Messaging templates, not a step-level runtime fallback.
+Runtime resolvers may read config during a transition period, but the target architecture is DB-first resolution from selected Messaging template assignments.
 
 
 ### Messaging channel availability
@@ -1094,23 +1052,21 @@ Messaging owns reusable message copy and delivery templates, including subject/b
 
 Campaign-owned message templates live inside Messaging configs under:
 
-    campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
+    campaigns.{campaign_key}.steps.{step_number}
 
 Those campaign message templates are resolved by:
 
-    channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key
+    channel + purpose + scope + campaign_key + step_number
 
 Campaign presets should not duplicate reusable message copy.
 
 Campaign presets should not define or override payloads.
 
-Campaign presets own journey identity, step order, step timing, and variant strategy.
+Campaign presets own journey identity, step order, and step timing.
 
-Messaging owns the delivery template for the campaign step variant.
+Messaging owns the delivery template for the campaign step.
 
 Post-webinar transactional follow-ups should use the same Messaging definition shape as confirmations, reminders, opt-ins, and campaign message templates.
-
-Webinars owns DB-backed `webinar_schedule_profiles` and `webinar_schedule_profile_items`. Schedule profiles decide timing and slot enablement for webinar-owned lifecycle messages. Messaging template presets decide reusable copy. Multiple schedule slots may share a generic `message_type` such as `reminder`; schedule profile item keys and source config paths identify the specific slot. Webinars may place compact schedule/profile identity in scheduled-message metadata, but should not place hydrated schedule profile objects or item collections in scheduled-message payloads.
 
 
 Good:
@@ -1793,7 +1749,9 @@ Campaigns may depend on:
 
 Campaigns may schedule messages through Messaging public actions.
 
-Campaign presets define journeys: campaign identity, step order, step timing, channel strategy, and message template references through variants.
+Campaign presets define journeys: campaign identity, step order, timing, channel/purpose/scope, and message template references.
+
+Campaign step variants are the planned shape for multi-channel campaign coordination.
 
 A Campaign enrollment is the lifecycle.
 
@@ -1818,29 +1776,30 @@ Campaign presets must not be the primary home for reusable email/SMS copy.
 
 Campaign presets must not define or override message payloads.
 
-Campaign variant templates are resolved from Messaging by:
+Campaign message templates are resolved from Messaging by:
 
-    channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key
+    channel + purpose + scope + campaign_key + step_number
 
 The matching Messaging config path is:
 
-    messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
+    messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}
 
-Campaign preset steps own step identity, timing, and `variant_strategy`.
+Campaign preset steps should reference the message template context only through first-class step fields:
 
-Campaign preset variants own template-reference fields:
-
-    key
     dispatch_key
     channel
     purpose
     scope
 
-Do not use `meta.message` as the canonical CampaignStep or CampaignStepVariant message reference.
+Do not use `meta.message` as the canonical CampaignStep message reference.
 
-`campaign_step_variants.channel`, `campaign_step_variants.purpose`, and `campaign_step_variants.scope` are first-class template-reference fields. Step-level channel/purpose/scope fields may remain as summary/debug defaults, but campaign delivery references belong on variants.
+`campaign_steps.channel`, `campaign_steps.purpose`, and `campaign_steps.scope` are first-class template-reference fields.
 
-The campaign key and step number come from the Campaign/CampaignStep definition; the variant key comes from CampaignStepVariant.
+`campaign_steps.meta` may keep non-routing/debug metadata such as:
+
+    type = message
+
+The campaign key and step number come from the Campaign/CampaignStep definition.
 
 Do not require authors to invent per-step `message_type` names for campaign journey steps.
 
@@ -1886,14 +1845,12 @@ Current tables/models:
 
     campaigns
     campaign_steps
-    campaign_step_variants
     campaign_enrollments
 
 Current models:
 
     Campaign
     CampaignStep
-    CampaignStepVariant
     CampaignEnrollment
 
 Use generic lifecycle fields such as:
@@ -2663,3 +2620,155 @@ Recommended direction:
 Do not use this section as a backlog. Actionable items belong in `TODO.md`.
 
 
+## FlowRoutes capability and producer boundary standard
+
+FlowRoutes is the automation/control-flow consumer. Producer modules should not import FlowRoutes, and FlowRoutes should not import producer-module private internals.
+
+Producer modules own their domain state first. Automation-worthy producer outcomes should emit neutral `AutomationEventRecorded` events after the owning module records its own state.
+
+Good producer direction:
+
+```text
+Webinars records attendance → emits AutomationEventRecorded(webinar.attended)
+Tasks records completion → emits AutomationEventRecorded(task.completed)
+Documents records upload/review state → emits AutomationEventRecorded(document.uploaded/document.approved/etc.)
+Scheduling records appointment state → emits AutomationEventRecorded(appointment.completed/etc.)
+```
+
+Bad producer direction:
+
+```text
+Webinars imports FlowRoutes
+Tasks completion listener lives inside FlowRoutes
+Documents directly creates FlowRouteExternalEvent
+Scheduling directly mutates contact_flow_route_progress
+```
+
+FlowRoutes may react to generic automation events internally by:
+
+```text
+AutomationEventRecorded
+→ FlowRoutes listener
+→ FlowRouteExternalEvent mapping/internal DTO
+→ selected route start or event_wait resume
+```
+
+FlowRoutes may call other modules only through public actions/services/contracts, such as:
+
+```text
+CreateTaskAction
+DispatchMessageAction
+TransitionContactWorkflowStatusAction
+EnrollContactInCampaignAction
+CancelCampaignEnrollmentAction
+```
+
+FlowRoutes must not directly create another module's private records when a public action/service exists.
+
+Good FlowRoutes point direction:
+
+```text
+create_task point → Tasks public task creation action
+send_message point → Messaging public dispatch action
+change_status point → Workflow public transition action
+enroll_campaign point → Campaigns public enrollment action
+cancel_campaign point → Campaigns public cancellation action
+```
+
+Bad FlowRoutes point direction:
+
+```text
+Task::create(...)
+ScheduledMessage::create(...)
+CampaignEnrollment::create(...)
+ContactWorkflowProfile::update(...)
+```
+
+## FlowRoutes capability registry default
+
+Do not jump directly to a vertical/point reconciliation table.
+
+The default path is:
+
+```text
+FlowRoutes point type
+→ handler registry
+→ optional public action/service in the consuming module
+```
+
+A DB-owned capability/binding table may be needed later only if the audit proves one of these needs:
+
+```text
+one point must be bound to a specific vertical-owned record;
+the same generic point type behaves differently depending on a selected vertical domain object;
+operators need to select from DB-owned vertical capabilities at runtime;
+route presets need durable references to vertical-installed capability records instead of config keys.
+```
+
+Until then, prefer provider, registry, and config seams over schema.
+
+Vertical modules such as PetServices, Music, and Mortgage may contribute:
+
+```text
+route presets
+task templates
+labels/copy/capability metadata
+public actions/services/contracts
+event producers
+subject records through morphs
+```
+
+They should not force FlowRoutes, Core, or Tasks to know vertical internals.
+
+## Route template vs route instance planning
+
+A reusable FlowRoute definition is the route template/default automation plan.
+
+A live contact/subject moving through that route is a route instance.
+
+Before production, FlowRoutes needs an explicit schema decision for whether active route instances execute directly from mutable route templates or from contact/subject-specific plan snapshots.
+
+The motivating case:
+
+```text
+PetServices installs a Dog Behavior Training Route template.
+The route applies to a specific contact/dog combo.
+The dog’s training takes longer than expected.
+The operator needs to add more appointments or repeat a final behavior check.
+That adjustment must affect only this contact/dog route instance, not the reusable template.
+```
+
+Durable concepts to audit:
+
+```text
+FlowRoute template/definition = reusable default automation plan.
+ContactFlowRouteProgress / route instance = this contact/subject moving through that plan.
+Route instance plan/adjustment = contact-specific or subject-specific modification without changing the template.
+```
+
+Possible names/concepts:
+
+```text
+FlowRoutePlan
+FlowRoutePlanItem
+ContactFlowRouteProgressItem
+ContactFlowRouteProgressAdjustment
+Route instance snapshot
+```
+
+Schema questions for the FlowRoutes audit:
+
+```text
+Should ContactFlowRouteProgress support subject_type / subject_id?
+Should route execution snapshot route points into progress items when a route starts?
+Should live route instances execute from the mutable template, or from a plan snapshot?
+Should operators be able to insert/repeat/skip/cancel specific plan items for one contact/subject?
+Should each plan item track source = template/manual/vertical/automation?
+Should plan items store config_snapshot json so template changes do not unexpectedly mutate active instances?
+Should event waits and task completion resume a specific plan item rather than only a raw route point?
+Should appointments/tasks/messages created by route points attach back to the specific progress item?
+```
+
+Do not implement route instance plan tables before the Phase 4 audit proves the right shape.
+
+But route instance adjustment is now a first-class schema-discovery concern before production.

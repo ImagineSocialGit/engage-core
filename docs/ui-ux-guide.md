@@ -292,6 +292,26 @@ If the contact show page already uses a status index or status selector pattern,
 
 Do not introduce a new layout for the same mental model unless the new screen asks a meaningfully different question.
 
+### Preserve context for inline CRM actions
+
+CRM workflows should avoid unnecessary full-page reloads when an operator is acting inside a focused context such as a dashboard panel, task list, modal, contact panel, or setup checklist.
+
+When an action is small, localized, and reversible or easily confirmed, prefer an inline/AJAX-style interaction that preserves the operator’s current position, filters, selected record, modal state, and visible feedback.
+
+Good candidates include:
+
+- completing or reopening a task;
+- cancelling, archiving, restoring, or reassigning a task;
+- sending a focused task broadcast;
+- loading contextual action options inside a modal;
+- marking a setup/readiness item reviewed;
+- refreshing a panel after a successful action.
+
+The interaction should provide clear feedback in place, such as a row status update, subtle success message, refreshed count, or inline activity log. It should not make the operator hunt back to where they were.
+
+Full-page submits are still acceptable when the action naturally changes the whole page context, requires a multi-step confirmation flow, creates a new primary record, or is not worth adding client-side complexity yet.
+
+This is a UX pattern first, not a schema requirement. Only add persisted state when the workflow proves that user-specific selections, filters, acknowledgements, dismissals, or saved views need to survive beyond the current page session.
 
 ## Visual wayfinding
 
