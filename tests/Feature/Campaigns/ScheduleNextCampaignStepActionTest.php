@@ -292,7 +292,7 @@ class ScheduleNextCampaignStepActionTest extends TestCase
             'flow_route_progress_item_id' => $flowRoute['progress_item']->getKey(),
             'flow_route_id' => $flowRoute['flow_route']->getKey(),
             'flow_route_point_id' => $flowRoute['flow_route_point']->getKey(),
-            'flow_route_capability_id' => $flowRoute['capability_id'],
+            'flow_route_capability_id' => $flowRoute['capability']->getKey(),
         ]);
 
         $scheduledMessage = app(ScheduleNextCampaignStepAction::class)->handle($enrollment);
@@ -305,7 +305,7 @@ class ScheduleNextCampaignStepActionTest extends TestCase
         $this->assertSame($flowRoute['progress_item']->getKey(), $scheduledMessage->flow_route_progress_item_id);
         $this->assertSame($flowRoute['flow_route']->getKey(), $scheduledMessage->flow_route_id);
         $this->assertSame($flowRoute['flow_route_point']->getKey(), $scheduledMessage->flow_route_point_id);
-        $this->assertSame($flowRoute['capability_id'], $scheduledMessage->flow_route_capability_id);
+        $this->assertSame($flowRoute['capability']->getKey(), $scheduledMessage->flow_route_capability_id);
 
         $this->assertSame($flowRoute['progress']->getKey(), data_get($scheduledMessage->meta, 'flow_route.flow_route_progress_id'));
         $this->assertSame($flowRoute['plan']->getKey(), data_get($scheduledMessage->meta, 'flow_route.flow_route_plan_id'));
@@ -313,7 +313,7 @@ class ScheduleNextCampaignStepActionTest extends TestCase
         $this->assertSame($flowRoute['progress_item']->getKey(), data_get($scheduledMessage->meta, 'flow_route.flow_route_progress_item_id'));
         $this->assertSame($flowRoute['flow_route']->getKey(), data_get($scheduledMessage->meta, 'flow_route.flow_route_id'));
         $this->assertSame($flowRoute['flow_route_point']->getKey(), data_get($scheduledMessage->meta, 'flow_route.flow_route_point_id'));
-        $this->assertNull(data_get($scheduledMessage->meta, 'flow_route.flow_route_capability_id'));
+        $this->assertSame($flowRoute['capability']->getKey(), data_get($scheduledMessage->meta, 'flow_route.flow_route_capability_id'));
     }
 
     private function createCampaignWithSteps(): Campaign
@@ -435,6 +435,32 @@ class ScheduleNextCampaignStepActionTest extends TestCase
             'meta' => [],
         ]);
 
+        $capability = \App\Modules\FlowRoutes\Models\FlowRouteCapability::query()->create([
+            'key' => 'test_capability_'.uniqid(),
+            'module_key' => 'flow_routes',
+            'capability_type' => \App\Modules\FlowRoutes\Models\FlowRouteCapability::TYPE_ACTION,
+            'point_type' => \App\Modules\FlowRoutes\Models\Point::TYPE_NOOP,
+            'handler_key' => 'noop',
+            'event_key' => null,
+            'action_key' => 'noop',
+            'name' => 'Test Capability',
+            'description' => null,
+            'category' => 'test',
+            'surface' => 'test',
+            'supported_subjects' => [],
+            'required_modules' => [],
+            'input_schema' => [],
+            'output_schema' => [],
+            'available_fields' => [],
+            'defaults' => [],
+            'is_active' => true,
+            'source' => 'test',
+            'source_version' => 'test',
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
         $point = \App\Modules\FlowRoutes\Models\Point::query()->create([
             'key' => 'test_point_'.uniqid(),
             'type' => \App\Modules\FlowRoutes\Models\Point::TYPE_NOOP,
@@ -452,7 +478,7 @@ class ScheduleNextCampaignStepActionTest extends TestCase
         $flowRoutePoint = \App\Modules\FlowRoutes\Models\FlowRoutePoint::query()->create([
             'flow_route_id' => $flowRoute->getKey(),
             'point_id' => $point->getKey(),
-            'flow_route_capability_id' => null,
+            'flow_route_capability_id' => $capability->getKey(),
             'key' => 'test_flow_route_point',
             'sort_order' => 10,
             'is_start' => true,
@@ -501,7 +527,7 @@ class ScheduleNextCampaignStepActionTest extends TestCase
             'flow_route_id' => $flowRoute->getKey(),
             'flow_route_point_id' => $flowRoutePoint->getKey(),
             'point_id' => $point->getKey(),
-            'flow_route_capability_id' => null,
+            'flow_route_capability_id' => $capability->getKey(),
             'key' => 'test_flow_route_plan_item',
             'point_type' => $point->type,
             'sort_order' => 10,
@@ -524,7 +550,7 @@ class ScheduleNextCampaignStepActionTest extends TestCase
             'flow_route_id' => $flowRoute->getKey(),
             'flow_route_point_id' => $flowRoutePoint->getKey(),
             'point_id' => $point->getKey(),
-            'flow_route_capability_id' => null,
+            'flow_route_capability_id' => $capability->getKey(),
             'key' => 'test_flow_route_progress_item',
             'point_type' => $point->type,
             'sequence' => 1,
@@ -542,7 +568,7 @@ class ScheduleNextCampaignStepActionTest extends TestCase
             'progress_item' => $progressItem,
             'flow_route' => $flowRoute,
             'flow_route_point' => $flowRoutePoint,
-            'capability_id' => null,
+            'capability' => $capability,
         ];
     }
 
