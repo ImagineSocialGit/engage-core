@@ -35,8 +35,7 @@ class CancelCampaignPointHandler implements PointHandler
                 reason: $definition->invalidReason ?? 'invalid_cancel_campaign_point_definition',
                 meta: [
                     'cancel_campaign_definition' => $definition->toMetaPayload(),
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                    'point_id' => $context->flowRoutePoint->point_id,
+                    ...$this->resultRouteMeta($context),
                 ],
             );
         }
@@ -48,8 +47,7 @@ class CancelCampaignPointHandler implements PointHandler
                 reason: 'cancel_campaign_contact_not_found',
                 meta: [
                     'contact_id' => $context->progress->contact_id,
-                    'flow_route_progress_id' => $context->progress->getKey(),
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    ...$this->resultRouteMeta($context),
                 ],
             );
         }
@@ -69,8 +67,7 @@ class CancelCampaignPointHandler implements PointHandler
                 meta: [
                     'error' => $exception->getMessage(),
                     'cancel_campaign_definition' => $definition->toMetaPayload(),
-                    'flow_route_progress_id' => $context->progress->getKey(),
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    ...$this->resultRouteMeta($context),
                 ],
             );
         }
@@ -84,6 +81,7 @@ class CancelCampaignPointHandler implements PointHandler
             meta: [
                 'campaign_enrollment' => $this->enrollmentMeta($enrollment),
                 'cancel_campaign_definition' => $definition->toMetaPayload(),
+                ...$this->resultRouteMeta($context),
             ],
         );
     }
@@ -94,8 +92,7 @@ class CancelCampaignPointHandler implements PointHandler
     ): PointExecutionResult {
         $meta = [
             'cancel_campaign_definition' => $definition->toMetaPayload(),
-            'flow_route_progress_id' => $context->progress->getKey(),
-            'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+            ...$this->resultRouteMeta($context),
         ];
 
         return match ($definition->onNotEnrolled) {
@@ -131,15 +128,43 @@ class CancelCampaignPointHandler implements PointHandler
         return array_replace_recursive(
             [
                 'source' => 'flow_routes',
-                'flow_route' => [
-                    'flow_route_progress_id' => $context->progress->getKey(),
-                    'flow_route_id' => $context->progress->flow_route_id,
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                    'point_id' => $context->flowRoutePoint->point_id,
-                ],
+                'flow_route' => $this->flowRouteProvenance($context),
             ],
             $this->renderArray($definition->meta, $context),
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function resultRouteMeta(PointExecutionContext $context): array
+    {
+        return [
+            'flow_route_progress_id' => $context->progress->getKey(),
+            'flow_route_plan_id' => $context->plan?->getKey(),
+            'flow_route_plan_item_id' => $context->planItem?->getKey(),
+            'flow_route_progress_item_id' => $context->progressItem?->getKey(),
+            'flow_route_id' => $context->progress->flow_route_id,
+            'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+            'flow_route_capability_id' => $context->flowRoutePoint->flow_route_capability_id,
+            'point_id' => $context->flowRoutePoint->point_id,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function flowRouteProvenance(PointExecutionContext $context): array
+    {
+        return [
+            'flow_route_progress_id' => $context->progress->getKey(),
+            'flow_route_plan_id' => $context->plan?->getKey(),
+            'flow_route_plan_item_id' => $context->planItem?->getKey(),
+            'flow_route_progress_item_id' => $context->progressItem?->getKey(),
+            'flow_route_id' => $context->progress->flow_route_id,
+            'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+            'flow_route_capability_id' => $context->flowRoutePoint->flow_route_capability_id,
+        ];
     }
 
     /**
@@ -163,14 +188,28 @@ class CancelCampaignPointHandler implements PointHandler
 
     private function renderText(string $value, PointExecutionContext $context): string
     {
-        return strtr($value, [
+        return strtr($value, $this->renderTokens($context));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function renderTokens(PointExecutionContext $context): array
+    {
+        return [
             '{contact.id}' => (string) $context->progress->contact_id,
             '{contact_status.id}' => (string) $context->progress->contact_status_id,
             '{workflow_profile.id}' => (string) $context->progress->contact_workflow_profile_id,
             '{flow_route.id}' => (string) $context->progress->flow_route_id,
+            '{flow_route_progress.id}' => (string) $context->progress->getKey(),
+            '{flow_route_plan.id}' => (string) $context->plan?->getKey(),
+            '{flow_route_plan_item.id}' => (string) $context->planItem?->getKey(),
+            '{flow_route_progress_item.id}' => (string) $context->progressItem?->getKey(),
             '{flow_route_point.id}' => (string) $context->flowRoutePoint->getKey(),
             '{point.id}' => (string) $context->flowRoutePoint->point_id,
-        ]);
+            '{subject.type}' => (string) $context->progress->subject_type,
+            '{subject.id}' => (string) $context->progress->subject_id,
+        ];
     }
 
     /**
@@ -190,6 +229,13 @@ class CancelCampaignPointHandler implements PointHandler
             'current_step' => $enrollment->current_step,
             'current_campaign_step_id' => $enrollment->current_campaign_step_id,
             'last_scheduled_message_id' => $enrollment->last_scheduled_message_id,
+            'flow_route_progress_id' => $enrollment->flow_route_progress_id,
+            'flow_route_plan_id' => $enrollment->flow_route_plan_id,
+            'flow_route_plan_item_id' => $enrollment->flow_route_plan_item_id,
+            'flow_route_progress_item_id' => $enrollment->flow_route_progress_item_id,
+            'flow_route_id' => $enrollment->flow_route_id,
+            'flow_route_point_id' => $enrollment->flow_route_point_id,
+            'flow_route_capability_id' => $enrollment->flow_route_capability_id,
             'started_at' => $enrollment->started_at?->toISOString(),
             'cancelled_at' => $enrollment->cancelled_at?->toISOString(),
             'exited_at' => $enrollment->exited_at?->toISOString(),

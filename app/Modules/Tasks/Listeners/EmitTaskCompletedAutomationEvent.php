@@ -13,10 +13,7 @@ class EmitTaskCompletedAutomationEvent
     public function handle(TaskCompleted $event): void
     {
         $task = $event->task->fresh();
-
-        if (! $task) {
-            return;
-        }
+        if (! $task) return;
 
         event(new AutomationEventRecorded(
             AutomationEventData::forSubject(
@@ -34,23 +31,31 @@ class EmitTaskCompletedAutomationEvent
                         'priority' => $task->priority,
                         'due_at' => $task->due_at?->toISOString(),
                         'completed_at' => $task->completed_at?->toISOString(),
-
                         'related_type' => $task->related_type,
                         'related_id' => $task->related_id,
-
                         'assigned_to_type' => $task->assigned_to_type,
                         'assigned_to_id' => $task->assigned_to_id,
-
                         'responsible_party' => $task->responsible_party,
                         'responsible_type' => $task->responsible_type,
                         'responsible_id' => $task->responsible_id,
-
+                        'flow_route_progress_id' => $task->flow_route_progress_id,
+                        'flow_route_plan_id' => $task->flow_route_plan_id,
+                        'flow_route_plan_item_id' => $task->flow_route_plan_item_id,
+                        'flow_route_progress_item_id' => $task->flow_route_progress_item_id,
+                        'flow_route_id' => $task->flow_route_id,
+                        'flow_route_point_id' => $task->flow_route_point_id,
+                        'flow_route_capability_id' => $task->flow_route_capability_id,
+                        'task_template_id' => $task->task_template_id,
+                        'task_template_key' => $task->task_template_key,
                         'meta' => $task->meta ?? [],
                     ],
                 ],
                 meta: [
                     'source_module' => 'tasks',
                     'task_id' => $task->id,
+                    'flow_route_progress_id' => $task->flow_route_progress_id,
+                    'flow_route_plan_item_id' => $task->flow_route_plan_item_id,
+                    'flow_route_progress_item_id' => $task->flow_route_progress_item_id,
                 ],
             ),
         ));
@@ -58,26 +63,13 @@ class EmitTaskCompletedAutomationEvent
 
     private function contactId(Task $task): ?int
     {
-        if ($this->isContactMorph($task->related_type) && $task->related_id) {
-            return (int) $task->related_id;
-        }
-
-        if ($this->isContactMorph($task->responsible_type) && $task->responsible_id) {
-            return (int) $task->responsible_id;
-        }
-
+        if ($this->isContactMorph($task->related_type) && $task->related_id) return (int) $task->related_id;
+        if ($this->isContactMorph($task->responsible_type) && $task->responsible_id) return (int) $task->responsible_id;
         return null;
     }
 
     private function isContactMorph(?string $type): bool
     {
-        if (! $type) {
-            return false;
-        }
-
-        return in_array($type, array_unique([
-            Contact::class,
-            (new Contact())->getMorphClass(),
-        ]), true);
+        return $type && in_array($type, array_unique([Contact::class, (new Contact())->getMorphClass()]), true);
     }
 }

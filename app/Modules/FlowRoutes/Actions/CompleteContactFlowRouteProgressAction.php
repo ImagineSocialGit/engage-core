@@ -3,6 +3,7 @@
 namespace App\Modules\FlowRoutes\Actions;
 
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
+use App\Modules\FlowRoutes\Models\ContactFlowRoutePlan;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use Illuminate\Support\Carbon;
 
@@ -13,6 +14,15 @@ class CompleteContactFlowRouteProgressAction
         ?PointExecutionResult $result = null,
     ): ContactFlowRouteProgress {
         $completedAt = Carbon::now();
+
+        $progress->loadMissing('plan');
+
+        if ($progress->plan instanceof ContactFlowRoutePlan) {
+            $progress->plan->forceFill([
+                'status' => ContactFlowRoutePlan::STATUS_COMPLETED,
+                'completed_at' => $completedAt,
+            ])->save();
+        }
 
         $progress->forceFill([
             'status' => ContactFlowRouteProgress::STATUS_COMPLETED,
@@ -35,7 +45,6 @@ class CompleteContactFlowRouteProgressAction
         Carbon $completedAt,
     ): array {
         $meta = $progress->meta ?? [];
-
         unset($meta['waiting']);
 
         $meta['completed'] = [

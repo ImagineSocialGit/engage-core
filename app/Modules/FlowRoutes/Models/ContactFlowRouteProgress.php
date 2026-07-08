@@ -11,6 +11,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Throwable;
 
 class ContactFlowRouteProgress extends Model
@@ -37,6 +40,8 @@ class ContactFlowRouteProgress extends Model
 
     protected $fillable = [
         'contact_id',
+        'subject_type',
+        'subject_id',
         'contact_status_id',
         'contact_workflow_profile_id',
         'flow_route_id',
@@ -55,6 +60,7 @@ class ContactFlowRouteProgress extends Model
 
     protected $casts = [
         'contact_id' => 'integer',
+        'subject_id' => 'integer',
         'contact_status_id' => 'integer',
         'contact_workflow_profile_id' => 'integer',
         'flow_route_id' => 'integer',
@@ -70,6 +76,11 @@ class ContactFlowRouteProgress extends Model
     public function contact(): BelongsTo
     {
         return $this->belongsTo(Contact::class);
+    }
+
+    public function subject(): MorphTo
+    {
+        return $this->morphTo();
     }
 
     public function contactStatus(): BelongsTo
@@ -90,6 +101,24 @@ class ContactFlowRouteProgress extends Model
     public function currentFlowRoutePoint(): BelongsTo
     {
         return $this->belongsTo(FlowRoutePoint::class, 'current_flow_route_point_id');
+    }
+
+    public function plan(): HasOne
+    {
+        return $this->hasOne(ContactFlowRoutePlan::class, 'contact_flow_route_progress_id');
+    }
+
+    public function planItems(): HasMany
+    {
+        return $this->hasMany(ContactFlowRoutePlanItem::class, 'contact_flow_route_progress_id')
+            ->orderBy('sort_order')
+            ->orderBy('sequence')
+            ->orderBy('id');
+    }
+
+    public function progressItems(): HasMany
+    {
+        return $this->hasMany(ContactFlowRouteProgressItem::class, 'contact_flow_route_progress_id');
     }
 
     public function scopeActive(Builder $query): Builder
@@ -143,6 +172,19 @@ class ContactFlowRouteProgress extends Model
     public function scopeForContact(Builder $query, int $contactId): Builder
     {
         return $query->where('contact_id', $contactId);
+    }
+
+    public function scopeForSubject(Builder $query, ?string $subjectType, int|string|null $subjectId): Builder
+    {
+        if ($subjectType === null && $subjectId === null) {
+            return $query
+                ->whereNull('subject_type')
+                ->whereNull('subject_id');
+        }
+
+        return $query
+            ->where('subject_type', $subjectType)
+            ->where('subject_id', $subjectId);
     }
 
     public function scopeForWorkflowProfile(Builder $query, int $contactWorkflowProfileId): Builder

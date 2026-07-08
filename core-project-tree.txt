@@ -190,6 +190,7 @@
 │   │   │   │   ├── AdvanceContactFlowRouteProgressAction.php
 │   │   │   │   ├── CancelActiveFlowRouteProgressAction.php
 │   │   │   │   ├── CompleteContactFlowRouteProgressAction.php
+│   │   │   │   ├── CreateContactFlowRoutePlanAction.php
 │   │   │   │   ├── ExecuteCurrentFlowRoutePointAction.php
 │   │   │   │   ├── HandleContactWorkflowStatusChangedAction.php
 │   │   │   │   ├── MarkFlowRouteProgressWaitingAction.php
@@ -238,7 +239,12 @@
 │   │   │   │   ├── HandleContactWorkflowStatusChanged.php
 │   │   │   │   └── ResumeFlowRoutesFromAutomationEvent.php
 │   │   │   ├── Models
+│   │   │   │   ├── ContactFlowRoutePlanItem.php
+│   │   │   │   ├── ContactFlowRoutePlan.php
+│   │   │   │   ├── ContactFlowRouteProgressItem.php
 │   │   │   │   ├── ContactFlowRouteProgress.php
+│   │   │   │   ├── FlowRouteCapabilityBinding.php
+│   │   │   │   ├── FlowRouteCapability.php
 │   │   │   │   ├── FlowRoute.php
 │   │   │   │   ├── FlowRoutePoint.php
 │   │   │   │   ├── FlowRouteTriggerBinding.php
@@ -520,6 +526,7 @@
 │   │   ├── Tasks
 │   │   │   ├── Actions
 │   │   │   │   ├── BuildTaskDigestsAction.php
+│   │   │   │   ├── CompleteTaskAction.php
 │   │   │   │   ├── CreateTaskAction.php
 │   │   │   │   ├── CreateTaskFromTemplateAction.php
 │   │   │   │   ├── NotifyAssignedTaskRecipientsAction.php
@@ -891,13 +898,20 @@
 │   │   ├── CommerceOrderItemFactory.php
 │   │   ├── CommerceProductFactory.php
 │   │   ├── ContactFactory.php
+│   │   ├── ContactFlowRoutePlanFactory.php
+│   │   ├── ContactFlowRoutePlanItemFactory.php
+│   │   ├── ContactFlowRouteProgressFactory.php
+│   │   ├── ContactFlowRouteProgressItemFactory.php
 │   │   ├── ContactImportBatchFactory.php
 │   │   ├── ContactLocationFactory.php
 │   │   ├── DocumentRequestFactory.php
 │   │   ├── DocumentRequirementDefinitionFactory.php
 │   │   ├── DocumentReviewEventFactory.php
 │   │   ├── DocumentUploadFactory.php
+│   │   ├── FlowRouteCapabilityBindingFactory.php
+│   │   ├── FlowRouteCapabilityFactory.php
 │   │   ├── FlowRouteFactory.php
+│   │   ├── FlowRoutePointFactory.php
 │   │   ├── FlowRouteTriggerBindingFactory.php
 │   │   ├── FormDefinitionFactory.php
 │   │   ├── FormSubmissionFactory.php
@@ -909,6 +923,7 @@
 │   │   ├── MessageTemplateCatalogEntryFactory.php
 │   │   ├── MessageTemplatePresetAssignmentFactory.php
 │   │   ├── MessageTemplatePresetFactory.php
+│   │   ├── PointFactory.php
 │   │   ├── PortalAccessGrantFactory.php
 │   │   ├── PortalContactLinkFactory.php
 │   │   ├── PortalInvitationFactory.php
@@ -957,8 +972,13 @@
 │   │   ├── 2026_04_15_203500_create_flow_routes_table.php
 │   │   ├── 2026_04_15_203505_create_flow_route_trigger_bindings_table.php
 │   │   ├── 2026_04_15_203510_create_points_table.php
+│   │   ├── 2026_04_15_203515_create_flow_route_capabilities_table.php
+│   │   ├── 2026_04_15_203516_create_flow_route_capability_bindings_table.php
 │   │   ├── 2026_04_15_203520_create_flow_route_points_table.php
 │   │   ├── 2026_04_15_203530_create_contact_flow_route_progress_table.php
+│   │   ├── 2026_04_15_203535_create_contact_flow_route_plans_table.php
+│   │   ├── 2026_04_15_203536_create_contact_flow_route_plan_items_table.php
+│   │   ├── 2026_04_15_203537_create_contact_flow_route_progress_items_table.php
 │   │   ├── 2026_04_15_203544_create_tasks_table.php
 │   │   ├── 2026_04_15_203545_create_task_templates_table.php
 │   │   ├── 2026_04_15_203546_create_notes_table.php
@@ -1045,7 +1065,6 @@
 │   ├── project-organization.md
 │   ├── TODO.md
 │   └── ui-ux-guide.md
-├── file_dumps
 ├── package.json
 ├── package-lock.json
 ├── phpunit.xml
@@ -1316,4 +1335,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-437 directories, 880 files
+436 directories, 900 files

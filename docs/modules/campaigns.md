@@ -343,6 +343,27 @@ That does not make Campaigns depend on the source module.
 Campaigns should treat source morphs as context unless an explicit public integration is introduced.
 
 
+
+## FlowRoutes-created campaign enrollment provenance
+
+Campaigns owns campaign enrollment lifecycle, progression, cancellation, exit behavior, and campaign scheduling.
+
+When FlowRoutes enrolls or cancels a Campaign through Campaigns public actions/services, CampaignEnrollment should preserve the existing source morph/start context and also store structured FlowRoutes provenance where applicable:
+
+```text
+flow_route_progress_id
+flow_route_plan_id
+flow_route_plan_item_id
+flow_route_progress_item_id
+flow_route_id
+flow_route_point_id
+flow_route_capability_id
+```
+
+`source_type` / `source_id` answers what domain thing caused or contextualized the enrollment. The FlowRoutes provenance fields answer which route instance/plan item created or controlled the enrollment. These are related but not interchangeable.
+
+Campaigns should not import FlowRoutes runtime internals. FlowRoutes should not mutate CampaignEnrollment internals directly.
+
 ## Automatic Follow-ups campaign usage
 
 FlowRoutes may enroll or cancel Campaigns through Campaign-owned public actions.

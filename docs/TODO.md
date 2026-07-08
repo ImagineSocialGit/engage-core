@@ -134,7 +134,7 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Dependency checks are scoped to the same campaign enrollment, same campaign step, and required variant key.
   - Preset sync creates variants, removes stale non-customized variants, preserves customized stale variants, and protects customized campaigns.
   - Campaign scheduled-message payloads stay compact; campaign/step/variant/template/debug identity belongs in meta.
-- [ ] Phase 3 — Task templates / task defaults.
+- [x] Phase 3 — Task templates / task defaults.
   - Audit `task_templates` table/model shape for generated/manual tasks.
   - Confirm FlowRoutes `create_task` points can reference `TaskTemplate` records.
   - Confirm task templates can define title/body/default due offsets/assigned_to/responsible_party/related-subject rules.
@@ -143,7 +143,7 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Confirm customized templates are preserved.
   - Decide whether direct template reference is enough or whether template assignment/selection is needed.
   - Build task template UI only if needed.
-- [ ] Phase 4 — FlowRoutes relationship, capability, and instance-plan audit.
+- [x] Phase 4A — FlowRoutes relationship, capability, and instance-plan audit.
   - Map FlowRoutes against current universal modules: Messaging, InboundMessaging, InternalNotifications, Tasks, Workflow, Campaigns, Broadcasts, Webinars, Reporting, Scheduling, Portal, Forms, Documents, Commerce, Location.
   - Map FlowRoutes against vertical/planned vertical modules: Mortgage, PetServices, Music.
   - Decide which modules produce automation events.
@@ -160,13 +160,24 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Decide whether active route plans need plan item snapshots so template edits do not unexpectedly change live instances.
   - Decide whether operators can insert/repeat/skip/cancel route instance plan items for one contact/subject.
   - Decide how event waits, task completion, appointment completion, document completion, etc. resume specific plan items.
-  - Do not add a vertical/point reconciliation table unless the audit proves registry/config/provider seams are insufficient.
+  - Audit conclusion: subject-scoped route instances, route instance plans/items, progress/execution items, capability catalog/bindings, and uniform artifact provenance are required before production.
+- [ ] Phase 4B — FlowRoutes schema hardening.
+  - Add `subject_type` / `subject_id` to `contact_flow_route_progress`.
+  - Add `contact_flow_route_plans`.
+  - Add `contact_flow_route_plan_items`.
+  - Add `contact_flow_route_progress_items`.
+  - Add `flow_route_capabilities`.
+  - Add `flow_route_capability_bindings`.
+  - Add uniform FlowRoutes provenance fields to route-created artifacts: Tasks, ScheduledMessages, and CampaignEnrollments.
+  - Ensure future modules use the same provenance pattern when FlowRoutes creates Scheduling appointments, Document requests, Form requests/submissions, Portal invitations/access grants, Commerce records, or vertical-owned artifacts.
+  - Keep module-owned business behavior behind public actions/services/contracts.
+  - Do not build the polished Route Management UX in this phase.
 - [ ] Phase 5 — FlowRoutes event-wait / task-completed resume implementation.
-  - Implement after Phase 4 because resume behavior may need route instance plan items/snapshots.
+  - Implement after Phase 4B schema hardening because resume behavior must target route progress/plan/progress items.
   - Resume from neutral `task.completed` `AutomationEventRecorded` events.
   - Do not add Task-specific FlowRoutes listeners.
-  - FlowRoutes listens to generic `AutomationEventRecorded` and resumes matching event_wait/progress/plan items internally.
-  - Add wait-correlation schema only if existing progress/plan metadata is insufficient.
+  - FlowRoutes listens to generic `AutomationEventRecorded` and resumes matching event_wait/progress/plan/progress items internally.
+  - Do not rely on contact-only fallback for task-completed waits; require task/progress/plan/progress-item correlation.
 - [ ] Phase 6 — Config validation / setup validation.
   - Validate Task presets.
   - Validate FlowRoute presets.
@@ -191,6 +202,7 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Warn operators before manual status changes run selected status FlowRoutes.
   - Keep this as a UI/awareness guardrail, not a ContactStatus schema split.
 - [ ] Phase 11 — Automatic Follow-ups / FlowRoutes UX polish.
+  - Rename side-panel to something that doesn't imply messaging, using the term "Routes" to help tie together the concepts of "Routes have points along them"
   - Do not start until the FlowRoutes capability/instance-plan/runtime model is settled.
   - Redesign Route Binding / Automatic Follow-ups around business outcomes, consequence previews, and client/operator language.
   - Let the UX be informed by actual route capabilities and instance behavior.

@@ -2,6 +2,10 @@
 
 namespace Tests\Feature\FlowRoutes;
 
+use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Campaigns\Models\CampaignStep;
+use App\Modules\Campaigns\Models\CampaignStepVariant;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\FlowRoutes\Actions\ExecuteCurrentFlowRoutePointAction;
@@ -18,7 +22,9 @@ use App\Modules\FlowRoutes\PointHandlers\NoopPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\WaitPointHandler;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Modules\InternalNotifications\Models\TeamMember;
+use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Models\TaskTemplate;
@@ -278,8 +284,130 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertSame('Created from template.', $task->description);
         $this->assertSame('high', $task->priority);
         $this->assertSame('route.follow_up', $task->meta['task_template']['key']);
-        $this->assertSame($setup['progress']->getKey(), $task->meta['created_by']['flow_route_progress_id']);
-        $this->assertNotNull($task->due_at);
+
+        $this->assertSame($setup['progress']->getKey(), $task->flow_route_progress_id);
+        $this->assertSame($setup['flow_route']->getKey(), $task->flow_route_id);
+        $this->assertSame($setup['flow_route_points'][0]->getKey(), $task->flow_route_point_id);
+        $this->assertNotNull($task->flow_route_plan_id);
+        $this->assertNotNull($task->flow_route_plan_item_id);
+        $this->assertNotNull($task->flow_route_progress_item_id);
+    }
+
+    public function test_enroll_campaign_point_stores_route_provenance_on_enrollment_and_scheduled_message(): void
+    {
+        Queue::fake();
+
+        config()->set('messaging.channel_availability.email', [
+            'runtime_supported' => true,
+            'provider_enabled' => true,
+            'requires_explicit_opt_in' => false,
+            'surfaces' => [
+                'campaigns' => true,
+            ],
+            'purpose_scopes' => [
+                'marketing:webinar' => true,
+            ],
+        ]);
+
+        config()->set('messaging.email.marketing.webinar.campaigns.route_campaign.steps.1.variants.email', [
+            'dispatch_key' => 'campaign_step_due',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'marketing',
+            'payload' => [
+                'to' => '{email}',
+                'subject' => 'Route campaign',
+                'body' => 'Route campaign body',
+            ],
+        ]);
+
+        $campaign = Campaign::query()->create([
+            'key' => 'route_campaign',
+            'name' => 'Route Campaign',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar',
+            'status' => Campaign::STATUS_ACTIVE,
+            'is_active' => true,
+            'meta' => [],
+        ]);
+
+        $step = CampaignStep::query()->create([
+            'campaign_id' => $campaign->getKey(),
+            'step_number' => 1,
+            'name' => 'Step 1',
+            'dispatch_key' => 'campaign_step_due',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar',
+            'variant_strategy' => 'first_available',
+            'is_active' => true,
+            'criteria' => [
+                'timing' => [
+                    'type' => 'delay',
+                    'minutes' => 15,
+                ],
+            ],
+            'meta' => [
+                'type' => 'message',
+            ],
+        ]);
+
+        CampaignStepVariant::query()->create([
+            'campaign_step_id' => $step->getKey(),
+            'key' => 'email',
+            'name' => 'Email',
+            'sort_order' => 0,
+            'dispatch_key' => 'campaign_step_due',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar',
+            'is_active' => true,
+            'criteria' => [],
+            'dependency_rules' => [],
+            'source_config_path' => 'messaging.email.marketing.webinar.campaigns.route_campaign.steps.1.variants.email',
+            'meta' => [],
+        ]);
+
+        $setup = $this->createProgressWithPoints([
+            Point::TYPE_ENROLL_CAMPAIGN,
+        ]);
+
+        MessageConsent::query()->create([
+            'contact_id' => $setup['progress']->contact_id,
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar',
+            'consented_at' => now()->subMinute(),
+            'source' => 'test',
+        ]);
+
+        $setup['flow_route_points'][0]->forceFill([
+            'definition' => [
+                'campaign_key' => 'route_campaign',
+            ],
+        ])->save();
+
+        $result = app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']);
+
+        $this->assertSame(PointExecutionResult::STATUS_COMPLETED, $result->status);
+        $this->assertSame('campaign_enrolled', $result->reason);
+
+        $enrollment = CampaignEnrollment::query()->firstOrFail();
+        $scheduledMessage = ScheduledMessage::query()->firstOrFail();
+
+        $this->assertSame($setup['progress']->getKey(), $enrollment->flow_route_progress_id);
+        $this->assertSame($setup['flow_route']->getKey(), $enrollment->flow_route_id);
+        $this->assertSame($setup['flow_route_points'][0]->getKey(), $enrollment->flow_route_point_id);
+        $this->assertNotNull($enrollment->flow_route_plan_id);
+        $this->assertNotNull($enrollment->flow_route_plan_item_id);
+        $this->assertNotNull($enrollment->flow_route_progress_item_id);
+
+        $this->assertSame($enrollment->flow_route_progress_id, $scheduledMessage->flow_route_progress_id);
+        $this->assertSame($enrollment->flow_route_plan_id, $scheduledMessage->flow_route_plan_id);
+        $this->assertSame($enrollment->flow_route_plan_item_id, $scheduledMessage->flow_route_plan_item_id);
+        $this->assertSame($enrollment->flow_route_progress_item_id, $scheduledMessage->flow_route_progress_item_id);
+        $this->assertSame($enrollment->flow_route_id, $scheduledMessage->flow_route_id);
+        $this->assertSame($enrollment->flow_route_point_id, $scheduledMessage->flow_route_point_id);
     }
 
     public function test_automation_event_route_can_change_contact_workflow_status(): void
@@ -516,4 +644,3 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         ];
     }
 }
-

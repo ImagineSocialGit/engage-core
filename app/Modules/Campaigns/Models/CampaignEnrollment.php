@@ -3,6 +3,13 @@
 namespace App\Modules\Campaigns\Models;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\FlowRoutes\Models\ContactFlowRoutePlan;
+use App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem;
+use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
+use App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem;
+use App\Modules\FlowRoutes\Models\FlowRoute;
+use App\Modules\FlowRoutes\Models\FlowRouteCapability;
+use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -26,6 +33,13 @@ class CampaignEnrollment extends Model
         'campaign_id',
         'source_type',
         'source_id',
+        'flow_route_progress_id',
+        'flow_route_plan_id',
+        'flow_route_plan_item_id',
+        'flow_route_progress_item_id',
+        'flow_route_id',
+        'flow_route_point_id',
+        'flow_route_capability_id',
         'campaign_key',
         'channel',
         'purpose',
@@ -53,6 +67,13 @@ class CampaignEnrollment extends Model
             'contact_id' => 'integer',
             'campaign_id' => 'integer',
             'source_id' => 'integer',
+            'flow_route_progress_id' => 'integer',
+            'flow_route_plan_id' => 'integer',
+            'flow_route_plan_item_id' => 'integer',
+            'flow_route_progress_item_id' => 'integer',
+            'flow_route_id' => 'integer',
+            'flow_route_point_id' => 'integer',
+            'flow_route_capability_id' => 'integer',
             'current_step' => 'integer',
             'current_campaign_step_id' => 'integer',
             'start_context' => 'array',
@@ -88,6 +109,41 @@ class CampaignEnrollment extends Model
         return $this->morphTo();
     }
 
+    public function flowRouteProgress(): BelongsTo
+    {
+        return $this->belongsTo(ContactFlowRouteProgress::class, 'flow_route_progress_id');
+    }
+
+    public function flowRoutePlan(): BelongsTo
+    {
+        return $this->belongsTo(ContactFlowRoutePlan::class, 'flow_route_plan_id');
+    }
+
+    public function flowRoutePlanItem(): BelongsTo
+    {
+        return $this->belongsTo(ContactFlowRoutePlanItem::class, 'flow_route_plan_item_id');
+    }
+
+    public function flowRouteProgressItem(): BelongsTo
+    {
+        return $this->belongsTo(ContactFlowRouteProgressItem::class, 'flow_route_progress_item_id');
+    }
+
+    public function flowRoute(): BelongsTo
+    {
+        return $this->belongsTo(FlowRoute::class);
+    }
+
+    public function flowRoutePoint(): BelongsTo
+    {
+        return $this->belongsTo(FlowRoutePoint::class);
+    }
+
+    public function flowRouteCapability(): BelongsTo
+    {
+        return $this->belongsTo(FlowRouteCapability::class);
+    }
+
     public function lastScheduledMessage(): BelongsTo
     {
         return $this->belongsTo(ScheduledMessage::class, 'last_scheduled_message_id');
@@ -113,4 +169,3 @@ class CampaignEnrollment extends Model
         return $this->status === self::STATUS_COMPLETED;
     }
 }
-

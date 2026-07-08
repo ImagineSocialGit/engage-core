@@ -15,7 +15,7 @@ return new class extends Migration
 
             $table->foreignIdFor(DocumentRequirementDefinition::class)
                 ->nullable()
-                ->constrained()
+                ->constrained(indexName: 'document_requests_requirement_fk')
                 ->nullOnDelete();
 
             $table->foreignIdFor(Contact::class)

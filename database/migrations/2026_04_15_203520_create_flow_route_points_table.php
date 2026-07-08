@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\FlowRoutes\Models\FlowRoute;
+use App\Modules\FlowRoutes\Models\FlowRouteCapability;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\Point;
 use Illuminate\Database\Migrations\Migration;
@@ -21,6 +22,11 @@ return new class extends Migration
             $table->foreignIdFor(Point::class)
                 ->constrained()
                 ->cascadeOnDelete();
+
+            $table->foreignIdFor(FlowRouteCapability::class)
+                ->nullable()
+                ->constrained('flow_route_capabilities')
+                ->nullOnDelete();
 
             $table->string('key')->nullable();
 
@@ -52,6 +58,7 @@ return new class extends Migration
             $table->index(['flow_route_id', 'is_active', 'sort_order']);
             $table->index(['flow_route_id', 'is_start']);
             $table->index(['point_id', 'is_active']);
+            $table->index(['flow_route_capability_id', 'is_active'], 'frp_capability_active_idx');
             $table->index(['key', 'source_version']);
             $table->index(['next_flow_route_point_id']);
         });

@@ -95,7 +95,7 @@ Universal modules are reusable capability modules. They may be disabled for many
 | InternalNotifications | Team members, notification preferences, internal notification gates/routing. |
 | Tasks | Manual human actions/dependencies, task templates, task assignment/responsibility, task digests. |
 | Workflow | Contact workflow/profile state and status transition services. |
-| FlowRoutes | Automation/control-flow routes, route points, waits, event waits, route progress. |
+| FlowRoutes | Automation/control-flow routes, route points, waits, event waits, subject-scoped route progress, instance plans/items, progress/execution items, capability catalog/bindings, and route-created artifact provenance. |
 | Campaigns | Enrolled multi-step message journeys and campaign progression. |
 | Broadcasts | One-time/batch sends and recipient bookkeeping. |
 | Webinars | Webinar series, webinars, registrations, waitlists, schedule profiles, provider behavior, attendance, replay/follow-up orchestration. |
@@ -131,6 +131,33 @@ Vertical modules should not push domain-specific fields into Core contacts.
 | --- | --- | --- |
 | PetServices | Pets/dogs, pet profiles, training goals, training programs, behavior notes, pet-service-specific rules/workflows. | Scheduling, Portal, Forms, Documents, Tasks, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Reporting. |
 | Music | Music-specific fan/customer meaning, release/fan strategy, music product interest categories, show/release logic, music-specific segmentation. | Commerce, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Scheduling, Portal, Reporting. |
+
+
+## Cross-module FlowRoutes integration pattern
+
+When a module participates in FlowRoutes, it should follow one uniform process:
+
+```text
+1. The module owns its domain records and lifecycle.
+2. The module emits neutral AutomationEventRecorded events for automation-worthy outcomes.
+3. The module exposes public actions/services/contracts before FlowRoutes creates or mutates its records.
+4. The module may contribute FlowRoute capabilities, route presets, task templates, labels, and available-field metadata through public seams.
+5. If FlowRoutes creates a module-owned artifact, that artifact stores the standard FlowRoutes provenance fields.
+```
+
+Standard provenance fields for route-created artifacts:
+
+```text
+flow_route_progress_id
+flow_route_plan_id
+flow_route_plan_item_id
+flow_route_progress_item_id
+flow_route_id
+flow_route_point_id
+flow_route_capability_id
+```
+
+This should make future Scheduling, Documents, Forms, Portal, Commerce, Mortgage, PetServices, and Music integrations follow the same route-instance/capability model instead of adding bespoke metadata paths.
 
 ## Integrations / Adapters
 

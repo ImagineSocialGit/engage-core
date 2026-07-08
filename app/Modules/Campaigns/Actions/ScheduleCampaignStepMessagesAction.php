@@ -178,19 +178,14 @@ class ScheduleCampaignStepMessagesAction
             dispatchKeys: $definition['dispatch_keys'],
             payload: $this->campaignPayload($enrollment, $payload),
             context: $context,
-            meta: array_replace_recursive([
-                'campaign_enrollment_id' => $enrollment->id,
-                'campaign_id' => $campaign->id,
-                'campaign_key' => $campaign->key,
-                'campaign_step_id' => $step->id,
-                'campaign_step' => $step->step_number,
-                'campaign_step_variant_id' => $variant->exists ? $variant->id : null,
-                'campaign_step_variant_key' => $variant->key,
-                'campaign_step_variant_source_config_path' => $variant->source_config_path,
-                'campaign_step_variant_source_version' => $variant->source_version,
-                'campaign_variant_strategy' => $strategy,
-                'campaign_step_waits_for_all_scheduled_variants' => in_array($strategy, ['send_all_eligible', 'dependency_aware'], true),
-            ], $meta ?? []),
+            meta: $this->messageMeta(
+                enrollment: $enrollment,
+                campaign: $campaign,
+                step: $step,
+                variant: $variant,
+                strategy: $strategy,
+                meta: $meta,
+            ),
             criteria: [
                 'campaign_key' => $campaign->key,
                 'step' => $step->step_number,
@@ -216,6 +211,55 @@ class ScheduleCampaignStepMessagesAction
         ];
 
         return $scheduledMessage;
+    }
+
+    /**
+     * @param array<string, mixed>|null $meta
+     * @return array<string, mixed>
+     */
+    private function messageMeta(
+        CampaignEnrollment $enrollment,
+        Campaign $campaign,
+        CampaignStep $step,
+        CampaignStepVariant $variant,
+        string $strategy,
+        ?array $meta,
+    ): array {
+        return array_replace_recursive(
+            $this->flowRouteMetaFromEnrollment($enrollment),
+            [
+                'campaign_enrollment_id' => $enrollment->id,
+                'campaign_id' => $campaign->id,
+                'campaign_key' => $campaign->key,
+                'campaign_step_id' => $step->id,
+                'campaign_step' => $step->step_number,
+                'campaign_step_variant_id' => $variant->exists ? $variant->id : null,
+                'campaign_step_variant_key' => $variant->key,
+                'campaign_step_variant_source_config_path' => $variant->source_config_path,
+                'campaign_step_variant_source_version' => $variant->source_version,
+                'campaign_variant_strategy' => $strategy,
+                'campaign_step_waits_for_all_scheduled_variants' => in_array($strategy, ['send_all_eligible', 'dependency_aware'], true),
+            ],
+            $meta ?? [],
+        );
+    }
+
+    /**
+     * @return array<string, array<string, int>>
+     */
+    private function flowRouteMetaFromEnrollment(CampaignEnrollment $enrollment): array
+    {
+        $flowRoute = array_filter([
+            'flow_route_progress_id' => $enrollment->flow_route_progress_id,
+            'flow_route_plan_id' => $enrollment->flow_route_plan_id,
+            'flow_route_plan_item_id' => $enrollment->flow_route_plan_item_id,
+            'flow_route_progress_item_id' => $enrollment->flow_route_progress_item_id,
+            'flow_route_id' => $enrollment->flow_route_id,
+            'flow_route_point_id' => $enrollment->flow_route_point_id,
+            'flow_route_capability_id' => $enrollment->flow_route_capability_id,
+        ], fn (mixed $value): bool => $value !== null);
+
+        return $flowRoute === [] ? [] : ['flow_route' => $flowRoute];
     }
 
     /**

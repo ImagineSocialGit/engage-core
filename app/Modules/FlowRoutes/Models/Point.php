@@ -63,6 +63,21 @@ class Point extends Model
         return $this->hasMany(FlowRoutePoint::class);
     }
 
+    public function capabilities(): HasMany
+    {
+        return $this->hasMany(FlowRouteCapability::class, 'point_type', 'type');
+    }
+
+    public function planItems(): HasMany
+    {
+        return $this->hasMany(ContactFlowRoutePlanItem::class);
+    }
+
+    public function progressItems(): HasMany
+    {
+        return $this->hasMany(ContactFlowRouteProgressItem::class);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);

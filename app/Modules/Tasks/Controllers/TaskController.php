@@ -4,9 +4,9 @@ namespace App\Modules\Tasks\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Tasks\Actions\CompleteTaskAction;
 use App\Modules\Tasks\Actions\CreateTaskAction;
 use App\Modules\Tasks\Actions\NotifyAssignedTaskRecipientsAction;
-use App\Modules\Tasks\Events\TaskCompleted;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Requests\StoreTaskRequest;
 use Illuminate\Http\RedirectResponse;
@@ -32,24 +32,9 @@ class TaskController extends Controller
         return redirect()->back();
     }
 
-    public function complete(Task $task): RedirectResponse
+    public function complete(Task $task, CompleteTaskAction $completeTask): RedirectResponse
     {
-        $wasCompleted = $task->isCompleted();
-
-        $task->update([
-            'status' => Task::STATUS_COMPLETED,
-            'completed_at' => $task->completed_at ?? now(),
-            'canceled_at' => null,
-            'canceled_reason' => null,
-        ]);
-
-        $task->refresh();
-
-        $this->touchRelatedContact($task);
-
-        if (! $wasCompleted) {
-            event(new TaskCompleted($task));
-        }
+        $completeTask->handle($task);
 
         return redirect()->back();
     }

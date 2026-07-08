@@ -285,6 +285,11 @@ Current ownership:
 | points | FlowRoutes |
 | flow_route_points | FlowRoutes |
 | contact_flow_route_progress | FlowRoutes |
+| contact_flow_route_plans | FlowRoutes |
+| contact_flow_route_plan_items | FlowRoutes |
+| contact_flow_route_progress_items | FlowRoutes |
+| flow_route_capabilities | FlowRoutes |
+| flow_route_capability_bindings | FlowRoutes |
 | tasks | Tasks |
 | task_templates | Tasks |
 | message_consents | Messaging |
@@ -1692,6 +1697,97 @@ That is expected.
 
 It means the route started from an automation event rather than a Workflow status transition.
 
+
+## FlowRoutes route instance and capability hardening
+
+Before production, FlowRoutes should use first-class schema for route instances, route plans, route plan items, progress/execution items, and capability discovery instead of pushing these concepts into `meta`.
+
+The durable layer split is:
+
+```text
+FlowRoute / FlowRoutePoint / Point
+    Reusable template/default route definition.
+
+ContactFlowRouteProgress
+    Live route instance for one contact and optional subject.
+
+ContactFlowRoutePlan
+    Instance-specific plan seeded from the reusable route template.
+
+ContactFlowRoutePlanItem
+    Ordered item in one route instance plan. It may come from template, manual insertion, automation, vertical preset, or later operator adjustment.
+
+ContactFlowRouteProgressItem
+    Execution attempt/result for a route plan item. It owns waiting state, resume/correlation data, result data, and created-artifact linkage.
+
+FlowRouteCapability / FlowRouteCapabilityBinding
+    Durable capability catalog and context/client/module binding layer for available actions, waits, conditions, events, labels, input schema, output context, and supported subject types.
+```
+
+`contact_flow_route_progress` should support:
+
+```text
+subject_type nullable
+subject_id nullable
+```
+
+Subject scoping lets one contact have separate live route instances for records such as appointments, document requests, form submissions, portal invitations, commerce orders, mortgage files, pets/dogs, or music-specific subjects.
+
+A reusable route template may change over time. A live route instance should execute from its instance plan so template edits do not unexpectedly mutate active route paths. Operators may later insert, repeat, skip, cancel, delay, or replace plan items for one contact/subject without changing the reusable template.
+
+FlowRoutes-created artifacts should use the same first-class provenance shape across modules:
+
+```text
+flow_route_progress_id
+flow_route_plan_id
+flow_route_plan_item_id
+flow_route_progress_item_id
+flow_route_id
+flow_route_point_id
+flow_route_capability_id
+```
+
+This applies first to:
+
+```text
+tasks
+scheduled_messages
+campaign_enrollments
+```
+
+Future modules should follow the same pattern when FlowRoutes creates module-owned records, such as:
+
+```text
+appointments
+document_requests
+form submissions or requests
+portal invitations/access grants
+commerce records when applicable
+vertical-owned records
+```
+
+The owning module still owns its business rules and lifecycle. FlowRoutes stores provenance/correlation and calls the owning module through public actions/services/contracts.
+
+Good:
+
+```text
+FlowRoutes create_task point → CreateTaskAction → Task with FlowRoutes provenance
+FlowRoutes create_appointment point → Scheduling public action → Appointment with FlowRoutes provenance
+FlowRoutes request_document point → Documents public action → DocumentRequest with FlowRoutes provenance
+```
+
+Bad:
+
+```text
+FlowRoutes writes directly to another module's private tables.
+Future modules create one-off FlowRoutes metadata shapes instead of the shared provenance columns.
+Producer modules import FlowRoutes to resume progress directly.
+```
+
+Task-completed resume should match a specific route progress/plan/progress item and task identity. Broad contact-only `task.completed` waits are unsafe when a contact may have multiple active tasks or multiple active subject-scoped route instances.
+
+Capability records do not replace point handlers or public actions. They describe and bind what is available for authoring, validation, labels, supported subjects, and runtime compatibility. Runtime execution still goes through registered handlers and public module actions/services.
+
 ## Campaigns Module
 
 Campaigns is optional.
@@ -2683,28 +2779,40 @@ CampaignEnrollment::create(...)
 ContactWorkflowProfile::update(...)
 ```
 
-## FlowRoutes capability registry default
+## FlowRoutes capability catalog standard
 
-Do not jump directly to a vertical/point reconciliation table.
+FlowRoutes should have DB-owned capability and capability binding records before production.
 
-The default path is:
+The capability catalog exists because route authoring and validation must eventually be dynamic across universal and vertical modules. Operators should be able to see which actions/events/conditions/waits are available for a client, a module set, and a subject type without FlowRoutes importing private module internals.
 
-```text
-FlowRoutes point type
-→ handler registry
-→ optional public action/service in the consuming module
-```
-
-A DB-owned capability/binding table may be needed later only if the audit proves one of these needs:
+The runtime path remains:
 
 ```text
-one point must be bound to a specific vertical-owned record;
-the same generic point type behaves differently depending on a selected vertical domain object;
-operators need to select from DB-owned vertical capabilities at runtime;
-route presets need durable references to vertical-installed capability records instead of config keys.
+FlowRoutes capability
+→ point type / handler registry
+→ public action/service/contract in the consuming module
 ```
 
-Until then, prefer provider, registry, and config seams over schema.
+Capability records should describe:
+
+```text
+module_key
+capability key
+capability kind: trigger/event/action/wait/condition/branch
+point_type / handler key
+label and help text
+supported subject types
+required modules
+input schema
+output context / available fields
+default definition/settings
+client/operator visibility
+active/customized/source metadata
+```
+
+Capability binding records should decide availability/visibility for a client, module, owner group, context, or vertical.
+
+Vertical modules such as PetServices, Music, and Mortgage may contribute capabilities, route presets, task templates, labels, public actions/services/contracts, event producers, and subject records through public seams. They should not force FlowRoutes, Core, or Tasks to know vertical private internals.
 
 Vertical modules such as PetServices, Music, and Mortgage may contribute:
 
@@ -2768,9 +2876,7 @@ Should event waits and task completion resume a specific plan item rather than o
 Should appointments/tasks/messages created by route points attach back to the specific progress item?
 ```
 
-Do not implement route instance plan tables before the Phase 4 audit proves the right shape.
-
-But route instance adjustment is now a first-class schema-discovery concern before production.
+The Phase 4A audit proved that route instance plan tables are required before production. Implement this schema before Phase 5 task-completed resume so runtime correlation does not become meta-heavy.
 
 ## Shared available-field/token registry direction
 

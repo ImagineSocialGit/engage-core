@@ -77,9 +77,8 @@ Completed runway pieces:
 
 Remaining near-term candidates:
 
-- Task templates/defaults for FlowRoutes-created tasks and module-contributed tasks.
-- FlowRoutes relationship, capability, and instance-plan audit.
-- FlowRoutes event-wait/task-completed resume implementation.
+- FlowRoutes schema hardening for route instances, plan items, progress items, capability catalog/bindings, and route-created artifact provenance.
+- FlowRoutes event-wait/task-completed resume implementation on top of route plan/progress item correlation.
 - Config/setup validation across presets, route points, module capabilities, available fields/tokens, and templates.
 - Permission invitation accepted/cancelled/skip/failure behavior.
 - Webinar message readiness checks.
@@ -108,9 +107,10 @@ Current schema-discovery sequence:
 | -: | --- | --- | --- | --- |
 | 1 | Webinar schedule profiles | Complete | DB/schema | DB-owned webinar schedule profiles/items exist. Series/webinars can select profiles with fallback. Webinars owns timing/slot identity. Messaging owns reusable copy/templates. Scheduled-message payloads stay compact; schedule/profile/template/debug identity belongs in meta. |
 | 2 | Campaign channel variants | Complete | DB/schema | DB-owned campaign step variants exist. Campaign enrollment is lifecycle, campaign step is the business moment, and campaign step variant is the channel-specific delivery option. Variant strategy and dependency-aware scheduling are hardened. Scheduled-message payloads stay compact; campaign/step/variant/template/debug identity belongs in meta. |
-| 3 | Task templates / task defaults | Next | DB/schema | Task templates are required foundation for FlowRoutes `create_task` points. Audit/implement DB-owned reusable task definitions before deeper FlowRoutes runtime work. |
-| 4 | FlowRoutes relationship, capability, and instance-plan audit | Planned | DB/schema + architecture | Map FlowRoutes against every universal and vertical module. Decide producer events, public actions, contributed point handlers, route presets, task templates, capability metadata/labels, client-facing Route terminology, subject morphs, route instance plans, and whether active instances need snapshots/adjustments. |
-| 5 | FlowRoutes event-wait / task-completed resume implementation | Planned | DB/schema + runtime | Implement after Phase 4 because resume behavior may need subject-scoped route instance plan items/snapshots rather than raw route points only. Resume from neutral `task.completed` automation events. |
+| 3 | Task templates / task defaults | Complete | DB/schema | DB-owned reusable `task_templates` exist. FlowRoutes `create_task` points may reference stable task template keys and create live tasks through Tasks public actions. Tasks owns due offsets, assignment strategy, responsibility, and related-subject defaults. |
+| 4A | FlowRoutes relationship, capability, and instance-plan audit | Complete | DB/schema + architecture | Audit confirmed that future subject-scoped route instance adjustment and durable capability discovery are guaranteed requirements before production. FlowRoutes should harden schema now instead of relying on meta-heavy execution/correlation. |
+| 4B | FlowRoutes schema hardening | Current | DB/schema + architecture | Add subject-scoped route progress, contact route plans, plan items, progress/execution items, capability catalog/bindings, and uniform route-created artifact provenance for Tasks, Messaging, Campaigns, and future modules such as Scheduling/Documents/Forms/Portal/Commerce/verticals. |
+| 5 | FlowRoutes event-wait / task-completed resume implementation | Planned | DB/schema + runtime | Implement after Phase 4B. Resume from neutral `task.completed` automation events by matching route progress, route plan item, route progress item, task id/template identity, and subject context. Do not resume task waits through contact-only fallback. |
 | 6 | Config validation / setup validation | Planned | Architecture + safety | Validate task presets, FlowRoute presets, task-template refs, route point types, module capability references, available field/token references, vertical references, campaign refs, messaging/template refs, unsupported point/module combinations, and route instance/snapshot assumptions. Prefer command/service-based validation first. |
 | 7 | Permission invitation accepted automation event | Planned | Architecture | Decide whether accepted invitations emit `permission_invitation.accepted` without Messaging depending on consumers. |
 | 8 | Permission invitation cancellation / skip / failure bookkeeping | Planned | DB/schema + architecture | Clarify durable lifecycle visibility across permission invitations, Broadcast bookkeeping, and Messaging scheduled messages. |
@@ -138,13 +138,58 @@ Deferred launch hardening:
 
 Do not build DB snapshot/export tooling during active pre-production schema discovery unless real data preservation becomes necessary. While the product is not yet in production, schema-heavy phases may replace branch migrations and reset local/staging data as needed. Add command-line SQL/JSONL snapshot tooling when schemas are stabilizing and production rollout is near.
 
+
+## Phase 4B FlowRoutes schema hardening decision
+
+The Phase 4A audit concluded that Engage Core should harden FlowRoutes schema before production because future route-instance adjustment and dynamic module/vertical capability discovery are guaranteed product requirements.
+
+Phase 4B should implement schema foundation, not polished Route Management UX.
+
+Durable target concepts:
+
+```text
+FlowRoute / FlowRoutePoint / Point
+    Reusable route template layer.
+
+ContactFlowRouteProgress
+    Live route instance for one contact and optional subject.
+
+ContactFlowRoutePlan
+    Instance-specific route plan seeded from the reusable route template.
+
+ContactFlowRoutePlanItem
+    Ordered plan item for that route instance. May originate from template, manual insertion, automation, vertical preset, or later operator adjustment.
+
+ContactFlowRouteProgressItem
+    Execution attempt/result for a plan item. Owns waiting/resume/correlation/result state.
+
+FlowRouteCapability / FlowRouteCapabilityBinding
+    Durable catalog and client/context availability records for actions, waits, conditions, events, labels, input schema, output context, and supported subject types.
+```
+
+Uniform route-created artifact provenance should be first-class on module-owned artifacts when FlowRoutes creates them:
+
+```text
+flow_route_progress_id
+flow_route_plan_id
+flow_route_plan_item_id
+flow_route_progress_item_id
+flow_route_id
+flow_route_point_id
+flow_route_capability_id
+```
+
+This shape applies first to Tasks, ScheduledMessages, and CampaignEnrollments. Future modules such as Scheduling, Documents, Forms, Portal, Commerce, Mortgage, PetServices, and Music should follow the same integration process rather than adding bespoke FlowRoutes correlation metadata.
+
+Phase 5 task-completed resume should depend on this foundation and resume specific route progress/plan/progress items from neutral `task.completed` automation events.
+
 ## Near-term sequencing rule
 
 Client-readiness implementation should chase one main item at a time unless two active threads are intentionally isolated by file ownership.
 
 The current sequence is the pre-prod schema-discovery sequence above.
 
-Continue with Task templates / task defaults, then the FlowRoutes relationship/capability/instance-plan audit, then FlowRoutes event-wait/task-completed resume implementation, and the remaining phases in order unless a concrete client need changes the risk ranking.
+Continue with FlowRoutes schema hardening before FlowRoutes event-wait/task-completed resume implementation. Phase 3 task templates and the Phase 4A audit are complete. Phase 4B is the current bridge between audit and runtime implementation.
 
 Do not run parallel threads that modify the same controllers, views, routes, services, migrations, or tests unless one thread is paused and rebased onto the other.
 
@@ -156,9 +201,10 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | -: | --- | ---: | --- |
 | 1 | Webinar schedule profiles | Complete | DB-owned `webinar_schedule_profiles` and `webinar_schedule_profile_items` are the durable schedule-selection path. Series and webinars may select profiles; existing scheduled messages remain stable. |
 | 2 | Campaign channel variants | Complete | DB-owned `campaign_step_variants` are the durable channel-coordination path. Steps own business moment and strategy; variants own channel/purpose/scope/dispatch references and do not own copy. |
-| 3 | Task templates / task defaults | 1–2 sessions | Audit whether `task_templates` supports generated/manual tasks well enough for FlowRoutes and vertical modules. Confirm FlowRoutes `create_task` points can reference `TaskTemplate` records. Build UI only if needed. |
-| 4 | FlowRoutes relationship, capability, and instance-plan audit | 1–3 sessions | Map FlowRoutes against every current/planned universal and vertical module. Decide producer seams, public actions, contributed point handlers, route presets, task templates, capability metadata/labels, client-facing Route terminology, subject morphs, instance plans, snapshots, and per-contact/subject adjustments. |
-| 5 | FlowRoutes event-wait / task-completed resume implementation | 0.5–1.5 sessions | Resume from neutral `task.completed` automation events after the Phase 4 runtime model is settled. Do not add Task-specific FlowRoutes listeners. Add wait-correlation schema only if existing progress/plan metadata is insufficient. |
+| 3 | Task templates / task defaults | Complete | DB-owned task templates support generated/manual task defaults. FlowRoutes can reference task template keys and must create live tasks through Tasks public actions. Task template UI remains deferred until needed. |
+| 4A | FlowRoutes relationship, capability, and instance-plan audit | Complete | Audit confirmed schema should support subject-scoped route instances, instance plans, plan items, progress/execution items, capability catalog/bindings, and uniform route-created artifact provenance before production. |
+| 4B | FlowRoutes schema hardening | Current | Add the FlowRoutes schema foundation before Phase 5 runtime resume work. Do not build the polished Route Management UX yet. |
+| 5 | FlowRoutes event-wait / task-completed resume implementation | 0.5–1.5 sessions | Resume from neutral `task.completed` automation events after Phase 4B schema hardening. Match against route progress/plan/progress item and created Task identity rather than broad contact-only waits. Do not add Task-specific FlowRoutes listeners. |
 | 6 | Config validation / setup validation | 0.5–1.5 sessions | Convert config-template expectations into practical validation behavior and operator/debug feedback. Validate task presets, FlowRoute presets, task-template refs, route point types, module capability refs, available field/token refs, vertical refs, campaign refs, Messaging template refs, unsupported point/module combinations, and route instance/snapshot assumptions. Prefer command/service-based validation first. |
 | 7 | Permission invitation accepted automation event decision | 0.25–0.5 session | Decide whether accepted invitations should emit a neutral automation event such as `permission_invitation.accepted`. |
 | 8 | Permission invitation cancellation behavior | 0.5–1 session | Clarify how cancellation/skip/failure should appear for permission-invitation Broadcast bookkeeping and Messaging scheduled messages. |
@@ -320,27 +366,18 @@ Completed baseline:
 
 ## Recommended next implementation target
 
-The next implementation target is Phase 3: Task templates / task defaults.
-
-Task templates are not optional if FlowRoutes `create_task` points need reusable tasks.
+The next implementation target is Phase 4B: FlowRoutes schema hardening.
 
 Goals:
 
-- Audit the existing `task_templates` table and model shape.
-- Confirm task templates can support generated/manual tasks.
-- Confirm FlowRoutes `create_task` points can reference `TaskTemplate` records.
-- Confirm task templates can define title/body/default due offsets/assigned_to/responsible_party/related-subject rules.
-- Confirm task templates are generic enough for PetServices, Mortgage, Music, Webinars, Documents, Scheduling, and other modules.
-- Confirm task template preset sync creates DB-owned default task templates only and does not create live tasks.
-- Confirm customized templates are preserved.
-- Decide whether direct template reference is enough or whether template assignment/selection is needed.
-- Build UI only if needed for client/operator management.
+- Add subject scoping to route progress.
+- Add route instance plan, plan item, and progress/execution item tables.
+- Add FlowRoute capability catalog and capability binding tables.
+- Add uniform structured route-created artifact provenance to Tasks, ScheduledMessages, and CampaignEnrollments.
+- Preserve module boundaries: producer modules emit neutral automation events; FlowRoutes calls other modules through public actions/services/contracts.
+- Prepare Phase 5 event-wait/task-completed resume to target specific route plan/progress items rather than broad contact-only waits.
 
-The following implementation target is Phase 4: FlowRoutes relationship, capability, and instance-plan audit.
-
-Do not jump directly to event-wait/task-completed resume implementation until the Phase 4 audit settles whether resume behavior needs route instance plan items/snapshots rather than raw route points only.
-
-Automatic Follow-ups / FlowRoutes UX polish remains later in the schema-discovery sequence. Its language should use client-facing Route/Route Management terminology, but the full polish pass should wait until capability labels and instance behavior are settled. Do not start it until the higher-risk schedule, variant, task-template, FlowRoutes capability/instance-plan, route-resume, config-validation, and permission-invitation pieces are settled or deliberately deferred.
+Do not build the polished Route Management builder/editor yet. The UX polish pass should happen after the schema and runtime foundation are stable.
 
 ## What this roadmap intentionally avoids
 

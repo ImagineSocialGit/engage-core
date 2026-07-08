@@ -21,40 +21,26 @@ class SendMessagePointHandler implements PointHandler
         private readonly MessageChannelAvailability $messageChannelAvailability,
     ) {}
 
-    public function type(): string
-    {
-        return Point::TYPE_SEND_MESSAGE;
-    }
+    public function type(): string { return Point::TYPE_SEND_MESSAGE; }
 
     public function handle(PointExecutionContext $context): PointExecutionResult
     {
-        $definition = SendMessagePointDefinition::from(
-            definition: $context->definition,
-            settings: $context->settings,
-        );
+        $definition = SendMessagePointDefinition::from($context->definition, $context->settings);
 
         if (! $definition->isValid()) {
-            return PointExecutionResult::failed(
-                reason: $definition->invalidReason ?? 'invalid_send_message_point_definition',
-                meta: [
-                    'send_message_definition' => $definition->toMetaPayload(),
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                    'point_id' => $context->flowRoutePoint->point_id,
-                ],
-            );
+            return PointExecutionResult::failed($definition->invalidReason ?? 'invalid_send_message_point_definition', [
+                'send_message_definition' => $definition->toMetaPayload(),
+                'flow_routes' => $context->flowRouteProvenance(),
+            ]);
         }
 
         $contact = Contact::query()->find($context->progress->contact_id);
 
         if (! $contact) {
-            return PointExecutionResult::failed(
-                reason: 'send_message_contact_not_found',
-                meta: [
-                    'contact_id' => $context->progress->contact_id,
-                    'flow_route_progress_id' => $context->progress->getKey(),
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                ],
-            );
+            return PointExecutionResult::failed('send_message_contact_not_found', [
+                'contact_id' => $context->progress->contact_id,
+                'flow_routes' => $context->flowRouteProvenance(),
+            ]);
         }
 
         if (! $this->messageChannelAvailability->isVisibleForSurface(
@@ -63,14 +49,10 @@ class SendMessagePointHandler implements PointHandler
             purpose: $definition->purpose,
             scope: $definition->scope,
         )) {
-            return PointExecutionResult::skipped(
-                reason: 'send_message_channel_unavailable',
-                meta: [
-                    'send_message_definition' => $definition->toMetaPayload(),
-                    'flow_route_progress_id' => $context->progress->getKey(),
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                ],
-            );
+            return PointExecutionResult::skipped('send_message_channel_unavailable', [
+                'send_message_definition' => $definition->toMetaPayload(),
+                'flow_routes' => $context->flowRouteProvenance(),
+            ]);
         }
 
         try {
@@ -88,110 +70,74 @@ class SendMessagePointHandler implements PointHandler
                 criteria: $definition->criteria,
             );
         } catch (Throwable $exception) {
-            return PointExecutionResult::failed(
-                reason: 'send_message_dispatch_failed',
-                meta: [
-                    'error' => $exception->getMessage(),
-                    'send_message_definition' => $definition->toMetaPayload(),
-                    'flow_route_progress_id' => $context->progress->getKey(),
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                ],
-            );
+            return PointExecutionResult::failed('send_message_dispatch_failed', [
+                'error' => $exception->getMessage(),
+                'send_message_definition' => $definition->toMetaPayload(),
+                'flow_routes' => $context->flowRouteProvenance(),
+            ]);
         }
 
         if ($scheduledMessages === []) {
             return $this->noMessagesResult($definition, $context);
         }
 
-        return PointExecutionResult::completed(
-            reason: 'message_scheduled',
-            meta: [
-                'scheduled_messages' => array_map(
-                    fn (ScheduledMessage $scheduledMessage): array => [
-                        'id' => $scheduledMessage->getKey(),
-                        'recipient_type' => $scheduledMessage->recipient_type,
-                        'recipient_id' => $scheduledMessage->recipient_id,
-                        'channel' => $scheduledMessage->channel,
-                        'purpose' => $scheduledMessage->purpose,
-                        'scope' => $scheduledMessage->scope,
-                        'message_type' => $scheduledMessage->message_type,
-                        'send_at' => $scheduledMessage->send_at?->toISOString(),
-                        'status' => $scheduledMessage->status,
-                    ],
-                    $scheduledMessages,
-                ),
-                'send_message_definition' => $definition->toMetaPayload(),
-            ],
-        );
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function payload(
-        SendMessagePointDefinition $definition,
-        PointExecutionContext $context,
-    ): array {
-        return array_replace_recursive(
-            $this->renderArray($definition->payload, $context),
-            [
-                'runtime_context' => [
-                    'flow_route_progress_id' => $context->progress->getKey(),
-                    'flow_route_id' => $context->progress->flow_route_id,
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                    'point_id' => $context->flowRoutePoint->point_id,
-                    'contact_id' => $context->progress->contact_id,
-                    'contact_status_id' => $context->progress->contact_status_id,
-                    'workflow_profile_id' => $context->progress->contact_workflow_profile_id,
-                ],
-            ],
-        );
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function meta(
-        SendMessagePointDefinition $definition,
-        PointExecutionContext $context,
-    ): array {
-        return array_replace_recursive(
-            [
-                'source' => 'flow_routes',
-                'flow_route' => [
-                    'flow_route_progress_id' => $context->progress->getKey(),
-                    'flow_route_id' => $context->progress->flow_route_id,
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                    'point_id' => $context->flowRoutePoint->point_id,
-                ],
-            ],
-            $definition->meta,
-        );
-    }
-
-    private function anchor(
-        SendMessagePointDefinition $definition,
-        PointExecutionContext $context,
-    ): Carbon|string|null {
-        if ($definition->anchor === null) {
-            return null;
+        if ($context->progressItem) {
+            $context->progressItem->forceFill([
+                'created_subject_type' => ScheduledMessage::class,
+                'created_subject_id' => $scheduledMessages[0]->getKey(),
+                'correlation_key' => 'scheduled_message.id',
+                'correlation_type' => 'scheduled_message',
+                'correlation' => ['scheduled_message_ids' => array_map(fn (ScheduledMessage $message) => $message->getKey(), $scheduledMessages)],
+            ])->save();
         }
 
-        if (! is_string($definition->anchor)) {
-            return $definition->anchor;
-        }
-
-        return $this->renderText($definition->anchor, $context);
+        return PointExecutionResult::completed('message_scheduled', [
+            'scheduled_messages' => array_map(fn (ScheduledMessage $scheduledMessage): array => [
+                'id' => $scheduledMessage->getKey(),
+                'recipient_type' => $scheduledMessage->recipient_type,
+                'recipient_id' => $scheduledMessage->recipient_id,
+                'channel' => $scheduledMessage->channel,
+                'purpose' => $scheduledMessage->purpose,
+                'scope' => $scheduledMessage->scope,
+                'message_type' => $scheduledMessage->message_type,
+                'send_at' => $scheduledMessage->send_at?->toISOString(),
+                'status' => $scheduledMessage->status,
+            ], $scheduledMessages),
+            'send_message_definition' => $definition->toMetaPayload(),
+            'flow_routes' => $context->flowRouteProvenance(),
+        ]);
     }
 
-    /**
-     * @param array<string, mixed> $values
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
+    private function payload(SendMessagePointDefinition $definition, PointExecutionContext $context): array
+    {
+        return array_replace_recursive($this->renderArray($definition->payload, $context), [
+            'runtime_context' => $context->flowRouteProvenance() + [
+                'contact_id' => $context->progress->contact_id,
+                'contact_status_id' => $context->progress->contact_status_id,
+                'workflow_profile_id' => $context->progress->contact_workflow_profile_id,
+            ],
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function meta(SendMessagePointDefinition $definition, PointExecutionContext $context): array
+    {
+        return array_replace_recursive([
+            'source' => 'flow_routes',
+            'flow_route' => $context->flowRouteProvenance(),
+        ], $this->renderArray($definition->meta, $context));
+    }
+
+    private function anchor(SendMessagePointDefinition $definition, PointExecutionContext $context): Carbon|string|null
+    {
+        if ($definition->anchor === null) return null;
+        return is_string($definition->anchor) ? $this->renderText($definition->anchor, $context) : $definition->anchor;
+    }
+
     private function renderArray(array $values, PointExecutionContext $context): array
     {
         $rendered = [];
-
         foreach ($values as $key => $value) {
             $rendered[$key] = match (true) {
                 is_string($value) => $this->renderText($value, $context),
@@ -199,7 +145,6 @@ class SendMessagePointHandler implements PointHandler
                 default => $value,
             };
         }
-
         return $rendered;
     }
 
@@ -209,42 +154,30 @@ class SendMessagePointHandler implements PointHandler
             '{contact.id}' => (string) $context->progress->contact_id,
             '{contact_status.id}' => (string) $context->progress->contact_status_id,
             '{workflow_profile.id}' => (string) $context->progress->contact_workflow_profile_id,
+            '{flow_route_progress.id}' => (string) $context->progress->getKey(),
+            '{flow_route_plan.id}' => (string) $context->plan?->getKey(),
+            '{flow_route_plan_item.id}' => (string) $context->planItem?->getKey(),
+            '{flow_route_progress_item.id}' => (string) $context->progressItem?->getKey(),
             '{flow_route.id}' => (string) $context->progress->flow_route_id,
             '{flow_route_point.id}' => (string) $context->flowRoutePoint->getKey(),
             '{point.id}' => (string) $context->flowRoutePoint->point_id,
+            '{subject.type}' => (string) $context->progress->subject_type,
+            '{subject.id}' => (string) $context->progress->subject_id,
         ]);
     }
 
-    private function noMessagesResult(
-        SendMessagePointDefinition $definition,
-        PointExecutionContext $context,
-    ): PointExecutionResult {
+    private function noMessagesResult(SendMessagePointDefinition $definition, PointExecutionContext $context): PointExecutionResult
+    {
         $meta = [
             'send_message_definition' => $definition->toMetaPayload(),
-            'flow_route_progress_id' => $context->progress->getKey(),
-            'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+            'flow_routes' => $context->flowRouteProvenance(),
         ];
 
         return match ($definition->onNoMessages) {
-            'completed' => PointExecutionResult::completed(
-                reason: 'send_message_no_messages_scheduled',
-                meta: $meta,
-            ),
-
-            'blocked' => PointExecutionResult::blocked(
-                reason: 'send_message_no_messages_scheduled',
-                meta: $meta,
-            ),
-
-            'failed' => PointExecutionResult::failed(
-                reason: 'send_message_no_messages_scheduled',
-                meta: $meta,
-            ),
-
-            default => PointExecutionResult::skipped(
-                reason: 'send_message_no_messages_scheduled',
-                meta: $meta,
-            ),
+            'completed' => PointExecutionResult::completed('send_message_no_messages_scheduled', $meta),
+            'blocked' => PointExecutionResult::blocked('send_message_no_messages_scheduled', $meta),
+            'failed' => PointExecutionResult::failed('send_message_no_messages_scheduled', $meta),
+            default => PointExecutionResult::skipped('send_message_no_messages_scheduled', $meta),
         };
     }
 }

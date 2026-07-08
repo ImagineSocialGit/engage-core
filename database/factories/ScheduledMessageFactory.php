@@ -23,6 +23,14 @@ class ScheduledMessageFactory extends Factory
             'context_type' => null,
             'context_id' => null,
 
+            'flow_route_progress_id' => null,
+            'flow_route_plan_id' => null,
+            'flow_route_plan_item_id' => null,
+            'flow_route_progress_item_id' => null,
+            'flow_route_id' => null,
+            'flow_route_point_id' => null,
+            'flow_route_capability_id' => null,
+
             'channel' => 'email',
             'message_type' => 'message',
 

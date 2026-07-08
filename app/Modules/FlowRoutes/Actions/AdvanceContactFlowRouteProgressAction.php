@@ -3,6 +3,7 @@
 namespace App\Modules\FlowRoutes\Actions;
 
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
+use App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use Illuminate\Support\Carbon;
@@ -15,6 +16,7 @@ class AdvanceContactFlowRouteProgressAction
 
     public function handle(
         ContactFlowRouteProgress $progress,
+        ContactFlowRoutePlanItem $fromPlanItem,
         FlowRoutePoint $fromFlowRoutePoint,
         ?PointExecutionResult $result = null,
     ): ContactFlowRouteProgress {
@@ -22,24 +24,31 @@ class AdvanceContactFlowRouteProgressAction
             return $progress;
         }
 
-        $nextFlowRoutePoint = $this->requestedNextFlowRoutePoint($fromFlowRoutePoint, $result)
-            ?? $this->configuredNextFlowRoutePoint($fromFlowRoutePoint);
+        $nextPlanItem = $this->requestedNextPlanItem($fromPlanItem, $result)
+            ?? $this->configuredNextPlanItem($fromPlanItem, $fromFlowRoutePoint)
+            ?? $this->nextSequentialPlanItem($fromPlanItem);
 
-        if (! $nextFlowRoutePoint) {
+        if (! $nextPlanItem instanceof ContactFlowRoutePlanItem) {
             return $this->completeContactFlowRouteProgress->handle($progress, $result);
         }
 
+        $nextFlowRoutePoint = $nextPlanItem->flowRoutePoint;
         $advancedAt = Carbon::now();
+
+        $nextPlanItem->forceFill([
+            'status' => ContactFlowRoutePlanItem::STATUS_ACTIVE,
+            'available_at' => $nextPlanItem->available_at ?? $advancedAt,
+        ])->save();
 
         $progress->forceFill([
             'status' => ContactFlowRouteProgress::STATUS_ACTIVE,
-            'current_flow_route_point_id' => $nextFlowRoutePoint->getKey(),
+            'current_flow_route_point_id' => $nextFlowRoutePoint?->getKey(),
             'resume_at' => null,
             'waiting_event_key' => null,
             'meta' => $this->mergedMeta(
                 progress: $progress,
-                fromFlowRoutePoint: $fromFlowRoutePoint,
-                nextFlowRoutePoint: $nextFlowRoutePoint,
+                fromPlanItem: $fromPlanItem,
+                nextPlanItem: $nextPlanItem,
                 result: $result,
                 advancedAt: $advancedAt,
             ),
@@ -48,53 +57,74 @@ class AdvanceContactFlowRouteProgressAction
         return $progress->refresh();
     }
 
-    private function requestedNextFlowRoutePoint(
-        FlowRoutePoint $fromFlowRoutePoint,
+    private function requestedNextPlanItem(
+        ContactFlowRoutePlanItem $fromPlanItem,
         ?PointExecutionResult $result,
-    ): ?FlowRoutePoint {
+    ): ?ContactFlowRoutePlanItem {
         if (! $result) {
             return null;
         }
 
         $targetFlowRoutePointId = $this->nullableInteger($result->meta['advance_to_flow_route_point_id'] ?? null);
         $targetFlowRoutePointKey = $this->nullableString($result->meta['advance_to_flow_route_point_key'] ?? null);
+        $targetPlanItemId = $this->nullableInteger($result->meta['advance_to_flow_route_plan_item_id'] ?? null);
+        $targetPlanItemKey = $this->nullableString($result->meta['advance_to_flow_route_plan_item_key'] ?? null);
 
-        if (! $targetFlowRoutePointId && $targetFlowRoutePointKey === null) {
+        if (! $targetFlowRoutePointId && $targetFlowRoutePointKey === null && ! $targetPlanItemId && $targetPlanItemKey === null) {
             return null;
         }
 
-        $query = FlowRoutePoint::query()
-            ->with('point')
-            ->where('flow_route_id', $fromFlowRoutePoint->flow_route_id)
-            ->active()
-            ->whereKeyNot($fromFlowRoutePoint->getKey())
-            ->whereHas('point', fn ($pointQuery) => $pointQuery->active());
+        $query = ContactFlowRoutePlanItem::query()
+            ->with('flowRoutePoint.point')
+            ->where('contact_flow_route_plan_id', $fromPlanItem->contact_flow_route_plan_id)
+            ->whereKeyNot($fromPlanItem->getKey())
+            ->runnable();
 
-        if ($targetFlowRoutePointId) {
-            return $query
-                ->whereKey($targetFlowRoutePointId)
-                ->first();
+        if ($targetPlanItemId) {
+            return $query->whereKey($targetPlanItemId)->first();
         }
 
-        return $query
-            ->forKey($targetFlowRoutePointKey)
-            ->first();
+        if ($targetPlanItemKey !== null) {
+            return $query->where('key', $targetPlanItemKey)->first();
+        }
+
+        if ($targetFlowRoutePointId) {
+            return $query->where('flow_route_point_id', $targetFlowRoutePointId)->first();
+        }
+
+        return $query->whereHas(
+            'flowRoutePoint',
+            fn ($flowRoutePointQuery) => $flowRoutePointQuery->forKey($targetFlowRoutePointKey),
+        )->first();
     }
 
-    private function configuredNextFlowRoutePoint(FlowRoutePoint $fromFlowRoutePoint): ?FlowRoutePoint
-    {
+    private function configuredNextPlanItem(
+        ContactFlowRoutePlanItem $fromPlanItem,
+        FlowRoutePoint $fromFlowRoutePoint,
+    ): ?ContactFlowRoutePlanItem {
         $nextFlowRoutePointId = $this->nullableInteger($fromFlowRoutePoint->next_flow_route_point_id);
 
         if (! $nextFlowRoutePointId) {
             return null;
         }
 
-        return FlowRoutePoint::query()
-            ->with('point')
-            ->where('flow_route_id', $fromFlowRoutePoint->flow_route_id)
-            ->whereKey($nextFlowRoutePointId)
-            ->active()
-            ->whereHas('point', fn ($query) => $query->active())
+        return ContactFlowRoutePlanItem::query()
+            ->with('flowRoutePoint.point')
+            ->where('contact_flow_route_plan_id', $fromPlanItem->contact_flow_route_plan_id)
+            ->where('flow_route_point_id', $nextFlowRoutePointId)
+            ->runnable()
+            ->oldest('sequence')
+            ->first();
+    }
+
+    private function nextSequentialPlanItem(ContactFlowRoutePlanItem $fromPlanItem): ?ContactFlowRoutePlanItem
+    {
+        return ContactFlowRoutePlanItem::query()
+            ->with('flowRoutePoint.point')
+            ->where('contact_flow_route_plan_id', $fromPlanItem->contact_flow_route_plan_id)
+            ->where('sequence', '>', (int) $fromPlanItem->sequence)
+            ->runnable()
+            ->oldest('sequence')
             ->first();
     }
 
@@ -103,21 +133,22 @@ class AdvanceContactFlowRouteProgressAction
      */
     private function mergedMeta(
         ContactFlowRouteProgress $progress,
-        FlowRoutePoint $fromFlowRoutePoint,
-        FlowRoutePoint $nextFlowRoutePoint,
+        ContactFlowRoutePlanItem $fromPlanItem,
+        ContactFlowRoutePlanItem $nextPlanItem,
         ?PointExecutionResult $result,
         Carbon $advancedAt,
     ): array {
         $meta = $progress->meta ?? [];
-
         unset($meta['waiting']);
 
         $meta['last_advanced'] = [
             'advanced_at' => $advancedAt->toISOString(),
-            'from_flow_route_point_id' => $fromFlowRoutePoint->getKey(),
-            'from_flow_route_point_key' => $fromFlowRoutePoint->key,
-            'to_flow_route_point_id' => $nextFlowRoutePoint->getKey(),
-            'to_flow_route_point_key' => $nextFlowRoutePoint->key,
+            'from_flow_route_plan_item_id' => $fromPlanItem->getKey(),
+            'from_flow_route_point_id' => $fromPlanItem->flow_route_point_id,
+            'from_flow_route_point_key' => $fromPlanItem->key,
+            'to_flow_route_plan_item_id' => $nextPlanItem->getKey(),
+            'to_flow_route_point_id' => $nextPlanItem->flow_route_point_id,
+            'to_flow_route_point_key' => $nextPlanItem->key,
             'result' => $result?->toMetaPayload(),
         ];
 
@@ -128,7 +159,6 @@ class AdvanceContactFlowRouteProgressAction
         }
 
         $history[] = $meta['last_advanced'];
-
         $meta['advancement_history'] = array_slice($history, -50);
 
         return $meta;

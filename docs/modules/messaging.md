@@ -429,6 +429,27 @@ Messaging may schedule messages for non-Contact recipients through recipient pay
 
 
 
+
+## FlowRoutes-created scheduled message provenance
+
+Messaging owns scheduled message delivery, recipient/context morphs, consent, suppression, gates, payloads, scheduling, and send lifecycle.
+
+When FlowRoutes creates or dispatches a message through Messaging public actions/services, the resulting `scheduled_messages` record should keep Messaging's canonical recipient/context shape and also store structured FlowRoutes provenance where applicable:
+
+```text
+flow_route_progress_id
+flow_route_plan_id
+flow_route_plan_item_id
+flow_route_progress_item_id
+flow_route_id
+flow_route_point_id
+flow_route_capability_id
+```
+
+Do not add `subject_type` / `subject_id` to `scheduled_messages`; `context_type` / `context_id` remains the canonical scheduled-message about-this-record relationship. FlowRoutes subject context belongs on the route progress/plan/progress item and may be available through provenance relationships.
+
+This makes route-created messages queryable and resumable without making Messaging import FlowRoutes execution internals.
+
 ### Automatic Follow-ups message usage
 
 FlowRoutes may use Messaging through public Messaging actions/services for send-message points.

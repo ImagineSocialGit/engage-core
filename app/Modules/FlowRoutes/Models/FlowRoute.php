@@ -92,6 +92,21 @@ class FlowRoute extends Model
         return $this->contactFlowRouteProgress()->active();
     }
 
+    public function contactFlowRoutePlans(): HasMany
+    {
+        return $this->hasMany(ContactFlowRoutePlan::class);
+    }
+
+    public function contactFlowRoutePlanItems(): HasMany
+    {
+        return $this->hasMany(ContactFlowRoutePlanItem::class);
+    }
+
+    public function contactFlowRouteProgressItems(): HasMany
+    {
+        return $this->hasMany(ContactFlowRouteProgressItem::class);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);

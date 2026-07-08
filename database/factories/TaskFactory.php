@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
-use App\Modules\Tasks\Models\Task;
 use App\Modules\InternalNotifications\Models\TeamMember;
+use App\Modules\Tasks\Models\Task;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -21,6 +21,18 @@ class TaskFactory extends Factory
             'related_id' => null,
             'assigned_to_type' => TeamMember::class,
             'assigned_to_id' => TeamMember::factory(),
+            'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+            'responsible_type' => null,
+            'responsible_id' => null,
+            'flow_route_progress_id' => null,
+            'flow_route_plan_id' => null,
+            'flow_route_plan_item_id' => null,
+            'flow_route_progress_item_id' => null,
+            'flow_route_id' => null,
+            'flow_route_point_id' => null,
+            'flow_route_capability_id' => null,
+            'task_template_id' => null,
+            'task_template_key' => null,
             'source' => Task::SOURCE_MANUAL,
             'title' => fake()->sentence(4),
             'description' => fake()->optional()->paragraph(),

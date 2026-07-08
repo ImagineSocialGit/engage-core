@@ -37,8 +37,7 @@ class EnrollCampaignPointHandler implements PointHandler
                 reason: $definition->invalidReason ?? 'invalid_enroll_campaign_point_definition',
                 meta: [
                     'enroll_campaign_definition' => $definition->toMetaPayload(),
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                    'point_id' => $context->flowRoutePoint->point_id,
+                    ...$this->resultRouteMeta($context),
                 ],
             );
         }
@@ -50,8 +49,7 @@ class EnrollCampaignPointHandler implements PointHandler
                 reason: 'enroll_campaign_contact_not_found',
                 meta: [
                     'contact_id' => $context->progress->contact_id,
-                    'flow_route_progress_id' => $context->progress->getKey(),
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    ...$this->resultRouteMeta($context),
                 ],
             );
         }
@@ -64,8 +62,7 @@ class EnrollCampaignPointHandler implements PointHandler
                 meta: [
                     'campaign_key' => $definition->campaignKey,
                     'enroll_campaign_definition' => $definition->toMetaPayload(),
-                    'flow_route_progress_id' => $context->progress->getKey(),
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    ...$this->resultRouteMeta($context),
                 ],
             );
         }
@@ -96,8 +93,7 @@ class EnrollCampaignPointHandler implements PointHandler
                 meta: [
                     'error' => $exception->getMessage(),
                     'enroll_campaign_definition' => $definition->toMetaPayload(),
-                    'flow_route_progress_id' => $context->progress->getKey(),
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    ...$this->resultRouteMeta($context),
                 ],
             );
         } catch (Throwable $exception) {
@@ -106,8 +102,7 @@ class EnrollCampaignPointHandler implements PointHandler
                 meta: [
                     'error' => $exception->getMessage(),
                     'enroll_campaign_definition' => $definition->toMetaPayload(),
-                    'flow_route_progress_id' => $context->progress->getKey(),
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+                    ...$this->resultRouteMeta($context),
                 ],
             );
         }
@@ -117,6 +112,7 @@ class EnrollCampaignPointHandler implements PointHandler
             meta: [
                 'campaign_enrollment' => $this->enrollmentMeta($enrollment),
                 'enroll_campaign_definition' => $definition->toMetaPayload(),
+                ...$this->resultRouteMeta($context),
             ],
         );
     }
@@ -151,8 +147,7 @@ class EnrollCampaignPointHandler implements PointHandler
         $meta = [
             'campaign_enrollment' => $this->enrollmentMeta($enrollment),
             'enroll_campaign_definition' => $definition->toMetaPayload(),
-            'flow_route_progress_id' => $context->progress->getKey(),
-            'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+            ...$this->resultRouteMeta($context),
         ];
 
         return match ($definition->onAlreadyEnrolled) {
@@ -188,15 +183,7 @@ class EnrollCampaignPointHandler implements PointHandler
         return array_replace_recursive(
             $this->renderArray($definition->payload, $context),
             [
-                'runtime_context' => [
-                    'flow_route_progress_id' => $context->progress->getKey(),
-                    'flow_route_id' => $context->progress->flow_route_id,
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                    'point_id' => $context->flowRoutePoint->point_id,
-                    'contact_id' => $context->progress->contact_id,
-                    'contact_status_id' => $context->progress->contact_status_id,
-                    'workflow_profile_id' => $context->progress->contact_workflow_profile_id,
-                ],
+                'runtime_context' => $this->runtimeContext($context),
             ],
         );
     }
@@ -211,12 +198,7 @@ class EnrollCampaignPointHandler implements PointHandler
         return array_replace_recursive(
             [
                 'source' => 'flow_routes',
-                'flow_route' => [
-                    'flow_route_progress_id' => $context->progress->getKey(),
-                    'flow_route_id' => $context->progress->flow_route_id,
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                    'point_id' => $context->flowRoutePoint->point_id,
-                ],
+                'flow_route' => $this->flowRouteProvenance($context),
             ],
             $this->renderArray($definition->meta, $context),
         );
@@ -234,12 +216,7 @@ class EnrollCampaignPointHandler implements PointHandler
         }
 
         return array_replace_recursive(
-            [
-                'flow_route_progress_id' => $context->progress->getKey(),
-                'flow_route_id' => $context->progress->flow_route_id,
-                'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                'point_id' => $context->flowRoutePoint->point_id,
-            ],
+            $this->runtimeContext($context),
             $this->renderArray($definition->startContext, $context),
         );
     }
@@ -256,6 +233,54 @@ class EnrollCampaignPointHandler implements PointHandler
         }
 
         return $this->renderArray($definition->exitConditions, $context);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function resultRouteMeta(PointExecutionContext $context): array
+    {
+        return [
+            'flow_route_progress_id' => $context->progress->getKey(),
+            'flow_route_plan_id' => $context->plan?->getKey(),
+            'flow_route_plan_item_id' => $context->planItem?->getKey(),
+            'flow_route_progress_item_id' => $context->progressItem?->getKey(),
+            'flow_route_id' => $context->progress->flow_route_id,
+            'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+            'flow_route_capability_id' => $context->flowRoutePoint->flow_route_capability_id,
+            'point_id' => $context->flowRoutePoint->point_id,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function flowRouteProvenance(PointExecutionContext $context): array
+    {
+        return [
+            'flow_route_progress_id' => $context->progress->getKey(),
+            'flow_route_plan_id' => $context->plan?->getKey(),
+            'flow_route_plan_item_id' => $context->planItem?->getKey(),
+            'flow_route_progress_item_id' => $context->progressItem?->getKey(),
+            'flow_route_id' => $context->progress->flow_route_id,
+            'flow_route_point_id' => $context->flowRoutePoint->getKey(),
+            'flow_route_capability_id' => $context->flowRoutePoint->flow_route_capability_id,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function runtimeContext(PointExecutionContext $context): array
+    {
+        return array_replace($this->flowRouteProvenance($context), [
+            'point_id' => $context->flowRoutePoint->point_id,
+            'contact_id' => $context->progress->contact_id,
+            'contact_status_id' => $context->progress->contact_status_id,
+            'workflow_profile_id' => $context->progress->contact_workflow_profile_id,
+            'subject_type' => $context->progress->subject_type,
+            'subject_id' => $context->progress->subject_id,
+        ]);
     }
 
     /**
@@ -279,14 +304,28 @@ class EnrollCampaignPointHandler implements PointHandler
 
     private function renderText(string $value, PointExecutionContext $context): string
     {
-        return strtr($value, [
+        return strtr($value, $this->renderTokens($context));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function renderTokens(PointExecutionContext $context): array
+    {
+        return [
             '{contact.id}' => (string) $context->progress->contact_id,
             '{contact_status.id}' => (string) $context->progress->contact_status_id,
             '{workflow_profile.id}' => (string) $context->progress->contact_workflow_profile_id,
             '{flow_route.id}' => (string) $context->progress->flow_route_id,
+            '{flow_route_progress.id}' => (string) $context->progress->getKey(),
+            '{flow_route_plan.id}' => (string) $context->plan?->getKey(),
+            '{flow_route_plan_item.id}' => (string) $context->planItem?->getKey(),
+            '{flow_route_progress_item.id}' => (string) $context->progressItem?->getKey(),
             '{flow_route_point.id}' => (string) $context->flowRoutePoint->getKey(),
             '{point.id}' => (string) $context->flowRoutePoint->point_id,
-        ]);
+            '{subject.type}' => (string) $context->progress->subject_type,
+            '{subject.id}' => (string) $context->progress->subject_id,
+        ];
     }
 
     /**
@@ -297,13 +336,22 @@ class EnrollCampaignPointHandler implements PointHandler
         return [
             'id' => $enrollment->getKey(),
             'contact_id' => $enrollment->contact_id,
+            'campaign_id' => $enrollment->campaign_id,
             'campaign_key' => $enrollment->campaign_key,
             'channel' => $enrollment->channel,
             'purpose' => $enrollment->purpose,
             'scope' => $enrollment->scope,
             'status' => $enrollment->status,
             'current_step' => $enrollment->current_step,
+            'current_campaign_step_id' => $enrollment->current_campaign_step_id,
             'last_scheduled_message_id' => $enrollment->last_scheduled_message_id,
+            'flow_route_progress_id' => $enrollment->flow_route_progress_id,
+            'flow_route_plan_id' => $enrollment->flow_route_plan_id,
+            'flow_route_plan_item_id' => $enrollment->flow_route_plan_item_id,
+            'flow_route_progress_item_id' => $enrollment->flow_route_progress_item_id,
+            'flow_route_id' => $enrollment->flow_route_id,
+            'flow_route_point_id' => $enrollment->flow_route_point_id,
+            'flow_route_capability_id' => $enrollment->flow_route_capability_id,
             'started_at' => $enrollment->started_at?->toISOString(),
             'exited_at' => $enrollment->exited_at?->toISOString(),
             'exit_reason' => $enrollment->exit_reason,

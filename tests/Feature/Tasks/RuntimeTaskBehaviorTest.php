@@ -5,6 +5,7 @@ namespace Tests\Feature\Tasks;
 use App\Modules\Core\Models\Contact;
 use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\Tasks\Actions\BuildTaskDigestsAction;
+use App\Modules\Tasks\Actions\CompleteTaskAction;
 use App\Modules\Tasks\Actions\CreateTaskAction;
 use App\Modules\Tasks\Actions\CreateTaskFromTemplateAction;
 use App\Modules\Tasks\Actions\SyncTaskPresetsAction;
@@ -16,6 +17,7 @@ use App\Modules\Tasks\Services\ContactShow\ContactTasksShowDataProvider;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
@@ -220,6 +222,70 @@ class RuntimeTaskBehaviorTest extends TestCase
         $this->assertNull($template->customized_at);
         $this->assertSame(1, $result->updated);
         $this->assertSame(0, $result->customizedSkipped);
+    }
+
+
+    public function test_complete_task_action_completes_task_touches_related_contact_and_dispatches_event_once(): void
+    {
+        Event::fake([
+            TaskCompleted::class,
+        ]);
+
+        Carbon::setTestNow('2026-07-08 10:00:00');
+
+        $contact = Contact::factory()->create([
+            'last_activity_at' => Carbon::parse('2026-07-01 09:00:00'),
+        ]);
+
+        $task = Task::factory()->relatedTo($contact)->create([
+            'status' => Task::STATUS_CANCELED,
+            'completed_at' => null,
+            'canceled_at' => Carbon::parse('2026-07-07 09:00:00'),
+            'canceled_reason' => 'Not needed yet.',
+        ]);
+
+        $completedTask = app(CompleteTaskAction::class)->handle($task);
+
+        $this->assertSame(Task::STATUS_COMPLETED, $completedTask->status);
+        $this->assertTrue($completedTask->completed_at->equalTo(Carbon::now()));
+        $this->assertNull($completedTask->canceled_at);
+        $this->assertNull($completedTask->canceled_reason);
+
+        $this->assertTrue($contact->refresh()->last_activity_at->equalTo(Carbon::now()));
+
+        Event::assertDispatched(
+            TaskCompleted::class,
+            fn (TaskCompleted $event): bool => $event->task->is($completedTask),
+        );
+
+        Carbon::setTestNow('2026-07-08 11:00:00');
+
+        app(CompleteTaskAction::class)->handle($completedTask->refresh());
+
+        Event::assertDispatchedTimes(TaskCompleted::class, 1);
+    }
+
+    public function test_complete_task_action_does_not_touch_non_contact_related_subjects(): void
+    {
+        Event::fake([
+            TaskCompleted::class,
+        ]);
+
+        Carbon::setTestNow('2026-07-08 10:00:00');
+
+        $task = Task::factory()->create([
+            'related_type' => 'not_a_contact',
+            'related_id' => 999,
+            'status' => Task::STATUS_OPEN,
+            'completed_at' => null,
+        ]);
+
+        $completedTask = app(CompleteTaskAction::class)->handle($task);
+
+        $this->assertSame(Task::STATUS_COMPLETED, $completedTask->status);
+        $this->assertTrue($completedTask->completed_at->equalTo(Carbon::now()));
+
+        Event::assertDispatched(TaskCompleted::class);
     }
 
     public function test_task_completed_automation_payload_includes_responsibility_fields(): void

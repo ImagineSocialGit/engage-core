@@ -11,10 +11,7 @@ use Carbon\CarbonImmutable;
 
 class WaitPointHandler implements PointHandler
 {
-    public function type(): string
-    {
-        return Point::TYPE_WAIT;
-    }
+    public function type(): string { return Point::TYPE_WAIT; }
 
     public function handle(PointExecutionContext $context): PointExecutionResult
     {
@@ -23,77 +20,48 @@ class WaitPointHandler implements PointHandler
         $waitingFlowRoutePointId = $context->progress->waitingFlowRoutePointId();
         $resumeAt = $context->progress->waitingResumeAt();
 
-        if (
-            $waitingFlowRoutePointId === (int) $context->flowRoutePoint->getKey()
-            && $resumeAt instanceof CarbonImmutable
-        ) {
+        if ($waitingFlowRoutePointId === (int) $context->flowRoutePoint->getKey() && $resumeAt instanceof CarbonImmutable) {
             if ($resumeAt->greaterThan($now)) {
-                return PointExecutionResult::waiting(
-                    reason: 'wait_point_not_due',
-                    meta: [
-                        'wait' => array_replace_recursive($waitingState, [
-                            'checked_at' => $now->toISOString(),
-                        ]),
-                    ],
-                );
+                return PointExecutionResult::waiting('wait_point_not_due', [
+                    'wait' => array_replace_recursive($waitingState, [
+                        'checked_at' => $now->toISOString(),
+                    ]),
+                ]);
             }
 
-            return PointExecutionResult::completed(
-                reason: 'wait_point_due',
-                meta: [
-                    'wait' => array_replace_recursive($waitingState, [
-                        'resumed_at' => $now->toISOString(),
-                    ]),
-                ],
-            );
+            return PointExecutionResult::completed('wait_point_due', [
+                'wait' => array_replace_recursive($waitingState, [
+                    'resumed_at' => $now->toISOString(),
+                ]),
+            ]);
         }
 
-        $definition = WaitPointDefinition::from(
-            definition: $context->definition,
-            settings: $context->settings,
-            now: $now,
-        );
+        $definition = WaitPointDefinition::from($context->definition, $context->settings, $now);
 
         if (! $definition->isValid()) {
-            return PointExecutionResult::failed(
-                reason: $definition->invalidReason ?? 'invalid_wait_point_definition',
-                meta: [
-                    'wait_definition' => $definition->toMetaPayload(),
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                    'flow_route_point_key' => $context->flowRoutePoint->key,
-                    'point_id' => $context->flowRoutePoint->point_id,
-                    'point_key' => $context->flowRoutePoint->point?->key,
-                ],
-            );
+            return PointExecutionResult::failed($definition->invalidReason ?? 'invalid_wait_point_definition', [
+                'wait_definition' => $definition->toMetaPayload(),
+                'flow_routes' => $context->flowRouteProvenance(),
+            ]);
         }
 
         if ($definition->isImmediate($now)) {
-            return PointExecutionResult::completed(
-                reason: 'wait_point_immediate',
-                meta: [
-                    'wait_definition' => $definition->toMetaPayload(),
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                    'flow_route_point_key' => $context->flowRoutePoint->key,
-                    'point_id' => $context->flowRoutePoint->point_id,
-                    'point_key' => $context->flowRoutePoint->point?->key,
-                ],
-            );
+            return PointExecutionResult::completed('wait_point_immediate', [
+                'wait_definition' => $definition->toMetaPayload(),
+                'flow_routes' => $context->flowRouteProvenance(),
+            ]);
         }
 
-        return PointExecutionResult::waiting(
-            reason: 'wait_point_scheduled',
-            meta: [
-                'wait' => [
-                    'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                    'flow_route_point_key' => $context->flowRoutePoint->key,
-                    'point_id' => $context->flowRoutePoint->point_id,
-                    'point_key' => $context->flowRoutePoint->point?->key,
-                    'point_type' => Point::TYPE_WAIT,
-                    'started_waiting_at' => $now->toISOString(),
-                    'resume_at' => $definition->resumeAt?->toISOString(),
-                    'definition' => $definition->toMetaPayload(),
-                ],
+        return PointExecutionResult::waiting('wait_point_scheduled', [
+            'wait' => [
+                ...$context->flowRouteProvenance(),
+                'flow_route_point_key' => $context->flowRoutePoint->key,
+                'point_key' => $context->flowRoutePoint->point?->key,
+                'point_type' => Point::TYPE_WAIT,
+                'started_waiting_at' => $now->toISOString(),
+                'resume_at' => $definition->resumeAt?->toISOString(),
+                'definition' => $definition->toMetaPayload(),
             ],
-        );
+        ]);
     }
 }

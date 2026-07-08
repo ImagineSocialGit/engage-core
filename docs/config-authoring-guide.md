@@ -19,7 +19,7 @@ Primary references:
 5. Future campaign step variants must reference Messaging-owned template presets/assignments and must not own reusable payload copy.
 6. Messaging template presets own reusable copy and safe DB-editable message payloads.
 7. Messaging template catalog entries own browsing/grouping metadata for template review; they do not own runtime behavior.
-8. FlowRoute presets own automation/control-flow routing and point definitions.
+8. FlowRoute presets own automation/control-flow routing and reusable point definitions; runtime execution should use DB-owned route templates, capabilities, instance plans, plan items, and progress/execution items.
 9. Webinar post-event config owns provider event orchestration, not message copy.
 10. Task presets create DB-owned task template definitions only. They do not create live tasks.
 11. Use `lead/leads` in CRM/client-facing copy unless explicitly told otherwise.
@@ -1063,9 +1063,9 @@ FlowRoute `create_task` points should reference TaskTemplate records or stable t
 
 FlowRoute presets should call other module capabilities through public actions/services/contracts, not private table internals.
 
-FlowRoute point capabilities should prefer provider/registry/config seams first. Add DB-owned capability/binding tables only when runtime selection or durable vertical references require them.
+FlowRoute point capabilities should be DB-owned before production. Capability and capability-binding records are the durable authoring/validation layer for module/vertical actions, waits, conditions, events, labels, supported subject types, inputs, and output context.
 
-Route instance plan/snapshot assumptions must be validated before presets rely on per-contact/subject route adjustments.
+Route instance plans are part of the durable FlowRoutes runtime model. Presets may assume that reusable templates seed contact/subject-specific plans with plan items and progress/execution items.
 
 Config/setup validation should check:
 
@@ -1091,24 +1091,29 @@ Prefer command/service-based validation first. Do not add persistent validation 
 
 ## FlowRoutes capability reference rule
 
-Do not invent durable FlowRoutes capability references before proving they are needed.
+FlowRoute presets should reference durable capabilities when a point represents an authorable action, wait, event, condition, branch, or module/vertical behavior.
 
-The default preset authoring shape is:
+The preferred preset authoring shape is:
 
 ```text
+capability_key
 point type
 handler key
 public action/service contract
-optional module key
+module key
 optional task template key
 optional message/campaign/template reference
+optional supported subject type
 ```
+
+Capability records describe what is available, how it should be labeled, what inputs are required, what subject types are supported, and what output context/fields become available. Point definitions still carry the route-specific configuration.
 
 Avoid route preset shapes that require FlowRoutes to know vertical private model/table details.
 
 Good:
 
 ```text
+capability_key: tasks.create_task
 point: create_task
 task_template_key: pet_services.final_behavior_check
 ```
@@ -1116,6 +1121,7 @@ task_template_key: pet_services.final_behavior_check
 Good:
 
 ```text
+capability_key: campaigns.enroll
 point: enroll_campaign
 campaign_key: webinar_attended_nurture
 ```
@@ -1127,23 +1133,23 @@ point: create_pet_behavior_appointment
 pet_behavior_goal_id: 123
 ```
 
-unless Phase 4 proves a DB-owned vertical capability/binding table is needed.
+unless PetServices exposes that behavior as a public capability/action with documented input schema and supported subject types.
 
 ## Route instance/snapshot validation rule
 
-If route presets or vertical presets assume per-contact/subject route adjustments, validation must check whether the runtime model supports those assumptions.
+Route presets and vertical presets may assume the durable FlowRoutes instance model once Phase 4B is implemented. Validation should check that route-instance assumptions are supported by schema and runtime.
 
-Before route instance plans exist, presets should avoid requiring behavior like:
+Supported durable assumptions should include:
 
 ```text
-insert one extra step into this contact/subject route only
-repeat this route point for one dog/contact only
-skip/cancel one plan item without changing the route template
-resume a specific plan item from task.completed
-attach an appointment/task/message back to one route instance plan item
+reusable route templates seed contact/subject-specific plans
+operators may later insert/repeat/skip/cancel one plan item without changing the template
+event waits and task completion can target specific plan/progress items
+created appointments/tasks/messages/campaign enrollments attach back to one route plan/progress item
+active route instances preserve point definition/settings snapshots
 ```
 
-If a preset needs those capabilities, the implementation should happen after the FlowRoutes relationship, capability, and instance-plan audit.
+Validation should flag any preset that references a capability, subject type, template, campaign, message assignment, or module action that is unavailable for the current module/client context.
 
 ## Available field/token picker and validation
 

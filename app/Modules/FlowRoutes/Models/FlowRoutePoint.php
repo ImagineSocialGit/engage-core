@@ -15,6 +15,7 @@ class FlowRoutePoint extends Model
     protected $fillable = [
         'flow_route_id',
         'point_id',
+        'flow_route_capability_id',
         'key',
         'sort_order',
         'is_start',
@@ -32,6 +33,7 @@ class FlowRoutePoint extends Model
     protected $casts = [
         'flow_route_id' => 'integer',
         'point_id' => 'integer',
+        'flow_route_capability_id' => 'integer',
         'sort_order' => 'integer',
         'is_start' => 'boolean',
         'is_active' => 'boolean',
@@ -54,6 +56,11 @@ class FlowRoutePoint extends Model
         return $this->belongsTo(Point::class);
     }
 
+    public function capability(): BelongsTo
+    {
+        return $this->belongsTo(FlowRouteCapability::class, 'flow_route_capability_id');
+    }
+
     public function nextFlowRoutePoint(): BelongsTo
     {
         return $this->belongsTo(self::class, 'next_flow_route_point_id');
@@ -67,6 +74,16 @@ class FlowRoutePoint extends Model
     public function contactFlowRouteProgress(): HasMany
     {
         return $this->hasMany(ContactFlowRouteProgress::class, 'current_flow_route_point_id');
+    }
+
+    public function planItems(): HasMany
+    {
+        return $this->hasMany(ContactFlowRoutePlanItem::class);
+    }
+
+    public function progressItems(): HasMany
+    {
+        return $this->hasMany(ContactFlowRouteProgressItem::class);
     }
 
     public function scopeActive(Builder $query): Builder

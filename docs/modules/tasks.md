@@ -183,6 +183,29 @@ Tasks should support optional assignment without requiring InternalNotifications
 
 InternalNotifications may contribute TeamMember notification behavior through public seams, but Tasks must remain usable with Core only.
 
+
+## FlowRoutes-created task provenance
+
+When FlowRoutes creates a Task, Tasks should continue to own task creation, assignment strategy, due-date resolution, responsibility, lifecycle, and task template behavior. FlowRoutes should call Tasks public actions/services, not create tasks directly.
+
+Route-created tasks should store structured FlowRoutes provenance so task completion can resume the correct route instance without meta-heavy correlation:
+
+```text
+flow_route_progress_id
+flow_route_plan_id
+flow_route_plan_item_id
+flow_route_progress_item_id
+flow_route_id
+flow_route_point_id
+flow_route_capability_id
+task_template_id
+task_template_key
+```
+
+`task_template_id` links to the current DB template when available. `task_template_key` preserves the durable stable key for debugging, historical context, and null-on-delete cases.
+
+Task completion automation events should include enough task identity and structured FlowRoutes provenance for FlowRoutes to resume a specific waiting route progress/plan/progress item. Broad contact-only task completion matching is unsafe.
+
 ## Task template UI
 
 A client/operator task template UI is only needed if clients/operators need to manage templates themselves.

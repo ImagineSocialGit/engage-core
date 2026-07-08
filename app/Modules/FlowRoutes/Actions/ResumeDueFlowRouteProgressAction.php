@@ -13,22 +13,9 @@ class ResumeDueFlowRouteProgressAction
         private readonly ResumeContactFlowRouteProgressAction $resumeContactFlowRouteProgress,
     ) {}
 
-    /**
-     * @return array{
-     *     checked: int,
-     *     resumed: int,
-     *     waiting: int,
-     *     blocked: int,
-     *     failed: int,
-     *     completed: int,
-     *     skipped: int
-     * }
-     */
     public function handle(?int $limit = null, ?CarbonInterface $now = null): array
     {
-        $now = $now
-            ? CarbonImmutable::instance($now)->utc()
-            : CarbonImmutable::now('UTC');
+        $now = $now ? CarbonImmutable::instance($now)->utc() : CarbonImmutable::now('UTC');
 
         $summary = [
             'checked' => 0,
@@ -41,7 +28,7 @@ class ResumeDueFlowRouteProgressAction
         ];
 
         $query = ContactFlowRouteProgress::query()
-            ->with('currentFlowRoutePoint.point')
+            ->with(['currentFlowRoutePoint.point', 'plan.items'])
             ->dueToResume($now)
             ->oldest('resume_at')
             ->oldest('id');
@@ -52,7 +39,6 @@ class ResumeDueFlowRouteProgressAction
 
         foreach ($query->cursor() as $progress) {
             $summary['checked']++;
-
             $result = $this->resumeContactFlowRouteProgress->handle($progress, $now);
 
             match ($result->status) {

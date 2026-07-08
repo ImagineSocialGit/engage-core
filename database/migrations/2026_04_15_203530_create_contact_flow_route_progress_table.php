@@ -20,23 +20,28 @@ return new class extends Migration
                 ->constrained()
                 ->cascadeOnDelete();
 
+            $table->nullableMorphs('subject');
+
             $table->foreignIdFor(ContactStatus::class)
                 ->nullable()
-                ->constrained()
+                ->constrained(indexName: 'cfrp_contact_status_fk')
                 ->nullOnDelete();
 
             $table->foreignIdFor(ContactWorkflowProfile::class)
                 ->nullable()
-                ->constrained()
+                ->constrained(indexName: 'cfrp_workflow_profile_fk')
                 ->nullOnDelete();
 
             $table->foreignIdFor(FlowRoute::class)
-                ->constrained()
+                ->constrained(indexName: 'cfrp_route_fk')
                 ->cascadeOnDelete();
 
             $table->foreignIdFor(FlowRoutePoint::class, 'current_flow_route_point_id')
                 ->nullable()
-                ->constrained('flow_route_points')
+                ->constrained(
+                    table: 'flow_route_points',
+                    indexName: 'cfrp_current_route_point_fk',
+                )
                 ->nullOnDelete();
 
             $table->string('status')->index('cfrp_status_idx');
@@ -57,9 +62,11 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['contact_id', 'status'], 'cfrp_contact_status_idx');
+            $table->index(['contact_id', 'subject_type', 'subject_id', 'status'], 'cfrp_contact_subject_status_idx');
             $table->index(['contact_workflow_profile_id', 'status'], 'cfrp_profile_status_idx');
             $table->index(['contact_status_id', 'status'], 'cfrp_contact_status_status_idx');
             $table->index(['flow_route_id', 'status'], 'cfrp_route_status_idx');
+            $table->index(['flow_route_id', 'subject_type', 'subject_id', 'status'], 'cfrp_route_subject_status_idx');
             $table->index(['status', 'resume_at'], 'cfrp_status_resume_idx');
             $table->index(['contact_id', 'status', 'waiting_event_key'], 'cfrp_contact_waiting_event_idx');
         });

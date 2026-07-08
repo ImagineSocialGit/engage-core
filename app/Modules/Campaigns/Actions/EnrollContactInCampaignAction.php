@@ -68,6 +68,7 @@ class EnrollContactInCampaignAction
             'exit_conditions' => $exitConditions,
             'started_at' => Carbon::now(),
             'meta' => $meta,
+            ...$this->flowRouteProvenance($meta ?? []),
         ]);
 
         $scheduledMessage = $this->scheduleNextSchedulableStep(
@@ -289,8 +290,32 @@ class EnrollContactInCampaignAction
         return $startContext;
     }
 
+    /**
+     * @param array<string, mixed> $meta
+     * @return array<string, int|null>
+     */
+    private function flowRouteProvenance(array $meta): array
+    {
+        $flowRoute = is_array($meta['flow_route'] ?? null) ? $meta['flow_route'] : [];
+
+        return [
+            'flow_route_progress_id' => $this->nullableInt($flowRoute['flow_route_progress_id'] ?? null),
+            'flow_route_plan_id' => $this->nullableInt($flowRoute['flow_route_plan_id'] ?? null),
+            'flow_route_plan_item_id' => $this->nullableInt($flowRoute['flow_route_plan_item_id'] ?? null),
+            'flow_route_progress_item_id' => $this->nullableInt($flowRoute['flow_route_progress_item_id'] ?? null),
+            'flow_route_id' => $this->nullableInt($flowRoute['flow_route_id'] ?? null),
+            'flow_route_point_id' => $this->nullableInt($flowRoute['flow_route_point_id'] ?? null),
+            'flow_route_capability_id' => $this->nullableInt($flowRoute['flow_route_capability_id'] ?? null),
+        ];
+    }
+
     private function normalizeSegment(string $value): string
     {
         return str_replace('-', '_', strtolower(trim($value)));
+    }
+
+    private function nullableInt(mixed $value): ?int
+    {
+        return is_numeric($value) ? (int) $value : null;
     }
 }

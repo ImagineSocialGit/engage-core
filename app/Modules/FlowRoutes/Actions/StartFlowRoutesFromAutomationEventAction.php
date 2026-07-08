@@ -14,6 +14,7 @@ class StartFlowRoutesFromAutomationEventAction
     public function __construct(
         private readonly ExecuteCurrentFlowRoutePointAction $executeCurrentFlowRoutePoint,
         private readonly FlowRouteTriggerBindingResolver $flowRouteTriggerBindingResolver,
+        private readonly CreateContactFlowRoutePlanAction $createContactFlowRoutePlan,
     ) {}
 
     public function handle(FlowRouteExternalEvent $event): void
@@ -65,17 +66,22 @@ class StartFlowRoutesFromAutomationEventAction
             $existingProgress = ContactFlowRouteProgress::query()
                 ->active()
                 ->forContact($event->contactId)
+                ->forSubject($event->subjectType, $event->subjectId)
                 ->where('flow_route_id', $flowRoute->getKey())
                 ->first();
 
             if ($existingProgress instanceof ContactFlowRouteProgress) {
+                $this->createContactFlowRoutePlan->handle($existingProgress, $flowRoute);
+
                 return $existingProgress;
             }
 
             $currentFlowRoutePoint = $this->startingFlowRoutePoint($flowRoute);
 
-            return ContactFlowRouteProgress::query()->create([
+            $progress = ContactFlowRouteProgress::query()->create([
                 'contact_id' => $event->contactId,
+                'subject_type' => $event->subjectType,
+                'subject_id' => $event->subjectId,
                 'contact_status_id' => null,
                 'contact_workflow_profile_id' => null,
                 'flow_route_id' => $flowRoute->getKey(),
@@ -86,6 +92,10 @@ class StartFlowRoutesFromAutomationEventAction
                     'started_from_automation_event' => $event->toMetaPayload(),
                 ],
             ]);
+
+            $this->createContactFlowRoutePlan->handle($progress, $flowRoute);
+
+            return $progress->refresh();
         });
     }
 

@@ -14,6 +14,11 @@ FlowRoutes owns:
 - `FlowRoutePoint`
 - `Point`
 - `ContactFlowRouteProgress`
+- `ContactFlowRoutePlan`
+- `ContactFlowRoutePlanItem`
+- `ContactFlowRouteProgressItem`
+- `FlowRouteCapability`
+- `FlowRouteCapabilityBinding`
 - `FlowRouteTriggerBinding`
 - route/point automation behavior
 - active route execution state
@@ -77,21 +82,31 @@ Examples:
     webinar.missed -> FlowRoutes event-triggered route -> enroll_campaign(webinar_missed_nurture)
     task.completed -> FlowRoutes event_wait resume, if configured
 
-Current tables/models:
+Current/target tables/models:
 
     flow_routes
     flow_route_trigger_bindings
     points
     flow_route_points
     contact_flow_route_progress
+    contact_flow_route_plans
+    contact_flow_route_plan_items
+    contact_flow_route_progress_items
+    flow_route_capabilities
+    flow_route_capability_bindings
 
-Current models:
+Current/target models:
 
     FlowRoute
     FlowRouteTriggerBinding
     Point
     FlowRoutePoint
     ContactFlowRouteProgress
+    ContactFlowRoutePlan
+    ContactFlowRoutePlanItem
+    ContactFlowRouteProgressItem
+    FlowRouteCapability
+    FlowRouteCapabilityBinding
 
 A ContactStatus trigger should usually have one selected FlowRoute binding per context in the first implementation.
 
@@ -281,9 +296,9 @@ FlowRoutes may support Campaign, Messaging, Task, and status-related point types
 
 ## Relationship, capability, and instance-plan audit
 
-Before deeper FlowRoutes runtime work, complete a FlowRoutes relationship, capability, and instance-plan audit.
+The Phase 4A audit is complete. It confirmed that FlowRoutes should harden schema before production for subject-scoped route instances, instance-specific route plans, plan items, progress/execution items, capability catalog/bindings, and route-created artifact provenance.
 
-This audit must happen before implementing task-completed event-wait resume behavior, because resume behavior may need to target a specific route instance plan item rather than only a raw reusable route point.
+This must happen before task-completed event-wait resume behavior, because resume behavior must target a specific route instance plan/progress item rather than only a raw reusable route point.
 
 The audit must map FlowRoutes against every current/planned universal and vertical module and decide, for each module:
 
@@ -329,28 +344,23 @@ The audit should preserve these rules:
 - FlowRoutes should call other modules only through public actions/services/contracts.
 - Vertical modules may contribute presets, task templates, labels, and public seams without forcing FlowRoutes or Core to know vertical internals.
 
-## Point capability registry default
+## FlowRoute capabilities
 
-Do not add a vertical/point reconciliation table without proving it.
+FlowRoutes should use DB-owned capability and capability binding records as the durable authoring/validation layer.
 
-The default path should be:
-
-```text
-FlowRoutes point type
-→ handler registry
-→ optional public action/service in the consuming module
-```
-
-A DB-owned capability/binding table may be needed only if the audit proves one of these needs:
+The runtime path remains:
 
 ```text
-one point must be bound to a specific vertical-owned record;
-the same generic point type behaves differently depending on a selected vertical domain object;
-operators need to select from DB-owned vertical capabilities at runtime;
-route presets need durable references to vertical-installed capability records instead of config keys.
+FlowRouteCapability
+→ point type / handler registry
+→ public action/service/contract in the consuming module
 ```
 
-Until then, prefer registry/config/provider seams.
+Capabilities describe what is available to a route, including actions, waits, events, conditions, branches, labels, help text, supported subject types, required modules, input schema, output context, and available fields.
+
+Capability bindings decide which capabilities are enabled, visible, or customized for a client/module/context/owner group/vertical.
+
+Capabilities do not give FlowRoutes permission to mutate another module's private tables. Every module-owned effect still goes through that module's public action/service/contract.
 
 ## TaskTemplate requirement for create_task points
 
@@ -377,7 +387,7 @@ A FlowRoute definition is a reusable template/default automation plan.
 
 A live `ContactFlowRouteProgress` record is a route instance: one contact, and potentially one subject, moving through that plan.
 
-The system may need contact/subject-specific route instance plans so operators can adjust one live route without mutating the reusable template.
+The system needs contact/subject-specific route instance plans so operators can adjust one live route without mutating the reusable template.
 
 Example:
 
@@ -390,32 +400,69 @@ The adjustment affects only that contact/dog route instance.
 The reusable route template remains unchanged.
 ```
 
-Possible schema/concept names:
+Target schema/concepts:
 
 ```text
-FlowRoutePlan
-FlowRoutePlanItem
+ContactFlowRouteProgress
+    route instance; owns contact, optional subject, status, current plan/progress item pointers, and lifecycle timestamps.
+
+ContactFlowRoutePlan
+    instance-specific plan seeded from a FlowRoute template.
+
+ContactFlowRoutePlanItem
+    ordered route instance item; stores point definition/settings snapshots and source such as template/manual/automation/vertical.
+
 ContactFlowRouteProgressItem
-ContactFlowRouteProgressAdjustment
-Route instance snapshot
+    execution attempt/result for a plan item; stores waiting/resume/correlation/result state and created-artifact references.
 ```
 
-Audit questions:
+Implementation requirements:
 
 ```text
-Should ContactFlowRouteProgress support subject_type / subject_id?
-Should route execution snapshot route points into progress items when a route starts?
-Should live route instances execute from the mutable template, or from a plan snapshot?
-Should operators be able to insert/repeat/skip/cancel specific plan items for one contact/subject?
-Should each plan item track source = template/manual/vertical/automation?
-Should plan items store config_snapshot json so template changes do not unexpectedly mutate active instances?
-Should event waits and task completion resume a specific plan item rather than only a raw route point?
-Should appointments/tasks/messages created by route points attach back to the specific progress item?
+ContactFlowRouteProgress supports subject_type / subject_id.
+Route start creates a ContactFlowRoutePlan and plan items from the selected FlowRoute template.
+Runtime execution advances through plan items, not only mutable FlowRoutePoint records.
+Plan items store definition/settings snapshots so template edits do not unexpectedly mutate active route instances.
+Operators may later insert/repeat/skip/cancel specific plan items for one contact/subject.
+Event waits and task completion resume a specific plan/progress item.
+Tasks/messages/campaign enrollments/appointments/documents/forms/portal records created by route points attach back through standard FlowRoutes provenance fields.
 ```
 
-Do not add route instance plan tables until the audit decides the right shape.
 
-But route instance adjustment is now a first-class schema-discovery concern before production.
+## Uniform route-created artifact provenance
+
+Any module-owned artifact created by FlowRoutes should use the same provenance shape where practical:
+
+```text
+flow_route_progress_id
+flow_route_plan_id
+flow_route_plan_item_id
+flow_route_progress_item_id
+flow_route_id
+flow_route_point_id
+flow_route_capability_id
+```
+
+Initial targets:
+
+```text
+tasks
+scheduled_messages
+campaign_enrollments
+```
+
+Future targets should follow the same process:
+
+```text
+appointments
+document_requests
+form submissions/requests
+portal invitations/access grants
+commerce records where appropriate
+vertical-owned records
+```
+
+The owning module still owns lifecycle and business state. FlowRoutes owns route provenance, route instance correlation, and route resume matching.
 
 ## Event-wait and task-completed resume implementation
 
@@ -434,7 +481,7 @@ Do not add Task-specific FlowRoutes listeners.
 
 Do not make Tasks import FlowRoutes.
 
-Add wait-correlation schema only if existing progress/plan metadata is insufficient.
+Use route plan/progress item correlation. Do not rely on contact-only fallback for task completion waits.
 
 Resume matching should be scoped enough to avoid unrelated task completions resuming the wrong route instance.
 
