@@ -58,9 +58,9 @@ Campaigns may schedule messages through Messaging public actions.
 
 Campaign presets define journeys: campaign identity, step order, step timing, channel strategy, and message template references through variants.
 
-## Campaign step groups and channel variants
+## Campaign steps and channel variants
 
-The target campaign/channel architecture is:
+The current campaign/channel architecture is:
 
 ```text
 Campaign enrollment = lifecycle
@@ -88,7 +88,7 @@ They should not embed reusable subject/body/message copy.
 
 ### Channel strategies
 
-Each step group should explicitly define how channel variants interact.
+Each campaign step should explicitly define how channel variants interact.
 
 Initial strategies:
 
@@ -106,14 +106,79 @@ Use it when email and SMS are alternatives, such as the same message at the same
 
 Use it when email and SMS are intentionally independent messages.
 
-`dependency_aware` means evaluate variant-level dependency rules before scheduling.
+`dependency_aware` means evaluate explicit sibling-variant dependency rules before scheduling a variant.
 
-Use it when one channel's message depends on another channel having been scheduled or sent, such as an SMS that references an email.
+Use it when one channel's message depends on another sibling variant reaching a clear state, such as an SMS that should only schedule after the email variant for the same step has been scheduled or sent.
 
-Do not infer channel behavior from timing alone.
+Dependency-aware behavior should not be inferred from timing alone, broad channel matching, or message type guesses.
 
 Different unrelated email/SMS messages at the same delay must explicitly choose whether they are independent sends or alternatives.
 
+
+### Variant dependency rules
+
+Dependency-aware variants should use explicit dependency rules.
+
+The recommended dependency shape is:
+
+```php
+'dependency_rules' => [
+    'requires_variant_states' => [
+        'email' => ['scheduled', 'sent'],
+    ],
+],
+```
+
+Meaning:
+
+```text
+Before scheduling this variant, the campaign runtime must find the sibling
+variant named email for the same campaign enrollment and same campaign step
+in one of the allowed states: scheduled or sent.
+```
+
+Supported dependency states should be explicit:
+
+```text
+scheduled
+sent
+skipped
+terminal
+```
+
+`terminal` means the sibling variant has reached a final Messaging outcome such as sent, skipped, or failed when the runtime intentionally treats those as no-longer-pending for progression/dependency purposes.
+
+Dependency checks should be scoped to:
+
+```text
+same campaign enrollment
+same campaign step
+same sibling variant key
+```
+
+A dependency match from a different enrollment, a different campaign step, a different campaign, or a broad channel/purpose/scope match should not satisfy the dependency.
+
+The runtime may consider both:
+
+```text
+sibling variants scheduled in the current scheduling pass
+existing ScheduledMessage records for the same enrollment + campaign step + variant identity
+```
+
+This keeps dependency-aware behavior durable when a variant is scheduled later by retry/replay/admin action instead of only during the original PHP scheduling loop.
+
+Avoid ambiguous dependency rules such as:
+
+```text
+requires email
+requires campaign_step_due
+requires marketing:webinar_nurture
+requires any message on this step
+```
+
+Those are too broad because same-channel variants and same-step variants may share channel, purpose, scope, dispatch key, or derived message type.
+
+If a dependency-aware variant is not scheduled, Campaigns should record compact debug metadata explaining which dependency was missing and which states were accepted.
 
 Messaging definitions define message copy and delivery templates.
 
@@ -139,6 +204,8 @@ Those catalog entries are for browsing/copy editing only. Campaigns still own th
 The Campaign Message Templates CRM surface is the current Campaign-side setup surface for selecting which Messaging template is active for each campaign step. It may link to Message Templates for copy editing, but it should not duplicate reusable message copy editing inside Campaigns.
 
 Campaign runtime should use variant-specific DB assignments first. Variant-specific config may seed/sync available templates, but step-level campaign template fallback is not supported.
+
+Campaign runtime should also keep variant progression/dependency checks tied to first-class variant identity. Do not collapse variants by channel, purpose, scope, dispatch key, or derived message type.
 
 
 The matching Messaging config path is:
@@ -288,5 +355,4 @@ Stop follow-up sequence: Webinar Missed Nurture.
 ```
 
 It should not expose CampaignEnrollment internals or campaign step machinery as primary labels.
-
 

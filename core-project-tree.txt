@@ -1214,6 +1214,7 @@
 │   │   ├── Campaigns
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
 │   │   │   ├── CampaignStepVariantsTest.php
+│   │   │   ├── CampaignVariantDependencyAwareTest.php
 │   │   │   ├── CampaignVariantPresetSyncSpecificityTest.php
 │   │   │   ├── CampaignVariantSchedulingDurabilityTest.php
 │   │   │   ├── EnrollContactInCampaignActionTest.php
@@ -1314,4 +1315,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-436 directories, 879 files
+436 directories, 880 files

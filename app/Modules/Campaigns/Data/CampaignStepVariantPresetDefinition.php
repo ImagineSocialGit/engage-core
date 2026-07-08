@@ -49,7 +49,7 @@ class CampaignStepVariantPresetDefinition
             scope: self::normalizeSegment(self::requiredString($data['scope'] ?? $fallbackScope, 'campaign step variant scope')),
             isActive: (bool) ($data['is_active'] ?? true),
             criteria: self::criteria($data),
-            dependencyRules: is_array($data['dependency_rules'] ?? null) ? $data['dependency_rules'] : [],
+            dependencyRules: self::dependencyRules($data['dependency_rules'] ?? []),
             sourceConfigPath: self::nullableString($data['source_config_path'] ?? null),
             sourceVersion: self::nullableString($data['source_version'] ?? $fallbackSourceVersion),
             meta: array_replace_recursive(
@@ -76,6 +76,124 @@ class CampaignStepVariantPresetDefinition
         return $criteria;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private static function dependencyRules(mixed $rules): array
+    {
+        if (! is_array($rules)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        $legacyRequiredScheduled = self::stringList($rules['requires_scheduled_variant_keys'] ?? []);
+
+        if ($legacyRequiredScheduled !== []) {
+            $normalized['requires_scheduled_variant_keys'] = $legacyRequiredScheduled;
+        }
+
+        $variantStates = $rules['requires_variant_states'] ?? [];
+
+        if (is_array($variantStates)) {
+            foreach ($variantStates as $variantKey => $states) {
+                if (is_int($variantKey)) {
+                    continue;
+                }
+
+                $normalizedVariantKey = self::nullableNormalizedSegment($variantKey);
+
+                if ($normalizedVariantKey === null) {
+                    continue;
+                }
+
+                $normalized['requires_variant_states'][$normalizedVariantKey] = self::dependencyStates($states);
+            }
+        }
+
+        $requires = $rules['requires'] ?? [];
+
+        if (is_array($requires)) {
+            foreach ($requires as $requirement) {
+                if (! is_array($requirement)) {
+                    continue;
+                }
+
+                $variantKey = self::nullableNormalizedSegment(
+                    $requirement['variant_key']
+                        ?? $requirement['variant']
+                        ?? $requirement['key']
+                        ?? null,
+                );
+
+                if ($variantKey === null) {
+                    continue;
+                }
+
+                $normalized['requires'][] = [
+                    'variant_key' => $variantKey,
+                    'states' => self::dependencyStates(
+                        $requirement['states']
+                            ?? $requirement['state']
+                            ?? $requirement['status']
+                            ?? 'scheduled',
+                    ),
+                ];
+            }
+        }
+
+        foreach ($rules as $key => $value) {
+            if (! is_string($key) || array_key_exists($key, $normalized)) {
+                continue;
+            }
+
+            if (in_array($key, ['requires_scheduled_variant_keys', 'requires_variant_states', 'requires'], true)) {
+                continue;
+            }
+
+            $normalized[$key] = $value;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function dependencyStates(mixed $states): array
+    {
+        $states = self::stringList($states);
+        $states = array_values(array_intersect($states, [
+            'scheduled',
+            'pending',
+            'sent',
+            'skipped',
+            'failed',
+            'terminal',
+        ]));
+
+        return $states !== [] ? $states : ['scheduled'];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function stringList(mixed $values): array
+    {
+        if (is_string($values)) {
+            $values = [$values];
+        }
+
+        if (! is_array($values)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(array_map(
+            fn (mixed $value): ?string => self::nullableNormalizedSegment($value),
+            $values,
+        ))));
+    }
+
     private static function requiredString(mixed $value, string $field): string
     {
         if (! is_string($value) || trim($value) === '') {
@@ -98,6 +216,15 @@ class CampaignStepVariantPresetDefinition
         $value = trim($value);
 
         return $value !== '' ? $value : null;
+    }
+
+    private static function nullableNormalizedSegment(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return self::normalizeSegment($value);
     }
 
     private static function normalizeSegment(string $value): string

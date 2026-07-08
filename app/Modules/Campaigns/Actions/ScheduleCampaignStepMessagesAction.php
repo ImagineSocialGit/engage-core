@@ -56,13 +56,24 @@ class ScheduleCampaignStepMessagesAction
         }
 
         foreach ($variants as $variant) {
-            if ($strategy === 'dependency_aware' && ! $this->dependenciesSatisfied($variant, $scheduledMessages)) {
-                $attempts[] = $this->attemptBase($campaign, $step, $variant) + [
-                    'result' => 'not_scheduled',
-                    'reason' => 'campaign_variant_dependency_unsatisfied',
-                ];
+            if ($strategy === 'dependency_aware') {
+                $dependencyEvaluation = $this->evaluateDependencies(
+                    enrollment: $enrollment,
+                    step: $step,
+                    variant: $variant,
+                    scheduledMessages: $scheduledMessages,
+                );
 
-                continue;
+                if (! $dependencyEvaluation['satisfied']) {
+                    $attempts[] = $this->attemptBase($campaign, $step, $variant) + [
+                        'result' => 'not_scheduled',
+                        'reason' => 'campaign_variant_dependency_unsatisfied',
+                        'dependency_requirements' => $dependencyEvaluation['requirements'],
+                        'dependency_unsatisfied' => $dependencyEvaluation['unsatisfied'],
+                    ];
+
+                    continue;
+                }
             }
 
             $scheduledMessage = $this->scheduleVariant(
@@ -222,20 +233,205 @@ class ScheduleCampaignStepMessagesAction
 
     /**
      * @param array<string, ScheduledMessage> $scheduledMessages
+     * @return array{satisfied: bool, requirements: array<string, array<int, string>>, unsatisfied: array<int, array{variant_key: string, states: array<int, string>}>}
      */
-    private function dependenciesSatisfied(CampaignStepVariant $variant, array $scheduledMessages): bool
-    {
-        $requiredScheduledKeys = $this->stringList(data_get($variant->dependency_rules ?? [], 'requires_scheduled_variant_keys', []));
+    private function evaluateDependencies(
+        CampaignEnrollment $enrollment,
+        CampaignStep $step,
+        CampaignStepVariant $variant,
+        array $scheduledMessages,
+    ): array {
+        $requirements = $this->dependencyRequirements($variant);
+        $unsatisfied = [];
 
-        foreach ($requiredScheduledKeys as $requiredKey) {
-            if (! array_key_exists($requiredKey, $scheduledMessages)) {
-                return false;
+        foreach ($requirements as $requiredVariantKey => $allowedStates) {
+            if (! $this->dependencyRequirementSatisfied(
+                enrollment: $enrollment,
+                step: $step,
+                requiredVariantKey: $requiredVariantKey,
+                allowedStates: $allowedStates,
+                scheduledMessages: $scheduledMessages,
+            )) {
+                $unsatisfied[] = [
+                    'variant_key' => $requiredVariantKey,
+                    'states' => $allowedStates,
+                ];
             }
         }
 
-        return true;
+        return [
+            'satisfied' => $unsatisfied === [],
+            'requirements' => $requirements,
+            'unsatisfied' => $unsatisfied,
+        ];
     }
 
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function dependencyRequirements(CampaignStepVariant $variant): array
+    {
+        $rules = $variant->dependency_rules ?? [];
+
+        if (! is_array($rules)) {
+            return [];
+        }
+
+        $requirements = [];
+
+        foreach ($this->stringList(data_get($rules, 'requires_scheduled_variant_keys', [])) as $variantKey) {
+            $requirements[$variantKey] = $this->mergeDependencyStates($requirements[$variantKey] ?? [], ['scheduled']);
+        }
+
+        $variantStates = data_get($rules, 'requires_variant_states', []);
+
+        if (is_array($variantStates)) {
+            foreach ($variantStates as $variantKey => $states) {
+                if (is_int($variantKey)) {
+                    continue;
+                }
+
+                $variantKey = $this->normalizeSegment((string) $variantKey);
+                $requirements[$variantKey] = $this->mergeDependencyStates(
+                    $requirements[$variantKey] ?? [],
+                    $this->dependencyStates($states),
+                );
+            }
+        }
+
+        $requires = data_get($rules, 'requires', []);
+
+        if (is_array($requires)) {
+            foreach ($requires as $requirement) {
+                if (! is_array($requirement)) {
+                    continue;
+                }
+
+                $variantKey = $this->nullableNormalizedSegment(
+                    $requirement['variant_key']
+                        ?? $requirement['variant']
+                        ?? $requirement['key']
+                        ?? null,
+                );
+
+                if ($variantKey === null) {
+                    continue;
+                }
+
+                $states = $requirement['states']
+                    ?? $requirement['state']
+                    ?? $requirement['status']
+                    ?? 'scheduled';
+
+                $requirements[$variantKey] = $this->mergeDependencyStates(
+                    $requirements[$variantKey] ?? [],
+                    $this->dependencyStates($states),
+                );
+            }
+        }
+
+        return $requirements;
+    }
+
+    /**
+     * @param array<int, string> $currentStates
+     * @param array<int, string> $newStates
+     * @return array<int, string>
+     */
+    private function mergeDependencyStates(array $currentStates, array $newStates): array
+    {
+        $states = array_values(array_unique(array_merge($currentStates, $newStates)));
+
+        return $states !== [] ? $states : ['scheduled'];
+    }
+
+    /**
+     * @param array<string, ScheduledMessage> $scheduledMessages
+     * @param array<int, string> $allowedStates
+     */
+    private function dependencyRequirementSatisfied(
+        CampaignEnrollment $enrollment,
+        CampaignStep $step,
+        string $requiredVariantKey,
+        array $allowedStates,
+        array $scheduledMessages,
+    ): bool {
+        $currentPassMessage = $scheduledMessages[$requiredVariantKey] ?? null;
+
+        if ($currentPassMessage instanceof ScheduledMessage && $this->messageMatchesAnyDependencyState($currentPassMessage, $allowedStates)) {
+            return true;
+        }
+
+        return ScheduledMessage::query()
+            ->where('meta->campaign_enrollment_id', $enrollment->id)
+            ->where('meta->campaign_step_id', $step->id)
+            ->where('meta->campaign_step_variant_key', $requiredVariantKey)
+            ->get()
+            ->contains(fn (ScheduledMessage $message): bool => $this->messageMatchesAnyDependencyState($message, $allowedStates));
+    }
+
+    /**
+     * @param array<int, string> $allowedStates
+     */
+    private function messageMatchesAnyDependencyState(ScheduledMessage $message, array $allowedStates): bool
+    {
+        foreach ($allowedStates as $state) {
+            if ($this->messageMatchesDependencyState($message, $state)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function messageMatchesDependencyState(ScheduledMessage $message, string $state): bool
+    {
+        return match ($state) {
+            'scheduled' => true,
+            'pending' => $message->status === ScheduledMessage::STATUS_PENDING,
+            'sent' => $message->status === ScheduledMessage::STATUS_SENT,
+            'skipped' => $message->status === ScheduledMessage::STATUS_SKIPPED,
+            'failed' => $message->status === ScheduledMessage::STATUS_FAILED,
+            'terminal' => in_array($message->status, [
+                ScheduledMessage::STATUS_SENT,
+                ScheduledMessage::STATUS_SKIPPED,
+                ScheduledMessage::STATUS_FAILED,
+            ], true),
+            default => false,
+        };
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function dependencyStates(mixed $states): array
+    {
+        if (is_string($states)) {
+            $states = [$states];
+        }
+
+        if (! is_array($states)) {
+            return ['scheduled'];
+        }
+
+        $states = array_values(array_unique(array_filter(array_map(
+            fn (mixed $state): ?string => is_string($state) && trim($state) !== ''
+                ? $this->normalizeSegment($state)
+                : null,
+            $states,
+        ))));
+
+        $states = array_values(array_intersect($states, [
+            'scheduled',
+            'pending',
+            'sent',
+            'skipped',
+            'failed',
+            'terminal',
+        ]));
+
+        return $states !== [] ? $states : ['scheduled'];
+    }
 
     /**
      * @return array<string, mixed>
@@ -327,9 +523,7 @@ class ScheduleCampaignStepMessagesAction
         }
 
         return array_values(array_unique(array_filter(array_map(
-            fn (mixed $value): ?string => is_string($value) && trim($value) !== ''
-                ? $this->normalizeSegment($value)
-                : null,
+            fn (mixed $value): ?string => $this->nullableNormalizedSegment($value),
             $values,
         ))));
     }
@@ -337,6 +531,15 @@ class ScheduleCampaignStepMessagesAction
     private function variantKey(CampaignStepVariant $variant): string
     {
         return $this->normalizeSegment($variant->key);
+    }
+
+    private function nullableNormalizedSegment(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return $this->normalizeSegment($value);
     }
 
     private function normalizeSegment(string $value): string
