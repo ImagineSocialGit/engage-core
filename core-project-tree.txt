@@ -664,6 +664,7 @@
 │   │   │   │   │   └── WebinarContactPanelProvider.php
 │   │   │   │   ├── Dashboard
 │   │   │   │   │   └── WebinarActivityDashboardPanelProvider.php
+│   │   │   │   ├── WebinarMessageReadinessService.php
 │   │   │   │   ├── WebinarProviderManager.php
 │   │   │   │   ├── WebinarScheduleProfileDefinitionResolver.php
 │   │   │   │   └── WebinarScheduleProfileResolver.php
@@ -1378,6 +1379,7 @@
 │   │   │   ├── DispatchWebinarWaitlistMessagesActionTest.php
 │   │   │   ├── PostEvent
 │   │   │   │   └── ProcessPostWebinarEventJobTest.php
+│   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
 │   │   │   ├── WebinarRegistrationControllerTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
@@ -1388,4 +1390,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-455 directories, 934 files
+455 directories, 936 files

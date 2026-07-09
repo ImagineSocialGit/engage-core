@@ -22,8 +22,10 @@ class UpdateWebinarMessageTemplateRequest extends FormRequest
         return [
             'context_key' => ['required', 'string', Rule::in([
                 'confirmation',
+                'registration_opt_in',
                 'reminders',
                 'waitlist',
+                'waitlist_opt_in',
                 'post_attended',
                 'post_missed',
             ])],

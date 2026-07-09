@@ -8,6 +8,7 @@ use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Webinars\Requests\UpdateWebinarMessageTemplateRequest;
+use App\Modules\Webinars\Services\WebinarMessageReadinessService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,11 @@ class WebinarMessageTemplateController extends Controller
             'description' => 'Sent after someone registers, using the registration message timing already owned by Webinars.',
             'usage_types' => ['webinar_confirmation'],
         ],
+        'registration_opt_in' => [
+            'label' => 'Registration opt-in confirmations',
+            'description' => 'Sent when someone grants webinar transactional messaging consent.',
+            'usage_types' => ['webinar_opt_in'],
+        ],
         'reminders' => [
             'label' => 'Reminder messages',
             'description' => 'Scheduled around the webinar start time. Changing the selected template affects future registrations only.',
@@ -31,6 +37,11 @@ class WebinarMessageTemplateController extends Controller
             'label' => 'Waitlist availability messages',
             'description' => 'Sent when a new webinar becomes available for people waiting on a series.',
             'usage_types' => ['webinar_waitlist_alert'],
+        ],
+        'waitlist_opt_in' => [
+            'label' => 'Waitlist opt-in confirmations',
+            'description' => 'Sent when someone grants marketing messaging consent while joining a webinar waitlist.',
+            'usage_types' => ['webinar_waitlist_opt_in'],
         ],
         'post_attended' => [
             'label' => 'Attended replay follow-up',
@@ -44,12 +55,20 @@ class WebinarMessageTemplateController extends Controller
         ],
     ];
 
-    public function index(Request $request): View
-    {
+    public function index(
+        Request $request,
+        WebinarMessageReadinessService $messageReadiness,
+    ): View {
         $catalogEntries = $this->webinarCatalogEntries();
         $currentAssignments = $this->currentAssignments($catalogEntries);
         $templateOptions = $this->templateOptions($catalogEntries);
-        $sections = $this->sections($catalogEntries, $currentAssignments, $templateOptions);
+        $readiness = $messageReadiness->resolve();
+        $sections = $this->sections($catalogEntries, $currentAssignments, $templateOptions)
+            ->map(function (array $section, string $sectionKey) use ($readiness): array {
+                $section['readiness'] = $readiness['contexts'][$sectionKey] ?? null;
+
+                return $section;
+            });
         $selectedSectionKey = $this->selectedSectionKey($request, $sections);
 
         return view('crm.webinars.message-templates.index', [
@@ -59,6 +78,7 @@ class WebinarMessageTemplateController extends Controller
             'selectedSectionKey' => $selectedSectionKey,
             'currentAssignments' => $currentAssignments,
             'templateOptions' => $templateOptions,
+            'readiness' => $readiness,
         ]);
     }
 
