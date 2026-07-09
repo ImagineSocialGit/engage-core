@@ -1,3 +1,4 @@
+
 <?php
 
 return [
@@ -15,7 +16,7 @@ return [
         'webinar_attended_nurture' => [
             'key' => 'webinar_attended_nurture',
             'name' => 'Webinar Attended Nurture',
-            'description' => 'Default marketing nurture sequence for leads who attended a webinar and should receive follow-up after the transactional replay/thank-you message.',
+            'description' => 'Default marketing nurture sequence for contacts who attended a webinar and should receive follow-up after the transactional replay/thank-you message.',
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
@@ -127,7 +128,7 @@ return [
         'webinar_missed_nurture' => [
             'key' => 'webinar_missed_nurture',
             'name' => 'Webinar Missed Nurture',
-            'description' => 'Default marketing nurture sequence for leads who registered for a webinar but missed it.',
+            'description' => 'Default marketing nurture sequence for contacts who registered for a webinar but missed it.',
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',

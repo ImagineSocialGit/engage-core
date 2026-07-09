@@ -1,16 +1,17 @@
+
 <?php
 
 return [
 
-    'default_workflow_status_key' => 'new',
+    'default_contact_status_key' => 'new',
 
     'labels' => [
-        'singular' => 'lead',
-        'plural' => 'leads',
+        'singular' => 'contact',
+        'plural' => 'contacts',
     ],
 
     'routes' => [
-        'plural' => 'leads',
+        'plural' => 'contacts',
     ],
 
     'sources' => [
@@ -61,9 +62,9 @@ return [
 
     'queues' => [
 
-        'ingestion' => env('LEAD_INGESTION_QUEUE', 'default'),
+        'ingestion' => env('CONTACT_INGESTION_QUEUE', 'default'),
 
-        'enrichment' => env('LEAD_ENRICHMENT_QUEUE', 'default'),
+        'enrichment' => env('CONTACT_ENRICHMENT_QUEUE', 'default'),
     ],
 
     'deduplication' => [

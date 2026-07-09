@@ -1,3 +1,4 @@
+
 <?php
 
 use App\Modules\Messaging\Payloads\SmsPayload;
@@ -6,6 +7,7 @@ return [
     'opt_ins' => [
         [
             'dispatch_key' => 'consent_granted',
+            'message_type' => 'opt_in',
             'channel' => 'sms',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',

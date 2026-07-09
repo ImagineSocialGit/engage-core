@@ -1,3 +1,4 @@
+
 <?php
 
 return [
@@ -5,7 +6,7 @@ return [
         'general_default' => ['new', 'engaged', 'requires_action', 'inactive'],
         'webinar_default' => ['new', 'registered', 'attended_webinar', 'missed_webinar', 'engaged', 'requires_action', 'inactive'],
         'mortgage_default' => ['new', 'registered', 'attended_webinar', 'missed_webinar', 'engaged', 'requires_action', 'application_started', 'prospect', 'in_process', 'closed', 'inactive', 'not_interested'],
-        'dog_training_default' => ['new', 'engaged', 'requires_action', 'inactive'],
+        'pet_service_default' => ['new', 'engaged', 'requires_action', 'inactive'],
         'musician_fan_default' => ['new', 'engaged', 'requires_action', 'inactive'],
     ],
     'definitions' => [

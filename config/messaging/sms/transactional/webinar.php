@@ -1,3 +1,4 @@
+
 <?php
 
 use App\Modules\Messaging\Payloads\SmsPayload;
@@ -7,6 +8,10 @@ return [
     'confirmations' => [
         [
             'dispatch_key' => 'registration_created',
+            'message_type' => 'confirmation',
+            'channel' => 'sms',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
 
             'conditions' => [
                 [
@@ -34,6 +39,10 @@ return [
     'opt_ins' => [
         [
             'dispatch_key' => 'consent_granted',
+            'message_type' => 'opt_in',
+            'channel' => 'sms',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
             'timing' => 'immediate',
             'payload_class' => SmsPayload::class,
             'queue' => 'opt_in_messages',
@@ -47,6 +56,10 @@ return [
     'reminders' => [
         [
             'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
+            'channel' => 'sms',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
             'timing' => 'scheduled',
             'payload_class' => SmsPayload::class,
             'queue' => 'reminders',
@@ -62,6 +75,10 @@ return [
         ],
         [
             'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
+            'channel' => 'sms',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
             'timing' => 'scheduled',
             'payload_class' => SmsPayload::class,
             'queue' => 'reminders',
@@ -77,6 +94,10 @@ return [
         ],
         [
             'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
+            'channel' => 'sms',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
             'timing' => 'scheduled',
             'payload_class' => SmsPayload::class,
             'queue' => 'reminders',
@@ -92,6 +113,10 @@ return [
         ],
         [
             'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
+            'channel' => 'sms',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
             'timing' => 'scheduled',
             'payload_class' => SmsPayload::class,
             'queue' => 'reminders',
@@ -107,6 +132,10 @@ return [
         ],
         [
             'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
+            'channel' => 'sms',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
             'timing' => 'scheduled',
             'payload_class' => SmsPayload::class,
             'queue' => 'reminders',
@@ -122,6 +151,10 @@ return [
         ],
         [
             'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
+            'channel' => 'sms',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
             'skip_when_join_clicked' => true,
             'timing' => 'scheduled',
             'payload_class' => SmsPayload::class,
@@ -141,6 +174,10 @@ return [
     'post_attended' => [
         [
             'dispatch_key' => 'webinar_ended',
+            'message_type' => 'post_attended',
+            'channel' => 'sms',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
             'conditions' => [
                 [
                     'field' => 'webinar_registration.attended_at',
@@ -160,6 +197,10 @@ return [
     'post_missed' => [
         [
             'dispatch_key' => 'webinar_ended',
+            'message_type' => 'post_missed',
+            'channel' => 'sms',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
             'conditions' => [
                 [
                     'field' => 'webinar_registration.attended_at',

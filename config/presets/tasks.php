@@ -1,3 +1,4 @@
+
 <?php
 
 use App\Modules\Tasks\Models\Task;
@@ -20,13 +21,13 @@ return [
         ],
 
         'webinar_default' => [
-            'webinar.call_hot_lead',
+            'webinar.call_high_intent_contact',
             'webinar.review_reply',
         ],
 
         'mortgage_default' => [
-            'mortgage.call_lead',
-            'mortgage.lead_documents',
+            'mortgage.call_contact',
+            'mortgage.contact_documents',
             'mortgage.review_application',
             'mortgage.waiting_on_realtor',
             'mortgage.waiting_on_vendor',
@@ -128,10 +129,10 @@ return [
             'category' => 'task_workspace',
         ],
 
-        'webinar.call_hot_lead' => [
-            'name' => 'Call hot lead',
-            'title' => 'Call webinar lead',
-            'description' => 'Follow up manually with a high-intent webinar lead.',
+        'webinar.call_high_intent_contact' => [
+            'name' => 'Call high-intent contact',
+            'title' => 'Call webinar contact',
+            'description' => 'Follow up manually with a high-intent webinar contact.',
             'task_description' => null,
             'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
             'assigned_to_strategy' => TaskTemplate::ASSIGNED_TO_STRATEGY_UNASSIGNED,
@@ -156,10 +157,10 @@ return [
             'category' => 'webinar',
         ],
 
-        'mortgage.call_lead' => [
-            'name' => 'Call lead',
-            'title' => 'Call lead',
-            'description' => 'Call the lead for next-step follow-up.',
+        'mortgage.call_contact' => [
+            'name' => 'Call contact',
+            'title' => 'Call contact',
+            'description' => 'Call the contact for next-step follow-up.',
             'task_description' => null,
             'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
             'assigned_to_strategy' => TaskTemplate::ASSIGNED_TO_STRATEGY_UNASSIGNED,
@@ -170,10 +171,10 @@ return [
             'category' => 'mortgage',
         ],
 
-        'mortgage.lead_documents' => [
-            'name' => 'Lead documents',
-            'title' => 'Lead needs to provide documents',
-            'description' => 'Track documents or information needed from the lead.',
+        'mortgage.contact_documents' => [
+            'name' => 'Contact documents',
+            'title' => 'Contact needs to provide documents',
+            'description' => 'Track documents or information needed from the contact.',
             'task_description' => null,
             'responsible_party' => Task::RESPONSIBLE_PARTY_CONTACT,
             'assigned_to_strategy' => TaskTemplate::ASSIGNED_TO_STRATEGY_UNASSIGNED,
@@ -189,8 +190,8 @@ return [
 
         'mortgage.review_application' => [
             'name' => 'Review application',
-            'title' => 'Review lead application',
-            'description' => 'Review lead application details.',
+            'title' => 'Review contact application',
+            'description' => 'Review contact application details.',
             'task_description' => null,
             'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
             'assigned_to_strategy' => TaskTemplate::ASSIGNED_TO_STRATEGY_UNASSIGNED,

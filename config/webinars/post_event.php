@@ -1,3 +1,4 @@
+
 <?php
 
 use App\Modules\Webinars\Actions\PostEvent\DispatchPostWebinarFollowUpsAction;
@@ -58,10 +59,6 @@ return [
 
         'missed' => [
             'event_key' => 'webinar.missed',
-        ],
-
-        'replay_available' => [
-            'event_key' => 'webinar.replay_available',
         ],
     ],
 ];

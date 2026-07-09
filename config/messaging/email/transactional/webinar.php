@@ -1,3 +1,4 @@
+
 <?php
 
 use App\Modules\Messaging\Payloads\EmailPayload;
@@ -25,6 +26,7 @@ return [
     'confirmations' => [
         [
             'dispatch_key' => 'registration_created',
+            'message_type' => 'confirmation',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -64,6 +66,7 @@ return [
     'opt_ins' => [
         [
             'dispatch_key' => 'consent_granted',
+            'message_type' => 'opt_in',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -82,6 +85,7 @@ return [
     'reminders' => [
         [
             'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -107,6 +111,7 @@ return [
 
         [
             'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -132,6 +137,7 @@ return [
 
         [
             'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -157,6 +163,7 @@ return [
 
         [
             'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -182,6 +189,7 @@ return [
 
         [
             'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -207,6 +215,7 @@ return [
 
         [
             'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -235,6 +244,7 @@ return [
     'post_attended' => [
         [
             'dispatch_key' => 'webinar_ended',
+            'message_type' => 'post_attended',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -264,6 +274,7 @@ return [
     'post_missed' => [
         [
             'dispatch_key' => 'webinar_ended',
+            'message_type' => 'post_missed',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',

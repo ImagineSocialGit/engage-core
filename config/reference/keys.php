@@ -1,3 +1,4 @@
+
 <?php
 
 return [
@@ -71,7 +72,7 @@ return [
             'status' => 'active',
         ],
         'webinar_waitlist' => [
-            'description' => 'Marketing/waitlist messages for leads waiting for future webinar availability.',
+            'description' => 'Marketing/waitlist messages for contacts waiting for future webinar availability.',
             'preferred_purposes' => ['marketing'],
             'status' => 'active',
         ],
@@ -108,6 +109,10 @@ return [
     ],
 
     'queues' => [
+        'default' => [
+            'description' => 'Default application queue.',
+            'status' => 'active',
+        ],
         'confirmation_messages' => [
             'description' => 'Registration confirmations and similar confirmation messages.',
             'status' => 'active',
@@ -133,7 +138,19 @@ return [
             'status' => 'active',
         ],
         'notifications' => [
-            'description' => 'Internal/team notifications.',
+            'description' => 'Internal/team notifications and shared notification work.',
+            'status' => 'active',
+        ],
+        'sms' => [
+            'description' => 'Default SMS transport queue when provider-specific scheduling uses it.',
+            'status' => 'active',
+        ],
+        'webinars' => [
+            'description' => 'Webinar registration and provider orchestration work.',
+            'status' => 'active',
+        ],
+        'webhooks' => [
+            'description' => 'Inbound provider webhook processing.',
             'status' => 'active',
         ],
     ],
@@ -159,7 +176,7 @@ return [
             'status' => 'active',
         ],
         'webinar_added' => [
-            'description' => 'A new webinar became available for waitlisted leads.',
+            'description' => 'A new webinar became available for waitlisted contacts.',
             'used_by' => ['webinars', 'messaging'],
             'recommended_for' => [
                 'webinar waitlist availability notification',
@@ -187,11 +204,15 @@ return [
             'typical_channel_purpose_scope' => ['email:marketing:webinar_nurture', 'sms:marketing:webinar_nurture'],
             'status' => 'active',
         ],
-        'marketing_message_sent' => [
-            'description' => 'Legacy/alternate campaign step trigger. Prefer campaign_step_due for new configs.',
-            'used_by' => ['campaigns'],
-            'recommended_for' => [],
-            'status' => 'legacy',
+        'broadcast_send' => [
+            'description' => 'A one-time Broadcast message should be scheduled through Messaging.',
+            'used_by' => ['broadcasts', 'messaging'],
+            'recommended_for' => [
+                'one-time email Broadcasts',
+                'one-time SMS Broadcasts',
+            ],
+            'typical_channel_purpose_scope' => ['email:marketing:broadcast', 'sms:marketing:broadcast'],
+            'status' => 'active',
         ],
         'imported_contact_permission_invitation' => [
             'description' => 'One-time imported-contact permission invitation email should be planned.',
@@ -205,95 +226,40 @@ return [
     ],
 
     'message_types' => [
-        'registration_confirmation' => [
-            'description' => 'Initial webinar registration confirmation.',
+        'confirmation' => [
+            'description' => 'Reusable confirmation message identity. Exact schedule-slot identity belongs to the owning schedule/profile item or source config path.',
             'dispatch_key' => 'registration_created',
-            'status' => 'recommended',
+            'status' => 'active',
         ],
-        'webinar_reminder_10d' => [
-            'description' => 'Ten-day webinar reminder.',
-            'dispatch_key' => 'registration_created',
-            'status' => 'recommended',
+        'opt_in' => [
+            'description' => 'Consent opt-in confirmation message identity.',
+            'dispatch_key' => 'consent_granted',
+            'status' => 'active',
         ],
-        'webinar_reminder_7d' => [
-            'description' => 'Seven-day webinar reminder.',
+        'reminder' => [
+            'description' => 'Reusable reminder message identity. Do not create schedule-specific message types for 10-day, 30-minute, live-now, or similar slots.',
             'dispatch_key' => 'registration_created',
-            'status' => 'recommended',
+            'status' => 'active',
         ],
-        'webinar_reminder_24h' => [
-            'description' => 'Twenty-four-hour webinar reminder.',
-            'dispatch_key' => 'registration_created',
-            'status' => 'recommended',
-        ],
-        'webinar_reminder_30m' => [
-            'description' => 'Thirty-minute webinar reminder.',
-            'dispatch_key' => 'registration_created',
-            'status' => 'recommended',
-        ],
-        'webinar_reminder_10m' => [
-            'description' => 'Ten-minute webinar reminder.',
-            'dispatch_key' => 'registration_created',
-            'status' => 'recommended',
-        ],
-        'webinar_live_now' => [
-            'description' => 'Live-now webinar join message.',
-            'dispatch_key' => 'registration_created',
-            'status' => 'recommended',
+        'alert' => [
+            'description' => 'Reusable availability/alert message identity, including webinar waitlist availability notices.',
+            'dispatch_key' => 'webinar_added',
+            'status' => 'active',
         ],
         'post_attended' => [
-            'description' => 'Post-webinar message for attended registrations.',
+            'description' => 'Post-webinar transactional follow-up for attended registrations.',
             'dispatch_key' => 'webinar_ended',
-            'status' => 'recommended',
+            'status' => 'active',
         ],
         'post_missed' => [
-            'description' => 'Post-webinar message for missed registrations.',
+            'description' => 'Post-webinar transactional follow-up for missed registrations.',
             'dispatch_key' => 'webinar_ended',
-            'status' => 'recommended',
-        ],
-        'marketing_opt_in' => [
-            'description' => 'Marketing opt-in confirmation.',
-            'dispatch_key' => 'consent_granted',
-            'status' => 'recommended',
-        ],
-        'waitlist_webinar_added' => [
-            'description' => 'Notify a waitlisted lead that a webinar is available.',
-            'dispatch_key' => 'webinar_added',
-            'status' => 'recommended',
-        ],
-        'attended_thank_you_next_step' => [
-            'description' => 'First attended nurture email.',
-            'dispatch_key' => 'campaign_step_due',
-            'status' => 'recommended',
-        ],
-        'attended_common_questions' => [
-            'description' => 'Attended nurture email covering common next-step questions.',
-            'dispatch_key' => 'campaign_step_due',
-            'status' => 'recommended',
-        ],
-        'attended_long_term_handoff' => [
-            'description' => 'Attended nurture message handing off to long-term nurture.',
-            'dispatch_key' => 'campaign_step_due',
-            'status' => 'recommended',
-        ],
-        'missed_replay_next_step' => [
-            'description' => 'First missed nurture/replay email.',
-            'dispatch_key' => 'campaign_step_due',
-            'status' => 'recommended',
-        ],
-        'missed_join_next_webinar' => [
-            'description' => 'Invite missed webinar lead to register for another webinar.',
-            'dispatch_key' => 'campaign_step_due',
-            'status' => 'recommended',
-        ],
-        'long_term_homebuyer_tip' => [
-            'description' => 'Long-term homebuyer nurture email.',
-            'dispatch_key' => 'campaign_step_due',
-            'status' => 'recommended',
+            'status' => 'active',
         ],
         'imported_contact_permission_invitation' => [
             'description' => 'One-time imported-contact permission invitation email.',
             'dispatch_key' => 'imported_contact_permission_invitation',
-            'status' => 'recommended',
+            'status' => 'active',
         ],
     ],
 
@@ -301,25 +267,25 @@ return [
         'webinar.registered' => [
             'producer' => 'webinars',
             'contact_required' => true,
-            'description' => 'A lead registered for a webinar.',
+            'description' => 'A contact registered for a webinar.',
             'status' => 'active',
         ],
         'webinar.cancelled' => [
             'producer' => 'webinars',
             'contact_required' => true,
-            'description' => 'A lead cancelled a webinar registration.',
+            'description' => 'A contact cancelled a webinar registration.',
             'status' => 'active',
         ],
         'webinar.attended' => [
             'producer' => 'webinars',
             'contact_required' => true,
-            'description' => 'A lead attended a webinar.',
+            'description' => 'A contact attended a webinar.',
             'status' => 'active',
         ],
         'webinar.missed' => [
             'producer' => 'webinars',
             'contact_required' => true,
-            'description' => 'A registered lead missed a webinar.',
+            'description' => 'A registered contact missed a webinar.',
             'status' => 'active',
         ],
         'webinar.ended' => [
@@ -337,20 +303,20 @@ return [
         'permission_invitation.accepted' => [
             'producer' => 'messaging',
             'contact_required' => true,
-            'description' => 'An imported-contact permission invitation was accepted.',
-            'status' => 'active',
+            'description' => 'Reserved for the Phase 7 decision about whether accepted imported-contact permission invitations emit a neutral automation event.',
+            'status' => 'planned',
         ],
     ],
 
     'campaign_keys' => [
         'webinar_attended_nurture' => [
-            'description' => 'Default nurture campaign for leads who attended a webinar.',
+            'description' => 'Default nurture campaign for contacts who attended a webinar.',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => 'active',
         ],
         'webinar_missed_nurture' => [
-            'description' => 'Default nurture campaign for leads who missed a webinar.',
+            'description' => 'Default nurture campaign for contacts who missed a webinar.',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => 'active',
@@ -400,23 +366,71 @@ return [
     ],
 
     'task_template_keys' => [
-        'call_lead' => [
-            'description' => 'Call the lead and record the outcome.',
-            'status' => 'recommended',
+        'general.follow_up' => [
+            'description' => 'General follow-up task.',
+            'status' => 'active',
         ],
-        'review_lead_notes' => [
-            'description' => 'Review lead history and determine the next best action.',
-            'status' => 'recommended',
+        'general.review' => [
+            'description' => 'Review a contact, request, file, or manual item.',
+            'status' => 'active',
+        ],
+        'general.waiting_on_contact' => [
+            'description' => 'Track something the contact needs to provide or complete.',
+            'status' => 'active',
+        ],
+        'general.waiting_on_third_party' => [
+            'description' => 'Track a dependency owned by a vendor, partner, or other third party.',
+            'status' => 'active',
+        ],
+        'task_workspace.follow_up' => [
+            'description' => 'Simple task-workspace follow-up.',
+            'status' => 'active',
+        ],
+        'task_workspace.review_item' => [
+            'description' => 'Review a manual item or dependency.',
+            'status' => 'active',
+        ],
+        'task_workspace.waiting_on_someone' => [
+            'description' => 'Track something that depends on another person.',
+            'status' => 'active',
+        ],
+        'webinar.call_high_intent_contact' => [
+            'description' => 'Call a high-intent webinar contact.',
+            'status' => 'active',
+        ],
+        'webinar.review_reply' => [
+            'description' => 'Review and respond to a webinar-related inbound reply.',
+            'status' => 'active',
+        ],
+        'mortgage.call_contact' => [
+            'description' => 'Call the mortgage contact for next-step follow-up.',
+            'status' => 'active',
+        ],
+        'mortgage.contact_documents' => [
+            'description' => 'Track documents or information needed from the mortgage contact.',
+            'status' => 'active',
+        ],
+        'mortgage.review_application' => [
+            'description' => 'Review mortgage application details.',
+            'status' => 'active',
+        ],
+        'mortgage.waiting_on_realtor' => [
+            'description' => 'Track a realtor-owned dependency.',
+            'status' => 'active',
+        ],
+        'mortgage.waiting_on_vendor' => [
+            'description' => 'Track a title, appraisal, inspection, or other vendor dependency.',
+            'status' => 'active',
         ],
     ],
 
     'future_keys' => [
         'dispatch_keys' => [
-            'appointment_scheduled' => 'A lead appointment/consultation was scheduled.',
-            'appointment_cancelled' => 'A lead appointment/consultation was cancelled.',
-            'application_started' => 'A lead started an application.',
-            'application_submitted' => 'A lead submitted an application.',
-            'document_requested' => 'A document was requested from a lead or third party.',
+            'appointment_scheduled' => 'A contact appointment/consultation was scheduled.',
+            'appointment_cancelled' => 'A contact appointment/consultation was cancelled.',
+            'application_started' => 'A contact started an application.',
+            'application_submitted' => 'A contact submitted an application.',
+            'document_requested' => 'A document was requested from a contact or third party.',
             'document_received' => 'A document was received.',
             'task_created' => 'A task was created and a notification may be needed.',
             'task_due' => 'A task is due soon.',

@@ -1,8 +1,9 @@
+
 <?php
 
 return [
 
-    'enabled' => config('client.modules.messaging', env('SMS_ENABLED', true)),
+    'enabled' => env('SMS_ENABLED', true),
 
     'provider' => env('SMS_PROVIDER', 'telnyx'),
 

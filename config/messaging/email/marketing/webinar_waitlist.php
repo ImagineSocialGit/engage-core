@@ -1,3 +1,4 @@
+
 <?php
 
 use App\Modules\Messaging\Payloads\EmailPayload;
@@ -7,6 +8,10 @@ return [
     'alerts' => [
         [
             'dispatch_key' => 'webinar_added',
+            'message_type' => 'alert',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar_waitlist',
             'timing' => 'immediate',
             'payload_class' => EmailPayload::class,
             'queue' => 'notifications',
@@ -32,6 +37,10 @@ return [
     'opt_ins' => [
         [
             'dispatch_key' => 'consent_granted',
+            'message_type' => 'opt_in',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar_waitlist',
             'timing' => 'immediate',
             'payload_class' => EmailPayload::class,
             'queue' => 'opt_in_messages',
