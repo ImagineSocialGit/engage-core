@@ -6,6 +6,7 @@ use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Webinars\Console\Commands\SyncWebinarScheduleProfilesCommand;
 use App\Modules\Webinars\Services\ContactPanels\WebinarContactPanelProvider;
 use App\Modules\Webinars\Services\Dashboard\WebinarActivityDashboardPanelProvider;
+use App\Modules\Webinars\Validation\WebinarsSetupValidationContributor;
 use App\Support\Dashboard\DashboardPanelRegistry;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -19,6 +20,10 @@ class WebinarsModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             WebinarActivityDashboardPanelProvider::class,
         ], DashboardPanelRegistry::providerTag());
+
+        $this->app->tag([
+            WebinarsSetupValidationContributor::class,
+        ], 'setup.validation_contributors');
     }
 
     public function boot(): void

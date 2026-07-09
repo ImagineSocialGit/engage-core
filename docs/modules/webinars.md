@@ -1,3 +1,4 @@
+
 # Webinars Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -90,9 +91,9 @@ At most one active default Webinar schedule profile should exist. Config sync mu
 
 ## Webinars setup validation ownership
 
-Webinars should contribute Webinars-owned setup checks to the shared app-level setup validation manager.
+Webinars contributes Webinars-owned setup checks through `WebinarsSetupValidationContributor` to the shared app-level setup validation manager.
 
-Webinars validation should use Webinars-owned schedule/profile definitions and public Messaging validation/resolution seams rather than duplicating Messaging internals.
+Webinars validation uses Webinars-owned schedule/profile definitions and public Messaging validation/resolution seams rather than duplicating Messaging internals. Missing compatible Messaging definitions are hard errors; a valid definition whose channel is unavailable for the surface is a warning.
 
 At minimum, validate:
 
@@ -236,3 +237,5 @@ Dev testing actions should still use public module seams:
 The dev UI should behave like an operator console. Actions inside testing modals should use AJAX/fetch where practical so the modal, selected registration, loaded message options, and activity log are not lost after each action.
 
 Sim Join should skip already-queued live reminders when the real definition has skip_when_join_clicked enabled. Manual dev sends are forced sends and may still send a selected reminder afterward so the exact payload can be tested.
+
+

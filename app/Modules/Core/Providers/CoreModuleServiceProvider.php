@@ -7,6 +7,7 @@ use App\Modules\Core\Data\Contacts\ContactImportField;
 use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Core\Support\Contacts\ContactShowDataRegistry;
+use App\Modules\Core\Validation\CoreSetupValidationContributor;
 use Illuminate\Support\ServiceProvider;
 
 class CoreModuleServiceProvider extends ServiceProvider
@@ -96,6 +97,11 @@ class CoreModuleServiceProvider extends ServiceProvider
                 ),
             ]);
         });
+
+        $this->app->tag(
+            CoreSetupValidationContributor::class,
+            'setup.validation_contributors',
+        );
     }
 
     public function boot(): void

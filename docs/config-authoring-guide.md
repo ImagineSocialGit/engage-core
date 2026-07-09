@@ -1,6 +1,7 @@
 
 
 
+
 # Engage Core Config Authoring Guide
 
 This guide is for creating or reviewing Engage Core default configs and client-specific configs.
@@ -1212,24 +1213,33 @@ Return complete config files and list any recommended new keys/tokens separately
 
 
 
-## Phase 6 setup validation architecture
+## Setup validation architecture
 
-Setup validation should be reusable infrastructure, not a one-off Artisan command full of module-specific conditionals.
+Setup validation is reusable infrastructure, not a one-off Artisan command full of module-specific conditionals.
 
-Preferred architecture:
+Implemented architecture:
 
 ```text
-SetupValidationManager / orchestrator
-    -> registered validation contributors/validators
-        -> module-owned validators
-        -> app-level/package/module dependency validators
+SetupValidationManager
+    -> tagged setup.validation_contributors
+        -> module-owned contributors
+        -> app-level module-dependency contributor
+        -> app-level reference-registry drift contributor
         -> adapters around existing validators such as MessageConfigValidator
     -> structured SetupValidationFinding records in memory
     -> SetupValidationResult
-        -> CLI output now
+        -> setup:validate CLI output now
         -> staging/client handoff blocking now
         -> future authoring UI, readiness screens, and builder feedback later
 ```
+
+Run the non-mutating readiness check with:
+
+```bash
+php artisan setup:validate
+```
+
+Errors return failure and block staging/client handoff. Warnings remain non-blocking. Clean results return success. Findings are not persisted by default.
 
 The shared finding shape should be stable enough for CLI and UI consumers. At minimum, audit these fields:
 
@@ -1344,9 +1354,9 @@ Available field/token
     -> context-aware registry/provider plus the runtime data source that can actually supply it
 ```
 
-`config/reference/keys.php` and `config/reference/tokens.php` remain important authoring/reference registries. Phase 6 validation should detect drift between those registries and owning definitions, but should not incorrectly reject a valid executable reference merely because a stale documentation registry was treated as the only truth.
+`config/reference/keys.php` and `config/reference/tokens.php` remain important authoring/reference registries. Setup validation detects reliable registry drift where an owning executable/config source exists, but does not incorrectly reject a valid executable reference merely because a stale documentation registry was treated as the only truth.
 
-### Phase 6 implementation order
+### Completed Phase 6 implementation order
 
 Use this order so code is not built around inconsistent docs/configs:
 
@@ -1498,7 +1508,7 @@ Client token registries for documented client-specific extensions
 
 Do not invent a selectable field in UI or config unless the owning runtime payload/data object/provider can actually supply it.
 
-Phase 6 config/setup validation should check:
+Setup validation should check:
 
 ```text
 field/token exists for the current context
@@ -1553,6 +1563,8 @@ business context label
 ```
 
 Do not persist schedule summary text unless a concrete reason appears. Prefer deriving it from the canonical schedule/profile/criteria definition.
+
+
 
 
 

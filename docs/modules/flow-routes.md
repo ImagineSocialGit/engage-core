@@ -1,5 +1,6 @@
 
 
+
 # FlowRoutes Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -332,17 +333,21 @@ Capabilities do not give FlowRoutes permission to mutate another module's privat
 
 ## FlowRoutes setup validation ownership
 
-FlowRoutes should contribute FlowRoutes-owned checks to the shared app-level setup validation manager.
+FlowRoutes contributes FlowRoutes-owned checks through `FlowRoutesSetupValidationContributor` to the shared app-level setup validation manager.
 
-FlowRoutes validation should use these sources of truth:
+FlowRoutes validation uses these sources of truth:
 
 ```text
 FlowRoute preset definition DTOs
-FlowRoute point preset definition DTOs
+FlowRoute point definition DTOs
+AutomationCapabilityRegistry for declared capabilities
 PointHandlerRegistry for actually registered executable point types
 DB-owned FlowRouteCapability / FlowRouteCapabilityBinding records where runtime/client context matters
-actual owning-module preset definitions or public resolvers for referenced Task templates, Campaigns, Messaging templates, statuses, and future vertical capabilities
+DB-owned active/current route, trigger-binding, progress, and plan state
+actual owning-module runtime truth or public resolvers for referenced Task templates, Campaigns, Messaging templates, statuses, and future vertical capabilities
 ```
+
+Validation deliberately distinguishes declared capability metadata from actually registered executable handlers and from DB-owned capability/binding state. A DB capability row cannot make unavailable runtime behavior executable.
 
 At minimum, validate:
 
@@ -369,7 +374,7 @@ A configured route point that cannot execute because its handler, required modul
 
 A dormant unused capability that is safely unavailable may be a warning.
 
-Do not make one global validator import every producer module's private models/config internals. FlowRoutes should validate cross-module references through shared setup-validation context and owning-module contributors/public seams.
+Do not make one global validator import every producer module's private models/config internals. FlowRoutes validates cross-module references through owning runtime truth/public seams while the shared manager only composes contributors. Future vertical modules should register their own contributors when they own real selected/executable reference contracts.
 
 ## TaskTemplate requirement for create_task points
 
@@ -633,5 +638,7 @@ Manage the automatic routes that create tasks, send messages, update statuses, a
 ```
 
 Route Management UX should explain available actions through FlowRouteCapability metadata rather than importing module internals.
+
+
 
 

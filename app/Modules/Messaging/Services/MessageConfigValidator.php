@@ -171,6 +171,30 @@ class MessageConfigValidator
      * @param array<int, string> $allowedTokens
      * @return array<int, array{level: string, path: string, message: string}>
      */
+    public function validateDefinitionArray(
+        array $definition,
+        string $path,
+        MessageChannel|string|null $channel = null,
+        array $allowedTokens = [],
+    ): array {
+        $channel = $channel === null
+            ? null
+            : $this->normalizeEnumValue($channel);
+
+        return $this->validateDefinition(
+            definition: $definition,
+            path: $path,
+            channel: $channel,
+            allowedTokens: $allowedTokens,
+            campaignTemplate: false,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     * @param array<int, string> $allowedTokens
+     * @return array<int, array{level: string, path: string, message: string}>
+     */
     private function validateDefinition(
         array $definition,
         string $path,

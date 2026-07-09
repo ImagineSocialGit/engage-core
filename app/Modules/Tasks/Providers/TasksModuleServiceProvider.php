@@ -12,6 +12,7 @@ use App\Modules\Tasks\Services\ContactShow\ContactTaskVisibilityDataProvider;
 use App\Modules\Tasks\Services\RelatedSubjects\ContactTaskRelatedSubjectResolver;
 use App\Modules\Tasks\Services\TaskAssignedRecipientsResolver;
 use App\Modules\Tasks\Services\TaskRelatedSubjectResolver;
+use App\Modules\Tasks\Validation\TasksSetupValidationContributor;
 use App\Support\Dashboard\DashboardPanelRegistry;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -23,6 +24,10 @@ class TasksModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             TasksAutomationCapabilityContributor::class,
         ], 'automation.capability_contributors');
+
+        $this->app->tag([
+            TasksSetupValidationContributor::class,
+        ], 'setup.validation_contributors');
 
         $this->app->tag([
             TeamMemberTaskAssignedRecipientResolver::class,

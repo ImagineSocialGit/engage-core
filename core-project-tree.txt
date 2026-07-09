@@ -2,7 +2,8 @@
 ├── app
 │   ├── Console
 │   │   └── Commands
-│   │       └── SyncPresetsCommand.php
+│   │       ├── SyncPresetsCommand.php
+│   │       └── ValidateSetupCommand.php
 │   ├── helpers.php
 │   ├── Http
 │   │   ├── Controllers
@@ -104,7 +105,9 @@
 │   │   │   │   ├── CampaignMessageDefinitionResolver.php
 │   │   │   │   └── ContactShow
 │   │   │   │       └── ContactCampaignsVisibilityDataProvider.php
-│   │   │   └── Support
+│   │   │   ├── Support
+│   │   │   └── Validation
+│   │   │       └── CampaignsSetupValidationContributor.php
 │   │   ├── Commerce
 │   │   │   ├── Actions
 │   │   │   ├── Contracts
@@ -167,11 +170,13 @@
 │   │   │   │   └── Contacts
 │   │   │   │       ├── ContactFilterResolver.php
 │   │   │   │       └── ContactImportStatusMapper.php
-│   │   │   └── Support
-│   │   │       └── Contacts
-│   │   │           ├── ContactImportRegistry.php
-│   │   │           ├── ContactPanelRegistry.php
-│   │   │           └── ContactShowDataRegistry.php
+│   │   │   ├── Support
+│   │   │   │   └── Contacts
+│   │   │   │       ├── ContactImportRegistry.php
+│   │   │   │       ├── ContactPanelRegistry.php
+│   │   │   │       └── ContactShowDataRegistry.php
+│   │   │   └── Validation
+│   │   │       └── CoreSetupValidationContributor.php
 │   │   ├── Documents
 │   │   │   ├── Actions
 │   │   │   ├── Contracts
@@ -276,7 +281,9 @@
 │   │   │   │   ├── FlowRouteConditionEvaluatorRegistry.php
 │   │   │   │   ├── FlowRouteTriggerBindingResolver.php
 │   │   │   │   └── PointHandlerRegistry.php
-│   │   │   └── Support
+│   │   │   ├── Support
+│   │   │   └── Validation
+│   │   │       └── FlowRoutesSetupValidationContributor.php
 │   │   ├── Forms
 │   │   │   ├── Actions
 │   │   │   ├── Contracts
@@ -477,8 +484,10 @@
 │   │   │   │       ├── SmsMessagingService.php
 │   │   │   │       ├── SmsProviderManager.php
 │   │   │   │       └── SmsSendGuard.php
-│   │   │   └── Support
-│   │   │       └── EmailConsentRevocationLinkGenerator.php
+│   │   │   ├── Support
+│   │   │   │   └── EmailConsentRevocationLinkGenerator.php
+│   │   │   └── Validation
+│   │   │       └── MessagingSetupValidationContributor.php
 │   │   ├── Mortgage
 │   │   │   ├── Actions
 │   │   │   ├── Contracts
@@ -575,7 +584,9 @@
 │   │   │   │   ├── TaskAssignedRecipientsResolver.php
 │   │   │   │   ├── TaskRelatedSubjectResolver.php
 │   │   │   │   └── TaskRelatedTypeResolver.php
-│   │   │   └── Support
+│   │   │   ├── Support
+│   │   │   └── Validation
+│   │   │       └── TasksSetupValidationContributor.php
 │   │   ├── Webinars
 │   │   │   ├── Actions
 │   │   │   │   ├── AddRegistrantToWebinarProviderAction.php
@@ -654,11 +665,13 @@
 │   │   │   │   ├── WebinarProviderManager.php
 │   │   │   │   ├── WebinarScheduleProfileDefinitionResolver.php
 │   │   │   │   └── WebinarScheduleProfileResolver.php
-│   │   │   └── Support
-│   │   │       ├── WebinarJoinLinkGenerator.php
-│   │   │       ├── WebinarPlaybackLinkGenerator.php
-│   │   │       ├── WebinarRegisterPageConfig.php
-│   │   │       └── WebinarRegistrationCancelLinkGenerator.php
+│   │   │   ├── Support
+│   │   │   │   ├── WebinarJoinLinkGenerator.php
+│   │   │   │   ├── WebinarPlaybackLinkGenerator.php
+│   │   │   │   ├── WebinarRegisterPageConfig.php
+│   │   │   │   └── WebinarRegistrationCancelLinkGenerator.php
+│   │   │   └── Validation
+│   │   │       └── WebinarsSetupValidationContributor.php
 │   │   └── Workflow
 │   │       ├── Actions
 │   │       │   └── TransitionContactWorkflowStatusAction.php
@@ -706,8 +719,18 @@
 │       │   ├── Contracts
 │       │   │   └── DashboardPanelProvider.php
 │       │   └── DashboardPanelRegistry.php
-│       └── Modules
-│           └── ModuleManager.php
+│       ├── Modules
+│       │   └── ModuleManager.php
+│       └── SetupValidation
+│           ├── Contracts
+│           │   └── SetupValidationContributor.php
+│           ├── Contributors
+│           │   ├── ModuleDependenciesSetupValidationContributor.php
+│           │   └── ReferenceRegistrySetupValidationContributor.php
+│           ├── Data
+│           │   ├── SetupValidationFinding.php
+│           │   └── SetupValidationResult.php
+│           └── SetupValidationManager.php
 ├── artisan
 ├── bootstrap
 │   ├── app.php
@@ -1246,6 +1269,7 @@
 │   │   │   └── ScheduleBroadcastActionTest.php
 │   │   ├── Campaigns
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
+│   │   │   ├── CampaignsSetupValidationContributorTest.php
 │   │   │   ├── CampaignStepVariantsTest.php
 │   │   │   ├── CampaignVariantDependencyAwareTest.php
 │   │   │   ├── CampaignVariantPresetSyncSpecificityTest.php
@@ -1262,7 +1286,8 @@
 │   │   │   ├── ContactFilterResolverTest.php
 │   │   │   ├── ContactImportBatchControllerTest.php
 │   │   │   ├── ContactImportStatusMappingTest.php
-│   │   │   └── ContactLookupControllerTest.php
+│   │   │   ├── ContactLookupControllerTest.php
+│   │   │   └── CoreSetupValidationContributorTest.php
 │   │   ├── CRM
 │   │   │   ├── DashboardControllerTest.php
 │   │   │   ├── UpdateContactStatusActionTest.php
@@ -1276,6 +1301,7 @@
 │   │   │   ├── FlowRouteConditionBranchPointTest.php
 │   │   │   ├── FlowRoutePointExecutionFoundationTest.php
 │   │   │   ├── FlowRoutesModelSchemaTest.php
+│   │   │   ├── FlowRoutesSetupValidationContributorTest.php
 │   │   │   ├── FlowRouteTriggerBindingTest.php
 │   │   │   ├── HandleContactWorkflowStatusChangedTest.php
 │   │   │   └── SyncFlowRoutePresetsActionTest.php
@@ -1308,6 +1334,7 @@
 │   │   │   ├── MessageTemplatePresetAssignmentResolverTest.php
 │   │   │   ├── MessageTemplatePresetControllerTest.php
 │   │   │   ├── MessageTemplatePresetSyncActionTest.php
+│   │   │   ├── MessagingSetupValidationContributorTest.php
 │   │   │   ├── ScheduleInternalNotificationActionTest.php
 │   │   │   ├── SendScheduledMessageJobTest.php
 │   │   │   ├── SmsMessagingServiceTest.php
@@ -1324,8 +1351,15 @@
 │   │   │   └── PortalFoundationTest.php
 │   │   ├── Scheduling
 │   │   │   └── SchedulingFoundationTest.php
+│   │   ├── SetupValidation
+│   │   │   ├── ModuleDependenciesSetupValidationContributorTest.php
+│   │   │   ├── ReferenceRegistrySetupValidationContributorTest.php
+│   │   │   ├── SetupValidationManagerTest.php
+│   │   │   ├── SetupValidationRegistrationTest.php
+│   │   │   └── ValidateSetupCommandTest.php
 │   │   ├── Tasks
-│   │   │   └── RuntimeTaskBehaviorTest.php
+│   │   │   ├── RuntimeTaskBehaviorTest.php
+│   │   │   └── TasksSetupValidationContributorTest.php
 │   │   ├── Webhooks
 │   │   │   ├── EmailWebhookControllerTest.php
 │   │   │   ├── SmsWebhookControllerTest.php
@@ -1342,10 +1376,11 @@
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
 │   │   │   ├── WebinarRegistrationControllerTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
+│   │   │   ├── WebinarsSetupValidationContributorTest.php
 │   │   │   └── WebinarWaitlistSignupControllerTest.php
 │   │   └── Workflow
 │   │       └── TransitionContactWorkflowStatusActionTest.php
 │   └── TestCase.php
 └── vite.config.js
 
-443 directories, 906 files
+454 directories, 930 files

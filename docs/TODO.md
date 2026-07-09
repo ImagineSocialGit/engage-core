@@ -1,5 +1,6 @@
 
 
+
 # Engage Core TODO
 
 This file is intentionally disposable. Add work here when it is real but not yet ready for an implementation slice. Delete items as they are completed. Do not treat this as an architectural reference; long-lived decisions belong in `module-boundaries.md` or a feature-specific doc.
@@ -61,9 +62,9 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [ ] Confirm missing optional content/style keys do not break public pages.
 - [ ] Confirm tests are tolerant of client copy changes unless exact copy is the behavior under test.
 - [ ] Confirm unsupported keys are rejected, flagged, or intentionally ignored with clear operator/debug feedback.
-- [ ] Classify config validation findings as hard errors or warnings.
-- [ ] Confirm hard errors block staging/client handoff.
-- [ ] Confirm warnings give useful operator/debug guidance without blocking safe runtime behavior.
+- [x] Classify config validation findings as hard errors or warnings.
+- [x] Confirm hard errors block staging/client handoff.
+- [x] Confirm warnings give useful operator/debug guidance without blocking safe runtime behavior.
 - [ ] Confirm client config overrides preserve unspecified nested defaults where fallback is expected.
 
 ### After each permission-invitation update
@@ -186,7 +187,7 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Supports unambiguous route-created Task artifact matching.
   - Supports explicit event_wait correlation for routes that may create multiple tasks.
   - Covers the real CompleteTaskAction → TaskCompleted → AutomationEventRecorded → FlowRoutes listener chain.
-- [ ] Phase 6 — Config validation / setup validation. Current phase; 6A/6B/6C complete, 6D next.
+- [x] Phase 6 — Config validation / setup validation. Complete; 6A–6E are green.
   - [x] Phase 6A — Documentation audit and contract normalization.
     - Docs define authoritative terminology, config ownership, validation ownership, severity direction, extension seams, and source-of-truth rules.
     - Internal/runtime identifiers use `contact`; client-facing UI/copy may use configured business nouns.
@@ -210,7 +211,7 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
     - Adjacent module/runtime boundary tests passed.
     - Broader end-phase test sweep passed.
     - No additional schema additions are recommended before Phase 6D.
-  - [ ] Phase 6D — Contributor-based validation/runtime code. Current next step.
+  - [x] Phase 6D — Contributor-based validation/runtime code.
     - Add a central `SetupValidationManager` orchestrator.
     - Add registered module/app validation contributors.
     - Reuse/adapt existing validators such as Messaging `MessageConfigValidator`.
@@ -227,11 +228,11 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
     - Make hard errors fail the command and block staging/client handoff; warnings remain non-blocking and actionable.
     - Validate reference registries for drift without treating stale registries as the sole runtime truth.
     - Do not persist validation findings/history unless a real operator workflow requires it.
-  - [ ] Phase 6E — Validation tests and final handoff coverage.
-    - Run fast migration/schema checks first when applicable.
-    - Add focused validator/config tests.
-    - Run adjacent module tests.
-    - Add broader preset/client fallback coverage.
+  - [x] Phase 6E — Validation tests and final handoff coverage.
+    - Focused setup-validation suite is green.
+    - Adjacent Campaigns, FlowRoutes, Messaging, Tasks, Webinars, Workflow, module-boundary, and client-fallback regression coverage is green.
+    - Broader default-preset/client fallback coverage is green.
+    - Final docs/handoff reconciliation completed.
 
 - [ ] Phase 7 — Permission invitation accepted automation event.
   - Decide whether accepted invitations should emit `permission_invitation.accepted`.
@@ -329,7 +330,7 @@ Remaining polish audit:
 
 ### Testing backlog
 
-- [ ] Add test coverage for client config fallback behavior.
+- [x] Add test coverage for client config fallback behavior.
   - Missing optional content/style keys should not break public pages.
   - Client copy changes should not break tests that only need behavioral assertions.
 
@@ -345,7 +346,7 @@ These notes are intentionally retained while the schema-discovery phases continu
   - Provide autocomplete search from available fields for the current context.
   - Insert stable hidden syntax such as `{{ first_name }}` or normalize to the current runtime token format.
   - Do not let users select fields that the current message/context cannot resolve.
-  - Treat the available-field source of truth as Phase 6 validation/registry work.
+  - Reuse the Phase 6 validation/registry direction and only add a universal available-field provider seam when a real authoring consumer requires it.
 
 ### Contextual hints
 
@@ -387,5 +388,7 @@ These notes are intentionally retained while the schema-discovery phases continu
 - [ ] Hide technical specs behind details/debug affordances.
 - [ ] Replace raw timing such as `Delay 10 minutes` with human-readable schedule summaries.
 - [ ] Clean up repeated dropdown labels such as `Step 1 Email — Webinar Attended Nurture — Step 1 Email`.
+
+
 
 

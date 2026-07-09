@@ -20,6 +20,7 @@ use App\Modules\FlowRoutes\PointHandlers\WaitPointHandler;
 use App\Modules\FlowRoutes\Services\ContactShow\ContactRoutesVisibilityDataProvider;
 use App\Modules\FlowRoutes\Services\FlowRouteConditionEvaluatorRegistry;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
+use App\Modules\FlowRoutes\Validation\FlowRoutesSetupValidationContributor;
 use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
 use App\Support\AutomationCapabilities\AutomationCapabilityRegistry;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
@@ -41,6 +42,10 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             FlowRoutesAutomationCapabilityContributor::class,
         ], 'automation.capability_contributors');
+
+        $this->app->tag([
+            FlowRoutesSetupValidationContributor::class,
+        ], 'setup.validation_contributors');
 
         $this->app->singleton(AutomationCapabilityRegistry::class, function ($app) {
             return new AutomationCapabilityRegistry(

@@ -1,4 +1,5 @@
 
+
 # Messaging Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -602,9 +603,9 @@ A client-facing alias must never be offered unless it resolves unambiguously to 
 
 ## Messaging setup validation ownership
 
-Messaging should contribute Messaging-owned checks to the shared app-level setup validation manager instead of placing Messaging-specific logic directly in a global command.
+Messaging contributes Messaging-owned checks through `MessagingSetupValidationContributor`, adapting the existing `MessageConfigValidator` instead of placing Messaging-specific logic directly in a global command.
 
-The existing `MessageConfigValidator` should be reused/adapted rather than duplicated.
+The existing `MessageConfigValidator` is reused/adapted rather than duplicated. Messaging setup validation covers current email/SMS config routes, customized DB-owned `MessageTemplatePreset` records, active assignments, unsupported channel/purpose values, incomplete assignment context/campaign identity, inactive or missing presets, and exact active-assignment ambiguity using the runtime identity dimensions.
 
 Messaging validation should cover, as applicable:
 
@@ -641,6 +642,8 @@ available-field/token picker UX
 No persistent validation-result tables are required unless a later operator workflow proves retained history or acknowledgement state is needed.
 
 Fields should be filtered by authoring/runtime context so operators cannot insert a field that will be unavailable when the message sends.
+
+
 
 
 

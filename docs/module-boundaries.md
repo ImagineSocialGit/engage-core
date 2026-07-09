@@ -1,5 +1,6 @@
 
 
+
 # Engage Core Module Boundaries
 
 Engage Core is a modular contact engagement platform.
@@ -2803,7 +2804,7 @@ Recommended direction:
 5. Treat the dashboard and contact show page as shared orientation surfaces with module-contributed summaries, not module inventories.
 6. Continue the runtime-selectable setup-surface path with Webinars message/template/schedule setup first.
 7. After the Webinars setup slice, improve Automatic Follow-ups / FlowRoutes UX around business-language selection, consequence previews, and diagnostic detail.
-8. Continue the remaining client-readiness path with Phase 6 contributor-based config/setup validation, then permission-invitation accepted-event decisions and later readiness/UX phases.
+8. Phase 6 contributor-based config/setup validation is complete. Continue with the permission-invitation accepted-event decision, then later readiness/UX phases.
 9. Regenerate `core-project-tree.txt` from the repo after each structural batch.
 
 Do not use this section as a backlog. Actionable items belong in `TODO.md`.
@@ -2964,19 +2965,22 @@ The Phase 4A audit proved that route instance plan tables were required before p
 
 Config/setup validation is app-level orchestration over module-owned validation contributors. It should not become one monolithic service that imports every module's private config parser, models, and runtime internals.
 
-Preferred shape:
+Implemented shape:
 
 ```text
-SetupValidationManager / orchestrator
-    -> registered validation contributors
-        -> app-level package/module dependency validators
-        -> Tasks validator
-        -> FlowRoutes validator
-        -> Campaigns validator
-        -> Messaging validator or adapter around MessageConfigValidator
-        -> future module/vertical validators
-    -> structured findings
-    -> CLI handoff command now
+SetupValidationManager
+    -> tagged setup.validation_contributors
+        -> ModuleDependenciesSetupValidationContributor
+        -> ReferenceRegistrySetupValidationContributor
+        -> CoreSetupValidationContributor
+        -> TasksSetupValidationContributor
+        -> MessagingSetupValidationContributor
+        -> WebinarsSetupValidationContributor
+        -> CampaignsSetupValidationContributor
+        -> FlowRoutesSetupValidationContributor
+        -> future module/vertical contributors
+    -> SetupValidationResult
+    -> setup:validate CLI now
     -> future authoring/readiness UI later
 ```
 
@@ -3020,9 +3024,9 @@ future Route Management authoring feedback
 future setup/readiness screens
 ```
 
-Executable references should be checked against their owning source of truth. Reference registries are useful authoring/documentation registries and should themselves be validated for drift, but a stale registry should not become the only runtime truth.
+Executable references should be checked against their owning source of truth. Reference registries are useful authoring/documentation registries and are validated for drift, but a stale registry must not become the only runtime truth. Future authoring/readiness UI should consume the same registries, resolvers, availability checks, and validation seams so impossible combinations are hidden, disabled, or blocked before save; server-side validation and `setup:validate` remain backstops for stale state, manual edits, deployment drift, and legacy data.
 
-Phase 6 implementation order is:
+Phase 6 completed in this order:
 
 ```text
 docs audit
@@ -3030,7 +3034,10 @@ docs audit
 -> schema/model audit
 -> contributor-based validation/runtime code
 -> fast schema checks when applicable
--> focused and adjacent tests
+-> focused validation tests
+-> adjacent module/runtime regressions
+-> broader client/default-preset fallback coverage
+-> final docs/handoff reconciliation
 ```
 
 Add schema only when the audit proves a durable first-class concept is missing. Do not use `meta` to avoid a proven field, and do not add tables merely to persist validation output.
@@ -3082,6 +3089,8 @@ Campaigns invents webinar URL fields without the enrollment caller supplying the
 ```
 
 Treat available-field validation as setup/config-validation work before every editor receives polished autocomplete.
+
+
 
 
 

@@ -1,5 +1,6 @@
 
 
+
 # Core Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -108,7 +109,7 @@ Default status resolution should use the configured canonical contact status key
 
 ## Core setup validation ownership
 
-Core should contribute setup validation for Core-owned authoring definitions, especially ContactStatus presets and Core-owned reference facts.
+Core contributes setup validation through `CoreSetupValidationContributor` for Core-owned authoring definitions, especially selected ContactStatus preset groups/definitions and canonical internal terminology.
 
 Core validation should verify at least:
 
@@ -120,7 +121,7 @@ required fields are present
 internal identifiers use canonical contact terminology
 ```
 
-Core-owned setup validation should return the shared structured finding shape used by the app-level setup validation manager. It should not persist validation findings by default.
+Core-owned setup validation returns the shared structured finding shape used by the app-level setup validation manager. It validates selected package/group/definition existence, definition key identity, canonical internal terminology, required names, metadata shape, and duplicated first-class metadata fields. It does not persist validation findings by default.
 
 Core contacts must remain generic.
 
@@ -226,5 +227,7 @@ Contact show should lead with next action and use module-provided summaries belo
 ```
 
 Core may render module-provided DTOs/arrays/views, but it should not query module tables directly.
+
+
 
 

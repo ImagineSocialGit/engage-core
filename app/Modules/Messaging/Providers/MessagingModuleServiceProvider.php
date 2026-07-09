@@ -14,6 +14,7 @@ use App\Modules\Messaging\Services\Email\EmailProviderManager;
 use App\Modules\Messaging\Services\MessageRecipientGateRegistry;
 use App\Modules\Messaging\Services\MessageRecipientPayloadProviderRegistry;
 use App\Modules\Messaging\Services\Sms\SmsProviderManager;
+use App\Modules\Messaging\Validation\MessagingSetupValidationContributor;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\ServiceProvider;
 use Twilio\Rest\Client;
@@ -28,6 +29,10 @@ class MessagingModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             MessagingAutomationCapabilityContributor::class,
         ], 'automation.capability_contributors');
+
+        $this->app->tag([
+            MessagingSetupValidationContributor::class,
+        ], 'setup.validation_contributors');
 
         $this->app->singleton(Client::class, function () {
             return new Client(

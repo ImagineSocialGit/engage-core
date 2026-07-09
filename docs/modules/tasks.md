@@ -1,6 +1,7 @@
 
 
 
+
 # Tasks Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -83,9 +84,9 @@ Normal sync should preserve customized templates unless an explicit force behavi
 
 ## Tasks setup validation ownership
 
-Tasks should contribute Tasks-owned checks to the shared app-level setup validation manager.
+Tasks contributes Tasks-owned checks through `TasksSetupValidationContributor` to the shared app-level setup validation manager.
 
-Task preset/template validation should use the actual Task preset definitions and DB-owned TaskTemplate/runtime rules as executable truth.
+Task preset/template validation uses the actual Task preset definitions and DB-owned TaskTemplate/runtime rules as executable truth. Tasks validates selected TaskTemplate groups/definitions, assignment and responsibility fields, due/default shapes, related-subject defaults, canonical terminology, legacy shapes, and ambiguous selected identities. Dotted TaskTemplate keys are treated as literal stable keys, not Laravel nested config paths. FlowRoutes owns validation of its own `create_task` references.
 
 At minimum, validate:
 
@@ -329,5 +330,7 @@ related subject fields, when present
 ```
 
 Do not make Phase 3 depend on a polished token picker. Phase 3 should first prove the DB-owned task-template/default shape. The field picker belongs to shared authoring UX and Phase 6 validation unless the task-template schema audit proves a missing persisted field/source concept.
+
+
 
 

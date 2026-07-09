@@ -6,6 +6,7 @@ use App\Modules\Campaigns\Capabilities\CampaignsAutomationCapabilityContributor;
 use App\Modules\Campaigns\Console\Commands\SyncCampaignPresetsCommand;
 use App\Modules\Campaigns\Listeners\ScheduleNextCampaignStepAfterScheduledMessageSent;
 use App\Modules\Campaigns\Services\ContactShow\ContactCampaignsVisibilityDataProvider;
+use App\Modules\Campaigns\Validation\CampaignsSetupValidationContributor;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use Illuminate\Support\Facades\Event;
@@ -18,6 +19,10 @@ class CampaignsModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             CampaignsAutomationCapabilityContributor::class,
         ], 'automation.capability_contributors');
+
+        $this->app->tag([
+            CampaignsSetupValidationContributor::class,
+        ], 'setup.validation_contributors');
 
         $this->app->tag([
             ContactCampaignsVisibilityDataProvider::class,

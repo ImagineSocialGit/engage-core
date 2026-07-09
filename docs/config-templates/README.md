@@ -1,3 +1,4 @@
+
 # Engage Core Config Templates
 
 This directory contains safe starting templates for Engage Core default configs and client-specific overrides.
@@ -145,15 +146,15 @@ Dependency-aware rules should be explicit and should not rely on broad channel/p
 
 The dependency context should be scoped to the same campaign enrollment and same campaign step.
 
-## Setup validation direction
+## Setup validation
 
-These templates are contracts for executable setup validation, not merely copy/paste examples.
+These templates are contracts for executable setup validation, not merely copy/paste examples. Phase 6 implemented the shared validation architecture and CLI.
 
-The shared validation architecture should use:
+The shared validation architecture uses:
 
 ```text
 SetupValidationManager
-    -> registered app/module validators
+    -> registered app/module contributors
     -> structured findings
         severity
         code
@@ -169,7 +170,7 @@ Owning modules validate their own private config/preset shapes. Cross-module orc
 
 Hard errors block staging/client handoff when intended runtime behavior is unsafe or impossible. Warnings remain non-blocking when configuration is dormant, unused, discouraged, or surprising but safe.
 
-Do not add persistent validation tables unless a real operator workflow requires history, acknowledgements, or retained readiness records.
+Do not add persistent validation tables unless a real operator workflow requires history, acknowledgements, or retained readiness records. Run `php artisan setup:validate` for a non-mutating readiness check; errors fail, warnings remain non-blocking, and clean results succeed.
 
 ## Config review checklist
 

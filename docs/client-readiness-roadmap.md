@@ -1,5 +1,6 @@
 
 
+
 # Engage Core Client-Readiness Roadmap
 
 This roadmap tracks the near-term implementation order for getting Engage Core ready for real client operation without treating the work as a limited or throwaway MVP.
@@ -114,7 +115,7 @@ Current schema-discovery sequence:
 | 4A | FlowRoutes relationship, capability, and instance-plan audit | Complete | DB/schema + architecture | Audit confirmed that future subject-scoped route instance adjustment and durable capability discovery are guaranteed requirements before production. FlowRoutes should harden schema now instead of relying on meta-heavy execution/correlation. |
 | 4B | FlowRoutes schema hardening | Complete | DB/schema + architecture | Subject-scoped route progress, contact route plans, plan items, progress/execution items, capability catalog/bindings, uniform route-created artifact provenance, blocked/cancelled runtime handling, provenance/debug consistency, and boundary guardrails are in place. |
 | 5 | FlowRoutes event-wait / task-completed resume implementation | Complete | Runtime | Resume from neutral `task.completed` automation events now uses the Phase 4B route progress/plan/progress-item foundation and created Task identity rather than broad contact-only waits. Direct resume and real CompleteTaskAction → TaskCompleted → AutomationEventRecorded → FlowRoutes listener behavior are covered. |
-| 6 | Config validation / setup validation | Current — 6A/6B/6C complete; 6D next | Architecture + safety | Documentation and config normalization are complete. The schema/model audit is complete with green fresh migrations, global preset sync, focused durability tests, adjacent boundary/runtime tests, and broader end-phase coverage. Next: implement contributor-based validation/runtime code, then validator-focused and fallback coverage. |
+| 6 | Config validation / setup validation | Complete | Architecture + safety | 6A–6E are complete. Engage Core now has a shared `SetupValidationManager`, structured findings/results, module-owned contributors, app-level dependency and registry-drift contributors, the non-mutating `setup:validate` CLI, focused validation coverage, adjacent regression coverage, and broader client/default-preset fallback coverage. |
 | 7 | Permission invitation accepted automation event | Planned | Architecture | Decide whether accepted invitations emit `permission_invitation.accepted` without Messaging depending on consumers. |
 | 8 | Permission invitation cancellation / skip / failure bookkeeping | Planned | DB/schema + architecture | Clarify durable lifecycle visibility across permission invitations, Broadcast bookkeeping, and Messaging scheduled messages. |
 | 9 | Webinar message readiness check | Planned | Architecture + operator safety | Add computed readiness visibility for webinar message setup without persisting setup state unless a concrete need appears. |
@@ -192,7 +193,7 @@ Client-readiness implementation should chase one main item at a time unless two 
 
 The current sequence is the pre-prod schema-discovery sequence above.
 
-Continue with Phase 6 config/setup validation now that Phase 5 FlowRoutes event-wait/task-completed resume behavior is complete. Route Management UI, CRM provenance/debug views, and polished Automatic Follow-ups UX remain deferred.
+Phase 6 config/setup validation is complete. Continue with Phase 7: decide whether accepted permission invitations emit a neutral `permission_invitation.accepted` automation event without making Messaging depend on consumers. Route Management UI, CRM provenance/debug views, and polished Automatic Follow-ups UX remain deferred.
 
 Do not run parallel threads that modify the same controllers, views, routes, services, migrations, or tests unless one thread is paused and rebased onto the other.
 
@@ -208,7 +209,7 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | 4A | FlowRoutes relationship, capability, and instance-plan audit | Complete | Audit confirmed schema should support subject-scoped route instances, instance plans, plan items, progress/execution items, capability catalog/bindings, and uniform route-created artifact provenance before production. |
 | 4B | FlowRoutes schema hardening | Complete | FlowRoutes now has subject-capable progress, route instance plans, plan items, progress/execution items, capability/binding schema, uniform provenance, blocked/cancelled handling, and backend guardrails. Polished Route Management UX remains deferred. |
 | 5 | FlowRoutes event-wait / task-completed resume implementation | Complete | Resume from neutral `task.completed` automation events now uses the Phase 4B route progress/plan/progress-item foundation and created Task identity rather than broad contact-only waits. Direct resume and real CompleteTaskAction → TaskCompleted → AutomationEventRecorded → FlowRoutes listener behavior are covered. |
-| 6 | Config validation / setup validation | Current — 6A/6B/6C complete; 6D next | Docs audit, config normalization, and schema/model audit are complete. Next: contributor-based validation/runtime code, followed by validator-focused and broader fallback coverage. Use reusable structured findings and module-owned contributors. Do not persist findings unless a concrete workflow requires history. |
+| 6 | Config validation / setup validation | Complete | Shared contributor-based validation is implemented across Core, Tasks, Messaging, Webinars, Campaigns, FlowRoutes, module dependencies, and reference-registry drift. `setup:validate` fails on errors, succeeds on warnings-only/clean results, and does not mutate state. Focused and broader regression coverage are green. |
 | 7 | Permission invitation accepted automation event decision | 0.25–0.5 session | Decide whether accepted invitations should emit a neutral automation event such as `permission_invitation.accepted`. |
 | 8 | Permission invitation cancellation behavior | 0.5–1 session | Clarify how cancellation/skip/failure should appear for permission-invitation Broadcast bookkeeping and Messaging scheduled messages. |
 | 9 | Webinar message readiness check | 0.5–1 session | Computed readiness summary for Webinars message setup. Do not persist readiness/acknowledgement state unless the implementation proves a durable concept is missing. |
@@ -419,45 +420,69 @@ adjacent module/runtime boundary tests
 broader end-phase sweep
 ```
 
-No additional schema additions are recommended before Phase 6D.
+No additional schema additions were required for Phase 6D or 6E.
+
+## Phase 6 validation completion
+
+Phase 6 is complete.
+
+Implemented architecture:
+
+```text
+SetupValidationManager
+    -> tagged setup.validation_contributors
+        -> app/module dependency validation
+        -> reference-registry drift validation
+        -> Core / ContactStatus validation
+        -> Tasks / TaskTemplate validation
+        -> Messaging config + DB-owned template/assignment validation
+        -> Webinars schedule-profile validation
+        -> Campaign preset/variant/dependency/runtime validation
+        -> FlowRoutes preset/capability/handler/runtime validation
+    -> SetupValidationResult
+        -> errors
+        -> warnings
+        -> deterministic ordering
+```
+
+The CLI entry point is:
+
+```bash
+php artisan setup:validate
+```
+
+Behavior:
+
+- errors return failure and block staging/client handoff;
+- warnings remain non-blocking and actionable;
+- clean results return success;
+- validation does not mutate DB state or auto-fix configuration;
+- findings are not persisted by default.
+
+Phase 6 also established these durable rules:
+
+- Owning modules validate their own private config/runtime truth.
+- App-level contributors validate cross-cutting module dependency and reference-registry drift concerns.
+- Selected/active unsafe behavior is a hard error.
+- Safe dormant/stale/unused behavior may be a warning.
+- Reference registries are validated for drift but are not treated as sole executable truth.
+- Explicit module visibility remains distinct from dependency-loaded provider availability.
+- Future vertical modules should register their own contributors when they own real selected/executable reference contracts.
+- Future authoring/readiness UI should reuse the same registries, resolvers, availability checks, and validation seams so impossible choices are prevented before save; server-side validation and setup validation remain backstops.
+
+Verification completed successfully:
+
+```text
+focused setup-validation tests
+adjacent module/runtime regression tests
+broader client/default-preset fallback coverage
+```
+
+The intentionally deferred available-field/token picker remains future authoring UX work. Current setup validation validates the reference/token contexts that already have executable sources of truth; it does not invent a universal field-provider architecture before a real consumer requires it.
 
 ## Recommended next implementation target
 
-The next implementation target is Phase 6D: contributor-based validation architecture and runtime code.
-
-Completed before 6D:
-
-- Phase 6A documentation audit and contract normalization.
-- Phase 6B config normalization.
-- Phase 6C schema/model audit.
-- Fresh migrations passed.
-- Global `presets:sync` completed successfully in dependency-safe order.
-- Focused durability/sync tests passed.
-- Adjacent module/runtime boundary tests passed.
-- Broader end-phase coverage passed.
-
-Goals for 6D:
-
-- Build a reusable contributor-based validation architecture with a central manager/orchestrator, module-owned validators/contributors, and structured findings.
-- Reuse that validation seam for command-line staging/client handoff checks now and future authoring UI later.
-- Validate Task presets, FlowRoute presets, route point types, task-template references, Campaign references, Messaging/template references, module capability references, available-field/token references, vertical references, module availability, unsupported point/module combinations, and route instance/snapshot assumptions.
-- Classify findings as hard errors or warnings.
-- Make hard errors block staging/client handoff.
-- Make warnings useful for operator/debug guidance without blocking safe runtime behavior.
-- Keep internal/runtime identifiers universal: use `contact`, not `lead`, in keys, presets, events, triggers, route/task-template identifiers, and generic config definitions. Client-facing UI/copy may use the configured business noun.
-- Do not add persistent validation records unless a concrete operator/setup workflow proves historical validation runs or acknowledgements are needed.
-
-Phase 6 implementation order:
-
-```text
-6A. Documentation audit and contract normalization.
-6B. Config normalization against the docs.
-6C. Schema/model audit against normalized config requirements.
-6D. Contributor-based validation architecture and runtime code.
-6E. Fast schema checks when applicable, focused tests, adjacent-module tests, then broader fallback/preset coverage.
-```
-
-Phase 6 should convert documented config-template expectations into reusable executable validation behavior without building a polished Route Management UX yet.
+Proceed to Phase 7: decide whether accepted permission invitations should emit a neutral `permission_invitation.accepted` automation event while keeping Messaging independent from downstream consumers.
 
 ## What this roadmap intentionally avoids
 
@@ -531,5 +556,7 @@ Routes
     Use Route Management / Routes in client-facing navigation.
     Use contextual hints to explain automatic actions in plain language.
 ```
+
+
 
 

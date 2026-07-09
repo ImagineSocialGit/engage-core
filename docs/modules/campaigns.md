@@ -1,6 +1,7 @@
 
 
 
+
 # Campaigns Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -267,9 +268,9 @@ If a referenced Messaging template is missing, fail loudly because the config is
 
 ## Campaign setup validation ownership
 
-Campaigns should contribute Campaign-owned checks to the shared app-level setup validation manager.
+Campaigns contributes Campaign-owned checks through `CampaignsSetupValidationContributor` to the shared app-level setup validation manager.
 
-Campaign validation should use actual Campaign preset definitions, Campaign step/variant definition DTOs, supported variant strategies, and Messaging-owned public reference/resolution seams as the executable truth.
+Campaign validation uses actual Campaign preset definitions, Campaign step/variant definition DTOs, supported variant strategies, active DB-owned Campaign runtime state, and Messaging-owned public reference/resolution seams as executable truth.
 
 At minimum, validate:
 
@@ -561,5 +562,7 @@ source event or route point, when available
 ```
 
 Do not persist summary text unless a concrete reporting/audit reason appears. Prefer deriving it from the canonical step/variant timing definition.
+
+
 
 
