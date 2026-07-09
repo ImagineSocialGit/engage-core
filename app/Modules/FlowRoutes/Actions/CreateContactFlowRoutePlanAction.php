@@ -12,15 +12,19 @@ use Illuminate\Support\Facades\DB;
 
 class CreateContactFlowRoutePlanAction
 {
-    public function handle(ContactFlowRouteProgress $progress, ?FlowRoute $flowRoute = null): ContactFlowRoutePlan
-    {
-        return DB::transaction(function () use ($progress, $flowRoute) {
+    public function handle(
+        ContactFlowRouteProgress $progress,
+        ?FlowRoute $flowRoute = null,
+        bool $forceNew = false,
+        ?ContactFlowRoutePlan $reconciledFromPlan = null,
+    ): ContactFlowRoutePlan {
+        return DB::transaction(function () use ($progress, $flowRoute, $forceNew, $reconciledFromPlan) {
             $progress = ContactFlowRouteProgress::query()
                 ->lockForUpdate()
                 ->with('plan')
                 ->findOrFail($progress->getKey());
 
-            if ($progress->plan instanceof ContactFlowRoutePlan) {
+            if (! $forceNew && $progress->plan instanceof ContactFlowRoutePlan) {
                 return $progress->plan;
             }
 
@@ -33,6 +37,9 @@ class CreateContactFlowRoutePlanAction
                 ->get();
 
             $now = Carbon::now();
+            $revision = ((int) ContactFlowRoutePlan::query()
+                ->where('contact_flow_route_progress_id', $progress->getKey())
+                ->max('revision')) + 1;
 
             $plan = ContactFlowRoutePlan::query()->create([
                 'contact_flow_route_progress_id' => $progress->getKey(),
@@ -42,14 +49,21 @@ class CreateContactFlowRoutePlanAction
                 'flow_route_id' => $flowRoute->getKey(),
                 'status' => ContactFlowRoutePlan::STATUS_ACTIVE,
                 'source' => ContactFlowRoutePlan::SOURCE_TEMPLATE,
+                'revision' => $revision,
                 'flow_route_version' => $flowRoute->version,
                 'snapshot_at' => $now,
                 'started_at' => $progress->started_at ?? $now,
+                'reconciled_from_plan_id' => $reconciledFromPlan?->getKey(),
                 'route_snapshot' => $this->routeSnapshot($flowRoute),
-                'meta' => [
+                'meta' => array_filter([
                     'created_by' => 'flow_routes',
-                    'created_from' => 'flow_route_template',
-                ],
+                    'created_from' => $reconciledFromPlan instanceof ContactFlowRoutePlan
+                        ? 'flow_route_version_reconciliation'
+                        : 'flow_route_template',
+                    'reconciled_from_plan_id' => $reconciledFromPlan?->getKey(),
+                    'reconciled_from_flow_route_id' => $reconciledFromPlan?->flow_route_id,
+                    'reconciled_from_flow_route_version' => $reconciledFromPlan?->flow_route_version,
+                ], static fn (mixed $value): bool => $value !== null),
             ]);
 
             $sequence = 1;
@@ -73,9 +87,10 @@ class CreateContactFlowRoutePlanAction
                     'sequence' => $sequence++,
                     'attempt' => 0,
                     'source' => ContactFlowRoutePlanItem::SOURCE_TEMPLATE,
-                    'status' => ((int) $progress->current_flow_route_point_id === (int) $flowRoutePoint->getKey())
-                        ? ContactFlowRoutePlanItem::STATUS_ACTIVE
-                        : ContactFlowRoutePlanItem::STATUS_PENDING,
+                    'status' => ! $forceNew
+                        && (int) $progress->current_flow_route_point_id === (int) $flowRoutePoint->getKey()
+                            ? ContactFlowRoutePlanItem::STATUS_ACTIVE
+                            : ContactFlowRoutePlanItem::STATUS_PENDING,
                     'definition_snapshot' => array_replace_recursive(
                         $flowRoutePoint->point->default_definition ?? [],
                         $flowRoutePoint->definition ?? [],

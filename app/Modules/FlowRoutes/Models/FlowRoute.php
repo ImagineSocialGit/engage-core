@@ -33,6 +33,7 @@ class FlowRoute extends Model
         'name',
         'description',
         'version',
+        'is_current_version',
         'trigger_type',
         'trigger_key',
         'is_active',
@@ -46,6 +47,7 @@ class FlowRoute extends Model
         'contact_status_id' => 'integer',
         'owner_id' => 'integer',
         'version' => 'integer',
+        'is_current_version' => 'boolean',
         'is_active' => 'boolean',
         'is_customized' => 'boolean',
         'customized_at' => 'datetime',
@@ -109,12 +111,28 @@ class FlowRoute extends Model
 
     public function scopeActive(Builder $query): Builder
     {
-        return $query->where('is_active', true);
+        return $query
+            ->where('is_current_version', true)
+            ->where('is_active', true);
+    }
+
+    public function scopeCurrentVersion(Builder $query): Builder
+    {
+        return $query->where('is_current_version', true);
+    }
+
+    public function scopeHistoricalVersions(Builder $query): Builder
+    {
+        return $query->where('is_current_version', false);
     }
 
     public function scopeInactive(Builder $query): Builder
     {
-        return $query->where('is_active', false);
+        return $query->where(function (Builder $query): void {
+            $query
+                ->where('is_current_version', false)
+                ->orWhere('is_active', false);
+        });
     }
 
     public function scopeForKey(Builder $query, string $key): Builder

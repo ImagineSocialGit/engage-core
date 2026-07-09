@@ -105,7 +105,16 @@ class ContactFlowRouteProgress extends Model
 
     public function plan(): HasOne
     {
-        return $this->hasOne(ContactFlowRoutePlan::class, 'contact_flow_route_progress_id');
+        return $this->hasOne(ContactFlowRoutePlan::class, 'contact_flow_route_progress_id')
+            ->where('status', ContactFlowRoutePlan::STATUS_ACTIVE)
+            ->latestOfMany('revision');
+    }
+
+    public function plans(): HasMany
+    {
+        return $this->hasMany(ContactFlowRoutePlan::class, 'contact_flow_route_progress_id')
+            ->orderBy('revision')
+            ->orderBy('id');
     }
 
     public function planItems(): HasMany
@@ -322,3 +331,4 @@ class ContactFlowRouteProgress extends Model
         return $resumeAt->lessThanOrEqualTo($now);
     }
 }
+

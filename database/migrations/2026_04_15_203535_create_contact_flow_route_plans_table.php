@@ -28,11 +28,11 @@ return new class extends Migration
             $table->nullableMorphs('subject');
 
             $table->foreignIdFor(FlowRoute::class)
-                ->constrained(indexName: 'cfrplan_route_fk')
-                ->cascadeOnDelete();
+                ->constrained(indexName: 'cfrplan_route_fk');
 
             $table->string('status')->default('active')->index();
             $table->string('source')->default('template')->index();
+            $table->unsignedInteger('revision')->default(1);
             $table->unsignedInteger('flow_route_version')->nullable();
             $table->timestamp('snapshot_at')->nullable();
 
@@ -40,16 +40,26 @@ return new class extends Migration
             $table->timestamp('completed_at')->nullable();
             $table->timestamp('cancelled_at')->nullable();
             $table->timestamp('failed_at')->nullable();
+            $table->timestamp('superseded_at')->nullable();
 
             $table->string('cancellation_reason')->nullable();
             $table->string('failure_reason')->nullable();
+
+            $table->foreignIdFor(ContactFlowRoutePlan::class, 'reconciled_from_plan_id')
+                ->nullable()
+                ->constrained(
+                    table: 'contact_flow_route_plans',
+                    indexName: 'cfrplan_reconciled_from_fk',
+                )
+                ->nullOnDelete();
 
             $table->json('route_snapshot')->nullable();
             $table->json('meta')->nullable();
 
             $table->timestamps();
 
-            $table->unique('contact_flow_route_progress_id', 'cfrplan_progress_unique');
+            $table->unique(['contact_flow_route_progress_id', 'revision'], 'cfrplan_progress_revision_unique');
+            $table->index(['contact_flow_route_progress_id', 'status', 'revision'], 'cfrplan_progress_status_revision_idx');
             $table->index(['contact_id', 'status'], 'cfrplan_contact_status_idx');
             $table->index(['contact_id', 'subject_type', 'subject_id', 'status'], 'cfrplan_contact_subject_status_idx');
             $table->index(['flow_route_id', 'status'], 'cfrplan_route_status_idx');
@@ -62,3 +72,4 @@ return new class extends Migration
         Schema::dropIfExists('contact_flow_route_plans');
     }
 };
+

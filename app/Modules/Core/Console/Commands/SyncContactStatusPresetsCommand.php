@@ -8,7 +8,9 @@ use Throwable;
 
 class SyncContactStatusPresetsCommand extends Command
 {
-    protected $signature = 'contact-statuses:sync-presets {preset? : Optional preset key, such as mortgage or webinar_funnel}';
+    protected $signature = 'contact-statuses:sync-presets
+        {preset? : Optional preset key, such as mortgage or webinar_funnel}
+        {--force : Overwrite customized ContactStatus records with preset definitions}';
 
     protected $description = 'Sync contact status preset definitions into database-owned ContactStatus records.';
 
@@ -21,7 +23,10 @@ class SyncContactStatusPresetsCommand extends Command
             : null;
 
         try {
-            $result = $syncContactStatusPresets->handle($presetKey);
+            $result = $syncContactStatusPresets->handle(
+                presetKey: $presetKey,
+                force: (bool) $this->option('force'),
+            );
         } catch (Throwable $exception) {
             $this->error($exception->getMessage());
 

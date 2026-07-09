@@ -33,8 +33,7 @@ return new class extends Migration
                 ->nullOnDelete();
 
             $table->foreignIdFor(FlowRoute::class)
-                ->constrained(indexName: 'cfrp_route_fk')
-                ->cascadeOnDelete();
+                ->constrained(indexName: 'cfrp_route_fk');
 
             $table->foreignIdFor(FlowRoutePoint::class, 'current_flow_route_point_id')
                 ->nullable()
@@ -77,3 +76,4 @@ return new class extends Migration
         Schema::dropIfExists('contact_flow_route_progress');
     }
 };
+

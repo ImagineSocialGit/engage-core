@@ -41,8 +41,12 @@ class FlowRoutePresetDefinition
         $contactStatusKey = self::string($data, 'contact_status_key');
         $trigger = self::array($data, 'trigger');
 
-        if ($contactStatusKey === null && $trigger === []) {
-            throw new InvalidArgumentException('Preset FlowRoute must define either [contact_status_key] or [trigger].');
+        self::validateTriggerContract($contactStatusKey, $trigger);
+
+        $version = self::int($data, 'version') ?? 1;
+
+        if ($version < 1) {
+            throw new InvalidArgumentException('Preset FlowRoute [version] must be at least 1.');
         }
 
         $points = [];
@@ -62,14 +66,18 @@ class FlowRoutePresetDefinition
             );
         }
 
+        $isActive = (bool) ($data['is_active'] ?? true);
+
+        self::validateRoutePointContract($flowRoutePoints, $isActive);
+
         return new self(
             presetKey: $presetKey,
             key: self::requiredString($data, 'key'),
             contactStatusKey: $contactStatusKey,
             name: self::requiredString($data, 'name'),
             description: self::string($data, 'description'),
-            version: self::int($data, 'version') ?? 1,
-            isActive: (bool) ($data['is_active'] ?? true),
+            version: $version,
+            isActive: $isActive,
             sourceVersion: $sourceVersion,
             ownerType: self::string($data, 'owner_type'),
             ownerId: self::int($data, 'owner_id'),
@@ -83,14 +91,14 @@ class FlowRoutePresetDefinition
 
     public function triggerType(): string
     {
+        if ($this->contactStatusKey !== null) {
+            return FlowRoute::TRIGGER_CONTACT_STATUS;
+        }
+
         $triggerType = $this->trigger['type'] ?? null;
 
         if (is_string($triggerType) && trim($triggerType) !== '') {
             return trim($triggerType);
-        }
-
-        if ($this->contactStatusKey !== null) {
-            return FlowRoute::TRIGGER_CONTACT_STATUS;
         }
 
         return FlowRoute::TRIGGER_MANUAL;
@@ -100,6 +108,10 @@ class FlowRoutePresetDefinition
     {
         if ($this->triggerType() === FlowRoute::TRIGGER_CONTACT_STATUS) {
             return $this->contactStatusKey;
+        }
+
+        if ($this->triggerType() !== FlowRoute::TRIGGER_AUTOMATION_EVENT) {
+            return null;
         }
 
         $triggerKey = $this->trigger['event_key'] ?? null;
@@ -121,6 +133,92 @@ class FlowRoutePresetDefinition
                 FlowRoute::TRIGGER_AUTOMATION_EVENT,
             ], true)
             && $this->triggerKey() !== null;
+    }
+
+    /**
+     * @param array<string, mixed> $trigger
+     */
+    private static function validateTriggerContract(?string $contactStatusKey, array $trigger): void
+    {
+        if ($contactStatusKey !== null && $trigger !== []) {
+            throw new InvalidArgumentException('Preset FlowRoute cannot define both [contact_status_key] and [trigger].');
+        }
+
+        if ($contactStatusKey !== null) {
+            return;
+        }
+
+        if ($trigger === []) {
+            throw new InvalidArgumentException('Preset FlowRoute must define either [contact_status_key] or [trigger].');
+        }
+
+        $triggerType = $trigger['type'] ?? null;
+
+        if (! is_string($triggerType) || trim($triggerType) === '') {
+            throw new InvalidArgumentException('Preset FlowRoute [trigger.type] is required.');
+        }
+
+        $triggerType = trim($triggerType);
+
+        if (! in_array($triggerType, FlowRoute::TRIGGERS, true)) {
+            throw new InvalidArgumentException("Preset FlowRoute trigger type [{$triggerType}] is not supported.");
+        }
+
+        if ($triggerType === FlowRoute::TRIGGER_CONTACT_STATUS) {
+            throw new InvalidArgumentException('Preset FlowRoute contact-status triggers must use [contact_status_key], not [trigger.type].');
+        }
+
+        if ($triggerType === FlowRoute::TRIGGER_AUTOMATION_EVENT) {
+            $eventKey = $trigger['event_key'] ?? null;
+
+            if (! is_string($eventKey) || trim($eventKey) === '') {
+                throw new InvalidArgumentException('Preset FlowRoute automation-event trigger requires [trigger.event_key].');
+            }
+        }
+    }
+
+    /**
+     * @param array<int, FlowRoutePointPresetDefinition> $flowRoutePoints
+     */
+    private static function validateRoutePointContract(array $flowRoutePoints, bool $isActive): void
+    {
+        $keys = [];
+        $activeStartCount = 0;
+        $activePointCount = 0;
+
+        foreach ($flowRoutePoints as $point) {
+            if (isset($keys[$point->key])) {
+                throw new InvalidArgumentException("Preset FlowRoute contains duplicate point key [{$point->key}].");
+            }
+
+            $keys[$point->key] = true;
+
+            if ($point->isActive) {
+                $activePointCount++;
+
+                if ($point->isStart) {
+                    $activeStartCount++;
+                }
+            }
+        }
+
+        if ($isActive && $activePointCount === 0) {
+            throw new InvalidArgumentException('Active preset FlowRoute must contain at least one active point.');
+        }
+
+        if ($isActive && $activeStartCount !== 1) {
+            throw new InvalidArgumentException("Active preset FlowRoute must contain exactly one active start point; found [{$activeStartCount}].");
+        }
+
+        foreach ($flowRoutePoints as $point) {
+            if ($point->nextPointKey === null) {
+                continue;
+            }
+
+            if (! isset($keys[$point->nextPointKey])) {
+                throw new InvalidArgumentException("Preset FlowRoutePoint [{$point->key}] references missing next point [{$point->nextPointKey}].");
+            }
+        }
     }
 
     /**

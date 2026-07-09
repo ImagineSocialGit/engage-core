@@ -16,6 +16,7 @@ class FlowRoutePointPresetDefinition
     public function __construct(
         public readonly string $key,
         public readonly string $pointKey,
+        public readonly ?string $capabilityKey,
         public readonly int $sortOrder,
         public readonly bool $isStart = false,
         public readonly bool $isActive = true,
@@ -53,6 +54,7 @@ class FlowRoutePointPresetDefinition
         return new self(
             key: $pointKey,
             pointKey: $pointKey,
+            capabilityKey: self::string($pointData, 'capability_key'),
             sortOrder: self::int($pointData, 'sort_order') ?? $fallbackSortOrder,
             isStart: (bool) ($pointData['is_start'] ?? false),
             isActive: (bool) ($pointData['is_active'] ?? true),

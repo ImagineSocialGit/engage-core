@@ -21,6 +21,9 @@ return new class extends Migration
             $table->boolean('is_core')->default(false)->index();
             $table->boolean('is_active')->default(true)->index();
 
+            $table->boolean('is_customized')->default(false)->index();
+            $table->timestamp('customized_at')->nullable();
+
             $table->unsignedSmallInteger('sort_order')->default(0)->index();
             $table->string('source_version')->nullable();
 
@@ -30,6 +33,7 @@ return new class extends Migration
 
             $table->index(['is_active', 'sort_order']);
             $table->index(['category', 'is_active']);
+            $table->index(['is_customized', 'is_active']);
         });
     }
 

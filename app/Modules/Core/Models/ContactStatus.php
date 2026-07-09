@@ -18,6 +18,8 @@ class ContactStatus extends Model
         'color',
         'is_core',
         'is_active',
+        'is_customized',
+        'customized_at',
         'sort_order',
         'source_version',
         'meta',
@@ -26,6 +28,8 @@ class ContactStatus extends Model
     protected $casts = [
         'is_core' => 'boolean',
         'is_active' => 'boolean',
+        'is_customized' => 'boolean',
+        'customized_at' => 'datetime',
         'sort_order' => 'integer',
         'meta' => 'array',
     ];
@@ -38,6 +42,16 @@ class ContactStatus extends Model
     public function scopeCore(Builder $query): Builder
     {
         return $query->where('is_core', true);
+    }
+
+    public function scopeCustomized(Builder $query): Builder
+    {
+        return $query->where('is_customized', true);
+    }
+
+    public function scopeNotCustomized(Builder $query): Builder
+    {
+        return $query->where('is_customized', false);
     }
 
     public function scopeOrdered(Builder $query): Builder

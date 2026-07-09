@@ -2,6 +2,7 @@
 
 namespace App\Modules\FlowRoutes\Providers;
 
+use App\Modules\FlowRoutes\Capabilities\FlowRoutesAutomationCapabilityContributor;
 use App\Modules\FlowRoutes\ConditionEvaluators\FlowRouteDataConditionEvaluator;
 use App\Modules\FlowRoutes\Console\Commands\SyncFlowRoutePresetsCommand;
 use App\Modules\FlowRoutes\Listeners\HandleContactWorkflowStatusChanged;
@@ -20,6 +21,7 @@ use App\Modules\FlowRoutes\Services\ContactShow\ContactRoutesVisibilityDataProvi
 use App\Modules\FlowRoutes\Services\FlowRouteConditionEvaluatorRegistry;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
+use App\Support\AutomationCapabilities\AutomationCapabilityRegistry;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -36,6 +38,16 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
 
     public function register(): void
     {
+        $this->app->tag([
+            FlowRoutesAutomationCapabilityContributor::class,
+        ], 'automation.capability_contributors');
+
+        $this->app->singleton(AutomationCapabilityRegistry::class, function ($app) {
+            return new AutomationCapabilityRegistry(
+                contributors: $app->tagged('automation.capability_contributors'),
+            );
+        });
+
         $this->app->tag($this->pointHandlers(), 'flow_routes.point_handlers');
 
         $this->app->singleton(PointHandlerRegistry::class, function ($app) {

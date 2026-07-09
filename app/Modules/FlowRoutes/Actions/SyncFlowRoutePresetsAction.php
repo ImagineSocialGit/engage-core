@@ -8,6 +8,7 @@ use App\Modules\FlowRoutes\Data\Presets\FlowRoutePointPresetDefinition;
 use App\Modules\FlowRoutes\Data\Presets\FlowRoutePresetDefinition;
 use App\Modules\FlowRoutes\Data\Presets\FlowRoutePresetSyncResult;
 use App\Modules\FlowRoutes\Models\FlowRoute;
+use App\Modules\FlowRoutes\Models\FlowRouteCapability;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
 use App\Modules\FlowRoutes\Models\Point;
@@ -16,6 +17,10 @@ use Throwable;
 
 class SyncFlowRoutePresetsAction
 {
+    public function __construct(
+        private readonly ReconcileFlowRouteProgressToCurrentVersionAction $reconcileFlowRouteProgressToCurrentVersion,
+    ) {}
+
     public function handle(
         ?string $presetKey = null,
         bool $force = false,
@@ -155,6 +160,10 @@ class SyncFlowRoutePresetsAction
         FlowRoutePresetSyncResult $result,
         bool $force,
     ): void {
+        if (! $this->validateCapabilityReferences($definition, $result)) {
+            return;
+        }
+
         DB::transaction(function () use ($definition, $result, $force) {
             $contactStatus = null;
 
@@ -178,7 +187,15 @@ class SyncFlowRoutePresetsAction
             $flowRouteWasRecentlyCreated = ! $flowRoute->exists;
 
             if ($flowRoute->exists && $flowRoute->is_customized && ! $force) {
-                $result->recordSkipped('flow_routes');
+                if (! $flowRoute->is_current_version) {
+                    $flowRoute->forceFill([
+                        'is_current_version' => true,
+                    ])->save();
+
+                    $result->recordUpdated('flow_routes');
+                } else {
+                    $result->recordSkipped('flow_routes');
+                }
             } else {
                 $flowRoute->forceFill([
                     'key' => $definition->key,
@@ -189,6 +206,7 @@ class SyncFlowRoutePresetsAction
                     'name' => $definition->name,
                     'description' => $definition->description,
                     'version' => $definition->version,
+                    'is_current_version' => true,
                     'trigger_type' => $definition->triggerType(),
                     'trigger_key' => $definition->triggerKey(),
                     'is_active' => $definition->isActive,
@@ -231,9 +249,16 @@ class SyncFlowRoutePresetsAction
                     continue;
                 }
 
+                $capability = $flowRoutePointDefinition->capabilityKey !== null
+                    ? FlowRouteCapability::query()
+                        ->where('key', $flowRoutePointDefinition->capabilityKey)
+                        ->first()
+                    : null;
+
                 $flowRoutePoint = $this->syncFlowRoutePoint(
                     flowRoute: $flowRoute,
                     point: $point,
+                    capability: $capability,
                     routeDefinition: $definition,
                     pointDefinition: $flowRoutePointDefinition,
                     result: $result,
@@ -248,6 +273,17 @@ class SyncFlowRoutePresetsAction
             $this->syncNextFlowRoutePoints(
                 flowRoutePointsByKey: $flowRoutePointsByKey,
                 pointDefinitions: $definition->flowRoutePoints,
+                result: $result,
+            );
+
+            $reconciledProgressCount = $this->reconcileFlowRouteProgressToCurrentVersion->handle($flowRoute);
+
+            if ($reconciledProgressCount > 0) {
+                $result->warn("FlowRoute [{$flowRoute->key}] reconciled [{$reconciledProgressCount}] active/waiting instance(s) to version [{$flowRoute->version}].");
+            }
+
+            $this->reconcileLogicalRouteVersions(
+                currentFlowRoute: $flowRoute,
                 result: $result,
             );
 
@@ -266,16 +302,24 @@ class SyncFlowRoutePresetsAction
         FlowRoutePresetSyncResult $result,
         bool $force,
     ): void {
+        $triggerType = $definition->triggerType();
+        $triggerKey = $definition->triggerKey();
+
+        $this->deactivateObsoleteDefaultBindings(
+            flowRoute: $flowRoute,
+            triggerType: $triggerType,
+            triggerKey: $triggerKey,
+            shouldHaveDefaultBinding: $definition->shouldCreateDefaultBinding(),
+            result: $result,
+        );
+
         if (! $definition->shouldCreateDefaultBinding()) {
             return;
         }
 
-        if (! $flowRoute->is_active) {
+        if (! $flowRoute->is_current_version || ! $flowRoute->is_active) {
             return;
         }
-
-        $triggerType = $definition->triggerType();
-        $triggerKey = $definition->triggerKey();
 
         $binding = FlowRouteTriggerBinding::query()->firstOrNew([
             'trigger_type' => $triggerType,
@@ -287,7 +331,7 @@ class SyncFlowRoutePresetsAction
 
         $wasRecentlyCreated = ! $binding->exists;
 
-        if ($binding->exists && ! $force) {
+        if ($binding->exists && $binding->is_active && ! $force) {
             $result->recordSkipped('flow_route_trigger_bindings');
 
             return;
@@ -304,6 +348,7 @@ class SyncFlowRoutePresetsAction
                 'preset' => [
                     'client_preset_key' => $definition->presetKey,
                     'flow_route_key' => $definition->key,
+                    'flow_route_version' => $definition->version,
                     'trigger' => $definition->trigger,
                     'default_binding' => true,
                 ],
@@ -311,6 +356,110 @@ class SyncFlowRoutePresetsAction
         ])->save();
 
         $result->{$wasRecentlyCreated ? 'recordCreated' : 'recordUpdated'}('flow_route_trigger_bindings');
+    }
+
+    private function reconcileLogicalRouteVersions(
+        FlowRoute $currentFlowRoute,
+        FlowRoutePresetSyncResult $result,
+    ): void {
+        $historicalVersions = FlowRoute::query()
+            ->where('key', $currentFlowRoute->key)
+            ->where('id', '!=', $currentFlowRoute->getKey())
+            ->get();
+
+        foreach ($historicalVersions as $historicalVersion) {
+            $wasChanged = false;
+
+            if ($historicalVersion->is_current_version) {
+                $historicalVersion->is_current_version = false;
+                $wasChanged = true;
+            }
+
+            if ($wasChanged) {
+                $historicalVersion->save();
+                $result->recordUpdated('flow_routes');
+            }
+
+            FlowRouteTriggerBinding::query()
+                ->where('flow_route_id', $historicalVersion->getKey())
+                ->where('is_active', true)
+                ->get()
+                ->each(function (FlowRouteTriggerBinding $binding) use ($result): void {
+                    $binding->forceFill(['is_active' => false])->save();
+                    $result->recordUpdated('flow_route_trigger_bindings');
+                });
+        }
+    }
+
+    private function deactivateObsoleteDefaultBindings(
+        FlowRoute $flowRoute,
+        string $triggerType,
+        ?string $triggerKey,
+        bool $shouldHaveDefaultBinding,
+        FlowRoutePresetSyncResult $result,
+    ): void {
+        $bindings = FlowRouteTriggerBinding::query()
+            ->where('flow_route_id', $flowRoute->getKey())
+            ->whereNull('context_type')
+            ->whereNull('context_id')
+            ->where('is_active', true)
+            ->get();
+
+        foreach ($bindings as $binding) {
+            $isPresetDefault = (bool) data_get($binding->meta, 'preset.default_binding', false);
+
+            if (! $isPresetDefault) {
+                continue;
+            }
+
+            $matchesCurrentTrigger = $binding->trigger_type === $triggerType
+                && $binding->trigger_key === $triggerKey;
+
+            if ($shouldHaveDefaultBinding && $matchesCurrentTrigger) {
+                continue;
+            }
+
+            $binding->forceFill(['is_active' => false])->save();
+            $result->recordUpdated('flow_route_trigger_bindings');
+        }
+    }
+
+    private function validateCapabilityReferences(
+        FlowRoutePresetDefinition $definition,
+        FlowRoutePresetSyncResult $result,
+    ): bool {
+        $valid = true;
+
+        foreach ($definition->flowRoutePoints as $pointDefinition) {
+            if ($pointDefinition->capabilityKey === null) {
+                continue;
+            }
+
+            $capability = FlowRouteCapability::query()
+                ->where('key', $pointDefinition->capabilityKey)
+                ->first();
+
+            if (! $capability instanceof FlowRouteCapability) {
+                $result->error("FlowRoute preset [{$definition->key}] route point [{$pointDefinition->key}] references missing capability [{$pointDefinition->capabilityKey}].");
+                $valid = false;
+
+                continue;
+            }
+
+            $pointDefinitionModel = collect($definition->points)
+                ->first(fn (PointPresetDefinition $point): bool => $point->key === $pointDefinition->pointKey);
+
+            if (! $pointDefinitionModel instanceof PointPresetDefinition) {
+                continue;
+            }
+
+            if ($capability->point_type !== $pointDefinitionModel->type) {
+                $result->error("FlowRoute preset [{$definition->key}] route point [{$pointDefinition->key}] capability [{$pointDefinition->capabilityKey}] expects point type [{$capability->point_type}], not [{$pointDefinitionModel->type}].");
+                $valid = false;
+            }
+        }
+
+        return $valid;
     }
 
     private function syncPoint(
@@ -360,6 +509,7 @@ class SyncFlowRoutePresetsAction
     private function syncFlowRoutePoint(
         FlowRoute $flowRoute,
         Point $point,
+        ?FlowRouteCapability $capability,
         FlowRoutePresetDefinition $routeDefinition,
         FlowRoutePointPresetDefinition $pointDefinition,
         FlowRoutePresetSyncResult $result,
@@ -381,6 +531,7 @@ class SyncFlowRoutePresetsAction
         $flowRoutePoint->forceFill([
             'flow_route_id' => $flowRoute->getKey(),
             'point_id' => $point->getKey(),
+            'flow_route_capability_id' => $capability?->getKey(),
             'key' => $pointDefinition->key,
             'sort_order' => $pointDefinition->sortOrder,
             'is_start' => $pointDefinition->isStart,
@@ -400,6 +551,7 @@ class SyncFlowRoutePresetsAction
                     'flow_route_key' => $routeDefinition->key,
                     'flow_route_point_key' => $pointDefinition->key,
                     'point_key' => $pointDefinition->pointKey,
+                    'capability_key' => $pointDefinition->capabilityKey,
                     'sort_order' => $pointDefinition->sortOrder,
                     'next_point_key' => $pointDefinition->nextPointKey,
                 ],

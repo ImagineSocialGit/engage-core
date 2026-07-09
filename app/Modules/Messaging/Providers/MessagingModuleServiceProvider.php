@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Providers;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Capabilities\MessagingAutomationCapabilityContributor;
 use App\Modules\Messaging\Console\Commands\SyncMessageTemplatePresetsCommand;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
@@ -23,6 +24,10 @@ class MessagingModuleServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(config_path('messaging/sms.php'), 'messaging.sms');
         $this->mergeConfigFrom(config_path('messaging/email.php'), 'messaging.email');
+
+        $this->app->tag([
+            MessagingAutomationCapabilityContributor::class,
+        ], 'automation.capability_contributors');
 
         $this->app->singleton(Client::class, function () {
             return new Client(

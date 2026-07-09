@@ -75,6 +75,8 @@
 │   │   │   │   ├── ScheduleCampaignStepMessagesAction.php
 │   │   │   │   ├── ScheduleNextCampaignStepAction.php
 │   │   │   │   └── SyncCampaignPresetsAction.php
+│   │   │   ├── Capabilities
+│   │   │   │   └── CampaignsAutomationCapabilityContributor.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
 │   │   │   │       └── SyncCampaignPresetsCommand.php
@@ -194,12 +196,16 @@
 │   │   │   │   ├── ExecuteCurrentFlowRoutePointAction.php
 │   │   │   │   ├── HandleContactWorkflowStatusChangedAction.php
 │   │   │   │   ├── MarkFlowRouteProgressWaitingAction.php
+│   │   │   │   ├── ReconcileFlowRouteProgressToCurrentVersionAction.php
 │   │   │   │   ├── ResumeContactFlowRouteProgressAction.php
 │   │   │   │   ├── ResumeDueFlowRouteProgressAction.php
 │   │   │   │   ├── ResumeFlowRouteProgressFromEventAction.php
 │   │   │   │   ├── StartFlowRouteProgressAction.php
 │   │   │   │   ├── StartFlowRoutesFromAutomationEventAction.php
+│   │   │   │   ├── SyncFlowRouteCapabilitiesAction.php
 │   │   │   │   └── SyncFlowRoutePresetsAction.php
+│   │   │   ├── Capabilities
+│   │   │   │   └── FlowRoutesAutomationCapabilityContributor.php
 │   │   │   ├── ConditionEvaluators
 │   │   │   │   └── FlowRouteDataConditionEvaluator.php
 │   │   │   ├── Console
@@ -381,6 +387,8 @@
 │   │   │   │   ├── ScheduleMessageAction.php
 │   │   │   │   ├── SkipScheduledMessagesAction.php
 │   │   │   │   └── SyncMessageTemplatePresetsAction.php
+│   │   │   ├── Capabilities
+│   │   │   │   └── MessagingAutomationCapabilityContributor.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
 │   │   │   │       └── SyncMessageTemplatePresetsCommand.php
@@ -532,6 +540,8 @@
 │   │   │   │   ├── NotifyAssignedTaskRecipientsAction.php
 │   │   │   │   ├── SendTaskDigestNotificationsAction.php
 │   │   │   │   └── SyncTaskPresetsAction.php
+│   │   │   ├── Capabilities
+│   │   │   │   └── TasksAutomationCapabilityContributor.php
 │   │   │   ├── Contracts
 │   │   │   │   ├── TaskAssignedRecipientResolver.php
 │   │   │   │   └── TaskRelatedSubjectResolverContract.php
@@ -677,6 +687,12 @@
 │   │   └── Modules
 │   │       └── IntegrationsModuleServiceProvider.php
 │   └── Support
+│       ├── AutomationCapabilities
+│       │   ├── AutomationCapabilityRegistry.php
+│       │   ├── Contracts
+│       │   │   └── AutomationCapabilityContributor.php
+│       │   └── Data
+│       │       └── AutomationCapabilityDefinition.php
 │       ├── AutomationEvents
 │       │   ├── Data
 │       │   │   └── AutomationEventData.php
@@ -975,8 +991,8 @@
 │   │   ├── 2026_04_15_203535_create_contact_flow_route_plans_table.php
 │   │   ├── 2026_04_15_203536_create_contact_flow_route_plan_items_table.php
 │   │   ├── 2026_04_15_203537_create_contact_flow_route_progress_items_table.php
+│   │   ├── 2026_04_15_203543_create_task_templates_table.php
 │   │   ├── 2026_04_15_203544_create_tasks_table.php
-│   │   ├── 2026_04_15_203545_create_task_templates_table.php
 │   │   ├── 2026_04_15_203546_create_notes_table.php
 │   │   ├── 2026_05_15_215534_create_message_consents_table.php
 │   │   ├── 2026_05_15_215834_create_consent_revocations_table.php
@@ -1332,4 +1348,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-436 directories, 897 files
+443 directories, 906 files

@@ -16,7 +16,7 @@ class SyncContactStatusPresetsAction
      *     errors: array<int, string>,
      * }
      */
-    public function handle(?string $presetKey = null): array
+    public function handle(?string $presetKey = null, bool $force = false): array
     {
         $presetKey = $this->normalizePresetKey($presetKey);
 
@@ -42,7 +42,7 @@ class SyncContactStatusPresetsAction
 
         $statusDefinitions = $this->statusDefinitions($presetKey);
 
-        return DB::transaction(function () use ($statusDefinitions) {
+        return DB::transaction(function () use ($statusDefinitions, $force) {
             $result = [
                 'created' => 0,
                 'updated' => 0,
@@ -56,14 +56,28 @@ class SyncContactStatusPresetsAction
                     ->first();
 
                 if (! $status instanceof ContactStatus) {
-                    ContactStatus::create($this->attributes($definition));
+                    ContactStatus::create([
+                        ...$this->attributes($definition),
+                        'is_customized' => false,
+                        'customized_at' => null,
+                    ]);
 
                     $result['created']++;
 
                     continue;
                 }
 
-                $status->forceFill($this->attributes($definition))->save();
+                if ($status->is_customized && ! $force) {
+                    $result['skipped']++;
+
+                    continue;
+                }
+
+                $status->forceFill([
+                    ...$this->attributes($definition),
+                    'is_customized' => $force ? false : (bool) $status->is_customized,
+                    'customized_at' => $force ? null : $status->customized_at,
+                ])->save();
 
                 $result['updated']++;
             }
@@ -150,18 +164,26 @@ class SyncContactStatusPresetsAction
             ? $definition['meta']
             : [];
 
-        if (is_string($definition['description'] ?? null) && trim($definition['description']) !== '') {
-            $meta['description'] = trim($definition['description']);
-        }
+        $category = $this->nullableString($definition['category'] ?? null)
+            ?? $this->nullableString($meta['category'] ?? null);
+
+        unset(
+            $meta['description'],
+            $meta['category'],
+            $meta['color'],
+            $meta['source_version'],
+        );
 
         return [
             'key' => $key,
             'name' => $name,
-            'category' => $this->nullableString($definition['category'] ?? null)
-                ?? $this->nullableString($meta['category'] ?? null),
+            'description' => $this->nullableString($definition['description'] ?? null),
+            'category' => $category,
+            'color' => $this->nullableString($definition['color'] ?? null),
             'is_core' => (bool) ($definition['is_core'] ?? true),
             'is_active' => (bool) ($definition['is_active'] ?? true),
             'sort_order' => (int) ($definition['sort_order'] ?? 0),
+            'source_version' => $this->nullableVersion($definition['source_version'] ?? null),
             'meta' => $meta,
         ];
     }
@@ -175,10 +197,13 @@ class SyncContactStatusPresetsAction
         return [
             'key' => $definition['key'],
             'name' => $definition['name'],
+            'description' => $definition['description'],
             'category' => $definition['category'],
+            'color' => $definition['color'],
             'is_core' => $definition['is_core'],
             'is_active' => $definition['is_active'],
             'sort_order' => $definition['sort_order'],
+            'source_version' => $definition['source_version'],
             'meta' => $definition['meta'],
         ];
     }
@@ -222,5 +247,14 @@ class SyncContactStatusPresetsAction
         $value = trim($value);
 
         return $value !== '' ? $value : null;
+    }
+
+    private function nullableVersion(mixed $value): ?string
+    {
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+
+        return $this->nullableString($value);
     }
 }

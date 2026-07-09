@@ -2,6 +2,7 @@
 
 namespace App\Modules\Tasks\Providers;
 
+use App\Modules\Tasks\Capabilities\TasksAutomationCapabilityContributor;
 use App\Modules\Tasks\Events\TaskCompleted;
 use App\Modules\Tasks\Listeners\EmitTaskCompletedAutomationEvent;
 use App\Modules\Tasks\Services\AssignedRecipients\TeamMemberTaskAssignedRecipientResolver;
@@ -19,6 +20,10 @@ class TasksModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->tag([
+            TasksAutomationCapabilityContributor::class,
+        ], 'automation.capability_contributors');
+
         $this->app->tag([
             TeamMemberTaskAssignedRecipientResolver::class,
         ], 'crm.tasks.assigned_recipient_resolvers');

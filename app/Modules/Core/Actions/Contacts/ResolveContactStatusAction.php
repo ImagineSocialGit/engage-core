@@ -8,10 +8,14 @@ class ResolveContactStatusAction
 {
     public function handle(?string $key = null): ?ContactStatus
     {
-        $key ??= 'prospect';
+        $key ??= config('contacts.default_contact_status_key');
+
+        if (! is_string($key) || trim($key) === '') {
+            return null;
+        }
 
         return ContactStatus::query()
-            ->where('key', $key)
+            ->where('key', trim($key))
             ->where('is_active', true)
             ->first();
     }

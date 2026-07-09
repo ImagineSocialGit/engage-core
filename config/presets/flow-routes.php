@@ -35,6 +35,7 @@ return [
                 [
                     'key' => 'change_status_to_attended_webinar',
                     'type' => 'change_status',
+                    'capability_key' => 'flow_routes.change_status',
                     'name' => 'Change Status to Attended Webinar',
                     'description' => 'Move the contact into the attended_webinar status after a webinar.attended event.',
                     'default_definition' => [
@@ -79,6 +80,7 @@ return [
                 [
                     'key' => 'change_status_to_missed_webinar',
                     'type' => 'change_status',
+                    'capability_key' => 'flow_routes.change_status',
                     'name' => 'Change Status to Missed Webinar',
                     'description' => 'Move the contact into the missed_webinar status after a webinar.missed event.',
                     'default_definition' => [
@@ -123,6 +125,7 @@ return [
                 [
                     'key' => 'enroll_webinar_attended_nurture',
                     'type' => 'enroll_campaign',
+                    'capability_key' => 'campaigns.enroll_contact',
                     'name' => 'Enroll Webinar Attended Nurture',
                     'description' => 'Enroll the contact into the attended webinar nurture campaign.',
                     'default_definition' => [
@@ -171,6 +174,7 @@ return [
                 [
                     'key' => 'enroll_webinar_missed_nurture',
                     'type' => 'enroll_campaign',
+                    'capability_key' => 'campaigns.enroll_contact',
                     'name' => 'Enroll Webinar Missed Nurture',
                     'description' => 'Enroll the contact into the missed webinar nurture campaign.',
                     'default_definition' => [

@@ -26,6 +26,7 @@ return new class extends Migration
             $table->text('description')->nullable();
 
             $table->unsignedInteger('version')->default(1);
+            $table->boolean('is_current_version')->default(true)->index();
 
             $table->string('trigger_type')->default('manual')->index();
             $table->string('trigger_key')->nullable()->index();
@@ -46,6 +47,7 @@ return new class extends Migration
             $table->index(['contact_status_id', 'is_active']);
             $table->index(['trigger_type', 'trigger_key', 'is_active']);
             $table->index(['owner_group', 'is_active']);
+            $table->index(['key', 'is_current_version', 'is_active'], 'flow_routes_key_current_active_index');
             $table->index(['key', 'source_version']);
         });
     }

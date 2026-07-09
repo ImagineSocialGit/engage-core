@@ -2,6 +2,7 @@
 
 namespace App\Modules\Campaigns\Providers;
 
+use App\Modules\Campaigns\Capabilities\CampaignsAutomationCapabilityContributor;
 use App\Modules\Campaigns\Console\Commands\SyncCampaignPresetsCommand;
 use App\Modules\Campaigns\Listeners\ScheduleNextCampaignStepAfterScheduledMessageSent;
 use App\Modules\Campaigns\Services\ContactShow\ContactCampaignsVisibilityDataProvider;
@@ -14,6 +15,10 @@ class CampaignsModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->tag([
+            CampaignsAutomationCapabilityContributor::class,
+        ], 'automation.capability_contributors');
+
         $this->app->tag([
             ContactCampaignsVisibilityDataProvider::class,
         ], 'core.contact_show_data_providers');

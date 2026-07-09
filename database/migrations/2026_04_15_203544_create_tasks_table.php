@@ -61,11 +61,10 @@ return new class extends Migration
                 ->constrained('flow_route_capabilities')
                 ->nullOnDelete();
 
-            // task_templates is created immediately after tasks in the current pre-prod migration order.
-            // Keep the structured column now, but do not add a DB constraint here.
             $table->foreignIdFor(TaskTemplate::class)
                 ->nullable()
-                ->index();
+                ->constrained('task_templates')
+                ->nullOnDelete();
 
             $table->string('task_template_key')->nullable()->index();
 
