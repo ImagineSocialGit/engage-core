@@ -1,3 +1,4 @@
+
 # FlowRoutes Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -326,6 +327,48 @@ Capabilities describe what is available to a route, including actions, waits, ev
 Capability bindings decide which capabilities are enabled, visible, or customized for a client/module/context/owner group/vertical.
 
 Capabilities do not give FlowRoutes permission to mutate another module's private tables. Every module-owned effect still goes through that module's public action/service/contract.
+
+
+## FlowRoutes setup validation ownership
+
+FlowRoutes should contribute FlowRoutes-owned checks to the shared app-level setup validation manager.
+
+FlowRoutes validation should use these sources of truth:
+
+```text
+FlowRoute preset definition DTOs
+FlowRoute point preset definition DTOs
+PointHandlerRegistry for actually registered executable point types
+DB-owned FlowRouteCapability / FlowRouteCapabilityBinding records where runtime/client context matters
+actual owning-module preset definitions or public resolvers for referenced Task templates, Campaigns, Messaging templates, statuses, and future vertical capabilities
+```
+
+At minimum, validate:
+
+```text
+selected FlowRoute preset groups exist
+referenced FlowRoute definitions exist
+route definition keys match their config keys
+trigger type and trigger key shape are supported
+route point keys are unique within the route
+route point types have registered handlers for the current installation/context
+required capability references exist and are available
+create_task references resolve to available TaskTemplate definitions when configured
+change_status references resolve to available ContactStatus definitions
+campaign point references resolve to available Campaign definitions
+send_message references resolve through Messaging-owned template/context validation
+required modules for capabilities/handlers are available
+supported subject types match route/capability assumptions
+next-point references resolve safely
+route-instance plan/snapshot assumptions are supported by the durable runtime model
+available-field references are valid for the authoring/execution context
+```
+
+A configured route point that cannot execute because its handler, required module, capability, or required referenced definition is unavailable is a hard error for that selected setup.
+
+A dormant unused capability that is safely unavailable may be a warning.
+
+Do not make one global validator import every producer module's private models/config internals. FlowRoutes should validate cross-module references through shared setup-validation context and owning-module contributors/public seams.
 
 ## TaskTemplate requirement for create_task points
 

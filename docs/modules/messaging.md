@@ -1,4 +1,5 @@
 
+
 # Messaging Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -537,5 +538,83 @@ AvailableFieldOption
 ```
 
 Message template validation should apply to DB-customized templates as well as config-synced templates. Editing copy in CRM/admin UI does not make an unsupported token valid.
+
+
+## Canonical available fields and client-facing aliases
+
+Messaging and shared authoring infrastructure should distinguish canonical internal field identity from client-facing alias vocabulary.
+
+Canonical runtime identity should remain universal, for example:
+
+```text
+contact.first_name
+contact.last_name
+contact.email
+```
+
+A client-facing editor may expose aliases based on the configured Contact noun, for example:
+
+```text
+lead_first_name
+fan_first_name
+customer_first_name
+```
+
+Those aliases are authoring/display conveniences only. They should normalize to the canonical internal field before storage validation/rendering or through another single documented normalization seam.
+
+Do not create separate token registries, payload fields, database columns, or runtime branches for Lead, Fan, Customer, Borrower, Owner, and similar presentation nouns when they all represent Core Contact fields.
+
+The available-field registry/provider should be able to expose:
+
+```text
+canonical key
+client-facing label
+accepted authoring aliases
+owning module/provider
+available contexts
+runtime source
+```
+
+A client-facing alias must never be offered unless it resolves unambiguously to a canonical field the runtime context can actually supply.
+
+## Messaging setup validation ownership
+
+Messaging should contribute Messaging-owned checks to the shared app-level setup validation manager instead of placing Messaging-specific logic directly in a global command.
+
+The existing `MessageConfigValidator` should be reused/adapted rather than duplicated.
+
+Messaging validation should cover, as applicable:
+
+```text
+canonical message definition shape
+dispatch key validity
+channel/purpose/scope validity
+payload class availability
+schedule/timing shape
+required payload fields
+unresolved or undeclared tokens/available fields
+context-specific field availability
+client-facing alias normalization to canonical fields
+runtime-only URL availability
+DB-customized MessageTemplatePreset payloads
+MessageTemplatePresetAssignment compatibility
+campaign variant template contexts
+webinar message/template contexts
+channel availability for relevant authoring surfaces
+```
+
+Hard errors should represent configuration that cannot safely execute or render. Warnings should represent safe but dormant, unused, unavailable, or potentially surprising setup.
+
+Messaging validation findings should be reusable by:
+
+```text
+setup:validate CLI output
+staging/client handoff checks
+Message Template editing UI
+future Campaign/Webinar/Route authoring surfaces
+available-field/token picker UX
+```
+
+No persistent validation-result tables are required unless a later operator workflow proves retained history or acknowledgement state is needed.
 
 Fields should be filtered by authoring/runtime context so operators cannot insert a field that will be unavailable when the message sends.

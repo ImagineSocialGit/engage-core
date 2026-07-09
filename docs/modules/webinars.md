@@ -1,3 +1,4 @@
+
 # Webinars Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -80,6 +81,28 @@ A schedule profile item references runtime dimensions such as dispatch key, mess
 Multiple reminder slots may share the same reusable Messaging behavior, for example `message_type = reminder`. The schedule profile item key and source config path identify the specific reminder slot, such as 30 minutes before start. Messaging should not encode reminder timing into schedule-specific message types such as `reminder_30_minute`.
 
 Scheduled-message payloads created by Webinars must remain compact. They should include send-ready payload fields, compact token maps, and compact context arrays. They must not include full Eloquent model arrays, loaded relationships, webinar schedule profile objects, or profile item collections. Schedule profile/source identity belongs in scheduled-message metadata.
+
+
+## Webinars setup validation ownership
+
+Webinars should contribute Webinars-owned setup checks to the shared app-level setup validation manager.
+
+Webinars validation should use Webinars-owned schedule/profile definitions and public Messaging validation/resolution seams rather than duplicating Messaging internals.
+
+At minimum, validate:
+
+```text
+selected webinar schedule profile exists or a valid default fallback exists
+schedule profile item keys are unique within a profile
+schedule/timing definitions are valid
+schedule profile items reference supported channel/purpose/scope/surface/message context
+selected Messaging template assignments are compatible and resolvable
+required webinar available fields/tokens are supplied by the actual webinar runtime path
+runtime-only URLs such as join/cancel/playback URLs are available for the context that uses them
+schedule/profile identity remains metadata and does not leak full model graphs into scheduled-message payloads
+```
+
+A required selected schedule item or template context that cannot execute safely is a hard error. Optional disabled schedule items or intentionally omitted channels may be warnings or omitted depending on operator usefulness.
 
 Post-webinar transactional follow-ups are not campaign nurture.
 

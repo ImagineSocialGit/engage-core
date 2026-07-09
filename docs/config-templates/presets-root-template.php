@@ -30,6 +30,25 @@ return [
 
     'default_package' => env('PRESET_PACKAGE', 'webinar_default'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Setup validation contract
+    |--------------------------------------------------------------------------
+    |
+    | Preset packages are validated through the shared setup-validation manager.
+    | Owning modules contribute validators for their own config/preset shapes and
+    | cross-references. Validation findings use one reusable structured shape and
+    | may be consumed by CLI commands now and authoring/readiness UI later.
+    |
+    | Hard errors represent unsafe or impossible intended runtime behavior.
+    | Warnings represent dormant, unused, discouraged, or surprising-but-safe
+    | configuration.
+    |
+    | Do not persist validation runs/findings unless a concrete operator workflow
+    | proves historical validation state is needed.
+    |
+    */
+
     'packages' => [
         'webinar_default' => [
             'name' => 'Webinar Default',

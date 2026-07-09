@@ -1,4 +1,5 @@
 
+
 # Campaigns Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -261,6 +262,33 @@ normalizes to:
     schedule.minutes = 4320
 
 If a referenced Messaging template is missing, fail loudly because the config is broken.
+
+
+## Campaign setup validation ownership
+
+Campaigns should contribute Campaign-owned checks to the shared app-level setup validation manager.
+
+Campaign validation should use actual Campaign preset definitions, Campaign step/variant definition DTOs, supported variant strategies, and Messaging-owned public reference/resolution seams as the executable truth.
+
+At minimum, validate:
+
+```text
+selected Campaign preset groups exist
+referenced Campaign definitions exist
+campaign definition keys match their config keys
+step numbers are valid and unique within a Campaign
+variant keys are valid and unique within a step
+variant_strategy is supported
+variant dependency rules reference real sibling variant keys
+variant dependency states are supported
+variant channel/purpose/scope/template context is resolvable through Messaging-owned seams
+Campaign presets do not own reusable subject/body/message payload copy
+FlowRoute or other external references to campaign_key resolve to a real available Campaign definition
+```
+
+A Campaign configuration that cannot execute safely is a hard error. A dormant but safe unused Campaign or variant may be a warning.
+
+Campaign validation must not turn Campaigns into the owner of Messaging template internals. Cross-module checks should use public contracts/services/registries or shared setup-validation context.
 
 If a referenced Messaging template exists but has no usable payload, skip scheduling safely with debug metadata instead of crashing runtime delivery.
 

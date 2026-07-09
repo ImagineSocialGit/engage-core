@@ -1,3 +1,4 @@
+
 # Engage Core UI/UX Guide
 
 This guide turns Engage Core's product principles into practical interface rules.
@@ -166,6 +167,8 @@ Do not reuse dev-testing UI patterns for client/operator-facing production UI. A
 ### Use configured business nouns
 
 Client-facing nouns should come from client/config terminology where available.
+
+This is a presentation rule only. Internal/runtime identifiers remain universal and `contact`-based. Do not let a client-facing noun such as Lead, Customer, Fan, Borrower, or Owner leak into generic config keys, preset identifiers, task-template keys, event keys, triggers, FlowRoute identifiers, payload/context fields, or universal service/action names.
 
 Examples:
 
@@ -1339,3 +1342,21 @@ Missed webinar replay email
 ```
 
 Keep raw campaign/template/config identity available only where it helps diagnostics.
+
+## Configured Contact nouns and canonical fields
+
+Client/operator UI should use the business noun that makes the product feel native to the client, such as Lead, Fan, Customer, Borrower, Owner, Member, or Contact.
+
+That presentation choice should not create new internal domain concepts.
+
+Authoring UI may expose field aliases such as:
+
+```text
+lead_first_name
+fan_first_name
+customer_first_name
+```
+
+when those names make the authoring experience clearer for the current client. The UI should resolve those aliases to one canonical internal Contact field such as `contact.first_name`.
+
+The product should optimize for the user's vocabulary without duplicating runtime concepts, token sources, schema, or validation logic.

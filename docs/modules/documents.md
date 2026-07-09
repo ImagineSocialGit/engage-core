@@ -1,3 +1,4 @@
+
 # Documents Module
 
 Documents is a current universal module.
@@ -28,8 +29,8 @@ For Documents, this creates a clear split.
 Client-facing Documents work:
 
 ```text
-Request these documents from a lead.
-Open this lead's document checklist.
+Request these documents from a contact.
+Open this contact's document checklist.
 Review an uploaded document.
 Approve a document.
 Reject a document and ask for a replacement.

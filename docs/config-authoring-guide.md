@@ -1,4 +1,5 @@
 
+
 # Engage Core Config Authoring Guide
 
 This guide is for creating or reviewing Engage Core default configs and client-specific configs.
@@ -23,15 +24,67 @@ Primary references:
 8. FlowRoute presets own automation/control-flow routing and reusable point definitions; runtime execution should use DB-owned route templates, capabilities, instance plans, plan items, and progress/execution items.
 9. Webinar post-event config owns provider event orchestration, not message copy.
 10. Task presets create DB-owned task template definitions only. They do not create live tasks.
-11. Use `lead/leads` in CRM/client-facing copy unless explicitly told otherwise.
-12. Do not invent new keys until checking the key registry.
-13. Do not use undocumented tokens in client-facing message copy.
-14. Avoid backward compatibility/legacy aliases unless explicitly chosen.
-15. Normal Broadcasts require normal Messaging consent. Do not use Broadcasts as a general imported-contact consent bypass.
-16. Imported-contact opt-in invitations are a distinct one-time Messaging flow with configurable public copy/style.
-17. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
-18. Module docs are the source of truth for module ownership and client-facing scope. Configs should not create a module feature that the owning module does not support.
-19. Commerce and Location configs should support admin convenience and integrations; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
+11. Internal/runtime identifiers must use the universal platform concept `contact`, never `lead`, unless a vertical truly owns a distinct domain concept named lead. This applies to keys, preset identifiers, task-template keys, route keys, event keys, triggers, reference registries, config paths, and generic definitions.
+12. Client-facing UI/copy may use the configured business noun such as Lead, Customer, Fan, Borrower, Owner, or another client/vertical label. Display terminology must not redefine internal identifiers.
+13. Do not invent new keys until checking the key registry and the actual owning config/runtime definitions.
+14. Do not use undocumented tokens in client-facing message copy.
+15. Avoid backward compatibility/legacy aliases unless explicitly chosen.
+16. Normal Broadcasts require normal Messaging consent. Do not use Broadcasts as a general imported-contact consent bypass.
+17. Imported-contact opt-in invitations are a distinct one-time Messaging flow with configurable public copy/style.
+18. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
+19. Module docs are the source of truth for module ownership and client-facing scope. Configs should not create a module feature that the owning module does not support.
+20. Commerce and Location configs should support admin convenience and integrations; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
+
+## Universal internal terminology vs configured client nouns
+
+Engage Core has one universal internal person concept: `Contact`.
+
+Use `contact` for internal/runtime identifiers such as:
+
+```text
+config keys
+preset keys
+task template keys
+FlowRoute keys and point keys
+automation event keys
+trigger keys
+reference registry keys
+payload/context field names
+service/action/DTO names when the concept is generic
+```
+
+Do not create universal identifiers such as:
+
+```text
+new_lead
+call_lead
+review_lead_notes
+lead.converted
+lead_follow_up_route
+```
+
+Prefer:
+
+```text
+new
+call_contact
+review_contact_notes
+contact.converted, only when that event is truly Core-owned and supported
+contact_follow_up_route
+```
+
+Client-facing UI and copy may use the configured business noun. Examples:
+
+```text
+Lead
+Customer
+Fan
+Borrower
+Pet owner
+Member
+```
+
+That display choice must stay at the presentation/copy layer and must not leak into generic runtime identifiers. Vertical modules may use vertical-owned terminology only for real vertical concepts, not as aliases for Core Contact.
 
 ## Before creating a config
 
@@ -47,6 +100,7 @@ Answer these questions:
 8. Should a new key/token be added, or should the request use an existing one?
 9. Is the copy vertical-neutral or vertical-specific?
 10. If it is vertical-specific, does it live under a vertical-specific scope?
+11. Are internal keys/identifiers still universal and `contact`-based even when client-facing copy uses another noun?
 
 ## Purpose and scope decisions
 
@@ -176,6 +230,32 @@ registration_created
 ```
 
 if the client intends it to mean something different from the core registration-created behavior.
+
+## Canonical Contact fields and client-facing aliases
+
+Internal field identity should remain canonical and universal.
+
+Use canonical Contact fields internally, for example:
+
+```text
+contact.first_name
+contact.last_name
+contact.email
+```
+
+Client/operator authoring UI may expose friendly aliases based on the configured business noun, for example:
+
+```text
+lead_first_name
+fan_first_name
+customer_first_name
+```
+
+Those aliases are presentation/authoring conveniences only. They should normalize through one documented seam to the canonical Contact field before validation/rendering or otherwise resolve unambiguously to that canonical field.
+
+Do not create separate runtime payload fields, database columns, event keys, preset keys, or validation concepts for Lead, Fan, Customer, Borrower, Owner, or similar presentation nouns when they represent the same Core Contact field.
+
+The available-field source of truth should be able to expose a canonical key, client-facing label, accepted aliases, owning provider/module, available contexts, and runtime source.
 
 ## Token selection process
 
@@ -1073,7 +1153,7 @@ Rules:
 - Mortgage-specific copy should use mortgage-specific scopes or client overrides.
 - Use documented tokens only.
 - If the client request needs a missing token, recommend adding that token to the runtime payload or changing the copy.
-- Use lead/leads in CRM/client-facing text.
+- Use the configured client-facing business noun in UI/copy when appropriate, but keep internal keys/identifiers universal and `contact`-based.
 - Keep SMS options config-toggleable in UI.
 - Keep imported-contact permission invitations separate from normal Broadcasts.
 
@@ -1086,6 +1166,156 @@ Return complete config files and list any recommended new keys/tokens separately
 
 
 
+
+## Phase 6 setup validation architecture
+
+Setup validation should be reusable infrastructure, not a one-off Artisan command full of module-specific conditionals.
+
+Preferred architecture:
+
+```text
+SetupValidationManager / orchestrator
+    -> registered validation contributors/validators
+        -> module-owned validators
+        -> app-level/package/module dependency validators
+        -> adapters around existing validators such as MessageConfigValidator
+    -> structured SetupValidationFinding records in memory
+    -> SetupValidationResult
+        -> CLI output now
+        -> staging/client handoff blocking now
+        -> future authoring UI, readiness screens, and builder feedback later
+```
+
+The shared finding shape should be stable enough for CLI and UI consumers. At minimum, audit these fields:
+
+```text
+severity        error | warning
+code            stable machine-readable identifier
+message         actionable human-readable explanation
+source          owning config/preset/module source
+path            precise config/reference path when available
+module          owning or affected module when applicable
+context         authoring/runtime context when applicable
+meta            compact diagnostic details only when useful
+```
+
+Do not persist validation findings by default. Add validation-history tables only if a concrete operator/setup workflow needs retained runs, acknowledgements, audit history, or comparison over time.
+
+### Validation ownership
+
+Each module should validate the config/preset concepts it owns.
+
+Examples:
+
+```text
+Tasks
+    Task preset shape
+    Task template definitions
+    Task template keys/references
+
+FlowRoutes
+    FlowRoute preset shape
+    Point types
+    Capability references
+    Task template / Campaign / Messaging references used by points
+    Supported subject types
+    Route instance/snapshot assumptions
+
+Campaigns
+    Campaign preset shape
+    Step/variant strategy
+    Variant dependency rules
+    Messaging template context references
+
+Messaging
+    Message definition shape
+    Template payloads
+    tokens/available fields by authoring/runtime context
+    channel/purpose/scope and template-assignment compatibility
+```
+
+The central manager orchestrates validation. It should not absorb every module's private config parser or model rules.
+
+### Hard errors vs warnings
+
+Use this decision rule:
+
+```text
+Would the selected/current setup make intended runtime behavior invalid, impossible, ambiguous, or unsafe?
+    Yes -> hard error.
+
+Is the setup safe but unused, dormant, unavailable by choice, deprecated-but-resolvable, or merely surprising?
+    Yes -> warning.
+```
+
+Typical hard errors:
+
+```text
+Selected preset package does not exist.
+Enabled module key is unknown or required dependency cannot be resolved.
+FlowRoute references an unknown/unregistered point type.
+FlowRoute references a missing TaskTemplate, Campaign, required Messaging template context, or required capability.
+A configured point requires a module/handler that is unavailable, so runtime cannot execute it safely.
+Campaign variant strategy/dependency shape is invalid.
+A field/token is not valid for the authoring/runtime context that will render it.
+A config assumes subject/plan-item behavior the current runtime cannot support.
+```
+
+Typical warnings:
+
+```text
+A valid template/capability exists but is unused.
+A template exists but is not currently assigned.
+An optional route preset is available but has no selected trigger binding.
+An optional channel/module definition is safely dormant because the client has not enabled that surface.
+A discouraged legacy authoring shape still resolves safely and is intentionally tolerated.
+```
+
+Hard errors should fail the validation command and block staging/client handoff. Warnings should remain non-blocking but actionable.
+
+### Reference-source authority
+
+Do not use a stale registry as the sole runtime truth.
+
+Use the owning source of truth for executable references:
+
+```text
+Task template reference
+    -> actual configured/synced TaskTemplate definitions
+
+FlowRoute point type
+    -> registered PointHandler/runtime point catalog
+
+FlowRoute capability reference
+    -> DB-owned capability catalog/bindings plus handler/module availability
+
+Campaign reference
+    -> actual configured/synced Campaign definitions
+
+Messaging template reference
+    -> actual Messaging config/preset/assignment context
+
+Available field/token
+    -> context-aware registry/provider plus the runtime data source that can actually supply it
+```
+
+`config/reference/keys.php` and `config/reference/tokens.php` remain important authoring/reference registries. Phase 6 validation should detect drift between those registries and owning definitions, but should not incorrectly reject a valid executable reference merely because a stale documentation registry was treated as the only truth.
+
+### Phase 6 implementation order
+
+Use this order so code is not built around inconsistent docs/configs:
+
+```text
+1. Audit and normalize docs.
+2. Normalize current default/client configs against the docs.
+3. Audit migrations/models against normalized config requirements.
+4. Add/replace schema only for proven durable first-class concepts.
+5. Implement contributor-based validation/runtime code.
+6. Run fast migration/schema checks first when schema changed.
+7. Add focused tests, adjacent-module tests, and broader config fallback/preset coverage.
+```
+
+Do not use `meta` to avoid adding a proven first-class field. Do not add schema merely to persist validation output.
 
 ## Task and FlowRoutes preset validation additions
 
@@ -1123,7 +1353,7 @@ Hard errors should block preset sync, staging handoff, or client launch when run
 
 Warnings should provide useful operator/debug guidance without blocking safe runtime behavior.
 
-Prefer command/service-based validation first. Do not add persistent validation result tables unless a concrete workflow proves that persisted validation runs/findings are needed.
+Use the contributor-based validation manager/service as the reusable source of truth. Expose it through an Artisan command first, and let future authoring/readiness UI consume the same structured findings. Do not add persistent validation result tables unless a concrete workflow proves retained validation history is needed.
 
 ## FlowRoutes capability reference rule
 
@@ -1278,3 +1508,4 @@ business context label
 ```
 
 Do not persist schedule summary text unless a concrete reason appears. Prefer deriving it from the canonical schedule/profile/criteria definition.
+

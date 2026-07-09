@@ -16,16 +16,31 @@ return [
     | FlowRoutes, Campaigns, Webinars, or Tasks are disabled.
     |
     | Keep statuses generic unless the preset package is explicitly vertical-
-    | specific. Use lead/leads in CRM/client-facing names and descriptions.
+    | specific. Internal keys stay contact-neutral. Client-facing names and descriptions may use the configured industry noun when the preset is deliberately product- or vertical-specific.
     |
     | Do not split statuses into manual-only or automation-only categories by default.
     | If a manual status change will trigger selected FlowRoute automation, 
     | the CRM UI should warn the operator before applying the change.
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Validation expectations
+    |--------------------------------------------------------------------------
+    |
+    | Core owns validation of ContactStatus preset groups and definitions. Stable
+    | internal keys remain contact-neutral. Client-facing labels may use the
+    | configured industry noun without changing the canonical key or runtime model.
+    |
+    | FlowRoutes change-status points may reference these stable keys and should be
+    | validated against the selected preset package's available ContactStatus
+    | definitions before sync/client handoff.
+    |
+    */
+
     'groups' => [
         'crm_default' => [
-            'new_lead',
+            'new_contact',
             'attempting_contact',
             'consultation_scheduled',
             'nurture',
@@ -34,10 +49,10 @@ return [
     ],
 
     'definitions' => [
-        'new_lead' => [
-            'key' => 'new_lead',
-            'name' => 'New Lead',
-            'description' => 'A newly-created lead that has not yet been worked.',
+        'new_contact' => [
+            'key' => 'new_contact',
+            'name' => 'New Contact',
+            'description' => 'A newly-created contact that has not yet been worked.',
             'color' => 'gray',
             'sort_order' => 10,
             'is_active' => true,
@@ -48,7 +63,7 @@ return [
         'attempting_contact' => [
             'key' => 'attempting_contact',
             'name' => 'Attempting Contact',
-            'description' => 'The team is trying to reach the lead.',
+            'description' => 'The team is trying to reach the contact.',
             'color' => 'blue',
             'sort_order' => 20,
             'is_active' => true,
@@ -59,7 +74,7 @@ return [
         'consultation_scheduled' => [
             'key' => 'consultation_scheduled',
             'name' => 'Consultation Scheduled',
-            'description' => 'The lead has scheduled a consultation or strategy session.',
+            'description' => 'The contact has scheduled a consultation or strategy session.',
             'color' => 'green',
             'sort_order' => 30,
             'is_active' => true,
@@ -70,7 +85,7 @@ return [
         'nurture' => [
             'key' => 'nurture',
             'name' => 'Nurture',
-            'description' => 'The lead is not ready now but should remain in follow-up.',
+            'description' => 'The contact is not ready now but should remain in follow-up.',
             'color' => 'yellow',
             'sort_order' => 40,
             'is_active' => true,
@@ -81,7 +96,7 @@ return [
         'closed_lost' => [
             'key' => 'closed_lost',
             'name' => 'Closed Lost',
-            'description' => 'The lead is no longer active.',
+            'description' => 'The contact is no longer active.',
             'color' => 'red',
             'sort_order' => 90,
             'is_active' => true,

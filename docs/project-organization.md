@@ -1,3 +1,4 @@
+
 # Engage Core Project Organization
 
 This document is a quick orientation map for Engage Core. It classifies the project into Core, universal modules, vertical modules, and integrations/adapters.
@@ -74,7 +75,7 @@ Some CRM surfaces are shared shells rather than feature modules.
 
 The dashboard is an app-level CRM orientation surface.
 
-It should be driven by config slots, preset priorities, and module-contributed panel providers. It should answer what needs attention today and what is already handled. It should not duplicate the Leads index or become a grid of module widgets.
+It should be driven by config slots, preset priorities, and module-contributed panel providers. It should answer what needs attention today and what is already handled. It should not duplicate the contact index (or its configured client-facing label, such as Leads) or become a grid of module widgets.
 
 ### Contact show
 
@@ -222,3 +223,4 @@ Avoid:
 ```text
 New Core columns for feature or vertical state
 ```
+

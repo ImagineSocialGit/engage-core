@@ -1,3 +1,4 @@
+
 # Forms Module
 
 Forms is a current universal module.
@@ -28,8 +29,8 @@ For Forms, this creates a clear split.
 Client-facing Forms work:
 
 ```text
-Send this existing intake form to a lead.
-Open this lead's submitted intake.
+Send this existing intake form to a contact.
+Open this contact's submitted intake.
 Review this submission.
 Approve this submission.
 Ask for missing information.
@@ -77,7 +78,7 @@ What form was defined, which version was submitted, who submitted it, what answe
 
 Forms should stay vertical-neutral.
 
-It may support dog training intake forms, mortgage lead/application intake, music booking inquiries, webinar questionnaires, general client questionnaires, internal request forms, portal-submitted forms, or other structured data collection without owning the vertical meaning of the submitted answers.
+It may support dog training intake forms, mortgage contact/application intake, music booking inquiries, webinar questionnaires, general client questionnaires, internal request forms, portal-submitted forms, or other structured data collection without owning the vertical meaning of the submitted answers.
 
 ## FOSS feature-shape assumptions
 
@@ -702,3 +703,22 @@ Should file upload fields route through Documents from the beginning, or be bloc
 Should submitted values include typed columns immediately, or only JSON value + text value for the first slice?
 Should Forms emit `form.submitted` automation events in the foundation slice, or wait until CreateFormSubmissionAction exists?
 ```
+
+## Setup/config validation vs submission validation
+
+Forms has two different validation concerns and they should not be conflated.
+
+```text
+Setup/config validation
+    Validates form presets, form definitions, field identifiers, rules, module references, and available-field references before client handoff or authoring save.
+
+Submission validation
+    Validates one submitted response against the frozen FormVersion schema/rules that apply to that submission.
+```
+
+`FormSubmissionValidator` remains Forms-owned runtime submission validation.
+
+When Forms adds config/preset authoring, it should contribute a Forms-owned validator to the shared app-level setup validation manager rather than adding Forms-specific logic directly to a global command.
+
+Setup validation should return reusable structured findings so the same result can support CLI validation now and guided form-authoring UI later.
+

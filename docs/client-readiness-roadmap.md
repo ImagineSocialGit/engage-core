@@ -1,3 +1,4 @@
+
 # Engage Core Client-Readiness Roadmap
 
 This roadmap tracks the near-term implementation order for getting Engage Core ready for real client operation without treating the work as a limited or throwaway MVP.
@@ -112,7 +113,7 @@ Current schema-discovery sequence:
 | 4A | FlowRoutes relationship, capability, and instance-plan audit | Complete | DB/schema + architecture | Audit confirmed that future subject-scoped route instance adjustment and durable capability discovery are guaranteed requirements before production. FlowRoutes should harden schema now instead of relying on meta-heavy execution/correlation. |
 | 4B | FlowRoutes schema hardening | Complete | DB/schema + architecture | Subject-scoped route progress, contact route plans, plan items, progress/execution items, capability catalog/bindings, uniform route-created artifact provenance, blocked/cancelled runtime handling, provenance/debug consistency, and boundary guardrails are in place. |
 | 5 | FlowRoutes event-wait / task-completed resume implementation | Complete | Runtime | Resume from neutral `task.completed` automation events now uses the Phase 4B route progress/plan/progress-item foundation and created Task identity rather than broad contact-only waits. Direct resume and real CompleteTaskAction → TaskCompleted → AutomationEventRecorded → FlowRoutes listener behavior are covered. |
-| 6 | Config validation / setup validation | Current | Architecture + safety | Validate task presets, FlowRoute presets, task-template refs, route point types, module capability references, available field/token references, vertical references, campaign refs, messaging/template refs, unsupported point/module combinations, and route instance/snapshot assumptions. Prefer command/service-based validation first. |
+| 6 | Config validation / setup validation | Current | Architecture + safety | Standardize docs first, then configs, then audit schema/models, then implement reusable contributor-based validation and tests. Validate task presets, FlowRoute presets, task-template refs, route point types, module capabilities, available fields/tokens, vertical refs, campaign refs, Messaging/template refs, unsupported point/module combinations, and route instance/snapshot assumptions. |
 | 7 | Permission invitation accepted automation event | Planned | Architecture | Decide whether accepted invitations emit `permission_invitation.accepted` without Messaging depending on consumers. |
 | 8 | Permission invitation cancellation / skip / failure bookkeeping | Planned | DB/schema + architecture | Clarify durable lifecycle visibility across permission invitations, Broadcast bookkeeping, and Messaging scheduled messages. |
 | 9 | Webinar message readiness check | Planned | Architecture + operator safety | Add computed readiness visibility for webinar message setup without persisting setup state unless a concrete need appears. |
@@ -206,7 +207,7 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | 4A | FlowRoutes relationship, capability, and instance-plan audit | Complete | Audit confirmed schema should support subject-scoped route instances, instance plans, plan items, progress/execution items, capability catalog/bindings, and uniform route-created artifact provenance before production. |
 | 4B | FlowRoutes schema hardening | Complete | FlowRoutes now has subject-capable progress, route instance plans, plan items, progress/execution items, capability/binding schema, uniform provenance, blocked/cancelled handling, and backend guardrails. Polished Route Management UX remains deferred. |
 | 5 | FlowRoutes event-wait / task-completed resume implementation | Complete | Resume from neutral `task.completed` automation events now uses the Phase 4B route progress/plan/progress-item foundation and created Task identity rather than broad contact-only waits. Direct resume and real CompleteTaskAction → TaskCompleted → AutomationEventRecorded → FlowRoutes listener behavior are covered. |
-| 6 | Config validation / setup validation | Current | Convert config-template expectations into practical validation behavior and operator/debug feedback. Validate task presets, FlowRoute presets, task-template refs, route point types, module capability refs, available field/token refs, vertical refs, campaign refs, Messaging template refs, unsupported point/module combinations, and route instance/snapshot assumptions. Prefer command/service-based validation first. |
+| 6 | Config validation / setup validation | Current | Docs audit -> config normalization -> schema/model audit -> contributor-based validation/runtime code -> tests. Use reusable structured findings and module-owned validators so the same validation seam can serve CLI handoff checks and future authoring UI. Do not persist findings unless a concrete workflow requires history. |
 | 7 | Permission invitation accepted automation event decision | 0.25–0.5 session | Decide whether accepted invitations should emit a neutral automation event such as `permission_invitation.accepted`. |
 | 8 | Permission invitation cancellation behavior | 0.5–1 session | Clarify how cancellation/skip/failure should appear for permission-invitation Broadcast bookkeeping and Messaging scheduled messages. |
 | 9 | Webinar message readiness check | 0.5–1 session | Computed readiness summary for Webinars message setup. Do not persist readiness/acknowledgement state unless the implementation proves a durable concept is missing. |
@@ -371,15 +372,29 @@ The next implementation target is Phase 6: Config validation / setup validation.
 
 Goals:
 
-- Validate Task presets, FlowRoute presets, route point types, task-template references, Campaign references, Messaging/template references, module capability references, available-field/token references, and unsupported point/module combinations.
-- Validate route instance/snapshot assumptions where config or preset shape affects runtime execution.
+- Audit and correct the docs first so they define one authoritative contract for terminology, config shapes, references, validation ownership, severity, and extension seams.
+- Normalize current default/client configs against that contract before designing validation around inconsistent inputs.
+- Audit migrations/models after config normalization and add or replace schema only when a durable first-class concept is actually missing. Do not use `meta` as a substitute for a proven first-class field.
+- Build a reusable contributor-based validation architecture with a central manager/orchestrator, module-owned validators/contributors, and structured findings.
+- Reuse that validation seam for command-line staging/client handoff checks now and future authoring UI later.
+- Validate Task presets, FlowRoute presets, route point types, task-template references, Campaign references, Messaging/template references, module capability references, available-field/token references, vertical references, module availability, unsupported point/module combinations, and route instance/snapshot assumptions.
 - Classify findings as hard errors or warnings.
 - Make hard errors block staging/client handoff.
 - Make warnings useful for operator/debug guidance without blocking safe runtime behavior.
-- Prefer command/service-based validation first.
-- Do not add persistent validation records unless a concrete operator/setup workflow proves they are needed.
+- Keep internal/runtime identifiers universal: use `contact`, not `lead`, in keys, presets, events, triggers, route/task-template identifiers, and generic config definitions. Client-facing UI/copy may use the configured business noun.
+- Do not add persistent validation records unless a concrete operator/setup workflow proves historical validation runs or acknowledgements are needed.
 
-Phase 6 should convert documented config-template expectations into executable validation behavior without building a polished Route Management UX yet.
+Phase 6 implementation order:
+
+```text
+6A. Documentation audit and contract normalization.
+6B. Config normalization against the docs.
+6C. Schema/model audit against normalized config requirements.
+6D. Contributor-based validation architecture and runtime code.
+6E. Fast schema checks when applicable, focused tests, adjacent-module tests, then broader fallback/preset coverage.
+```
+
+Phase 6 should convert documented config-template expectations into reusable executable validation behavior without building a polished Route Management UX yet.
 
 ## What this roadmap intentionally avoids
 
@@ -421,8 +436,8 @@ Schema/code-sensitive notes:
 
 ```text
 Shared available-field/token picker
-    May require a provider/registry source of truth and validation by message/context.
-    Track primarily in Phase 6 config/setup validation.
+    Requires a provider/registry source of truth and validation by authoring/runtime context.
+    Phase 6 should establish the reusable source-of-truth/validation seam before polished editors consume it.
 
 Route terminology and capability labels
     Route Management / Routes language should use FlowRouteCapability metadata, labels, hints, supported subjects, required modules, and available fields so client-facing screens can explain available actions without importing module internals.

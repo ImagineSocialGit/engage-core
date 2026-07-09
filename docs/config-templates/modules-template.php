@@ -46,6 +46,20 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Setup validation expectations
+    |--------------------------------------------------------------------------
+    |
+    | Module validation should reject unknown enabled module keys and impossible
+    | dependency graphs. Explicit feature visibility remains distinct from provider
+    | loading for dependencies.
+    |
+    | Other setup validators should use the canonical module manager/provider state
+    | rather than duplicating ad hoc module-enabled checks.
+    |
+    */
+
     'enabled' => array_filter(array_map(
         'trim',
         explode(',', env(

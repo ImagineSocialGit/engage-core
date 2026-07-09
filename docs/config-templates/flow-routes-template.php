@@ -18,13 +18,36 @@ return [
     | FlowRoutes listens and maps automation events internally.
     |
     | FlowRoute presets may reference DB-owned Campaigns, Tasks, Messaging
-    | definitions, or ContactStatus keys through point definitions.
+    | definitions, ContactStatus keys, and durable FlowRoute capabilities through
+    | point definitions. Capability references should use stable keys when the
+    | authoring/runtime path supports them.
     |
     | FlowRoute preset sync assumes dependencies were synced first:
     | contact_statuses -> tasks -> campaigns -> flow_routes.
     | 
     | Preset sync creates available FlowRoute definitions and may create default selected trigger bindings.
     | Runtime execution should resolve selected routes through FlowRouteTriggerBinding, not by running every active matching route.
+    */
+
+    /*
+    |--------------------------------------------------------------------------
+    | Validation expectations
+    |--------------------------------------------------------------------------
+    |
+    | FlowRoutes owns validation of route preset shape, trigger shape, point type,
+    | registered point-handler availability, capability references, route graph,
+    | subject support, route-instance/snapshot assumptions, and point-specific
+    | references.
+    |
+    | Cross-module references must be checked through public/runtime truths:
+    | - Tasks validates Task-template availability.
+    | - Campaigns validates Campaign availability.
+    | - Messaging validates message/template/field context.
+    | - Module availability comes from the canonical module manager/provider state.
+    |
+    | A selected preset that contains a point whose required handler/module cannot
+    | execute is a hard validation error, not merely a warning.
+    |
     */
 
     'groups' => [

@@ -1,3 +1,4 @@
+
 # Engage Core Module Boundaries
 
 Engage Core is a modular contact engagement platform.
@@ -48,6 +49,35 @@ The preferred shape is:
 Not:
 
     Module A -> Module B implementation detail
+
+## Universal Internal Terminology
+
+The universal internal person concept is `Contact`.
+
+Internal/runtime identifiers must use `contact`, not `lead`, unless a vertical genuinely owns a distinct domain concept named lead. This rule applies to keys, preset definitions, task-template identifiers, route/point identifiers, event keys, triggers, registries, payload/context fields, and generic services/actions/DTOs.
+
+Client-facing UI and copy may use a configured business noun such as Lead, Customer, Fan, Borrower, Owner, or Member. Presentation terminology must not redefine the underlying universal identifier.
+
+Good:
+
+```text
+contact
+call_contact
+review_contact_notes
+contact_follow_up_route
+Client UI label: Lead
+```
+
+Avoid:
+
+```text
+new_lead
+call_lead
+review_lead_notes
+lead_follow_up_route
+```
+
+Vertical modules may use vertical-specific nouns for real vertical-owned records and behaviors. They should not rename Core Contact inside generic config/runtime identifiers.
 
 ## Installed Schema vs Enabled Features
 
@@ -671,7 +701,6 @@ Accepted dependency direction:
 - Campaigns -> Messaging
 - Broadcasts -> Core
 - Broadcasts -> Messaging
-- Tasks -> Core
 - Tasks -> Core
 - Tasks may optionally use InternalNotifications and Messaging through public actions/services/contracts when those modules are enabled
 - Workflow -> Core
@@ -2723,7 +2752,7 @@ Recommended direction:
 5. Treat the dashboard and contact show page as shared orientation surfaces with module-contributed summaries, not module inventories.
 6. Continue the runtime-selectable setup-surface path with Webinars message/template/schedule setup first.
 7. After the Webinars setup slice, improve Automatic Follow-ups / FlowRoutes UX around business-language selection, consequence previews, and diagnostic detail.
-8. Continue the remaining client-readiness path with permission-invitation accepted-event decisions and config validation guidance.
+8. Continue the remaining client-readiness path with Phase 6 contributor-based config/setup validation, then permission-invitation accepted-event decisions and later readiness/UX phases.
 9. Regenerate `core-project-tree.txt` from the repo after each structural batch.
 
 Do not use this section as a backlog. Actionable items belong in `TODO.md`.
@@ -2880,6 +2909,81 @@ Structured FlowRoutes provenance on route-created artifacts
 
 The Phase 4A audit proved that route instance plan tables were required before production, and Phase 4B implemented the backend foundation before Phase 5 task-completed resume so runtime correlation does not become meta-heavy.
 
+## Setup validation architecture standard
+
+Config/setup validation is app-level orchestration over module-owned validation contributors. It should not become one monolithic service that imports every module's private config parser, models, and runtime internals.
+
+Preferred shape:
+
+```text
+SetupValidationManager / orchestrator
+    -> registered validation contributors
+        -> app-level package/module dependency validators
+        -> Tasks validator
+        -> FlowRoutes validator
+        -> Campaigns validator
+        -> Messaging validator or adapter around MessageConfigValidator
+        -> future module/vertical validators
+    -> structured findings
+    -> CLI handoff command now
+    -> future authoring/readiness UI later
+```
+
+Validation contributors should return one stable finding shape with machine-readable code and actionable context. At minimum, the shared contract should support:
+
+```text
+severity
+code
+message
+source
+path
+module
+context
+compact meta when useful
+```
+
+Use two blocking levels initially:
+
+```text
+error
+    Intended runtime behavior is invalid, impossible, ambiguous, or unsafe.
+    Fails the validation command and blocks staging/client handoff.
+
+warning
+    Setup is safe but dormant, unused, unavailable by choice, discouraged, or surprising.
+    Does not block handoff.
+```
+
+Do not persist validation findings by default. Add validation history/schema only when a concrete operator workflow needs retained runs, acknowledgements, audit history, or comparisons.
+
+Validation ownership follows module ownership. Tasks validates Task definitions. FlowRoutes validates route definitions/capabilities/references. Campaigns validates Campaign journey/variant definitions. Messaging validates message definitions/templates/fields/tokens. The app-level manager coordinates them without absorbing private module rules.
+
+The same reusable validation seam should support:
+
+```text
+Artisan setup validation
+staging/client handoff gates
+future Message Template authoring feedback
+future Campaign authoring feedback
+future Route Management authoring feedback
+future setup/readiness screens
+```
+
+Executable references should be checked against their owning source of truth. Reference registries are useful authoring/documentation registries and should themselves be validated for drift, but a stale registry should not become the only runtime truth.
+
+Phase 6 implementation order is:
+
+```text
+docs audit
+-> config normalization
+-> schema/model audit
+-> contributor-based validation/runtime code
+-> fast schema checks when applicable
+-> focused and adjacent tests
+```
+
+Add schema only when the audit proves a durable first-class concept is missing. Do not use `meta` to avoid a proven field, and do not add tables merely to persist validation output.
+
 ## Shared available-field/token registry direction
 
 Many modules author reusable copy, task descriptions, instructions, route send-message points, or other text that may include dynamic fields.
@@ -2927,4 +3031,5 @@ Campaigns invents webinar URL fields without the enrollment caller supplying the
 ```
 
 Treat available-field validation as setup/config-validation work before every editor receives polished autocomplete.
+
 

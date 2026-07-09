@@ -10,6 +10,23 @@ Do not invent token names unless the owning runtime payload/data object is also 
 
 Do not use runtime-only URL tokens in static config unless the source path that supplies the token is documented.
 
+## Canonical contact fields and client-facing aliases
+
+The runtime source of truth uses canonical Contact fields and tokens.
+
+Authoring UI may expose friendlier, client-specific aliases such as:
+
+```text
+fan_first_name    -> contact.first_name
+lead_first_name   -> contact.first_name
+customer_name     -> contact.name
+borrower_email    -> contact.email
+```
+
+The alias is a presentation/authoring convenience. It must not create a new runtime field, payload contract, database column, event key, route key, preset key, or validation branch.
+
+Validation should normalize a recognized alias to its canonical field before checking availability for the current authoring context. Unknown aliases should produce actionable validation findings.
+
 ## Message template preset token rules
 
 MessageTemplatePreset records must use the same documented token rules as config-defined templates.

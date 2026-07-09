@@ -1,3 +1,4 @@
+
 # Core Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -18,6 +19,61 @@ Core owns:
 - module-safe contact-facing extension points
 
 ContactStatus preset sync may be run directly through Core tooling, but normal new-project setup should be orchestrated by the app-level `presets:sync` command.
+
+
+## Canonical contact terminology and client-facing aliases
+
+Core owns the canonical internal Contact identity.
+
+Internal identifiers should use `contact`, including config keys, preset keys, task-template keys, route keys, automation event keys, trigger keys, registry keys, token identities, model/data field names, and validation codes.
+
+Client/operator UI may present a configured business noun such as:
+
+```text
+Lead
+Fan
+Customer
+Client
+Borrower
+Owner
+Member
+```
+
+That label is presentation vocabulary, not a second runtime identity.
+
+Authoring UI may also expose friendly field aliases derived from the configured contact noun, for example:
+
+```text
+lead_first_name
+fan_first_name
+customer_first_name
+```
+
+Those aliases should normalize to one canonical internal field identity such as:
+
+```text
+contact.first_name
+```
+
+or another documented canonical Contact token/field.
+
+Do not create separate runtime payload fields, database columns, event keys, preset identifiers, or validation concepts for each client-facing noun.
+
+## Core setup validation ownership
+
+Core should contribute setup validation for Core-owned authoring definitions, especially ContactStatus presets and Core-owned reference facts.
+
+Core validation should verify at least:
+
+```text
+selected ContactStatus preset groups exist
+referenced ContactStatus definitions exist
+definition keys match their registry/config keys
+required fields are present
+internal identifiers use canonical contact terminology
+```
+
+Core-owned setup validation should return the shared structured finding shape used by the app-level setup validation manager. It should not persist validation findings by default.
 
 Core contacts must remain generic.
 

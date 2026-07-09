@@ -1,3 +1,4 @@
+
 # Possible Scenarios
 
 This document grounds Engage Core's abstract module architecture in concrete cross-industry workflows.
@@ -171,7 +172,7 @@ FlowRoutes owns waiting/resume logic.
 
 ### Webinar attendee to mortgage follow-up
 
-A lead attends a home-buyer or loan-specific webinar.
+A contact attends a home-buyer or loan-specific webinar.
 
 Expected shape:
 
@@ -199,7 +200,7 @@ FlowRoutes owns selected route behavior.
 
 ### Missed webinar to alternate nurture
 
-A lead registers but misses the webinar.
+A contact registers but misses the webinar.
 
 Expected shape:
 
@@ -211,12 +212,12 @@ The routes may:
     move the contact to missed_webinar status;
     enroll the contact in a missed-webinar nurture sequence;
     send a replay or reschedule prompt;
-    create a task only for high-intent leads.
+    create a task only for high-intent contacts.
 ```
 
 ### Document collection route
 
-A mortgage lead reaches a point where bank statements, pay stubs, or disclosures are needed.
+A mortgage contact reaches a point where bank statements, pay stubs, or disclosures are needed.
 
 Expected shape:
 
@@ -336,3 +337,4 @@ Config/setup validation for preset references, event keys, route point definitio
 ```
 
 Phase 6 config/setup validation should use scenarios like these to ensure future presets fail clearly when they reference unavailable modules, missing templates, missing campaign keys, unsupported point types, invalid tokens/fields, unavailable capabilities, or unsafe route/event_wait correlation.
+

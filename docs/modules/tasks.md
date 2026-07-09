@@ -1,4 +1,5 @@
 
+
 # Tasks Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -66,6 +67,34 @@ FlowRoutes should not hardcode every reusable task shape inline forever.
 Task template preset sync should create DB-owned default task templates only. It should not create live tasks.
 
 Normal sync should preserve customized templates unless an explicit force behavior is chosen.
+
+
+## Tasks setup validation ownership
+
+Tasks should contribute Tasks-owned checks to the shared app-level setup validation manager.
+
+Task preset/template validation should use the actual Task preset definitions and DB-owned TaskTemplate/runtime rules as executable truth.
+
+At minimum, validate:
+
+```text
+selected Task preset groups exist
+referenced Task preset definitions exist
+Task template keys are valid and unique
+definition keys match their config keys
+required task-template fields are present
+due-offset/default assignment/responsibility shapes are valid
+related-subject defaults use supported generic shapes
+vertical-contributed task templates remain generic at the Tasks storage/runtime layer
+FlowRoute create_task references resolve to available TaskTemplate definitions
+internal identifiers do not use client-facing nouns such as lead/fan/customer in place of canonical contact terminology
+```
+
+A missing TaskTemplate referenced by a selected FlowRoute is a hard error.
+
+An unused but valid TaskTemplate may be a warning or omitted from findings depending on whether unused-definition visibility is useful to the operator.
+
+Tasks validation should return shared structured findings and should not persist validation history by default.
 
 Task templates should be generic enough to support:
 

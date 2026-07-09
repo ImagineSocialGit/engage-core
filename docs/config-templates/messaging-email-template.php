@@ -1,4 +1,3 @@
-
 <?php
 
 use App\Modules\Messaging\Payloads\EmailPayload;
@@ -48,6 +47,28 @@ return [
     | Broadcast record. Email Broadcast payloads use subject/body. Do not add
     | reusable Broadcast copy here unless a future workflow intentionally
     | dispatches Broadcast messages from Messaging config.
+    */
+
+    /*
+    |--------------------------------------------------------------------------
+    | Validation and authoring reuse
+    |--------------------------------------------------------------------------
+    |
+    | Messaging validation should remain reusable infrastructure, not a one-off
+    | CLI-only check. The same context-aware validation sources should support:
+    | - setup validation commands;
+    | - template save validation;
+    | - available-field pickers;
+    | - future guided authoring UI;
+    | - operator readiness/debug feedback.
+    |
+    | Validate definition shape, required payload fields, registered dispatch keys,
+    | payload classes, schedule shape, channel/purpose/scope compatibility, and
+    | available fields/tokens for the exact runtime context that supplies them.
+    |
+    | Client-facing field aliases may differ by configured contact noun, but must
+    | normalize to canonical Contact fields before runtime validation/rendering.
+    |
     */
 
     /*

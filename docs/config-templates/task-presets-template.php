@@ -23,19 +23,34 @@ return [
     | represented without adding parallel timing semantics.
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Validation expectations
+    |--------------------------------------------------------------------------
+    |
+    | Tasks owns validation of task preset groups and task template definitions.
+    | Validation should catch missing groups, missing definitions, malformed
+    | definitions, duplicate/ambiguous stable keys, invalid responsibility or
+    | assignment strategies, and references that cannot create a safe live Task.
+    |
+    | FlowRoutes may reference Task templates by stable key, but Tasks remains the
+    | authority for whether that template definition is valid and available.
+    |
+    */
+
     'groups' => [
         'crm_default' => [
-            'call_lead',
-            'review_lead_notes',
+            'call_contact',
+            'review_contact_notes',
         ],
     ],
 
     'definitions' => [
-        'call_lead' => [
-            'title' => 'Call lead',
-            'name' => 'Call lead',
-            'description' => 'Call the lead and record the outcome.',
-            'task_description' => 'Call the lead, record the outcome, and update the contact notes.',
+        'call_contact' => [
+            'title' => 'Call contact',
+            'name' => 'Call contact',
+            'description' => 'Call the contact and record the outcome.',
+            'task_description' => 'Call the contact, record the outcome, and update the contact notes.',
             'priority' => 'normal',
             'responsible_party' => 'internal',
             'assigned_to_strategy' => 'unassigned',
@@ -57,10 +72,10 @@ return [
             'meta' => [],
         ],
 
-        'review_lead_notes' => [
-            'title' => 'Review lead notes',
-            'name' => 'Review lead notes',
-            'description' => 'Review lead history and determine the next best action.',
+        'review_contact_notes' => [
+            'title' => 'Review contact notes',
+            'name' => 'Review contact notes',
+            'description' => 'Review contact history and determine the next best action.',
             'task_description' => null,
             'priority' => 'normal',
             'responsible_party' => 'internal',

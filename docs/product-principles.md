@@ -1,3 +1,4 @@
+
 # Engage Core Product Principles
 
 Engage Core is a dev-built operating system for small service businesses.
@@ -151,6 +152,16 @@ The capability composes cleanly with other modules through public seams.
 
 A module capability is suspect when it primarily creates a new thing for the client to design, configure, maintain, or relearn.
 
+## Universal internal terminology
+
+The universal internal person concept is `Contact`.
+
+Internal keys, presets, events, triggers, task-template identifiers, route identifiers, config paths, registries, payload/context fields, and generic code concepts should use `contact`, not `lead`.
+
+Client-facing UI and copy may use the configured business noun that fits the client or vertical, such as Lead, Customer, Fan, Borrower, Owner, or Member. That display language must not redefine the universal internal concept.
+
+This split lets Engage Core feel natural in different industries without creating different internal standards for the same person record.
+
 ## UX standard
 
 Client-facing UI should follow `ui-ux-guide.md`.
@@ -174,7 +185,7 @@ The dashboard and contact show page are orientation surfaces, not module invento
 
 The dashboard should help the client decide where to start today. It should be config-driven by enabled modules and preset priorities, but the client should experience it as a calm summary of immediate work, recent movement, and safe next action.
 
-The contact show page should feel like a lead/customer workspace. Core owns the shell and generic contact details. Modules may contribute summaries, panels, tasks, messages, webinar history, campaigns, or automatic follow-up visibility, but those contributions should answer business questions instead of exposing module internals.
+The contact show page should feel like a person/customer workspace using the configured client-facing noun. Core owns the shell and generic contact details. Modules may contribute summaries, panels, tasks, messages, webinar history, campaigns, or automatic follow-up visibility, but those contributions should answer business questions instead of exposing module internals.
 
 ## Exploration before builders
 
@@ -193,3 +204,4 @@ Which raw keys or route details are useful only as diagnostics?
 A blank-canvas builder is not client-ready just because the underlying module supports many point types. The product direction is guided, preset-backed setup first, with advanced builder detail only where it is deliberately needed.
 
 Detailed language rules, reusable UI patterns, automation-warning patterns, and UI review checklists belong in `ui-ux-guide.md`.
+

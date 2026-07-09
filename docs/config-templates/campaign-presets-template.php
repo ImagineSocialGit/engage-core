@@ -1,4 +1,3 @@
-
 <?php
 
 return [
@@ -49,6 +48,21 @@ return [
     | messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Validation expectations
+    |--------------------------------------------------------------------------
+    |
+    | Campaigns owns validation of Campaign/Step/Variant preset shape, strategy,
+    | timing, dependency rules, stable variant identity, and Messaging template
+    | context references.
+    |
+    | Missing required templates or impossible dependency references are hard
+    | errors when they make intended runtime behavior unsafe or impossible.
+    | Dormant or unused definitions may be warnings when runtime remains safe.
+    |
+    */
+
     'groups' => [
         'webinar_default' => [
             'webinar_attended_nurture',
@@ -67,7 +81,7 @@ return [
         'webinar_attended_nurture' => [
             'key' => 'webinar_attended_nurture',
             'name' => 'Webinar Attended Nurture',
-            'description' => 'Follow-up sequence for leads who attended a webinar.',
+            'description' => 'Follow-up sequence for contacts who attended a webinar.',
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
@@ -157,7 +171,7 @@ return [
         'webinar_missed_nurture' => [
             'key' => 'webinar_missed_nurture',
             'name' => 'Webinar Missed Nurture',
-            'description' => 'Follow-up sequence for leads who registered for a webinar but missed it.',
+            'description' => 'Follow-up sequence for contacts who registered for a webinar but missed it.',
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',

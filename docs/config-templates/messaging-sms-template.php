@@ -1,4 +1,3 @@
-
 <?php
 
 use App\Modules\Messaging\Payloads\SmsPayload;
@@ -45,6 +44,23 @@ return [
     | Broadcast record. SMS Broadcast payloads use payload.message and are
     | hydrated by Messaging with to/channel/purpose/scope/message_type before
     | scheduling.
+    */
+
+    /*
+    |--------------------------------------------------------------------------
+    | Validation and authoring reuse
+    |--------------------------------------------------------------------------
+    |
+    | SMS definitions participate in the same reusable Messaging validation
+    | infrastructure as email. Validate definition shape, payload requirements,
+    | registered dispatch keys, schedule shape, context-aware fields/tokens, and
+    | channel/purpose/scope compatibility before client handoff.
+    |
+    | UI visibility is separate from runtime capability. A configured SMS template
+    | may be valid while the channel remains hidden for a client surface; a route or
+    | preset that requires an unavailable executable SMS path should be reported
+    | according to whether intended runtime behavior is impossible or merely dormant.
+    |
     */
 
     /*

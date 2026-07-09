@@ -9,7 +9,7 @@ Rules:
 - Views remain in resources/views.
 - Modules live under app/Modules.
 - Integrations live under app/Integrations.
-- Use lead/leads, not borrower/borrowers, in CRM/client-facing text unless explicitly told otherwise.
+- Use `contact` for canonical internal keys, preset identifiers, events, triggers, routes, task-template keys, runtime fields, and generic system terminology. Client-facing copy may use the configured industry noun such as Lead, Fan, Customer, Borrower, Owner, or another deliberate label.
 - Do not preserve old behavior by default.
 - Do not invent columns, runtime features, unsupported module behavior, undocumented tokens, or available fields.
 - Messaging configs own reusable message copy and delivery templates.
@@ -62,6 +62,12 @@ Rules:
 - Commerce/Location requests should improve admin/client convenience; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
 - If a request needs module behavior beyond config, identify the owning module and list required code/seam work separately.
 
+Canonical contact alias rule:
+- Internal/runtime/config identifiers use `contact`.
+- Client-facing field pickers and copy may expose aliases based on the configured industry noun, such as `fan_first_name` or `lead_first_name`.
+- Those aliases must resolve to canonical fields such as `contact.first_name`.
+- Do not create separate runtime fields, schema, events, routes, or preset keys for each client-facing noun.
+
 Attached reference templates:
 - README.md
 - TOKEN_REFERENCE.md
@@ -83,4 +89,3 @@ Return complete config files only, using the same structural shapes as the templ
 List any recommended new keys/tokens separately.
 If the request requires unsupported module behavior, list the needed module/seam work separately instead of inventing config keys.
 ```
-

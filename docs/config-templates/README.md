@@ -23,6 +23,27 @@ client/{client-key}/config/reference/keys.php
 client/{client-key}/config/reference/tokens.php
 ```
 
+## Canonical contact fields and client-facing aliases
+
+Engage Core uses `contact` as the canonical internal identity term.
+
+Client-facing authoring may expose industry-appropriate aliases such as:
+
+```text
+fan_first_name
+lead_first_name
+customer_first_name
+borrower_first_name
+```
+
+Those aliases should resolve to canonical fields such as:
+
+```text
+contact.first_name
+```
+
+Do not create separate runtime payload fields, database columns, event keys, preset keys, route keys, or validation branches for each client noun. The alias layer exists for UX; canonical runtime identity remains stable.
+
 ## Template files
 
 | Template | Use for |
@@ -123,6 +144,32 @@ Dependency-aware rules should be explicit and should not rely on broad channel/p
 
 The dependency context should be scoped to the same campaign enrollment and same campaign step.
 
+## Setup validation direction
+
+These templates are contracts for executable setup validation, not merely copy/paste examples.
+
+The shared validation architecture should use:
+
+```text
+SetupValidationManager
+    -> registered app/module validators
+    -> structured findings
+        severity
+        code
+        message
+        source
+        path
+        module
+        context
+        meta
+```
+
+Owning modules validate their own private config/preset shapes. Cross-module orchestration composes findings without teaching one monolithic validator every module's internals.
+
+Hard errors block staging/client handoff when intended runtime behavior is unsafe or impossible. Warnings remain non-blocking when configuration is dormant, unused, discouraged, or surprising but safe.
+
+Do not add persistent validation tables unless a real operator workflow requires history, acknowledgements, or retained readiness records.
+
 ## Config review checklist
 
 Before accepting a config change, confirm:
@@ -167,7 +214,7 @@ Rules:
 - Mortgage-specific copy should use mortgage-specific scopes or client overrides.
 - Use documented tokens only.
 - If the client request needs a missing token, recommend adding that token to the runtime payload or changing the copy.
-- Use lead/leads in CRM/client-facing text.
+- Use `contact` for canonical internal keys and runtime concepts. Client-facing copy may use the configured industry noun such as Lead, Fan, Customer, Borrower, or Owner.
 - Keep SMS options config-toggleable in UI.
 - Keep imported-contact permission invitations separate from normal Broadcasts.
 
@@ -176,4 +223,3 @@ Client request:
 
 Return complete config files and list any recommended new keys/tokens separately.
 ```
-

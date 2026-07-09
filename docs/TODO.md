@@ -1,3 +1,4 @@
+
 # Engage Core TODO
 
 This file is intentionally disposable. Add work here when it is real but not yet ready for an implementation slice. Delete items as they are completed. Do not treat this as an architectural reference; long-lived decisions belong in `module-boundaries.md` or a feature-specific doc.
@@ -87,7 +88,7 @@ These are repeatable checklists. Run the relevant checklist after a production s
 
 ### Before committing a feature slice
 
-- [ ] Review changed files for stale terminology, especially `audience` vs `recipient` and borrower/borrowers vs lead/leads.
+- [ ] Review changed files for stale terminology. Internal/runtime identifiers should use `contact`; client-facing UI/copy may use the configured business noun. Also check `audience` vs `recipient` and other module-specific naming drift.
 - [ ] Confirm newly added public routes/controllers follow module directory conventions.
 - [ ] Confirm feature-specific docs or `TODO.md` were updated when useful.
 - [ ] Confirm `module-boundaries.md` was updated only for long-lived architectural decisions.
@@ -185,18 +186,45 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Supports explicit event_wait correlation for routes that may create multiple tasks.
   - Covers the real CompleteTaskAction → TaskCompleted → AutomationEventRecorded → FlowRoutes listener chain.
 - [ ] Phase 6 — Config validation / setup validation. Current next phase.
-  - Validate Task presets.
-  - Validate FlowRoute presets.
-  - Validate task template refs.
-  - Validate route point types.
-  - Validate module capability references.
-  - Validate available field/token references by authoring context.
-  - Validate vertical references.
-  - Validate campaign refs.
-  - Validate messaging/template refs.
-  - Validate unsupported point/module combinations.
-  - Validate route instance/snapshot assumptions if applicable.
-  - Prefer command/service-based validation first unless persistent validation records are proven necessary.
+  - [ ] Phase 6A — Documentation audit and contract normalization.
+    - Make docs authoritative for terminology, config shape, validation ownership, severity, extension seams, and source-of-truth rules.
+    - Protect unrelated module concepts from speculative rewrites.
+    - Internal/runtime identifiers use `contact`, not `lead`; client-facing UI/copy may use configured business nouns.
+  - [ ] Phase 6B — Config normalization.
+    - Normalize current default/client configs against the docs before building validators around inconsistent inputs.
+    - Remove internal `lead` keys/identifiers and other known naming drift.
+    - Align preset groups/definitions, references, tokens/available fields, capabilities, module requirements, and authoring shapes.
+  - [ ] Phase 6C — Schema/model audit.
+    - Compare normalized config/runtime needs against current migrations/models.
+    - Add or replace schema only for proven durable first-class concepts.
+    - Do not use `meta` as a dumping ground for fields that should be first-class.
+    - Do not add persistent validation tables unless a concrete workflow requires retained history.
+  - [ ] Phase 6D — Contributor-based validation/runtime code.
+    - Add a central SetupValidation manager/orchestrator.
+    - Add registered module/app validation contributors.
+    - Reuse/adapt existing validators such as Messaging `MessageConfigValidator`.
+    - Return structured findings with severity, code, message, source, path, module, context, and compact diagnostic meta where useful.
+    - Make the same seam reusable by CLI now and future authoring/readiness UI later.
+    - Validate Task presets.
+    - Validate FlowRoute presets.
+    - Validate task template refs.
+    - Validate route point types.
+    - Validate module capability references and module/handler availability.
+    - Validate available field/token references by authoring/runtime context.
+    - Validate vertical references.
+    - Validate Campaign refs and Campaign variant/dependency shape.
+    - Validate Messaging/template refs.
+    - Validate unsupported point/module combinations.
+    - Validate route instance/snapshot assumptions where config affects runtime.
+    - Treat invalid/impossible/unsafe selected runtime behavior as a hard error.
+    - Treat safe-but-dormant/unused/surprising behavior as a warning.
+    - Make hard errors fail the command and block staging/client handoff; warnings remain non-blocking and actionable.
+    - Validate reference registries for drift without treating stale registries as the sole runtime truth.
+  - [ ] Phase 6E — Tests.
+    - Run fast migration/schema checks first when Phase 6C changes schema.
+    - Add focused validator/config tests.
+    - Run adjacent module tests.
+    - Add broader preset/client fallback coverage.
 - [ ] Phase 7 — Permission invitation accepted automation event.
   - Decide whether accepted invitations should emit `permission_invitation.accepted`.
   - Keep Messaging independent from consumers.
@@ -351,4 +379,5 @@ These notes are intentionally retained while the schema-discovery phases continu
 - [ ] Hide technical specs behind details/debug affordances.
 - [ ] Replace raw timing such as `Delay 10 minutes` with human-readable schedule summaries.
 - [ ] Clean up repeated dropdown labels such as `Step 1 Email — Webinar Attended Nurture — Step 1 Email`.
+
 
