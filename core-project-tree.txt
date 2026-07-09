@@ -1057,6 +1057,7 @@
 │   │   ├── webinars.md
 │   │   └── workflow.md
 │   ├── permission-invitations.md
+│   ├── possible-scenarios.md
 │   ├── product-principles.md
 │   ├── project-organization.md
 │   ├── TODO.md
@@ -1331,4 +1332,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-436 directories, 896 files
+436 directories, 897 files
