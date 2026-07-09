@@ -34,15 +34,18 @@ Core owns the import batch records and import batch detail page.
 
 Core may display the Messaging-owned action when Messaging is enabled, but Core must not import Messaging models, actions, or services directly.
 
-Broadcasts do not own the current import-batch permission invitation scheduling path.
+Broadcasts may provide an operator-facing entry point for scheduling imported-contact permission invitations and may own Broadcast recipient bookkeeping for that batch operation.
 
-Broadcasts must not own:
+Messaging still owns the permission-invitation capability itself, including:
 
 - invitation one-time enforcement
+- invitation claim/token creation
 - consent creation
 - public preference token behavior
 - Messaging delivery gates
-- direct creation of permission invitation records
+- invitation lifecycle state
+
+Broadcasts must not directly create permission invitation records or bypass Messaging-owned claim, eligibility, consent, or delivery rules.
 
 ## Runtime flow
 
@@ -267,6 +270,62 @@ The event must not be emitted again when an already accepted invitation is submi
 
 Downstream behavior belongs to consumers such as FlowRoutes through the generic `AutomationEventRecorded` seam. Messaging must not import FlowRoutes, Campaigns, Tasks, Workflow, or vertical modules to react to acceptance.
 
+## Cancellation, skip, and failure lifecycle
+
+Permission invitation lifecycle state and scheduled-message delivery state are related, but they do not use identical vocabularies.
+
+Canonical permission invitation states remain:
+
+```text
+claimed
+sent
+failed
+accepted
+```
+
+Do not add `cancelled` or `skipped` invitation states unless a later workflow proves they are needed.
+
+Expected behavior:
+
+```text
+Cancelled before send-time claim
+    ScheduledMessage = skipped
+    ContactPermissionInvitation = no row
+    BroadcastRecipient = cancelled, when Broadcast-owned
+
+Messaging gate denial before claim
+    ScheduledMessage = skipped
+    ContactPermissionInvitation = no row
+    BroadcastRecipient = skipped, when Broadcast-owned
+
+Duplicate invitation discovered at claim
+    ScheduledMessage = skipped
+    Existing ContactPermissionInvitation = unchanged
+
+Local preparation failure after claim, including unresolved tokens
+    ScheduledMessage = skipped
+    ContactPermissionInvitation = failed
+    invitation.failure_reason mirrors the scheduled-message skip reason
+
+Provider/runtime exception after claim
+    ScheduledMessage = failed
+    ContactPermissionInvitation = failed
+
+Successful send followed by acceptance
+    ScheduledMessage remains sent
+    ContactPermissionInvitation = accepted
+```
+
+A claimed invitation must never remain stuck in `claimed` after its scheduled message reaches a terminal skipped state. Messaging listens to `ScheduledMessageSkipped` and reconciles a matching claimed invitation to `failed`.
+
+The reconciliation is intentionally scoped by `scheduled_message_id` and `status = claimed`. Therefore:
+
+- pre-claim skips create no invitation row;
+- an existing sent/failed/accepted invitation is not rewritten;
+- a duplicate scheduled attempt does not mutate the invitation that already consumed the one-time claim.
+
+Failed invitation rows continue to count as already invited for one-time enforcement. Do not automatically create a fresh invitation after failure. A future explicit retry/reissue workflow may revisit that policy with operator-visible audit semantics.
+
 ## Testing expectations
 
 Coverage should prove:
@@ -289,4 +348,3 @@ Coverage should prove:
 - contacts with required marketing email consent are skipped
 - contacts without email addresses are skipped
 - contacts with `contact_import_batch_id` count as imported for final Messaging send-time enforcement
-

@@ -5,6 +5,8 @@ namespace App\Modules\Messaging\Providers;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Capabilities\MessagingAutomationCapabilityContributor;
 use App\Modules\Messaging\Console\Commands\SyncMessageTemplatePresetsCommand;
+use App\Modules\Messaging\Events\ScheduledMessageSkipped;
+use App\Modules\Messaging\Listeners\MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
@@ -16,6 +18,7 @@ use App\Modules\Messaging\Services\MessageRecipientPayloadProviderRegistry;
 use App\Modules\Messaging\Services\Sms\SmsProviderManager;
 use App\Modules\Messaging\Validation\MessagingSetupValidationContributor;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Twilio\Rest\Client;
 
@@ -67,6 +70,11 @@ class MessagingModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Event::listen(
+            ScheduledMessageSkipped::class,
+            MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped::class,
+        );
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 SyncMessageTemplatePresetsCommand::class,

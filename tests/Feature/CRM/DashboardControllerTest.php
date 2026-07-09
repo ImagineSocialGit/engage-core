@@ -71,7 +71,7 @@ class DashboardControllerTest extends TestCase
         $response->assertSee('Print');
         $response->assertSee('View');
         $response->assertSee('Call Tess about her reply');
-        $response->assertSee('Leads needing attention');
+        $response->assertSee('Contacts needing attention');
         $response->assertSee('Review reply');
         $response->assertSee('Tess Lead replied');
         $response->assertSee('Overdue');
@@ -88,7 +88,7 @@ class DashboardControllerTest extends TestCase
         $response->assertOk();
         $response->assertSee('You have a clear place to start.');
         $response->assertSee('No tasks need your attention today.');
-        $response->assertSee('No lead replies need review.');
+        $response->assertSee('No contact replies need review.');
         $response->assertDontSee('No new webinar activity to review.');
         $response->assertDontSee('data-module-panel="webinars"', false);
     }
@@ -410,7 +410,7 @@ class DashboardControllerTest extends TestCase
         $response->assertSee('data-module-panel="tasks"', false);
         $response->assertSee('No tasks need your attention today.');
         $response->assertDontSee('data-module-panel="inbound_messaging"', false);
-        $response->assertDontSee('No lead replies need review.');
+        $response->assertDontSee('No contact replies need review.');
         $response->assertDontSee('data-module-panel="webinars"', false);
         $response->assertDontSee('Webinar activity');
     }
@@ -485,7 +485,7 @@ class DashboardControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSeeInOrder([
-            'Leads needing attention',
+            'Contacts needing attention',
             'Today’s tasks',
         ]);
         $response->assertSee('Priority Lead replied');

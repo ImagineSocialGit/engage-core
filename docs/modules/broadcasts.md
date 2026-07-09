@@ -198,6 +198,33 @@ Good:
 
     CancelBroadcastAction -> SkipScheduledMessagesAction
 
+Permission-invitation Broadcast lifecycle bookkeeping should follow these rules:
+
+```text
+Cancelled before invitation claim
+    Broadcast = cancelled
+    pending ScheduledMessage = skipped
+    BroadcastRecipient = cancelled
+    no ContactPermissionInvitation row exists
+
+Skipped by Messaging before claim
+    BroadcastRecipient = skipped
+    ScheduledMessage = skipped
+    no ContactPermissionInvitation row exists
+
+Skipped after claim
+    BroadcastRecipient mirrors the ScheduledMessageSkipped outcome
+    ScheduledMessage = skipped
+    matching claimed ContactPermissionInvitation = failed
+
+Provider/runtime failure after claim
+    BroadcastRecipient = failed
+    ScheduledMessage = failed
+    ContactPermissionInvitation = failed
+```
+
+Broadcasts should not rewrite invitation state directly. Messaging owns invitation reconciliation and final delivery lifecycle. Already sent invitation messages and invitation rows remain untouched when a Broadcast is later cancelled.
+
 Broadcasts should remain simpler than Campaigns.
 
 Broadcasts are single-channel sends.

@@ -531,6 +531,45 @@ Core may expose the operator entry point on the import batch detail page when Me
 Other modules may request this flow through Messaging public services/actions, but they must not create invitation records directly.
 
 
+### Permission invitation cancellation, skip, and failure bookkeeping
+
+Permission invitation lifecycle state remains:
+
+```text
+claimed
+sent
+failed
+accepted
+```
+
+Scheduled-message delivery may also be `skipped`, but Messaging does not need matching `skipped` or `cancelled` invitation statuses.
+
+The durable rules are:
+
+```text
+pre-claim scheduled-message skip or cancellation
+    no ContactPermissionInvitation row is created
+
+post-claim ScheduledMessageSkipped
+    matching claimed ContactPermissionInvitation becomes failed
+
+provider/runtime failure after claim
+    ScheduledMessage becomes failed
+    matching invitation becomes failed
+
+successful send
+    ScheduledMessage becomes sent
+    invitation becomes sent
+
+later public acceptance
+    ScheduledMessage stays sent
+    invitation becomes accepted
+```
+
+Messaging owns reconciliation from `ScheduledMessageSkipped` to a matching claimed permission invitation. Reconciliation must match by `scheduled_message_id` and only transition `claimed` invitations so existing sent, failed, or accepted invitation rows remain untouched.
+
+Failed invitation rows continue to enforce the current one-time invitation rule. Automatic reissue is not supported.
+
 Accepted imported-contact permission invitations emit the neutral automation event:
 
 ```text
@@ -653,10 +692,3 @@ available-field/token picker UX
 No persistent validation-result tables are required unless a later operator workflow proves retained history or acknowledgement state is needed.
 
 Fields should be filtered by authoring/runtime context so operators cannot insert a field that will be unavailable when the message sends.
-
-
-
-
-
-
-

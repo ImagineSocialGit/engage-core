@@ -17,12 +17,16 @@ class MessageConfigValidatorTest extends TestCase
                 'webinar_attended_nurture' => [
                     'steps' => [
                         1 => [
-                            'dispatch_key' => 'campaign_step_due',
-                            'payload_class' => EmailPayload::class,
-                            'queue' => 'marketing',
-                            'payload' => [
-                                'subject' => 'Thanks for joining',
-                                'body' => 'Hi {first_name}, reply with your biggest question.',
+                            'variants' => [
+                                'email' => [
+                                    'dispatch_key' => 'campaign_step_due',
+                                    'payload_class' => EmailPayload::class,
+                                    'queue' => 'marketing',
+                                    'payload' => [
+                                        'subject' => 'Thanks for joining',
+                                        'body' => 'Hi {first_name}, reply with your biggest question.',
+                                    ],
+                                ],
                             ],
                         ],
                     ],

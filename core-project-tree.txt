@@ -428,6 +428,8 @@
 │   │   │   │   └── ScheduledMessageSkipped.php
 │   │   │   ├── Jobs
 │   │   │   │   └── SendScheduledMessageJob.php
+│   │   │   ├── Listeners
+│   │   │   │   └── MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped.php
 │   │   │   ├── Models
 │   │   │   │   ├── ConsentRevocation.php
 │   │   │   │   ├── ContactPermissionInvitation.php
@@ -1326,6 +1328,7 @@
 │   │   │   ├── GrantMessageConsentActionTest.php
 │   │   │   ├── InternalNotificationChannelResolverTest.php
 │   │   │   ├── InternalNotificationGateTest.php
+│   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest.php
 │   │   │   ├── MessageChannelAvailabilityTest.php
 │   │   │   ├── MessageConfigValidatorTest.php
 │   │   │   ├── MessageDefinitionResolverTest.php
@@ -1385,4 +1388,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-454 directories, 932 files
+455 directories, 934 files

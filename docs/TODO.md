@@ -239,8 +239,8 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Already accepted invitations do not emit the event again.
   - Messaging remains independent from downstream consumers.
   - No schema change was required.
-- [ ] Phase 8 — Permission invitation cancellation / skip / failure bookkeeping.
-  - Clarify durable lifecycle visibility across permission invitations, Broadcast bookkeeping, and Messaging scheduled messages.
+- [x] Phase 8 — Permission invitation cancellation / skip / failure bookkeeping.
+  - Pre-claim skips/cancellations create no invitation row. Post-claim scheduled-message skips reconcile matching claimed invitations to failed. Provider/runtime failures remain failed across delivery and invitation state. No schema change or new invitation statuses were required.
 - [ ] Phase 9 — Webinar message readiness check.
   - Add computed readiness visibility for webinar message setup without persisting setup state unless a concrete need appears.
 - [ ] Phase 10 — Manual status-change automation warning.
@@ -390,7 +390,3 @@ These notes are intentionally retained while the schema-discovery phases continu
 - [ ] Hide technical specs behind details/debug affordances.
 - [ ] Replace raw timing such as `Delay 10 minutes` with human-readable schedule summaries.
 - [ ] Clean up repeated dropdown labels such as `Step 1 Email — Webinar Attended Nurture — Step 1 Email`.
-
-
-
-
