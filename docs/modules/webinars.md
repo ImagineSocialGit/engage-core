@@ -1,4 +1,3 @@
-
 # Webinars Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -38,17 +37,65 @@ Messaging template presets decide what those messages say.
 
 Webinars decide when those messages are sent and which webinar context they apply to.
 
-The Webinars setup surface should support contexts such as:
+The Webinars setup surface supports these message contexts:
 
 ```text
 registration confirmation
+registration opt-in confirmation
 reminders
 waitlist availability messages
+waitlist opt-in confirmation
 post-attended transactional follow-up
 post-missed transactional follow-up
 ```
 
-That surface should show the current selected Messaging template for each context, allow choosing a compatible `MessageTemplatePreset`, save the selected `MessageTemplatePresetAssignment`, and link back to Message Templates for copy editing. Schedule selection remains Webinars-owned and separate from copy editing.
+That surface shows the current selected Messaging template for each context, allows choosing a compatible `MessageTemplatePreset`, saves the selected `MessageTemplatePresetAssignment`, and links back to Message Templates for copy editing. Schedule selection remains Webinars-owned and separate from copy editing.
+
+## Webinar message readiness
+
+Webinars owns a computed readiness service for webinar-owned message setup.
+
+Readiness is not persisted.
+
+Current readiness areas are:
+
+```text
+registration confirmations
+registration opt-in confirmations
+reminders
+waitlist availability messages
+waitlist opt-in confirmations
+post-attended transactional follow-up
+post-missed transactional follow-up
+```
+
+Readiness uses current runtime truth:
+
+```text
+Messaging DB-first definition resolution with config fallback
+Messaging channel availability for the surface/purpose/scope
+active Webinar schedule profiles actually in use
+explicit schedule-profile disablement
+missing or inactive selected schedule-profile references
+conflicting active default schedule profiles
+post-event outcome-message enablement
+```
+
+Current states:
+
+```text
+Ready
+Needs attention
+Optional / disabled
+```
+
+Registration opt-in readiness is required when transactional webinar registration messaging has at least one available channel.
+
+Waitlist opt-in readiness is required when webinar-waitlist marketing messaging has at least one available channel.
+
+When the corresponding messaging surface is unavailable, the opt-in area is `Optional / disabled` rather than a false blocker.
+
+Opt-in messages are immediate `consent_granted` messages. They are Webinar-scoped Messaging templates, but they are not schedule-profile items because Webinar schedule profiles own lifecycle timing/slot identity rather than immediate consent-event dispatch.
 
 ## Selectable webinar schedule profiles
 
@@ -237,5 +284,3 @@ Dev testing actions should still use public module seams:
 The dev UI should behave like an operator console. Actions inside testing modals should use AJAX/fetch where practical so the modal, selected registration, loaded message options, and activity log are not lost after each action.
 
 Sim Join should skip already-queued live reminders when the real definition has skip_when_join_clicked enabled. Manual dev sends are forced sends and may still send a selected reminder afterward so the exact payload can be tested.
-
-

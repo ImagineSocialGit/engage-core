@@ -80,11 +80,16 @@ Completed runway pieces:
 
 Remaining near-term candidates:
 
+- Automatic Follow-ups / FlowRoutes UX polish around business-language route selection and consequence previews.
+- Dashboard / contact workspace polish audit after the main runtime and route-management work settles.
+- FOSS-informed module schema audit before production rollout.
+
+Completed in the current client-readiness sequence:
+
 - Config/setup validation across presets, route points, module capabilities, available fields/tokens, and templates.
 - Permission invitation cancellation/skip/failure behavior.
 - Webinar message readiness checks.
-- Manual status-change automation warnings.
-- Automatic Follow-ups / FlowRoutes UX polish later, after the runtime/capability model is settled.
+- Backend manual status-change automation impact preview.
 
 The remaining runway pieces should continue to be implemented as durable client-readiness work, not as smoke-test shortcuts.
 
@@ -115,8 +120,8 @@ Current schema-discovery sequence:
 | 6 | Config validation / setup validation | Complete | Architecture + safety | 6A–6E are complete. Engage Core now has a shared `SetupValidationManager`, structured findings/results, module-owned contributors, app-level dependency and registry-drift contributors, the non-mutating `setup:validate` CLI, focused validation coverage, adjacent regression coverage, and broader client/default-preset fallback coverage. |
 | 7 | Permission invitation accepted automation event | Complete | Architecture | Accepted invitations emit neutral `permission_invitation.accepted` events after transactional acceptance, with row locking/idempotency and no Messaging dependency on consumers. |
 | 8 | Permission invitation cancellation / skip / failure bookkeeping | Complete | DB/schema + architecture | No schema change was needed. Pre-claim skips/cancellation create no invitation row; post-claim scheduled-message skips reconcile matching claimed invitations to failed; provider failures remain failed across Messaging and invitation state; failed invitations stay one-time-blocking. |
-| 9 | Webinar message readiness check | Planned | Architecture + operator safety | Add computed readiness visibility for webinar message setup without persisting setup state unless a concrete need appears. |
-| 10 | Manual status-change automation warning | Planned | Operator safety | Warn before manual status changes run selected status-based FlowRoutes. Avoid schema unless audit/acknowledgement state is proven necessary. |
+| 9 | Webinar message readiness check | Complete | Architecture + operator safety | Computed Webinars-owned readiness now evaluates runtime Messaging resolution, channel availability, active schedule-profile effects, intentional disablement, registration/waitlist opt-ins, and post-event outcome-message enablement without persisting readiness state. |
+| 10 | Manual status-change automation warning foundation | Complete | Operator safety + architecture | Backend-only consequence preview is implemented through a read-only FlowRoutes-owned impact resolver. It reports whether selected status-based FlowRoutes would run and which routes are selected without starting route progress. The actual operator warning UX is deferred to Phase 11. |
 | 11 | Automatic Follow-ups / FlowRoutes UX polish | Planned | UI/UX + architecture | Redesign Route Binding around business outcomes, consequence previews, and client/operator language after the FlowRoutes capability/instance-plan/runtime model is settled. |
 | 12 | Dashboard / contact workspace polish audit | Planned | UI/UX + possible schema | Review orientation surfaces after core runtime pieces settle. Add persisted preferences/acknowledgements only when needed. |
 | 13 | FOSS-informed module schema audit | Planned | DB/schema audit | Compare Engage Core modules against mature FOSS patterns to identify likely missing persisted concepts before production. Pull FlowRoutes-specific FOSS/OSS pattern review earlier into Phase 4 if helpful. |
@@ -209,8 +214,8 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | 6 | Config validation / setup validation | Complete | Shared contributor-based validation is implemented across Core, Tasks, Messaging, Webinars, Campaigns, FlowRoutes, module dependencies, and reference-registry drift. `setup:validate` fails on errors, succeeds on warnings-only/clean results, and does not mutate state. Focused and broader regression coverage are green. |
 | 7 | Permission invitation accepted automation event | Complete | Accepted invitations emit one neutral `permission_invitation.accepted` event after transactional acceptance. The invitation row is locked/rechecked for idempotency, submitted SMS phone updates occur inside the same transaction, and Messaging remains independent from consumers. |
 | 8 | Permission invitation cancellation behavior | Complete | Pre-claim skips/cancellations create no invitation row; post-claim skips reconcile claimed invitations to failed; provider failures remain failed; no new invitation statuses or schema changes were required. |
-| 9 | Webinar message readiness check | 0.5–1 session | Computed readiness summary for Webinars message setup. Do not persist readiness/acknowledgement state unless the implementation proves a durable concept is missing. |
-| 10 | Manual status-change automation warning | 0.5–1 session | Warn operators before a manual status change runs a selected status FlowRoute. This is a UI awareness guardrail, not a ContactStatus schema split. |
+| 9 | Webinar message readiness check | Complete | Computed readiness is available for registration confirmations, registration opt-ins, reminders, waitlist alerts, waitlist opt-ins, and post-event follow-ups. Readiness is derived from runtime resolution, channel availability, active schedule-profile effects, and post-event enablement; no readiness state is persisted. |
+| 10 | Manual status-change automation warning foundation | Complete | FlowRoutes exposes a read-only `ContactStatusAutomationImpactResolver` and plural status-trigger route resolution. No schema, controller, or Blade changes were required. The actual warning interaction belongs to Phase 11 UX work. |
 | 11 | Automatic Follow-ups / FlowRoutes UX polish | 1–3 sessions for first product pass | Redesign the current Route Binding surface around business outcomes and consequence previews after the capability/instance-plan/runtime model is settled. |
 | 12 | Dashboard / contact workspace polish audit | 1–2 sessions | Review shared orientation surfaces after runtime behavior settles. Add persisted state only for proven needs such as acknowledgements or preferences. |
 | 13 | FOSS-informed module schema audit | 2–6 sessions, split by module group | Compare Engage Core module tables against mature FOSS patterns to catch likely missing persisted concepts before production. |
@@ -308,17 +313,20 @@ Completed baseline:
 - Webinar dispatch payloads store compact token/context data. Schedule profile identity belongs in scheduled-message metadata, not as a hydrated profile/items object graph inside `scheduled_messages.payload`.
 - Tests include payload-shape checks so full Eloquent relationship graphs do not leak into scheduled-message payloads.
 
-### Webinars message/template setup
+### Webinars message/template setup and readiness
 
 Completed functional baseline:
 
-- Webinars has a Webinars-owned message setup surface for registration confirmations, reminders, waitlist availability messages, post-attended transactional follow-ups, and post-missed transactional follow-ups.
+- Webinars has a Webinars-owned message setup surface for registration confirmations, registration opt-ins, reminders, waitlist availability messages, waitlist opt-ins, post-attended transactional follow-ups, and post-missed transactional follow-ups.
 - The surface shows the currently selected Messaging template per webinar message context.
 - Operators can choose compatible `MessageTemplatePreset` records from the Webinars setup surface.
 - Selection saves through `MessageTemplatePresetAssignment` while copy editing remains on the Message Templates page.
-- Runtime resolution remains DB-first with config fallback so existing registration confirmation/reminder behavior is preserved during migration.
-- This is a functional setup UI, not the final UX-polished communication-plan experience.
-- Schedule/profile/timing selection remains a Webinars-owned follow-up item.
+- Runtime resolution remains DB-first with config fallback.
+- Computed readiness exposes `Ready`, `Needs attention`, and `Optional / disabled` states without persisting readiness records.
+- Readiness considers Messaging runtime definition resolution, channel visibility, active schedule profiles actually in use, explicit profile disablement, missing/inactive selected profile references, conflicting active defaults, and post-event outcome-message enablement.
+- Registration and waitlist opt-in readiness is included when the corresponding messaging surface has an available channel.
+- Opt-in contexts are immediate consent-event messages and are not forced into Webinar schedule-profile items.
+- This is a functional setup/readiness UI, not the final UX-polished communication-plan experience.
 
 ### Campaign channel variants
 
@@ -497,9 +505,79 @@ The event is contact-scoped, uses `ContactPermissionInvitation` as subject, incl
 
 No schema change was required.
 
+## Phase 9 Webinar message readiness completion
+
+Phase 9 is complete.
+
+Webinars now owns a computed readiness layer for these message areas:
+
+```text
+registration confirmations
+registration opt-in confirmations
+reminders
+waitlist availability messages
+waitlist opt-in confirmations
+post-attended transactional follow-up
+post-missed transactional follow-up
+```
+
+Readiness is computed from current runtime truth rather than persisted as setup state.
+
+The readiness service considers:
+
+```text
+Messaging DB-first definition resolution with config fallback
+channel availability for the owning surface/purpose/scope
+active Webinar schedule profiles actually in use
+explicit schedule-profile disablement
+missing or inactive selected profile references
+conflicting active default schedule profiles
+post-event outcome-message enablement
+```
+
+The operator-facing states are:
+
+```text
+Ready
+Needs attention
+Optional / disabled
+```
+
+No schema change was required.
+
+## Phase 10 manual status-change automation impact completion
+
+Phase 10 is complete for the backend foundation.
+
+FlowRoutes now exposes:
+
+```text
+FlowRouteTriggerBindingResolver::selectedFlowRoutesForContactStatus(...)
+ContactStatusAutomationImpactResolver::forContactStatus(...)
+```
+
+The impact resolver is read-only. It reports:
+
+```text
+has_automation
+status_id
+status_key
+status_name
+route_count
+routes[] with id/key/name
+```
+
+It ignores inactive bindings and inactive routes and does not start `ContactFlowRouteProgress`.
+
+No schema, `ContactController`, Workflow runtime, or Blade changes were required.
+
+The actual operator warning/confirmation UX before a manual status change remains intentionally deferred to Phase 11.
+
 ## Recommended next implementation target
 
-Phase 8 is complete. Permission invitation cancellation, skip, and failure bookkeeping now has explicit durable semantics across Messaging invitations, scheduled messages, and Broadcast bookkeeping without schema changes.
+Phases 9 and 10 are complete.
+
+Phase 11 is the next implementation target: Automatic Follow-ups / FlowRoutes UX polish. The backend runtime, capability, route-instance plan model, plural status-trigger resolution, and read-only contact-status automation impact preview are now in place. Phase 11 should use those seams for business-language route selection and consequence previews rather than redesigning runtime architecture again.
 
 ## What this roadmap intentionally avoids
 

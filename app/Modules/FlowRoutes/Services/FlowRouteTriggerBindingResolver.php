@@ -89,20 +89,28 @@ class FlowRouteTriggerBindingResolver
             : null;
     }
 
-    public function selectedFlowRouteForContactStatus(ContactStatus|int $contactStatus): ?FlowRoute
+    /**
+     * @return Collection<int, FlowRoute>
+     */
+    public function selectedFlowRoutesForContactStatus(ContactStatus|int $contactStatus): Collection
     {
         $status = $contactStatus instanceof ContactStatus
             ? $contactStatus
             : ContactStatus::query()->find($contactStatus);
 
         if (! $status instanceof ContactStatus) {
-            return null;
+            return new Collection();
         }
 
-        return $this->selectedFlowRoute(
+        return $this->selectedFlowRoutes(
             triggerType: FlowRoute::TRIGGER_CONTACT_STATUS,
             triggerKey: $status->key,
         );
+    }
+
+    public function selectedFlowRouteForContactStatus(ContactStatus|int $contactStatus): ?FlowRoute
+    {
+        return $this->selectedFlowRoutesForContactStatus($contactStatus)->first();
     }
 
     public function selectedFlowRouteForAutomationEvent(

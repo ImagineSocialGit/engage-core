@@ -1,6 +1,3 @@
-
-
-
 # FlowRoutes Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -131,12 +128,51 @@ Runtime meaning:
 
 FlowRoutes runtime behavior should read DB-owned route/point definitions.
 
+## Manual contact-status automation impact preview
+
+FlowRoutes owns the backend consequence-preview seam for manual contact-status changes.
+
+Current public read services:
+
+```text
+FlowRouteTriggerBindingResolver::selectedFlowRoutesForContactStatus(...)
+ContactStatusAutomationImpactResolver::forContactStatus(...)
+```
+
+The plural trigger resolver returns every currently selected active FlowRoute for a ContactStatus trigger.
+
+The impact resolver is read-only and returns compact consequence data:
+
+```text
+has_automation
+status_id
+status_key
+status_name
+route_count
+routes[]
+    id
+    key
+    name
+```
+
+Rules:
+
+- inactive bindings are ignored;
+- inactive routes are ignored;
+- preview resolution must not start route progress;
+- preview resolution must not mutate Workflow or Contact state;
+- no acknowledgement or warning state is persisted;
+- Core and Workflow should not import FlowRoutes internals to calculate automation impact.
+
+The eventual operator warning UX should consume this FlowRoutes-owned read seam rather than duplicating trigger-binding queries in Core or Workflow.
+
+The actual warning/confirmation interaction is deferred to the Automatic Follow-ups / Route Management UX phase.
 
 ## Automatic Follow-ups UI exploration
 
 The current trigger binding runtime model is durable enough to support CRM selection, but the client/operator UI should not be redesigned until the product questions are answered.
 
-This is the next implementation focus after the Webinars message/template/schedule setup slice. Start with an audit and Q&A pass before replacing the current UI.
+This is the current implementation focus after the backend runtime, capability, route-instance-plan, and status-change impact-preview foundations were completed. Start with an audit and Q&A pass before replacing the current UI.
 
 Questions to answer:
 
@@ -149,7 +185,7 @@ Which point types can be shown to clients?
 Which point types are operator/developer-only?
 How should unavailable module-owned point types appear when a module is disabled?
 Where should send-message point template assignment be edited?
-What confirmation is required before a manual status change starts a selected status route?
+What confirmation is required before a manual status change starts one or more selected status routes, using the existing read-only impact preview?
 ```
 
 Until those answers are captured, keep implementation focused on stable runtime bindings, capability-aware availability, and diagnostics.
@@ -638,7 +674,3 @@ Manage the automatic routes that create tasks, send messages, update statuses, a
 ```
 
 Route Management UX should explain available actions through FlowRouteCapability metadata rather than importing module internals.
-
-
-
-

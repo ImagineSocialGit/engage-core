@@ -42,8 +42,14 @@ Expected direction:
 
 1. Core/manual CRM or another module requests a status/profile transition through Workflow.
 2. Workflow records the state/profile change.
-3. Workflow emits an event.
-4. FlowRoutes may later react to that event.
+3. Workflow emits `ContactWorkflowStatusChanged`.
+4. FlowRoutes may react to that event when enabled.
+
+Manual CRM status changes use the same Workflow transition path as other legitimate status changes. Workflow does not decide whether a selected FlowRoute will run and does not own automation-consequence previews.
+
+FlowRoutes owns the read-only backend impact seam for selected status-triggered routes. The current preview resolver reports the selected route impact without mutating Workflow state or starting route progress.
+
+The eventual operator warning/confirmation UI should consume that FlowRoutes-owned read seam through an appropriate UI integration boundary rather than making Workflow depend on FlowRoutes.
 
 Workflow should not depend on FlowRoutes.
 

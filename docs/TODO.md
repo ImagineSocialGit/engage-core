@@ -21,7 +21,8 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - Replace raw status/event terminology with Status and Activity language.
   - Use a status selector for status-triggered follow-ups.
   - Use module tabs and human-readable activity names for automation-event follow-ups.
-  - Define consequence-preview requirements before save and before manual status changes.
+  - Use the existing FlowRoutes-owned `ContactStatusAutomationImpactResolver` as the backend source of truth for manual-status-change consequence previews.
+  - Define the final warning/confirmation interaction before save and before manual status changes.
   - Decide which point types are client-safe, operator-only, or developer-only.
 - [ ] Apply the AJAX/preserve-context UI pattern to other CRM row/panel/modal workflows where page reloads would frustrate operators.
   - Tasks complete/reopen/cancel/archive.
@@ -241,11 +242,17 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - No schema change was required.
 - [x] Phase 8 — Permission invitation cancellation / skip / failure bookkeeping.
   - Pre-claim skips/cancellations create no invitation row. Post-claim scheduled-message skips reconcile matching claimed invitations to failed. Provider/runtime failures remain failed across delivery and invitation state. No schema change or new invitation statuses were required.
-- [ ] Phase 9 — Webinar message readiness check.
-  - Add computed readiness visibility for webinar message setup without persisting setup state unless a concrete need appears.
-- [ ] Phase 10 — Manual status-change automation warning.
-  - Warn operators before manual status changes run selected status FlowRoutes.
-  - Keep this as a UI/awareness guardrail, not a ContactStatus schema split.
+- [x] Phase 9 — Webinar message readiness check.
+  - Added computed readiness visibility for registration confirmations, registration opt-ins, reminders, waitlist alerts, waitlist opt-ins, and post-event follow-ups.
+  - Readiness uses runtime Messaging resolution, channel availability, active schedule-profile effects, explicit disablement, selected-profile validity, active-default conflicts, and post-event outcome-message enablement.
+  - Readiness is not persisted.
+- [x] Phase 10 — Manual status-change automation warning foundation.
+  - Added plural selected FlowRoute resolution for ContactStatus triggers.
+  - Added a read-only `ContactStatusAutomationImpactResolver` reporting whether automation would run and which selected routes are involved.
+  - Inactive bindings/routes are ignored.
+  - Preview resolution does not start route progress or mutate Workflow/Contact state.
+  - No schema, controller, or Blade changes were required.
+  - The actual operator warning/confirmation UX remains part of Phase 11.
 - [ ] Phase 11 — Automatic Follow-ups / FlowRoutes UX polish.
   - Rename side-panel to something that doesn't imply messaging, using the term "Routes" to help tie together the concepts of "Routes have points along them"
   - Do not start until the FlowRoutes capability/instance-plan/runtime model is settled.

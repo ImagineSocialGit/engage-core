@@ -1,6 +1,3 @@
-
-
-
 # Engage Core Module Boundaries
 
 Engage Core is a modular contact engagement platform.
@@ -217,6 +214,20 @@ automation_event:webinar.attended
 
 This intentionally supersedes the older interpretation where matching active FlowRoutes were the selected runtime behavior.
 
+FlowRoutes also owns read-only consequence preview for manual ContactStatus changes.
+
+Current backend seam:
+
+```text
+FlowRouteTriggerBindingResolver::selectedFlowRoutesForContactStatus(...)
+ContactStatusAutomationImpactResolver::forContactStatus(...)
+```
+
+The preview returns compact selected-route impact data and must not mutate Contact/Workflow state or start FlowRoute progress.
+
+Core and Workflow should not duplicate FlowRoute trigger-binding queries or import FlowRoutes internals to compute this impact. The eventual CRM warning UX should consume the FlowRoutes-owned read seam through an appropriate integration boundary.
+
+No persisted acknowledgement/warning state is required unless a later operator workflow proves a durable audit need.
 
 FlowRoute logical identity is versioned by stable `key` plus `version`.
 
@@ -1732,7 +1743,7 @@ FlowRoutes runtime behavior should read DB-owned route/point definitions.
 
 Preset config may create/update DB-owned FlowRoute definitions, but runtime execution should not depend directly on config definitions.
 
-Manual contact-status changes may trigger selected status-based FlowRoutes. The CRM should warn the operator/client before applying a manual status change when a selected FlowRoute will run. This is a UI/awareness guardrail, not a ContactStatus schema distinction. Do not split ContactStatus into manual-only or automation-only categories unless a future workflow proves that policy is needed.
+Manual contact-status changes may trigger selected status-based FlowRoutes. FlowRoutes now exposes a read-only backend impact resolver for this consequence preview, including plural selected-route resolution. The actual CRM warning/confirmation interaction remains deferred to Route Management UX work. This is a UI/awareness guardrail, not a ContactStatus schema distinction. Do not split ContactStatus into manual-only or automation-only categories unless a future workflow proves that policy is needed.
 
 Current point handler capabilities include:
 
@@ -2393,6 +2404,23 @@ A webinar series or webinar may select a schedule profile, with webinar selectio
 
 Schedule profile items identify timing/slot identity and must not embed reusable copy.
 
+Webinars also owns computed message readiness for:
+
+```text
+registration confirmations
+registration opt-in confirmations
+reminders
+waitlist availability messages
+waitlist opt-in confirmations
+post-attended transactional follow-up
+post-missed transactional follow-up
+```
+
+Readiness is derived from runtime Messaging resolution, channel availability, active Webinar schedule profiles and explicit disablement, selected-profile validity, active-default conflicts, and post-event outcome-message enablement.
+
+Readiness is not persisted.
+
+Immediate consent-event opt-in messages are Webinar-scoped Messaging templates but are not forced into Webinar schedule-profile items.
 
 Post-webinar transactional follow-ups are not campaign nurture.
 
@@ -2802,10 +2830,11 @@ Recommended direction:
 3. Add public seams only when a concrete consumer/workflow needs them.
 4. Add contact filters for Commerce or Location only when Broadcasts, Campaigns, Reporting, or another consuming surface needs them.
 5. Treat the dashboard and contact show page as shared orientation surfaces with module-contributed summaries, not module inventories.
-6. Continue the runtime-selectable setup-surface path with Webinars message/template/schedule setup first.
-7. After the Webinars setup slice, improve Automatic Follow-ups / FlowRoutes UX around business-language selection, consequence previews, and diagnostic detail.
-8. Phase 6 contributor-based config/setup validation is complete. Continue with the permission-invitation accepted-event decision, then later readiness/UX phases.
-9. Regenerate `core-project-tree.txt` from the repo after each structural batch.
+6. Webinars message/template setup and computed readiness are complete, including registration and waitlist opt-ins.
+7. FlowRoutes now has a read-only manual ContactStatus automation impact preview; use it during Automatic Follow-ups / Route Management UX work.
+8. Phase 6 contributor-based setup validation and Phases 7–10 client-readiness foundations are complete.
+9. Proceed with Automatic Follow-ups / FlowRoutes UX polish before the later dashboard/contact workspace polish audit.
+10. Regenerate `core-project-tree.txt` from the repo after each structural batch.
 
 Do not use this section as a backlog. Actionable items belong in `TODO.md`.
 
@@ -3089,9 +3118,3 @@ Campaigns invents webinar URL fields without the enrollment caller supplying the
 ```
 
 Treat available-field validation as setup/config-validation work before every editor receives polished autocomplete.
-
-
-
-
-
-

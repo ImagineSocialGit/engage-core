@@ -270,4 +270,68 @@ class FlowRouteTriggerBindingTest extends TestCase
                 ?->is($globalRoute),
         );
     }
+
+    public function test_resolver_returns_all_selected_routes_for_contact_status_trigger(): void
+    {
+        $status = ContactStatus::query()->create([
+            'key' => 'qualified',
+            'name' => 'Qualified',
+        ]);
+
+        $firstRoute = FlowRoute::query()->create([
+            'key' => 'qualified_first_route',
+            'contact_status_id' => $status->getKey(),
+            'owner_type' => null,
+            'owner_id' => null,
+            'owner_group' => 'sales',
+            'name' => 'Qualified First Route',
+            'description' => null,
+            'version' => 1,
+            'trigger_type' => FlowRoute::TRIGGER_CONTACT_STATUS,
+            'trigger_key' => $status->key,
+            'is_active' => true,
+            'source_version' => null,
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        $secondRoute = FlowRoute::query()->create([
+            'key' => 'qualified_second_route',
+            'contact_status_id' => $status->getKey(),
+            'owner_type' => null,
+            'owner_id' => null,
+            'owner_group' => 'ops',
+            'name' => 'Qualified Second Route',
+            'description' => null,
+            'version' => 1,
+            'trigger_type' => FlowRoute::TRIGGER_CONTACT_STATUS,
+            'trigger_key' => $status->key,
+            'is_active' => true,
+            'source_version' => null,
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        foreach ([$firstRoute, $secondRoute] as $route) {
+            FlowRouteTriggerBinding::query()->create([
+                'trigger_type' => FlowRoute::TRIGGER_CONTACT_STATUS,
+                'trigger_key' => $status->key,
+                'flow_route_id' => $route->getKey(),
+                'context_type' => null,
+                'context_id' => null,
+                'is_active' => true,
+                'meta' => [],
+            ]);
+        }
+
+        $selectedRoutes = app(FlowRouteTriggerBindingResolver::class)
+            ->selectedFlowRoutesForContactStatus($status);
+
+        $this->assertCount(2, $selectedRoutes);
+        $this->assertTrue($selectedRoutes->contains(fn (FlowRoute $route): bool => $route->is($firstRoute)));
+        $this->assertTrue($selectedRoutes->contains(fn (FlowRoute $route): bool => $route->is($secondRoute)));
+    }
+
 }
