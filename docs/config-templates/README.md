@@ -65,6 +65,7 @@ Do not create separate runtime payload fields, database columns, event keys, pre
 ## Core authoring rules
 
 - Messaging configs own reusable message copy and delivery templates.
+- Every list-based Messaging definition must declare a stable explicit `key`. The synced `MessageTemplatePreset.key` derives from that explicit identity rather than list position. `source_config_path` remains provenance/debug location, not durable template identity.
 - Campaign presets own journeys, timing, step order, variant strategy, and delivery references.
 - Campaign presets must not define reusable subject/body/CTA/message payloads.
 - Campaign message templates live in Messaging configs under:
@@ -223,3 +224,5 @@ Client request:
 
 Return complete config files and list any recommended new keys/tokens separately.
 ```
+
+

@@ -47,9 +47,6 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             'contact_id' => $contact->id,
             'campaign_id' => $campaign->id,
             'campaign_key' => 'webinar_attended',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
             'status' => CampaignEnrollment::STATUS_ACTIVE,
             'current_step' => 1,
             'current_campaign_step_id' => $stepOne->id,
@@ -128,9 +125,6 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             'contact_id' => $contact->id,
             'campaign_id' => $campaign->id,
             'campaign_key' => 'webinar_attended',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
             'status' => CampaignEnrollment::STATUS_ACTIVE,
             'current_step' => 1,
             'current_campaign_step_id' => $stepOne->id,
@@ -247,9 +241,6 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             'contact_id' => $contact->id,
             'campaign_id' => $campaign->id,
             'campaign_key' => 'webinar_attended',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
             'status' => CampaignEnrollment::STATUS_ACTIVE,
             'current_step' => 2,
             'current_campaign_step_id' => $stepTwo->id,
@@ -392,3 +383,5 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
         parent::tearDown();
     }
 }
+
+

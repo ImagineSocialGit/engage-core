@@ -27,6 +27,8 @@ class WebinarScheduleProfile extends Model
         'status',
         'is_default',
         'is_active',
+        'is_customized',
+        'customized_at',
         'source',
         'source_config_path',
         'source_version',
@@ -37,6 +39,8 @@ class WebinarScheduleProfile extends Model
     protected $casts = [
         'is_default' => 'boolean',
         'is_active' => 'boolean',
+        'is_customized' => 'boolean',
+        'customized_at' => 'datetime',
         'source_version' => 'integer',
         'last_synced_at' => 'datetime',
         'meta' => 'array',
@@ -47,6 +51,16 @@ class WebinarScheduleProfile extends Model
         return $query
             ->where('is_active', true)
             ->where('status', self::STATUS_ACTIVE);
+    }
+
+    public function scopeCustomized(Builder $query): Builder
+    {
+        return $query->where('is_customized', true);
+    }
+
+    public function scopeNotCustomized(Builder $query): Builder
+    {
+        return $query->where('is_customized', false);
     }
 
     public function items(): HasMany

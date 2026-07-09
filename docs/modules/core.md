@@ -1,4 +1,5 @@
 
+
 # Core Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -58,6 +59,52 @@ contact.first_name
 or another documented canonical Contact token/field.
 
 Do not create separate runtime payload fields, database columns, event keys, preset identifiers, or validation concepts for each client-facing noun.
+
+## ContactStatus durability and preset sync
+
+`ContactStatus` is DB-owned runtime state, not a config-only value.
+
+Preset sync semantics:
+
+```text
+missing status
+    create it
+
+existing non-customized status
+    update it from the selected preset definition
+
+existing customized status
+    preserve it during normal sync
+
+force sync
+    overwrite it from preset data and clear is_customized/customized_at
+```
+
+Durable customization fields are:
+
+```text
+is_customized
+customized_at
+```
+
+The first-class `ContactStatus` fields remain the source of truth for status identity and presentation:
+
+```text
+key
+name
+description
+category
+color
+is_core
+is_active
+sort_order
+source_version
+meta
+```
+
+Do not duplicate first-class values inside `meta`.
+
+Default status resolution should use the configured canonical contact status key rather than hard-coding `prospect` or another vertical/client-specific label.
 
 ## Core setup validation ownership
 
@@ -179,3 +226,5 @@ Contact show should lead with next action and use module-provided summaries belo
 ```
 
 Core may render module-provided DTOs/arrays/views, but it should not query module tables directly.
+
+

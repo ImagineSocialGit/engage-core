@@ -20,7 +20,7 @@ class SyncPresetsCommand extends Command
         {--force-flow-routes : Overwrite customized FlowRoutes, Points, and FlowRoutePoints}
         {--force-tasks : Overwrite customized task templates}
         {--force-message-templates : Overwrite customized Messaging template presets and reactivate synced assignments}
-        {--force-webinar-schedule-profiles : Reserved for future customized webinar schedule profile handling}';
+        {--force-webinar-schedule-profiles : Overwrite customized webinar schedule profiles and profile items}';
 
     protected $description = 'Sync preset-owned database definitions in dependency-safe order. Campaign sync intentionally preserves customized records and has no force mode.';
 
@@ -291,6 +291,7 @@ class SyncPresetsCommand extends Command
      *     created: int,
      *     updated: int,
      *     customized_skipped: int,
+     *     stale_removed: int,
      *     assignments_created: int,
      *     assignments_updated: int,
      *     assignments_preserved: int,
@@ -309,6 +310,7 @@ class SyncPresetsCommand extends Command
                 ['Created', $result['created']],
                 ['Updated', $result['updated']],
                 ['Customized skipped', $result['customized_skipped']],
+                ['Removed stale', $result['stale_removed']],
                 ['Assignments created', $result['assignments_created']],
                 ['Assignments updated', $result['assignments_updated']],
                 ['Assignments preserved', $result['assignments_preserved']],
@@ -323,8 +325,10 @@ class SyncPresetsCommand extends Command
      * @param array{
      *     profiles_created: int,
      *     profiles_updated: int,
+     *     profiles_skipped: int,
      *     items_created: int,
      *     items_updated: int,
+     *     items_skipped: int,
      *     items_disabled: int
      * } $result
      */
@@ -338,8 +342,10 @@ class SyncPresetsCommand extends Command
             [
                 ['Profiles created', $result['profiles_created']],
                 ['Profiles updated', $result['profiles_updated']],
+                ['Profiles customized skipped', $result['profiles_skipped']],
                 ['Items created', $result['items_created']],
                 ['Items updated', $result['items_updated']],
+                ['Items customized skipped', $result['items_skipped']],
                 ['Items disabled', $result['items_disabled']],
             ],
         );
@@ -422,6 +428,12 @@ class SyncPresetsCommand extends Command
                     $result->updated['flow_route_points'] ?? 0,
                     $result->skipped['flow_route_points'] ?? 0,
                 ],
+                [
+                    'FlowRouteTriggerBindings',
+                    $result->created['flow_route_trigger_bindings'] ?? 0,
+                    $result->updated['flow_route_trigger_bindings'] ?? 0,
+                    $result->skipped['flow_route_trigger_bindings'] ?? 0,
+                ],
             ],
         );
 
@@ -434,3 +446,5 @@ class SyncPresetsCommand extends Command
         }
     }
 }
+
+

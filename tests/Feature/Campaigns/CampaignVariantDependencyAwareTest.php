@@ -331,9 +331,6 @@ class CampaignVariantDependencyAwareTest extends TestCase
             'contact_id' => $contact->id,
             'campaign_id' => $campaign->id,
             'campaign_key' => $campaign->key,
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar_nurture',
             'status' => CampaignEnrollment::STATUS_ACTIVE,
             'current_step' => $step->step_number,
             'current_campaign_step_id' => $step->id,
@@ -462,3 +459,4 @@ class CampaignVariantDependencyAwareTest extends TestCase
         parent::tearDown();
     }
 }
+

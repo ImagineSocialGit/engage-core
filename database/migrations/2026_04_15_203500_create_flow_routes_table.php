@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignIdFor(ContactStatus::class)
                 ->nullable()
                 ->constrained()
-                ->cascadeOnDelete();
+                ->nullOnDelete();
 
             $table->nullableMorphs('owner');
             $table->string('owner_group')->nullable()->index();

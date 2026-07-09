@@ -1,3 +1,4 @@
+
 <?php
 
 return [
@@ -21,6 +22,22 @@ return [
     | Do not split statuses into manual-only or automation-only categories by default.
     | If a manual status change will trigger selected FlowRoute automation, 
     | the CRM UI should warn the operator before applying the change.
+    */
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sync/customization expectations
+    |--------------------------------------------------------------------------
+    |
+    | ContactStatus rows are DB-owned.
+    |
+    | Normal sync updates non-customized rows and preserves customized rows.
+    | Explicit force sync may overwrite customized rows and clears
+    | is_customized/customized_at.
+    |
+    | Keep first-class status values in first-class fields. Do not duplicate
+    | description/category/color/source_version inside meta.
+    |
     */
 
     /*
@@ -106,3 +123,5 @@ return [
     ],
 
 ];
+
+

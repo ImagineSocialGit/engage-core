@@ -97,6 +97,7 @@ class SyncCampaignPresetsAction
             foreach ($this->normalizeStringList($campaignKeys) as $campaignKey) {
                 $definitions[] = CampaignPresetDefinition::fromArray(
                     data: $this->campaignDefinition($campaignKey),
+                    definitionKey: $campaignKey,
                 );
             }
         }

@@ -1,3 +1,4 @@
+
 <?php
 
 return [
@@ -22,11 +23,24 @@ return [
     | point definitions. Capability references should use stable keys when the
     | authoring/runtime path supports them.
     |
-    | FlowRoute preset sync assumes dependencies were synced first:
-    | contact_statuses -> tasks -> campaigns -> flow_routes.
+    | Global preset sync uses dependency-safe order:
+    | contact_statuses -> tasks -> messaging -> webinar schedule profiles
+    | -> campaigns -> FlowRoute capabilities -> FlowRoutes.
+    |
+    | FlowRoute capability sync must run before FlowRoute preset sync when route
+    | points reference durable capability keys.
     | 
     | Preset sync creates available FlowRoute definitions and may create default selected trigger bindings.
     | Runtime execution should resolve selected routes through FlowRouteTriggerBinding, not by running every active matching route.
+    |
+    | FlowRoute.key is durable logical identity. version is definition revision.
+    | is_current_version selects the current revision; is_active determines whether
+    | that selected revision is enabled.
+    |
+    | When a new revision becomes current, active/waiting older instances reconcile
+    | by durable FlowRoutePoint key into a new route-plan revision. Unmappable
+    | current/waiting points are hard conflicts; do not guess, skip, restart, or
+    | cancel them automatically.
     */
 
     /*
@@ -203,3 +217,5 @@ return [
     ],
 
 ];
+
+

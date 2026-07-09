@@ -71,6 +71,7 @@ return [
 
     'confirmations' => [
         [
+            'key' => 'confirmation',
             'dispatch_key' => 'registration_created',
             'channel' => 'sms',
             'purpose' => 'transactional',
@@ -93,6 +94,7 @@ return [
 
     'reminders' => [
         [
+            'key' => 'reminder_1_day',
             'dispatch_key' => 'registration_created',
             'channel' => 'sms',
             'purpose' => 'transactional',
@@ -113,6 +115,7 @@ return [
         ],
 
         [
+            'key' => 'reminder_10_minute',
             'dispatch_key' => 'registration_created',
             'channel' => 'sms',
             'purpose' => 'transactional',
@@ -136,6 +139,7 @@ return [
 
     'post_attended' => [
         [
+            'key' => 'post_attended',
             'dispatch_key' => 'webinar_ended',
             'channel' => 'sms',
             'purpose' => 'transactional',
@@ -160,6 +164,7 @@ return [
 
     'post_missed' => [
         [
+            'key' => 'post_missed',
             'dispatch_key' => 'webinar_ended',
             'channel' => 'sms',
             'purpose' => 'transactional',
@@ -227,3 +232,5 @@ return [
     ],
 
 ];
+
+

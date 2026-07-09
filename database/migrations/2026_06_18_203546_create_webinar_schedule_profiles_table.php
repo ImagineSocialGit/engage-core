@@ -19,6 +19,9 @@ return new class extends Migration
             $table->boolean('is_default')->default(false)->index();
             $table->boolean('is_active')->default(true)->index();
 
+            $table->boolean('is_customized')->default(false)->index();
+            $table->timestamp('customized_at')->nullable();
+
             $table->string('source')->nullable()->index();
             $table->string('source_config_path')->nullable();
             $table->unsignedInteger('source_version')->nullable();
@@ -26,6 +29,8 @@ return new class extends Migration
 
             $table->json('meta')->nullable();
             $table->timestamps();
+
+            $table->index(['is_customized', 'is_active'], 'wsp_customized_active_idx');
         });
 
         Schema::create('webinar_schedule_profile_items', function (Blueprint $table) {
@@ -52,6 +57,10 @@ return new class extends Migration
 
             $table->boolean('is_enabled')->default(true)->index();
             $table->boolean('is_active')->default(true)->index();
+
+            $table->boolean('is_customized')->default(false)->index();
+            $table->timestamp('customized_at')->nullable();
+
             $table->unsignedInteger('sort_order')->default(0);
 
             $table->string('timing')->default('immediate');
@@ -79,6 +88,11 @@ return new class extends Migration
             $table->index(
                 ['webinar_schedule_profile_id', 'source_config_path'],
                 'wsp_items_source_idx',
+            );
+
+            $table->index(
+                ['webinar_schedule_profile_id', 'is_customized', 'is_active'],
+                'wsp_items_customized_active_idx',
             );
         });
     }

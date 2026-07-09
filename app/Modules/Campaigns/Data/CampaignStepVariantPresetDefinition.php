@@ -163,16 +163,30 @@ class CampaignStepVariantPresetDefinition
     private static function dependencyStates(mixed $states): array
     {
         $states = self::stringList($states);
-        $states = array_values(array_intersect($states, [
+        $allowedStates = [
             'scheduled',
             'pending',
             'sent',
             'skipped',
             'failed',
             'terminal',
-        ]));
+        ];
 
-        return $states !== [] ? $states : ['scheduled'];
+        if ($states === []) {
+            throw new InvalidArgumentException(
+                'Campaign step variant dependency states must include at least one supported state.'
+            );
+        }
+
+        $unsupportedStates = array_values(array_diff($states, $allowedStates));
+
+        if ($unsupportedStates !== []) {
+            throw new InvalidArgumentException(
+                'Unsupported Campaign step variant dependency state(s): ['.implode(', ', $unsupportedStates).'].'
+            );
+        }
+
+        return $states;
     }
 
     /**

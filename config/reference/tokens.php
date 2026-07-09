@@ -1,4 +1,3 @@
-
 <?php
 
 return [
@@ -292,9 +291,6 @@ return [
                 'source_type',
                 'source_id',
                 'campaign_key',
-                'channel',
-                'purpose',
-                'scope',
                 'status',
                 'current_step',
                 'current_campaign_step_id',
@@ -309,9 +305,6 @@ return [
             'tokens' => [
                 '{campaign_enrollment.id}',
                 '{campaign_enrollment.campaign_key}',
-                '{campaign_enrollment.channel}',
-                '{campaign_enrollment.purpose}',
-                '{campaign_enrollment.scope}',
                 '{campaign_enrollment.status}',
                 '{campaign_enrollment.current_step}',
             ],
@@ -383,34 +376,6 @@ return [
             'dispatch_key' => 'registration_created',
             'default_channel_purpose_scope' => 'email:transactional:webinar',
         
-    /*
-    |--------------------------------------------------------------------------
-    | Contact authoring aliases
-    |--------------------------------------------------------------------------
-    |
-    | Authoring UI may derive client-facing aliases from the configured Contact
-    | noun without changing runtime identity. For example, a configured noun of
-    | "fan" may expose fan_first_name while runtime validation resolves it to
-    | contact.first_name.
-    |
-    */
-
-    'contact_authoring_aliases' => [
-        'label_config_path' => 'contacts.labels.singular',
-        'fields' => [
-            'first_name' => 'contact.first_name',
-            'last_name' => 'contact.last_name',
-            'name' => 'contact.name',
-            'email' => 'contact.email',
-            'phone' => 'contact.phone',
-        ],
-        'rules' => [
-            'Alias names are presentation/authoring conveniences only.',
-            'Normalize recognized aliases to canonical Contact fields before availability validation.',
-            'Do not create separate runtime payload fields, schema columns, event keys, preset keys, route keys, or validation branches for each configured noun.',
-        ],
-    ],
-
     'models' => [
                 'contact',
                 'webinar',
@@ -438,34 +403,6 @@ return [
             'description' => 'Opt-in messages after active consent is newly granted.',
             'dispatch_key' => 'consent_granted',
         
-    /*
-    |--------------------------------------------------------------------------
-    | Contact authoring aliases
-    |--------------------------------------------------------------------------
-    |
-    | Authoring UI may derive client-facing aliases from the configured Contact
-    | noun without changing runtime identity. For example, a configured noun of
-    | "fan" may expose fan_first_name while runtime validation resolves it to
-    | contact.first_name.
-    |
-    */
-
-    'contact_authoring_aliases' => [
-        'label_config_path' => 'contacts.labels.singular',
-        'fields' => [
-            'first_name' => 'contact.first_name',
-            'last_name' => 'contact.last_name',
-            'name' => 'contact.name',
-            'email' => 'contact.email',
-            'phone' => 'contact.phone',
-        ],
-        'rules' => [
-            'Alias names are presentation/authoring conveniences only.',
-            'Normalize recognized aliases to canonical Contact fields before availability validation.',
-            'Do not create separate runtime payload fields, schema columns, event keys, preset keys, route keys, or validation branches for each configured noun.',
-        ],
-    ],
-
     'models' => [
                 'contact',
             ],
@@ -483,34 +420,6 @@ return [
             'dispatch_key' => 'webinar_added',
             'default_channel_purpose_scope' => 'email:marketing:webinar_waitlist',
         
-    /*
-    |--------------------------------------------------------------------------
-    | Contact authoring aliases
-    |--------------------------------------------------------------------------
-    |
-    | Authoring UI may derive client-facing aliases from the configured Contact
-    | noun without changing runtime identity. For example, a configured noun of
-    | "fan" may expose fan_first_name while runtime validation resolves it to
-    | contact.first_name.
-    |
-    */
-
-    'contact_authoring_aliases' => [
-        'label_config_path' => 'contacts.labels.singular',
-        'fields' => [
-            'first_name' => 'contact.first_name',
-            'last_name' => 'contact.last_name',
-            'name' => 'contact.name',
-            'email' => 'contact.email',
-            'phone' => 'contact.phone',
-        ],
-        'rules' => [
-            'Alias names are presentation/authoring conveniences only.',
-            'Normalize recognized aliases to canonical Contact fields before availability validation.',
-            'Do not create separate runtime payload fields, schema columns, event keys, preset keys, route keys, or validation branches for each configured noun.',
-        ],
-    ],
-
     'models' => [
                 'contact',
                 'webinar',
@@ -540,34 +449,6 @@ return [
             'dispatch_key' => 'webinar_ended',
             'default_channel_purpose_scope' => 'email:transactional:webinar',
         
-    /*
-    |--------------------------------------------------------------------------
-    | Contact authoring aliases
-    |--------------------------------------------------------------------------
-    |
-    | Authoring UI may derive client-facing aliases from the configured Contact
-    | noun without changing runtime identity. For example, a configured noun of
-    | "fan" may expose fan_first_name while runtime validation resolves it to
-    | contact.first_name.
-    |
-    */
-
-    'contact_authoring_aliases' => [
-        'label_config_path' => 'contacts.labels.singular',
-        'fields' => [
-            'first_name' => 'contact.first_name',
-            'last_name' => 'contact.last_name',
-            'name' => 'contact.name',
-            'email' => 'contact.email',
-            'phone' => 'contact.phone',
-        ],
-        'rules' => [
-            'Alias names are presentation/authoring conveniences only.',
-            'Normalize recognized aliases to canonical Contact fields before availability validation.',
-            'Do not create separate runtime payload fields, schema columns, event keys, preset keys, route keys, or validation branches for each configured noun.',
-        ],
-    ],
-
     'models' => [
                 'contact',
                 'webinar',
@@ -600,34 +481,6 @@ return [
             'dispatch_key' => 'campaign_step_due',
             'default_channel_purpose_scope' => 'email:marketing:webinar_nurture',
         
-    /*
-    |--------------------------------------------------------------------------
-    | Contact authoring aliases
-    |--------------------------------------------------------------------------
-    |
-    | Authoring UI may derive client-facing aliases from the configured Contact
-    | noun without changing runtime identity. For example, a configured noun of
-    | "fan" may expose fan_first_name while runtime validation resolves it to
-    | contact.first_name.
-    |
-    */
-
-    'contact_authoring_aliases' => [
-        'label_config_path' => 'contacts.labels.singular',
-        'fields' => [
-            'first_name' => 'contact.first_name',
-            'last_name' => 'contact.last_name',
-            'name' => 'contact.name',
-            'email' => 'contact.email',
-            'phone' => 'contact.phone',
-        ],
-        'rules' => [
-            'Alias names are presentation/authoring conveniences only.',
-            'Normalize recognized aliases to canonical Contact fields before availability validation.',
-            'Do not create separate runtime payload fields, schema columns, event keys, preset keys, route keys, or validation branches for each configured noun.',
-        ],
-    ],
-
     'models' => [
                 'contact',
                 'campaign',
@@ -653,34 +506,6 @@ return [
         'flow_route_send_message' => [
             'description' => 'FlowRoutes send_message point payload interpolation.',
         
-    /*
-    |--------------------------------------------------------------------------
-    | Contact authoring aliases
-    |--------------------------------------------------------------------------
-    |
-    | Authoring UI may derive client-facing aliases from the configured Contact
-    | noun without changing runtime identity. For example, a configured noun of
-    | "fan" may expose fan_first_name while runtime validation resolves it to
-    | contact.first_name.
-    |
-    */
-
-    'contact_authoring_aliases' => [
-        'label_config_path' => 'contacts.labels.singular',
-        'fields' => [
-            'first_name' => 'contact.first_name',
-            'last_name' => 'contact.last_name',
-            'name' => 'contact.name',
-            'email' => 'contact.email',
-            'phone' => 'contact.phone',
-        ],
-        'rules' => [
-            'Alias names are presentation/authoring conveniences only.',
-            'Normalize recognized aliases to canonical Contact fields before availability validation.',
-            'Do not create separate runtime payload fields, schema columns, event keys, preset keys, route keys, or validation branches for each configured noun.',
-        ],
-    ],
-
     'models' => [
                 'contact',
             ],

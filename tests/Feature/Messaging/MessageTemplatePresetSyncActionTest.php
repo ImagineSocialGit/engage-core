@@ -143,6 +143,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
                 'webinar' => [
                     'reminders' => [
                         [
+                            'key' => 'webinar_reminder_1_day',
                             'dispatch_key' => 'registration_created',
                             'timing' => 'scheduled',
                             'schedule' => ['type' => 'anchored', 'minutes' => -1440],
@@ -154,6 +155,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
                             ],
                         ],
                         [
+                            'key' => 'webinar_reminder_30_minute',
                             'dispatch_key' => 'registration_created',
                             'timing' => 'scheduled',
                             'schedule' => ['type' => 'anchored', 'minutes' => -30],
@@ -183,6 +185,11 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             'messaging.email.transactional.webinar.reminders.0',
             'messaging.email.transactional.webinar.reminders.1',
         ], $presets->pluck('source_config_path')->all());
+
+        $this->assertSame([
+            'email.transactional.webinar.webinar_reminder_1_day',
+            'email.transactional.webinar.webinar_reminder_30_minute',
+        ], $presets->pluck('key')->all());
 
         $this->assertSame(['reminder', 'reminder'], $presets->pluck('message_type')->all());
         $this->assertDatabaseMissing('message_template_presets', ['message_type' => 'reminder_1_day']);
@@ -362,6 +369,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
                 'webinar' => [
                     'reminders' => [
                         [
+                            'key' => 'webinar_reminder_30_minute',
                             'dispatch_key' => 'registration_created',
                             'timing' => 'scheduled',
                             'payload_class' => EmailPayload::class,
@@ -376,6 +384,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
                             ],
                         ],
                         [
+                            'key' => 'webinar_reminder_10_minute',
                             'dispatch_key' => 'registration_created',
                             'timing' => 'scheduled',
                             'payload_class' => EmailPayload::class,
@@ -401,12 +410,14 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         $this->assertSame(2, $result['catalog_entries_created']);
 
         $this->assertDatabaseHas('message_template_presets', [
+            'key' => 'email.transactional.webinar.webinar_reminder_30_minute',
             'message_type' => 'reminder',
             'name' => 'Webinar Reminders — Reminder Email',
             'source_config_path' => 'messaging.email.transactional.webinar.reminders.0',
         ]);
 
         $this->assertDatabaseHas('message_template_presets', [
+            'key' => 'email.transactional.webinar.webinar_reminder_10_minute',
             'message_type' => 'reminder',
             'name' => 'Webinar Reminders — Reminder 2 Email',
             'source_config_path' => 'messaging.email.transactional.webinar.reminders.1',
@@ -438,5 +449,3 @@ class MessageTemplatePresetSyncActionTest extends TestCase
     }
 
 }
-
-

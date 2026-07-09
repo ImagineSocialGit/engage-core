@@ -71,10 +71,6 @@ return new class extends Migration
 
             $table->string('campaign_key', 120)->index();
 
-            $table->string('channel', 32)->index();
-            $table->string('purpose', 32)->index();
-            $table->string('scope', 120)->index();
-
             $table->string('status', 32)->default('active')->index();
             $table->unsignedInteger('current_step')->nullable();
 
@@ -113,23 +109,13 @@ return new class extends Migration
             $table->index([
                 'contact_id',
                 'campaign_key',
-                'channel',
                 'status',
-            ], 'campaign_enrollments_contact_campaign_channel_status_index');
-
-            $table->index([
-                'campaign_key',
-                'channel',
-                'purpose',
-                'scope',
-                'status',
-            ], 'campaign_enrollments_campaign_message_status_index');
+            ], 'campaign_enrollments_contact_campaign_status_index');
 
             $table->index([
                 'source_id',
                 'campaign_key',
-                'channel',
-            ], 'campaign_enrollments_source_campaign_channel_index');
+            ], 'campaign_enrollments_source_campaign_index');
 
             $table->index(['flow_route_progress_id', 'status'], 'ce_route_progress_status_idx');
             $table->index(['flow_route_plan_item_id', 'status'], 'ce_route_plan_item_status_idx');

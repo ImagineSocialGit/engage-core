@@ -1,4 +1,5 @@
 
+
 # FlowRoutes Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -380,6 +381,61 @@ Tasks remains the owner of task creation, assignment strategy, responsibility fi
 
 `tasks.task_template_id` may be treated as a soft/current DB reference while `task_template_key` preserves durable historical identity for route-created tasks.
 
+## FlowRoute definition versioning and live-instance reconciliation
+
+`FlowRoute.key` is the durable logical route identity.
+
+`FlowRoute.version` is the definition revision.
+
+`FlowRoute.is_current_version` identifies the selected revision for that logical route key. `is_active` answers whether that selected revision is enabled for runtime use.
+
+The intended meaning is:
+
+```text
+current
+    selected logical revision
+
+active
+    selected revision is enabled
+
+historical
+    older revision retained for history/provenance
+```
+
+New route starts should use the current active revision.
+
+A new current revision does not permanently pin active or waiting route instances to the revision on which they started. Runnable instances on an older revision should reconcile immediately to the new current revision.
+
+Reconciliation rules:
+
+```text
+map route points by durable FlowRoutePoint.key
+carry completed state forward when the same point key still exists
+carry current/waiting state forward when the same point key still exists
+preserve wait timing, event keys, and correlation state
+create a new ContactFlowRoutePlan revision
+retain old plans as historical execution evidence
+mark the old current plan superseded
+record reconciled_from_plan_id on the replacement plan
+```
+
+An unmappable current/waiting point is a hard reconciliation conflict.
+
+Do not guess, silently skip, restart, cancel, or choose another point automatically.
+
+Route-definition sync should be transactional so a reconciliation conflict rolls back the revision switch instead of leaving route definitions, bindings, and live instances in mixed states.
+
+When a new revision becomes current:
+
+```text
+sibling route revisions become historical
+old preset-owned default trigger bindings deactivate
+the new current default binding activates when the route is active
+an inactive current route does not retain an active preset-owned default binding
+```
+
+FlowRoute history must remain queryable. Core route-history foreign keys should not cascade-delete route revisions that are still needed as provenance/history.
+
 ## Route template vs route instance plan
 
 A FlowRoute definition is a reusable template/default automation plan.
@@ -577,3 +633,5 @@ Manage the automatic routes that create tasks, send messages, update statuses, a
 ```
 
 Route Management UX should explain available actions through FlowRouteCapability metadata rather than importing module internals.
+
+

@@ -31,6 +31,8 @@ class WebinarScheduleProfileItem extends Model
         'source_config_path',
         'is_enabled',
         'is_active',
+        'is_customized',
+        'customized_at',
         'sort_order',
         'timing',
         'schedule',
@@ -41,6 +43,8 @@ class WebinarScheduleProfileItem extends Model
     protected $casts = [
         'is_enabled' => 'boolean',
         'is_active' => 'boolean',
+        'is_customized' => 'boolean',
+        'customized_at' => 'datetime',
         'sort_order' => 'integer',
         'schedule' => 'array',
         'conditions' => 'array',
@@ -50,6 +54,16 @@ class WebinarScheduleProfileItem extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeCustomized(Builder $query): Builder
+    {
+        return $query->where('is_customized', true);
+    }
+
+    public function scopeNotCustomized(Builder $query): Builder
+    {
+        return $query->where('is_customized', false);
     }
 
     public function webinarScheduleProfile(): BelongsTo

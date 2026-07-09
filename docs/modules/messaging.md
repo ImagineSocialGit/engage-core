@@ -1,5 +1,4 @@
 
-
 # Messaging Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -135,6 +134,10 @@ SMS / Marketing / Campaigns / Webinar Attended Nurture / Step 1
 ```
 
 Template names should be readable catalog labels, not raw config paths.
+
+For config-defined reusable templates, `MessageTemplatePreset.key` is durable identity. List-based definitions must declare an explicit stable `key`; list position must never determine durable template identity because inserting or reordering sibling definitions would otherwise retarget customized DB-owned templates. `source_config_path` remains provenance/debug location and may change independently of durable template identity.
+
+A singular named definition may continue to derive its preset key from its stable named config path when no explicit key is supplied.
 
 ### MessageTemplateCatalogEntry
 
@@ -298,6 +301,26 @@ Step-only Campaign assignment wording is legacy compatibility language only. New
 Sync may create or update non-customized presets and catalog entries from config.
 
 Sync should not overwrite customized DB copy unless a force option is explicitly used.
+
+For config-owned presets, normal sync should reconcile stale definitions after the complete current definition set has been collected and validated:
+
+```text
+current config-owned preset
+    keep/sync
+
+stale config-owned non-customized preset
+    remove
+
+stale config-owned customized preset
+    preserve
+
+manual/non-config-owned preset
+    preserve
+```
+
+This cleanup is important when durable template identity changes, such as moving list-based definitions away from positional config-path keys.
+
+Assignments and catalog entries that belong only to a removed stale preset may be removed through their preset relationship. Do not globally purge manual or customized templates.
 
 Catalog entries are regenerated from source definition context and should stay aligned with the source config/definition shape.
 
@@ -618,3 +641,7 @@ available-field/token picker UX
 No persistent validation-result tables are required unless a later operator workflow proves retained history or acknowledgement state is needed.
 
 Fields should be filtered by authoring/runtime context so operators cannot insert a field that will be unavailable when the message sends.
+
+
+
+

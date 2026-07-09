@@ -5,69 +5,88 @@ namespace App\Modules\Messaging\Actions;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 class SyncMessageTemplatePresetsAction
 {
     /**
-     * @return array{created: int, updated: int, customized_skipped: int, assignments_created: int, assignments_updated: int, assignments_preserved: int, catalog_entries_created: int, catalog_entries_updated: int}
+     * @return array{created: int, updated: int, customized_skipped: int, stale_removed: int, assignments_created: int, assignments_updated: int, assignments_preserved: int, catalog_entries_created: int, catalog_entries_updated: int}
      */
     public function handle(bool $force = false): array
     {
-        $result = [
-            'created' => 0,
-            'updated' => 0,
-            'customized_skipped' => 0,
-            'assignments_created' => 0,
-            'assignments_updated' => 0,
-            'assignments_preserved' => 0,
-            'catalog_entries_created' => 0,
-            'catalog_entries_updated' => 0,
-        ];
+        $definitions = iterator_to_array($this->definitionsFromConfig(), false);
+        $this->assertUniqueDefinitionKeys($definitions);
 
-        foreach ($this->definitionsFromConfig() as $definition) {
-            $preset = MessageTemplatePreset::query()
-                ->where('key', $definition['key'])
-                ->first();
+        return DB::transaction(function () use ($definitions, $force): array {
+            $result = [
+                'created' => 0,
+                'updated' => 0,
+                'customized_skipped' => 0,
+                'stale_removed' => 0,
+                'assignments_created' => 0,
+                'assignments_updated' => 0,
+                'assignments_preserved' => 0,
+                'catalog_entries_created' => 0,
+                'catalog_entries_updated' => 0,
+            ];
 
-            if (! $preset instanceof MessageTemplatePreset) {
-                $preset = MessageTemplatePreset::query()->create($definition['preset']);
-                $result['created']++;
-            } elseif ($preset->is_customized && ! $force) {
-                $result['customized_skipped']++;
-            } else {
-                $preset->forceFill($definition['preset'] + [
-                    'is_customized' => false,
-                    'customized_at' => null,
-                ])->save();
-                $result['updated']++;
+            foreach ($definitions as $definition) {
+                $preset = MessageTemplatePreset::query()
+                    ->where('key', $definition['key'])
+                    ->first();
+
+                if (! $preset instanceof MessageTemplatePreset) {
+                    $preset = MessageTemplatePreset::query()->create($definition['preset']);
+                    $result['created']++;
+                } elseif ($preset->is_customized && ! $force) {
+                    $result['customized_skipped']++;
+                } else {
+                    $preset->forceFill($definition['preset'] + [
+                        'is_customized' => false,
+                        'customized_at' => null,
+                    ])->save();
+                    $result['updated']++;
+                }
+
+                $assignmentAttributes = array_replace($definition['assignment'], [
+                    'message_template_preset_id' => $preset->getKey(),
+                ]);
+
+                $assignment = $this->matchingGlobalAssignment($definition['assignment']);
+
+                if (! $assignment instanceof MessageTemplatePresetAssignment) {
+                    MessageTemplatePresetAssignment::query()->create($assignmentAttributes);
+                    $result['assignments_created']++;
+                } elseif ($force) {
+                    $assignment->forceFill(array_replace($assignmentAttributes, [
+                        'is_active' => true,
+                    ]))->save();
+
+                    $result['assignments_updated']++;
+                } else {
+                    $result['assignments_preserved']++;
+                }
+
+                $catalogEntry = $this->syncCatalogEntry($preset, $definition['catalog_entry']);
+                $result[$catalogEntry->wasRecentlyCreated ? 'catalog_entries_created' : 'catalog_entries_updated']++;
             }
 
-            $assignmentAttributes = array_replace($definition['assignment'], [
-                'message_template_preset_id' => $preset->getKey(),
-            ]);
+            $activeKeys = array_values(array_unique(array_column($definitions, 'key')));
+            $stalePresets = MessageTemplatePreset::query()
+                ->where('source', 'config')
+                ->where('is_customized', false);
 
-            $assignment = $this->matchingGlobalAssignment($definition['assignment']);
-
-            if (! $assignment instanceof MessageTemplatePresetAssignment) {
-                MessageTemplatePresetAssignment::query()->create($assignmentAttributes);
-                $result['assignments_created']++;
-            } elseif ($force) {
-                $assignment->forceFill(array_replace($assignmentAttributes, [
-                    'is_active' => true,
-                ]))->save();
-
-                $result['assignments_updated']++;
-            } else {
-                $result['assignments_preserved']++;
+            if ($activeKeys !== []) {
+                $stalePresets->whereNotIn('key', $activeKeys);
             }
 
-            $catalogEntry = $this->syncCatalogEntry($preset, $definition['catalog_entry']);
-            $result[$catalogEntry->wasRecentlyCreated ? 'catalog_entries_created' : 'catalog_entries_updated']++;
-        }
+            $result['stale_removed'] = $stalePresets->count();
+            $stalePresets->delete();
 
-        return $result;
+            return $result;
+        });
     }
 
     /**
@@ -196,6 +215,12 @@ class SyncMessageTemplatePresetsAction
                 }
 
                 $configPath = "{$scopeConfigPath}.{$messageType}".($isList ? ".{$index}" : '');
+                $definitionKey = $this->definitionKey(
+                    definition: $nestedDefinition,
+                    configPath: $configPath,
+                    required: $isList,
+                );
+
                 yield $this->definitionPayload(
                     definition: $nestedDefinition,
                     channel: $channel,
@@ -210,6 +235,7 @@ class SyncMessageTemplatePresetsAction
                     surface: $this->surfaceForScope($scope),
                     campaignTemplate: false,
                     listIndex: $isList ? (int) $index : null,
+                    definitionKey: $definitionKey,
                 );
             }
         }
@@ -283,6 +309,7 @@ class SyncMessageTemplatePresetsAction
                         surface: 'campaigns',
                         campaignTemplate: true,
                         listIndex: null,
+                        definitionKey: null,
                     );
                 }
             }
@@ -307,6 +334,7 @@ class SyncMessageTemplatePresetsAction
         ?string $surface,
         bool $campaignTemplate,
         ?int $listIndex,
+        ?string $definitionKey,
     ): array {
         $messageType = $this->normalizeSegment($messageType);
         $dispatchKeys = $this->normalizeDispatchKeys($definition);
@@ -346,7 +374,13 @@ class SyncMessageTemplatePresetsAction
             throw new InvalidArgumentException("Message template preset source [{$configPath}] has invalid [conditions].");
         }
 
-        $key = $this->presetKey($configPath);
+        $key = $this->presetKey(
+            channel: $channel,
+            purpose: $purpose,
+            scope: $scope,
+            definitionKey: $definitionKey,
+            configPath: $configPath,
+        );
         $now = now();
         $catalog = $this->catalogEntryPayload(
             definition: $definition,
@@ -362,6 +396,7 @@ class SyncMessageTemplatePresetsAction
             surface: $surface,
             campaignTemplate: $campaignTemplate,
             listIndex: $listIndex,
+            presetKey: $key,
         );
 
         $meta = array_replace_recursive(
@@ -467,6 +502,7 @@ class SyncMessageTemplatePresetsAction
         ?string $surface,
         bool $campaignTemplate,
         ?int $listIndex,
+        string $presetKey,
     ): array {
         if ($campaignTemplate && $campaignKey !== null && $campaignStep !== null && $campaignStepVariantKey !== null) {
             $moduleKey = 'campaigns';
@@ -493,7 +529,7 @@ class SyncMessageTemplatePresetsAction
             $usageType = $this->usageTypeForMessage($scope, $sourceMessageType);
         }
 
-        $itemKey = $this->presetKey($configPath);
+        $itemKey = $presetKey;
         $displayName = $groupLabel.' — '.$itemLabel;
 
         return [
@@ -674,8 +710,62 @@ class SyncMessageTemplatePresetsAction
         return $this->normalizeSegment($scope.'_'.Str::singular($sourceMessageType));
     }
 
-    private function presetKey(string $configPath): string
+    /**
+     * @param array<string, mixed> $definition
+     */
+    private function definitionKey(array $definition, string $configPath, bool $required): ?string
     {
+        $key = $definition['key'] ?? null;
+
+        if (! is_string($key) || trim($key) === '') {
+            if ($required) {
+                throw new InvalidArgumentException(
+                    "List-based message template preset source [{$configPath}] requires a stable explicit [key]."
+                );
+            }
+
+            return null;
+        }
+
+        return $this->normalizeSegment($key);
+    }
+
+    /**
+     * @param array<int, array{key: string, preset: array<string, mixed>, assignment: array<string, mixed>, catalog_entry: array<string, mixed>}> $definitions
+     */
+    private function assertUniqueDefinitionKeys(array $definitions): void
+    {
+        $seen = [];
+
+        foreach ($definitions as $definition) {
+            $key = $definition['key'];
+
+            if (array_key_exists($key, $seen)) {
+                throw new InvalidArgumentException(
+                    "Duplicate message template preset key [{$key}] from [{$seen[$key]}] and [{$definition['preset']['source_config_path']}]."
+                );
+            }
+
+            $seen[$key] = $definition['preset']['source_config_path'];
+        }
+    }
+
+    private function presetKey(
+        string $channel,
+        string $purpose,
+        string $scope,
+        ?string $definitionKey,
+        string $configPath,
+    ): string {
+        if ($definitionKey !== null) {
+            return implode('.', [
+                $this->normalizeSegment($channel),
+                $this->normalizeSegment($purpose),
+                $this->normalizeSegment($scope),
+                $this->normalizeSegment($definitionKey),
+            ]);
+        }
+
         return str_replace('-', '_', strtolower(preg_replace('/^messaging\./', '', $configPath) ?? $configPath));
     }
 
@@ -697,3 +787,7 @@ class SyncMessageTemplatePresetsAction
         return str_replace('-', '_', strtolower(trim($value)));
     }
 }
+
+
+
+

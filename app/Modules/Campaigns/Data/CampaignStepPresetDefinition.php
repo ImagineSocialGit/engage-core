@@ -65,6 +65,18 @@ class CampaignStepPresetDefinition
             throw new InvalidArgumentException('Campaign message steps must define at least one valid variant.');
         }
 
+        $variantKeys = [];
+
+        foreach ($variantDefinitions as $variantDefinition) {
+            if (in_array($variantDefinition->key, $variantKeys, true)) {
+                throw new InvalidArgumentException(
+                    'Campaign step ['.$stepNumber.'] has duplicate variant key ['.$variantDefinition->key.'].'
+                );
+            }
+
+            $variantKeys[] = $variantDefinition->key;
+        }
+
         return new self(
             stepNumber: $stepNumber,
             name: self::optionalString($data['name'] ?? null),
@@ -87,9 +99,11 @@ class CampaignStepPresetDefinition
             ? self::normalizeSegment($value)
             : 'first_available';
 
-        return in_array($strategy, ['first_available', 'send_all_eligible', 'dependency_aware'], true)
-            ? $strategy
-            : 'first_available';
+        if (! in_array($strategy, ['first_available', 'send_all_eligible', 'dependency_aware'], true)) {
+            throw new InvalidArgumentException('Unsupported Campaign variant strategy ['.$strategy.'].');
+        }
+
+        return $strategy;
     }
 
     private static function optionalString(mixed $value): ?string

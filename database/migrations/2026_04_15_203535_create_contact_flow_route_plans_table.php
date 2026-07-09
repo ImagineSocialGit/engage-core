@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\FlowRoutes\Models\ContactFlowRoutePlan;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use Illuminate\Database\Migrations\Migration;

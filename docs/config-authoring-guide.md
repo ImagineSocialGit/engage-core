@@ -1,5 +1,6 @@
 
 
+
 # Engage Core Config Authoring Guide
 
 This guide is for creating or reviewing Engage Core default configs and client-specific configs.
@@ -589,6 +590,50 @@ Automatic Follow-ups / send-message point editor
 ```
 
 The Messaging template editor should primarily edit/review reusable copy and show read-only usage links.
+
+## DB-owned definition sync semantics
+
+Do not assume all preset families sync identically.
+
+Current contract:
+
+```text
+ContactStatus
+    preserve customized on normal sync
+    force supported
+
+TaskTemplate
+    preserve customized on normal sync
+    force supported
+
+MessageTemplatePreset
+    preserve customized on normal sync
+    force supported
+    remove stale config-owned non-customized presets
+    preserve customized/manual presets
+
+Webinar schedule profiles/items
+    preserve customized on normal sync
+    force supported
+    deactivate stale non-customized items
+    preserve stale customized items
+
+Campaigns/Steps/Variants
+    preserve customized on normal sync
+    remove stale non-customized nested definitions where authoritative
+    no force mode
+
+FlowRoute capabilities
+    preserve customized rows
+
+FlowRoutes/Points/FlowRoutePoints
+    preserve customized definitions according to route semantics
+    force supported
+```
+
+Use the owning module's actual sync contract. Do not invent a force option for symmetry.
+
+For FlowRoutes, stable `FlowRoute.key` identifies the logical route and `version` identifies a revision. `is_current_version` selects the current revision. New starts use that revision, while active/waiting instances on older revisions reconcile by durable route-point key. An unmappable current/waiting point is a hard conflict.
 
 ## Campaign Messaging template shape
 
@@ -1508,4 +1553,6 @@ business context label
 ```
 
 Do not persist schedule summary text unless a concrete reason appears. Prefer deriving it from the canonical schedule/profile/criteria definition.
+
+
 

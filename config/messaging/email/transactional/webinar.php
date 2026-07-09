@@ -1,4 +1,3 @@
-
 <?php
 
 use App\Modules\Messaging\Payloads\EmailPayload;
@@ -25,6 +24,7 @@ return [
 
     'confirmations' => [
         [
+            'key' => 'confirmation',
             'dispatch_key' => 'registration_created',
             'message_type' => 'confirmation',
             'channel' => 'email',
@@ -65,6 +65,7 @@ return [
 
     'opt_ins' => [
         [
+            'key' => 'opt_in',
             'dispatch_key' => 'consent_granted',
             'message_type' => 'opt_in',
             'channel' => 'email',
@@ -84,6 +85,7 @@ return [
 
     'reminders' => [
         [
+            'key' => 'reminder_10_day',
             'dispatch_key' => 'registration_created',
             'message_type' => 'reminder',
             'channel' => 'email',
@@ -110,6 +112,7 @@ return [
         ],
 
         [
+            'key' => 'reminder_1_week',
             'dispatch_key' => 'registration_created',
             'message_type' => 'reminder',
             'channel' => 'email',
@@ -136,6 +139,7 @@ return [
         ],
 
         [
+            'key' => 'reminder_1_day',
             'dispatch_key' => 'registration_created',
             'message_type' => 'reminder',
             'channel' => 'email',
@@ -162,6 +166,7 @@ return [
         ],
 
         [
+            'key' => 'reminder_30_minute',
             'dispatch_key' => 'registration_created',
             'message_type' => 'reminder',
             'channel' => 'email',
@@ -188,6 +193,7 @@ return [
         ],
 
         [
+            'key' => 'reminder_10_minute',
             'dispatch_key' => 'registration_created',
             'message_type' => 'reminder',
             'channel' => 'email',
@@ -214,6 +220,7 @@ return [
         ],
 
         [
+            'key' => 'reminder_live',
             'dispatch_key' => 'registration_created',
             'message_type' => 'reminder',
             'channel' => 'email',
@@ -243,6 +250,7 @@ return [
 
     'post_attended' => [
         [
+            'key' => 'post_attended',
             'dispatch_key' => 'webinar_ended',
             'message_type' => 'post_attended',
             'channel' => 'email',
@@ -273,6 +281,7 @@ return [
 
     'post_missed' => [
         [
+            'key' => 'post_missed',
             'dispatch_key' => 'webinar_ended',
             'message_type' => 'post_missed',
             'channel' => 'email',
@@ -302,3 +311,5 @@ return [
     ],
 
 ];
+
+

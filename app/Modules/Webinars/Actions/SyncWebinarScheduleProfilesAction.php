@@ -4,12 +4,21 @@ namespace App\Modules\Webinars\Actions;
 
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class SyncWebinarScheduleProfilesAction
 {
     /**
-     * @return array{profiles_created: int, profiles_updated: int, items_created: int, items_updated: int, items_disabled: int}
+     * @return array{
+     *     profiles_created: int,
+     *     profiles_updated: int,
+     *     profiles_skipped: int,
+     *     items_created: int,
+     *     items_updated: int,
+     *     items_skipped: int,
+     *     items_disabled: int
+     * }
      */
     public function handle(bool $force = false): array
     {
@@ -19,42 +28,157 @@ class SyncWebinarScheduleProfilesAction
             $profiles = [];
         }
 
-        $result = [
-            'profiles_created' => 0,
-            'profiles_updated' => 0,
-            'items_created' => 0,
-            'items_updated' => 0,
-            'items_disabled' => 0,
-        ];
+        $profiles = $this->validatedProfiles($profiles);
+
+        return DB::transaction(function () use ($profiles, $force): array {
+            $result = [
+                'profiles_created' => 0,
+                'profiles_updated' => 0,
+                'profiles_skipped' => 0,
+                'items_created' => 0,
+                'items_updated' => 0,
+                'items_skipped' => 0,
+                'items_disabled' => 0,
+            ];
+
+            foreach ($profiles as $key => $profileConfig) {
+                $profileWasCustomized = WebinarScheduleProfile::query()
+                    ->where('key', $key)
+                    ->value('is_customized') === true;
+
+                $profile = $this->syncProfile($key, $profileConfig, $force);
+
+                if ($profile->wasRecentlyCreated) {
+                    $result['profiles_created']++;
+                } elseif ($profileWasCustomized && ! $force) {
+                    $result['profiles_skipped']++;
+                } else {
+                    $result['profiles_updated']++;
+                }
+
+                $syncedItemKeys = [];
+
+                foreach ($profileConfig['items'] as $index => $itemConfig) {
+                    $itemKey = $this->normalizeSegment($this->requiredString(
+                        $itemConfig,
+                        'key',
+                        "webinars.schedule_profiles.{$profile->key}.items.{$index}.key",
+                    ));
+
+                    $itemWasCustomized = $profile->items()
+                        ->where('key', $itemKey)
+                        ->value('is_customized') === true;
+
+                    $item = $this->syncItem(
+                        profile: $profile,
+                        config: $itemConfig,
+                        index: (int) $index,
+                        force: $force,
+                    );
+
+                    $syncedItemKeys[] = $item->key;
+
+                    if ($item->wasRecentlyCreated) {
+                        $result['items_created']++;
+                    } elseif ($itemWasCustomized && ! $force) {
+                        $result['items_skipped']++;
+                    } else {
+                        $result['items_updated']++;
+                    }
+                }
+
+                $staleItems = $profile->items()
+                    ->where('is_customized', false);
+
+                if ($syncedItemKeys !== []) {
+                    $staleItems->whereNotIn('key', $syncedItemKeys);
+                }
+
+                $result['items_disabled'] += $staleItems->update([
+                    'is_active' => false,
+                ]);
+            }
+
+            return $result;
+        });
+    }
+
+    /**
+     * @param array<string, mixed> $profiles
+     * @return array<string, array<string, mixed>>
+     */
+    private function validatedProfiles(array $profiles): array
+    {
+        $normalizedProfiles = [];
+        $activeDefaultKeys = [];
 
         foreach ($profiles as $key => $profileConfig) {
             if (! is_string($key) || trim($key) === '' || ! is_array($profileConfig)) {
                 continue;
             }
 
-            $profile = $this->syncProfile($key, $profileConfig, $force);
-            $result[$profile->wasRecentlyCreated ? 'profiles_created' : 'profiles_updated']++;
+            $normalizedKey = $this->normalizeSegment($key);
 
-            $syncedItemKeys = [];
+            if (array_key_exists($normalizedKey, $normalizedProfiles)) {
+                throw new InvalidArgumentException(
+                    "Duplicate normalized Webinar schedule profile key [{$normalizedKey}]."
+                );
+            }
 
-            foreach (($profileConfig['items'] ?? []) as $index => $itemConfig) {
+            $items = $profileConfig['items'] ?? [];
+
+            if (! is_array($items)) {
+                throw new InvalidArgumentException(
+                    "Webinar schedule profile [{$normalizedKey}] items must be an array."
+                );
+            }
+
+            $seenItemKeys = [];
+
+            foreach ($items as $index => $itemConfig) {
                 if (! is_array($itemConfig)) {
                     continue;
                 }
 
-                $item = $this->syncItem($profile, $itemConfig, (int) $index);
-                $syncedItemKeys[] = $item->key;
-                $result[$item->wasRecentlyCreated ? 'items_created' : 'items_updated']++;
+                $itemKey = $this->normalizeSegment($this->requiredString(
+                    $itemConfig,
+                    'key',
+                    "webinars.schedule_profiles.{$normalizedKey}.items.{$index}.key",
+                ));
+
+                if (array_key_exists($itemKey, $seenItemKeys)) {
+                    throw new InvalidArgumentException(
+                        "Webinar schedule profile [{$normalizedKey}] contains duplicate normalized item key [{$itemKey}]."
+                    );
+                }
+
+                $seenItemKeys[$itemKey] = true;
             }
 
-            $disabled = $profile->items()
-                ->whereNotIn('key', $syncedItemKeys)
-                ->update(['is_active' => false]);
+            $profileConfig['items'] = $items;
+            $normalizedProfiles[$normalizedKey] = $profileConfig;
 
-            $result['items_disabled'] += $disabled;
+            $status = $this->normalizeSegment((string) (
+                $profileConfig['status'] ?? WebinarScheduleProfile::STATUS_ACTIVE
+            ));
+
+            if (
+                (bool) ($profileConfig['is_default'] ?? false)
+                && (bool) ($profileConfig['is_active'] ?? true)
+                && $status === WebinarScheduleProfile::STATUS_ACTIVE
+            ) {
+                $activeDefaultKeys[] = $normalizedKey;
+            }
         }
 
-        return $result;
+        if (count($activeDefaultKeys) > 1) {
+            throw new InvalidArgumentException(
+                'Only one active default Webinar schedule profile may be configured. Found: '
+                .implode(', ', $activeDefaultKeys).'.'
+            );
+        }
+
+        return $normalizedProfiles;
     }
 
     /**
@@ -62,27 +186,39 @@ class SyncWebinarScheduleProfilesAction
      */
     private function syncProfile(string $key, array $config, bool $force): WebinarScheduleProfile
     {
-        $normalizedKey = $this->normalizeSegment($key);
-        $profile = WebinarScheduleProfile::query()->where('key', $normalizedKey)->first();
+        $profile = WebinarScheduleProfile::query()->where('key', $key)->first();
+
         $attributes = [
-            'key' => $normalizedKey,
+            'key' => $key,
             'name' => $this->requiredString($config, 'name', "webinars.schedule_profiles.{$key}.name"),
             'description' => $this->nullableString($config['description'] ?? null),
             'status' => $this->normalizeSegment((string) ($config['status'] ?? WebinarScheduleProfile::STATUS_ACTIVE)),
             'is_default' => (bool) ($config['is_default'] ?? false),
             'is_active' => (bool) ($config['is_active'] ?? true),
             'source' => 'config',
-            'source_config_path' => "webinars.schedule_profiles.{$normalizedKey}",
+            'source_config_path' => "webinars.schedule_profiles.{$key}",
             'source_version' => is_numeric($config['source_version'] ?? null) ? (int) $config['source_version'] : null,
             'last_synced_at' => now(),
             'meta' => is_array($config['meta'] ?? null) ? $config['meta'] : [],
         ];
 
         if (! $profile instanceof WebinarScheduleProfile) {
-            return WebinarScheduleProfile::query()->create($attributes);
+            return WebinarScheduleProfile::query()->create([
+                ...$attributes,
+                'is_customized' => false,
+                'customized_at' => null,
+            ]);
         }
 
-        $profile->forceFill($attributes)->save();
+        if ($profile->is_customized && ! $force) {
+            return $profile;
+        }
+
+        $profile->forceFill([
+            ...$attributes,
+            'is_customized' => false,
+            'customized_at' => null,
+        ])->save();
 
         return $profile;
     }
@@ -90,31 +226,67 @@ class SyncWebinarScheduleProfilesAction
     /**
      * @param array<string, mixed> $config
      */
-    private function syncItem(WebinarScheduleProfile $profile, array $config, int $index): WebinarScheduleProfileItem
-    {
-        $key = $this->requiredString($config, 'key', "webinars.schedule_profiles.{$profile->key}.items.{$index}.key");
+    private function syncItem(
+        WebinarScheduleProfile $profile,
+        array $config,
+        int $index,
+        bool $force,
+    ): WebinarScheduleProfileItem {
+        $key = $this->requiredString(
+            $config,
+            'key',
+            "webinars.schedule_profiles.{$profile->key}.items.{$index}.key",
+        );
+
+        $normalizedKey = $this->normalizeSegment($key);
         $timing = $this->normalizeSegment((string) ($config['timing'] ?? 'immediate'));
         $schedule = is_array($config['schedule'] ?? null) ? $config['schedule'] : null;
 
         if (! in_array($timing, ['immediate', 'scheduled'], true)) {
-            throw new InvalidArgumentException("Webinar schedule profile item [{$profile->key}:{$key}] has invalid [timing].");
+            throw new InvalidArgumentException(
+                "Webinar schedule profile item [{$profile->key}:{$normalizedKey}] has invalid [timing]."
+            );
         }
 
         if ($timing === 'scheduled') {
-            $this->validateSchedule($schedule, $profile->key, $key);
+            $this->validateSchedule($schedule, $profile->key, $normalizedKey);
         }
 
         $attributes = [
             'webinar_schedule_profile_id' => $profile->getKey(),
-            'key' => $this->normalizeSegment($key),
+            'key' => $normalizedKey,
             'label' => $this->nullableString($config['label'] ?? null),
-            'context_key' => $this->normalizeSegment($this->requiredString($config, 'context_key', "webinars.schedule_profiles.{$profile->key}.items.{$index}.context_key")),
-            'channel' => $this->normalizeSegment($this->requiredString($config, 'channel', "webinars.schedule_profiles.{$profile->key}.items.{$index}.channel")),
-            'purpose' => $this->normalizeSegment($this->requiredString($config, 'purpose', "webinars.schedule_profiles.{$profile->key}.items.{$index}.purpose")),
-            'scope' => $this->normalizeSegment($this->requiredString($config, 'scope', "webinars.schedule_profiles.{$profile->key}.items.{$index}.scope")),
+            'context_key' => $this->normalizeSegment($this->requiredString(
+                $config,
+                'context_key',
+                "webinars.schedule_profiles.{$profile->key}.items.{$index}.context_key",
+            )),
+            'channel' => $this->normalizeSegment($this->requiredString(
+                $config,
+                'channel',
+                "webinars.schedule_profiles.{$profile->key}.items.{$index}.channel",
+            )),
+            'purpose' => $this->normalizeSegment($this->requiredString(
+                $config,
+                'purpose',
+                "webinars.schedule_profiles.{$profile->key}.items.{$index}.purpose",
+            )),
+            'scope' => $this->normalizeSegment($this->requiredString(
+                $config,
+                'scope',
+                "webinars.schedule_profiles.{$profile->key}.items.{$index}.scope",
+            )),
             'surface' => $this->nullableNormalizedString($config['surface'] ?? null),
-            'message_type' => $this->normalizeSegment($this->requiredString($config, 'message_type', "webinars.schedule_profiles.{$profile->key}.items.{$index}.message_type")),
-            'dispatch_key' => $this->normalizeSegment($this->requiredString($config, 'dispatch_key', "webinars.schedule_profiles.{$profile->key}.items.{$index}.dispatch_key")),
+            'message_type' => $this->normalizeSegment($this->requiredString(
+                $config,
+                'message_type',
+                "webinars.schedule_profiles.{$profile->key}.items.{$index}.message_type",
+            )),
+            'dispatch_key' => $this->normalizeSegment($this->requiredString(
+                $config,
+                'dispatch_key',
+                "webinars.schedule_profiles.{$profile->key}.items.{$index}.dispatch_key",
+            )),
             'source_config_path' => $this->nullableString($config['source_config_path'] ?? null),
             'is_enabled' => (bool) ($config['is_enabled'] ?? true),
             'is_active' => (bool) ($config['is_active'] ?? true),
@@ -131,13 +303,25 @@ class SyncWebinarScheduleProfilesAction
             ),
         ];
 
-        $item = $profile->items()->where('key', $attributes['key'])->first();
+        $item = $profile->items()->where('key', $normalizedKey)->first();
 
         if (! $item instanceof WebinarScheduleProfileItem) {
-            return WebinarScheduleProfileItem::query()->create($attributes);
+            return WebinarScheduleProfileItem::query()->create([
+                ...$attributes,
+                'is_customized' => false,
+                'customized_at' => null,
+            ]);
         }
 
-        $item->forceFill($attributes)->save();
+        if ($item->is_customized && ! $force) {
+            return $item;
+        }
+
+        $item->forceFill([
+            ...$attributes,
+            'is_customized' => false,
+            'customized_at' => null,
+        ])->save();
 
         return $item;
     }
@@ -148,15 +332,21 @@ class SyncWebinarScheduleProfilesAction
     private function validateSchedule(?array $schedule, string $profileKey, string $itemKey): void
     {
         if (! is_array($schedule)) {
-            throw new InvalidArgumentException("Webinar schedule profile item [{$profileKey}:{$itemKey}] is missing [schedule].");
+            throw new InvalidArgumentException(
+                "Webinar schedule profile item [{$profileKey}:{$itemKey}] is missing [schedule]."
+            );
         }
 
         if (! in_array($schedule['type'] ?? null, ['delay', 'anchored'], true)) {
-            throw new InvalidArgumentException("Webinar schedule profile item [{$profileKey}:{$itemKey}] has invalid [schedule.type].");
+            throw new InvalidArgumentException(
+                "Webinar schedule profile item [{$profileKey}:{$itemKey}] has invalid [schedule.type]."
+            );
         }
 
         if (! is_int($schedule['minutes'] ?? null)) {
-            throw new InvalidArgumentException("Webinar schedule profile item [{$profileKey}:{$itemKey}] has invalid [schedule.minutes].");
+            throw new InvalidArgumentException(
+                "Webinar schedule profile item [{$profileKey}:{$itemKey}] has invalid [schedule.minutes]."
+            );
         }
     }
 
@@ -166,7 +356,9 @@ class SyncWebinarScheduleProfilesAction
     private function requiredString(array $config, string $key, string $path): string
     {
         if (! is_string($config[$key] ?? null) || trim($config[$key]) === '') {
-            throw new InvalidArgumentException("Webinar schedule profile config [{$path}] must be a non-empty string.");
+            throw new InvalidArgumentException(
+                "Webinar schedule profile config [{$path}] must be a non-empty string."
+            );
         }
 
         return trim($config[$key]);

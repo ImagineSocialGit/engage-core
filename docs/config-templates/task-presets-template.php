@@ -1,3 +1,4 @@
+
 <?php
 
 return [
@@ -21,6 +22,28 @@ return [
     | due_offset_days may be accepted by legacy/adapted config paths, but new
     | presets should use due_offset_minutes so sub-day task defaults can be
     | represented without adding parallel timing semantics.
+    */
+
+    /*
+    |--------------------------------------------------------------------------
+    | Runtime/default precedence
+    |--------------------------------------------------------------------------
+    |
+    | Template-backed live task creation resolves values in this order:
+    |
+    | 1. explicit caller value
+    | 2. first-class TaskTemplate field
+    | 3. TaskTemplate.defaults
+    | 4. system fallback
+    |
+    | Use first-class fields for stable concepts such as title, priority,
+    | responsible_party, assignment strategy, and due_offset_minutes. Use
+    | defaults only for genuine generic fallback data.
+    |
+    | A live Task may store nullable task_template_id plus durable
+    | task_template_key identity. Historical tasks must survive template
+    | deletion/replacement safely.
+    |
     */
 
     /*
@@ -92,3 +115,5 @@ return [
     ],
 
 ];
+
+

@@ -1,5 +1,6 @@
 
 
+
 # Tasks Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -59,6 +60,17 @@ unless the code is inside Tasks itself or there is an intentional, documented ex
 ## Task templates and defaults
 
 Task templates are DB-owned reusable task definitions.
+
+Task template-backed live task creation resolves defaults in this order:
+
+```text
+1. Explicit caller value.
+2. First-class TaskTemplate field.
+3. TaskTemplate.defaults.
+4. System fallback.
+```
+
+`TaskTemplate.defaults` is real generic fallback data. It is not a dumping ground for values that already have first-class TaskTemplate columns.
 
 Task templates are not optional if FlowRoutes `create_task` points need reusable tasks.
 
@@ -238,7 +250,11 @@ This split is intentional. `tasks.task_template_id` should be treated as a soft/
 
 `tasks.task_template_key` is the durable historical identity. It should remain available for debugging, reporting, provenance, route correlation, and future template deletion/replacement scenarios.
 
-Do not add a hard foreign-key constraint from live tasks to task templates unless a later audit proves that deleting or replacing task templates should be blocked by historical task rows. Current direction is that historical tasks should survive template cleanup, template replacement, and template re-sync safely.
+`tasks.task_template_id` is a real nullable foreign key with `nullOnDelete()`. Deleting or replacing a TaskTemplate must not delete historical Task rows or erase durable template identity.
+
+`tasks.task_template_key` remains the durable historical identity even when the referenced DB template is later deleted, replaced, or re-synced.
+
+Template-backed task creation must preserve the same structured FlowRoutes provenance as inline task creation. `CreateTaskFromTemplateAction` should pass route provenance through to the Tasks-owned live task creation path and persist both `task_template_id` and `task_template_key`.
 
 Task completion automation events should include enough task identity and structured FlowRoutes provenance for FlowRoutes to resume a specific waiting route progress/plan/progress item. Broad contact-only task completion matching is unsafe.
 
@@ -313,3 +329,5 @@ related subject fields, when present
 ```
 
 Do not make Phase 3 depend on a polished token picker. Phase 3 should first prove the DB-owned task-template/default shape. The field picker belongs to shared authoring UX and Phase 6 validation unless the task-template schema audit proves a missing persisted field/source concept.
+
+

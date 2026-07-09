@@ -1,4 +1,3 @@
-
 <?php
 
 use App\Modules\Messaging\Payloads\EmailPayload;
@@ -6,6 +5,7 @@ use App\Modules\Messaging\Payloads\EmailPayload;
 return [
     'opt_ins' => [
         [
+            'key' => 'opt_in',
             'dispatch_key' => 'consent_granted',
             'message_type' => 'opt_in',
             'channel' => 'email',
@@ -136,3 +136,5 @@ return [
         ],
     ],
 ];
+
+

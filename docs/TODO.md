@@ -1,4 +1,5 @@
 
+
 # Engage Core TODO
 
 This file is intentionally disposable. Add work here when it is real but not yet ready for an implementation slice. Delete items as they are completed. Do not treat this as an architectural reference; long-lived decisions belong in `module-boundaries.md` or a feature-specific doc.
@@ -185,46 +186,53 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Supports unambiguous route-created Task artifact matching.
   - Supports explicit event_wait correlation for routes that may create multiple tasks.
   - Covers the real CompleteTaskAction → TaskCompleted → AutomationEventRecorded → FlowRoutes listener chain.
-- [ ] Phase 6 — Config validation / setup validation. Current next phase.
-  - [ ] Phase 6A — Documentation audit and contract normalization.
-    - Make docs authoritative for terminology, config shape, validation ownership, severity, extension seams, and source-of-truth rules.
-    - Protect unrelated module concepts from speculative rewrites.
-    - Internal/runtime identifiers use `contact`, not `lead`; client-facing UI/copy may use configured business nouns.
-  - [ ] Phase 6B — Config normalization.
-    - Normalize current default/client configs against the docs before building validators around inconsistent inputs.
-    - Remove internal `lead` keys/identifiers and other known naming drift.
-    - Align preset groups/definitions, references, tokens/available fields, capabilities, module requirements, and authoring shapes.
-  - [ ] Phase 6C — Schema/model audit.
-    - Compare normalized config/runtime needs against current migrations/models.
-    - Add or replace schema only for proven durable first-class concepts.
-    - Do not use `meta` as a dumping ground for fields that should be first-class.
-    - Do not add persistent validation tables unless a concrete workflow requires retained history.
-  - [ ] Phase 6D — Contributor-based validation/runtime code.
-    - Add a central SetupValidation manager/orchestrator.
+- [ ] Phase 6 — Config validation / setup validation. Current phase; 6A/6B/6C complete, 6D next.
+  - [x] Phase 6A — Documentation audit and contract normalization.
+    - Docs define authoritative terminology, config ownership, validation ownership, severity direction, extension seams, and source-of-truth rules.
+    - Internal/runtime identifiers use `contact`; client-facing UI/copy may use configured business nouns.
+  - [x] Phase 6B — Config normalization.
+    - Normalized preset groups/definitions, Messaging definitions, Webinars config, reference registries, token contexts, and canonical contact terminology.
+    - Removed stale legacy keys and schedule-specific shared message-type drift.
+  - [x] Phase 6C — Schema/model audit.
+    - Completed ContactStatus customization contract.
+    - Completed TaskTemplate defaults/durability and live Task template identity.
+    - Completed FlowRoute capability source of truth.
+    - Completed FlowRoute current-version/revision contract.
+    - Completed live route-instance reconciliation and plan revision history.
+    - Completed Campaign schema/variant/enrollment ownership audit.
+    - Completed Messaging template/authoring identity and stale config-owned preset reconciliation.
+    - Completed Messaging validation seam audit; no additional schema needed for validation.
+    - Completed Webinar schedule-profile customization/default uniqueness contract.
+    - Completed global preset orchestration reconciliation.
+    - Fresh migrations passed.
+    - Global `presets:sync` passed.
+    - Focused sync/durability tests passed.
+    - Adjacent module/runtime boundary tests passed.
+    - Broader end-phase test sweep passed.
+    - No additional schema additions are recommended before Phase 6D.
+  - [ ] Phase 6D — Contributor-based validation/runtime code. Current next step.
+    - Add a central `SetupValidationManager` orchestrator.
     - Add registered module/app validation contributors.
     - Reuse/adapt existing validators such as Messaging `MessageConfigValidator`.
     - Return structured findings with severity, code, message, source, path, module, context, and compact diagnostic meta where useful.
     - Make the same seam reusable by CLI now and future authoring/readiness UI later.
-    - Validate Task presets.
-    - Validate FlowRoute presets.
-    - Validate task template refs.
-    - Validate route point types.
-    - Validate module capability references and module/handler availability.
-    - Validate available field/token references by authoring/runtime context.
-    - Validate vertical references.
-    - Validate Campaign refs and Campaign variant/dependency shape.
-    - Validate Messaging/template refs.
-    - Validate unsupported point/module combinations.
-    - Validate route instance/snapshot assumptions where config affects runtime.
+    - Validate Task presets and TaskTemplate references.
+    - Validate FlowRoute presets, point types, capability references, handler/module availability, route graphs, and route-instance assumptions.
+    - Validate Campaign references, variants, strategies, and dependency rules.
+    - Validate Messaging/template references and available field/token context.
+    - Validate Webinar schedule-profile integrity and conflicting active defaults.
+    - Validate vertical references and unsupported point/module combinations.
     - Treat invalid/impossible/unsafe selected runtime behavior as a hard error.
     - Treat safe-but-dormant/unused/surprising behavior as a warning.
     - Make hard errors fail the command and block staging/client handoff; warnings remain non-blocking and actionable.
     - Validate reference registries for drift without treating stale registries as the sole runtime truth.
-  - [ ] Phase 6E — Tests.
-    - Run fast migration/schema checks first when Phase 6C changes schema.
+    - Do not persist validation findings/history unless a real operator workflow requires it.
+  - [ ] Phase 6E — Validation tests and final handoff coverage.
+    - Run fast migration/schema checks first when applicable.
     - Add focused validator/config tests.
     - Run adjacent module tests.
     - Add broader preset/client fallback coverage.
+
 - [ ] Phase 7 — Permission invitation accepted automation event.
   - Decide whether accepted invitations should emit `permission_invitation.accepted`.
   - Keep Messaging independent from consumers.

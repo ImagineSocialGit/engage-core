@@ -86,9 +86,6 @@ class EnrollContactInCampaignActionTest extends TestCase
             'contact_id' => $contact->id,
             'campaign_id' => $campaign->id,
             'campaign_key' => 'webinar_attended',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
             'status' => CampaignEnrollment::STATUS_ACTIVE,
             'current_step' => 1,
             'current_campaign_step_id' => $step->id,
@@ -117,9 +114,6 @@ class EnrollContactInCampaignActionTest extends TestCase
             'contact_id' => $contact->id,
             'campaign_id' => $campaign->id,
             'campaign_key' => 'webinar_attended',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar',
             'status' => CampaignEnrollment::STATUS_PAUSED,
             'current_step' => 1,
             'current_campaign_step_id' => $step->id,
@@ -594,3 +588,5 @@ class EnrollContactInCampaignActionTest extends TestCase
         parent::tearDown();
     }
 }
+
+

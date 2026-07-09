@@ -1,4 +1,5 @@
 
+
 # Engage Core Module Boundaries
 
 Engage Core is a modular contact engagement platform.
@@ -215,6 +216,13 @@ automation_event:webinar.attended
 
 This intentionally supersedes the older interpretation where matching active FlowRoutes were the selected runtime behavior.
 
+
+FlowRoute logical identity is versioned by stable `key` plus `version`.
+
+`is_current_version` selects the logical revision; `is_active` determines whether that selected revision is enabled.
+
+New starts use the current active revision. Active/waiting instances on older revisions reconcile to a newly current revision by durable FlowRoutePoint key, creating a new route-plan revision and preserving historical plans. Unmappable current/waiting points are hard reconciliation conflicts; runtime must not guess, silently skip, restart, or cancel them.
+
 ### Messaging template presets
 
 Messaging should store reusable synced/editable message copy as DB-owned template presets.
@@ -239,6 +247,50 @@ Use `owner_group` for semantic grouping such as `sales`, `ops`, `compliance`, or
 
 Do not use `responsible_party` for FlowRoute ownership. `responsible_party` is already a Task-owned concept meaning who or what must perform a manual task action.
 
+
+## DB-owned definition sync and customization contract
+
+Config and preset files define reusable package-owned definitions. Sync actions materialize them into DB-owned records. Runtime should execute from DB state and selected DB-owned bindings/assignments rather than reading raw config as the only source of truth.
+
+Current durable sync behavior:
+
+```text
+ContactStatus
+    normal sync preserves customized rows
+    force sync may overwrite and clear customization
+
+TaskTemplate
+    normal sync preserves customized rows
+    force sync may overwrite and clear customization
+
+MessageTemplatePreset
+    normal sync preserves customized rows
+    force sync may overwrite and clear customization
+    stale config-owned non-customized presets are removed
+    customized/manual presets are preserved
+
+WebinarScheduleProfile / WebinarScheduleProfileItem
+    normal sync preserves customized rows
+    force sync may overwrite and clear customization
+    stale non-customized items are deactivated
+    stale customized items are preserved
+
+Campaign / CampaignStep / CampaignStepVariant
+    normal sync preserves customized rows
+    stale non-customized nested steps/variants may be removed
+    no force mode is currently supported
+
+FlowRouteCapability
+    normal sync preserves customized capability rows
+
+FlowRoute / Point / FlowRoutePoint
+    normal sync preserves customized definitions according to route sync semantics
+    explicit FlowRoute force behavior is supported
+```
+
+Do not assume every definition family has identical force semantics.
+
+Do not add force mode merely for symmetry.
 
 ## Migration Organization
 
@@ -333,6 +385,7 @@ Current ownership:
 | inbound_messages | InboundMessaging |
 | campaigns | Campaigns |
 | campaign_steps | Campaigns |
+| campaign_step_variants | Campaigns |
 | campaign_enrollments | Campaigns |
 | broadcasts | Broadcasts |
 | broadcast_recipients | Broadcasts |
@@ -340,6 +393,8 @@ Current ownership:
 | webinars | Webinars |
 | webinar_registrations | Webinars |
 | webinar_waitlist_signups | Webinars |
+| webinar_schedule_profiles | Webinars |
+| webinar_schedule_profile_items | Webinars |
 | mortgage_stages | Mortgage |
 | contact_mortgage_profiles | Mortgage |
 
@@ -1038,7 +1093,7 @@ message_template_preset_assignments
 
 ```text
 channel + purpose + scope + surface + message_type
-channel + purpose + scope + campaign_key + campaign_step
+channel + purpose + scope + campaign_key + campaign_step + campaign_step_variant_key
 channel + purpose + scope + webinar schedule/reminder type
 ```
 
@@ -1982,12 +2037,14 @@ Current tables/models:
 
     campaigns
     campaign_steps
+    campaign_step_variants
     campaign_enrollments
 
 Current models:
 
     Campaign
     CampaignStep
+    CampaignStepVariant
     CampaignEnrollment
 
 Use generic lifecycle fields such as:
@@ -2325,21 +2382,15 @@ Webinars may depend on:
 
 Webinars may use Messaging to send registration confirmations, reminders, opt-ins, and post-webinar transactional follow-ups.
 
-Webinar reminder, confirmation, and post-event schedules may become selectable DB-owned schedule profiles.
+Webinar reminder, confirmation, and post-event timing is selectable through DB-owned schedule profiles and profile items.
 
-Webinars should own when webinar lifecycle messages are scheduled.
+Webinars owns when webinar lifecycle messages are scheduled.
 
-Messaging should own what those messages say through Messaging template presets and assignments.
+Messaging owns what those messages say through Messaging template presets and assignments.
 
-A webinar series or webinar may later select schedule profiles for:
+A webinar series or webinar may select a schedule profile, with webinar selection taking precedence over series selection and active-default fallback.
 
-```text
-registration confirmations
-reminders
-post-event transactional follow-ups
-```
-
-Those profiles should reference Messaging template assignments instead of embedding reusable copy.
+Schedule profile items identify timing/slot identity and must not embed reusable copy.
 
 
 Post-webinar transactional follow-ups are not campaign nurture.
@@ -3031,5 +3082,7 @@ Campaigns invents webinar URL fields without the enrollment caller supplying the
 ```
 
 Treat available-field validation as setup/config-validation work before every editor receives polished autocomplete.
+
+
 
 

@@ -1,5 +1,6 @@
 
 
+
 # Campaigns Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -317,6 +318,37 @@ Current models:
     CampaignStepVariant
     CampaignEnrollment
 
+`CampaignEnrollment` is lifecycle state, not delivery identity.
+
+It should not own first-class:
+
+```text
+channel
+purpose
+scope
+```
+
+Those belong to the delivery/template layers:
+
+```text
+Campaign
+    default/classification context
+
+CampaignStep
+    step-level fallback/summary context
+
+CampaignStepVariant
+    authoritative channel/purpose/scope delivery-template context
+
+ScheduledMessage
+    actual delivery instance
+
+CampaignEnrollment
+    one contact moving through the campaign lifecycle
+```
+
+One campaign step may schedule multiple variants, so CampaignEnrollment should not carry a single current variant pointer merely to describe delivery.
+
 Use generic lifecycle fields such as:
 
     start_context
@@ -529,3 +561,5 @@ source event or route point, when available
 ```
 
 Do not persist summary text unless a concrete reporting/audit reason appears. Prefer deriving it from the canonical step/variant timing definition.
+
+

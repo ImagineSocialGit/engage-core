@@ -27,20 +27,38 @@ class CampaignPresetDefinition
     /**
      * @param array<string, mixed> $data
      */
-    public static function fromArray(array $data): self
+    public static function fromArray(array $data, ?string $definitionKey = null): self
     {
+        $key = self::normalizeSegment(self::requiredString($data['key'] ?? null, 'campaign key'));
+
+        if ($definitionKey !== null && self::normalizeSegment($definitionKey) !== $key) {
+            throw new InvalidArgumentException(
+                'Campaign preset definition ['.$definitionKey.'] key must match its definition key ['.$key.'].'
+            );
+        }
+
         $steps = [];
+        $stepNumbers = [];
 
         foreach (($data['steps'] ?? []) as $step) {
             if (! is_array($step)) {
                 continue;
             }
 
-            $steps[] = CampaignStepPresetDefinition::fromArray($step);
+            $stepDefinition = CampaignStepPresetDefinition::fromArray($step);
+
+            if (in_array($stepDefinition->stepNumber, $stepNumbers, true)) {
+                throw new InvalidArgumentException(
+                    'Campaign preset ['.$key.'] has duplicate step number ['.$stepDefinition->stepNumber.'].'
+                );
+            }
+
+            $stepNumbers[] = $stepDefinition->stepNumber;
+            $steps[] = $stepDefinition;
         }
 
         return new self(
-            key: self::requiredString($data['key'] ?? null, 'campaign key'),
+            key: $key,
             name: self::requiredString($data['name'] ?? null, 'campaign name'),
             description: self::nullableString($data['description'] ?? null),
             channel: self::requiredString($data['channel'] ?? null, 'campaign channel'),
@@ -61,6 +79,11 @@ class CampaignPresetDefinition
         }
 
         return trim($value);
+    }
+
+    private static function normalizeSegment(string $value): string
+    {
+        return str_replace('-', '_', strtolower(trim($value)));
     }
 
     private static function nullableString(mixed $value): ?string

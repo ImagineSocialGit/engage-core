@@ -3,6 +3,7 @@
 namespace Tests\Feature\FlowRoutes;
 
 use App\Modules\Core\Models\ContactStatus;
+use App\Modules\FlowRoutes\Actions\SyncFlowRouteCapabilitiesAction;
 use App\Modules\FlowRoutes\Actions\SyncFlowRoutePresetsAction;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
@@ -26,7 +27,7 @@ class SyncFlowRoutePresetsActionTest extends TestCase
             'name' => 'Missed Webinar',
         ]);
 
-        app(SyncFlowRoutePresetsAction::class)->handle('mortgage');
+        $this->syncMortgageFlowRoutes();
 
         $attendedRoute = FlowRoute::query()
             ->where('key', 'webinar_attended_status_transition')
@@ -71,7 +72,7 @@ class SyncFlowRoutePresetsActionTest extends TestCase
 
     public function test_it_syncs_default_webinar_campaign_enrollment_routes(): void
     {
-        app(SyncFlowRoutePresetsAction::class)->handle('mortgage');
+        $this->syncMortgageFlowRoutes();
 
         $attendedRoute = FlowRoute::query()
             ->where('key', 'webinar_attended_campaign_enrollment')
@@ -113,7 +114,7 @@ class SyncFlowRoutePresetsActionTest extends TestCase
             'name' => 'Missed Webinar',
         ]);
 
-        app(SyncFlowRoutePresetsAction::class)->handle('mortgage');
+        $this->syncMortgageFlowRoutes();
 
         $attendedRoutes = FlowRoute::query()
             ->where('trigger_type', FlowRoute::TRIGGER_AUTOMATION_EVENT)
@@ -163,5 +164,12 @@ class SyncFlowRoutePresetsActionTest extends TestCase
             ->where('flow_route_id', $flowRoute->id)
             ->where('key', $key)
             ->firstOrFail();
+    }
+
+    private function syncMortgageFlowRoutes(): void
+    {
+        app(SyncFlowRouteCapabilitiesAction::class)->handle();
+
+        app(SyncFlowRoutePresetsAction::class)->handle('mortgage');
     }
 }

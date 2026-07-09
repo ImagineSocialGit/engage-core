@@ -446,7 +446,7 @@ class DispatchMessageActionTest extends TestCase
 
         Config::set('messaging.email.marketing.webinar', [
             'first_drip' => [
-                'dispatch_key' => 'marketing_message_sent',
+                'dispatch_key' => 'campaign_step_due',
                 'campaign_key' => 'webinar_attended',
                 'step' => 1,
                 'timing' => 'scheduled',
@@ -463,7 +463,7 @@ class DispatchMessageActionTest extends TestCase
             ],
 
             'second_drip' => [
-                'dispatch_key' => 'marketing_message_sent',
+                'dispatch_key' => 'campaign_step_due',
                 'campaign_key' => 'webinar_attended',
                 'step' => 2,
                 'timing' => 'scheduled',
@@ -485,7 +485,7 @@ class DispatchMessageActionTest extends TestCase
             channel: 'email',
             purpose: 'marketing',
             scope: 'webinar',
-            dispatchKeys: 'marketing_message_sent',
+            dispatchKeys: 'campaign_step_due',
             criteria: [
                 'campaign_key' => 'webinar_attended',
                 'step' => 2,
@@ -508,7 +508,7 @@ class DispatchMessageActionTest extends TestCase
 
         Config::set('messaging.email.marketing.webinar', [
             'first_drip' => [
-                'dispatch_key' => 'marketing_message_sent',
+                'dispatch_key' => 'campaign_step_due',
                 'campaign_key' => 'webinar_attended',
                 'step' => 1,
                 'timing' => 'scheduled',
@@ -530,7 +530,7 @@ class DispatchMessageActionTest extends TestCase
             channel: 'email',
             purpose: 'marketing',
             scope: 'webinar',
-            dispatchKeys: 'marketing_message_sent',
+            dispatchKeys: 'campaign_step_due',
             criteria: [
                 'campaign_key' => 'webinar_attended',
                 'step' => 2,
@@ -547,7 +547,7 @@ class DispatchMessageActionTest extends TestCase
 
         Config::set('messaging.email.marketing.webinar', [
             'first_drip_a' => [
-                'dispatch_key' => 'marketing_message_sent',
+                'dispatch_key' => 'campaign_step_due',
                 'campaign_key' => 'webinar_attended',
                 'step' => 2,
                 'timing' => 'scheduled',
@@ -564,7 +564,7 @@ class DispatchMessageActionTest extends TestCase
             ],
 
             'first_drip_b' => [
-                'dispatch_key' => 'marketing_message_sent',
+                'dispatch_key' => 'campaign_step_due',
                 'campaign_key' => 'webinar_attended',
                 'step' => 2,
                 'timing' => 'scheduled',
@@ -589,7 +589,7 @@ class DispatchMessageActionTest extends TestCase
             channel: 'email',
             purpose: 'marketing',
             scope: 'webinar',
-            dispatchKeys: 'marketing_message_sent',
+            dispatchKeys: 'campaign_step_due',
             criteria: [
                 'campaign_key' => 'webinar_attended',
                 'step' => 2,
@@ -794,5 +794,3 @@ class DispatchMessageActionTest extends TestCase
         parent::tearDown();
     }
 }
-
-

@@ -58,6 +58,17 @@ class CreateTaskFromTemplateAction
                 $template->responsible_id,
             ),
 
+            'flow_route_progress_id' => $data['flow_route_progress_id'] ?? null,
+            'flow_route_plan_id' => $data['flow_route_plan_id'] ?? null,
+            'flow_route_plan_item_id' => $data['flow_route_plan_item_id'] ?? null,
+            'flow_route_progress_item_id' => $data['flow_route_progress_item_id'] ?? null,
+            'flow_route_id' => $data['flow_route_id'] ?? null,
+            'flow_route_point_id' => $data['flow_route_point_id'] ?? null,
+            'flow_route_capability_id' => $data['flow_route_capability_id'] ?? null,
+
+            'task_template_id' => $template->getKey(),
+            'task_template_key' => $template->key,
+
             'source' => $this->value($data, $defaults, 'source', Task::SOURCE_MODULE),
             'title' => $this->value($data, $defaults, 'title', $template->title),
             'description' => $this->value(

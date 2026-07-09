@@ -1,4 +1,3 @@
-
 <?php
 
 use App\Modules\Messaging\Payloads\EmailPayload;
@@ -7,6 +6,7 @@ return [
 
     'alerts' => [
         [
+            'key' => 'alert',
             'dispatch_key' => 'webinar_added',
             'message_type' => 'alert',
             'channel' => 'email',
@@ -36,6 +36,7 @@ return [
 
     'opt_ins' => [
         [
+            'key' => 'opt_in',
             'dispatch_key' => 'consent_granted',
             'message_type' => 'opt_in',
             'channel' => 'email',
@@ -53,3 +54,5 @@ return [
     ],
 
 ];
+
+

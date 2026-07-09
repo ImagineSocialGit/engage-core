@@ -26,9 +26,10 @@ return [
     | Non-campaign top-level keys describe message definition groups. For
     | list-based groups such as confirmations or reminders, the reusable runtime
     | message_type may be singularized, such as confirmation or reminder.
-    | Multiple reminder definitions may therefore share message_type = reminder;
-    | source_config_path and owning module schedule-profile item keys identify
-    | the exact schedule slot.
+    | Multiple reminder definitions may therefore share message_type = reminder.
+    | Every list-based definition must declare a stable explicit key. That key
+    | becomes durable DB-owned template identity; source_config_path remains
+    | provenance/debug location and may change when list ordering changes.
     |
     | Campaign message templates live under:
     |
@@ -79,6 +80,7 @@ return [
 
     'confirmations' => [
         [
+            'key' => 'confirmation',
             'dispatch_key' => 'registration_created',
             'channel' => 'email',
             'purpose' => 'transactional',
@@ -129,6 +131,7 @@ TEXT,
 
     'opt_ins' => [
         [
+            'key' => 'opt_in',
             'dispatch_key' => 'consent_granted',
             'channel' => 'email',
             'purpose' => 'transactional',
@@ -147,6 +150,7 @@ TEXT,
 
     'reminders' => [
         [
+            'key' => 'reminder_1_day',
             'dispatch_key' => 'registration_created',
             'channel' => 'email',
             'purpose' => 'transactional',
@@ -172,6 +176,7 @@ TEXT,
         ],
 
         [
+            'key' => 'reminder_30_minute',
             'dispatch_key' => 'registration_created',
             'channel' => 'email',
             'purpose' => 'transactional',
@@ -200,6 +205,7 @@ TEXT,
 
     'post_attended' => [
         [
+            'key' => 'post_attended',
             'dispatch_key' => 'webinar_ended',
             'channel' => 'email',
             'purpose' => 'transactional',
@@ -229,6 +235,7 @@ TEXT,
 
     'post_missed' => [
         [
+            'key' => 'post_missed',
             'dispatch_key' => 'webinar_ended',
             'channel' => 'email',
             'purpose' => 'transactional',
@@ -335,3 +342,5 @@ TEXT,
     ],
 
 ];
+
+

@@ -1,4 +1,3 @@
-
 <?php
 
 use App\Modules\Messaging\Payloads\SmsPayload;
@@ -7,6 +6,7 @@ return [
 
     'opt_ins' => [
         [
+            'key' => 'opt_in',
             'dispatch_key' => 'consent_granted',
             'message_type' => 'opt_in',
             'channel' => 'sms',
@@ -23,3 +23,5 @@ return [
     ],
 
 ];
+
+

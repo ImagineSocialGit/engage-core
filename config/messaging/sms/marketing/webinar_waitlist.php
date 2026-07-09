@@ -1,4 +1,3 @@
-
 <?php
 
 use App\Modules\Messaging\Payloads\SmsPayload;
@@ -7,6 +6,7 @@ return [
 
     'alerts' => [
         [
+            'key' => 'alert',
             'dispatch_key' => 'webinar_added',
             'message_type' => 'alert',
             'channel' => 'sms',
@@ -31,6 +31,7 @@ return [
 
     'opt_ins' => [
         [
+            'key' => 'opt_in',
             'dispatch_key' => 'consent_granted',
             'message_type' => 'opt_in',
             'channel' => 'sms',
@@ -47,3 +48,5 @@ return [
     ],
 
 ];
+
+
