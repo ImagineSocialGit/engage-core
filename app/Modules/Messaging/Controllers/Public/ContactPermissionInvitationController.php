@@ -62,18 +62,11 @@ class ContactPermissionInvitationController extends Controller
             ]);
         }
 
-        $contact = $invitation->contact;
-
-        if ($contact && in_array('sms', $request->acceptedChannels(), true) && $request->phone()) {
-            $contact->forceFill([
-                'phone' => $request->phone(),
-            ])->save();
-        }
-
         $this->permissionInvitationService->accept(
             invitation: $invitation,
             channels: $request->acceptedChannels(),
             request: $request,
+            phone: $request->phone(),
         );
 
         return redirect()->route('messaging.permission-invitations.show', [

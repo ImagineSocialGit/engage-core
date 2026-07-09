@@ -121,6 +121,24 @@ class ModuleDependenciesSetupValidationContributor implements SetupValidationCon
                 continue;
             }
 
+            $definition = $definitions[$moduleKey] ?? [];
+            $requiresProvider = $definition['requires_provider'] ?? true;
+
+            if (! is_bool($requiresProvider)) {
+                yield $this->error(
+                    code: 'app.modules.requires_provider_invalid',
+                    message: "Module [{$moduleKey}] requires_provider must be boolean when configured.",
+                    path: "modules.modules.{$moduleKey}.requires_provider",
+                    context: ['module_key' => $moduleKey],
+                );
+
+                continue;
+            }
+
+            if (! $requiresProvider) {
+                continue;
+            }
+
             $providers = $this->moduleManager->providers($moduleKey);
 
             if ($providers === []) {
@@ -331,3 +349,4 @@ class ModuleDependenciesSetupValidationContributor implements SetupValidationCon
         );
     }
 }
+

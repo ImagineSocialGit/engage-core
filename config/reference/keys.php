@@ -1,4 +1,3 @@
-
 <?php
 
 return [
@@ -45,7 +44,7 @@ return [
             'description' => 'Promotional, nurture, conversion, re-engagement, or educational messaging.',
             'examples' => [
                 'webinar nurture',
-                'long-term homebuyer nurture',
+                'long-term educational nurture',
                 'waitlist availability updates',
             ],
             'status' => 'active',
@@ -56,7 +55,7 @@ return [
                 'inbound reply notification',
                 'task digest',
             ],
-            'status' => 'active',
+            'status' => 'planned',
         ],
     ],
 
@@ -99,11 +98,6 @@ return [
         'permission_invitation' => [
             'description' => 'Transactional imported-contact permission invitation email flow.',
             'preferred_purposes' => ['transactional'],
-            'status' => 'active',
-        ],
-        'mortgage_homebuyer_nurture' => [
-            'description' => 'Mortgage-specific long-term homebuyer nurture messages.',
-            'preferred_purposes' => ['marketing'],
             'status' => 'active',
         ],
     ],
@@ -303,8 +297,8 @@ return [
         'permission_invitation.accepted' => [
             'producer' => 'messaging',
             'contact_required' => true,
-            'description' => 'Reserved for the Phase 7 decision about whether accepted imported-contact permission invitations emit a neutral automation event.',
-            'status' => 'planned',
+            'description' => 'An imported-contact permission invitation was accepted and Messaging recorded the selected channels/consent scopes.',
+            'status' => 'active',
         ],
     ],
 
@@ -319,12 +313,6 @@ return [
             'description' => 'Default nurture campaign for contacts who missed a webinar.',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
-            'status' => 'active',
-        ],
-        'mortgage_homebuyer_nurture' => [
-            'description' => 'Mortgage-specific long-term homebuyer education/re-engagement nurture.',
-            'purpose' => 'marketing',
-            'scope' => 'mortgage_homebuyer_nurture',
             'status' => 'active',
         ],
     ],
@@ -402,26 +390,6 @@ return [
             'description' => 'Review and respond to a webinar-related inbound reply.',
             'status' => 'active',
         ],
-        'mortgage.call_contact' => [
-            'description' => 'Call the mortgage contact for next-step follow-up.',
-            'status' => 'active',
-        ],
-        'mortgage.contact_documents' => [
-            'description' => 'Track documents or information needed from the mortgage contact.',
-            'status' => 'active',
-        ],
-        'mortgage.review_application' => [
-            'description' => 'Review mortgage application details.',
-            'status' => 'active',
-        ],
-        'mortgage.waiting_on_realtor' => [
-            'description' => 'Track a realtor-owned dependency.',
-            'status' => 'active',
-        ],
-        'mortgage.waiting_on_vendor' => [
-            'description' => 'Track a title, appraisal, inspection, or other vendor dependency.',
-            'status' => 'active',
-        ],
     ],
 
     'future_keys' => [
@@ -450,7 +418,6 @@ return [
             'appointments',
             'applications',
             'documents',
-            'mortgage_nurture',
         ],
     ],
 
@@ -465,8 +432,10 @@ return [
         'example_prefixes' => [
             'slam_dunk.va_buyer_follow_up',
             'slam_dunk.credit_review_requested',
-            'rob_mortgage_coach.bridge_loan_follow_up',
+            'acme.customer_reengagement',
         ],
     ],
 
 ];
+
+

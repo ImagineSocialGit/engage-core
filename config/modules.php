@@ -356,6 +356,7 @@ return [
             ],
             'always_on' => true,
             'depends_on' => [],
+            'requires_provider' => false,
             'providers' => [],
         ],
 
@@ -600,6 +601,7 @@ return [
     ],
 
 ];
+
 
 
 

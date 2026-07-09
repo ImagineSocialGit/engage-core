@@ -150,82 +150,6 @@ return [
             ],
         ],
 
-        'mortgage' => [
-            'modules' => [
-                'enabled' => [
-                    'tasks',
-                    'workflow',
-                    'flow_routes',
-                    'messaging',
-                    'inbound_messaging',
-                    'internal_notifications',
-                    'campaigns',
-                    'broadcasts',
-                    'webinars',
-                    'mortgage',
-                    'integrations',
-                    'reporting',
-                ],
-            ],
-
-            'contacts' => [
-                'labels' => [
-                    'singular' => 'lead',
-                    'plural' => 'leads',
-                ],
-
-                'routes' => [
-                    'plural' => 'leads',
-                ],
-
-                'sources' => [
-                    'webinar' => [
-                        'enabled' => true,
-                    ],
-
-                    'website' => [
-                        'enabled' => true,
-                    ],
-
-                    'realtor' => [
-                        'enabled' => true,
-                    ],
-
-                    'zillow' => [
-                        'enabled' => true,
-                    ],
-
-                    'facebook' => [
-                        'enabled' => true,
-                    ],
-
-                    'google_ads' => [
-                        'enabled' => true,
-                    ],
-
-                    'manual' => [
-                        'enabled' => true,
-                    ],
-                ],
-            ],
-
-            'groups' => [
-                'contact_statuses' => [
-                    'mortgage_default',
-                ],
-                'tasks' => [
-                    'general_default',
-                    'mortgage_default',
-                ],
-                'flow_routes' => [
-                    'mortgage_default',
-                ],
-                'campaigns' => [
-                    'mortgage_default',
-                ],
-            ],
-        ],
-
         'pet_service' => [
             'modules' => [
                 'enabled' => [
@@ -332,3 +256,4 @@ return [
     ],
 
 ];
+

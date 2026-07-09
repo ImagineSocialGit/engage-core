@@ -48,6 +48,7 @@ class MessageConfigValidator
                     $this->validateCampaigns(
                         campaigns: $definition,
                         basePath: "{$scopePath}.campaigns",
+                        channel: $channel,
                         allowedTokens: $allowedTokens,
                     ),
                 );
@@ -102,7 +103,12 @@ class MessageConfigValidator
      * @param array<int, string> $allowedTokens
      * @return array<int, array{level: string, path: string, message: string}>
      */
-    private function validateCampaigns(mixed $campaigns, string $basePath, array $allowedTokens): array
+    private function validateCampaigns(
+        mixed $campaigns,
+        string $basePath,
+        string $channel,
+        array $allowedTokens,
+    ): array
     {
         if (! is_array($campaigns)) {
             return [$this->issue('error', $basePath, 'Campaign message templates must be an array.')];
@@ -150,16 +156,52 @@ class MessageConfigValidator
                     continue;
                 }
 
-                $issues = array_merge(
-                    $issues,
-                    $this->validateDefinition(
-                        definition: $stepDefinition,
-                        path: $stepPath,
-                        channel: null,
-                        allowedTokens: $allowedTokens,
-                        campaignTemplate: true,
-                    ),
-                );
+                $variants = $stepDefinition['variants'] ?? null;
+
+                if (! is_array($variants) || $variants === []) {
+                    $issues[] = $this->issue(
+                        'error',
+                        "{$stepPath}.variants",
+                        'Campaign message step must define at least one message variant.',
+                    );
+
+                    continue;
+                }
+
+                foreach ($variants as $variantIndex => $variantDefinition) {
+                    $variantKey = is_string($variantIndex) && trim($variantIndex) !== ''
+                        ? trim($variantIndex)
+                        : (is_array($variantDefinition) && is_string($variantDefinition['key'] ?? null)
+                            ? trim($variantDefinition['key'])
+                            : (string) $variantIndex);
+
+                    $variantPath = "{$stepPath}.variants.{$variantKey}";
+
+                    if (! is_array($variantDefinition)) {
+                        $issues[] = $this->issue(
+                            'error',
+                            $variantPath,
+                            'Campaign message variant definition must be an array.',
+                        );
+
+                        continue;
+                    }
+
+                    if (($variantDefinition['enabled'] ?? true) === false) {
+                        continue;
+                    }
+
+                    $issues = array_merge(
+                        $issues,
+                        $this->validateDefinition(
+                            definition: $variantDefinition,
+                            path: $variantPath,
+                            channel: $channel,
+                            allowedTokens: $allowedTokens,
+                            campaignTemplate: true,
+                        ),
+                    );
+                }
             }
         }
 
@@ -492,3 +534,4 @@ class MessageConfigValidator
         return is_string($value) && trim($value) !== '';
     }
 }
+

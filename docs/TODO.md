@@ -1,6 +1,3 @@
-
-
-
 # Engage Core TODO
 
 This file is intentionally disposable. Add work here when it is real but not yet ready for an implementation slice. Delete items as they are completed. Do not treat this as an architectural reference; long-lived decisions belong in `module-boundaries.md` or a feature-specific doc.
@@ -234,9 +231,14 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
     - Broader default-preset/client fallback coverage is green.
     - Final docs/handoff reconciliation completed.
 
-- [ ] Phase 7 — Permission invitation accepted automation event.
-  - Decide whether accepted invitations should emit `permission_invitation.accepted`.
-  - Keep Messaging independent from consumers.
+- [x] Phase 7 — Permission invitation accepted automation event.
+  - Accepted invitations emit neutral `permission_invitation.accepted` events.
+  - Acceptance locks/rechecks the invitation row inside a transaction for idempotency.
+  - SMS phone updates, consent creation, and invitation accepted state are committed together.
+  - The event emits only after the acceptance transaction succeeds.
+  - Already accepted invitations do not emit the event again.
+  - Messaging remains independent from downstream consumers.
+  - No schema change was required.
 - [ ] Phase 8 — Permission invitation cancellation / skip / failure bookkeeping.
   - Clarify durable lifecycle visibility across permission invitations, Broadcast bookkeeping, and Messaging scheduled messages.
 - [ ] Phase 9 — Webinar message readiness check.

@@ -86,11 +86,11 @@ class MessageTemplatePresetControllerTest extends TestCase
         $user = User::factory()->create();
 
         $preset = MessageTemplatePreset::factory()->create([
-            'name' => 'Mortgage Homebuyer Nurture — Step 2 Email',
+            'name' => 'Webinar Attended Nurture — Step 2 Email',
             'channel' => 'email',
             'purpose' => 'marketing',
-            'scope' => 'mortgage_homebuyer_nurture',
-            'message_type' => 'mortgage_homebuyer_nurture_step_2',
+            'scope' => 'webinar_nurture',
+            'message_type' => 'webinar_attended_nurture_step_2',
             'payload_class' => EmailPayload::class,
             'queue' => 'marketing',
             'dispatch_keys' => ['campaign_step_due'],
@@ -102,25 +102,25 @@ class MessageTemplatePresetControllerTest extends TestCase
                 'module_key' => 'campaigns',
                 'module_label' => 'Campaigns',
                 'surface' => 'campaigns',
-                'group_key' => 'campaign:mortgage_homebuyer_nurture',
-                'group_label' => 'Mortgage Homebuyer Nurture',
-                'item_key' => 'email.marketing.mortgage_homebuyer_nurture.campaigns.mortgage_homebuyer_nurture.steps.2.variants.email',
+                'group_key' => 'campaign:webinar_attended_nurture',
+                'group_label' => 'Webinar Attended Nurture',
+                'item_key' => 'email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.2.variants.email',
                 'item_label' => 'Step 2 Email',
                 'item_order' => 2,
                 'usage_type' => 'campaign_step',
                 'meta' => [
-                    'campaign_key' => 'mortgage_homebuyer_nurture',
+                    'campaign_key' => 'webinar_attended_nurture',
                     'campaign_step' => 2,
                     'campaign_step_variant_key' => 'email',
                 ],
             ]);
 
         $neighborPreset = MessageTemplatePreset::factory()->create([
-            'name' => 'Mortgage Homebuyer Nurture — Step 3 Email',
+            'name' => 'Webinar Attended Nurture — Step 3 Email',
             'channel' => 'email',
             'purpose' => 'marketing',
-            'scope' => 'mortgage_homebuyer_nurture',
-            'message_type' => 'mortgage_homebuyer_nurture_step_3',
+            'scope' => 'webinar_nurture',
+            'message_type' => 'webinar_attended_nurture_step_3',
             'payload_class' => EmailPayload::class,
             'queue' => 'marketing',
             'dispatch_keys' => ['campaign_step_due'],
@@ -132,14 +132,14 @@ class MessageTemplatePresetControllerTest extends TestCase
                 'module_key' => 'campaigns',
                 'module_label' => 'Campaigns',
                 'surface' => 'campaigns',
-                'group_key' => 'campaign:mortgage_homebuyer_nurture',
-                'group_label' => 'Mortgage Homebuyer Nurture',
-                'item_key' => 'email.marketing.mortgage_homebuyer_nurture.campaigns.mortgage_homebuyer_nurture.steps.3.variants.email',
+                'group_key' => 'campaign:webinar_attended_nurture',
+                'group_label' => 'Webinar Attended Nurture',
+                'item_key' => 'email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.3.variants.email',
                 'item_label' => 'Step 3 Email',
                 'item_order' => 3,
                 'usage_type' => 'campaign_step',
                 'meta' => [
-                    'campaign_key' => 'mortgage_homebuyer_nurture',
+                    'campaign_key' => 'webinar_attended_nurture',
                     'campaign_step' => 3,
                     'campaign_step_variant_key' => 'email',
                 ],
@@ -147,14 +147,14 @@ class MessageTemplatePresetControllerTest extends TestCase
 
         MessageTemplatePresetAssignment::factory()
             ->forPreset($preset)
-            ->forCampaignStepVariant('mortgage_homebuyer_nurture', 2, 'email', 'messaging.email.marketing.mortgage_homebuyer_nurture.campaigns.mortgage_homebuyer_nurture.steps.2.variants.email')
+            ->forCampaignStepVariant('webinar_attended_nurture', 2, 'email', 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.2.variants.email')
             ->create([
                 'meta' => [
                     'source' => 'config_sync',
-                    'source_config_path' => 'messaging.email.marketing.mortgage_homebuyer_nurture.campaigns.mortgage_homebuyer_nurture.steps.2.variants.email',
+                    'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.2.variants.email',
                     'campaign_step_variant_key' => 'email',
                     'catalog' => [
-                        'group_label' => 'Mortgage Homebuyer Nurture',
+                        'group_label' => 'Webinar Attended Nurture',
                         'item_label' => 'Step 2 Email',
                     ],
                 ],
@@ -167,14 +167,14 @@ class MessageTemplatePresetControllerTest extends TestCase
             ->assertOk()
             ->assertSee('Used by')
             ->assertSee('Campaigns')
-            ->assertSee('Mortgage Homebuyer Nurture')
+            ->assertSee('Webinar Attended Nurture')
             ->assertSee('Step 2 Email')
             ->assertSee('Step 3 Email')
             ->assertSee('Messages in this group')
             ->assertSee('Change template selection from the campaign, webinar, or automatic follow-up setup screen.')
             ->assertSee('Manage selection')
             ->assertSee(route('crm.campaigns.message-templates.index', [
-                'campaign' => 'mortgage_homebuyer_nurture',
+                'campaign' => 'webinar_attended_nurture',
                 'step' => 2,
             ]))
             ->assertDontSee('Active template')
@@ -323,4 +323,5 @@ class MessageTemplatePresetControllerTest extends TestCase
             ->assertSessionHasErrors(['payload.subject', 'payload.body']);
     }
 }
+
 

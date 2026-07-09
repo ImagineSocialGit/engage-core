@@ -8,12 +8,6 @@ return [
             'webinar_attended_campaign_enrollment',
             'webinar_missed_campaign_enrollment',
         ],
-        'mortgage_default' => [
-            'webinar_attended_status_transition',
-            'webinar_missed_status_transition',
-            'webinar_attended_campaign_enrollment',
-            'webinar_missed_campaign_enrollment',
-        ],
     ],
     'definitions' => [
         'webinar_attended_status_transition' => [
@@ -206,3 +200,4 @@ return [
         ],
     ],
 ];
+

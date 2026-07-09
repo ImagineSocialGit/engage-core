@@ -1,13 +1,8 @@
-
 <?php
 
 return [
     'groups' => [
         'webinar_default' => [
-            'webinar_attended_nurture',
-            'webinar_missed_nurture',
-        ],
-        'mortgage_default' => [
             'webinar_attended_nurture',
             'webinar_missed_nurture',
         ],
@@ -239,3 +234,4 @@ return [
         ],
     ],
 ];
+

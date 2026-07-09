@@ -146,6 +146,8 @@ class ContactPermissionInvitationControllerTest extends TestCase
                     && ($event->event->meta['source'] ?? null) === 'imported_contact_permission_invitation';
             },
         );
+
+        Event::assertDispatchedTimes(AutomationEventRecorded::class, 1);
     }
 
     public function test_sms_opt_in_is_rejected_when_hidden_for_permission_invitations(): void

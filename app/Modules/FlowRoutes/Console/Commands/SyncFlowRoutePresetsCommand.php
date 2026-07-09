@@ -9,7 +9,7 @@ use Throwable;
 class SyncFlowRoutePresetsCommand extends Command
 {
     protected $signature = 'flow-routes:sync-presets
-        {preset? : Optional preset key, such as mortgage or webinar_funnel}
+        {preset? : Optional preset key, such as webinar_funnel or general_contact_engagement}
         {--force : Overwrite customized FlowRoutes, Points, and FlowRoutePoints}';
 
     protected $description = 'Sync FlowRoute preset definitions into database-owned FlowRoute, Point, and FlowRoutePoint records.';

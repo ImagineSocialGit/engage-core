@@ -13,15 +13,16 @@ use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ContactPermissionInvitationService
 {
+    public const MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION = 'imported_contact_permission_invitation';
+
     public function __construct(
         private readonly MessageChannelAvailability $channelAvailability,
     ) {}
-
-    public const MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION = 'imported_contact_permission_invitation';
 
     /**
      * @param array<string, mixed> $context
@@ -141,66 +142,104 @@ class ContactPermissionInvitationService
         ContactPermissionInvitation $invitation,
         array $channels,
         Request $request,
+        ?string $phone = null,
     ): ContactPermissionInvitation {
-        if ($invitation->hasBeenAccepted()) {
-            return $invitation;
-        }
-
         $channels = $this->normalizedAcceptedChannels($channels);
         $scopes = $this->consentScopes();
-        $contact = $invitation->contact;
 
-        if (! $contact) {
-            return $invitation;
-        }
+        $result = DB::transaction(function () use ($invitation, $channels, $scopes, $request, $phone): array {
+            $lockedInvitation = ContactPermissionInvitation::query()
+                ->with('contact')
+                ->lockForUpdate()
+                ->findOrFail($invitation->getKey());
 
-        foreach ($channels as $channel) {
-            foreach ($scopes as $scope) {
-                MessageConsent::query()->updateOrCreate(
-                    [
-                        'contact_id' => $contact->getKey(),
-                        'channel' => $channel,
-                        'purpose' => MessagePurpose::Marketing->value,
-                        'scope' => $scope,
-                    ],
-                    [
-                        'consented_at' => now(),
-                        'source' => 'imported_contact_permission_invitation',
+            if ($lockedInvitation->hasBeenAccepted()) {
+                return [
+                    'invitation' => $lockedInvitation,
+                    'should_emit' => false,
+                ];
+            }
+
+            $contact = $lockedInvitation->contact;
+
+            if (! $contact) {
+                return [
+                    'invitation' => $lockedInvitation,
+                    'should_emit' => false,
+                ];
+            }
+
+            $normalizedPhone = is_string($phone) && trim($phone) !== ''
+                ? trim($phone)
+                : null;
+
+            if (
+                in_array(MessageChannel::Sms->value, $channels, true)
+                && $normalizedPhone !== null
+            ) {
+                $contact->forceFill([
+                    'phone' => $normalizedPhone,
+                ])->save();
+            }
+
+            $acceptedAt = now();
+
+            foreach ($channels as $channel) {
+                foreach ($scopes as $scope) {
+                    MessageConsent::query()->updateOrCreate(
+                        [
+                            'contact_id' => $contact->getKey(),
+                            'channel' => $channel,
+                            'purpose' => MessagePurpose::Marketing->value,
+                            'scope' => $scope,
+                        ],
+                        [
+                            'consented_at' => $acceptedAt,
+                            'source' => 'imported_contact_permission_invitation',
+                            'ip_address' => $request->ip(),
+                            'user_agent' => $request->userAgent(),
+                            'meta' => [
+                                'permission_invitation_id' => $lockedInvitation->getKey(),
+                                'permission_invitation_source' => $lockedInvitation->source,
+                                'accepted_from' => 'public_form',
+                            ],
+                        ],
+                    );
+                }
+            }
+
+            $lockedInvitation->forceFill([
+                'status' => ContactPermissionInvitation::STATUS_ACCEPTED,
+                'accepted_at' => $acceptedAt,
+                'accepted_channels' => $channels,
+                'meta' => array_replace_recursive($lockedInvitation->meta ?? [], [
+                    'accepted' => [
                         'ip_address' => $request->ip(),
                         'user_agent' => $request->userAgent(),
-                        'meta' => [
-                            'permission_invitation_id' => $invitation->getKey(),
-                            'permission_invitation_source' => $invitation->source,
-                            'accepted_from' => 'public_form',
-                        ],
+                        'channels' => $channels,
+                        'scopes' => $scopes,
                     ],
-                );
-            }
+                ]),
+            ])->save();
+
+            return [
+                'invitation' => $lockedInvitation->refresh(),
+                'should_emit' => true,
+            ];
+        });
+
+        /** @var ContactPermissionInvitation $acceptedInvitation */
+        $acceptedInvitation = $result['invitation'];
+
+        if ($result['should_emit']) {
+            $this->emitAcceptedAutomationEvent(
+                invitation: $acceptedInvitation,
+                channels: $channels,
+                scopes: $scopes,
+            );
         }
 
-        $invitation->forceFill([
-            'status' => ContactPermissionInvitation::STATUS_ACCEPTED,
-            'accepted_at' => now(),
-            'accepted_channels' => $channels,
-            'meta' => array_replace_recursive($invitation->meta ?? [], [
-                'accepted' => [
-                    'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent(),
-                    'channels' => $channels,
-                    'scopes' => $scopes,
-                ],
-            ]),
-        ])->save();
-
-        $invitation = $invitation->refresh();
-
-        $this->emitAcceptedAutomationEvent(
-            invitation: $invitation,
-            channels: $channels,
-            scopes: $scopes,
-        );
-
-        return $invitation;
+        return $acceptedInvitation;
     }
 
     public function findPublicInvitation(string $token): ?ContactPermissionInvitation
@@ -363,7 +402,6 @@ class ContactPermissionInvitationService
 
         return $baseUrl !== '' ? $baseUrl : null;
     }
-
 
     /**
      * @param array<int, string> $channels

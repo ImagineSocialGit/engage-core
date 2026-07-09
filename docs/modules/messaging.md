@@ -1,5 +1,3 @@
-
-
 # Messaging Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -532,6 +530,19 @@ Core may expose the operator entry point on the import batch detail page when Me
 
 Other modules may request this flow through Messaging public services/actions, but they must not create invitation records directly.
 
+
+Accepted imported-contact permission invitations emit the neutral automation event:
+
+```text
+permission_invitation.accepted
+```
+
+The acceptance transaction owns consent creation, invitation accepted state, accepted channels, and any submitted SMS phone update. The invitation row should be locked and accepted state rechecked inside the transaction so concurrent submissions cannot emit duplicate acceptance events.
+
+After the acceptance transaction succeeds, Messaging emits `AutomationEventRecorded` with the invitation as subject and compact accepted-channel/consent-scope context.
+
+Messaging must remain independent from consumers. It must not import FlowRoutes or decide downstream status changes, tasks, campaigns, notifications, or vertical behavior.
+
 ## Available field/token picker support
 
 Messaging owns universal Contact-recipient message fields and the reusable template/runtime validation path.
@@ -642,6 +653,7 @@ available-field/token picker UX
 No persistent validation-result tables are required unless a later operator workflow proves retained history or acknowledgement state is needed.
 
 Fields should be filtered by authoring/runtime context so operators cannot insert a field that will be unavailable when the message sends.
+
 
 
 

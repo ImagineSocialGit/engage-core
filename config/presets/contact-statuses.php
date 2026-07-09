@@ -4,7 +4,6 @@ return [
     'groups' => [
         'general_default' => ['new', 'engaged', 'requires_action', 'inactive'],
         'webinar_default' => ['new', 'registered', 'attended_webinar', 'missed_webinar', 'engaged', 'requires_action', 'inactive'],
-        'mortgage_default' => ['new', 'registered', 'attended_webinar', 'missed_webinar', 'engaged', 'requires_action', 'application_started', 'prospect', 'in_process', 'closed', 'inactive', 'not_interested'],
         'pet_service_default' => ['new', 'engaged', 'requires_action', 'inactive'],
         'musician_fan_default' => ['new', 'engaged', 'requires_action', 'inactive'],
     ],
@@ -94,61 +93,9 @@ return [
             ],
         ],
 
-        'application_started' => [
-            'key' => 'application_started',
-            'name' => 'Application Started',
-            'description' => 'Contact started an application, intake, or similar high-intent process.',
-            'category' => 'mortgage',
-            'sort_order' => 40,
-            'is_active' => true,
-            'source_version' => '2026_07_phase_6c_1',
-            'meta' => [
-                'intent_level' => 'high',
-                'automation_role' => 'sales_or_ops_follow_up',
-            ],
-        ],
 
-        'prospect' => [
-            'key' => 'prospect',
-            'name' => 'Prospect',
-            'description' => 'Contact has moved from webinar follow-up into the application/intake prospect path.',
-            'category' => 'mortgage',
-            'sort_order' => 45,
-            'is_active' => true,
-            'source_version' => '2026_07_phase_6c_1',
-            'meta' => [
-                'intent_level' => 'high',
-                'automation_role' => 'cancel_webinar_nurture_and_create_prospect_task',
-            ],
-        ],
 
-        'in_process' => [
-            'key' => 'in_process',
-            'name' => 'In Process',
-            'description' => 'Contact is actively being worked by the business or team.',
-            'category' => 'mortgage',
-            'sort_order' => 50,
-            'is_active' => true,
-            'source_version' => '2026_07_phase_6c_1',
-            'meta' => [
-                'intent_level' => 'high',
-                'automation_role' => 'active_pipeline',
-            ],
-        ],
 
-        'closed' => [
-            'key' => 'closed',
-            'name' => 'Closed',
-            'description' => 'Contact reached a successful or completed outcome.',
-            'category' => 'mortgage',
-            'sort_order' => 80,
-            'is_active' => true,
-            'source_version' => '2026_07_phase_6c_1',
-            'meta' => [
-                'intent_level' => 'completed',
-                'automation_role' => 'post_close_or_noop',
-            ],
-        ],
 
         'inactive' => [
             'key' => 'inactive',
@@ -164,18 +111,6 @@ return [
             ],
         ],
 
-        'not_interested' => [
-            'key' => 'not_interested',
-            'name' => 'Not Interested',
-            'description' => 'Contact explicitly indicated they are not interested in the opportunity.',
-            'category' => 'mortgage',
-            'sort_order' => 95,
-            'is_active' => true,
-            'source_version' => '2026_07_phase_6c_1',
-            'meta' => [
-                'intent_level' => 'none',
-                'automation_role' => 'stop_sales_follow_up',
-            ],
-        ],
     ],
 ];
+

@@ -9,7 +9,6 @@ use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Services\MessageConfigValidator;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 
 class MessagingSetupValidationContributor implements SetupValidationContributor
@@ -418,18 +417,48 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
         }
 
         $tokens = [];
+        $listTokenKeys = [
+            'approved_aliases',
+            'caller_supplied_aliases',
+            'flow_route_only_tokens',
+        ];
 
-        foreach (Arr::dot($reference) as $value) {
-            if (! is_string($value)) {
-                continue;
+        $collect = function (mixed $value, ?string $parentKey = null) use (&$collect, &$tokens, $listTokenKeys): void {
+            if (is_string($value)) {
+                if (preg_match('/^\{([a-zA-Z_][a-zA-Z0-9_.:-]*)\}$/', trim($value), $matches) === 1) {
+                    $tokens[] = $matches[1];
+
+                    return;
+                }
+
+                if (in_array($parentKey, $listTokenKeys, true) && trim($value) !== '') {
+                    $tokens[] = trim($value);
+                }
+
+                return;
             }
 
-            if (preg_match('/^\{([a-zA-Z_][a-zA-Z0-9_.:-]*)\}$/', trim($value), $matches) !== 1) {
-                continue;
+            if (! is_array($value)) {
+                return;
             }
 
-            $tokens[] = $matches[1];
-        }
+            if ($parentKey === 'aliases' && ! array_is_list($value)) {
+                foreach (array_keys($value) as $alias) {
+                    if (is_string($alias) && trim($alias) !== '') {
+                        $tokens[] = trim($alias);
+                    }
+                }
+            }
+
+            foreach ($value as $key => $nestedValue) {
+                $collect(
+                    value: $nestedValue,
+                    parentKey: is_string($key) ? $key : $parentKey,
+                );
+            }
+        };
+
+        $collect($reference);
 
         return array_values(array_unique($tokens));
     }
@@ -515,3 +544,4 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
         );
     }
 }
+

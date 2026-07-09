@@ -15,7 +15,7 @@ use Throwable;
 class SyncPresetsCommand extends Command
 {
     protected $signature = 'presets:sync
-        {preset? : Optional preset key, such as mortgage or webinar_funnel}
+        {preset? : Optional preset key, such as webinar_funnel or general_contact_engagement}
         {--force-contact-statuses : Overwrite customized contact statuses}
         {--force-flow-routes : Overwrite customized FlowRoutes, Points, and FlowRoutePoints}
         {--force-tasks : Overwrite customized task templates}
@@ -446,5 +446,6 @@ class SyncPresetsCommand extends Command
         }
     }
 }
+
 
 

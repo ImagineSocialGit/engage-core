@@ -1,6 +1,3 @@
-
-
-
 # Engage Core Client-Readiness Roadmap
 
 This roadmap tracks the near-term implementation order for getting Engage Core ready for real client operation without treating the work as a limited or throwaway MVP.
@@ -84,7 +81,7 @@ Completed runway pieces:
 Remaining near-term candidates:
 
 - Config/setup validation across presets, route points, module capabilities, available fields/tokens, and templates.
-- Permission invitation accepted/cancelled/skip/failure behavior.
+- Permission invitation cancellation/skip/failure behavior.
 - Webinar message readiness checks.
 - Manual status-change automation warnings.
 - Automatic Follow-ups / FlowRoutes UX polish later, after the runtime/capability model is settled.
@@ -116,7 +113,7 @@ Current schema-discovery sequence:
 | 4B | FlowRoutes schema hardening | Complete | DB/schema + architecture | Subject-scoped route progress, contact route plans, plan items, progress/execution items, capability catalog/bindings, uniform route-created artifact provenance, blocked/cancelled runtime handling, provenance/debug consistency, and boundary guardrails are in place. |
 | 5 | FlowRoutes event-wait / task-completed resume implementation | Complete | Runtime | Resume from neutral `task.completed` automation events now uses the Phase 4B route progress/plan/progress-item foundation and created Task identity rather than broad contact-only waits. Direct resume and real CompleteTaskAction → TaskCompleted → AutomationEventRecorded → FlowRoutes listener behavior are covered. |
 | 6 | Config validation / setup validation | Complete | Architecture + safety | 6A–6E are complete. Engage Core now has a shared `SetupValidationManager`, structured findings/results, module-owned contributors, app-level dependency and registry-drift contributors, the non-mutating `setup:validate` CLI, focused validation coverage, adjacent regression coverage, and broader client/default-preset fallback coverage. |
-| 7 | Permission invitation accepted automation event | Planned | Architecture | Decide whether accepted invitations emit `permission_invitation.accepted` without Messaging depending on consumers. |
+| 7 | Permission invitation accepted automation event | Complete | Architecture | Accepted invitations emit neutral `permission_invitation.accepted` events after transactional acceptance, with row locking/idempotency and no Messaging dependency on consumers. |
 | 8 | Permission invitation cancellation / skip / failure bookkeeping | Planned | DB/schema + architecture | Clarify durable lifecycle visibility across permission invitations, Broadcast bookkeeping, and Messaging scheduled messages. |
 | 9 | Webinar message readiness check | Planned | Architecture + operator safety | Add computed readiness visibility for webinar message setup without persisting setup state unless a concrete need appears. |
 | 10 | Manual status-change automation warning | Planned | Operator safety | Warn before manual status changes run selected status-based FlowRoutes. Avoid schema unless audit/acknowledgement state is proven necessary. |
@@ -193,7 +190,7 @@ Client-readiness implementation should chase one main item at a time unless two 
 
 The current sequence is the pre-prod schema-discovery sequence above.
 
-Phase 6 config/setup validation is complete. Continue with Phase 7: decide whether accepted permission invitations emit a neutral `permission_invitation.accepted` automation event without making Messaging depend on consumers. Route Management UI, CRM provenance/debug views, and polished Automatic Follow-ups UX remain deferred.
+Phase 7 permission-invitation acceptance automation is complete. Continue with Phase 8: clarify cancellation/skip/failure bookkeeping across permission invitations, Broadcast bookkeeping, and Messaging scheduled messages. Route Management UI, CRM provenance/debug views, and polished Automatic Follow-ups UX remain deferred.
 
 Do not run parallel threads that modify the same controllers, views, routes, services, migrations, or tests unless one thread is paused and rebased onto the other.
 
@@ -210,7 +207,7 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | 4B | FlowRoutes schema hardening | Complete | FlowRoutes now has subject-capable progress, route instance plans, plan items, progress/execution items, capability/binding schema, uniform provenance, blocked/cancelled handling, and backend guardrails. Polished Route Management UX remains deferred. |
 | 5 | FlowRoutes event-wait / task-completed resume implementation | Complete | Resume from neutral `task.completed` automation events now uses the Phase 4B route progress/plan/progress-item foundation and created Task identity rather than broad contact-only waits. Direct resume and real CompleteTaskAction → TaskCompleted → AutomationEventRecorded → FlowRoutes listener behavior are covered. |
 | 6 | Config validation / setup validation | Complete | Shared contributor-based validation is implemented across Core, Tasks, Messaging, Webinars, Campaigns, FlowRoutes, module dependencies, and reference-registry drift. `setup:validate` fails on errors, succeeds on warnings-only/clean results, and does not mutate state. Focused and broader regression coverage are green. |
-| 7 | Permission invitation accepted automation event decision | 0.25–0.5 session | Decide whether accepted invitations should emit a neutral automation event such as `permission_invitation.accepted`. |
+| 7 | Permission invitation accepted automation event | Complete | Accepted invitations emit one neutral `permission_invitation.accepted` event after transactional acceptance. The invitation row is locked/rechecked for idempotency, submitted SMS phone updates occur inside the same transaction, and Messaging remains independent from consumers. |
 | 8 | Permission invitation cancellation behavior | 0.5–1 session | Clarify how cancellation/skip/failure should appear for permission-invitation Broadcast bookkeeping and Messaging scheduled messages. |
 | 9 | Webinar message readiness check | 0.5–1 session | Computed readiness summary for Webinars message setup. Do not persist readiness/acknowledgement state unless the implementation proves a durable concept is missing. |
 | 10 | Manual status-change automation warning | 0.5–1 session | Warn operators before a manual status change runs a selected status FlowRoute. This is a UI awareness guardrail, not a ContactStatus schema split. |
@@ -480,9 +477,29 @@ broader client/default-preset fallback coverage
 
 The intentionally deferred available-field/token picker remains future authoring UX work. Current setup validation validates the reference/token contexts that already have executable sources of truth; it does not invent a universal field-provider architecture before a real consumer requires it.
 
+## Phase 7 permission invitation accepted automation event completion
+
+Phase 7 is complete.
+
+Durable behavior:
+
+```text
+Contact accepts imported-contact permission invitation
+→ Messaging locks/rechecks the invitation inside a transaction
+→ optional submitted SMS phone update is saved in the same transaction
+→ configured MessageConsent rows are created/updated
+→ invitation is marked accepted
+→ transaction succeeds
+→ Messaging emits permission_invitation.accepted once
+```
+
+The event is contact-scoped, uses `ContactPermissionInvitation` as subject, includes accepted channels and consent scopes, and keeps Messaging independent from downstream consumers.
+
+No schema change was required.
+
 ## Recommended next implementation target
 
-Proceed to Phase 7: decide whether accepted permission invitations should emit a neutral `permission_invitation.accepted` automation event while keeping Messaging independent from downstream consumers.
+Proceed to Phase 8: permission invitation cancellation / skip / failure bookkeeping. Clarify durable lifecycle visibility across permission invitations, Broadcast bookkeeping, and Messaging scheduled messages.
 
 ## What this roadmap intentionally avoids
 
@@ -556,6 +573,7 @@ Routes
     Use Route Management / Routes in client-facing navigation.
     Use contextual hints to explain automatic actions in plain language.
 ```
+
 
 
 

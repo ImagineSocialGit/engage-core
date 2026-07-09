@@ -9,7 +9,7 @@ use Throwable;
 class SyncContactStatusPresetsCommand extends Command
 {
     protected $signature = 'contact-statuses:sync-presets
-        {preset? : Optional preset key, such as mortgage or webinar_funnel}
+        {preset? : Optional preset key, such as webinar_funnel or general_contact_engagement}
         {--force : Overwrite customized ContactStatus records with preset definitions}';
 
     protected $description = 'Sync contact status preset definitions into database-owned ContactStatus records.';

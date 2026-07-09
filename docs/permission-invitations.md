@@ -70,6 +70,7 @@ Broadcasts must not own:
 13. The public preference page lets the contact choose email, SMS, or both, depending on channel availability config.
 14. Messaging creates `MessageConsent` rows for the configured scopes.
 15. Messaging marks the invitation accepted and stores accepted channels.
+16. After the acceptance transaction succeeds, Messaging emits the neutral `permission_invitation.accepted` automation event exactly once for that invitation.
 
 ## Import batch invitation visibility
 
@@ -226,6 +227,46 @@ If `{cta}` is not present and the CTA exists, the default email view renders the
 
 Do not hand-author public preference URLs in client copy.
 
+
+## Accepted automation event
+
+Accepted permission invitations emit the neutral automation event:
+
+```text
+permission_invitation.accepted
+```
+
+Messaging remains independent from downstream consumers.
+
+The acceptance path should:
+
+```text
+lock the invitation row
+recheck accepted state inside the transaction
+update the SMS phone number, when selected/provided
+create/update configured MessageConsent rows
+mark the invitation accepted
+commit
+emit permission_invitation.accepted after the transaction succeeds
+```
+
+The event is contact-scoped and uses `ContactPermissionInvitation` as its subject.
+
+Payload includes compact invitation context such as:
+
+```text
+accepted_channels
+consent_scopes
+accepted_at
+invitation source/status/channel
+context_type / context_id
+scheduled_message_id
+```
+
+The event must not be emitted again when an already accepted invitation is submitted again.
+
+Downstream behavior belongs to consumers such as FlowRoutes through the generic `AutomationEventRecorded` seam. Messaging must not import FlowRoutes, Campaigns, Tasks, Workflow, or vertical modules to react to acceptance.
+
 ## Testing expectations
 
 Coverage should prove:
@@ -237,6 +278,8 @@ Coverage should prove:
 - email+SMS acceptance creates both sets of consent records
 - accepted invitations show the accepted state
 - already accepted invitations do not create duplicate consent rows
+- first acceptance emits exactly one `permission_invitation.accepted` automation event
+- already accepted invitations do not emit the acceptance event again
 - scheduled-send job injects the public preference URL before sending
 - SMS does not receive the email-only bypass
 - normal Broadcasts do not receive the imported-contact bypass
@@ -246,3 +289,4 @@ Coverage should prove:
 - contacts with required marketing email consent are skipped
 - contacts without email addresses are skipped
 - contacts with `contact_import_batch_id` count as imported for final Messaging send-time enforcement
+

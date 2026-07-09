@@ -27,7 +27,7 @@ class SyncFlowRoutePresetsActionTest extends TestCase
             'name' => 'Missed Webinar',
         ]);
 
-        $this->syncMortgageFlowRoutes();
+        $this->syncWebinarFlowRoutes();
 
         $attendedRoute = FlowRoute::query()
             ->where('key', 'webinar_attended_status_transition')
@@ -72,7 +72,7 @@ class SyncFlowRoutePresetsActionTest extends TestCase
 
     public function test_it_syncs_default_webinar_campaign_enrollment_routes(): void
     {
-        $this->syncMortgageFlowRoutes();
+        $this->syncWebinarFlowRoutes();
 
         $attendedRoute = FlowRoute::query()
             ->where('key', 'webinar_attended_campaign_enrollment')
@@ -114,7 +114,7 @@ class SyncFlowRoutePresetsActionTest extends TestCase
             'name' => 'Missed Webinar',
         ]);
 
-        $this->syncMortgageFlowRoutes();
+        $this->syncWebinarFlowRoutes();
 
         $attendedRoutes = FlowRoute::query()
             ->where('trigger_type', FlowRoute::TRIGGER_AUTOMATION_EVENT)
@@ -166,10 +166,10 @@ class SyncFlowRoutePresetsActionTest extends TestCase
             ->firstOrFail();
     }
 
-    private function syncMortgageFlowRoutes(): void
+    private function syncWebinarFlowRoutes(): void
     {
         app(SyncFlowRouteCapabilitiesAction::class)->handle();
 
-        app(SyncFlowRoutePresetsAction::class)->handle('mortgage');
+        app(SyncFlowRoutePresetsAction::class)->handle('webinar_funnel');
     }
 }

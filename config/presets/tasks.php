@@ -1,4 +1,3 @@
-
 <?php
 
 use App\Modules\Tasks\Models\Task;
@@ -25,13 +24,6 @@ return [
             'webinar.review_reply',
         ],
 
-        'mortgage_default' => [
-            'mortgage.call_contact',
-            'mortgage.contact_documents',
-            'mortgage.review_application',
-            'mortgage.waiting_on_realtor',
-            'mortgage.waiting_on_vendor',
-        ],
     ],
 
     'definitions' => [
@@ -157,78 +149,11 @@ return [
             'category' => 'webinar',
         ],
 
-        'mortgage.call_contact' => [
-            'name' => 'Call contact',
-            'title' => 'Call contact',
-            'description' => 'Call the contact for next-step follow-up.',
-            'task_description' => null,
-            'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
-            'assigned_to_strategy' => TaskTemplate::ASSIGNED_TO_STRATEGY_UNASSIGNED,
-            'priority' => null,
-            'due_offset_minutes' => 1440,
-            'source_version' => '2026_07_phase_3',
-            'owner_group' => 'mortgage',
-            'category' => 'mortgage',
-        ],
 
-        'mortgage.contact_documents' => [
-            'name' => 'Contact documents',
-            'title' => 'Contact needs to provide documents',
-            'description' => 'Track documents or information needed from the contact.',
-            'task_description' => null,
-            'responsible_party' => Task::RESPONSIBLE_PARTY_CONTACT,
-            'assigned_to_strategy' => TaskTemplate::ASSIGNED_TO_STRATEGY_UNASSIGNED,
-            'priority' => 'high',
-            'due_offset_minutes' => 2880,
-            'source_version' => '2026_07_phase_3',
-            'owner_group' => 'mortgage',
-            'category' => 'mortgage',
-            'related_subject' => [
-                'default' => 'current_contact',
-            ],
-        ],
 
-        'mortgage.review_application' => [
-            'name' => 'Review application',
-            'title' => 'Review contact application',
-            'description' => 'Review contact application details.',
-            'task_description' => null,
-            'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
-            'assigned_to_strategy' => TaskTemplate::ASSIGNED_TO_STRATEGY_UNASSIGNED,
-            'priority' => null,
-            'due_offset_minutes' => 1440,
-            'source_version' => '2026_07_phase_3',
-            'owner_group' => 'mortgage',
-            'category' => 'mortgage',
-        ],
 
-        'mortgage.waiting_on_realtor' => [
-            'name' => 'Waiting on realtor',
-            'title' => 'Realtor needs to provide information',
-            'description' => 'Track a realtor-owned dependency.',
-            'task_description' => null,
-            'responsible_party' => Task::RESPONSIBLE_PARTY_THIRD_PARTY,
-            'assigned_to_strategy' => TaskTemplate::ASSIGNED_TO_STRATEGY_UNASSIGNED,
-            'priority' => null,
-            'due_offset_minutes' => 4320,
-            'source_version' => '2026_07_phase_3',
-            'owner_group' => 'mortgage',
-            'category' => 'mortgage',
-        ],
 
-        'mortgage.waiting_on_vendor' => [
-            'name' => 'Waiting on vendor',
-            'title' => 'Vendor needs to complete item',
-            'description' => 'Track a title, appraisal, inspection, or other vendor dependency.',
-            'task_description' => null,
-            'responsible_party' => Task::RESPONSIBLE_PARTY_THIRD_PARTY,
-            'assigned_to_strategy' => TaskTemplate::ASSIGNED_TO_STRATEGY_UNASSIGNED,
-            'priority' => null,
-            'due_offset_minutes' => 4320,
-            'source_version' => '2026_07_phase_3',
-            'owner_group' => 'mortgage',
-            'category' => 'mortgage',
-        ],
     ],
 
 ];
+

@@ -8,7 +8,7 @@ use Throwable;
 
 class SyncCampaignPresetsCommand extends Command
 {
-    protected $signature = 'campaigns:sync-presets {preset? : Optional preset key, such as mortgage or webinar_funnel}';
+    protected $signature = 'campaigns:sync-presets {preset? : Optional preset key, such as webinar_funnel or general_contact_engagement}';
 
     protected $description = 'Sync campaign preset definitions into database-owned Campaign, CampaignStep, and CampaignStepVariant records. Customized records are preserved; no force mode is supported.';
 
@@ -49,3 +49,4 @@ class SyncCampaignPresetsCommand extends Command
         return self::SUCCESS;
     }
 }
+

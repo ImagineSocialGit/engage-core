@@ -93,6 +93,43 @@ class ModuleDependenciesSetupValidationContributorTest extends TestCase
         );
     }
 
+
+    public function test_providerless_available_module_does_not_report_missing_provider_when_explicitly_allowed(): void
+    {
+        Config::set('modules.enabled', []);
+        Config::set('modules.modules', [
+            'dashboard' => [
+                'always_on' => true,
+                'depends_on' => [],
+                'requires_provider' => false,
+                'providers' => [],
+            ],
+        ]);
+
+        $this->assertNotContains(
+            'app.modules.provider_missing',
+            array_column($this->findings(), 'code'),
+        );
+    }
+
+    public function test_it_reports_invalid_requires_provider_flag(): void
+    {
+        Config::set('modules.enabled', []);
+        Config::set('modules.modules', [
+            'dashboard' => [
+                'always_on' => true,
+                'depends_on' => [],
+                'requires_provider' => 'no',
+                'providers' => [],
+            ],
+        ]);
+
+        $this->assertContains(
+            'app.modules.requires_provider_invalid',
+            array_column($this->findings(), 'code'),
+        );
+    }
+
     public function test_it_reports_missing_provider_class_for_available_module(): void
     {
         Config::set('modules.enabled', ['tasks']);
@@ -130,5 +167,6 @@ class ModuleDependenciesSetupValidationContributorTest extends TestCase
         );
     }
 }
+
 
 

@@ -24,7 +24,7 @@ class FlowRoutesModelSchemaTest extends TestCase
         ]);
 
         $activeRoute = FlowRoute::query()->create([
-            'key' => 'mortgage.new_lead',
+            'key' => 'general.new_lead',
             'contact_status_id' => $contactStatus->id,
             'name' => 'New Lead Route',
             'description' => 'Route for new leads.',
@@ -40,7 +40,7 @@ class FlowRoutesModelSchemaTest extends TestCase
         ]);
 
         FlowRoute::query()->create([
-            'key' => 'mortgage.new_lead',
+            'key' => 'general.new_lead',
             'contact_status_id' => $contactStatus->id,
             'name' => 'New Lead Route v2',
             'description' => 'Inactive second version.',
@@ -57,14 +57,14 @@ class FlowRoutesModelSchemaTest extends TestCase
         $this->assertTrue($activeRoute->is_active);
         $this->assertFalse($activeRoute->is_customized);
         $this->assertSame(['source' => 'preset'], $activeRoute->meta);
-        $this->assertSame('mortgage.new_lead', $activeRoute->key);
+        $this->assertSame('general.new_lead', $activeRoute->key);
         $this->assertSame(FlowRoute::TRIGGER_CONTACT_STATUS, $activeRoute->trigger_type);
         $this->assertSame($contactStatus->key, $activeRoute->trigger_key);
         $this->assertTrue($activeRoute->contactStatus->is($contactStatus));
 
         $this->assertSame(1, FlowRoute::query()->active()->count());
         $this->assertSame(1, FlowRoute::query()->inactive()->count());
-        $this->assertSame(2, FlowRoute::query()->forKey('mortgage.new_lead')->count());
+        $this->assertSame(2, FlowRoute::query()->forKey('general.new_lead')->count());
         $this->assertSame(1, FlowRoute::query()->forTrigger(FlowRoute::TRIGGER_CONTACT_STATUS, $contactStatus->key)->active()->count());
         $this->assertSame(1, FlowRoute::query()->forContactStatus($contactStatus)->active()->count());
         $this->assertSame(1, FlowRoute::query()->customized()->count());
