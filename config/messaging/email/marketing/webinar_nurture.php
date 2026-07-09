@@ -58,33 +58,7 @@ return [
                             'queue' => 'marketing',
                             'payload' => [
                                 'subject' => 'Still interested?',
-                                'body' => 'Hi {first_name}, even if now is not the right time, we’ll keep sending helpful follow-up information so you can stay prepared.',
-                            ],
-                        ],
-                    ],
-                ],
-                4 => [
-                    'variants' => [
-                        'email' => [
-                            'dispatch_key' => 'campaign_step_due',
-                            'payload_class' => EmailPayload::class,
-                            'queue' => 'marketing',
-                            'payload' => [
-                                'subject' => 'A quick follow-up from the webinar',
-                                'body' => 'Hi {first_name}, checking in with one more useful reminder from the webinar. Reply with any question and we’ll help.',
-                            ],
-                        ],
-                    ],
-                ],
-                5 => [
-                    'variants' => [
-                        'email' => [
-                            'dispatch_key' => 'campaign_step_due',
-                            'payload_class' => EmailPayload::class,
-                            'queue' => 'marketing',
-                            'payload' => [
-                                'subject' => 'Last webinar follow-up for now',
-                                'body' => 'Hi {first_name}, this is the last follow-up in this short webinar sequence. Reply any time when you’re ready for help with the next step.',
+                                'body' => 'Hi {first_name}, thanks again for joining the webinar. This is the last message in this short follow-up sequence. Reply any time if you have a question or want help with the next step.',
                             ],
                         ],
                     ],
@@ -127,7 +101,7 @@ return [
                             'queue' => 'marketing',
                             'payload' => [
                                 'subject' => 'Still interested?',
-                                'body' => 'Hi {first_name}, even if now is not the right time, we’ll keep sending helpful follow-up information so you can stay prepared.',
+                                'body' => 'Hi {first_name}, sorry we missed you at the webinar. This is the last message in this short follow-up sequence. Reply any time if you have a question or want help finding the next useful step.',
                             ],
                         ],
                     ],
@@ -136,5 +110,3 @@ return [
         ],
     ],
 ];
-
-

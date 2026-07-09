@@ -176,6 +176,200 @@ class CampaignsSetupValidationContributor implements SetupValidationContributor
                 );
             }
         }
+
+        yield from $this->validateSelectedCampaignMessagingTemplateOrphans(
+            selectedCampaignKeys: array_keys($selectedCampaignKeys),
+            allDefinitions: $allDefinitions,
+        );
+    }
+
+    /**
+     * @param array<int, string> $selectedCampaignKeys
+     * @param array<string, mixed> $allDefinitions
+     * @return iterable<int, SetupValidationFinding>
+     */
+    private function validateSelectedCampaignMessagingTemplateOrphans(
+        array $selectedCampaignKeys,
+        array $allDefinitions,
+    ): iterable {
+        foreach ($selectedCampaignKeys as $campaignKey) {
+            $definition = $allDefinitions[$campaignKey] ?? null;
+
+            if (! is_array($definition)) {
+                continue;
+            }
+
+            $expectedIdentities = $this->selectedCampaignMessagingTemplateIdentities(
+                campaignKey: $campaignKey,
+                definition: $definition,
+            );
+
+            foreach (['email', 'sms'] as $channel) {
+                foreach (['transactional', 'marketing', 'internal'] as $purpose) {
+                    $purposeConfig = config("messaging.{$channel}.{$purpose}", []);
+
+                    if (! is_array($purposeConfig)) {
+                        continue;
+                    }
+
+                    foreach ($purposeConfig as $scope => $scopeConfig) {
+                        if (! $this->filledString($scope) || ! is_array($scopeConfig)) {
+                            continue;
+                        }
+
+                        $messagingCampaign = data_get($scopeConfig, "campaigns.{$campaignKey}");
+
+                        if (! is_array($messagingCampaign)) {
+                            continue;
+                        }
+
+                        $steps = $messagingCampaign['steps'] ?? null;
+
+                        if (! is_array($steps)) {
+                            continue;
+                        }
+
+                        foreach ($steps as $stepNumber => $stepDefinition) {
+                            $stepNumber = filter_var($stepNumber, FILTER_VALIDATE_INT);
+
+                            if (! is_int($stepNumber) || $stepNumber < 1 || ! is_array($stepDefinition)) {
+                                continue;
+                            }
+
+                            if (! ($stepDefinition['enabled'] ?? true)) {
+                                continue;
+                            }
+
+                            $variants = $stepDefinition['variants'] ?? null;
+
+                            if (! is_array($variants)) {
+                                continue;
+                            }
+
+                            foreach ($variants as $variantKey => $variantDefinition) {
+                                if (! $this->filledString($variantKey)
+                                    || ! is_array($variantDefinition)
+                                    || ! ($variantDefinition['enabled'] ?? true)
+                                ) {
+                                    continue;
+                                }
+
+                                $variantKey = $this->normalizeSegment($variantKey);
+                                $normalizedScope = $this->normalizeSegment($scope);
+                                $identity = $this->campaignMessagingTemplateIdentity(
+                                    channel: $channel,
+                                    purpose: $purpose,
+                                    scope: $normalizedScope,
+                                    campaignKey: $campaignKey,
+                                    stepNumber: $stepNumber,
+                                    variantKey: $variantKey,
+                                );
+
+                                if (isset($expectedIdentities[$identity])) {
+                                    continue;
+                                }
+
+                                yield $this->warning(
+                                    code: 'campaigns.messaging_template_orphaned_from_selected_campaign',
+                                    message: "Messaging campaign template [{$campaignKey}:{$stepNumber}:{$variantKey}] has no matching step variant in the selected Campaign definition.",
+                                    path: "messaging.{$channel}.{$purpose}.{$normalizedScope}.campaigns.{$campaignKey}.steps.{$stepNumber}.variants.{$variantKey}",
+                                    context: [
+                                        'campaign_key' => $campaignKey,
+                                        'step_number' => $stepNumber,
+                                        'variant_key' => $variantKey,
+                                        'channel' => $channel,
+                                        'purpose' => $purpose,
+                                        'scope' => $normalizedScope,
+                                    ],
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     * @return array<string, true>
+     */
+    private function selectedCampaignMessagingTemplateIdentities(
+        string $campaignKey,
+        array $definition,
+    ): array {
+        $identities = [];
+        $steps = $definition['steps'] ?? null;
+
+        if (! is_array($steps)) {
+            return $identities;
+        }
+
+        foreach ($steps as $step) {
+            if (! is_array($step)) {
+                continue;
+            }
+
+            $stepNumber = filter_var($step['step_number'] ?? null, FILTER_VALIDATE_INT);
+
+            if (! is_int($stepNumber) || $stepNumber < 1) {
+                continue;
+            }
+
+            $variants = $step['variants'] ?? null;
+
+            if (! is_array($variants)) {
+                continue;
+            }
+
+            foreach ($variants as $variant) {
+                if (! is_array($variant) || ! $this->filledString($variant['key'] ?? null)) {
+                    continue;
+                }
+
+                $channel = $variant['channel'] ?? $step['channel'] ?? $definition['channel'] ?? null;
+                $purpose = $variant['purpose'] ?? $step['purpose'] ?? $definition['purpose'] ?? null;
+                $scope = $variant['scope'] ?? $step['scope'] ?? $definition['scope'] ?? null;
+
+                if (! $this->filledString($channel)
+                    || ! $this->filledString($purpose)
+                    || ! $this->filledString($scope)
+                ) {
+                    continue;
+                }
+
+                $identity = $this->campaignMessagingTemplateIdentity(
+                    channel: $channel,
+                    purpose: $purpose,
+                    scope: $scope,
+                    campaignKey: $campaignKey,
+                    stepNumber: $stepNumber,
+                    variantKey: $variant['key'],
+                );
+
+                $identities[$identity] = true;
+            }
+        }
+
+        return $identities;
+    }
+
+    private function campaignMessagingTemplateIdentity(
+        string $channel,
+        string $purpose,
+        string $scope,
+        string $campaignKey,
+        int $stepNumber,
+        string $variantKey,
+    ): string {
+        return implode('|', [
+            $this->normalizeSegment($channel),
+            $this->normalizeSegment($purpose),
+            $this->normalizeSegment($scope),
+            $this->normalizeSegment($campaignKey),
+            $stepNumber,
+            $this->normalizeSegment($variantKey),
+        ]);
     }
 
     /**

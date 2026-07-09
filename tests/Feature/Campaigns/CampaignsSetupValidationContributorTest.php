@@ -72,6 +72,81 @@ class CampaignsSetupValidationContributorTest extends TestCase
         $this->assertSame([], $this->findings());
     }
 
+    public function test_it_warns_when_selected_campaign_has_orphaned_messaging_template_variant(): void
+    {
+        $this->setPresetPackage(['general_default']);
+
+        Config::set('presets.campaigns.groups.general_default', [
+            'test_campaign',
+        ]);
+
+        Config::set('presets.campaigns.definitions.test_campaign', [
+            'key' => 'test_campaign',
+            'name' => 'Test Campaign',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar_nurture',
+            'status' => 'active',
+            'is_active' => true,
+            'steps' => [
+                [
+                    'step_number' => 1,
+                    'name' => 'Initial follow-up',
+                    'variant_strategy' => 'first_available',
+                    'variants' => [
+                        [
+                            'key' => 'email',
+                            'dispatch_key' => 'campaign_step_due',
+                            'channel' => 'email',
+                            'purpose' => 'marketing',
+                            'scope' => 'webinar_nurture',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        Config::set('messaging.email.marketing.webinar_nurture.campaigns.test_campaign.steps', [
+            1 => [
+                'variants' => [
+                    'email' => [
+                        'dispatch_key' => 'campaign_step_due',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'marketing',
+                        'payload' => [
+                            'subject' => 'Step 1',
+                            'body' => 'Expected template',
+                        ],
+                    ],
+                ],
+            ],
+            2 => [
+                'variants' => [
+                    'email' => [
+                        'dispatch_key' => 'campaign_step_due',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'marketing',
+                        'payload' => [
+                            'subject' => 'Step 2',
+                            'body' => 'Orphaned template',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $warnings = array_values(array_filter(
+            $this->findings(),
+            fn (array $finding): bool => $finding['code'] === 'campaigns.messaging_template_orphaned_from_selected_campaign',
+        ));
+
+        $this->assertCount(1, $warnings);
+        $this->assertSame(SetupValidationFinding::SEVERITY_WARNING, $warnings[0]['severity']);
+        $this->assertSame('test_campaign', data_get($warnings[0], 'context.campaign_key'));
+        $this->assertSame(2, data_get($warnings[0], 'context.step_number'));
+        $this->assertSame('email', data_get($warnings[0], 'context.variant_key'));
+    }
+
     public function test_it_reports_missing_group_and_missing_definition(): void
     {
         $this->setPresetPackage([
