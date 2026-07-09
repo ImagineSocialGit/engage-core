@@ -176,13 +176,15 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Confirmed future modules should use the same provenance pattern when FlowRoutes creates Scheduling appointments, Document requests, Form requests/submissions, Portal invitations/access grants, Commerce records, or vertical-owned artifacts.
   - Kept module-owned business behavior behind public actions/services/contracts.
   - Deferred polished Route Management UX, CRM provenance/debug views, and Automatic Follow-ups UX polish.
-- [ ] Phase 5 — FlowRoutes event-wait / task-completed resume implementation.
-  - Implement after Phase 4B schema hardening because resume behavior must target route progress/plan/progress items.
-  - Resume from neutral `task.completed` `AutomationEventRecorded` events.
-  - Do not add Task-specific FlowRoutes listeners.
+- [x] Phase 5 — FlowRoutes event-wait / task-completed resume implementation.
+  - Resumes from neutral `task.completed` `AutomationEventRecorded` events.
+  - Keeps Tasks independent from FlowRoutes.
   - FlowRoutes listens to generic `AutomationEventRecorded` and resumes matching event_wait/progress/plan/progress items internally.
-  - Do not rely on contact-only fallback for task-completed waits; require task/progress/plan/progress-item correlation.
-- [ ] Phase 6 — Config validation / setup validation.
+  - Does not rely on contact-only fallback for task-completed waits.
+  - Supports unambiguous route-created Task artifact matching.
+  - Supports explicit event_wait correlation for routes that may create multiple tasks.
+  - Covers the real CompleteTaskAction → TaskCompleted → AutomationEventRecorded → FlowRoutes listener chain.
+- [ ] Phase 6 — Config validation / setup validation. Current next phase.
   - Validate Task presets.
   - Validate FlowRoute presets.
   - Validate task template refs.
@@ -318,7 +320,7 @@ These notes are intentionally retained while the schema-discovery phases continu
 
 ### Route Management / Routes language
 
-- [ ] During Phase 4, decide public/client-facing FlowRoutes terminology.
+- [ ] “During Route Management UX polish, apply the established Routes / Route Management terminology and use FlowRouteCapability metadata for labels, hints, and consequence previews.”
   - Candidate navigation label: `Route Management`.
   - Candidate plain-language hint: `Choose what automatic actions happen after important contact activity.`
   - Keep `FlowRoutes` in developer/module docs where precision matters.

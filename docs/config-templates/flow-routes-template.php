@@ -124,10 +124,15 @@ return [
             ],
         ],
 
-        // Example only. Do not activate this preset until Phase 5 implements
-        // task.completed event_wait resume with specific route progress, plan item,
-        // progress item, created Task identity, template identity, and subject-context
-        // correlation. Broad contact-only task.completed waits are unsafe.
+        // Example only. task.completed event_wait resume is supported, but broad
+        // contact-only task completion waits remain unsafe.
+        //
+        // If a route creates exactly one Task before the event_wait, FlowRoutes may
+        // resume from that specific route-created Task identity.
+        //
+        // If a route can create multiple Tasks before the event_wait, define explicit
+        // correlation such as task.task_template_key plus flow_route_progress_id,
+        // flow_route_plan_item_id, or flow_route_progress_item_id.
 
         'task_completed_resume_example' => [
             'key' => 'task_completed_resume_example',
@@ -157,6 +162,10 @@ return [
                     'description' => 'Pause until a matching task.completed automation event is recorded.',
                     'default_definition' => [
                         'event_key' => 'task.completed',
+                        'correlation' => [
+                            'task.task_template_key' => 'example.follow_up',
+                            'task.flow_route_progress_id' => '{flow_route_progress.id}',
+                        ],
                         'timeout' => null,
                     ],
                     'sort_order' => 10,

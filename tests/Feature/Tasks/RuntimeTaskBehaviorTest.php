@@ -448,6 +448,47 @@ class RuntimeTaskBehaviorTest extends TestCase
         );
     }
 
+    public function test_task_completed_contact_id_can_resolve_from_flow_route_progress_when_task_subject_is_not_contact(): void
+    {
+        Event::fake([
+            AutomationEventRecorded::class,
+        ]);
+
+        $contact = Contact::factory()->create();
+
+        $flowRoute = $this->createFlowRouteProvenance($contact);
+
+        $task = Task::factory()
+            ->completed()
+            ->create([
+                'related_type' => 'dog',
+                'related_id' => 123,
+                'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+                'responsible_type' => null,
+                'responsible_id' => null,
+                'flow_route_progress_id' => $flowRoute['progress']->getKey(),
+                'flow_route_plan_id' => $flowRoute['plan']->getKey(),
+                'flow_route_plan_item_id' => $flowRoute['plan_item']->getKey(),
+                'flow_route_progress_item_id' => $flowRoute['progress_item']->getKey(),
+                'flow_route_id' => $flowRoute['flow_route']->getKey(),
+                'flow_route_point_id' => $flowRoute['flow_route_point']->getKey(),
+                'flow_route_capability_id' => $flowRoute['capability']->getKey(),
+            ]);
+
+        app(EmitTaskCompletedAutomationEvent::class)->handle(
+            new TaskCompleted($task),
+        );
+
+        Event::assertDispatched(
+            AutomationEventRecorded::class,
+            fn (AutomationEventRecorded $event): bool => $event->event->contactId === $contact->getKey()
+                && $event->event->subjectType === $task->getMorphClass()
+                && $event->event->subjectId === $task->getKey()
+                && data_get($event->event->payload, 'task.related_type') === 'dog'
+                && data_get($event->event->payload, 'task.related_id') === 123,
+        );
+    }
+
     private function createFlowRouteProvenance(Contact $contact): array
     {
         $status = \App\Modules\Core\Models\ContactStatus::query()->create([

@@ -63,8 +63,21 @@ class EmitTaskCompletedAutomationEvent
 
     private function contactId(Task $task): ?int
     {
-        if ($this->isContactMorph($task->related_type) && $task->related_id) return (int) $task->related_id;
-        if ($this->isContactMorph($task->responsible_type) && $task->responsible_id) return (int) $task->responsible_id;
+        if ($this->isContactMorph($task->related_type) && $task->related_id) {
+            return (int) $task->related_id;
+        }
+
+        if ($this->isContactMorph($task->responsible_type) && $task->responsible_id) {
+            return (int) $task->responsible_id;
+        }
+
+        if ($task->flow_route_progress_id) {
+            $flowRouteContactId = $task->flowRouteProgress()
+                ->value('contact_id');
+
+            return is_numeric($flowRouteContactId) ? (int) $flowRouteContactId : null;
+        }
+
         return null;
     }
 

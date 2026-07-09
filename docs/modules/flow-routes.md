@@ -421,26 +421,59 @@ vertical-owned records
 
 The owning module still owns lifecycle and business state. FlowRoutes owns route provenance, route instance correlation, and route resume matching.
 
-## Event-wait and task-completed resume implementation
+## Event-wait and task-completed resume behavior
 
-Implement task-completed resume in Phase 5 on top of the completed relationship/capability/instance-plan foundation.
+Task-completed event-wait resume is implemented on top of the relationship/capability/instance-plan foundation.
 
-Target behavior:
+Runtime behavior:
 
 ```text
 Tasks records task completion.
 Tasks emits AutomationEventRecorded(task.completed).
 FlowRoutes listens to generic AutomationEventRecorded.
-FlowRoutes resumes matching event_wait/progress/plan items internally.
+FlowRoutes maps the event to FlowRouteExternalEvent internally.
+FlowRoutes resumes matching event_wait progress/plan/progress items.
 ```
 
 Do not add Task-specific FlowRoutes listeners.
 
 Do not make Tasks import FlowRoutes.
 
-Use route plan/progress item correlation. Do not rely on contact-only fallback for task completion waits.
+Do not rely on contact-only fallback for `task.completed` waits.
 
-Resume matching should be scoped enough to avoid unrelated task completions resuming the wrong route instance.
+For `task.completed`, matching is intentionally stricter than generic event waits because a contact may have multiple open tasks and multiple active route instances.
+
+Supported safe matching paths:
+
+```text
+1. Explicit event_wait correlation.
+2. Unambiguous route-created Task artifact provenance when the route created exactly one Task before the wait.
+```
+
+Explicit correlation should be used when a route may create more than one Task before the wait.
+
+Good examples:
+
+```php
+'correlation' => [
+    'task.task_template_key' => 'route.follow_up',
+    'task.flow_route_progress_id' => '{flow_route_progress.id}',
+]
+```
+
+```php
+'correlation' => [
+    'task.flow_route_progress_item_id' => '{flow_route_progress_item.id}',
+]
+```
+
+Use task-template correlation when the author wants to wait for a specific kind of task created by the route.
+
+Use route progress/plan/progress-item correlation when the wait must be tied to a specific route instance.
+
+Generic contact context may be used as a safety filter, but it must not be the only matching rule for task completion waits.
+
+Tasks may carry contact context from related/responsible Contact records or from FlowRoute provenance when the task is subject-scoped to another record such as a dog, appointment, document request, or other future route subject.
 
 Potential matching dimensions:
 
@@ -448,11 +481,16 @@ Potential matching dimensions:
 event_key
 contact_id
 subject_type / subject_id
-task_id
-task_template_id or task_template_key
-flow_route_id
-flow_route_point_id or plan_item_id
-contact_flow_route_progress_id
+task.id
+task.task_template_id
+task.task_template_key
+task.flow_route_progress_id
+task.flow_route_plan_id
+task.flow_route_plan_item_id
+task.flow_route_progress_item_id
+task.flow_route_id
+task.flow_route_point_id
+task.flow_route_capability_id
 ```
 
 ## Client-facing Route Management terminology
@@ -495,5 +533,4 @@ or:
 Manage the automatic routes that create tasks, send messages, update statuses, and start follow-up sequences.
 ```
 
-Phase 4 should audit whether point handlers/capabilities need label and hint metadata from module providers so Route Management can explain available actions without importing module internals.
-
+Route Management UX should explain available actions through FlowRouteCapability metadata rather than importing module internals.

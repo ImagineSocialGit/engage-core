@@ -663,6 +663,409 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         Event::assertDispatched(ContactWorkflowStatusChanged::class);
     }
 
+    public function test_task_completed_event_resumes_waiting_route_for_the_specific_route_created_task(): void
+    {
+        $setup = $this->createProgressWithPoints([
+            Point::TYPE_CREATE_TASK,
+            Point::TYPE_EVENT_WAIT,
+            Point::TYPE_NOOP,
+        ]);
+
+        $setup['flow_route_points'][0]->forceFill([
+            'definition' => [
+                'title' => 'Complete this route-created task',
+                'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+            ],
+        ])->save();
+
+        $setup['flow_route_points'][1]->forceFill([
+            'definition' => [
+                'event_key' => 'task.completed',
+            ],
+        ])->save();
+
+        $createTaskResult = app(ExecuteCurrentFlowRoutePointAction::class)
+            ->handle($setup['progress']);
+
+        $this->assertSame(PointExecutionResult::STATUS_COMPLETED, $createTaskResult->status);
+        $this->assertSame('task_created', $createTaskResult->reason);
+
+        $task = Task::query()
+            ->where('title', 'Complete this route-created task')
+            ->firstOrFail();
+
+        $waitResult = app(ExecuteCurrentFlowRoutePointAction::class)
+            ->handle($setup['progress']->refresh());
+
+        $this->assertSame(PointExecutionResult::STATUS_WAITING, $waitResult->status);
+
+        $progress = $setup['progress']->refresh();
+
+        $this->assertSame(ContactFlowRouteProgress::STATUS_WAITING, $progress->status);
+        $this->assertSame('task.completed', $progress->waiting_event_key);
+
+        $contact = Contact::query()->findOrFail($progress->contact_id);
+
+        $unrelatedTask = Task::factory()
+            ->relatedTo($contact)
+            ->completed()
+            ->create([
+                'title' => 'Unrelated completed task',
+            ]);
+
+        app(\App\Modules\FlowRoutes\Actions\ResumeFlowRouteProgressFromEventAction::class)
+            ->handle($this->taskCompletedExternalEvent($unrelatedTask, $contact->getKey()));
+
+        $progress->refresh();
+
+        $this->assertSame(ContactFlowRouteProgress::STATUS_WAITING, $progress->status);
+        $this->assertSame($setup['flow_route_points'][1]->getKey(), $progress->current_flow_route_point_id);
+
+        $task->forceFill([
+            'status' => Task::STATUS_COMPLETED,
+            'completed_at' => now(),
+        ])->save();
+
+        app(\App\Modules\FlowRoutes\Actions\ResumeFlowRouteProgressFromEventAction::class)
+            ->handle($this->taskCompletedExternalEvent($task->refresh(), $contact->getKey()));
+
+        $progress->refresh();
+
+        $this->assertSame(ContactFlowRouteProgress::STATUS_COMPLETED, $progress->status);
+        $this->assertNull($progress->current_flow_route_point_id);
+        $this->assertNull($progress->resume_at);
+        $this->assertNull($progress->waiting_event_key);
+    }
+
+    public function test_task_completed_event_can_resume_subject_scoped_route_created_task_without_contact_only_matching(): void
+    {
+        $setup = $this->createProgressWithPoints([
+            Point::TYPE_CREATE_TASK,
+            Point::TYPE_EVENT_WAIT,
+            Point::TYPE_NOOP,
+        ]);
+
+        $setup['progress']->forceFill([
+            'subject_type' => 'dog',
+            'subject_id' => 123,
+        ])->save();
+
+        $setup['flow_route_points'][0]->forceFill([
+            'definition' => [
+                'title' => 'Subject-scoped route-created task',
+                'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+            ],
+        ])->save();
+
+        $setup['flow_route_points'][1]->forceFill([
+            'definition' => [
+                'event_key' => 'task.completed',
+            ],
+        ])->save();
+
+        $createTaskResult = app(ExecuteCurrentFlowRoutePointAction::class)
+            ->handle($setup['progress']->refresh());
+
+        $this->assertSame(PointExecutionResult::STATUS_COMPLETED, $createTaskResult->status);
+
+        $task = Task::query()
+            ->where('title', 'Subject-scoped route-created task')
+            ->firstOrFail();
+
+        $this->assertSame('dog', $task->related_type);
+        $this->assertSame(123, $task->related_id);
+
+        $waitResult = app(ExecuteCurrentFlowRoutePointAction::class)
+            ->handle($setup['progress']->refresh());
+
+        $this->assertSame(PointExecutionResult::STATUS_WAITING, $waitResult->status);
+
+        $task->forceFill([
+            'status' => Task::STATUS_COMPLETED,
+            'completed_at' => now(),
+        ])->save();
+
+        app(\App\Modules\FlowRoutes\Actions\ResumeFlowRouteProgressFromEventAction::class)
+            ->handle($this->taskCompletedExternalEvent($task->refresh(), null));
+
+        $progress = $setup['progress']->refresh();
+
+        $this->assertSame(ContactFlowRouteProgress::STATUS_COMPLETED, $progress->status);
+        $this->assertNull($progress->current_flow_route_point_id);
+        $this->assertNull($progress->waiting_event_key);
+    }
+
+    public function test_task_completed_event_with_multiple_route_created_tasks_requires_explicit_correlation(): void
+    {
+        $setup = $this->createProgressWithPoints([
+            Point::TYPE_CREATE_TASK,
+            Point::TYPE_CREATE_TASK,
+            Point::TYPE_EVENT_WAIT,
+            Point::TYPE_NOOP,
+        ]);
+
+        $setup['flow_route_points'][0]->forceFill([
+            'definition' => [
+                'title' => 'First route-created task',
+                'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+            ],
+        ])->save();
+
+        $setup['flow_route_points'][1]->forceFill([
+            'definition' => [
+                'title' => 'Second route-created task',
+                'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+            ],
+        ])->save();
+
+        $setup['flow_route_points'][2]->forceFill([
+            'definition' => [
+                'event_key' => 'task.completed',
+            ],
+        ])->save();
+
+        app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']);
+        app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']->refresh());
+
+        $waitResult = app(ExecuteCurrentFlowRoutePointAction::class)
+            ->handle($setup['progress']->refresh());
+
+        $this->assertSame(PointExecutionResult::STATUS_WAITING, $waitResult->status);
+
+        $task = Task::query()
+            ->where('title', 'First route-created task')
+            ->firstOrFail();
+
+        $task->forceFill([
+            'status' => Task::STATUS_COMPLETED,
+            'completed_at' => now(),
+        ])->save();
+
+        app(\App\Modules\FlowRoutes\Actions\ResumeFlowRouteProgressFromEventAction::class)
+            ->handle($this->taskCompletedExternalEvent($task->refresh(), $setup['progress']->contact_id));
+
+        $progress = $setup['progress']->refresh();
+
+        $this->assertSame(ContactFlowRouteProgress::STATUS_WAITING, $progress->status);
+        $this->assertSame($setup['flow_route_points'][2]->getKey(), $progress->current_flow_route_point_id);
+    }
+
+    public function test_task_completed_event_with_multiple_route_created_tasks_can_resume_with_explicit_template_correlation(): void
+    {
+        TaskTemplate::factory()->create([
+            'key' => 'route.first_task',
+            'title' => 'First templated route task',
+            'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+        ]);
+
+        TaskTemplate::factory()->create([
+            'key' => 'route.second_task',
+            'title' => 'Second templated route task',
+            'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+        ]);
+
+        $setup = $this->createProgressWithPoints([
+            Point::TYPE_CREATE_TASK,
+            Point::TYPE_CREATE_TASK,
+            Point::TYPE_EVENT_WAIT,
+            Point::TYPE_NOOP,
+        ]);
+
+        $setup['flow_route_points'][0]->forceFill([
+            'definition' => [
+                'task_template_key' => 'route.first_task',
+            ],
+        ])->save();
+
+        $setup['flow_route_points'][1]->forceFill([
+            'definition' => [
+                'task_template_key' => 'route.second_task',
+            ],
+        ])->save();
+
+        $setup['flow_route_points'][2]->forceFill([
+            'definition' => [
+                'event_key' => 'task.completed',
+                'correlation' => [
+                    'task.task_template_key' => 'route.second_task',
+                    'task.flow_route_progress_id' => '{flow_route_progress.id}',
+                ],
+            ],
+        ])->save();
+
+        app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']);
+        app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']->refresh());
+
+        $waitResult = app(ExecuteCurrentFlowRoutePointAction::class)
+            ->handle($setup['progress']->refresh());
+
+        $this->assertSame(PointExecutionResult::STATUS_WAITING, $waitResult->status);
+
+        $firstTask = Task::query()
+            ->where('task_template_key', 'route.first_task')
+            ->firstOrFail();
+
+        $firstTask->forceFill([
+            'status' => Task::STATUS_COMPLETED,
+            'completed_at' => now(),
+        ])->save();
+
+        app(\App\Modules\FlowRoutes\Actions\ResumeFlowRouteProgressFromEventAction::class)
+            ->handle($this->taskCompletedExternalEvent($firstTask->refresh(), $setup['progress']->contact_id));
+
+        $progress = $setup['progress']->refresh();
+
+        $this->assertSame(ContactFlowRouteProgress::STATUS_WAITING, $progress->status);
+        $this->assertSame($setup['flow_route_points'][2]->getKey(), $progress->current_flow_route_point_id);
+
+        $secondTask = Task::query()
+            ->where('task_template_key', 'route.second_task')
+            ->firstOrFail();
+
+        $secondTask->forceFill([
+            'status' => Task::STATUS_COMPLETED,
+            'completed_at' => now(),
+        ])->save();
+
+        app(\App\Modules\FlowRoutes\Actions\ResumeFlowRouteProgressFromEventAction::class)
+            ->handle($this->taskCompletedExternalEvent($secondTask->refresh(), $setup['progress']->contact_id));
+
+        $progress->refresh();
+
+        $this->assertSame(ContactFlowRouteProgress::STATUS_COMPLETED, $progress->status);
+        $this->assertNull($progress->current_flow_route_point_id);
+        $this->assertNull($progress->waiting_event_key);
+    }
+
+    public function test_complete_task_action_resumes_waiting_event_wait_route_through_automation_event_listener_chain(): void
+    {
+        $setup = $this->createProgressWithPoints([
+            Point::TYPE_CREATE_TASK,
+            Point::TYPE_EVENT_WAIT,
+            Point::TYPE_NOOP,
+        ]);
+
+        $setup['flow_route_points'][0]->forceFill([
+            'definition' => [
+                'title' => 'Complete through listener chain',
+                'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+            ],
+        ])->save();
+
+        $setup['flow_route_points'][1]->forceFill([
+            'definition' => [
+                'event_key' => 'task.completed',
+            ],
+        ])->save();
+
+        $createTaskResult = app(ExecuteCurrentFlowRoutePointAction::class)
+            ->handle($setup['progress']);
+
+        $this->assertSame(PointExecutionResult::STATUS_COMPLETED, $createTaskResult->status);
+        $this->assertSame('task_created', $createTaskResult->reason);
+
+        $waitResult = app(ExecuteCurrentFlowRoutePointAction::class)
+            ->handle($setup['progress']->refresh());
+
+        $this->assertSame(PointExecutionResult::STATUS_WAITING, $waitResult->status);
+
+        $progress = $setup['progress']->refresh();
+
+        $this->assertSame(ContactFlowRouteProgress::STATUS_WAITING, $progress->status);
+        $this->assertSame('task.completed', $progress->waiting_event_key);
+
+        $task = Task::query()
+            ->where('title', 'Complete through listener chain')
+            ->firstOrFail();
+
+        app(\App\Modules\Tasks\Actions\CompleteTaskAction::class)
+            ->handle($task);
+
+        $progress->refresh();
+
+        $this->assertSame(ContactFlowRouteProgress::STATUS_COMPLETED, $progress->status);
+        $this->assertNull($progress->current_flow_route_point_id);
+        $this->assertNull($progress->resume_at);
+        $this->assertNull($progress->waiting_event_key);
+
+        $this->assertGreaterThanOrEqual(3, ContactFlowRouteProgressItem::query()
+            ->where('contact_flow_route_progress_id', $progress->getKey())
+            ->where('status', ContactFlowRouteProgressItem::STATUS_COMPLETED)
+            ->count());
+
+        $this->assertDatabaseHas('contact_flow_route_progress_items', [
+            'contact_flow_route_progress_id' => $progress->getKey(),
+            'flow_route_point_id' => $setup['flow_route_points'][0]->getKey(),
+            'point_type' => Point::TYPE_CREATE_TASK,
+            'status' => ContactFlowRouteProgressItem::STATUS_COMPLETED,
+        ]);
+
+        $this->assertDatabaseHas('contact_flow_route_progress_items', [
+            'contact_flow_route_progress_id' => $progress->getKey(),
+            'flow_route_point_id' => $setup['flow_route_points'][1]->getKey(),
+            'point_type' => Point::TYPE_EVENT_WAIT,
+            'status' => ContactFlowRouteProgressItem::STATUS_COMPLETED,
+        ]);
+
+        $this->assertDatabaseHas('contact_flow_route_progress_items', [
+            'contact_flow_route_progress_id' => $progress->getKey(),
+            'flow_route_point_id' => $setup['flow_route_points'][2]->getKey(),
+            'point_type' => Point::TYPE_NOOP,
+            'status' => ContactFlowRouteProgressItem::STATUS_COMPLETED,
+        ]);
+    }
+
+    private function taskCompletedExternalEvent(Task $task, ?int $contactId): FlowRouteExternalEvent
+    {
+        return FlowRouteExternalEvent::make(
+            name: 'task.completed',
+            contactId: $contactId,
+            subjectType: $task->getMorphClass(),
+            subjectId: $task->getKey(),
+            occurredAt: $task->completed_at ?? now(),
+            payload: [
+                'task' => [
+                    'id' => $task->getKey(),
+                    'title' => $task->title,
+                    'description' => $task->description,
+                    'status' => $task->status,
+                    'source' => $task->source,
+                    'priority' => $task->priority,
+                    'due_at' => $task->due_at?->toISOString(),
+                    'completed_at' => $task->completed_at?->toISOString(),
+                    'related_type' => $task->related_type,
+                    'related_id' => $task->related_id,
+                    'assigned_to_type' => $task->assigned_to_type,
+                    'assigned_to_id' => $task->assigned_to_id,
+                    'responsible_party' => $task->responsible_party,
+                    'responsible_type' => $task->responsible_type,
+                    'responsible_id' => $task->responsible_id,
+                    'flow_route_progress_id' => $task->flow_route_progress_id,
+                    'flow_route_plan_id' => $task->flow_route_plan_id,
+                    'flow_route_plan_item_id' => $task->flow_route_plan_item_id,
+                    'flow_route_progress_item_id' => $task->flow_route_progress_item_id,
+                    'flow_route_id' => $task->flow_route_id,
+                    'flow_route_point_id' => $task->flow_route_point_id,
+                    'flow_route_capability_id' => $task->flow_route_capability_id,
+                    'task_template_id' => $task->task_template_id,
+                    'task_template_key' => $task->task_template_key,
+                    'meta' => $task->meta ?? [],
+                ],
+                'automation_event_meta' => [
+                    'source_module' => 'tasks',
+                    'task_id' => $task->getKey(),
+                    'flow_route_progress_id' => $task->flow_route_progress_id,
+                    'flow_route_plan_id' => $task->flow_route_plan_id,
+                    'flow_route_plan_item_id' => $task->flow_route_plan_item_id,
+                    'flow_route_progress_item_id' => $task->flow_route_progress_item_id,
+                    'flow_route_id' => $task->flow_route_id,
+                    'flow_route_point_id' => $task->flow_route_point_id,
+                    'flow_route_capability_id' => $task->flow_route_capability_id,
+                ],
+            ],
+        );
+    }
+
     /**
      * @param array<int, string> $types
      * @return array{

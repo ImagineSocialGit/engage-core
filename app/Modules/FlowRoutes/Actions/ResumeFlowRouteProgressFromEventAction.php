@@ -7,10 +7,13 @@ use App\Modules\FlowRoutes\Data\Events\FlowRouteExternalEventResumeResult;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
+use App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem;
 use Illuminate\Support\Facades\DB;
 
 class ResumeFlowRouteProgressFromEventAction
 {
+    private const TASK_COMPLETED_EVENT = 'task.completed';
+
     public function __construct(
         private readonly ExecuteCurrentFlowRoutePointAction $executeCurrentFlowRoutePoint,
     ) {}
@@ -31,7 +34,7 @@ class ResumeFlowRouteProgressFromEventAction
             $query->forContact($event->contactId);
         }
 
-        if ($event->subjectType !== null || $event->subjectId !== null) {
+        if ($this->shouldApplyEventSubjectQueryFilter($event)) {
             $query->forSubject($event->subjectType, $event->subjectId);
         }
 
@@ -41,6 +44,7 @@ class ResumeFlowRouteProgressFromEventAction
 
                 if (! $this->matches($progress, $event)) {
                     $result->recordIgnored();
+
                     continue;
                 }
 
@@ -48,11 +52,14 @@ class ResumeFlowRouteProgressFromEventAction
 
                 if ($prepared instanceof PointExecutionResult) {
                     $result->recordResumed($prepared);
+
                     continue;
                 }
 
                 $result->recordMatched($prepared->getKey());
+
                 $executionResult = $this->executeProgressUntilIdle($prepared);
+
                 $result->recordResumed($executionResult);
             }
         });
@@ -107,12 +114,15 @@ class ResumeFlowRouteProgressFromEventAction
                 ]);
             }
 
+            $now = now();
             $meta = $progress->meta ?? [];
             $waiting = $progress->waitingState();
+
             $waiting['matched_event'] = $event->toMetaPayload();
-            $waiting['matched_at'] = now()->toISOString();
+            $waiting['matched_at'] = $now->toISOString();
 
             $waitingPlanItemId = $this->nullableInt($waiting['flow_route_plan_item_id'] ?? null);
+            $waitingProgressItemId = $this->nullableInt($waiting['flow_route_progress_item_id'] ?? null);
 
             if ($waitingPlanItemId !== null) {
                 ContactFlowRoutePlanItem::query()
@@ -127,9 +137,29 @@ class ResumeFlowRouteProgressFromEventAction
                     ]);
             }
 
-            $resumeAttempts = is_array($meta['event_resume_attempts'] ?? null) ? $meta['event_resume_attempts'] : [];
+            if ($waitingProgressItemId !== null) {
+                ContactFlowRouteProgressItem::query()
+                    ->whereKey($waitingProgressItemId)
+                    ->where('contact_flow_route_progress_id', $progress->getKey())
+                    ->where('status', ContactFlowRouteProgressItem::STATUS_WAITING)
+                    ->update([
+                        'status' => ContactFlowRouteProgressItem::STATUS_COMPLETED,
+                        'completed_at' => $now,
+                        'resume_at' => null,
+                        'waiting_event_key' => null,
+                        'result_reason' => 'event_wait_matched',
+                        'result_payload' => [
+                            'matched_event' => $event->toMetaPayload(),
+                        ],
+                    ]);
+            }
+
+            $resumeAttempts = is_array($meta['event_resume_attempts'] ?? null)
+                ? $meta['event_resume_attempts']
+                : [];
+
             $resumeAttempts[] = [
-                'attempted_at' => now()->toISOString(),
+                'attempted_at' => $now->toISOString(),
                 'waiting' => $waiting,
                 'event' => $event->toMetaPayload(),
             ];
@@ -140,6 +170,7 @@ class ResumeFlowRouteProgressFromEventAction
 
             $progress->forceFill([
                 'status' => ContactFlowRouteProgress::STATUS_ACTIVE,
+                'resume_at' => null,
                 'meta' => $meta,
             ])->save();
 
@@ -149,40 +180,87 @@ class ResumeFlowRouteProgressFromEventAction
 
     private function matches(ContactFlowRouteProgress $progress, FlowRouteExternalEvent $event): bool
     {
-        if ($progress->waitingExpectedEvent() !== $event->name) {
-            return false;
+        foreach ($this->matchRules() as $rule) {
+            if (! $this->{$rule}($progress, $event)) {
+                return false;
+            }
         }
 
+        return true;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function matchRules(): array
+    {
+        return [
+            'matchesExpectedEvent',
+            'matchesWaitingPoint',
+            'matchesContactWhenPresent',
+            'matchesSubjectWhenRequired',
+            'matchesCorrelationPolicy',
+        ];
+    }
+
+    private function matchesExpectedEvent(ContactFlowRouteProgress $progress, FlowRouteExternalEvent $event): bool
+    {
+        return $progress->waitingExpectedEvent() === $event->name;
+    }
+
+    private function matchesWaitingPoint(ContactFlowRouteProgress $progress, FlowRouteExternalEvent $event): bool
+    {
         $waitingFlowRoutePointId = $progress->waitingFlowRoutePointId();
 
-        if (
-            $waitingFlowRoutePointId !== null
-            && $progress->current_flow_route_point_id !== null
-            && $waitingFlowRoutePointId !== (int) $progress->current_flow_route_point_id
-        ) {
-            return false;
+        return $waitingFlowRoutePointId === null
+            || $progress->current_flow_route_point_id === null
+            || $waitingFlowRoutePointId === (int) $progress->current_flow_route_point_id;
+    }
+
+    private function matchesContactWhenPresent(ContactFlowRouteProgress $progress, FlowRouteExternalEvent $event): bool
+    {
+        return $event->contactId === null
+            || (int) $progress->contact_id === $event->contactId;
+    }
+
+    private function matchesSubjectWhenRequired(ContactFlowRouteProgress $progress, FlowRouteExternalEvent $event): bool
+    {
+        if ($this->isTaskCompletedEvent($event)) {
+            return true;
         }
 
-        if ($event->contactId !== null && (int) $progress->contact_id !== $event->contactId) {
-            return false;
+        if ($progress->subject_type === null && $progress->subject_id === null) {
+            return true;
         }
 
-        if ($progress->subject_type !== null || $progress->subject_id !== null) {
-            if ($progress->subject_type !== $event->subjectType) {
-                return false;
-            }
+        return $progress->subject_type === $event->subjectType
+            && (string) $progress->subject_id === (string) $event->subjectId;
+    }
 
-            if ((string) $progress->subject_id !== (string) $event->subjectId) {
-                return false;
-            }
-        }
-
+    private function matchesCorrelationPolicy(ContactFlowRouteProgress $progress, FlowRouteExternalEvent $event): bool
+    {
         $correlation = $progress->waitingCorrelation();
 
-        if ($correlation === []) {
-            return $event->contactId !== null && (int) $progress->contact_id === $event->contactId;
+        if ($correlation !== []) {
+            return $this->matchesExplicitCorrelation($progress, $event, $correlation);
         }
 
+        if ($this->isTaskCompletedEvent($event)) {
+            return $this->matchesSingleRouteCreatedTask($progress, $event);
+        }
+
+        return $event->contactId !== null
+            && (int) $progress->contact_id === $event->contactId;
+    }
+
+    /**
+     * @param array<string, mixed> $correlation
+     */
+    private function matchesExplicitCorrelation(
+        ContactFlowRouteProgress $progress,
+        FlowRouteExternalEvent $event,
+        array $correlation,
+    ): bool {
         foreach ($correlation as $key => $expectedValue) {
             if (! is_string($key) || trim($key) === '') {
                 return false;
@@ -198,17 +276,81 @@ class ResumeFlowRouteProgressFromEventAction
         return true;
     }
 
+    private function matchesSingleRouteCreatedTask(
+        ContactFlowRouteProgress $progress,
+        FlowRouteExternalEvent $event,
+    ): bool {
+        $taskId = $this->taskId($event);
+
+        if ($taskId === null) {
+            return false;
+        }
+
+        $eventProgressId = $this->nullableInt($this->eventValue($event, 'task.flow_route_progress_id'));
+
+        if ($eventProgressId !== null && $eventProgressId !== (int) $progress->getKey()) {
+            return false;
+        }
+
+        $totalRouteCreatedTaskArtifacts = ContactFlowRouteProgressItem::query()
+            ->where('contact_flow_route_progress_id', $progress->getKey())
+            ->where('correlation_type', 'task')
+            ->count();
+
+        if ($totalRouteCreatedTaskArtifacts !== 1) {
+            return false;
+        }
+
+        return ContactFlowRouteProgressItem::query()
+            ->where('contact_flow_route_progress_id', $progress->getKey())
+            ->where('correlation_type', 'task')
+            ->where('created_subject_id', $taskId)
+            ->when(
+                $event->subjectType !== null,
+                fn ($query) => $query->where('created_subject_type', $event->subjectType),
+            )
+            ->exists();
+    }
+
+    private function shouldApplyEventSubjectQueryFilter(FlowRouteExternalEvent $event): bool
+    {
+        return ! $this->isTaskCompletedEvent($event)
+            && ($event->subjectType !== null || $event->subjectId !== null);
+    }
+
+    private function isTaskCompletedEvent(FlowRouteExternalEvent $event): bool
+    {
+        return $event->name === self::TASK_COMPLETED_EVENT;
+    }
+
+    private function taskId(FlowRouteExternalEvent $event): ?int
+    {
+        return $this->nullableInt($this->eventValue($event, 'task.id'))
+            ?? $this->nullableInt($event->subjectId);
+    }
+
     private function eventValue(FlowRouteExternalEvent $event, string $key): mixed
     {
         if (str_starts_with($key, 'payload.')) {
             return data_get($event->payload, substr($key, 8));
         }
 
+        if (str_starts_with($key, 'meta.')) {
+            return data_get($event->payload['automation_event_meta'] ?? [], substr($key, 5));
+        }
+
+        if (str_starts_with($key, 'automation_event_meta.')) {
+            return data_get($event->payload['automation_event_meta'] ?? [], substr($key, 22));
+        }
+
         return $event->value($key);
     }
 
-    private function correlationValueMatches(ContactFlowRouteProgress $progress, mixed $expectedValue, mixed $actualValue): bool
-    {
+    private function correlationValueMatches(
+        ContactFlowRouteProgress $progress,
+        mixed $expectedValue,
+        mixed $actualValue,
+    ): bool {
         if ($expectedValue === true) {
             return $actualValue !== null && $actualValue !== '';
         }

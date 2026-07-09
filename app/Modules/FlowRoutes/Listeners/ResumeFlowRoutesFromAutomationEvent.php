@@ -22,10 +22,6 @@ class ResumeFlowRoutesFromAutomationEvent
             return;
         }
 
-        if ($automationEvent->contactId === null) {
-            return;
-        }
-
         $externalEvent = FlowRouteExternalEvent::make(
             name: $automationEvent->eventKey,
             contactId: $automationEvent->contactId,
@@ -39,7 +35,9 @@ class ResumeFlowRoutesFromAutomationEvent
             ],
         );
 
-        $this->startFlowRoutesFromAutomationEvent->handle($externalEvent);
+        if ($automationEvent->contactId !== null) {
+            $this->startFlowRoutesFromAutomationEvent->handle($externalEvent);
+        }
 
         $this->resumeFlowRouteProgressFromEvent->handle($externalEvent);
     }
