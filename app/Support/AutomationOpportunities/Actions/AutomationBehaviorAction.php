@@ -16,4 +16,13 @@ abstract class AutomationBehaviorAction
     ): AutomationBehaviorOccurrence {
         return $this->recordAutomationBehaviorOccurrence->handle($behavior);
     }
+
+    protected function recordEvidence(
+        AutomationBehaviorData $behavior,
+    ): AutomationBehaviorOccurrence {
+        return $this->recordAutomationBehaviorOccurrence->handle(
+            behavior: $behavior,
+            evaluateOpportunity: false,
+        );
+    }
 }

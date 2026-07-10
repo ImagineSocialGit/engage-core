@@ -553,6 +553,7 @@
 │   │   │   │   ├── CreateTaskFromTemplateAction.php
 │   │   │   │   ├── NotifyAssignedTaskRecipientsAction.php
 │   │   │   │   ├── RecordManualTaskAutomationBehaviorAction.php
+│   │   │   │   ├── RecordManualTaskCompletionAutomationBehaviorAction.php
 │   │   │   │   ├── SendTaskDigestNotificationsAction.php
 │   │   │   │   └── SyncTaskPresetsAction.php
 │   │   │   ├── Capabilities
@@ -681,6 +682,7 @@
 │   │   │       └── WebinarsSetupValidationContributor.php
 │   │   └── Workflow
 │   │       ├── Actions
+│   │       │   ├── RecordManualStatusTransitionAutomationBehaviorAction.php
 │   │       │   └── TransitionContactWorkflowStatusAction.php
 │   │       ├── Contracts
 │   │       ├── Controllers
@@ -688,6 +690,8 @@
 │   │       │   └── ContactWorkflowStatusTransition.php
 │   │       ├── Events
 │   │       │   └── ContactWorkflowStatusChanged.php
+│   │       ├── Listeners
+│   │       │   └── RecordManualStatusTransitionAutomationBehavior.php
 │   │       ├── Models
 │   │       │   └── ContactWorkflowProfile.php
 │   │       ├── Providers
@@ -1403,6 +1407,7 @@
 │   │   │   └── ValidateSetupCommandTest.php
 │   │   ├── Tasks
 │   │   │   ├── RecordManualTaskAutomationBehaviorActionTest.php
+│   │   │   ├── RecordManualTaskCompletionAutomationBehaviorActionTest.php
 │   │   │   ├── RuntimeTaskBehaviorTest.php
 │   │   │   ├── TaskCompletionProvenanceTest.php
 │   │   │   └── TasksSetupValidationContributorTest.php
@@ -1427,8 +1432,9 @@
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
 │   │   │   └── WebinarWaitlistSignupControllerTest.php
 │   │   └── Workflow
+│   │       ├── RecordManualStatusTransitionAutomationBehaviorActionTest.php
 │   │       └── TransitionContactWorkflowStatusActionTest.php
 │   └── TestCase.php
 └── vite.config.js
 
-461 directories, 971 files
+462 directories, 976 files

@@ -15,15 +15,20 @@ class RecordAutomationBehaviorOccurrenceAction
         private readonly EvaluateAutomationOpportunityAction $evaluateAutomationOpportunity,
     ) {}
 
-    public function handle(AutomationBehaviorData $behavior): AutomationBehaviorOccurrence
-    {
+    public function handle(
+        AutomationBehaviorData $behavior,
+        bool $evaluateOpportunity = true,
+    ): AutomationBehaviorOccurrence {
         if (! $behavior->isValid()) {
             throw new InvalidArgumentException(
                 'Automation behavior requires a non-empty action key and fingerprint parts.',
             );
         }
 
-        return DB::transaction(function () use ($behavior): AutomationBehaviorOccurrence {
+        return DB::transaction(function () use (
+            $behavior,
+            $evaluateOpportunity,
+        ): AutomationBehaviorOccurrence {
             $occurrence = AutomationBehaviorOccurrence::query()->create([
                 'action_key' => trim($behavior->actionKey),
                 'actor_type' => $behavior->actor?->getMorphClass(),
@@ -44,7 +49,9 @@ class RecordAutomationBehaviorOccurrenceAction
                 'occurred_at' => $behavior->occurredAt,
             ]);
 
-            $this->evaluateAutomationOpportunity->handle($occurrence);
+            if ($evaluateOpportunity) {
+                $this->evaluateAutomationOpportunity->handle($occurrence);
+            }
 
             return $occurrence->refresh();
         });

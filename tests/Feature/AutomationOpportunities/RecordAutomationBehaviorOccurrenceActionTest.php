@@ -71,6 +71,28 @@ class RecordAutomationBehaviorOccurrenceActionTest extends TestCase
         $this->assertTrue($opportunity->last_occurred_at->equalTo($occurredAt));
     }
 
+    public function test_it_can_record_evidence_without_creating_an_opportunity(): void
+    {
+        $actor = User::factory()->create();
+        $subject = Contact::factory()->create();
+
+        $occurrence = app(RecordAutomationBehaviorOccurrenceAction::class)->handle(
+            behavior: AutomationBehaviorData::make(
+                actionKey: 'task.completed_manually',
+                actor: $actor,
+                subject: $subject,
+                fingerprintParts: [
+                    'normalized_title' => 'review application',
+                ],
+            ),
+            evaluateOpportunity: false,
+        );
+
+        $this->assertInstanceOf(AutomationBehaviorOccurrence::class, $occurrence);
+        $this->assertDatabaseCount('automation_behavior_occurrences', 1);
+        $this->assertDatabaseCount('automation_opportunities', 0);
+    }
+
     public function test_it_reuses_one_opportunity_for_equivalent_fingerprint_parts(): void
     {
         $actor = User::factory()->create();

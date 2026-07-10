@@ -2,13 +2,14 @@
 
 namespace App\Modules\Tasks\Providers;
 
+use App\Modules\Tasks\Actions\RecordManualTaskCompletionAutomationBehaviorAction;
 use App\Modules\Tasks\Capabilities\TasksAutomationCapabilityContributor;
 use App\Modules\Tasks\Events\TaskCompleted;
 use App\Modules\Tasks\Listeners\EmitTaskCompletedAutomationEvent;
 use App\Modules\Tasks\Services\AssignedRecipients\TeamMemberTaskAssignedRecipientResolver;
-use App\Modules\Tasks\Services\Dashboard\TodayTasksDashboardPanelProvider;
 use App\Modules\Tasks\Services\ContactShow\ContactTasksShowDataProvider;
 use App\Modules\Tasks\Services\ContactShow\ContactTaskVisibilityDataProvider;
+use App\Modules\Tasks\Services\Dashboard\TodayTasksDashboardPanelProvider;
 use App\Modules\Tasks\Services\RelatedSubjects\ContactTaskRelatedSubjectResolver;
 use App\Modules\Tasks\Services\TaskAssignedRecipientsResolver;
 use App\Modules\Tasks\Services\TaskRelatedSubjectResolver;
@@ -60,6 +61,11 @@ class TasksModuleServiceProvider extends ServiceProvider
         Event::listen(
             TaskCompleted::class,
             EmitTaskCompletedAutomationEvent::class,
+        );
+
+        Event::listen(
+            TaskCompleted::class,
+            RecordManualTaskCompletionAutomationBehaviorAction::class,
         );
     }
 }
