@@ -13,14 +13,17 @@ class EmitTaskCompletedAutomationEvent
     public function handle(TaskCompleted $event): void
     {
         $task = $event->task->fresh();
-        if (! $task) return;
+
+        if (! $task) {
+            return;
+        }
 
         event(new AutomationEventRecorded(
             AutomationEventData::forSubject(
                 eventKey: TaskCompleted::NAME,
                 subject: $task,
                 contactId: $this->contactId($task),
-                occurredAt: $task->completed_at ?? now(),
+                occurredAt: $event->occurredAt,
                 payload: [
                     'task' => [
                         'id' => $task->id,
@@ -54,6 +57,13 @@ class EmitTaskCompletedAutomationEvent
                     [
                         'source_module' => 'tasks',
                         'task_id' => $task->id,
+                        'completion' => [
+                            'source' => $event->source,
+                            'actor_type' => $event->actorType,
+                            'actor_id' => $event->actorId,
+                            'occurred_at' => $event->occurredAt->toISOString(),
+                            'meta' => $event->meta,
+                        ],
                     ],
                     $this->flowRouteMeta($task),
                 ),

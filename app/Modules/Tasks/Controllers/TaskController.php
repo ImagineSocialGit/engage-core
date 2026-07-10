@@ -39,9 +39,19 @@ class TaskController extends Controller
         return redirect()->back();
     }
 
-    public function complete(Task $task, CompleteTaskAction $completeTask): RedirectResponse
-    {
-        $completeTask->handle($task);
+    public function complete(
+        Request $request,
+        Task $task,
+        CompleteTaskAction $completeTask,
+    ): RedirectResponse {
+        $completeTask->handle(
+            task: $task,
+            actor: $request->user(),
+            source: 'crm',
+            meta: [
+                'source' => 'task_controller.complete',
+            ],
+        );
 
         return redirect()->back();
     }

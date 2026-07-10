@@ -754,10 +754,7 @@
 ├── bootstrap
 │   ├── app.php
 │   ├── cache
-│   │   ├── config.php
-│   │   ├── events.php
 │   │   ├── packages.php
-│   │   ├── routes-v7.php
 │   │   └── services.php
 │   └── providers.php
 ├── client
@@ -1407,6 +1404,7 @@
 │   │   ├── Tasks
 │   │   │   ├── RecordManualTaskAutomationBehaviorActionTest.php
 │   │   │   ├── RuntimeTaskBehaviorTest.php
+│   │   │   ├── TaskCompletionProvenanceTest.php
 │   │   │   └── TasksSetupValidationContributorTest.php
 │   │   ├── Webhooks
 │   │   │   ├── EmailWebhookControllerTest.php
@@ -1433,4 +1431,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-461 directories, 973 files
+461 directories, 971 files

@@ -10,6 +10,7 @@ use App\Modules\Tasks\Models\Task;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use App\Support\AutomationOpportunities\Models\AutomationBehaviorOccurrence;
 use App\Support\AutomationOpportunities\Models\AutomationOpportunity;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -187,5 +188,262 @@ class RecordManualTaskAutomationBehaviorActionTest extends TestCase
         $this->assertSame(3, $opportunity->distinct_subject_count);
         $this->assertSame(AutomationOpportunity::STATUS_ELIGIBLE, $opportunity->status);
         $this->assertNotNull($opportunity->eligible_at);
+    }
+
+    public function test_it_records_compound_pattern_after_recent_manual_status_change_by_same_actor(): void
+    {
+        $actor = User::factory()->create();
+        $contact = Contact::factory()->create();
+
+        $fromStatus = ContactStatus::query()->create([
+            'key' => 'prospect',
+            'name' => 'Prospect',
+            'is_active' => true,
+        ]);
+
+        $toStatus = ContactStatus::query()->create([
+            'key' => 'attempting_contact',
+            'name' => 'Attempting Contact',
+            'is_active' => true,
+        ]);
+
+        $changedAt = CarbonImmutable::parse('2026-07-10 14:00:00', 'UTC');
+        $taskCreatedAt = $changedAt->addMinutes(5);
+
+        ContactWorkflowProfile::query()->create([
+            'contact_id' => $contact->getKey(),
+            'contact_status_id' => $toStatus->getKey(),
+            'last_status_changed_at' => $changedAt,
+            'meta' => [
+                'last_status_change' => [
+                    'from_contact_status_id' => $fromStatus->getKey(),
+                    'to_contact_status_id' => $toStatus->getKey(),
+                    'reason' => 'crm_manual_status_update',
+                    'source' => 'crm',
+                    'actor_type' => $actor->getMorphClass(),
+                    'actor_id' => $actor->getKey(),
+                    'changed_at' => $changedAt->toISOString(),
+                    'meta' => [
+                        'source' => 'contact_show_status_form',
+                    ],
+                ],
+            ],
+        ]);
+
+        $task = Task::factory()->relatedTo($contact)->create([
+            'source' => Task::SOURCE_MANUAL,
+            'title' => 'Call this contact',
+            'task_template_key' => null,
+            'created_at' => $taskCreatedAt,
+            'updated_at' => $taskCreatedAt,
+        ]);
+
+        app(RecordManualTaskAutomationBehaviorAction::class)->handle(
+            task: $task,
+            actor: $actor,
+        );
+
+        $compoundOccurrence = AutomationBehaviorOccurrence::query()
+            ->forAction(RecordManualTaskAutomationBehaviorAction::COMPOUND_ACTION_KEY)
+            ->firstOrFail();
+
+        $this->assertSame('prospect', $compoundOccurrence->fingerprint_parts['from_status_key']);
+        $this->assertSame('attempting_contact', $compoundOccurrence->fingerprint_parts['to_status_key']);
+        $this->assertSame('call this contact', $compoundOccurrence->fingerprint_parts['normalized_title']);
+        $this->assertSame('Prospect', $compoundOccurrence->context['from_status_name']);
+        $this->assertSame('Attempting Contact', $compoundOccurrence->context['to_status_name']);
+        $this->assertSame(
+            'manual_status_change_then_manual_task_creation',
+            $compoundOccurrence->meta['pattern'],
+        );
+
+        $this->assertDatabaseCount('automation_behavior_occurrences', 2);
+        $this->assertDatabaseCount('automation_opportunities', 2);
+    }
+
+    public function test_it_does_not_record_compound_pattern_when_status_change_is_too_old(): void
+    {
+        $actor = User::factory()->create();
+        $contact = Contact::factory()->create();
+
+        $fromStatus = ContactStatus::query()->create([
+            'key' => 'prospect',
+            'name' => 'Prospect',
+            'is_active' => true,
+        ]);
+
+        $toStatus = ContactStatus::query()->create([
+            'key' => 'attempting_contact',
+            'name' => 'Attempting Contact',
+            'is_active' => true,
+        ]);
+
+        $changedAt = CarbonImmutable::parse('2026-07-10 14:00:00', 'UTC');
+        $taskCreatedAt = $changedAt->addMinutes(
+            RecordManualTaskAutomationBehaviorAction::RELATED_ACTION_WINDOW_MINUTES + 1,
+        );
+
+        ContactWorkflowProfile::query()->create([
+            'contact_id' => $contact->getKey(),
+            'contact_status_id' => $toStatus->getKey(),
+            'last_status_changed_at' => $changedAt,
+            'meta' => [
+                'last_status_change' => [
+                    'from_contact_status_id' => $fromStatus->getKey(),
+                    'to_contact_status_id' => $toStatus->getKey(),
+                    'reason' => 'crm_manual_status_update',
+                    'source' => 'crm',
+                    'actor_type' => $actor->getMorphClass(),
+                    'actor_id' => $actor->getKey(),
+                    'changed_at' => $changedAt->toISOString(),
+                    'meta' => [
+                        'source' => 'contact_show_status_form',
+                    ],
+                ],
+            ],
+        ]);
+
+        $task = Task::factory()->relatedTo($contact)->create([
+            'source' => Task::SOURCE_MANUAL,
+            'title' => 'Call this contact',
+            'created_at' => $taskCreatedAt,
+            'updated_at' => $taskCreatedAt,
+        ]);
+
+        app(RecordManualTaskAutomationBehaviorAction::class)->handle(
+            task: $task,
+            actor: $actor,
+        );
+
+        $this->assertDatabaseMissing('automation_behavior_occurrences', [
+            'action_key' => RecordManualTaskAutomationBehaviorAction::COMPOUND_ACTION_KEY,
+        ]);
+
+        $this->assertDatabaseCount('automation_behavior_occurrences', 1);
+        $this->assertDatabaseCount('automation_opportunities', 1);
+    }
+
+    public function test_it_does_not_record_compound_pattern_for_different_actor(): void
+    {
+        $statusActor = User::factory()->create();
+        $taskActor = User::factory()->create();
+        $contact = Contact::factory()->create();
+
+        $fromStatus = ContactStatus::query()->create([
+            'key' => 'prospect',
+            'name' => 'Prospect',
+            'is_active' => true,
+        ]);
+
+        $toStatus = ContactStatus::query()->create([
+            'key' => 'attempting_contact',
+            'name' => 'Attempting Contact',
+            'is_active' => true,
+        ]);
+
+        $changedAt = CarbonImmutable::parse('2026-07-10 14:00:00', 'UTC');
+        $taskCreatedAt = $changedAt->addMinutes(2);
+
+        ContactWorkflowProfile::query()->create([
+            'contact_id' => $contact->getKey(),
+            'contact_status_id' => $toStatus->getKey(),
+            'last_status_changed_at' => $changedAt,
+            'meta' => [
+                'last_status_change' => [
+                    'from_contact_status_id' => $fromStatus->getKey(),
+                    'to_contact_status_id' => $toStatus->getKey(),
+                    'reason' => 'crm_manual_status_update',
+                    'source' => 'crm',
+                    'actor_type' => $statusActor->getMorphClass(),
+                    'actor_id' => $statusActor->getKey(),
+                    'changed_at' => $changedAt->toISOString(),
+                    'meta' => [
+                        'source' => 'contact_show_status_form',
+                    ],
+                ],
+            ],
+        ]);
+
+        $task = Task::factory()->relatedTo($contact)->create([
+            'source' => Task::SOURCE_MANUAL,
+            'title' => 'Call this contact',
+            'created_at' => $taskCreatedAt,
+            'updated_at' => $taskCreatedAt,
+        ]);
+
+        app(RecordManualTaskAutomationBehaviorAction::class)->handle(
+            task: $task,
+            actor: $taskActor,
+        );
+
+        $this->assertDatabaseMissing('automation_behavior_occurrences', [
+            'action_key' => RecordManualTaskAutomationBehaviorAction::COMPOUND_ACTION_KEY,
+        ]);
+    }
+
+    public function test_repeated_compound_patterns_for_distinct_contacts_become_eligible(): void
+    {
+        $actor = User::factory()->create();
+
+        $fromStatus = ContactStatus::query()->create([
+            'key' => 'prospect',
+            'name' => 'Prospect',
+            'is_active' => true,
+        ]);
+
+        $toStatus = ContactStatus::query()->create([
+            'key' => 'attempting_contact',
+            'name' => 'Attempting Contact',
+            'is_active' => true,
+        ]);
+
+        foreach (Contact::factory()->count(3)->create() as $index => $contact) {
+            $changedAt = CarbonImmutable::parse('2026-07-10 14:00:00', 'UTC')
+                ->addMinutes($index * 20);
+
+            ContactWorkflowProfile::query()->create([
+                'contact_id' => $contact->getKey(),
+                'contact_status_id' => $toStatus->getKey(),
+                'last_status_changed_at' => $changedAt,
+                'meta' => [
+                    'last_status_change' => [
+                        'from_contact_status_id' => $fromStatus->getKey(),
+                        'to_contact_status_id' => $toStatus->getKey(),
+                        'reason' => 'crm_manual_status_update',
+                        'source' => 'crm',
+                        'actor_type' => $actor->getMorphClass(),
+                        'actor_id' => $actor->getKey(),
+                        'changed_at' => $changedAt->toISOString(),
+                        'meta' => [
+                            'source' => 'contact_show_status_form',
+                        ],
+                    ],
+                ],
+            ]);
+
+            $taskCreatedAt = $changedAt->addMinutes(3);
+
+            $task = Task::factory()->relatedTo($contact)->create([
+                'source' => Task::SOURCE_MANUAL,
+                'title' => 'Call this contact',
+                'task_template_key' => null,
+                'created_at' => $taskCreatedAt,
+                'updated_at' => $taskCreatedAt,
+            ]);
+
+            app(RecordManualTaskAutomationBehaviorAction::class)->handle(
+                task: $task,
+                actor: $actor,
+            );
+        }
+
+        $compoundOpportunity = AutomationOpportunity::query()
+            ->forAction(RecordManualTaskAutomationBehaviorAction::COMPOUND_ACTION_KEY)
+            ->firstOrFail();
+
+        $this->assertSame(3, $compoundOpportunity->occurrence_count);
+        $this->assertSame(3, $compoundOpportunity->distinct_subject_count);
+        $this->assertSame(AutomationOpportunity::STATUS_ELIGIBLE, $compoundOpportunity->status);
+        $this->assertNotNull($compoundOpportunity->eligible_at);
     }
 }
