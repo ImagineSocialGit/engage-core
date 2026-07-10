@@ -1,4 +1,5 @@
 
+
 # Engage Core UI/UX Guide
 
 This guide turns Engage Core's product principles into practical interface rules.
@@ -670,6 +671,56 @@ Where should template assignment changes happen for send-message points?
 ```
 
 Until those answers are documented, implementation should focus on exploration, vocabulary, information architecture, and consequence-preview rules rather than replacing the binding UI with another incomplete cockpit.
+
+## Contextual automation discovery
+
+Engage Core should help users discover automation from work they are already doing instead of requiring them to understand Route Management first.
+
+Route Management is the control center:
+
+```text
+What happens automatically, and why?
+```
+
+Contextual automation suggestions are the discovery layer:
+
+```text
+You just repeated something that may be worth handling automatically next time.
+```
+
+Only show a suggestion when durable occurrence evidence and current eligibility support it.
+
+Good:
+
+```text
+You've created this task for 3 contacts in Attempting Contact.
+Add it to their Route so it happens automatically next time?
+```
+
+Avoid:
+
+```text
+Would you like to automate this?
+```
+
+after the first occurrence or after every manual action.
+
+Suggestions should:
+
+```text
+stay silent for one-off behavior
+explain the exact repeated pattern
+use plain business language
+avoid confidence scores or AI language
+avoid suggesting automation that already exists
+provide one clear next action
+allow dismissal or snoozing
+never create or change automation without explicit approval
+```
+
+Do not turn Engage Core into Clippy. Contextual assistance should be sparse, evidence-based, and useful.
+
+Detailed persistence and producer rules live in `docs/automation-opportunities.md`.
 
 ## Messaging, Broadcasts, and Campaigns UI
 

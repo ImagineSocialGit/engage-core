@@ -1,6 +1,7 @@
 
 
 
+
 # Core Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -213,6 +214,18 @@ Core `ContactController` may ask registries for module-provided data.
 Core `ContactController` must not directly import module-specific models/services such as Tasks, Messaging, InboundMessaging, InternalNotifications, Webinars, Campaigns, Mortgage, or FlowRoutes.
 
 
+## Automation opportunity producer boundary
+
+Core may host manual CRM entry points that produce meaningful behavior occurrences, but Core does not own cross-module Automation Opportunities infrastructure.
+
+Manual Contact status changes are a candidate producer because the CRM path already has explicit actor/source/reason context.
+
+Repeated status transitions often prove a pattern without proving the correct automatic trigger. Treat those as exploratory opportunities unless enough context exists for a specific automation suggestion.
+
+Do not add automation-opportunity state to `contacts` or `contact_statuses`.
+
+Do not make Core depend on FlowRoutes merely to record an occurrence.
+
 ## Contact show shell
 
 Core owns the contact show shell and generic contact details.
@@ -227,7 +240,3 @@ Contact show should lead with next action and use module-provided summaries belo
 ```
 
 Core may render module-provided DTOs/arrays/views, but it should not query module tables directly.
-
-
-
-

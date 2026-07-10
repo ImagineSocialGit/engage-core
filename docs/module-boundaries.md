@@ -1,3 +1,4 @@
+
 # Engage Core Module Boundaries
 
 Engage Core is a modular contact engagement platform.
@@ -958,6 +959,36 @@ Good direct calls:
     Campaigns -> Messaging schedule/send actions
 
 Do not route everything through automation events just for purity.
+
+## Automation Opportunities shared infrastructure
+
+Automation Opportunities are app-level shared infrastructure for noticing repeated meaningful manual work and suggesting automation without acting autonomously.
+
+Detailed contract: `docs/automation-opportunities.md`.
+
+Keep these concepts distinct:
+
+```text
+AutomationEventRecorded
+    neutral domain/business outcome that automation may react to
+
+AutomationBehaviorOccurrence
+    intentionally observed meaningful manual action
+
+AutomationOpportunity
+    repeated behavior pattern that may justify a suggestion
+
+FlowRoutes
+    owns accepted automation/control-flow execution
+```
+
+Participating modules explicitly opt in. Do not implement generic clickstream tracking, global Eloquent observation, or arbitrary request capture.
+
+The owning producer module decides what makes two actions meaningfully equivalent and supplies compact fingerprint parts/context. Shared infrastructure normalizes/hashes fingerprints, persists occurrences, aggregates opportunities, tracks lifecycle, and exposes suggestion read seams.
+
+Shared opportunity infrastructure may reference stable automation capability keys. It should not canonically depend on FlowRoutes-owned database IDs merely to represent that a behavior could be automated.
+
+Producer modules must not depend on FlowRoutes to record occurrences. FlowRoutes remains the destination for accepted automation where applicable.
 
 ## Core Module
 

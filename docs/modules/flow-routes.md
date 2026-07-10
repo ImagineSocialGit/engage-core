@@ -1,4 +1,5 @@
 
+
 # FlowRoutes Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -655,6 +656,40 @@ task.flow_route_id
 task.flow_route_point_id
 task.flow_route_capability_id
 ```
+
+## Relationship to Automation Opportunities
+
+FlowRoutes does not own behavior observation or opportunity aggregation.
+
+Shared Automation Opportunities infrastructure may detect that a user repeatedly performs a meaningful manual action and may suggest that the behavior be added to a Route.
+
+Responsibility split:
+
+```text
+Automation Opportunities
+    notices repeated manual behavior and determines suggestion eligibility
+
+Automation capability registry
+    describes what can be automated
+
+FlowRoutes
+    owns accepted route/control-flow definition and execution
+```
+
+Automation Opportunities may reference stable capability keys where applicable. Shared infrastructure should not canonically depend on `flow_route_capability_id` merely to represent that a behavior is automatable.
+
+Equivalent-automation checks should be dynamic because Routes, points, capabilities, bindings, active state, and versions can change. Do not persist a permanent `already_automated` truth on an opportunity.
+
+Producer modules must not depend on FlowRoutes to record manual behavior occurrences.
+
+Client-facing Route discovery may use contextual suggestions such as:
+
+```text
+You've created this task for 3 contacts in Attempting Contact.
+Add it to their Route so it happens automatically next time?
+```
+
+Route Management remains the control center for reviewing what happens automatically. Contextual automation suggestions are the discovery layer.
 
 ## Client-facing Route Management terminology
 

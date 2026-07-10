@@ -1,3 +1,4 @@
+
 # Engage Core Client-Readiness Roadmap
 
 This roadmap tracks the near-term implementation order for getting Engage Core ready for real client operation without treating the work as a limited or throwaway MVP.
@@ -132,7 +133,7 @@ Current schema-discovery sequence:
 | 8 | Permission invitation cancellation / skip / failure bookkeeping | Complete | DB/schema + architecture | No schema change was needed. Pre-claim skips/cancellation create no invitation row; post-claim scheduled-message skips reconcile matching claimed invitations to failed; provider failures remain failed across Messaging and invitation state; failed invitations stay one-time-blocking. |
 | 9 | Webinar message readiness check | Complete | Architecture + operator safety | Computed Webinars-owned readiness now evaluates runtime Messaging resolution, channel availability, active schedule-profile effects, intentional disablement, registration/waitlist opt-ins, and post-event outcome-message enablement without persisting readiness state. |
 | 10 | Manual status-change automation warning foundation | Complete | Operator safety + architecture | Backend-only consequence preview is implemented through a read-only FlowRoutes-owned impact resolver. It reports whether selected status-based FlowRoutes would run and which routes are selected without starting route progress. The actual operator warning UX is deferred to Phase 11. |
-| 11 | Automatic Follow-ups / FlowRoutes UX polish | Planned | UI/UX + architecture | Redesign Route Binding around business outcomes, consequence previews, and client/operator language after the FlowRoutes capability/instance-plan/runtime model is settled. |
+| 11 | Automation opportunity foundation + Automatic Follow-ups / FlowRoutes UX | In progress | DB/schema + architecture + UI/UX | Phase 11 expanded after UX audit revealed a durable product need: persist meaningful manual behavior occurrences, aggregate automation opportunities, integrate justified producers, then use those seams for contextual Route discovery and Route Management UX. |
 | 12 | Dashboard / contact workspace polish audit | Planned | UI/UX + possible schema | Review orientation surfaces after core runtime pieces settle. Add persisted preferences/acknowledgements only when needed. |
 | 13 | FOSS-informed module schema audit | Planned | DB/schema audit | Compare Engage Core modules against mature FOSS patterns to identify likely missing persisted concepts before production. Pull FlowRoutes-specific FOSS/OSS pattern review earlier into Phase 4 if helpful. |
 
@@ -154,6 +155,60 @@ Deferred launch hardening:
 
 Do not build DB snapshot/export tooling during active pre-production schema discovery unless real data preservation becomes necessary. While the product is not yet in production, schema-heavy phases may replace branch migrations and reset local/staging data as needed. Add command-line SQL/JSONL snapshot tooling when schemas are stabilizing and production rollout is near.
 
+
+## Phase 11 automation opportunity foundation and Route discovery
+
+Phase 11 was expanded after the Route Management UX audit revealed a durable schema/architecture need before polish.
+
+The product goal is:
+
+```text
+Observe repetition.
+Explain the pattern.
+Suggest one clear next step.
+Never act without permission.
+```
+
+The agreed sequence is:
+
+```text
+1. Audit current state.
+2. Update/add durable docs.
+3. Add automation behavior occurrence and opportunity migrations/models.
+4. Add justified producer integrations module by module.
+5. Add focused and adjacent tests.
+6. Continue Route Management and contextual UX work.
+```
+
+Current architecture direction:
+
+```text
+automation_behavior_occurrences
+    append-style evidence for explicitly observed meaningful manual actions
+
+automation_opportunities
+    aggregate lifecycle for repeated patterns and suggestion eligibility
+
+app/Support/AutomationOpportunities
+    shared infrastructure; not FlowRoutes-owned
+
+producer module
+    owns semantic fingerprint inputs for its manual action
+
+shared infrastructure
+    normalizes/hashes fingerprints, persists occurrences, aggregates opportunities
+
+FlowRoutes
+    remains the owner of accepted automation/control-flow execution
+```
+
+The first producer should be manual Contact-associated Task creation.
+
+Manual Contact status changes are a strong second producer candidate, but often produce exploratory opportunities because repeated transitions do not necessarily reveal the correct automatic trigger.
+
+Do not build clickstream tracking, generic AI recommendations, confidence scores, or autonomous Route creation.
+
+Detailed contract: `docs/automation-opportunities.md`.
 
 ## Phase 4B FlowRoutes schema hardening completion
 
@@ -226,7 +281,7 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | 8 | Permission invitation cancellation behavior | Complete | Pre-claim skips/cancellations create no invitation row; post-claim skips reconcile claimed invitations to failed; provider failures remain failed; no new invitation statuses or schema changes were required. |
 | 9 | Webinar message readiness check | Complete | Computed readiness is available for registration confirmations, registration opt-ins, reminders, waitlist alerts, waitlist opt-ins, and post-event follow-ups. Readiness is derived from runtime resolution, channel availability, active schedule-profile effects, and post-event enablement; no readiness state is persisted. |
 | 10 | Manual status-change automation warning foundation | Complete | FlowRoutes exposes a read-only `ContactStatusAutomationImpactResolver` and plural status-trigger route resolution. No schema, controller, or Blade changes were required. The actual warning interaction belongs to Phase 11 UX work. |
-| 11 | Automatic Follow-ups / FlowRoutes UX polish | 1–3 sessions for first product pass | Redesign the current Route Binding surface around business outcomes and consequence previews after the capability/instance-plan/runtime model is settled. |
+| 11 | Automation opportunity foundation + Automatic Follow-ups / FlowRoutes UX | In progress | First complete shared occurrence/opportunity foundation and justified producers, then redesign Route Management around business outcomes, contextual discovery, and consequence previews. |
 | 12 | Dashboard / contact workspace polish audit | 1–2 sessions | Review shared orientation surfaces after runtime behavior settles. Add persisted state only for proven needs such as acknowledgements or preferences. |
 | 13 | FOSS-informed module schema audit | 2–6 sessions, split by module group | Compare Engage Core module tables against mature FOSS patterns to catch likely missing persisted concepts before production. |
 | Deferred | DB Snapshot / Export Safety Tool | 0.5–1.5 sessions near launch | Command-line SQL/JSONL snapshot tooling for production/launch hardening. Do not build during active pre-prod schema discovery unless real data preservation becomes necessary. |
@@ -632,7 +687,9 @@ This is durable schema/architecture work completed before production rollout, no
 
 Phases 9 and 10 are complete.
 
-Phase 11 is the next implementation target: Automatic Follow-ups / FlowRoutes UX polish. The backend runtime, capability, route-instance plan model, plural status-trigger resolution, and read-only contact-status automation impact preview are now in place. Phase 11 should use those seams for business-language route selection and consequence previews rather than redesigning runtime architecture again.
+Phase 11 is in progress. The first Route Management UX audit revealed a durable automation-opportunity foundation that should be completed before polish: record explicitly opted-in meaningful manual actions, aggregate repeated patterns, expose deterministic suggestion eligibility, integrate justified producer modules, then use those seams for contextual Route discovery and business-language Route Management UX.
+
+Do not redesign existing FlowRoutes runtime architecture unless the implementation proves a genuine missing seam. Detailed direction lives in `docs/automation-opportunities.md`.
 
 ## What this roadmap intentionally avoids
 

@@ -1,5 +1,6 @@
 
 
+
 # Engage Core Product Principles
 
 Engage Core is a dev-built operating system for small service businesses.
@@ -180,6 +181,38 @@ Internal keys, presets, events, triggers, task-template identifiers, route ident
 Client-facing UI and copy may use the configured business noun that fits the client or vertical, such as Lead, Customer, Fan, Borrower, Owner, or Member. That display language must not redefine the universal internal concept.
 
 This split lets Engage Core feel natural in different industries without creating different internal standards for the same person record.
+
+## Helpful automation discovery, not autonomous AI
+
+Engage Core may quietly notice repeated meaningful manual work and suggest a simpler automated path.
+
+The product rule is:
+
+```text
+Observe repetition.
+Explain the pattern.
+Suggest one clear next step.
+Never act without permission.
+```
+
+Good:
+
+```text
+You've created this task for 3 contacts in Attempting Contact.
+Add it to their Route so it happens automatically next time?
+```
+
+Avoid:
+
+```text
+Automation opportunity detected with confidence score 0.84.
+```
+
+The system should stay silent after one-off actions, avoid constant prompting, explain why a suggestion appeared, avoid suggesting behavior that is already automated, and never create Routes or change business behavior without explicit approval.
+
+This is deterministic assistance intended to make the product feel easier and less intimidating. It is not a general AI agent, recommendation engine, or behavioral-surveillance system.
+
+Detailed architecture lives in `automation-opportunities.md`.
 
 ## UX standard
 

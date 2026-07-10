@@ -1,3 +1,4 @@
+
 # Workflow Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -54,3 +55,26 @@ The eventual operator warning/confirmation UI should consume that FlowRoutes-own
 Workflow should not depend on FlowRoutes.
 
 Workflow should not call FlowRoutes directly.
+
+## Automation opportunity producer boundary
+
+Workflow owns durable Contact workflow transitions and emits `ContactWorkflowStatusChanged` after real status changes.
+
+The CRM manual status-change path is a candidate source for Automation Opportunities because transition data already includes:
+
+```text
+from status
+to status
+reason
+source
+actor
+occurred_at
+meta
+```
+
+Do not make every Workflow transition a behavior occurrence. Only an unambiguous manual path should opt in.
+
+Repeated manual transitions may be exploratory rather than directly automatable because the transition alone may not reveal whether the intended trigger is a form submission, webinar outcome, task completion, elapsed time, document upload, or another event.
+
+Workflow should not depend on FlowRoutes or own automation-opportunity aggregation.
+

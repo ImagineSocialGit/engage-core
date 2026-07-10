@@ -1,3 +1,4 @@
+
 # Engage Core TODO
 
 This file is intentionally disposable. Add work here when it is real but not yet ready for an implementation slice. Delete items as they are completed. Do not treat this as an architectural reference; long-lived decisions belong in `module-boundaries.md` or a feature-specific doc.
@@ -14,6 +15,9 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - The page should avoid platform-cockpit sprawl: too many modules, widgets, logs, builders, raw keys, and settings at once.
   - Powerful features should default to summaries, presets, guided choices, and consequence previews.
 - [ ] Run an Automatic Follow-ups / FlowRoute binding UX exploration before implementation.
+  - Treat contextual automation opportunities as the discovery layer and Route Management as the control center.
+  - Do not prompt after one-off behavior; require durable evidence and current eligibility.
+  - Explain the repeated pattern in plain language and never act without approval.
   - Do not start UX polish until the FlowRoutes capability/instance-plan/runtime model is settled.
   - Decide whether the first version selects prebuilt routes only, edits route points, or only previews selected behavior.
   - Decide intended user type: client, operator, developer, or split surfaces.
@@ -274,6 +278,21 @@ Deferred launch hardening:
   - Keep command-line only; no CRM UI.
   - SQL dump should be the primary restore safety net.
   - JSONL table exports should be for inspection, diffing, selective recovery, and debugging.
+
+### Automation opportunity foundation
+
+- [ ] Add `docs/automation-opportunities.md` and keep architecture/product rules current.
+- [ ] Add durable `automation_behavior_occurrences` and `automation_opportunities` schema using current migration conventions.
+- [ ] Add models and shared `app/Support/AutomationOpportunities` infrastructure.
+- [ ] Keep `AutomationEventRecorded` distinct from manual behavior occurrences.
+- [ ] Require explicit producer opt-in; do not add clickstream/global Eloquent observation.
+- [ ] Keep fingerprint semantics producer-owned and hashing/normalization shared.
+- [ ] Use stable capability keys where applicable instead of canonically depending on FlowRoutes DB IDs.
+- [ ] Add manual Contact-associated Task creation as the first producer.
+- [ ] Audit manual Contact status changes as the second producer and distinguish direct from exploratory suggestions.
+- [ ] Add eligibility checks for threshold, distinct subjects, recency, capability availability, dismissal/snooze state, conversion state, and equivalent existing automation.
+- [ ] Add focused tests, adjacent module tests, and boundary tests.
+- [ ] Continue Route Management/contextual UX only after the foundation and first producer behavior are trustworthy.
 
 ## One-off backlog
 

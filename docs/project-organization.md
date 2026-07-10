@@ -1,5 +1,6 @@
 
 
+
 # Engage Core Project Organization
 
 This document is a quick orientation map for Engage Core. It classifies the project into Core, universal modules, vertical modules, and integrations/adapters.
@@ -83,6 +84,25 @@ It should be driven by config slots, preset priorities, and module-contributed p
 The contact show page is Core-owned because Core owns generic contact identity and CRM contact pages.
 
 Feature modules contribute contact-specific information through Core-owned registries. Core should not import feature-module models directly to build the page.
+
+## Shared automation infrastructure
+
+Engage Core has shared app-level automation seams that are not feature modules:
+
+```text
+app/Support/AutomationEvents
+    neutral business/domain outcomes that automation may react to
+
+app/Support/AutomationCapabilities
+    module-contributed catalog of what can be automated
+
+app/Support/AutomationOpportunities
+    repeated meaningful manual behavior and suggestion lifecycle
+```
+
+`AutomationOpportunities` should observe only explicitly contributed meaningful manual actions. It is not clickstream analytics and should not record arbitrary page views, clicks, requests, or model saves.
+
+Detailed direction lives in `docs/automation-opportunities.md`.
 
 ## Universal Modules
 

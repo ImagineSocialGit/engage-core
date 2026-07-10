@@ -3,6 +3,7 @@
 
 
 
+
 # Tasks Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -298,6 +299,44 @@ Examples:
 - viewing a task may link to the task detail page, the related contact, or a contact task section depending on the final task workspace model.
 
 This is not part of the Phase 3 schema-discovery requirement unless the task UX reveals missing persisted concepts such as saved task views, per-user task panel state, task action acknowledgements, selected-task batches, or durable task broadcast batches.
+
+## Automation opportunity producer direction
+
+Tasks is the first recommended producer for the shared Automation Opportunities infrastructure.
+
+The initial meaningful behavior is:
+
+```text
+task.created_manually
+```
+
+The first slice should focus on manual Tasks related to a Contact because those can produce a specific, understandable Route suggestion.
+
+Example:
+
+```text
+You've created this task for 3 contacts in Attempting Contact.
+Add it to their Route so it happens automatically next time?
+```
+
+Tasks owns the semantic fingerprint inputs for deciding whether two manual Task creations are meaningfully equivalent.
+
+Recommended inputs:
+
+```text
+related subject type
+task_template_key when available
+normalized title when no template exists
+Contact status key when available
+```
+
+Shared Automation Opportunities infrastructure owns deterministic normalization/hashing, occurrence persistence, aggregation, lifecycle, and generic eligibility state.
+
+Do not record FlowRoute-created, module-created, or system-created Tasks as manual behavior occurrences.
+
+Do not put manual behavior recording inside generic `CreateTaskAction` merely because all Task creation passes through it. Record from an unambiguous manual application/UI seam such as the manual Task controller path, unless a later Tasks-owned manual creation action is introduced.
+
+Standalone manual Tasks may become a producer later, but they do not have Contact-status Route context by default and should not be forced into the first slice.
 
 ## Events
 
