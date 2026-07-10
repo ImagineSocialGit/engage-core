@@ -718,9 +718,16 @@
 │       │   └── Events
 │       │       └── AutomationEventRecorded.php
 │       ├── AutomationOpportunities
-│       │   └── Models
-│       │       ├── AutomationBehaviorOccurrence.php
-│       │       └── AutomationOpportunity.php
+│       │   ├── Actions
+│       │   │   ├── EvaluateAutomationOpportunityAction.php
+│       │   │   └── RecordAutomationBehaviorOccurrenceAction.php
+│       │   ├── Data
+│       │   │   └── AutomationBehaviorData.php
+│       │   ├── Models
+│       │   │   ├── AutomationBehaviorOccurrence.php
+│       │   │   └── AutomationOpportunity.php
+│       │   └── Services
+│       │       └── AutomationBehaviorFingerprintBuilder.php
 │       ├── Caching
 │       │   └── CacheKey.php
 │       ├── Clients
@@ -1285,6 +1292,10 @@
 │   ├── Feature
 │   │   ├── Auth
 │   │   │   └── LoginThrottlingTest.php
+│   │   ├── AutomationOpportunities
+│   │   │   ├── AutomationBehaviorFingerprintBuilderTest.php
+│   │   │   ├── EvaluateAutomationOpportunityActionTest.php
+│   │   │   └── RecordAutomationBehaviorOccurrenceActionTest.php
 │   │   ├── Broadcasts
 │   │   │   ├── BroadcastControllerTest.php
 │   │   │   ├── BroadcastModelTest.php
@@ -1419,4 +1430,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-457 directories, 963 files
+461 directories, 970 files
