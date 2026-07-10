@@ -103,6 +103,16 @@ class GrantMessageConsentAction
                         purpose: $purpose,
                         scope: $scope,
                         dispatchKeys: 'consent_granted',
+                        behavior: [
+                            'timing' => 'immediate',
+                        ],
+                        occurrenceKey: implode(':', [
+                            'consent_granted',
+                            $consent->getKey(),
+                            $channel,
+                            $purpose,
+                            $scope,
+                        ]),
                         payload: $optInPayload,
                         context: $context,
                         meta: [

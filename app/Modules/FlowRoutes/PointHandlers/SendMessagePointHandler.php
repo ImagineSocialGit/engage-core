@@ -67,6 +67,7 @@ class SendMessagePointHandler implements PointHandler
                 triggeredAt: now(),
                 sendAt: now(),
                 behaviorOwner: $context->flowRoutePoint,
+                occurrenceKey: $this->occurrenceKey($context),
                 meta: $this->meta($definition, $context),
                 criteria: $definition->criteria,
             );
@@ -181,4 +182,14 @@ class SendMessagePointHandler implements PointHandler
             default => PointExecutionResult::skipped('send_message_no_messages_scheduled', $meta),
         };
     }
+    private function occurrenceKey(PointExecutionContext $context): string
+    {
+        return implode(':', array_filter([
+            'flow_route_point',
+            $context->progressItem?->getKey(),
+            $context->progress->getKey(),
+            $context->flowRoutePoint->getKey(),
+        ], fn (mixed $value): bool => $value !== null));
+    }
+
 }

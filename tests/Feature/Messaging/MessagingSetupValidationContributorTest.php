@@ -40,7 +40,6 @@ class MessagingSetupValidationContributorTest extends TestCase
         Config::set('messaging.email.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
-                'timing' => 'immediate',
                 'payload_class' => EmailPayload::class,
                 'queue' => 'confirmation_messages',
                 'payload' => [
@@ -58,11 +57,6 @@ class MessagingSetupValidationContributorTest extends TestCase
         Config::set('messaging.email.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
-                'timing' => 'scheduled',
-                'schedule' => [
-                    'type' => 'invalid_schedule',
-                    'minutes' => 'soon',
-                ],
                 'payload_class' => 'Missing\\Payload',
                 'queue' => '',
                 'payload' => [
@@ -75,8 +69,7 @@ class MessagingSetupValidationContributorTest extends TestCase
         $messages = array_column($findings, 'message');
 
         $this->assertContains('Payload class does not exist.', $messages);
-        $this->assertContains('Schedule type must be delay or anchored.', $messages);
-        $this->assertContains('Schedule minutes must be an integer.', $messages);
+        $this->assertContains('Message definition has invalid [queue].', $messages);
         $this->assertContains('Email payload requires a body.', $messages);
     }
 
@@ -92,7 +85,6 @@ class MessagingSetupValidationContributorTest extends TestCase
             'payload_class' => 'Missing\\Payload',
             'queue' => '',
             'dispatch_keys' => [],
-            'timing' => 'immediate',
             'payload' => [
                 'subject' => 'Subject only',
             ],
@@ -231,7 +223,6 @@ class MessagingSetupValidationContributorTest extends TestCase
         Config::set('messaging.email.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
-                'timing' => 'immediate',
                 'payload_class' => 'Missing\\Payload',
                 'queue' => 'confirmation_messages',
                 'payload' => [
@@ -267,7 +258,6 @@ class MessagingSetupValidationContributorTest extends TestCase
             'payload_class' => EmailPayload::class,
             'queue' => 'confirmation_messages',
             'dispatch_keys' => ['registration_created'],
-            'timing' => 'immediate',
             'payload' => [
                 'subject' => 'Registered',
                 'body' => 'Thanks',

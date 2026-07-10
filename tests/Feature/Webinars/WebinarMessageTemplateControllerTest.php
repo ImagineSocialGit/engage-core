@@ -223,8 +223,6 @@ class WebinarMessageTemplateControllerTest extends TestCase
             'usage_type' => 'webinar_confirmation',
             'group_label' => 'Webinar Confirmations',
             'item_label' => 'Confirmation Email',
-            'timing' => 'immediate',
-            'schedule' => null,
         ]);
 
         MessageTemplatePresetAssignment::factory()
@@ -252,6 +250,7 @@ class WebinarMessageTemplateControllerTest extends TestCase
             'surface' => 'webinar_registrations',
             'message_type' => 'confirmation',
             'dispatch_key' => 'registration_created',
+            'message_template_key' => $preset->key,
             'source_config_path' => $preset->source_config_path,
             'is_enabled' => true,
             'is_active' => true,

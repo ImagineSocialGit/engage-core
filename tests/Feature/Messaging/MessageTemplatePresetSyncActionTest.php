@@ -22,7 +22,6 @@ class MessageTemplatePresetSyncActionTest extends TestCase
                 'webinar' => [
                     'confirmation' => [
                         'dispatch_key' => 'registration_created',
-                        'timing' => 'immediate',
                         'payload_class' => EmailPayload::class,
                         'queue' => 'confirmation_messages',
                         'payload' => [
@@ -145,8 +144,6 @@ class MessageTemplatePresetSyncActionTest extends TestCase
                         [
                             'key' => 'webinar_reminder_1_day',
                             'dispatch_key' => 'registration_created',
-                            'timing' => 'scheduled',
-                            'schedule' => ['type' => 'anchored', 'minutes' => -1440],
                             'payload_class' => EmailPayload::class,
                             'queue' => 'reminders',
                             'payload' => [
@@ -157,8 +154,6 @@ class MessageTemplatePresetSyncActionTest extends TestCase
                         [
                             'key' => 'webinar_reminder_30_minute',
                             'dispatch_key' => 'registration_created',
-                            'timing' => 'scheduled',
-                            'schedule' => ['type' => 'anchored', 'minutes' => -30],
                             'payload_class' => EmailPayload::class,
                             'queue' => 'reminders',
                             'payload' => [
@@ -213,7 +208,6 @@ class MessageTemplatePresetSyncActionTest extends TestCase
                 'webinar' => [
                     'confirmation' => [
                         'dispatch_key' => 'registration_created',
-                        'timing' => 'immediate',
                         'payload_class' => EmailPayload::class,
                         'queue' => 'confirmation_messages',
                         'payload' => [
@@ -264,7 +258,6 @@ class MessageTemplatePresetSyncActionTest extends TestCase
                 'webinar' => [
                     'confirmation' => [
                         'dispatch_key' => 'registration_created',
-                        'timing' => 'immediate',
                         'payload_class' => EmailPayload::class,
                         'queue' => 'confirmation_messages',
                         'payload' => [
@@ -317,7 +310,6 @@ class MessageTemplatePresetSyncActionTest extends TestCase
                 'webinar' => [
                     'confirmation' => [
                         'dispatch_key' => 'registration_created',
-                        'timing' => 'immediate',
                         'payload_class' => EmailPayload::class,
                         'queue' => 'confirmation_messages',
                         'payload' => [
@@ -371,13 +363,8 @@ class MessageTemplatePresetSyncActionTest extends TestCase
                         [
                             'key' => 'webinar_reminder_30_minute',
                             'dispatch_key' => 'registration_created',
-                            'timing' => 'scheduled',
                             'payload_class' => EmailPayload::class,
                             'queue' => 'reminders',
-                            'schedule' => [
-                                'type' => 'anchored',
-                                'minutes' => -30,
-                            ],
                             'payload' => [
                                 'subject' => '30 minutes',
                                 'body' => 'Join soon, {first_name}.',
@@ -386,13 +373,8 @@ class MessageTemplatePresetSyncActionTest extends TestCase
                         [
                             'key' => 'webinar_reminder_10_minute',
                             'dispatch_key' => 'registration_created',
-                            'timing' => 'scheduled',
                             'payload_class' => EmailPayload::class,
                             'queue' => 'reminders',
-                            'schedule' => [
-                                'type' => 'anchored',
-                                'minutes' => -10,
-                            ],
                             'payload' => [
                                 'subject' => '10 minutes',
                                 'body' => 'Join now, {first_name}.',

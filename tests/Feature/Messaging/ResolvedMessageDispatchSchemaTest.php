@@ -18,6 +18,11 @@ class ResolvedMessageDispatchSchemaTest extends TestCase
         ]));
     }
 
+    public function test_webinar_profile_items_store_stable_template_identity(): void
+    {
+        $this->assertTrue(Schema::hasColumn('webinar_schedule_profile_items', 'message_template_key'));
+    }
+
     public function test_message_template_presets_do_not_store_business_behavior(): void
     {
         $this->assertFalse(Schema::hasColumn('message_template_presets', 'timing'));

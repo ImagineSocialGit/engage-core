@@ -15,6 +15,7 @@ final readonly class ResolvedMessageDispatch
         public array $definition,
         public Carbon $sendAt,
         public ?Model $behaviorOwner = null,
+        public ?string $occurrenceKey = null,
         public array $meta = [],
     ) {}
 }

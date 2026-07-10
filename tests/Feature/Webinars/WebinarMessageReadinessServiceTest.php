@@ -95,18 +95,9 @@ class WebinarMessageReadinessServiceTest extends TestCase
                 dispatchKey: 'registration_created',
                 subject: 'Registered',
             ),
-            'reminder' => array_replace_recursive(
-                $this->definition(
-                    dispatchKey: 'registration_created',
-                    subject: 'Reminder',
-                ),
-                [
-                    'timing' => 'scheduled',
-                    'schedule' => [
-                        'type' => 'anchored',
-                        'minutes' => -30,
-                    ],
-                ],
+            'reminder' => $this->definition(
+                dispatchKey: 'registration_created',
+                subject: 'Reminder',
             ),
         ]);
 
@@ -163,6 +154,7 @@ class WebinarMessageReadinessServiceTest extends TestCase
             'surface' => 'webinar_registrations',
             'message_type' => 'reminder',
             'dispatch_key' => 'registration_created',
+            'message_template_key' => 'reminder',
             'is_enabled' => false,
             'is_active' => true,
             'timing' => 'scheduled',
@@ -190,18 +182,9 @@ class WebinarMessageReadinessServiceTest extends TestCase
                 dispatchKey: 'consent_granted',
                 subject: 'Subscribed',
             ),
-            'reminder' => array_replace_recursive(
-                $this->definition(
-                    dispatchKey: 'registration_created',
-                    subject: 'Reminder',
-                ),
-                [
-                    'timing' => 'scheduled',
-                    'schedule' => [
-                        'type' => 'anchored',
-                        'minutes' => -30,
-                    ],
-                ],
+            'reminder' => $this->definition(
+                dispatchKey: 'registration_created',
+                subject: 'Reminder',
             ),
         ]);
     }
@@ -213,7 +196,6 @@ class WebinarMessageReadinessServiceTest extends TestCase
     {
         return [
             'dispatch_key' => $dispatchKey,
-            'timing' => 'immediate',
             'payload_class' => EmailPayload::class,
             'queue' => 'notifications',
             'payload' => [

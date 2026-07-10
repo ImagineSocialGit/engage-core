@@ -287,6 +287,11 @@ class SyncWebinarScheduleProfilesAction
                 'dispatch_key',
                 "webinars.schedule_profiles.{$profile->key}.items.{$index}.dispatch_key",
             )),
+            'message_template_key' => $this->normalizeSegment($this->requiredString(
+                $config,
+                'message_template_key',
+                "webinars.schedule_profiles.{$profile->key}.items.{$index}.message_template_key",
+            )),
             'source_config_path' => $this->nullableString($config['source_config_path'] ?? null),
             'is_enabled' => (bool) ($config['is_enabled'] ?? true),
             'is_active' => (bool) ($config['is_active'] ?? true),

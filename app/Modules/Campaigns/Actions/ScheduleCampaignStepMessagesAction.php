@@ -193,6 +193,12 @@ class ScheduleCampaignStepMessagesAction
                 'source_config_path' => $variant->source_config_path,
             ],
             definitions: [$definition],
+            occurrenceKey: implode(':', [
+                'campaign',
+                $enrollment->getKey(),
+                $step->getKey(),
+                $variant->getKey(),
+            ]),
         );
 
         $scheduledMessage = $scheduledMessages[0] ?? null;

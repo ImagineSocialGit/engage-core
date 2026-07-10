@@ -80,6 +80,7 @@ class ScheduleBroadcastAction
                     triggeredAt: now(),
                     sendAt: $sendAt,
                     behaviorOwner: $broadcast,
+                    occurrenceKey: 'broadcast:'.$broadcast->getKey(),
                     meta: [
                         'queue' => $broadcast->queue,
                         'dispatch_keys' => [$broadcast->dispatch_key],

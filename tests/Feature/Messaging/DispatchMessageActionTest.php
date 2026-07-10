@@ -29,10 +29,9 @@ class DispatchMessageActionTest extends TestCase
         Config::set('messaging.email.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
-                'timing' => 'immediate',
                 'payload_class' => EmailPayload::class,
                 'queue' => 'confirmation_messages',
-
+                
                 'payload' => [
                     'subject' => 'Registered',
                     'body' => 'Hello {first_name}',
@@ -48,6 +47,9 @@ class DispatchMessageActionTest extends TestCase
             purpose: 'transactional',
             scope: 'webinar',
             dispatchKeys: 'registration_created',
+            behavior: [
+                'timing' => 'immediate',
+            ],
         );
 
         $this->assertCount(1, $messages);
@@ -75,7 +77,6 @@ class DispatchMessageActionTest extends TestCase
         Config::set('messaging.email.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'consent_granted',
-                'timing' => 'immediate',
                 'payload_class' => EmailPayload::class,
                 'queue' => 'notifications',
                 'payload' => [
@@ -87,145 +88,6 @@ class DispatchMessageActionTest extends TestCase
 
         app(DispatchMessageAction::class)->handle(
             recipient: $this->contactWithConsent(),
-            channel: 'email',
-            purpose: 'transactional',
-            scope: 'webinar',
-            dispatchKeys: 'registration_created',
-        );
-
-        $this->assertDatabaseCount(
-            'scheduled_messages',
-            0
-        );
-    }
-
-    public function test_it_creates_delay_schedule(): void
-    {
-        Queue::fake();
-
-        Carbon::setTestNow('2026-06-11 09:00:00');
-
-        Config::set('messaging.email.transactional.webinar', [
-            'follow_up' => [
-                'dispatch_key' => 'webinar_ended',
-
-                'timing' => 'scheduled',
-
-                'schedule' => [
-                    'type' => 'delay',
-                    'minutes' => 15,
-                ],
-
-                'payload_class' => EmailPayload::class,
-
-                'queue' => 'notifications',
-
-                'payload' => [
-                    'subject' => 'Follow Up',
-                    'body' => 'Hi',
-                ],
-            ],
-        ]);
-
-        $triggeredAt = Carbon::parse('2026-06-11 10:00:00');
-
-        app(DispatchMessageAction::class)->handle(
-            recipient: $this->contactWithConsent(),
-            channel: 'email',
-            purpose: 'transactional',
-            scope: 'webinar',
-            dispatchKeys: 'webinar_ended',
-            triggeredAt: $triggeredAt,
-        );
-
-        $message = ScheduledMessage::first();
-
-        $this->assertNotNull($message);
-
-        $this->assertEquals(
-            $triggeredAt->copy()->addMinutes(15),
-            $message->send_at,
-        );
-    }
-
-    public function test_it_creates_anchored_schedule(): void
-    {
-        Queue::fake();
-
-        Carbon::setTestNow('2026-06-11 14:00:00');
-
-        Config::set('messaging.email.transactional.webinar', [
-            'reminder' => [
-                'dispatch_key' => 'registration_created',
-
-                'timing' => 'scheduled',
-
-                'schedule' => [
-                    'type' => 'anchored',
-                    'minutes' => -30,
-                ],
-
-                'payload_class' => EmailPayload::class,
-
-                'queue' => 'reminders',
-
-                'payload' => [
-                    'subject' => 'Reminder',
-                    'body' => 'Soon',
-                ],
-            ],
-        ]);
-
-        $anchor = Carbon::parse('2026-06-11 15:00:00');
-
-        app(DispatchMessageAction::class)->handle(
-            recipient: $this->contactWithConsent(),
-            channel: 'email',
-            purpose: 'transactional',
-            scope: 'webinar',
-            dispatchKeys: 'registration_created',
-            anchor: $anchor,
-        );
-
-        $message = ScheduledMessage::first();
-
-        $this->assertNotNull($message);
-
-        $this->assertEquals(
-            $anchor->copy()->subMinutes(30),
-            $message->send_at,
-        );
-    }
-
-    public function test_it_skips_failed_conditions(): void
-    {
-        Queue::fake();
-
-        Config::set('messaging.email.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'registration_created',
-
-                'conditions' => [
-                    'contact.source' => 'referral',
-                ],
-
-                'timing' => 'immediate',
-
-                'payload_class' => EmailPayload::class,
-
-                'queue' => 'notifications',
-
-                'payload' => [
-                    'subject' => 'A',
-                    'body' => 'B',
-                ],
-            ],
-        ]);
-
-        app(DispatchMessageAction::class)->handle(
-            recipient: $this->contactWithConsent(attributes: [
-                'source' => 'webinar',
-            ]),
             channel: 'email',
             purpose: 'transactional',
             scope: 'webinar',
@@ -246,8 +108,6 @@ class DispatchMessageActionTest extends TestCase
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
 
-                'timing' => 'immediate',
-
                 'payload_class' => EmailPayload::class,
 
                 'queue' => 'notifications',
@@ -265,6 +125,9 @@ class DispatchMessageActionTest extends TestCase
             purpose: 'transactional',
             scope: 'webinar',
             dispatchKeys: 'registration_created',
+            behavior: [
+                'timing' => 'immediate',
+            ],
             payload: [
                 'tokens' => [
                     'first_name' => 'Jeff',
@@ -299,7 +162,6 @@ class DispatchMessageActionTest extends TestCase
         Config::set('messaging.sms.marketing.broadcast', [
             'broadcast' => [
                 'dispatch_key' => 'broadcast_send',
-                'timing' => 'immediate',
                 'payload_class' => SmsPayload::class,
                 'queue' => 'marketing',
                 'payload' => [
@@ -324,6 +186,9 @@ class DispatchMessageActionTest extends TestCase
             purpose: 'marketing',
             scope: 'broadcast',
             dispatchKeys: 'broadcast_send',
+            behavior: [
+                'timing' => 'immediate',
+            ],
             payload: [
                 'message' => 'Runtime SMS broadcast.',
             ],
@@ -360,7 +225,6 @@ class DispatchMessageActionTest extends TestCase
         Config::set('messaging.sms.marketing.webinar_waitlist', [
             'opt_in' => [
                 'dispatch_key' => 'consent_granted',
-                'timing' => 'immediate',
                 'payload_class' => SmsPayload::class,
                 'queue' => 'opt_in_messages',
                 'payload' => [
@@ -385,6 +249,9 @@ class DispatchMessageActionTest extends TestCase
             purpose: 'marketing',
             scope: 'webinar_waitlist',
             dispatchKeys: 'consent_granted',
+            behavior: [
+                'timing' => 'immediate',
+            ],
         );
 
         $message = ScheduledMessage::query()->first();
@@ -404,7 +271,6 @@ class DispatchMessageActionTest extends TestCase
         Config::set('messaging.sms.marketing.broadcast', [
             'broadcast' => [
                 'dispatch_key' => 'broadcast_send',
-                'timing' => 'immediate',
                 'payload_class' => SmsPayload::class,
                 'queue' => 'marketing',
                 'payload' => [
@@ -429,6 +295,9 @@ class DispatchMessageActionTest extends TestCase
             purpose: 'marketing',
             scope: 'broadcast',
             dispatchKeys: 'broadcast_send',
+            behavior: [
+                'timing' => 'immediate',
+            ],
             payload: [
                 'message' => 'Runtime SMS broadcast.',
             ],
@@ -449,11 +318,6 @@ class DispatchMessageActionTest extends TestCase
                 'dispatch_key' => 'campaign_step_due',
                 'campaign_key' => 'webinar_attended',
                 'step' => 1,
-                'timing' => 'scheduled',
-                'schedule' => [
-                    'type' => 'delay',
-                    'minutes' => 60,
-                ],
                 'payload_class' => EmailPayload::class,
                 'queue' => 'marketing',
                 'payload' => [
@@ -466,11 +330,6 @@ class DispatchMessageActionTest extends TestCase
                 'dispatch_key' => 'campaign_step_due',
                 'campaign_key' => 'webinar_attended',
                 'step' => 2,
-                'timing' => 'scheduled',
-                'schedule' => [
-                    'type' => 'delay',
-                    'minutes' => 120,
-                ],
                 'payload_class' => EmailPayload::class,
                 'queue' => 'marketing',
                 'payload' => [
@@ -486,6 +345,13 @@ class DispatchMessageActionTest extends TestCase
             purpose: 'marketing',
             scope: 'webinar',
             dispatchKeys: 'campaign_step_due',
+            behavior: [
+                'timing' => 'scheduled',
+                'schedule' => [
+                    'type' => 'delay',
+                    'minutes' => 60,
+                ],
+            ],
             criteria: [
                 'campaign_key' => 'webinar_attended',
                 'step' => 2,
@@ -511,11 +377,6 @@ class DispatchMessageActionTest extends TestCase
                 'dispatch_key' => 'campaign_step_due',
                 'campaign_key' => 'webinar_attended',
                 'step' => 1,
-                'timing' => 'scheduled',
-                'schedule' => [
-                    'type' => 'delay',
-                    'minutes' => 60,
-                ],
                 'payload_class' => EmailPayload::class,
                 'queue' => 'marketing',
                 'payload' => [
@@ -531,6 +392,13 @@ class DispatchMessageActionTest extends TestCase
             purpose: 'marketing',
             scope: 'webinar',
             dispatchKeys: 'campaign_step_due',
+            behavior: [
+                'timing' => 'scheduled',
+                'schedule' => [
+                    'type' => 'delay',
+                    'minutes' => 60,
+                ],
+            ],
             criteria: [
                 'campaign_key' => 'webinar_attended',
                 'step' => 2,
@@ -550,11 +418,6 @@ class DispatchMessageActionTest extends TestCase
                 'dispatch_key' => 'campaign_step_due',
                 'campaign_key' => 'webinar_attended',
                 'step' => 2,
-                'timing' => 'scheduled',
-                'schedule' => [
-                    'type' => 'delay',
-                    'minutes' => 60,
-                ],
                 'payload_class' => EmailPayload::class,
                 'queue' => 'marketing',
                 'payload' => [
@@ -567,11 +430,6 @@ class DispatchMessageActionTest extends TestCase
                 'dispatch_key' => 'campaign_step_due',
                 'campaign_key' => 'webinar_attended',
                 'step' => 2,
-                'timing' => 'scheduled',
-                'schedule' => [
-                    'type' => 'delay',
-                    'minutes' => 90,
-                ],
                 'payload_class' => EmailPayload::class,
                 'queue' => 'marketing',
                 'payload' => [
@@ -590,6 +448,13 @@ class DispatchMessageActionTest extends TestCase
             purpose: 'marketing',
             scope: 'webinar',
             dispatchKeys: 'campaign_step_due',
+            behavior: [
+                'timing' => 'scheduled',
+                'schedule' => [
+                    'type' => 'delay',
+                    'minutes' => 60,
+                ],
+            ],
             criteria: [
                 'campaign_key' => 'webinar_attended',
                 'step' => 2,
@@ -624,7 +489,6 @@ class DispatchMessageActionTest extends TestCase
         Config::set('messaging.email.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
-                'timing' => 'immediate',
                 'payload_class' => EmailPayload::class,
                 'queue' => 'confirmation_messages',
                 'payload' => [
@@ -660,6 +524,9 @@ class DispatchMessageActionTest extends TestCase
             purpose: 'transactional',
             scope: 'webinar',
             dispatchKeys: 'registration_created',
+            behavior: [
+                'timing' => 'immediate',
+            ],
         );
 
         $message = ScheduledMessage::query()->first();
@@ -681,10 +548,6 @@ class DispatchMessageActionTest extends TestCase
         Config::set('messaging.email.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
-                'conditions' => [
-                    'contact.source' => 'webinar',
-                ],
-                'timing' => 'immediate',
                 'payload_class' => EmailPayload::class,
                 'queue' => 'confirmation_messages',
                 'payload' => [
@@ -705,6 +568,9 @@ class DispatchMessageActionTest extends TestCase
             purpose: 'transactional',
             scope: 'webinar',
             dispatchKeys: 'registration_created',
+            behavior: [
+                'timing' => 'immediate',
+            ],
         );
 
         $message = ScheduledMessage::query()->first();
@@ -719,17 +585,13 @@ class DispatchMessageActionTest extends TestCase
         $this->assertSame('webinar', $message->payload['tokens']['contact']['source'] ?? null);
     }
 
-    public function test_it_preserves_explicit_compact_runtime_context_for_condition_checks(): void
+    public function test_it_preserves_explicit_compact_runtime_context_in_scheduled_payload(): void
     {
         Queue::fake();
 
         Config::set('messaging.email.transactional.webinar', [
             'follow_up' => [
                 'dispatch_key' => 'webinar_ended',
-                'conditions' => [
-                    'webinar.outcome' => 'attended',
-                ],
-                'timing' => 'immediate',
                 'payload_class' => EmailPayload::class,
                 'queue' => 'notifications',
                 'payload' => [
@@ -745,6 +607,9 @@ class DispatchMessageActionTest extends TestCase
             purpose: 'transactional',
             scope: 'webinar',
             dispatchKeys: 'webinar_ended',
+            behavior: [
+                'timing' => 'immediate',
+            ],
             payload: [
                 'runtime_context' => [
                     'webinar' => [

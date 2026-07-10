@@ -234,6 +234,7 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
                 'scope',
                 'message_type',
                 'dispatch_key',
+                'message_template_key',
             ] as $requiredField) {
                 if (! $this->filledString($item[$requiredField] ?? null)) {
                     yield $this->error(
@@ -398,6 +399,7 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
             'surface',
             'message_type',
             'dispatch_key',
+            'message_template_key',
         ] as $requiredField) {
             if (! $this->filledString($item->{$requiredField})) {
                 yield $this->error(
@@ -496,6 +498,7 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
                     'scope' => $item->scope,
                     'message_type' => $item->message_type,
                     'dispatch_key' => $item->dispatch_key,
+                    'message_template_key' => $item->message_template_key,
                     'source_config_path' => $item->source_config_path,
                 ],
             );
@@ -529,21 +532,12 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
                 continue;
             }
 
-            $requiredSourcePath = $this->nullableString($item->source_config_path);
+            $requiredTemplateKey = $this->normalizeSegment((string) $item->message_template_key);
+            $definitionTemplateKey = $this->normalizeSegment((string) (
+                $definition['key'] ?? data_get($definition, 'meta.message_template_preset.key') ?? ''
+            ));
 
-            if ($requiredSourcePath === null) {
-                return true;
-            }
-
-            $definitionSourcePaths = array_values(array_filter([
-                $this->nullableString($definition['source_config_path'] ?? null),
-                $this->nullableString($definition['config_path'] ?? null),
-                $this->nullableString(data_get($definition, 'meta.seed.config_path')),
-                $this->nullableString(data_get($definition, 'meta.message_template_assignment.source_config_path')),
-                $this->nullableString(data_get($definition, 'meta.message_template_preset.source_config_path')),
-            ]));
-
-            if (in_array($requiredSourcePath, $definitionSourcePaths, true)) {
+            if ($requiredTemplateKey !== '' && $definitionTemplateKey === $requiredTemplateKey) {
                 return true;
             }
         }

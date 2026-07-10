@@ -20,6 +20,7 @@ use App\Modules\Webinars\Data\ProviderWebhookEvent;
 use App\Modules\Webinars\Data\WebinarMessageData;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Services\WebinarScheduleProfileDefinitionResolver;
 use BadMethodCallException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -37,6 +38,7 @@ class WebinarDevController extends Controller
         WebinarRegistration $registration,
         MessageDefinitionResolver $messageDefinitionResolver,
         MessageChannelAvailability $messageChannelAvailability,
+        WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
     ): JsonResponse {
         $this->abortUnlessDevTestingAllowed();
 
@@ -54,6 +56,7 @@ class WebinarDevController extends Controller
                 registration: $registration,
                 messageDefinitionResolver: $messageDefinitionResolver,
                 messageChannelAvailability: $messageChannelAvailability,
+                scheduleProfileDefinitionResolver: $scheduleProfileDefinitionResolver,
             ),
         ]);
     }
@@ -65,6 +68,7 @@ class WebinarDevController extends Controller
         MessageDefinitionResolver $messageDefinitionResolver,
         MessageChannelAvailability $messageChannelAvailability,
         MessageEligibilityGate $messageEligibilityGate,
+        WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
     ): RedirectResponse|JsonResponse {
         $this->abortUnlessDevTestingAllowed();
 
@@ -79,6 +83,7 @@ class WebinarDevController extends Controller
             configPaths: [$configPath],
             messageDefinitionResolver: $messageDefinitionResolver,
             messageChannelAvailability: $messageChannelAvailability,
+            scheduleProfileDefinitionResolver: $scheduleProfileDefinitionResolver,
         );
 
         if ($definitions === []) {
@@ -106,6 +111,7 @@ class WebinarDevController extends Controller
         MessageDefinitionResolver $messageDefinitionResolver,
         MessageChannelAvailability $messageChannelAvailability,
         MessageEligibilityGate $messageEligibilityGate,
+        WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
     ): RedirectResponse|JsonResponse {
         $this->abortUnlessDevTestingAllowed();
 
@@ -113,6 +119,7 @@ class WebinarDevController extends Controller
             registration: $registration,
             messageDefinitionResolver: $messageDefinitionResolver,
             messageChannelAvailability: $messageChannelAvailability,
+            scheduleProfileDefinitionResolver: $scheduleProfileDefinitionResolver,
         ))
             ->flatMap(fn (array $group): array => $group['definitions'] ?? [])
             ->all();
@@ -371,6 +378,7 @@ class WebinarDevController extends Controller
         WebinarRegistration $registration,
         MessageDefinitionResolver $messageDefinitionResolver,
         MessageChannelAvailability $messageChannelAvailability,
+        WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
     ): array {
         $registration->loadMissing(['contact', 'webinar', 'webinar.webinarSeries']);
 
@@ -398,10 +406,15 @@ class WebinarDevController extends Controller
                 continue;
             }
 
-            $definitions = $messageDefinitionResolver->resolve(
-                channel: $channel,
-                purpose: MessagePurpose::Transactional->value,
-                scope: self::SCOPE,
+            $definitions = $scheduleProfileDefinitionResolver->applyForWebinar(
+                webinar: $registration->webinar,
+                definitions: $messageDefinitionResolver->resolve(
+                    channel: $channel,
+                    purpose: MessagePurpose::Transactional->value,
+                    scope: self::SCOPE,
+                ),
+                dispatchKeys: 'registration_created',
+                surface: self::SURFACE,
             );
 
             $definitions = collect($definitions)
@@ -432,6 +445,7 @@ class WebinarDevController extends Controller
         array $configPaths,
         MessageDefinitionResolver $messageDefinitionResolver,
         MessageChannelAvailability $messageChannelAvailability,
+        WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
     ): array {
         $configPaths = array_values(array_unique(array_filter(array_map(
             fn (mixed $path): ?string => is_string($path) && trim($path) !== ''
@@ -448,6 +462,7 @@ class WebinarDevController extends Controller
             registration: $registration,
             messageDefinitionResolver: $messageDefinitionResolver,
             messageChannelAvailability: $messageChannelAvailability,
+            scheduleProfileDefinitionResolver: $scheduleProfileDefinitionResolver,
         ))
             ->flatMap(fn (array $group): array => $group['definitions'] ?? [])
             ->filter(fn (array $definition): bool => in_array($definition['config_path'] ?? null, $configPaths, true))
@@ -489,14 +504,12 @@ class WebinarDevController extends Controller
                 continue;
             }
 
-            $inlineDefinition = $this->immediateDefinition($definition);
-
             $messages = $dispatchMessageAction->handle(
                 recipient: $registration->contact,
                 channel: $channel,
                 purpose: MessagePurpose::Transactional,
                 scope: self::SCOPE,
-                dispatchKeys: $inlineDefinition['dispatch_keys'] ?? [],
+                dispatchKeys: $definition['dispatch_keys'] ?? [],
                 payload: [
                     'tokens' => $messageData,
                     'context' => [
@@ -517,11 +530,14 @@ class WebinarDevController extends Controller
                         'source' => 'crm_webinar_dev_controller',
                         'forced_immediate' => true,
                         'original_config_path' => $definition['config_path'] ?? null,
-                        'original_timing' => $definition['timing'] ?? null,
-                        'original_schedule' => $definition['schedule'] ?? null,
+                        'original_timing' => data_get($definition, 'resolved_behavior.timing'),
+                        'original_schedule' => data_get($definition, 'resolved_behavior.schedule'),
                     ],
                 ],
-                definitions: [$inlineDefinition],
+                behavior: [
+                    'timing' => 'immediate',
+                ],
+                definitions: [$definition],
             );
 
             $created += count(array_filter(
@@ -539,7 +555,7 @@ class WebinarDevController extends Controller
      */
     private function definitionOption(array $definition): array
     {
-        $schedule = $definition['schedule'] ?? [];
+        $schedule = data_get($definition, 'resolved_behavior.schedule', []);
 
         return [
             ...$definition,
@@ -548,31 +564,6 @@ class WebinarDevController extends Controller
         ];
     }
 
-    /**
-     * @param array<string, mixed> $definition
-     * @return array<string, mixed>
-     */
-    private function immediateDefinition(array $definition): array
-    {
-        $dispatchKeys = $definition['dispatch_keys'] ?? [];
-
-        return array_replace_recursive($definition, [
-            'dispatch_key' => Arr::first($dispatchKeys),
-            'dispatch_keys' => $dispatchKeys,
-            'timing' => 'immediate',
-            'schedule' => [
-                'type' => 'delay',
-                'minutes' => 0,
-            ],
-            'meta' => array_replace_recursive($definition['meta'] ?? [], [
-                'dev_testing' => [
-                    'forced_immediate' => true,
-                    'original_timing' => $definition['timing'] ?? null,
-                    'original_schedule' => $definition['schedule'] ?? null,
-                ],
-            ]),
-        ]);
-    }
 
     /**
      * @param array<string, mixed> $definition
@@ -581,7 +572,7 @@ class WebinarDevController extends Controller
     {
         $configPath = (string) ($definition['config_path'] ?? '');
         $messageType = (string) ($definition['message_type'] ?? 'message');
-        $schedule = $definition['schedule'] ?? [];
+        $schedule = data_get($definition, 'resolved_behavior.schedule', []);
         $scheduleLabel = $this->scheduleLabel(is_array($schedule) ? $schedule : []);
 
         if (Str::contains($configPath, '.confirmations')) {

@@ -28,6 +28,7 @@ class WebinarScheduleProfileItem extends Model
         'surface',
         'message_type',
         'dispatch_key',
+        'message_template_key',
         'source_config_path',
         'is_enabled',
         'is_active',

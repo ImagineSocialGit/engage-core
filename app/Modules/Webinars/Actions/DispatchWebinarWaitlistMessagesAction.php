@@ -103,6 +103,11 @@ class DispatchWebinarWaitlistMessagesAction
                     'webinar_series_id' => $webinar->webinar_series_id,
                 ],
                 definitions: $definitions,
+                occurrenceKey: implode(':', [
+                    'webinar_waitlist',
+                    $signup->getKey(),
+                    $webinar->getKey(),
+                ]),
             ));
         }
 

@@ -53,6 +53,7 @@ return new class extends Migration
             $table->string('surface')->nullable()->index();
             $table->string('message_type')->index();
             $table->string('dispatch_key')->index();
+            $table->string('message_template_key')->index();
             $table->string('source_config_path')->nullable()->index();
 
             $table->boolean('is_enabled')->default(true)->index();
@@ -86,8 +87,8 @@ return new class extends Migration
             );
 
             $table->index(
-                ['webinar_schedule_profile_id', 'source_config_path'],
-                'wsp_items_source_idx',
+                ['webinar_schedule_profile_id', 'message_template_key'],
+                'wsp_items_template_idx',
             );
 
             $table->index(

@@ -752,11 +752,17 @@ class ScheduleBroadcastActionTest extends TestCase
                 $recipient = $arguments['recipient'] ?? $arguments[0];
                 $broadcast = $arguments['context'] ?? $arguments[6];
                 $triggeredAt = $arguments['triggeredAt'] ?? $arguments[7];
+                $sendAt = $arguments['sendAt'] ?? $arguments[12];
                 $meta = $arguments['meta'] ?? $arguments[9];
 
                 $this->assertSame(
-                    '2026-07-01 10:05:00',
+                    '2026-07-01 10:00:00',
                     Carbon::parse($triggeredAt)->toDateTimeString(),
+                );
+
+                $this->assertSame(
+                    '2026-07-01 10:05:00',
+                    Carbon::parse($sendAt)->toDateTimeString(),
                 );
 
                 $this->assertSame(
@@ -770,7 +776,7 @@ class ScheduleBroadcastActionTest extends TestCase
                         'recipient_id' => $recipient->getKey(),
                         'context_type' => $broadcast->getMorphClass(),
                         'context_id' => $broadcast->getKey(),
-                        'send_at' => Carbon::parse($triggeredAt),
+                        'send_at' => Carbon::parse($sendAt),
                     ]),
                 ];
             });
@@ -805,10 +811,16 @@ class ScheduleBroadcastActionTest extends TestCase
                 $recipient = $arguments['recipient'] ?? $arguments[0];
                 $broadcast = $arguments['context'] ?? $arguments[6];
                 $triggeredAt = $arguments['triggeredAt'] ?? $arguments[7];
+                $sendAt = $arguments['sendAt'] ?? $arguments[12];
+
+                $this->assertSame(
+                    '2026-07-01 10:00:00',
+                    Carbon::parse($triggeredAt)->toDateTimeString(),
+                );
 
                 $this->assertSame(
                     '2026-07-01 11:00:00',
-                    Carbon::parse($triggeredAt)->toDateTimeString(),
+                    Carbon::parse($sendAt)->toDateTimeString(),
                 );
 
                 return [
@@ -817,7 +829,7 @@ class ScheduleBroadcastActionTest extends TestCase
                         'recipient_id' => $recipient->getKey(),
                         'context_type' => $broadcast->getMorphClass(),
                         'context_id' => $broadcast->getKey(),
-                        'send_at' => Carbon::parse($triggeredAt),
+                        'send_at' => Carbon::parse($sendAt),
                     ]),
                 ];
             });

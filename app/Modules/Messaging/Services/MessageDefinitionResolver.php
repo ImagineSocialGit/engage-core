@@ -343,27 +343,6 @@ class MessageDefinitionResolver
 
     /**
      * @param array<string, mixed> $definition
-     */
-    private function validateSchedule(array $definition): void
-    {
-        if (! is_array($definition['schedule'] ?? null)) {
-            throw new InvalidArgumentException("Scheduled message definition [{$definition['config_path']}] is missing [schedule].");
-        }
-
-        $type = $definition['schedule']['type'] ?? null;
-        $minutes = $definition['schedule']['minutes'] ?? null;
-
-        if (! in_array($type, ['delay', 'anchored'], true)) {
-            throw new InvalidArgumentException("Scheduled message definition [{$definition['config_path']}] has invalid [schedule.type].");
-        }
-
-        if (! is_int($minutes)) {
-            throw new InvalidArgumentException("Scheduled message definition [{$definition['config_path']}] has invalid [schedule.minutes].");
-        }
-    }
-
-    /**
-     * @param array<string, mixed> $definition
      * @return array<int, string>
      */
     private function normalizeDispatchKeys(array $definition): array

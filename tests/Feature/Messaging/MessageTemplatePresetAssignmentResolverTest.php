@@ -19,7 +19,6 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
         Config::set('messaging.email.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
-                'timing' => 'immediate',
                 'payload_class' => EmailPayload::class,
                 'queue' => 'confirmation_messages',
                 'payload' => [
@@ -130,7 +129,6 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
         Config::set('messaging.email.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
-                'timing' => 'immediate',
                 'payload_class' => EmailPayload::class,
                 'queue' => 'confirmation_messages',
                 'payload' => [
@@ -156,7 +154,6 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
         Config::set('messaging.email.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
-                'timing' => 'immediate',
                 'payload_class' => EmailPayload::class,
                 'queue' => 'confirmation_messages',
                 'payload' => [
@@ -220,7 +217,6 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
         Config::set('messaging.email.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
-                'timing' => 'immediate',
                 'payload_class' => EmailPayload::class,
                 'queue' => 'confirmation_messages',
                 'payload' => [
@@ -263,5 +259,3 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
     }
 
 }
-
-

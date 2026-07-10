@@ -43,6 +43,14 @@ class CreateContactPermissionInvitationsForImportBatchAction
                         purpose: MessagePurpose::Marketing,
                         scope: 'broadcast',
                         dispatchKeys: 'imported_contact_permission_invitation',
+                        behavior: [
+                            'timing' => 'immediate',
+                        ],
+                        occurrenceKey: implode(':', [
+                            'imported_contact_permission_invitation',
+                            $importBatch->getKey(),
+                            $contact->getKey(),
+                        ]),
                         payload: [],
                         context: $importBatch,
                         meta: [
@@ -59,7 +67,6 @@ class CreateContactPermissionInvitationsForImportBatchAction
                                 'purpose' => MessagePurpose::Marketing->value,
                                 'scope' => 'broadcast',
                                 'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
-                                'timing' => 'immediate',
                                 'payload_class' => EmailPayload::class,
                                 'queue' => 'marketing',
                                 'payload' => [

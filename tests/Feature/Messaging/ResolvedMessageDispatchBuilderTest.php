@@ -14,17 +14,26 @@ class ResolvedMessageDispatchBuilderTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_builds_an_immediate_dispatch_from_content_only_template_data(): void
+    public function test_content_only_template_requires_explicit_behavior_or_exact_send_at(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('requires exact [sendAt] or explicit caller-owned [behavior]');
+
+        app(ResolvedMessageDispatchBuilder::class)->build(
+            template: $this->template(),
+        );
+    }
+
+    public function test_explicit_immediate_behavior_resolves_now(): void
     {
         Carbon::setTestNow('2026-07-09 12:00:00');
 
         $dispatch = app(ResolvedMessageDispatchBuilder::class)->build(
             template: $this->template(),
+            behavior: ['timing' => 'immediate'],
         );
 
         $this->assertSame('immediate', $dispatch->definition['timing']);
-        $this->assertNull($dispatch->definition['schedule']);
-        $this->assertSame([], $dispatch->definition['conditions']);
         $this->assertTrue($dispatch->sendAt->equalTo(now()));
     }
 
@@ -64,8 +73,8 @@ class ResolvedMessageDispatchBuilderTest extends TestCase
         );
 
         $this->assertTrue($dispatch->sendAt->equalTo($sendAt));
-        $this->assertSame('immediate', $dispatch->definition['timing']);
-        $this->assertNull($dispatch->definition['schedule']);
+        $this->assertArrayNotHasKey('timing', $dispatch->definition);
+        $this->assertArrayNotHasKey('schedule', $dispatch->definition);
         $this->assertTrue($dispatch->behaviorOwner->is($broadcast));
         $this->assertSame($broadcast->getMorphClass(), data_get($dispatch->meta, 'resolved_message_dispatch.behavior_owner_type'));
         $this->assertSame($broadcast->getKey(), data_get($dispatch->meta, 'resolved_message_dispatch.behavior_owner_id'));
@@ -82,6 +91,17 @@ class ResolvedMessageDispatchBuilderTest extends TestCase
         );
     }
 
+
+    public function test_it_rejects_behavior_fields_inside_reusable_template_data(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('must not own [timing]');
+
+        app(ResolvedMessageDispatchBuilder::class)->build(
+            template: $this->template() + ['timing' => 'immediate'],
+            sendAt: now(),
+        );
+    }
     /** @return array<string, mixed> */
     private function template(): array
     {

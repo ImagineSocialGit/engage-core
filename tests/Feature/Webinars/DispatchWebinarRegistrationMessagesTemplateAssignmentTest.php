@@ -15,6 +15,8 @@ use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Webinars\Actions\DispatchWebinarRegistrationMessagesAction;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Models\WebinarScheduleProfile;
+use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
 use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
@@ -31,7 +33,6 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
 
         $this->configureWebinarRegistrationChannelAvailability();
         $this->configureRegistrationMessages();
-
         $preset = MessageTemplatePreset::factory()->create([
             'key' => 'email.transactional.webinar.confirmation.db',
             'name' => 'DB Webinar Confirmation',
@@ -42,13 +43,14 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
             'payload_class' => EmailPayload::class,
             'queue' => 'confirmation_messages',
             'dispatch_keys' => ['registration_created'],
-            'timing' => 'immediate',
             'payload' => [
                 'subject' => 'DB confirmation for {first_name}',
                 'body' => 'DB selected confirmation copy.',
             ],
             'source_config_path' => 'messaging.email.transactional.webinar.confirmation',
         ]);
+
+        $this->configureRegistrationScheduleProfile($preset->key);
 
         MessageTemplateCatalogEntry::factory()
             ->forPreset($preset)
@@ -121,8 +123,8 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
     {
         Config::set('messaging.email.transactional.webinar', [
             'confirmation' => [
+                'key' => 'confirmation',
                 'dispatch_key' => 'registration_created',
-                'timing' => 'immediate',
                 'payload_class' => EmailPayload::class,
                 'queue' => 'confirmation_messages',
                 'payload' => [
@@ -132,12 +134,8 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
             ],
 
             'reminder' => [
+                'key' => 'reminder',
                 'dispatch_key' => 'registration_created',
-                'timing' => 'scheduled',
-                'schedule' => [
-                    'type' => 'anchored',
-                    'minutes' => -30,
-                ],
                 'payload_class' => EmailPayload::class,
                 'queue' => 'reminders',
                 'payload' => [
@@ -145,6 +143,56 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
                     'body' => 'Starts soon.',
                 ],
             ],
+        ]);
+    }
+
+    private function configureRegistrationScheduleProfile(string $confirmationTemplateKey): void
+    {
+        $profile = WebinarScheduleProfile::factory()->create([
+            'key' => 'registration_assignment_test_profile',
+            'name' => 'Registration assignment test profile',
+            'status' => WebinarScheduleProfile::STATUS_ACTIVE,
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+
+        WebinarScheduleProfileItem::factory()->create([
+            'webinar_schedule_profile_id' => $profile->getKey(),
+            'key' => 'email_confirmation',
+            'context_key' => 'confirmation',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'surface' => 'webinar_registrations',
+            'message_type' => 'confirmation',
+            'dispatch_key' => 'registration_created',
+            'message_template_key' => $confirmationTemplateKey,
+            'timing' => 'immediate',
+            'schedule' => null,
+            'conditions' => [],
+            'is_enabled' => true,
+            'is_active' => true,
+        ]);
+
+        WebinarScheduleProfileItem::factory()->create([
+            'webinar_schedule_profile_id' => $profile->getKey(),
+            'key' => 'email_reminder',
+            'context_key' => 'reminders',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'surface' => 'webinar_registrations',
+            'message_type' => 'reminder',
+            'dispatch_key' => 'registration_created',
+            'message_template_key' => 'reminder',
+            'timing' => 'scheduled',
+            'schedule' => [
+                'type' => 'anchored',
+                'minutes' => -30,
+            ],
+            'conditions' => [],
+            'is_enabled' => true,
+            'is_active' => true,
         ]);
     }
 

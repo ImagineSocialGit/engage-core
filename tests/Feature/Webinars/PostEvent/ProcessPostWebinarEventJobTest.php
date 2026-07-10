@@ -6,6 +6,8 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Webinars\Actions\PostEvent\DispatchPostWebinarFollowUpsAction;
 use App\Modules\Webinars\Actions\PostEvent\RecordWebinarProviderAttendanceAction;
 use App\Modules\Webinars\Actions\PostEvent\ResolveWebinarPlaybackAction;
@@ -15,6 +17,8 @@ use App\Modules\Webinars\Data\WebinarAttendanceRecord;
 use App\Modules\Webinars\Jobs\PostEvent\ProcessWebinarProviderEventJob;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Models\WebinarScheduleProfile;
+use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
 use App\Modules\Webinars\Services\WebinarProviderManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -207,6 +211,8 @@ class ProcessPostWebinarEventJobTest extends TestCase
             ],
         ]);
 
+        $this->configurePostEventMessagesAndScheduleProfile();
+
         Carbon::setTestNow('2026-06-12 12:00:00');
 
         [$webinar, , , $attendanceRecord] = $this->makeWebinarWithRegistrations();
@@ -305,6 +311,84 @@ class ProcessPostWebinarEventJobTest extends TestCase
         $this->assertNull(data_get($webinar->meta, 'normalized.post_event.attendance_recorded_at'));
         $this->assertNull(data_get($webinar->meta, 'normalized.post_event.playback_resolved_at'));
         $this->assertNull(data_get($webinar->meta, 'automation_events.webinar_ended_recorded_at'));
+    }
+
+
+    private function configurePostEventMessagesAndScheduleProfile(): void
+    {
+        Config::set('messaging.email.transactional.webinar', [
+            'post_attended' => [
+                'key' => 'post_attended',
+                'dispatch_key' => 'webinar_ended',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'notifications',
+                'payload' => [
+                    'subject' => 'Thanks for attending',
+                    'body' => 'Replay: {webinar_playback_url}',
+                ],
+            ],
+            'post_missed' => [
+                'key' => 'post_missed',
+                'dispatch_key' => 'webinar_ended',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'notifications',
+                'payload' => [
+                    'subject' => 'Sorry we missed you',
+                    'body' => 'Replay: {webinar_playback_url}',
+                ],
+            ],
+        ]);
+
+        Config::set('messaging.sms.transactional.webinar', [
+            'post_attended' => [
+                'key' => 'post_attended',
+                'dispatch_key' => 'webinar_ended',
+                'payload_class' => SmsPayload::class,
+                'queue' => 'notifications',
+                'payload' => [
+                    'message' => 'Thanks for attending. Replay: {webinar_playback_url}',
+                ],
+            ],
+            'post_missed' => [
+                'key' => 'post_missed',
+                'dispatch_key' => 'webinar_ended',
+                'payload_class' => SmsPayload::class,
+                'queue' => 'notifications',
+                'payload' => [
+                    'message' => 'Sorry we missed you. Replay: {webinar_playback_url}',
+                ],
+            ],
+        ]);
+
+        $profile = WebinarScheduleProfile::factory()->create([
+            'key' => 'post_event_test_profile',
+            'name' => 'Post-event test profile',
+            'status' => WebinarScheduleProfile::STATUS_ACTIVE,
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+
+        foreach ([MessageChannel::Email->value, MessageChannel::Sms->value] as $channel) {
+            foreach (['post_attended', 'post_missed'] as $messageType) {
+                WebinarScheduleProfileItem::factory()->create([
+                    'webinar_schedule_profile_id' => $profile->getKey(),
+                    'key' => "{$channel}_{$messageType}",
+                    'context_key' => $messageType,
+                    'channel' => $channel,
+                    'purpose' => MessagePurpose::Transactional->value,
+                    'scope' => 'webinar',
+                    'surface' => 'webinar_registrations',
+                    'message_type' => $messageType,
+                    'dispatch_key' => 'webinar_ended',
+                    'message_template_key' => $messageType,
+                    'timing' => 'immediate',
+                    'schedule' => null,
+                    'conditions' => [],
+                    'is_enabled' => true,
+                    'is_active' => true,
+                ]);
+            }
+        }
     }
 
     private function makeWebinarWithRegistrations(): array

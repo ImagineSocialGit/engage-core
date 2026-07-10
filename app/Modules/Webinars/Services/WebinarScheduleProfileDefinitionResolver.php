@@ -98,10 +98,12 @@ class WebinarScheduleProfileDefinitionResolver
             $conditions = is_array($item->conditions) ? $item->conditions : [];
 
             $resolvedDefinition = array_replace($definition, [
-                'timing' => $item->timing,
-                'schedule' => $schedule,
-                'conditions' => $conditions,
-                'skip_when_join_clicked' => (bool) data_get($item->meta, 'skip_when_join_clicked', false),
+                'resolved_behavior' => [
+                    'timing' => $item->timing,
+                    'schedule' => $schedule,
+                    'conditions' => $conditions,
+                    'skip_when_join_clicked' => (bool) data_get($item->meta, 'skip_when_join_clicked', false),
+                ],
                 'behavior_owner' => $item,
             ]);
 
@@ -155,11 +157,10 @@ class WebinarScheduleProfileDefinitionResolver
             return false;
         }
 
-        if (is_string($item->source_config_path) && trim($item->source_config_path) !== '') {
-            $definitionSourceConfigPath = $this->definitionSourceConfigPath($definition);
+        $definitionTemplateKey = $this->definitionTemplateKey($definition);
 
-            return $definitionSourceConfigPath !== null
-                && trim($item->source_config_path) === $definitionSourceConfigPath;
+        if ($definitionTemplateKey === null || $definitionTemplateKey !== $this->normalizeSegment($item->message_template_key)) {
+            return false;
         }
 
         return true;
@@ -169,16 +170,13 @@ class WebinarScheduleProfileDefinitionResolver
     /**
      * @param array<string, mixed> $definition
      */
-    private function definitionSourceConfigPath(array $definition): ?string
+    /** @param array<string, mixed> $definition */
+    private function definitionTemplateKey(array $definition): ?string
     {
-        $sourceConfigPath = $definition['source_config_path']
-            ?? data_get($definition, 'meta.seed.config_path')
-            ?? data_get($definition, 'meta.message_template_preset.source_config_path')
-            ?? $definition['config_path']
-            ?? null;
+        $key = $definition['key'] ?? data_get($definition, 'meta.message_template_preset.key');
 
-        return is_string($sourceConfigPath) && trim($sourceConfigPath) !== ''
-            ? trim($sourceConfigPath)
+        return is_string($key) && trim($key) !== ''
+            ? $this->normalizeSegment(trim($key))
             : null;
     }
 

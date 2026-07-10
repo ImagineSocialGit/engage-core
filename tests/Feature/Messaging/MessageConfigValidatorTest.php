@@ -49,10 +49,6 @@ class MessageConfigValidatorTest extends TestCase
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'timing' => 'scheduled',
-                'schedule' => [
-                    'type' => 'webinar_relative',
-                    'minutes' => 'soon',
-                ],
                 'payload_class' => 'Missing\\Payload',
                 'queue' => '',
                 'payload' => [
@@ -69,8 +65,10 @@ class MessageConfigValidatorTest extends TestCase
 
         $this->assertNotEmpty($issues);
         $this->assertContains('Payload class does not exist.', array_column($issues, 'message'));
-        $this->assertContains('Schedule type must be delay or anchored.', array_column($issues, 'message'));
-        $this->assertContains('Schedule minutes must be an integer.', array_column($issues, 'message'));
+        $this->assertContains(
+            'Reusable Messaging templates must not own [timing] behavior.',
+            array_column($issues, 'message'),
+        );
         $this->assertContains('Email payload requires a body.', array_column($issues, 'message'));
     }
 
@@ -79,7 +77,6 @@ class MessageConfigValidatorTest extends TestCase
         Config::set('messaging.email.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
-                'timing' => 'immediate',
                 'payload_class' => EmailPayload::class,
                 'queue' => 'confirmation_messages',
                 'payload' => [
@@ -126,15 +123,8 @@ class MessageConfigValidatorTest extends TestCase
             'alerts' => [
                 [
                     'dispatch_key' => 'webinar_added',
-                    'timing' => 'immediate',
                     'payload_class' => EmailPayload::class,
                     'queue' => 'notifications',
-                    'conditions' => [
-                        [
-                            'field' => 'webinar.registration_url',
-                            'operator' => 'filled',
-                        ],
-                    ],
                     'payload' => [
                         'subject' => 'New webinar scheduled: {webinar_title}',
                         'body' => 'A new webinar session is available. Register here: {webinar_registration_url}',
@@ -149,7 +139,6 @@ class MessageConfigValidatorTest extends TestCase
             'opt_ins' => [
                 [
                     'dispatch_key' => 'consent_granted',
-                    'timing' => 'immediate',
                     'payload_class' => EmailPayload::class,
                     'queue' => 'opt_in_messages',
                     'payload' => [
@@ -178,11 +167,6 @@ class MessageConfigValidatorTest extends TestCase
         Config::set('messaging.sms.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
-                'timing' => 'scheduled',
-                'schedule' => [
-                    'type' => 'delay',
-                    'minutes' => 15,
-                ],
                 'payload_class' => SmsPayload::class,
                 'queue' => 'confirmation_messages',
                 'payload' => [

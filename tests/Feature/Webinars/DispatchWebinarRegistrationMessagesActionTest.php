@@ -13,6 +13,8 @@ use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Webinars\Actions\DispatchWebinarRegistrationMessagesAction;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Models\WebinarScheduleProfile;
+use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
 use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
@@ -35,6 +37,7 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
         Queue::fake();
 
         $this->configureRegistrationMessages();
+        $this->configureRegistrationScheduleProfile();
 
         $registration = $this->registrationForContact(
             contact: $this->contactWithTransactionalConsent([
@@ -82,6 +85,7 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
 
         $this->enableWebinarRegistrationSms();
         $this->configureRegistrationMessages();
+        $this->configureRegistrationScheduleProfile();
 
         $registration = $this->registrationForContact(
             contact: $this->contactWithTransactionalConsent([
@@ -143,6 +147,7 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
 
         $this->enableWebinarRegistrationSms();
         $this->configureRegistrationMessages();
+        $this->configureRegistrationScheduleProfile();
 
         $registration = $this->registrationForContact(
             contact: $this->contactWithTransactionalConsent([
@@ -176,6 +181,7 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
 
         $this->enableWebinarRegistrationSms();
         $this->configureRegistrationMessages();
+        $this->configureRegistrationScheduleProfile();
 
         $registration = $this->registrationForContact(
             contact: $this->contactWithTransactionalConsent([
@@ -210,8 +216,8 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
     {
         Config::set('messaging.email.transactional.webinar', [
             'confirmation' => [
+                'key' => 'confirmation',
                 'dispatch_key' => 'registration_created',
-                'timing' => 'immediate',
                 'payload_class' => EmailPayload::class,
                 'queue' => 'confirmation_messages',
                 'payload' => [
@@ -221,12 +227,8 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
             ],
 
             'reminder' => [
+                'key' => 'reminder',
                 'dispatch_key' => 'registration_created',
-                'timing' => 'scheduled',
-                'schedule' => [
-                    'type' => 'anchored',
-                    'minutes' => -30,
-                ],
                 'payload_class' => EmailPayload::class,
                 'queue' => 'reminders',
                 'payload' => [
@@ -238,8 +240,8 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
 
         Config::set('messaging.sms.transactional.webinar', [
             'confirmation' => [
+                'key' => 'confirmation',
                 'dispatch_key' => 'registration_created',
-                'timing' => 'immediate',
                 'payload_class' => SmsPayload::class,
                 'queue' => 'confirmation_messages',
                 'payload' => [
@@ -248,12 +250,8 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
             ],
 
             'reminder' => [
+                'key' => 'reminder',
                 'dispatch_key' => 'registration_created',
-                'timing' => 'scheduled',
-                'schedule' => [
-                    'type' => 'anchored',
-                    'minutes' => -30,
-                ],
                 'payload_class' => SmsPayload::class,
                 'queue' => 'reminders',
                 'payload' => [
@@ -261,6 +259,58 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
                 ],
             ],
         ]);
+    }
+
+    private function configureRegistrationScheduleProfile(): void
+    {
+        $profile = WebinarScheduleProfile::factory()->create([
+            'key' => 'registration_test_profile',
+            'name' => 'Registration test profile',
+            'status' => WebinarScheduleProfile::STATUS_ACTIVE,
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+
+        foreach ([MessageChannel::Email->value, MessageChannel::Sms->value] as $channel) {
+            WebinarScheduleProfileItem::factory()->create([
+                'webinar_schedule_profile_id' => $profile->getKey(),
+                'key' => "{$channel}_confirmation",
+                'context_key' => 'confirmation',
+                'channel' => $channel,
+                'purpose' => MessagePurpose::Transactional->value,
+                'scope' => 'webinar',
+                'surface' => 'webinar_registrations',
+                'message_type' => 'confirmation',
+                'dispatch_key' => 'registration_created',
+                'message_template_key' => 'confirmation',
+                'timing' => 'immediate',
+                'schedule' => null,
+                'conditions' => [],
+                'is_enabled' => true,
+                'is_active' => true,
+            ]);
+
+            WebinarScheduleProfileItem::factory()->create([
+                'webinar_schedule_profile_id' => $profile->getKey(),
+                'key' => "{$channel}_reminder",
+                'context_key' => 'reminders',
+                'channel' => $channel,
+                'purpose' => MessagePurpose::Transactional->value,
+                'scope' => 'webinar',
+                'surface' => 'webinar_registrations',
+                'message_type' => 'reminder',
+                'dispatch_key' => 'registration_created',
+                'message_template_key' => 'reminder',
+                'timing' => 'scheduled',
+                'schedule' => [
+                    'type' => 'anchored',
+                    'minutes' => -30,
+                ],
+                'conditions' => [],
+                'is_enabled' => true,
+                'is_active' => true,
+            ]);
+        }
     }
 
     /**

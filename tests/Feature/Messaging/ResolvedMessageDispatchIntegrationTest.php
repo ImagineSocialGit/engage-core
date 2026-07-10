@@ -45,6 +45,7 @@ class ResolvedMessageDispatchIntegrationTest extends TestCase
             dispatchKeys: 'test_dispatch',
             sendAt: $sendAt,
             behaviorOwner: $broadcast,
+            occurrenceKey: 'broadcast:'.$broadcast->getKey(),
             definitions: [[
                 'dispatch_key' => 'test_dispatch',
                 'message_type' => 'test_message',
@@ -110,6 +111,7 @@ class ResolvedMessageDispatchIntegrationTest extends TestCase
             dispatchKeys: 'test_dispatch',
             sendAt: $sendAt,
             behaviorOwner: $firstBroadcast,
+            occurrenceKey: 'broadcast:'.$firstBroadcast->getKey(),
             definitions: $definition,
         );
 
@@ -121,10 +123,52 @@ class ResolvedMessageDispatchIntegrationTest extends TestCase
             dispatchKeys: 'test_dispatch',
             sendAt: $sendAt,
             behaviorOwner: $secondBroadcast,
+            occurrenceKey: 'broadcast:'.$secondBroadcast->getKey(),
             definitions: $definition,
         );
 
         $this->assertDatabaseCount('scheduled_messages', 2);
         $this->assertCount(2, ScheduledMessage::query()->pluck('dedupe_key')->unique());
     }
+    public function test_stable_occurrence_key_dedupes_retry_even_when_send_at_changes(): void
+    {
+        Queue::fake();
+        $contact = Contact::factory()->create(['email' => 'person@example.com']);
+        MessageConsent::query()->create([
+            'contact_id' => $contact->id,
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'general',
+            'consented_at' => now()->subMinute(),
+            'source' => 'test',
+        ]);
+        $broadcast = Broadcast::factory()->create();
+        $definition = [[
+            'dispatch_key' => 'test_dispatch',
+            'message_type' => 'test_message',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'general',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'notifications',
+            'payload' => ['subject' => 'Hello', 'body' => 'Body'],
+        ]];
+
+        foreach ([now()->addMinute(), now()->addMinutes(2)] as $sendAt) {
+            app(DispatchMessageAction::class)->handle(
+                recipient: $contact,
+                channel: 'email',
+                purpose: 'transactional',
+                scope: 'general',
+                dispatchKeys: 'test_dispatch',
+                sendAt: $sendAt,
+                behaviorOwner: $broadcast,
+                occurrenceKey: 'broadcast:'.$broadcast->getKey(),
+                definitions: $definition,
+            );
+        }
+
+        $this->assertDatabaseCount('scheduled_messages', 1);
+    }
+
 }

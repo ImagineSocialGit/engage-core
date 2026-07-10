@@ -25,6 +25,7 @@ class WebinarResolvedMessageDispatchOwnershipTest extends TestCase
             'surface' => 'webinar_registrations',
             'message_type' => 'confirmation',
             'dispatch_key' => 'registration_created',
+            'message_template_key' => 'confirmation',
             'timing' => 'scheduled',
             'schedule' => ['type' => 'delay', 'minutes' => 10],
             'conditions' => [[
@@ -46,10 +47,10 @@ class WebinarResolvedMessageDispatchOwnershipTest extends TestCase
         );
 
         $this->assertCount(1, $resolved);
-        $this->assertSame('scheduled', $resolved[0]['timing']);
-        $this->assertSame(['type' => 'delay', 'minutes' => 10], $resolved[0]['schedule']);
-        $this->assertEquals($item->conditions, $resolved[0]['conditions']);
-        $this->assertTrue($resolved[0]['skip_when_join_clicked']);
+        $this->assertSame('scheduled', $resolved[0]['resolved_behavior']['timing']);
+        $this->assertSame(['type' => 'delay', 'minutes' => 10], $resolved[0]['resolved_behavior']['schedule']);
+        $this->assertEquals($item->conditions, $resolved[0]['resolved_behavior']['conditions']);
+        $this->assertTrue($resolved[0]['resolved_behavior']['skip_when_join_clicked']);
         $this->assertTrue($resolved[0]['behavior_owner']->is($item));
     }
 
@@ -76,6 +77,7 @@ class WebinarResolvedMessageDispatchOwnershipTest extends TestCase
             'webinar_schedule_profile_id' => $profile->getKey(),
             'message_type' => 'reminder',
             'dispatch_key' => 'registration_created',
+            'message_template_key' => 'reminder_30_minute',
         ]);
         $webinar = Webinar::factory()->create([
             'webinar_schedule_profile_id' => $profile->getKey(),
@@ -95,6 +97,7 @@ class WebinarResolvedMessageDispatchOwnershipTest extends TestCase
     private function contentOnlyDefinition(): array
     {
         return [
+            'key' => 'confirmation',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',

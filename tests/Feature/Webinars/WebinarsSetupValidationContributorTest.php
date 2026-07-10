@@ -241,8 +241,8 @@ class WebinarsSetupValidationContributorTest extends TestCase
     {
         Config::set('messaging.email.transactional.webinar', [
             'confirmation' => [
+                'key' => 'confirmation',
                 'dispatch_key' => 'registration_created',
-                'timing' => 'immediate',
                 'payload_class' => EmailPayload::class,
                 'queue' => 'confirmation_messages',
                 'payload' => [
@@ -278,6 +278,7 @@ class WebinarsSetupValidationContributorTest extends TestCase
             'surface' => 'webinar_registrations',
             'message_type' => 'confirmation',
             'dispatch_key' => 'registration_created',
+            'message_template_key' => 'confirmation',
             'source_config_path' => null,
             'timing' => 'scheduled',
             'schedule' => [
@@ -325,6 +326,7 @@ class WebinarsSetupValidationContributorTest extends TestCase
             'surface' => 'webinar_registrations',
             'message_type' => 'confirmation',
             'dispatch_key' => 'registration_created',
+            'message_template_key' => 'confirmation',
             'source_config_path' => null,
             'is_enabled' => true,
             'is_active' => true,

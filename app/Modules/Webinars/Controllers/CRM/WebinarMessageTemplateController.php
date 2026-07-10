@@ -374,14 +374,18 @@ class WebinarMessageTemplateController extends Controller
             );
 
             foreach ($definitions as $definition) {
+                $resolvedBehavior = is_array($definition['resolved_behavior'] ?? null)
+                    ? $definition['resolved_behavior']
+                    : [];
+
                 $label = $this->scheduleLabel(
-                    is_array($definition['schedule'] ?? null)
-                        ? $definition['schedule']
+                    is_array($resolvedBehavior['schedule'] ?? null)
+                        ? $resolvedBehavior['schedule']
                         : null,
                 );
 
                 if ($label === null) {
-                    $timing = $definition['timing'] ?? null;
+                    $timing = $resolvedBehavior['timing'] ?? null;
 
                     $label = $timing === 'immediate'
                         ? 'Immediate'

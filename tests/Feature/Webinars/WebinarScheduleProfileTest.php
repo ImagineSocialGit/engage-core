@@ -44,6 +44,7 @@ class WebinarScheduleProfileTest extends TestCase
                         'surface' => 'webinar_registrations',
                         'message_type' => 'confirmation',
                         'dispatch_key' => 'registration_created',
+                        'message_template_key' => 'confirmation',
                         'timing' => 'scheduled',
                         'schedule' => ['type' => 'delay', 'minutes' => 5],
                     ],
@@ -80,7 +81,13 @@ class WebinarScheduleProfileTest extends TestCase
         WebinarScheduleProfileItem::factory()->create([
             'webinar_schedule_profile_id' => $profile->getKey(),
             'key' => 'email_confirmation_fast',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'surface' => 'webinar_registrations',
             'message_type' => 'confirmation',
+            'dispatch_key' => 'registration_created',
+            'message_template_key' => 'confirmation',
             'timing' => 'scheduled',
             'schedule' => ['type' => 'delay', 'minutes' => 2],
         ]);
@@ -88,8 +95,13 @@ class WebinarScheduleProfileTest extends TestCase
             'webinar_schedule_profile_id' => $profile->getKey(),
             'key' => 'email_reminder_disabled',
             'context_key' => 'reminders',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'surface' => 'webinar_registrations',
             'message_type' => 'reminder',
             'dispatch_key' => 'registration_created',
+            'message_template_key' => 'reminder',
             'is_enabled' => false,
             'timing' => 'scheduled',
             'schedule' => ['type' => 'anchored', 'minutes' => -30],
@@ -143,20 +155,24 @@ class WebinarScheduleProfileTest extends TestCase
     {
         Config::set('messaging.email.transactional.webinar', [
             'confirmation' => [
+                'key' => 'confirmation',
                 'dispatch_key' => 'registration_created',
-                'timing' => 'scheduled',
-                'schedule' => ['type' => 'delay', 'minutes' => 15],
                 'payload_class' => EmailPayload::class,
                 'queue' => 'confirmation_messages',
-                'payload' => ['subject' => 'Registered', 'body' => 'Registered.'],
+                'payload' => [
+                    'subject' => 'Registered',
+                    'body' => 'Registered.',
+                ],
             ],
             'reminder' => [
+                'key' => 'reminder',
                 'dispatch_key' => 'registration_created',
-                'timing' => 'scheduled',
-                'schedule' => ['type' => 'anchored', 'minutes' => -30],
                 'payload_class' => EmailPayload::class,
                 'queue' => 'reminders',
-                'payload' => ['subject' => 'Reminder', 'body' => 'Reminder.'],
+                'payload' => [
+                    'subject' => 'Reminder',
+                    'body' => 'Reminder.',
+                ],
             ],
         ]);
     }

@@ -88,6 +88,7 @@ class DispatchWebinarRegistrationMessagesAction
                     'webinar_slug' => $registration->webinar_slug,
                 ],
                 definitions: $definitions,
+                occurrenceKey: 'webinar_registration:'.$registration->getKey(),
             );
         }
     }

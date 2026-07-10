@@ -54,6 +54,7 @@ class DispatchMessageAction
         Carbon|string|null $sendAt = null,
         ?Model $behaviorOwner = null,
         array $behavior = [],
+        ?string $occurrenceKey = null,
     ): array {
         $channel = $this->normalizeEnumValue($channel);
         $purpose = $this->normalizeEnumValue($purpose);
@@ -92,17 +93,21 @@ class DispatchMessageAction
 
         foreach ($definitions as $definition) {
             $definitionBehaviorOwner = $definition['behavior_owner'] ?? null;
-            unset($definition['behavior_owner']);
+            $definitionBehavior = is_array($definition['resolved_behavior'] ?? null)
+                ? $definition['resolved_behavior']
+                : [];
+            unset($definition['behavior_owner'], $definition['resolved_behavior']);
 
             $resolvedDispatch = $this->resolvedDispatchBuilder->build(
                 template: $definition,
                 triggeredAt: $triggeredAt,
                 anchor: $anchor,
                 sendAt: $sendAt,
-                behavior: $this->definitionBehavior($definition, $behavior),
+                behavior: array_replace_recursive($definitionBehavior, $behavior),
                 behaviorOwner: $definitionBehaviorOwner instanceof Model
                     ? $definitionBehaviorOwner
                     : $behaviorOwner,
+                occurrenceKey: $occurrenceKey,
                 meta: $meta ?? [],
             );
 
@@ -158,7 +163,7 @@ class DispatchMessageAction
             return null;
         }
 
-        if (($definition['timing'] ?? 'immediate') === 'scheduled' && $dispatch->sendAt->lt(now())) {
+        if (($definition['timing'] ?? null) === 'scheduled' && $dispatch->sendAt->lt(now())) {
             return null;
         }
 
@@ -193,27 +198,10 @@ class DispatchMessageAction
                 context: $context,
                 sendAt: $dispatch->sendAt,
                 behaviorOwner: $dispatch->behaviorOwner,
+                occurrenceKey: $dispatch->occurrenceKey,
             ),
             meta: $messageMeta,
         );
-    }
-
-    /**
-     * @param array<string, mixed> $definition
-     * @param array<string, mixed> $behavior
-     * @return array<string, mixed>
-     */
-    private function definitionBehavior(array $definition, array $behavior): array
-    {
-        $definitionBehavior = array_filter([
-            'timing' => $definition['timing'] ?? null,
-            'schedule' => $definition['schedule'] ?? null,
-            'conditions' => $definition['conditions'] ?? null,
-            'skip_when_join_clicked' => $definition['skip_when_join_clicked'] ?? null,
-            'notification_type' => $definition['notification_type'] ?? null,
-        ], fn (mixed $value): bool => $value !== null);
-
-        return array_replace_recursive($definitionBehavior, $behavior);
     }
 
     private function normalizeEnumValue(MessageChannel|MessagePurpose|string $value): string

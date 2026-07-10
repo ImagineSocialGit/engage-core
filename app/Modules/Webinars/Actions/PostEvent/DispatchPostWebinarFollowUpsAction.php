@@ -163,6 +163,11 @@ class DispatchPostWebinarFollowUpsAction
                     triggeredAt: now(),
                     meta: $meta + ['webinar_schedule_profile_applied' => true],
                     definitions: $definitions,
+                    occurrenceKey: implode(':', [
+                        'webinar_post_event',
+                        $registration->getKey(),
+                        $webinar->getKey(),
+                    ]),
                 );
             }
         }

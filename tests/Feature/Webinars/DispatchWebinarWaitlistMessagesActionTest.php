@@ -12,6 +12,8 @@ use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Webinars\Actions\DispatchWebinarWaitlistMessagesAction;
 use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Models\WebinarScheduleProfile;
+use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -52,6 +54,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         Queue::fake();
 
         $this->configureWaitlistMessages();
+        $this->configureWaitlistScheduleProfile();
 
         $series = $this->createSeries();
         $webinar = $this->createWebinar($series);
@@ -101,6 +104,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
 
         $this->enableWebinarWaitlistSms();
         $this->configureWaitlistMessages();
+        $this->configureWaitlistScheduleProfile();
 
         $series = $this->createSeries();
         $webinar = $this->createWebinar($series);
@@ -156,6 +160,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         Queue::fake();
 
         $this->configureWaitlistMessages();
+        $this->configureWaitlistScheduleProfile();
 
         $series = $this->createSeries();
         $webinar = $this->createWebinar($series, [
@@ -199,6 +204,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         Queue::fake();
 
         $this->configureWaitlistMessages();
+        $this->configureWaitlistScheduleProfile();
 
         $series = $this->createSeries();
         $webinar = $this->createWebinar($series, [
@@ -234,6 +240,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
 
         $this->enableWebinarWaitlistSms();
         $this->configureWaitlistMessages();
+        $this->configureWaitlistScheduleProfile();
 
         $series = $this->createSeries();
         $webinar = $this->createWebinar($series);
@@ -274,6 +281,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         Queue::fake();
 
         $this->configureWaitlistMessages();
+        $this->configureWaitlistScheduleProfile();
 
         $series = $this->createSeries();
         $webinar = $this->createWebinar($series);
@@ -301,6 +309,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         Queue::fake();
 
         $this->configureWaitlistMessages();
+        $this->configureWaitlistScheduleProfile();
 
         $series = $this->createSeries();
         $webinar = $this->createWebinar($series);
@@ -323,16 +332,10 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
     {
         Config::set('messaging.email.marketing.webinar_waitlist', [
             'scheduled_notice' => [
+                'key' => 'scheduled_notice',
                 'dispatch_key' => 'webinar_added',
-                'timing' => 'immediate',
                 'payload_class' => EmailPayload::class,
                 'queue' => 'notifications',
-                'conditions' => [
-                    [
-                        'field' => 'webinar_waitlist_registration_url',
-                        'operator' => 'filled',
-                    ],
-                ],
                 'payload' => [
                     'subject' => 'New webinar scheduled: {webinar_title}',
                     'body' => 'A new webinar is available. Register here: {webinar_waitlist_registration_url}',
@@ -346,21 +349,51 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
 
         Config::set('messaging.sms.marketing.webinar_waitlist', [
             'scheduled_notice' => [
+                'key' => 'scheduled_notice',
                 'dispatch_key' => 'webinar_added',
-                'timing' => 'immediate',
                 'payload_class' => SmsPayload::class,
                 'queue' => 'notifications',
+                'payload' => [
+                    'message' => 'A new webinar is available. Register here: {webinar_waitlist_registration_url}',
+                ],
+            ],
+        ]);
+    }
+
+    private function configureWaitlistScheduleProfile(): void
+    {
+        $profile = WebinarScheduleProfile::factory()->create([
+            'key' => 'waitlist_test_profile',
+            'name' => 'Waitlist test profile',
+            'status' => WebinarScheduleProfile::STATUS_ACTIVE,
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+
+        foreach ([MessageChannel::Email->value, MessageChannel::Sms->value] as $channel) {
+            WebinarScheduleProfileItem::factory()->create([
+                'webinar_schedule_profile_id' => $profile->getKey(),
+                'key' => "{$channel}_scheduled_notice",
+                'context_key' => 'waitlist',
+                'channel' => $channel,
+                'purpose' => MessagePurpose::Marketing->value,
+                'scope' => 'webinar_waitlist',
+                'surface' => 'webinar_waitlists',
+                'message_type' => 'scheduled_notice',
+                'dispatch_key' => 'webinar_added',
+                'message_template_key' => 'scheduled_notice',
+                'timing' => 'immediate',
+                'schedule' => null,
                 'conditions' => [
                     [
                         'field' => 'webinar_waitlist_registration_url',
                         'operator' => 'filled',
                     ],
                 ],
-                'payload' => [
-                    'message' => 'A new webinar is available. Register here: {webinar_waitlist_registration_url}',
-                ],
-            ],
-        ]);
+                'is_enabled' => true,
+                'is_active' => true,
+            ]);
+        }
     }
 
     private function createSeries(): WebinarSeries

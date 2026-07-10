@@ -23,6 +23,7 @@ class WebinarScheduleProfileItemFactory extends Factory
             'surface' => 'webinar_registrations',
             'message_type' => 'confirmation',
             'dispatch_key' => 'registration_created',
+            'message_template_key' => 'confirmation',
             'source_config_path' => null,
             'is_enabled' => true,
             'is_active' => true,

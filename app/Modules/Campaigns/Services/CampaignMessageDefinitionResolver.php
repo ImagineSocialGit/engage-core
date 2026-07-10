@@ -52,15 +52,12 @@ class CampaignMessageDefinitionResolver
             'purpose' => $reference['purpose'],
             'scope' => $reference['scope'],
             'dispatch_keys' => [$reference['dispatch_key']],
-            'conditions' => $this->conditions($step, $variant),
             'payload' => $payload,
             'campaign_key' => $campaign->key,
             'step' => $step->step_number,
             'variant' => $reference['variant_key'],
             'campaign_step_variant_key' => $reference['variant_key'],
             'campaign_step_variant_source_config_path' => $reference['variant_source_config_path'],
-            'skip_when_join_clicked' => (bool) data_get($variant?->meta ?? $step->meta ?? [], 'skip_when_join_clicked', false),
-            'notification_type' => data_get($variant?->meta ?? $step->meta ?? [], 'notification_type'),
             'behavior_owner' => $variant,
             'meta' => array_replace_recursive(
                 $definition['meta'] ?? [],
@@ -80,8 +77,13 @@ class CampaignMessageDefinitionResolver
         ]);
 
         if ($schedule !== null) {
-            $resolved['timing'] = $schedule['timing'];
-            $resolved['schedule'] = $schedule['schedule'];
+            $resolved['resolved_behavior'] = [
+                'timing' => $schedule['timing'],
+                'schedule' => $schedule['schedule'],
+                'conditions' => $this->conditions($step, $variant),
+                'skip_when_join_clicked' => (bool) data_get($variant->meta ?? $step->meta ?? [], 'skip_when_join_clicked', false),
+                'notification_type' => data_get($variant->meta ?? $step->meta ?? [], 'notification_type'),
+            ];
         }
 
         if ($skipReason !== null) {
@@ -194,16 +196,20 @@ class CampaignMessageDefinitionResolver
             'purpose' => $reference['purpose'],
             'scope' => $reference['scope'],
             'dispatch_keys' => [$reference['dispatch_key']],
-            'conditions' => $this->conditions($step, $variant),
             'payload' => [],
             'campaign_key' => $campaign->key,
             'step' => $step->step_number,
             'variant' => $reference['variant_key'],
             'campaign_step_variant_key' => $reference['variant_key'],
             'campaign_step_variant_source_config_path' => $reference['variant_source_config_path'],
-            'skip_when_join_clicked' => (bool) data_get($variant?->meta ?? $step->meta ?? [], 'skip_when_join_clicked', false),
-            'notification_type' => data_get($variant?->meta ?? $step->meta ?? [], 'notification_type'),
             'behavior_owner' => $variant,
+            'resolved_behavior' => [
+                'timing' => 'immediate',
+                'schedule' => null,
+                'conditions' => $this->conditions($step, $variant),
+                'skip_when_join_clicked' => (bool) data_get($variant?->meta ?? $step->meta ?? [], 'skip_when_join_clicked', false),
+                'notification_type' => data_get($variant?->meta ?? $step->meta ?? [], 'notification_type'),
+            ],
             'meta' => [
                 'campaign' => array_filter([
                     'campaign_id' => $campaign->id,

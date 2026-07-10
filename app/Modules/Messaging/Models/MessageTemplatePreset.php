@@ -99,6 +99,7 @@ class MessageTemplatePreset extends Model
         );
 
         $definition = array_filter([
+            'key' => $this->key,
             'channel' => $assignment?->channel ?? $this->channel,
             'purpose' => $assignment?->purpose ?? $this->purpose,
             'scope' => $assignment?->scope ?? $this->scope,
