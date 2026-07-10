@@ -1,3 +1,4 @@
+
 # Broadcasts Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -141,6 +142,26 @@ Broadcast delivery metadata should be first-class on `broadcasts`:
     queue
 
 Broadcasts should use Messaging public actions/services to schedule or send messages.
+
+Broadcasts owns the exact Broadcast send time and batch behavior. A Broadcast should not manufacture a fake zero-delay Messaging schedule merely to satisfy a generic template contract.
+
+The durable dispatch shape is:
+
+```text
+Broadcast
+    owns send_at, audience/filter, channel choice, batch intent, and Broadcast-specific behavior
+
+Messaging template or Broadcast payload
+    owns reusable/sendable content and delivery-template metadata
+
+ResolvedMessageDispatchBuilder
+    assembles the exact Broadcast-owned send_at with the message content
+
+ScheduledMessage
+    may preserve behavior_owner = Broadcast
+```
+
+Messaging must not reinterpret Broadcast timing from reusable template fields.
 
 Good:
 

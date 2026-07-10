@@ -1,3 +1,4 @@
+
 # FlowRoutes Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -127,6 +128,28 @@ Runtime meaning:
     ContactFlowRouteProgress records active/waiting/completed/cancelled execution state
 
 FlowRoutes runtime behavior should read DB-owned route/point definitions.
+
+## Send-message point behavior ownership
+
+A FlowRoute `send_message` point is reached because FlowRoutes execution has already progressed through the route's waits, conditions, branches, and prior points. Reusable Messaging templates must not inject a hidden second workflow layer.
+
+Durable rule:
+
+```text
+FlowRoutes
+    owns when execution reaches the send_message point
+    owns route conditions, waits, branches, and point-specific behavior
+
+Messaging template
+    owns reusable content and delivery-template metadata
+
+ResolvedMessageDispatchBuilder
+    assembles the selected template with the FlowRoute-resolved dispatch behavior
+```
+
+By default, reaching a `send_message` point means the message is eligible to send at the point's resolved execution time. Any additional delay or condition must be explicitly owned by the FlowRoute point/route definition, not inherited from reusable template timing.
+
+The resulting `ResolvedMessageDispatch` may preserve the `FlowRoutePoint` as polymorphic behavior provenance. Messaging should not import FlowRoutes internals to interpret the point.
 
 ## Manual contact-status automation impact preview
 

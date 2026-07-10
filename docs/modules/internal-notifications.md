@@ -1,3 +1,4 @@
+
 # InternalNotifications Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -26,6 +27,10 @@ InternalNotifications contributes TeamMember support to Messaging through:
 
 - `TeamMemberMessageRecipientGate`
 - `TeamMemberMessageRecipientPayloadProvider`
+
+InternalNotifications owns when an internal notification should exist, how team recipients/channels are resolved, and any InternalNotifications-specific trigger or timing behavior. Messaging remains the generic delivery capability.
+
+When an internal notification uses the shared resolved-dispatch path, InternalNotifications should provide the resolved send time/behavior to `ResolvedMessageDispatchBuilder`; reusable Messaging content must not secretly own Team notification cadence or trigger conditions. Existing direct scheduling paths with an explicit `sendAt` remain architecturally valid when they already provide a complete Messaging scheduling contract.
 
 Core contacts should not know about TeamMembers.
 

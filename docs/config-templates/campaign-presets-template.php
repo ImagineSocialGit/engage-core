@@ -16,8 +16,10 @@ return [
     | Campaign presets own:
     | - campaign identity
     | - step order
-    | - step timing
+    | - step/variant timing
+    | - step/variant conditions
     | - variant strategy
+    | - variant dependencies and enablement
     | - message template references through variants
     |
     | Messaging configs own:
@@ -25,6 +27,10 @@ return [
     | - subject/body/CTA payloads
     | - payload_class
     | - delivery queue
+    |
+    | Campaigns resolves Campaign-owned behavior first. The shared
+    | ResolvedMessageDispatchBuilder combines that behavior with the selected
+    | reusable Messaging template into the normalized dispatch contract.
     |
     | Campaign presets must not own reusable subject/body copy.
     | Campaign presets must not define or override payloads.

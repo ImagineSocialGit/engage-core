@@ -2,6 +2,7 @@
 
 
 
+
 # Engage Core Config Authoring Guide
 
 This guide is for creating or reviewing Engage Core default configs and client-specific configs.
@@ -16,16 +17,21 @@ Primary references:
 
 ## Core rules
 
-1. Messaging configs own reusable message copy and delivery templates.
-2. Campaign presets own journeys, order, timing, and references to message templates.
-3. Campaign presets do not own or override reusable subject/body/CTA payloads.
-4. Campaign message templates resolve by `channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key`, not author-created per-step message names.
-5. Campaign step variants reference Messaging-owned template presets/assignments and must not own reusable payload copy.
-6. Messaging template presets own reusable copy and safe DB-editable message payloads.
-7. Messaging template catalog entries own browsing/grouping metadata for template review; they do not own runtime behavior.
-8. FlowRoute presets own automation/control-flow routing and reusable point definitions; runtime execution should use DB-owned route templates, capabilities, instance plans, plan items, and progress/execution items.
-9. Webinar post-event config owns provider event orchestration, not message copy.
-10. Task presets create DB-owned task template definitions only. They do not create live tasks.
+1. Messaging configs own reusable message copy and delivery-template metadata.
+2. Reusable Messaging templates do not own business timing, lifecycle conditions, sequencing, dependencies, lifecycle enablement, or module-specific skip behavior for module-owned flows.
+3. The consuming module owns whether a message should exist, when it should send, and the lifecycle rules that govern it.
+4. `ResolvedMessageDispatchBuilder` is the universal Messaging-owned runtime assembly seam; it combines reusable template data with behavior already resolved by the owning module and produces a `ResolvedMessageDispatch` with an exact `send_at`.
+5. Campaign presets own journeys, order, timing, conditions, dependency behavior, and references to message templates.
+6. Campaign presets do not own or override reusable subject/body/CTA payloads.
+7. Campaign message templates resolve by `channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key`, not author-created per-step message names.
+8. Campaign step variants reference Messaging-owned template presets/assignments and must not own reusable payload copy.
+9. Messaging template presets own reusable copy and safe DB-editable message payloads.
+10. Messaging template catalog entries own browsing/grouping metadata for template review; they do not own runtime behavior.
+11. Webinar schedule profiles/profile items own all Webinar lifecycle message timing, schedules, conditions, enablement, and Webinar-specific skip behavior, including immediate lifecycle messages.
+12. FlowRoute presets own automation/control-flow routing and reusable point definitions; reaching a `send_message` point determines when that action occurs unless the point itself explicitly owns additional behavior.
+13. Broadcasts own their exact `send_at`, audience, channel choice, and batch intent.
+14. Webinar post-event config owns provider event orchestration, not message copy.
+15. Task presets create DB-owned task template definitions only. They do not create live tasks.
 11. Internal/runtime identifiers must use the universal platform concept `contact`, never `lead`, unless a vertical truly owns a distinct domain concept named lead. This applies to keys, preset identifiers, task-template keys, route keys, event keys, triggers, reference registries, config paths, and generic definitions.
 12. Client-facing UI/copy may use the configured business noun such as Lead, Customer, Fan, Borrower, Owner, or another client/vertical label. Display terminology must not redefine internal identifiers.
 13. Do not invent new keys until checking the key registry and the actual owning config/runtime definitions.
@@ -461,29 +467,23 @@ client/slam-dunk-crm/config/messaging/email/transactional/webinar.php
 client/slam-dunk-crm/config/messaging/email/marketing/webinar_nurture.php
 ```
 
-## Normal Messaging definition shape
+## Normal Messaging template definition shape
 
-Use this shape for non-campaign definitions such as confirmations, opt-ins, reminders, waitlist messages, and post-event transactional messages:
+Messaging config definitions are reusable content/delivery templates. They should contain only template identity, delivery-template metadata, and reusable payload copy.
+
+Example:
 
 ```php
 'confirmations' => [
     [
+        'key' => 'confirmation',
         'dispatch_key' => 'registration_created',
+        'message_type' => 'confirmation',
         'channel' => 'email',
         'purpose' => 'transactional',
         'scope' => 'webinar',
-
-        'conditions' => [],
-
-        'timing' => 'scheduled',
         'payload_class' => EmailPayload::class,
         'queue' => 'confirmation_messages',
-
-        'schedule' => [
-            'type' => 'delay',
-            'minutes' => 15,
-        ],
-
         'payload' => [
             'subject' => 'Subject with {first_name}',
             'body' => 'Body with {webinar_title}',
@@ -496,7 +496,41 @@ Use this shape for non-campaign definitions such as confirmations, opt-ins, remi
 ],
 ```
 
-For webinar transactional emails, use a uniform shape across defaults and clients:
+For module-owned flows, do not put these fields on reusable Messaging templates:
+
+```text
+timing
+schedule
+conditions
+lifecycle enablement
+sequencing/dependencies
+module-specific skip rules
+```
+
+Those values belong to the module that owns the lifecycle. Examples:
+
+```text
+Webinars
+    WebinarScheduleProfile / WebinarScheduleProfileItem
+
+Campaigns
+    CampaignStep / CampaignStepVariant
+
+Broadcasts
+    Broadcast.send_at and Broadcast-owned audience/batch behavior
+
+FlowRoutes
+    FlowRoutePoint and route execution state
+
+Tasks / InternalNotifications
+    task/digest trigger and notification scheduling behavior
+```
+
+The owning module resolves its business behavior first and passes the reusable template plus resolved behavior to `ResolvedMessageDispatchBuilder`. The resulting `ResolvedMessageDispatch` should contain an exact `send_at`; Messaging should not infer module lifecycle timing from template config.
+
+A missing module-owned behavior record must not silently fall back to an implicit immediate send or hidden template schedule. Treat missing required behavior as validation/runtime setup failure according to the owning module's contract.
+
+For webinar transactional emails, use a uniform reusable-content shape across defaults and clients:
 
 ```text
 confirmations
@@ -506,18 +540,7 @@ post_attended
 post_missed
 ```
 
-Do not mix old named reminder keys with the canonical `reminders` array.
-
-Avoid:
-
-```text
-reminder_10_day
-reminder_7_day
-reminder_24_hour
-reminder_30_minute
-reminder_10_minute
-reminder_live
-```
+Do not encode reminder timing into schedule-specific `message_type` values. Multiple reminder slots may share `message_type = reminder`; Webinar schedule profile items identify the specific lifecycle slots.
 
 ## Messaging template presets, catalog entries, and assignments
 
@@ -1563,8 +1586,3 @@ business context label
 ```
 
 Do not persist schedule summary text unless a concrete reason appears. Prefer deriving it from the canonical schedule/profile/criteria definition.
-
-
-
-
-

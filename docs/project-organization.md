@@ -1,4 +1,5 @@
 
+
 # Engage Core Project Organization
 
 This document is a quick orientation map for Engage Core. It classifies the project into Core, universal modules, vertical modules, and integrations/adapters.
@@ -160,6 +161,35 @@ flow_route_capability_id
 
 This should make future Scheduling, Documents, Forms, Portal, Commerce, Mortgage, PetServices, and Music integrations follow the same route-instance/capability model instead of adding bespoke metadata paths.
 
+## Cross-module resolved message dispatch pattern
+
+Modules that use Messaging should keep business behavior with the module that owns the lifecycle. Reusable Messaging templates own copy and delivery-template metadata; they do not own another module's timing, conditions, sequencing, dependencies, enablement, or skip behavior.
+
+Preferred shape:
+
+```text
+Owning module records/resolves its own behavior
+    -> selects reusable Messaging template/copy
+    -> ResolvedMessageDispatchBuilder
+    -> ResolvedMessageDispatch with exact send_at
+    -> Messaging gating/persistence/queue/provider delivery
+```
+
+The builder is universal and Messaging-owned, but it must not query or interpret concrete feature-module tables. The caller supplies already-resolved behavior.
+
+`ScheduledMessage` may preserve an optional polymorphic `behavior_owner` reference to the exact module-owned record responsible for the behavior. This provenance must not create a hard Messaging dependency on concrete feature-module classes.
+
+Examples:
+
+```text
+Webinars -> WebinarScheduleProfileItem
+Campaigns -> CampaignStepVariant
+Broadcasts -> Broadcast
+FlowRoutes -> FlowRoutePoint
+```
+
+Modules do not need to adopt a universal profile/profile-item storage pair. Shared assembly is universal; behavior storage remains module-owned.
+
 ## Integrations / Adapters
 
 Integrations/adapters connect modules to external providers. They are not modules.
@@ -223,4 +253,3 @@ Avoid:
 ```text
 New Core columns for feature or vertical state
 ```
-

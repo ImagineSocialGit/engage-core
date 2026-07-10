@@ -7,8 +7,10 @@ use App\Modules\Messaging\Actions\AssignMessageTemplatePresetAction;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
+use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Requests\UpdateWebinarMessageTemplateRequest;
 use App\Modules\Webinars\Services\WebinarMessageReadinessService;
+use App\Modules\Webinars\Services\WebinarScheduleProfileDefinitionResolver;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -58,12 +60,21 @@ class WebinarMessageTemplateController extends Controller
     public function index(
         Request $request,
         WebinarMessageReadinessService $messageReadiness,
+        WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
     ): View {
         $catalogEntries = $this->webinarCatalogEntries();
         $currentAssignments = $this->currentAssignments($catalogEntries);
         $templateOptions = $this->templateOptions($catalogEntries);
         $readiness = $messageReadiness->resolve();
-        $sections = $this->sections($catalogEntries, $currentAssignments, $templateOptions)
+        $profiles = $messageReadiness->profilesInUse()['profiles'];
+
+        $sections = $this->sections(
+            catalogEntries: $catalogEntries,
+            currentAssignments: $currentAssignments,
+            templateOptions: $templateOptions,
+            profiles: $profiles,
+            scheduleProfileDefinitionResolver: $scheduleProfileDefinitionResolver,
+        )
             ->map(function (array $section, string $sectionKey) use ($readiness): array {
                 $section['readiness'] = $readiness['contexts'][$sectionKey] ?? null;
 
@@ -221,12 +232,26 @@ class WebinarMessageTemplateController extends Controller
         Collection $catalogEntries,
         Collection $currentAssignments,
         Collection $templateOptions,
+        Collection $profiles,
+        WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
     ): Collection {
         return collect(self::CONTEXTS)
-            ->map(function (array $context, string $contextKey) use ($catalogEntries, $currentAssignments, $templateOptions): array {
+            ->map(function (array $context, string $contextKey) use (
+                $catalogEntries,
+                $currentAssignments,
+                $templateOptions,
+                $profiles,
+                $scheduleProfileDefinitionResolver,
+            ): array {
                 $entries = $catalogEntries
                     ->filter(fn (MessageTemplateCatalogEntry $entry): bool => in_array($entry->usage_type, $context['usage_types'], true))
-                    ->map(function (MessageTemplateCatalogEntry $entry) use ($contextKey, $currentAssignments, $templateOptions): array {
+                    ->map(function (MessageTemplateCatalogEntry $entry) use (
+                        $contextKey,
+                        $currentAssignments,
+                        $templateOptions,
+                        $profiles,
+                        $scheduleProfileDefinitionResolver,
+                    ): array {
                         $preset = $entry->messageTemplatePreset;
                         $surface = $entry->surface ?: $this->surfaceForEntry($entry);
                         $messageType = $preset?->message_type ?? data_get($entry->meta, 'message_type') ?? '';
@@ -251,7 +276,12 @@ class WebinarMessageTemplateController extends Controller
                             'assignment_key' => $assignmentKey,
                             'surface' => $surface,
                             'message_type' => $messageType,
-                            'schedule_label' => $this->scheduleLabel($selectedPreset?->schedule ?? []),
+                            'schedule_label' => $this->effectiveScheduleLabel(
+                                preset: $preset,
+                                entry: $entry,
+                                profiles: $profiles,
+                                scheduleProfileDefinitionResolver: $scheduleProfileDefinitionResolver,
+                            ),
                         ];
                     })
                     ->values();
@@ -313,6 +343,68 @@ class WebinarMessageTemplateController extends Controller
         return $entry->scope === 'webinar_waitlist'
             ? 'webinar_waitlists'
             : 'webinar_registrations';
+    }
+
+    /**
+     * @param Collection<int, WebinarScheduleProfile> $profiles
+     */
+    private function effectiveScheduleLabel(
+        ?MessageTemplatePreset $preset,
+        MessageTemplateCatalogEntry $entry,
+        Collection $profiles,
+        WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
+    ): ?string {
+        if (! $preset instanceof MessageTemplatePreset) {
+            return null;
+        }
+
+        if ($profiles->isEmpty()) {
+            return $this->scheduleLabel($preset->schedule);
+        }
+
+        $surface = $entry->surface ?: $this->surfaceForEntry($entry);
+        $labels = [];
+
+        foreach ($profiles as $profile) {
+            $definitions = $scheduleProfileDefinitionResolver->applyProfile(
+                profile: $profile,
+                definitions: [$preset->toMessageDefinition()],
+                dispatchKeys: $preset->dispatchKeys(),
+                surface: $surface,
+            );
+
+            foreach ($definitions as $definition) {
+                $label = $this->scheduleLabel(
+                    is_array($definition['schedule'] ?? null)
+                        ? $definition['schedule']
+                        : null,
+                );
+
+                if ($label === null) {
+                    $timing = $definition['timing'] ?? null;
+
+                    $label = $timing === 'immediate'
+                        ? 'Immediate'
+                        : null;
+                }
+
+                if ($label !== null) {
+                    $labels[] = $label;
+                }
+            }
+        }
+
+        $labels = array_values(array_unique($labels));
+
+        if (count($labels) === 1) {
+            return $labels[0];
+        }
+
+        if (count($labels) > 1) {
+            return 'Varies by schedule profile';
+        }
+
+        return null;
     }
 
     /**

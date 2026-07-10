@@ -9,6 +9,8 @@ use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Services\MessageDefinitionResolver;
+use App\Modules\Webinars\Models\WebinarScheduleProfile;
+use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -205,6 +207,70 @@ class WebinarMessageTemplateControllerTest extends TestCase
                 'message_template_preset_id' => $wrongPreset->getKey(),
             ])
             ->assertSessionHasErrors(['message_template_preset_id']);
+    }
+
+    public function test_index_displays_effective_timing_from_the_active_webinar_schedule_profile(): void
+    {
+        config()->set('modules.enabled', [
+            'webinars',
+            'messaging',
+        ]);
+
+        $user = User::factory()->create();
+
+        $preset = $this->webinarTemplate([
+            'message_type' => 'confirmation',
+            'usage_type' => 'webinar_confirmation',
+            'group_label' => 'Webinar Confirmations',
+            'item_label' => 'Confirmation Email',
+            'timing' => 'immediate',
+            'schedule' => null,
+        ]);
+
+        MessageTemplatePresetAssignment::factory()
+            ->forPreset($preset)
+            ->create([
+                'surface' => 'webinar_registrations',
+                'message_type' => 'confirmation',
+            ]);
+
+        $profile = WebinarScheduleProfile::factory()->create([
+            'key' => 'default_profile',
+            'name' => 'Default profile',
+            'status' => WebinarScheduleProfile::STATUS_ACTIVE,
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+
+        WebinarScheduleProfileItem::factory()->create([
+            'webinar_schedule_profile_id' => $profile->getKey(),
+            'key' => 'email_confirmation',
+            'context_key' => 'confirmations',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'surface' => 'webinar_registrations',
+            'message_type' => 'confirmation',
+            'dispatch_key' => 'registration_created',
+            'source_config_path' => $preset->source_config_path,
+            'is_enabled' => true,
+            'is_active' => true,
+            'timing' => 'scheduled',
+            'schedule' => [
+                'type' => 'delay',
+                'minutes' => 10,
+            ],
+        ]);
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/webinars/message-templates?section=confirmation')
+            ->assertOk()
+            ->assertSee('After 10 minutes')
+            ->assertDontSee('Timing</dt>
+                                                            <dd class="mt-1 font-semibold text-slate-900">
+                                                                Immediate', false);
     }
 
     /**

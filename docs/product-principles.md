@@ -1,4 +1,5 @@
 
+
 # Engage Core Product Principles
 
 Engage Core is a dev-built operating system for small service businesses.
@@ -122,6 +123,24 @@ Documents:
     Client requests, reviews, or tracks documents.
 ```
 
+The same split applies to cross-module message delivery:
+
+```text
+Messaging template
+    owns reusable copy and delivery-template metadata
+
+Owning module
+    owns whether, why, and when the message should exist
+
+ResolvedMessageDispatchBuilder
+    assembles the already-resolved module behavior with the reusable template
+
+Messaging runtime
+    owns generic gating, persistence, queueing, and provider delivery
+```
+
+Do not hide business workflow behavior inside reusable content templates merely because Messaging is the delivery capability. A universal builder may normalize a final runtime contract, but the module that owns the lifecycle must remain authoritative for its timing, conditions, sequencing, dependencies, enablement, and module-specific skip behavior.
+
 ## Subscription and service sprawl principle
 
 Engage Core should reduce the number of external services a small business must pay for, integrate, and remember how to use.
@@ -204,4 +223,3 @@ Which raw keys or route details are useful only as diagnostics?
 A blank-canvas builder is not client-ready just because the underlying module supports many point types. The product direction is guided, preset-backed setup first, with advanced builder detail only where it is deliberately needed.
 
 Detailed language rules, reusable UI patterns, automation-warning patterns, and UI review checklists belong in `ui-ux-guide.md`.
-

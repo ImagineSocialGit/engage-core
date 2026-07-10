@@ -1,3 +1,4 @@
+
 # Messaging Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -41,26 +42,67 @@ Messaging does not own:
 
 Other modules may use Messaging through public actions/services/contracts.
 
-Messaging definitions should use a consistent canonical definition shape across config files and DB-adapted inline definitions.
+## Reusable template vs resolved behavior contract
 
-Canonical message definition shape:
+Messaging templates are reusable content and delivery-template definitions. They are not workflow engines.
 
-    dispatch_key
-    message_type
-    channel
-    purpose
-    scope
-    timing
+The durable ownership split is:
+
+```text
+Messaging template / MessageTemplatePreset
+    reusable copy
+    payload class
     queue
-    payload_class
-    conditions
-    schedule
-    payload
-    meta
+    channel/purpose/scope/message identity
+    dispatch identity
+    token metadata
+    template provenance
 
-A definition may omit fields that are inferable from caller context, but adapters should normalize into this shape before calling Messaging runtime actions.
+Owning module
+    whether the message should exist
+    exact lifecycle timing
+    conditions/eligibility owned by that lifecycle
+    sequencing and dependencies
+    enablement
+    module-specific skip behavior
+```
 
-Messaging definitions are reusable templates.
+For module-owned flows, reusable Messaging templates must not own competing `timing`, `schedule`, `conditions`, lifecycle enablement, sequencing, dependencies, or module-specific skip rules.
+
+The universal runtime assembly seam is:
+
+```text
+Owning module resolves behavior
+    -> ResolvedMessageDispatchBuilder
+    -> ResolvedMessageDispatch
+    -> Messaging gating / persistence / queueing / provider delivery
+```
+
+`ResolvedMessageDispatchBuilder` is Messaging-owned and generic. It combines reusable template data with behavior already resolved by the caller. It must not query or interpret Webinar, Campaign, Broadcast, FlowRoute, Task, InternalNotifications, or vertical-module tables.
+
+`ResolvedMessageDispatch` is the normalized final dispatch contract. It should contain the exact resolved `send_at` and the generic information required for Messaging to apply delivery safety and persist a `ScheduledMessage`.
+
+The builder may accept an optional polymorphic `behaviorOwner` model. `ScheduledMessage` may persist that provenance through `behavior_owner_type` / `behavior_owner_id`. Messaging stores the morph generically and does not import concrete feature-module models to understand their behavior.
+
+Examples:
+
+```text
+Webinar message
+    behavior owner = WebinarScheduleProfileItem
+
+Campaign message
+    behavior owner = CampaignStepVariant
+
+Broadcast message
+    behavior owner = Broadcast
+
+FlowRoute send_message
+    behavior owner = FlowRoutePoint
+```
+
+Not every message requires a behavior-owner record. The morph is provenance, not a requirement that every module adopt a profile/profile-item table pair.
+
+Missing module-owned behavior must never silently fall back to hidden timing or conditions from a reusable template. A consuming module should either resolve a valid dispatch intent or safely decline/fail according to its explicit runtime and setup-validation contract.
 
 ## Message template presets, catalog entries, and assignments
 
@@ -91,7 +133,7 @@ MessageTemplatePresetAssignment
 
 ### MessageTemplatePreset
 
-`MessageTemplatePreset` owns reusable message content and delivery-template fields.
+`MessageTemplatePreset` owns reusable message content and delivery-template metadata. It does not own module lifecycle behavior.
 
 Durable fields include:
 
@@ -107,9 +149,6 @@ message_type nullable
 payload_class
 queue nullable
 dispatch_keys json nullable
-timing
-schedule json nullable
-conditions json nullable
 payload json
 tokens json nullable
 status / is_active
@@ -285,6 +324,8 @@ Messaging resolvers should eventually resolve message definitions in this order:
 ```
 
 Long-term runtime should be DB-first. Config should seed/update available presets and catalog entries; it should not remain the only runtime source of reusable message copy.
+
+DB-first template resolution does not make Messaging the owner of consuming-module behavior. After the reusable template is selected, the consuming module remains authoritative for its own timing, conditions, sequencing, dependencies, enablement, and skip behavior before `ResolvedMessageDispatchBuilder` assembles the final runtime contract.
 
 
 For Campaign runtime contexts, assignment and fallback resolution must include the variant key when variants are involved:
@@ -660,11 +701,10 @@ The existing `MessageConfigValidator` is reused/adapted rather than duplicated. 
 Messaging validation should cover, as applicable:
 
 ```text
-canonical message definition shape
+canonical reusable template definition shape
 dispatch key validity
 channel/purpose/scope validity
 payload class availability
-schedule/timing shape
 required payload fields
 unresolved or undeclared tokens/available fields
 context-specific field availability

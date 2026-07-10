@@ -50,11 +50,11 @@ Do not create separate runtime payload fields, database columns, event keys, pre
 | Template | Use for |
 | --- | --- |
 | `campaign-presets-template.php` | Campaign journeys, step order, step timing, variant strategy, and variant delivery references. Campaign presets must not own reusable message copy or payloads. |
-| `messaging-email-template.php` | Email message definitions, including transactional webinar messages and campaign variant templates under `campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}`. |
-| `messaging-sms-template.php` | SMS message definitions, including campaign variant templates. SMS must remain explicit and surface-controlled. |
+| `messaging-email-template.php` | Reusable email content/template definitions. Module-owned lifecycle timing, conditions, sequencing, dependencies, and skip behavior do not belong here. |
+| `messaging-sms-template.php` | Reusable SMS content/template definitions. Module-owned lifecycle behavior does not belong here; SMS remains explicit and surface-controlled. |
 | `flow-routes-template.php` | FlowRoute definitions, route points, waits, event waits, and automation/control-flow presets. |
 | `task-presets-template.php` | DB-owned task template/default definitions. Task preset sync creates task templates only, not live tasks. |
-| `webinar-schedule-profiles-template.php` | DB-owned webinar schedule profiles and schedule profile items. These own timing/slot identity, not reusable message copy. |
+| `webinar-schedule-profiles-template.php` | DB-owned Webinar behavior profiles/items. These exclusively own Webinar lifecycle timing, conditions, enablement, and Webinar-specific skip behavior, not reusable copy. |
 | `webinar-post-event-template.php` | Webinar post-event provider orchestration such as attendance recording, playback resolution, follow-up dispatch, and automation events. |
 | `permission-invitations-template.php` | Imported-contact one-time permission invitation copy, public preference page copy/style, and accepted consent scopes. |
 | `contact-status-presets-template.php` | Core contact status definitions. |
@@ -65,8 +65,11 @@ Do not create separate runtime payload fields, database columns, event keys, pre
 
 ## Core authoring rules
 
-- Messaging configs own reusable message copy and delivery templates.
+- Messaging configs own reusable message copy and delivery-template metadata only.
 - Every list-based Messaging definition must declare a stable explicit `key`. The synced `MessageTemplatePreset.key` derives from that explicit identity rather than list position. `source_config_path` remains provenance/debug location, not durable template identity.
+- Reusable Messaging templates must not own business timing, lifecycle conditions, sequencing, dependencies, enablement, or module-specific skip behavior.
+- Owning modules resolve their own behavior and use `ResolvedMessageDispatchBuilder` to produce a normalized `ResolvedMessageDispatch` with an exact `send_at`.
+- Missing module-owned behavior must never silently fall back to hidden template timing or an implicit immediate send.
 - Campaign presets own journeys, timing, step order, variant strategy, and delivery references.
 - Campaign presets must not define reusable subject/body/CTA/message payloads.
 - Campaign message templates live in Messaging configs under:
@@ -105,7 +108,7 @@ Campaign preset
     dependency_rules, when needed
 ```
 
-Messaging templates should hold the reusable copy:
+Messaging templates should hold reusable content and delivery-template metadata:
 
 ```text
 Messaging template
@@ -113,8 +116,11 @@ Messaging template
   queue
   reusable payload/copy
   tokens
-  conditions, when needed
+  template identity/provenance
 ```
+
+The owning module should hold timing, lifecycle conditions, sequencing,
+dependencies, enablement, and module-specific behavior.
 
 Do not use `meta.message` as the canonical Campaign step or variant message reference.
 
@@ -180,6 +186,7 @@ Before accepting a config change, confirm:
 - Every key exists in the key registry or client key registry.
 - Every token exists in the token registry or client token registry.
 - Campaign presets are free of reusable copy and payload overrides.
+- Messaging templates are free of module-owned timing, lifecycle conditions, sequencing, dependencies, enablement, and module-specific skip behavior.
 - Campaign variants use first-class `key`, `dispatch_key`, `channel`, `purpose`, and `scope` fields.
 - Campaign Messaging templates are under `steps.{step_number}.variants.{variant_key}`.
 - Runtime-only URLs are not guessed in static config.
@@ -202,8 +209,8 @@ Read these first:
 Rules:
 - Use existing keys when behavior matches.
 - Recommend a new key only when behavior is meaningfully distinct.
-- Messaging configs own reusable message copy.
-- Campaign presets own journeys/timing/template references.
+- Messaging configs own reusable message copy and delivery-template metadata only.
+- Campaign presets own journeys, timing, conditions, strategies, dependencies, enablement, and template references.
 - Campaign presets must not own or override payloads.
 - Campaign preset steps define business moments, timing, and variant_strategy.
 - Campaign preset variants reference Messaging templates with first-class key/dispatch_key/channel/purpose/scope keys.

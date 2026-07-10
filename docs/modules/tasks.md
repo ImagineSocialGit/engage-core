@@ -2,6 +2,7 @@
 
 
 
+
 # Tasks Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -34,6 +35,10 @@ Tasks should remain standalone-capable with Core only for core task creation, li
 Current assignment behavior may resolve active `TeamMember` records when InternalNotifications is installed and enabled, because TeamMember is the current internal assignee model. That is an optional assignment/notification capability path, not a requirement for Tasks to create, complete, reopen, cancel, archive, restore, or display basic tasks.
 
 InternalNotifications and Messaging are optional consumers/capabilities for assignment notifications and digests. Tasks must not require them for its core model, lifecycle, or template/default behavior.
+
+Tasks owns the business trigger and cadence for task assignment notifications and task digests. Reusable Messaging templates must not own task digest schedules, task-assignment trigger timing, or Task-specific eligibility rules.
+
+When Tasks/InternalNotifications deliver through the shared resolved-dispatch seam, the owning task/notification code resolves the behavior first and `ResolvedMessageDispatchBuilder` assembles it with reusable Messaging content. Messaging then applies generic delivery safety, persistence, queueing, and provider delivery.
 
 Tasks does not own:
 
@@ -330,7 +335,3 @@ related subject fields, when present
 ```
 
 Do not make Phase 3 depend on a polished token picker. Phase 3 should first prove the DB-owned task-template/default shape. The field picker belongs to shared authoring UX and Phase 6 validation unless the task-template schema audit proves a missing persisted field/source concept.
-
-
-
-

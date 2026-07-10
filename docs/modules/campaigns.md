@@ -2,6 +2,7 @@
 
 
 
+
 # Campaigns Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -37,6 +38,21 @@ Campaigns owns:
 - campaign listeners
 - campaign-specific metadata
 - campaign conditions/segments later
+
+Campaigns is authoritative for Campaign-owned message behavior:
+
+```text
+step/variant timing
+step/variant conditions
+variant strategy
+dependency rules
+step order and progression
+Campaign-specific skip behavior
+```
+
+Reusable Messaging templates referenced by Campaign steps/variants own reusable copy and delivery-template metadata only. They must not carry competing Campaign timing, schedule, conditions, sequencing, or dependency behavior.
+
+Campaign runtime resolves the selected `CampaignStep` / `CampaignStepVariant` behavior first, selects the reusable Messaging template, and uses `ResolvedMessageDispatchBuilder` to assemble a `ResolvedMessageDispatch` with an exact `send_at`. The resulting scheduled message may preserve the `CampaignStepVariant` as polymorphic behavior provenance.
 
 Campaigns does not own:
 
@@ -252,16 +268,17 @@ Campaign step timing may be author-friendly:
     hours
     days
 
-Before calling Messaging runtime actions, Campaigns should normalize timing into the canonical Messaging schedule shape.
+Before calling Messaging runtime actions, Campaigns should normalize its author-friendly timing into an exact resolved send time for `ResolvedMessageDispatch`.
 
 Example:
 
     criteria.timing.days = 3
 
-normalizes to:
+resolves from the Campaign-owned trigger/step context to:
 
-    schedule.type = delay
-    schedule.minutes = 4320
+    send_at = exact timestamp
+
+The reusable Messaging template does not own that delay and must not provide a competing fallback schedule.
 
 If a referenced Messaging template is missing, fail loudly because the config is broken.
 
@@ -562,7 +579,3 @@ source event or route point, when available
 ```
 
 Do not persist summary text unless a concrete reporting/audit reason appears. Prefer deriving it from the canonical step/variant timing definition.
-
-
-
-

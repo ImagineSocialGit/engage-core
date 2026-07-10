@@ -11,7 +11,6 @@ return [
             'channel' => 'sms',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
-            'timing' => 'immediate',
             'payload_class' => SmsPayload::class,
             'queue' => 'opt_in_messages',
             'payload' => [
@@ -55,5 +54,3 @@ return [
         ],
     ],
 ];
-
-

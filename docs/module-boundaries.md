@@ -1,3 +1,4 @@
+
 # Engage Core Module Boundaries
 
 Engage Core is a modular contact engagement platform.
@@ -235,15 +236,45 @@ FlowRoute logical identity is versioned by stable `key` plus `version`.
 
 New starts use the current active revision. Active/waiting instances on older revisions reconcile to a newly current revision by durable FlowRoutePoint key, creating a new route-plan revision and preserving historical plans. Unmappable current/waiting points are hard reconciliation conflicts; runtime must not guess, silently skip, restart, or cancel them.
 
-### Messaging template presets
+### Messaging template presets and resolved dispatch ownership
 
 Messaging should store reusable synced/editable message copy as DB-owned template presets.
 
-Message template catalog entries should organize synced/editable templates for browsing and copy review. Catalog entries are read-organization records only; they do not own campaign timing, webinar schedules, FlowRoute trigger behavior, skip rules, or runtime selection.
+Message template catalog entries should organize synced/editable templates for browsing and copy review. Catalog entries are read-organization records only; they do not own campaign timing, webinar schedules, FlowRoute trigger behavior, skip rules, lifecycle conditions, sequencing, dependencies, or runtime selection.
 
 Message template assignments should choose which preset is active for a channel/purpose/scope/surface/message context.
 
-Campaigns, Webinars, and FlowRoutes should reference Messaging template keys or assignments. They should not embed reusable subject/body/message copy in their own presets.
+Campaigns, Webinars, FlowRoutes, Broadcasts, Tasks, InternalNotifications, and future consuming modules may reference Messaging template keys or assignments. They should not embed reusable subject/body/message copy in their own presets or records.
+
+The inverse ownership rule is equally important:
+
+```text
+Messaging template/preset
+    owns reusable content and delivery-template metadata
+
+Consuming module
+    owns whether the message should exist, when it should send, lifecycle conditions,
+    sequencing, dependencies, enablement, and module-specific skip behavior
+```
+
+Reusable Messaging templates must not become hidden workflow engines. For module-owned flows, they must not own competing `timing`, `schedule`, `conditions`, lifecycle enablement, sequencing, dependencies, or module-specific skip rules.
+
+The shared runtime assembly seam is:
+
+```text
+Owning module resolves its behavior
+    -> ResolvedMessageDispatchBuilder
+    -> ResolvedMessageDispatch
+    -> Messaging scheduling/delivery infrastructure
+```
+
+`ResolvedMessageDispatchBuilder` is Messaging-owned and universal. It may combine reusable template content with caller-resolved behavior, normalize the final dispatch contract, and attach generic provenance. It must not query or interpret Webinar, Campaign, Broadcast, FlowRoute, Task, InternalNotifications, or vertical-module tables.
+
+`ResolvedMessageDispatch` should carry the exact resolved `send_at` and other generic delivery inputs Messaging requires. Messaging should not infer Webinar schedules, Campaign cadence, Broadcast timing, FlowRoute waits, Task digest cadence, or other module lifecycle rules from reusable template definitions.
+
+`ScheduledMessage` may preserve optional polymorphic behavior provenance through a `behavior_owner` morph. The concrete owner remains module-owned, for example a `WebinarScheduleProfileItem`, `CampaignStepVariant`, `Broadcast`, or `FlowRoutePoint`. Messaging stores the morph generically and must not import those concrete feature-module models to interpret behavior.
+
+Missing module-owned behavior must never silently fall back to hidden timing, conditions, or skip behavior from a reusable Messaging template. Setup validation and runtime behavior should make missing ownership explicit.
 
 ### FlowRoute ownership
 
@@ -1066,26 +1097,23 @@ Messaging does not own:
 
 Other modules may use Messaging through public actions/services/contracts.
 
-Messaging definitions should use a consistent canonical definition shape across config files and DB-adapted inline definitions.
+Messaging reusable templates should use a consistent canonical content/delivery-template shape across config files and DB-backed presets.
 
-Canonical message definition shape:
+Canonical reusable template shape:
 
-    dispatch_key
+    key / template identity
+    dispatch_key or dispatch_keys
     message_type
     channel
     purpose
     scope
-    timing
     queue
     payload_class
-    conditions
-    schedule
     payload
-    meta
+    token metadata
+    template provenance/meta
 
-A definition may omit fields that are inferable from caller context, but adapters should normalize into this shape before calling Messaging runtime actions.
-
-Messaging definitions are reusable templates.
+For module-owned flows, `timing`, `schedule`, `conditions`, lifecycle enablement, sequencing, dependencies, and module-specific skip rules belong to the consuming module rather than the reusable Messaging template. The consuming module resolves that behavior before `ResolvedMessageDispatchBuilder` assembles the final `ResolvedMessageDispatch`.
 
 Messaging template presets are DB-owned reusable message definitions created from config and optionally edited through CRM/admin UI.
 
@@ -2019,16 +2047,17 @@ Campaign step timing may be author-friendly:
     hours
     days
 
-Before calling Messaging runtime actions, Campaigns should normalize timing into the canonical Messaging schedule shape.
+Before calling Messaging runtime actions, Campaigns should resolve its author-friendly timing into the exact send time used by `ResolvedMessageDispatch`.
 
 Example:
 
     criteria.timing.days = 3
 
-normalizes to:
+resolves from the Campaign-owned step context to:
 
-    schedule.type = delay
-    schedule.minutes = 4320
+    send_at = exact timestamp
+
+The reusable Messaging template must not carry a competing Campaign schedule fallback.
 
 If a referenced Messaging template is missing, fail loudly because the config is broken.
 

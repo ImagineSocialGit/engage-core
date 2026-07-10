@@ -398,7 +398,7 @@ class WebinarMessageReadinessService
     /**
      * @return array{profiles: Collection<int, WebinarScheduleProfile>, issues: array<int, string>}
      */
-    private function profilesInUse(): array
+    public function profilesInUse(): array
     {
         $seriesProfileIds = WebinarSeries::query()
             ->whereNotNull('webinar_schedule_profile_id')

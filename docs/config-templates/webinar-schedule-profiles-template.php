@@ -14,10 +14,22 @@ return [
     | Webinars owns schedule profiles.
     | Messaging owns reusable message copy/templates.
     |
-    | Schedule profiles decide when webinar lifecycle messages are sent.
-    | Schedule profile items identify the schedule slot and reference Messaging
-    | definitions by stable runtime dimensions. They must not embed reusable
-    | subject/body/message copy.
+    | Schedule profiles exclusively own Webinar lifecycle behavior:
+    | - timing and exact schedule rules
+    | - lifecycle conditions
+    | - enablement
+    | - Webinar-specific skip behavior
+    |
+    | Schedule profile items identify the lifecycle slot and reference reusable
+    | Messaging templates by stable runtime dimensions. They must not embed
+    | reusable subject/body/message copy.
+    |
+    | Every Webinar lifecycle message dispatched through Webinars must have a
+    | matching profile item, including immediate/internal slots such as opt-in
+    | confirmations when Webinars owns that lifecycle moment.
+    |
+    | Missing profile coverage must not silently fall back to template timing or
+    | an implicit immediate send.
     |
     | Multiple reminder items may share message_type = reminder. Use the item
     | key and source_config_path to identify the schedule slot. Do not create
@@ -35,7 +47,7 @@ return [
 
         'items' => [
             [
-                'key' => 'email_confirmation_15_minute_delay',
+                'key' => 'email_confirmation_10_minute_delay',
                 'label' => 'Confirmation Email',
                 'context_key' => 'confirmations',
                 'channel' => 'email',
@@ -48,13 +60,41 @@ return [
                 'timing' => 'scheduled',
                 'schedule' => [
                     'type' => 'delay',
-                    'minutes' => 15,
+                    'minutes' => 10,
                 ],
-                'conditions' => [],
+                'conditions' => [
+                    [
+                        'field' => 'webinar.starts_at',
+                        'operator' => 'at_least_minutes_from_now',
+                        'value' => 40,
+                    ],
+                ],
                 'is_enabled' => true,
                 'is_active' => true,
                 'sort_order' => 10,
                 'meta' => [],
+            ],
+
+            [
+                'key' => 'email_webinar_opt_in',
+                'label' => 'Email Webinar Opt-In Confirmation',
+                'context_key' => 'opt_ins',
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+                'surface' => 'webinar_registrations',
+                'message_type' => 'opt_in',
+                'dispatch_key' => 'consent_granted',
+                'source_config_path' => 'messaging.email.transactional.webinar.opt_ins.0',
+                'timing' => 'immediate',
+                'schedule' => null,
+                'conditions' => [],
+                'is_enabled' => true,
+                'is_active' => true,
+                'sort_order' => 15,
+                'meta' => [
+                    'visibility' => 'internal',
+                ],
             ],
 
             [

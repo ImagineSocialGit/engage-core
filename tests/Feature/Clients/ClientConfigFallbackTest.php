@@ -83,6 +83,73 @@ PHP);
         $this->assertSame(['broadcast'], config('messaging.permission_invitations.consent.scopes'));
     }
 
+    public function test_sparse_numeric_client_arrays_replace_defaults_instead_of_merging(): void
+    {
+        $root = $this->makeTempDirectory();
+
+        mkdir($root.'/messaging/email/marketing', 0777, true);
+
+        file_put_contents($root.'/messaging/email/marketing/webinar_nurture.php', <<<'PHP'
+    <?php
+
+    return [
+        'campaigns' => [
+            'webinar_attended_nurture' => [
+                'steps' => [
+                    1 => [
+                        'variants' => [
+                            'email' => ['subject' => 'Client step 1'],
+                        ],
+                    ],
+                    4 => [
+                        'variants' => [
+                            'email' => ['subject' => 'Client step 4'],
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ];
+    PHP);
+
+        config([
+            'client.config_path' => $root,
+            'client.env_path' => $root.'/.env',
+            'client.preset' => null,
+            'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps' => [
+                1 => [
+                    'variants' => [
+                        'email' => ['subject' => 'Default step 1'],
+                        'sms' => ['message' => 'Default step 1 SMS'],
+                    ],
+                ],
+                3 => [
+                    'variants' => [
+                        'email' => ['subject' => 'Default step 3'],
+                    ],
+                ],
+            ],
+        ]);
+
+        (new ClientServiceProvider($this->app))->register();
+
+        $this->assertSame(
+            [
+                1 => [
+                    'variants' => [
+                        'email' => ['subject' => 'Client step 1'],
+                    ],
+                ],
+                4 => [
+                    'variants' => [
+                        'email' => ['subject' => 'Client step 4'],
+                    ],
+                ],
+            ],
+            config('messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps'),
+        );
+    }
+
     private function makeTempDirectory(): string
     {
         $directory = sys_get_temp_dir().'/engage-core-client-config-'.bin2hex(random_bytes(8));

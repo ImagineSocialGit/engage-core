@@ -170,7 +170,13 @@ class ClientServiceProvider extends ServiceProvider
             return true;
         }
 
-        return array_keys($array) !== range(0, count($array) - 1);
+        foreach (array_keys($array) as $key) {
+            if (is_string($key)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function loadClientEnvironment(): void

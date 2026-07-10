@@ -15,6 +15,17 @@ return [
     |
     | Create one file per purpose/scope pair.
     |
+    | Reusable Messaging templates own content and delivery-template metadata.
+    | They must not own business timing, lifecycle conditions, sequencing,
+    | dependencies, enablement, or module-specific skip behavior.
+    |
+    | Consuming modules resolve those concerns from their own records/state,
+    | then combine the selected reusable template with already-resolved behavior
+    | through ResolvedMessageDispatchBuilder.
+    |
+    | A reusable template must never silently become an immediate message merely
+    | because module-owned behavior is missing.
+    |
     | Keep SMS payloads short.
     | SMS should be supplemental and safe to skip if consent, suppression,
     | provider, or recipient-phone requirements are not satisfied.
@@ -77,14 +88,8 @@ return [
             'purpose' => 'transactional',
             'scope' => 'webinar',
 
-            'timing' => 'scheduled',
             'payload_class' => SmsPayload::class,
             'queue' => 'confirmation_messages',
-
-            'schedule' => [
-                'type' => 'delay',
-                'minutes' => 15,
-            ],
 
             'payload' => [
                 'message' => 'You’re registered for {webinar_title}. Join here: {webinar_join_url}',
@@ -100,14 +105,8 @@ return [
             'purpose' => 'transactional',
             'scope' => 'webinar',
 
-            'timing' => 'scheduled',
             'payload_class' => SmsPayload::class,
             'queue' => 'reminders',
-
-            'schedule' => [
-                'type' => 'anchored',
-                'minutes' => -30,
-            ],
 
             'payload' => [
                 'message' => '{webinar_title} starts in 30 minutes. Join: {webinar_join_url}',
@@ -121,15 +120,8 @@ return [
             'purpose' => 'transactional',
             'scope' => 'webinar',
 
-            'skip_when_join_clicked' => true,
-            'timing' => 'scheduled',
             'payload_class' => SmsPayload::class,
             'queue' => 'reminders',
-
-            'schedule' => [
-                'type' => 'anchored',
-                'minutes' => 5,
-            ],
 
             'payload' => [
                 'message' => '{webinar_title} is live. Join now: {webinar_join_url}',
@@ -145,16 +137,8 @@ return [
             'purpose' => 'transactional',
             'scope' => 'webinar',
 
-            'timing' => 'immediate',
             'payload_class' => SmsPayload::class,
             'queue' => 'post_event',
-
-            'conditions' => [
-                [
-                    'field' => 'webinar_registration.attended_at',
-                    'operator' => 'filled',
-                ],
-            ],
 
             'payload' => [
                 'message' => 'Thanks for joining {webinar_title}. Replay: {webinar_playback_url}',
@@ -170,16 +154,8 @@ return [
             'purpose' => 'transactional',
             'scope' => 'webinar',
 
-            'timing' => 'immediate',
             'payload_class' => SmsPayload::class,
             'queue' => 'post_event',
-
-            'conditions' => [
-                [
-                    'field' => 'webinar_registration.attended_at',
-                    'operator' => 'blank',
-                ],
-            ],
 
             'payload' => [
                 'message' => 'Sorry we missed you at {webinar_title}. Replay: {webinar_playback_url}',
@@ -232,5 +208,3 @@ return [
     ],
 
 ];
-
-

@@ -1,3 +1,4 @@
+
 # Webinars Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -72,9 +73,10 @@ post-missed transactional follow-up
 Readiness uses current runtime truth:
 
 ```text
-Messaging DB-first definition resolution with config fallback
+Messaging DB-first reusable-template resolution with explicit supported fallback
 Messaging channel availability for the surface/purpose/scope
 active Webinar schedule profiles actually in use
+complete schedule-profile coverage for required Webinar lifecycle messages
 explicit schedule-profile disablement
 missing or inactive selected schedule-profile references
 conflicting active default schedule profiles
@@ -95,13 +97,15 @@ Waitlist opt-in readiness is required when webinar-waitlist marketing messaging 
 
 When the corresponding messaging surface is unavailable, the opt-in area is `Optional / disabled` rather than a false blocker.
 
-Opt-in messages are immediate `consent_granted` messages. They are Webinar-scoped Messaging templates, but they are not schedule-profile items because Webinar schedule profiles own lifecycle timing/slot identity rather than immediate consent-event dispatch.
+Webinar-owned opt-in confirmations are lifecycle message contexts too. Even when their behavior is simply `immediate`, they should be represented by Webinar schedule-profile items rather than carrying hidden timing in reusable Messaging templates. Internal/default profile items may remain non-editable or hidden from client-facing UI when no operator choice is useful.
 
 ## Selectable webinar schedule profiles
 
 Webinars supports DB-owned selectable schedule profiles for webinar-owned messages.
 
-Schedule profiles decide when webinar lifecycle messages are sent. Messaging template presets decide what those messages say.
+Schedule profiles decide whether, when, and under what Webinar lifecycle conditions messages are sent. Messaging template presets decide what those messages say and provide reusable delivery-template metadata.
+
+Every Webinar lifecycle message dispatched through the Webinar lifecycle should get its behavior from a `WebinarScheduleProfileItem`, including immediate confirmations or opt-in acknowledgements. A profile item may be internal/default and never exposed as a client-editable choice.
 
 Profile items may cover categories such as:
 
@@ -124,6 +128,21 @@ no reminders
 Assignments may be default/global or context-specific. The current durable selection points are webinar series and individual webinar, with individual webinar selection taking precedence over series selection.
 
 A schedule profile item references runtime dimensions such as dispatch key, message type, channel, purpose, scope, surface, source config path, timing, schedule, conditions, and metadata. It should not embed reusable message copy.
+
+Webinar lifecycle behavior owned by the profile item includes:
+
+```text
+timing
+schedule
+conditions
+is_enabled
+Webinar-specific skip behavior such as skip_when_join_clicked
+other Webinar lifecycle flags that affect whether or when the message exists
+```
+
+Reusable Messaging templates for Webinar lifecycle messages must not duplicate those fields. A matching profile item is authoritative. If a required lifecycle template has no matching active/effective profile item, Webinars must not silently fall back to template timing or an implicit immediate send. Setup validation should report missing coverage, and runtime should safely decline the unresolved dispatch according to the Webinar contract.
+
+Before handing a message to Messaging, Webinars resolves the active schedule profile and exact profile item, evaluates Webinar-owned lifecycle behavior, and uses `ResolvedMessageDispatchBuilder` to combine that behavior with the selected reusable Messaging template. The resulting `ResolvedMessageDispatch` carries an exact `send_at` and may preserve the `WebinarScheduleProfileItem` as polymorphic behavior provenance.
 
 Multiple reminder slots may share the same reusable Messaging behavior, for example `message_type = reminder`. The schedule profile item key and source config path identify the specific reminder slot, such as 30 minutes before start. Messaging should not encode reminder timing into schedule-specific message types such as `reminder_30_minute`.
 
@@ -149,6 +168,8 @@ selected webinar schedule profile exists or a valid default fallback exists
 schedule profile item keys are unique within a profile
 schedule/timing definitions are valid
 schedule profile items reference supported channel/purpose/scope/surface/message context
+every required Webinar lifecycle template/context has matching effective schedule-profile behavior
+reusable Webinar Messaging templates do not duplicate schedule-profile-owned timing, schedule, conditions, enablement, or Webinar-specific skip behavior
 selected Messaging template assignments are compatible and resolvable
 required webinar available fields/tokens are supplied by the actual webinar runtime path
 runtime-only URLs such as join/cancel/playback URLs are available for the context that uses them
@@ -183,7 +204,7 @@ Webinars should not transition Workflow status solely to trigger Campaign enroll
 Current outcome direction:
 
 1. Webinars records webinar registration/attendance/outcome state.
-2. Webinars uses Messaging for webinar-owned transactional messages such as confirmations, reminders, and replay follow-ups.
+2. Webinars resolves profile-owned lifecycle behavior for transactional messages such as confirmations, reminders, opt-in acknowledgements, waitlist alerts, and replay follow-ups, then hands the resulting dispatch intent to Messaging through the shared resolved-dispatch seam.
 3. Webinars emits `AutomationEventRecorded` for automation-worthy outcomes.
 4. FlowRoutes listens to the generic automation event seam.
 5. FlowRoutes maps generic automation events into `FlowRouteExternalEvent` internally.

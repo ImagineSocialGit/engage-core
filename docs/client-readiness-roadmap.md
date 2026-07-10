@@ -1,3 +1,4 @@
+
 # Engage Core Client-Readiness Roadmap
 
 This roadmap tracks the near-term implementation order for getting Engage Core ready for real client operation without treating the work as a limited or throwaway MVP.
@@ -52,6 +53,7 @@ The imported-contact onboarding, Broadcast visibility, dashboard, contact worksp
 - Webinars owns DB-backed schedule profiles/items for webinar lifecycle message timing.
 - Campaigns owns DB-backed step variants for channel-specific delivery options.
 - FlowRoutes runtime now uses subject-capable route progress, route instance plans, plan items, progress items, capability/binding schema, structured route-created artifact provenance, and backend guardrails for safe execution.
+- Dev/client smoke testing exposed a cross-module message-behavior ownership flaw: reusable Messaging templates could still carry timing/schedule/conditions that duplicated Webinar or other module-owned behavior. The architecture correction is to make consuming modules authoritative for lifecycle behavior and use `ResolvedMessageDispatchBuilder` / `ResolvedMessageDispatch` as the universal runtime assembly seam.
 
 ## Architecture runway after staging smoke success
 
@@ -64,6 +66,15 @@ sync available options
 select active options in CRM/admin
 resolve selected DB-owned options at runtime
 ```
+
+Current architecture correction before deeper UX polish:
+
+- Reusable Messaging templates become content/delivery-template definitions only for module-owned flows.
+- Webinars, Campaigns, Broadcasts, FlowRoutes, Tasks, InternalNotifications, and future modules remain authoritative for their own timing, conditions, sequencing, dependencies, enablement, and module-specific skip behavior.
+- `ResolvedMessageDispatchBuilder` combines selected reusable content with already-resolved module behavior.
+- `ResolvedMessageDispatch` carries the exact `send_at` and normalized generic dispatch contract.
+- `ScheduledMessage` may gain polymorphic `behavior_owner` provenance without importing concrete feature modules into Messaging.
+- Missing module-owned behavior must not silently fall back to hidden template timing or implicit immediate delivery.
 
 Completed runway pieces:
 
@@ -572,6 +583,45 @@ It ignores inactive bindings and inactive routes and does not start `ContactFlow
 No schema, `ContactController`, Workflow runtime, or Blade changes were required.
 
 The actual operator warning/confirmation UX before a manual status change remains intentionally deferred to Phase 11.
+
+## Cross-module resolved message dispatch architecture correction
+
+Status: **In progress before the next UX-focused roadmap phase.**
+
+This correction was discovered through real dev/client configuration and smoke testing, which showed that Webinar lifecycle timing could be duplicated between reusable Messaging templates and Webinar schedule-profile items. The duplicate source of truth allowed stale template behavior to survive and silently override intended client behavior.
+
+Target architecture:
+
+```text
+Reusable Messaging template
+    owns copy and delivery-template metadata
+
+Owning module
+    owns whether/why/when the message exists and its lifecycle behavior
+
+ResolvedMessageDispatchBuilder
+    combines selected template data with caller-resolved behavior
+
+ResolvedMessageDispatch
+    carries exact send_at and generic normalized dispatch data
+
+Messaging
+    owns delivery safety, ScheduledMessage persistence, queueing, and providers
+```
+
+Expected implementation work includes:
+
+- add `ResolvedMessageDispatch` and `ResolvedMessageDispatchBuilder`;
+- add optional polymorphic `behavior_owner` provenance to `scheduled_messages`;
+- migrate Webinars first so every Webinar lifecycle message gets behavior from a `WebinarScheduleProfileItem`, including internal/default immediate items;
+- migrate Campaigns to pass Campaign-owned step/variant behavior through the shared builder;
+- remove fake Messaging schedule behavior from Broadcast dispatch;
+- ensure FlowRoute `send_message` points do not inherit hidden template timing;
+- preserve the already-clean explicit timing ownership of InternalNotifications/Tasks paths;
+- add setup validation that rejects module-owned templates carrying competing lifecycle behavior;
+- remove obsolete `timing`, `schedule`, and `conditions` fields from `MessageTemplatePreset` after all consumers are migrated.
+
+This is intentionally schema/architecture work discovered before production rollout, not a compatibility-preservation exercise.
 
 ## Recommended next implementation target
 

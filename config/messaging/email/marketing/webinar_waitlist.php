@@ -12,16 +12,8 @@ return [
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar_waitlist',
-            'timing' => 'immediate',
             'payload_class' => EmailPayload::class,
             'queue' => 'notifications',
-
-            'conditions' => [
-                [
-                    'field' => 'webinar.registration_url',
-                    'operator' => 'filled',
-                ],
-            ],
 
             'payload' => [
                 'subject' => 'New webinar scheduled: {webinar_title}',
@@ -42,7 +34,6 @@ return [
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar_waitlist',
-            'timing' => 'immediate',
             'payload_class' => EmailPayload::class,
             'queue' => 'opt_in_messages',
 
@@ -54,5 +45,3 @@ return [
     ],
 
 ];
-
-

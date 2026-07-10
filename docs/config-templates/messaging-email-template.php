@@ -15,6 +15,17 @@ return [
     |
     | Create one file per purpose/scope pair.
     |
+    | Reusable Messaging templates own content and delivery-template metadata.
+    | They must not own business timing, lifecycle conditions, sequencing,
+    | dependencies, enablement, or module-specific skip behavior.
+    |
+    | Consuming modules resolve those concerns from their own records/state,
+    | then combine the selected reusable template with already-resolved behavior
+    | through ResolvedMessageDispatchBuilder.
+    |
+    | A reusable template must never silently become an immediate message merely
+    | because module-owned behavior is missing.
+    |
     | Examples:
     | config/messaging/email/transactional/webinar.php
     | config/messaging/email/transactional/permission_invitation.php
@@ -38,8 +49,9 @@ return [
     | Campaign templates resolve by channel + purpose + scope + campaign_key
     | + step_number + campaign_step_variant_key.
     |
-    | Campaign templates do not own timing/schedule. Campaign presets own
-    | campaign step timing and overlay timing before dispatching.
+    | Campaign templates do not own timing, schedule, conditions, strategy,
+    | dependencies, or enablement. Campaign steps/variants own that behavior
+    | and provide exact resolved dispatch behavior before Messaging schedules.
     |
     | Keep default webinar copy vertical-neutral.
     | Put vertical-specific copy in vertical-specific scopes.
@@ -86,22 +98,8 @@ return [
             'purpose' => 'transactional',
             'scope' => 'webinar',
 
-            'conditions' => [
-                [
-                    'field' => 'webinar.starts_at',
-                    'operator' => 'at_least_minutes_from_now',
-                    'value' => 30,
-                ],
-            ],
-
-            'timing' => 'scheduled',
             'payload_class' => EmailPayload::class,
             'queue' => 'confirmation_messages',
-
-            'schedule' => [
-                'type' => 'delay',
-                'minutes' => 15,
-            ],
 
             'payload' => [
                 'subject' => 'You’re registered for {webinar_title}',
@@ -137,7 +135,6 @@ TEXT,
             'purpose' => 'transactional',
             'scope' => 'webinar',
 
-            'timing' => 'immediate',
             'payload_class' => EmailPayload::class,
             'queue' => 'opt_in_messages',
 
@@ -156,14 +153,8 @@ TEXT,
             'purpose' => 'transactional',
             'scope' => 'webinar',
 
-            'timing' => 'scheduled',
             'payload_class' => EmailPayload::class,
             'queue' => 'reminders',
-
-            'schedule' => [
-                'type' => 'anchored',
-                'minutes' => -1440,
-            ],
 
             'payload' => [
                 'subject' => 'Your webinar is tomorrow',
@@ -182,15 +173,8 @@ TEXT,
             'purpose' => 'transactional',
             'scope' => 'webinar',
 
-            'skip_when_join_clicked' => true,
-            'timing' => 'scheduled',
             'payload_class' => EmailPayload::class,
             'queue' => 'reminders',
-
-            'schedule' => [
-                'type' => 'anchored',
-                'minutes' => 5,
-            ],
 
             'payload' => [
                 'subject' => 'Your webinar is live',
@@ -211,14 +195,6 @@ TEXT,
             'purpose' => 'transactional',
             'scope' => 'webinar',
 
-            'conditions' => [
-                [
-                    'field' => 'webinar_registration.attended_at',
-                    'operator' => 'filled',
-                ],
-            ],
-
-            'timing' => 'immediate',
             'payload_class' => EmailPayload::class,
             'queue' => 'post_event',
 
@@ -241,14 +217,6 @@ TEXT,
             'purpose' => 'transactional',
             'scope' => 'webinar',
 
-            'conditions' => [
-                [
-                    'field' => 'webinar_registration.attended_at',
-                    'operator' => 'blank',
-                ],
-            ],
-
-            'timing' => 'immediate',
             'payload_class' => EmailPayload::class,
             'queue' => 'post_event',
 
@@ -342,5 +310,3 @@ TEXT,
     ],
 
 ];
-
-
