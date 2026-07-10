@@ -3,6 +3,7 @@
 use App\Modules\Broadcasts\Providers\BroadcastsModuleServiceProvider;
 use App\Modules\Campaigns\Providers\CampaignsModuleServiceProvider;
 use App\Modules\Core\Presets\CorePresetContributor;
+use App\Support\Presets\ClientPresetContributor;
 use App\Modules\Core\Providers\CoreModuleServiceProvider;
 use App\Modules\Commerce\Providers\CommerceModuleServiceProvider;
 use App\Modules\Documents\Providers\DocumentsModuleServiceProvider;
@@ -380,6 +381,7 @@ return [
             'depends_on' => [],
             'preset_contributors' => [
                 CorePresetContributor::class,
+                ClientPresetContributor::class,
             ],
             'providers' => [
                 CoreModuleServiceProvider::class,
@@ -613,7 +615,3 @@ return [
     ],
 
 ];
-
-
-
-

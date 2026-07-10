@@ -8,6 +8,8 @@ use App\Modules\FlowRoutes\Actions\SyncFlowRoutePresetsAction;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
+use App\Support\Presets\Enums\PresetDomain;
+use App\Support\Presets\PresetCompositionResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -168,8 +170,21 @@ class SyncFlowRoutePresetsActionTest extends TestCase
 
     private function syncWebinarFlowRoutes(): void
     {
+        config()->set('presets.packages.webinar_funnel', [
+            'groups' => [
+                'flow_routes' => [
+                    'webinar_default',
+                ],
+            ],
+        ]);
+
         app(SyncFlowRouteCapabilitiesAction::class)->handle();
 
-        app(SyncFlowRoutePresetsAction::class)->handle('webinar_funnel');
+        app(SyncFlowRoutePresetsAction::class)->handle(
+            app(PresetCompositionResolver::class)->resolve(
+                'webinar_funnel',
+                PresetDomain::FlowRoutes,
+            ),
+        );
     }
 }
