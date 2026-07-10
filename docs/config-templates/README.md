@@ -1,4 +1,3 @@
-
 # Engage Core Config Templates
 
 This directory contains safe starting templates for Engage Core default configs and client-specific overrides.
@@ -69,6 +68,9 @@ Do not create separate runtime payload fields, database columns, event keys, pre
 - Every list-based Messaging definition must declare a stable explicit `key`. The synced `MessageTemplatePreset.key` derives from that explicit identity rather than list position. `source_config_path` remains provenance/debug location, not durable template identity.
 - Reusable Messaging templates must not own business timing, lifecycle conditions, sequencing, dependencies, enablement, or module-specific skip behavior.
 - Owning modules resolve their own behavior and use `ResolvedMessageDispatchBuilder` to produce a normalized `ResolvedMessageDispatch` with an exact `send_at`.
+- Resolved dispatches require either exact caller-owned `sendAt` or explicit caller-owned behavior; there is no implicit immediate fallback.
+- Module-owned dispatch paths should provide stable logical `occurrenceKey` identity for retries/idempotency. `send_at` is not logical occurrence identity.
+
 - Missing module-owned behavior must never silently fall back to hidden template timing or an implicit immediate send.
 - Campaign presets own journeys, timing, step order, variant strategy, and delivery references.
 - Campaign presets must not define reusable subject/body/CTA/message payloads.
@@ -232,5 +234,3 @@ Client request:
 
 Return complete config files and list any recommended new keys/tokens separately.
 ```
-
-

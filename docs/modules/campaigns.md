@@ -1,8 +1,3 @@
-
-
-
-
-
 # Campaigns Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -52,7 +47,7 @@ Campaign-specific skip behavior
 
 Reusable Messaging templates referenced by Campaign steps/variants own reusable copy and delivery-template metadata only. They must not carry competing Campaign timing, schedule, conditions, sequencing, or dependency behavior.
 
-Campaign runtime resolves the selected `CampaignStep` / `CampaignStepVariant` behavior first, selects the reusable Messaging template, and uses `ResolvedMessageDispatchBuilder` to assemble a `ResolvedMessageDispatch` with an exact `send_at`. The resulting scheduled message may preserve the `CampaignStepVariant` as polymorphic behavior provenance.
+Campaign runtime resolves the selected `CampaignStep` / `CampaignStepVariant` behavior first, selects the reusable Messaging template, and uses `ResolvedMessageDispatchBuilder` to assemble a `ResolvedMessageDispatch` with an exact `send_at`. When the variant is the concrete behavior owner, the resulting scheduled message preserves the `CampaignStepVariant` as polymorphic behavior provenance.
 
 Campaigns does not own:
 
@@ -279,6 +274,9 @@ resolves from the Campaign-owned trigger/step context to:
     send_at = exact timestamp
 
 The reusable Messaging template does not own that delay and must not provide a competing fallback schedule.
+
+Campaign scheduling should provide stable module-owned occurrence identity for the enrollment + step + variant occurrence. Retry/dedupe identity must not rely on `send_at` alone; the same logical Campaign occurrence should keep the same occurrence key even if its timestamp is recalculated.
+
 
 If a referenced Messaging template is missing, fail loudly because the config is broken.
 

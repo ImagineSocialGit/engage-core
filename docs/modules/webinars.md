@@ -1,4 +1,3 @@
-
 # Webinars Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -127,7 +126,7 @@ no reminders
 
 Assignments may be default/global or context-specific. The current durable selection points are webinar series and individual webinar, with individual webinar selection taking precedence over series selection.
 
-A schedule profile item references runtime dimensions such as dispatch key, message type, channel, purpose, scope, surface, source config path, timing, schedule, conditions, and metadata. It should not embed reusable message copy.
+A schedule profile item references runtime dimensions such as dispatch key, message type, channel, purpose, scope, surface, stable `message_template_key`, timing, schedule, conditions, and metadata. `source_config_path` may remain as provenance/debug location, but it is not durable template identity. The item must not embed reusable message copy.
 
 Webinar lifecycle behavior owned by the profile item includes:
 
@@ -142,11 +141,14 @@ other Webinar lifecycle flags that affect whether or when the message exists
 
 Reusable Messaging templates for Webinar lifecycle messages must not duplicate those fields. A matching profile item is authoritative. If a required lifecycle template has no matching active/effective profile item, Webinars must not silently fall back to template timing or an implicit immediate send. Setup validation should report missing coverage, and runtime should safely decline the unresolved dispatch according to the Webinar contract.
 
-Before handing a message to Messaging, Webinars resolves the active schedule profile and exact profile item, evaluates Webinar-owned lifecycle behavior, and uses `ResolvedMessageDispatchBuilder` to combine that behavior with the selected reusable Messaging template. The resulting `ResolvedMessageDispatch` carries an exact `send_at` and may preserve the `WebinarScheduleProfileItem` as polymorphic behavior provenance.
+Before handing a message to Messaging, Webinars resolves the active schedule profile and exact profile item. `WebinarScheduleProfileDefinitionResolver` attaches transient `resolved_behavior` and `behavior_owner` data to the matched content-only definition. `DispatchMessageAction` consumes those transient values and uses `ResolvedMessageDispatchBuilder` to combine the selected reusable Messaging template with Webinar-owned behavior. The resulting `ResolvedMessageDispatch` carries an exact `send_at`, stable logical occurrence identity when supplied, and the `WebinarScheduleProfileItem` as polymorphic behavior provenance.
 
-Multiple reminder slots may share the same reusable Messaging behavior, for example `message_type = reminder`. The schedule profile item key and source config path identify the specific reminder slot, such as 30 minutes before start. Messaging should not encode reminder timing into schedule-specific message types such as `reminder_30_minute`.
+Multiple reminder slots may share the same generic Messaging `message_type`, for example `message_type = reminder`. The schedule profile item key identifies the Webinar lifecycle slot, while `message_template_key` identifies the reusable Messaging template selected for that slot. `source_config_path` is provenance/debug location only and must not be used as durable matching identity. Messaging should not encode reminder timing into schedule-specific message types such as `reminder_30_minute`.
 
 Scheduled-message payloads created by Webinars must remain compact. They should include send-ready payload fields, compact token maps, and compact context arrays. They must not include full Eloquent model arrays, loaded relationships, webinar schedule profile objects, or profile item collections. Schedule profile/source identity belongs in scheduled-message metadata.
+
+Webinar dispatch paths should also provide stable module-owned occurrence identity. Registration messages, waitlist notices, and post-event follow-ups should use stable logical occurrence keys based on the owning Webinar records/context rather than treating `send_at` as identity. A retry or recalculated timestamp for the same logical message occurrence should retain the same occurrence identity.
+
 
 Webinar schedule profiles and profile items are DB-owned definitions with customization semantics.
 

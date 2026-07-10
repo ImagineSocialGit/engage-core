@@ -1,4 +1,3 @@
-
 # Engage Core Client-Readiness Roadmap
 
 This roadmap tracks the near-term implementation order for getting Engage Core ready for real client operation without treating the work as a limited or throwaway MVP.
@@ -53,7 +52,7 @@ The imported-contact onboarding, Broadcast visibility, dashboard, contact worksp
 - Webinars owns DB-backed schedule profiles/items for webinar lifecycle message timing.
 - Campaigns owns DB-backed step variants for channel-specific delivery options.
 - FlowRoutes runtime now uses subject-capable route progress, route instance plans, plan items, progress items, capability/binding schema, structured route-created artifact provenance, and backend guardrails for safe execution.
-- Dev/client smoke testing exposed a cross-module message-behavior ownership flaw: reusable Messaging templates could still carry timing/schedule/conditions that duplicated Webinar or other module-owned behavior. The architecture correction is to make consuming modules authoritative for lifecycle behavior and use `ResolvedMessageDispatchBuilder` / `ResolvedMessageDispatch` as the universal runtime assembly seam.
+- Dev/client smoke testing exposed and the subsequent refactor corrected a cross-module message-behavior ownership flaw: reusable Messaging templates no longer carry lifecycle `timing`, `schedule`, `conditions`, or module-specific skip behavior for module-owned flows. Consuming modules are authoritative for lifecycle behavior, and `ResolvedMessageDispatchBuilder` / `ResolvedMessageDispatch` is the universal runtime assembly seam.
 
 ## Architecture runway after staging smoke success
 
@@ -67,14 +66,14 @@ select active options in CRM/admin
 resolve selected DB-owned options at runtime
 ```
 
-Current architecture correction before deeper UX polish:
+Completed architecture correction before deeper UX polish:
 
-- Reusable Messaging templates become content/delivery-template definitions only for module-owned flows.
+- Reusable Messaging templates are content/delivery-template definitions only for module-owned flows.
 - Webinars, Campaigns, Broadcasts, FlowRoutes, Tasks, InternalNotifications, and future modules remain authoritative for their own timing, conditions, sequencing, dependencies, enablement, and module-specific skip behavior.
 - `ResolvedMessageDispatchBuilder` combines selected reusable content with already-resolved module behavior.
 - `ResolvedMessageDispatch` carries the exact `send_at` and normalized generic dispatch contract.
-- `ScheduledMessage` may gain polymorphic `behavior_owner` provenance without importing concrete feature modules into Messaging.
-- Missing module-owned behavior must not silently fall back to hidden template timing or implicit immediate delivery.
+- `ScheduledMessage` supports polymorphic `behavior_owner` provenance without importing concrete feature modules into Messaging.
+- Missing module-owned behavior does not silently fall back to hidden template timing or implicit immediate delivery. Dispatch requires either an exact caller-owned `sendAt` or explicit caller-owned behavior.
 
 Completed runway pieces:
 
@@ -318,8 +317,8 @@ Completed baseline:
 - Webinars owns DB-backed `WebinarScheduleProfile` and `WebinarScheduleProfileItem` records.
 - Schedule profiles decide when webinar lifecycle messages are sent; Messaging template presets decide what those messages say.
 - Profiles can be selected at the webinar series or webinar level, with an active default fallback.
-- Schedule profile items reference stable runtime dimensions such as channel, purpose, scope, surface, message type, dispatch key, and source config path.
-- Multiple reminder slots may share `message_type = reminder`; the schedule profile item key/source config path owns the slot identity.
+- Schedule profile items reference stable runtime dimensions such as channel, purpose, scope, surface, message type, dispatch key, and `message_template_key`. `source_config_path` is provenance/debug location only.
+- Multiple reminder slots may share `message_type = reminder`; the schedule profile item key owns the Webinar lifecycle slot, while `message_template_key` identifies the reusable Messaging template. `source_config_path` is provenance only.
 - Existing scheduled messages are not rewritten retroactively when a profile or template assignment changes.
 - Webinar dispatch payloads store compact token/context data. Schedule profile identity belongs in scheduled-message metadata, not as a hydrated profile/items object graph inside `scheduled_messages.payload`.
 - Tests include payload-shape checks so full Eloquent relationship graphs do not leak into scheduled-message payloads.
@@ -586,42 +585,48 @@ The actual operator warning/confirmation UX before a manual status change remain
 
 ## Cross-module resolved message dispatch architecture correction
 
-Status: **In progress before the next UX-focused roadmap phase.**
+Status: **Complete.**
 
 This correction was discovered through real dev/client configuration and smoke testing, which showed that Webinar lifecycle timing could be duplicated between reusable Messaging templates and Webinar schedule-profile items. The duplicate source of truth allowed stale template behavior to survive and silently override intended client behavior.
 
-Target architecture:
+The completed durable architecture is:
 
 ```text
 Reusable Messaging template
-    owns copy and delivery-template metadata
+    owns copy and delivery-template metadata only
 
 Owning module
     owns whether/why/when the message exists and its lifecycle behavior
 
 ResolvedMessageDispatchBuilder
-    combines selected template data with caller-resolved behavior
+    combines selected content-only template data with caller-resolved behavior
 
 ResolvedMessageDispatch
-    carries exact send_at and generic normalized dispatch data
+    carries exact send_at, optional behavior-owner provenance, and stable occurrence identity
 
 Messaging
     owns delivery safety, ScheduledMessage persistence, queueing, and providers
 ```
 
-Expected implementation work includes:
+Completed behavior:
 
-- add `ResolvedMessageDispatch` and `ResolvedMessageDispatchBuilder`;
-- add optional polymorphic `behavior_owner` provenance to `scheduled_messages`;
-- migrate Webinars first so every Webinar lifecycle message gets behavior from a `WebinarScheduleProfileItem`, including internal/default immediate items;
-- migrate Campaigns to pass Campaign-owned step/variant behavior through the shared builder;
-- remove fake Messaging schedule behavior from Broadcast dispatch;
-- ensure FlowRoute `send_message` points do not inherit hidden template timing;
-- preserve the already-clean explicit timing ownership of InternalNotifications/Tasks paths;
-- add setup validation that rejects module-owned templates carrying competing lifecycle behavior;
-- remove obsolete `timing`, `schedule`, and `conditions` fields from `MessageTemplatePreset` after all consumers are migrated.
+- `ResolvedMessageDispatch` and `ResolvedMessageDispatchBuilder` are implemented and are the generic runtime assembly seam.
+- Reusable Messaging templates are rejected when they attempt to own `timing`, `schedule`, `conditions`, or module-specific skip behavior.
+- Every resolved dispatch must provide either an exact caller-owned `sendAt` or explicit caller-owned `behavior`; there is no implicit immediate fallback.
+- `ScheduledMessage` persists optional polymorphic `behavior_owner_type` / `behavior_owner_id` provenance without Messaging importing concrete feature-module models.
+- Stable module-owned `occurrenceKey` identity is carried through resolved dispatch and dedupe so retries of the same logical occurrence remain the same occurrence even if `send_at` changes.
+- Webinars resolves behavior from `WebinarScheduleProfileItem`. Schedule-profile items match reusable Messaging templates through stable `message_template_key`; `source_config_path` remains provenance only.
+- Webinar schedule-profile resolution contributes transient `resolved_behavior` and `behavior_owner` data that `DispatchMessageAction` consumes before building the final content-plus-behavior dispatch contract.
+- Campaigns supplies Campaign-owned step/variant timing and behavior.
+- Broadcasts supplies exact `sendAt` and uses the `Broadcast` as behavior-owner provenance rather than manufacturing a fake zero-delay Messaging schedule.
+- FlowRoute `send_message` behavior does not inherit hidden timing from reusable Messaging templates.
+- Imported-contact permission invitations and consent acknowledgements explicitly request immediate behavior and use stable logical occurrence identity.
+- Setup validation rejects reusable Messaging templates that carry competing lifecycle behavior.
+- Obsolete `timing`, `schedule`, and `conditions` columns are absent from `message_template_presets`.
+- Webinar dev tooling now resolves Webinar-owned behavior through the same schedule-profile seam and uses explicit caller-owned immediate behavior only when deliberately forcing a dev send.
+- The focused and full automated test suites are green after the refactor.
 
-This is intentionally schema/architecture work discovered before production rollout, not a compatibility-preservation exercise.
+This is durable schema/architecture work completed before production rollout, not a compatibility-preservation layer.
 
 ## Recommended next implementation target
 

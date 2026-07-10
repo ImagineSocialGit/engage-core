@@ -32,8 +32,11 @@ return [
     | an implicit immediate send.
     |
     | Multiple reminder items may share message_type = reminder. Use the item
-    | key and source_config_path to identify the schedule slot. Do not create
-    | schedule-specific Messaging message types such as reminder_30_minute.
+    | key to identify the Webinar lifecycle slot and message_template_key to
+    | identify the reusable Messaging template. source_config_path is optional
+    | provenance/debug location only and must not be durable matching identity.
+    | Do not create schedule-specific Messaging message types such as
+    | reminder_30_minute.
     |
     */
 
@@ -56,6 +59,7 @@ return [
                 'surface' => 'webinar_registrations',
                 'message_type' => 'confirmation',
                 'dispatch_key' => 'registration_created',
+                'message_template_key' => 'confirmation',
                 'source_config_path' => 'messaging.email.transactional.webinar.confirmations.0',
                 'timing' => 'scheduled',
                 'schedule' => [
@@ -85,6 +89,7 @@ return [
                 'surface' => 'webinar_registrations',
                 'message_type' => 'reminder',
                 'dispatch_key' => 'registration_created',
+                'message_template_key' => 'reminder_1_day',
                 'source_config_path' => 'messaging.email.transactional.webinar.reminders.0',
                 'timing' => 'scheduled',
                 'schedule' => [
@@ -108,6 +113,7 @@ return [
                 'surface' => 'webinar_registrations',
                 'message_type' => 'reminder',
                 'dispatch_key' => 'registration_created',
+                'message_template_key' => 'reminder_30_minute',
                 'source_config_path' => 'messaging.email.transactional.webinar.reminders.1',
                 'timing' => 'scheduled',
                 'schedule' => [
@@ -133,6 +139,7 @@ return [
                 'surface' => 'webinar_registrations',
                 'message_type' => 'post_attended',
                 'dispatch_key' => 'webinar_ended',
+                'message_template_key' => 'post_attended',
                 'source_config_path' => 'messaging.email.transactional.webinar.post_attended.0',
                 'timing' => 'immediate',
                 'schedule' => null,

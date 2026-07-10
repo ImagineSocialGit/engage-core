@@ -1,8 +1,3 @@
-
-
-
-
-
 # Engage Core Config Authoring Guide
 
 This guide is for creating or reviewing Engage Core default configs and client-specific configs.
@@ -21,28 +16,29 @@ Primary references:
 2. Reusable Messaging templates do not own business timing, lifecycle conditions, sequencing, dependencies, lifecycle enablement, or module-specific skip behavior for module-owned flows.
 3. The consuming module owns whether a message should exist, when it should send, and the lifecycle rules that govern it.
 4. `ResolvedMessageDispatchBuilder` is the universal Messaging-owned runtime assembly seam; it combines reusable template data with behavior already resolved by the owning module and produces a `ResolvedMessageDispatch` with an exact `send_at`.
-5. Campaign presets own journeys, order, timing, conditions, dependency behavior, and references to message templates.
-6. Campaign presets do not own or override reusable subject/body/CTA payloads.
-7. Campaign message templates resolve by `channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key`, not author-created per-step message names.
-8. Campaign step variants reference Messaging-owned template presets/assignments and must not own reusable payload copy.
-9. Messaging template presets own reusable copy and safe DB-editable message payloads.
-10. Messaging template catalog entries own browsing/grouping metadata for template review; they do not own runtime behavior.
-11. Webinar schedule profiles/profile items own all Webinar lifecycle message timing, schedules, conditions, enablement, and Webinar-specific skip behavior, including immediate lifecycle messages.
-12. FlowRoute presets own automation/control-flow routing and reusable point definitions; reaching a `send_message` point determines when that action occurs unless the point itself explicitly owns additional behavior.
-13. Broadcasts own their exact `send_at`, audience, channel choice, and batch intent.
-14. Webinar post-event config owns provider event orchestration, not message copy.
-15. Task presets create DB-owned task template definitions only. They do not create live tasks.
-11. Internal/runtime identifiers must use the universal platform concept `contact`, never `lead`, unless a vertical truly owns a distinct domain concept named lead. This applies to keys, preset identifiers, task-template keys, route keys, event keys, triggers, reference registries, config paths, and generic definitions.
-12. Client-facing UI/copy may use the configured business noun such as Lead, Customer, Fan, Borrower, Owner, or another client/vertical label. Display terminology must not redefine internal identifiers.
-13. Do not invent new keys until checking the key registry and the actual owning config/runtime definitions.
-14. Do not use undocumented tokens in client-facing message copy.
-15. Avoid backward compatibility/legacy aliases unless explicitly chosen.
-16. Normal Broadcasts require normal Messaging consent. Do not use Broadcasts as a general imported-contact consent bypass.
-17. Imported-contact opt-in invitations are a distinct one-time Messaging flow with configurable public copy/style.
-18. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
-19. Module docs are the source of truth for module ownership and client-facing scope. Configs should not create a module feature that the owning module does not support.
-20. Commerce and Location configs should support admin convenience and integrations; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
-
+5. Resolved dispatches do not have an implicit immediate fallback. Callers must provide either exact `sendAt` or explicit caller-owned behavior.
+6. Module-owned dispatch paths should provide stable `occurrenceKey` identity for retries/idempotency. The same logical occurrence keeps the same key even if `send_at` changes.
+7. Campaign presets own journeys, order, timing, conditions, dependency behavior, and references to message templates.
+8. Campaign presets do not own or override reusable subject/body/CTA payloads.
+9. Campaign message templates resolve by `channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key`, not author-created per-step message names.
+10. Campaign step variants reference Messaging-owned template presets/assignments and must not own reusable payload copy.
+11. Messaging template presets own reusable copy and safe DB-editable message payloads.
+12. Messaging template catalog entries own browsing/grouping metadata for template review; they do not own runtime behavior.
+13. Webinar schedule profiles/profile items own all Webinar lifecycle message timing, schedules, conditions, enablement, and Webinar-specific skip behavior, including immediate lifecycle messages.
+14. FlowRoute presets own automation/control-flow routing and reusable point definitions; reaching a `send_message` point determines when that action occurs unless the point itself explicitly owns additional behavior.
+15. Broadcasts own their exact `send_at`, audience, channel choice, and batch intent.
+16. Webinar post-event config owns provider event orchestration, not message copy.
+17. Task presets create DB-owned task template definitions only. They do not create live tasks.
+18. Internal/runtime identifiers must use the universal platform concept `contact`, never `lead`, unless a vertical truly owns a distinct domain concept named lead. This applies to keys, preset identifiers, task-template keys, route keys, event keys, triggers, reference registries, config paths, and generic definitions.
+19. Client-facing UI/copy may use the configured business noun such as Lead, Customer, Fan, Borrower, Owner, or another client/vertical label. Display terminology must not redefine internal identifiers.
+20. Do not invent new keys until checking the key registry and the actual owning config/runtime definitions.
+21. Do not use undocumented tokens in client-facing message copy.
+22. Avoid backward compatibility/legacy aliases unless explicitly chosen.
+23. Normal Broadcasts require normal Messaging consent. Do not use Broadcasts as a general imported-contact consent bypass.
+24. Imported-contact opt-in invitations are a distinct one-time Messaging flow with configurable public copy/style.
+25. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
+26. Module docs are the source of truth for module ownership and client-facing scope. Configs should not create a module feature that the owning module does not support.
+27. Commerce and Location configs should support admin convenience and integrations; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
 ## Universal internal terminology vs configured client nouns
 
 Engage Core has one universal internal person concept: `Contact`.
@@ -530,6 +526,11 @@ The owning module resolves its business behavior first and passes the reusable t
 
 A missing module-owned behavior record must not silently fall back to an implicit immediate send or hidden template schedule. Treat missing required behavior as validation/runtime setup failure according to the owning module's contract.
 
+At runtime, some owning-module resolvers may attach transient `resolved_behavior` and `behavior_owner` values to a resolved definition before `DispatchMessageAction` runs. Those are runtime handoff values, not reusable template fields. `DispatchMessageAction` consumes them before the content-only template reaches `ResolvedMessageDispatchBuilder`.
+
+Stable occurrence identity is also caller-owned. Use a stable `occurrenceKey` for the same logical message occurrence across retries or send-time recalculation. Do not use `send_at` as the sole occurrence identity.
+
+
 For webinar transactional emails, use a uniform reusable-content shape across defaults and clients:
 
 ```text
@@ -1005,7 +1006,7 @@ last-minute only schedule
 no reminders
 ```
 
-Schedule profile configs should reference Messaging template assignments or message types, not embed reusable copy.
+Schedule profile configs should reference reusable Messaging templates through stable `message_template_key` identity plus the other required runtime dimensions. They must not embed reusable copy. `source_config_path` may be retained as provenance/debug location only and must not be the durable matching identity.
 
 ## Post-event config shape
 

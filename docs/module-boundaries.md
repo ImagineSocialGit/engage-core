@@ -1,4 +1,3 @@
-
 # Engage Core Module Boundaries
 
 Engage Core is a modular contact engagement platform.
@@ -270,11 +269,18 @@ Owning module resolves its behavior
 
 `ResolvedMessageDispatchBuilder` is Messaging-owned and universal. It may combine reusable template content with caller-resolved behavior, normalize the final dispatch contract, and attach generic provenance. It must not query or interpret Webinar, Campaign, Broadcast, FlowRoute, Task, InternalNotifications, or vertical-module tables.
 
-`ResolvedMessageDispatch` should carry the exact resolved `send_at` and other generic delivery inputs Messaging requires. Messaging should not infer Webinar schedules, Campaign cadence, Broadcast timing, FlowRoute waits, Task digest cadence, or other module lifecycle rules from reusable template definitions.
+`ResolvedMessageDispatch` carries the exact resolved `send_at`, optional polymorphic behavior-owner provenance, optional stable logical occurrence identity, and the other generic delivery inputs Messaging requires. Messaging must not infer Webinar schedules, Campaign cadence, Broadcast timing, FlowRoute waits, Task digest cadence, or other module lifecycle rules from reusable template definitions.
 
-`ScheduledMessage` may preserve optional polymorphic behavior provenance through a `behavior_owner` morph. The concrete owner remains module-owned, for example a `WebinarScheduleProfileItem`, `CampaignStepVariant`, `Broadcast`, or `FlowRoutePoint`. Messaging stores the morph generically and must not import those concrete feature-module models to interpret behavior.
+`ScheduledMessage` supports optional polymorphic behavior provenance through a `behavior_owner` morph. When a caller supplies a concrete behavior owner, Messaging persists `behavior_owner_type` / `behavior_owner_id` generically. The concrete owner remains module-owned, for example a `WebinarScheduleProfileItem`, `CampaignStepVariant`, `Broadcast`, or `FlowRoutePoint`. Messaging must not import those concrete feature-module models to interpret behavior.
 
 Missing module-owned behavior must never silently fall back to hidden timing, conditions, or skip behavior from a reusable Messaging template. Setup validation and runtime behavior should make missing ownership explicit.
+
+There is no implicit immediate fallback at the resolved-dispatch boundary. The caller must provide either an exact `sendAt` or explicit caller-owned behavior.
+
+Logical occurrence identity is separate from scheduled time. Module-owned dispatch paths should provide stable `occurrenceKey` values for retry/idempotency identity. The same logical occurrence should retain the same key even if `send_at` changes; dedupe must not treat timestamp changes alone as a new occurrence.
+
+Reusable templates are content-only at the builder boundary. Behavior fields such as `timing`, `schedule`, `conditions`, and module-specific skip behavior must arrive through explicit caller-owned behavior, not through the reusable template.
+
 
 ### FlowRoute ownership
 

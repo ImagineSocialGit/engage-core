@@ -26,6 +26,11 @@ return [
     | A reusable template must never silently become an immediate message merely
     | because module-owned behavior is missing.
     |
+    | Runtime callers must provide exact sendAt or explicit caller-owned behavior.
+    | Module-owned dispatch paths should also provide stable logical occurrenceKey
+    | identity for retries/idempotency; send_at is not logical occurrence identity.
+
+    |
     | Examples:
     | config/messaging/email/transactional/webinar.php
     | config/messaging/email/transactional/permission_invitation.php
@@ -76,7 +81,8 @@ return [
     | - operator readiness/debug feedback.
     |
     | Validate definition shape, required payload fields, registered dispatch keys,
-    | payload classes, schedule shape, channel/purpose/scope compatibility, and
+    | payload classes, channel/purpose/scope compatibility, forbidden template-owned
+    | lifecycle behavior fields, and
     | available fields/tokens for the exact runtime context that supplies them.
     |
     | Client-facing field aliases may differ by configured contact noun, but must

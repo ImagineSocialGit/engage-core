@@ -13,6 +13,9 @@ Rules:
 - Do not preserve old behavior by default.
 - Do not invent columns, runtime features, unsupported module behavior, undocumented tokens, or available fields.
 - Messaging configs own reusable message copy and delivery templates.
+- Reusable Messaging templates must not own `timing`, `schedule`, `conditions`, lifecycle enablement, sequencing, dependencies, or module-specific skip behavior for module-owned flows.
+- Every resolved module-owned dispatch must provide either exact caller-owned `sendAt` or explicit caller-owned behavior; there is no implicit immediate fallback.
+- Module-owned dispatch paths should use stable logical `occurrenceKey` identity for retry/idempotency rather than treating `send_at` as occurrence identity.
 - Campaign presets own journey/order/timing/template references.
 - Campaign presets do not own payload/copy and do not override payload/copy.
 - Campaign preset variants reference Messaging templates with first-class key, dispatch_key, channel, purpose, and scope keys.
@@ -22,7 +25,7 @@ Rules:
 - FlowRoute presets own automation/control-flow routing.
 - Webinar post-event config owns provider orchestration, not message copy.
 - Webinar schedule profile configs own webinar message timing/slot identity, not message copy.
-- Schedule profile items may share generic Messaging message types such as `reminder`; use item keys and source config paths for schedule-slot identity instead of schedule-specific message types like `reminder_30_minute`.
+- Schedule profile items may share generic Messaging message types such as `reminder`; use the schedule-profile item key for lifecycle-slot identity and stable `message_template_key` for reusable template identity. `source_config_path` is provenance/debug location only. Do not invent schedule-specific message types such as `reminder_30_minute`.
 - Persisted runtime payloads should be compact. Do not store full Eloquent model arrays or loaded relationship graphs in scheduled message payloads, automation events, route progress, task metadata, or broadcast/inbound metadata unless that column is explicitly a raw provider payload.
 - Default webinar configs should be vertical-neutral.
 - Vertical-specific copy belongs in vertical-specific scopes such as marketing:mortgage_homebuyer_nurture.

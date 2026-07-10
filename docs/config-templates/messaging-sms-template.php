@@ -26,6 +26,11 @@ return [
     | A reusable template must never silently become an immediate message merely
     | because module-owned behavior is missing.
     |
+    | Runtime callers must provide exact sendAt or explicit caller-owned behavior.
+    | Module-owned dispatch paths should also provide stable logical occurrenceKey
+    | identity for retries/idempotency; send_at is not logical occurrence identity.
+
+    |
     | Keep SMS payloads short.
     | SMS should be supplemental and safe to skip if consent, suppression,
     | provider, or recipient-phone requirements are not satisfied.
@@ -64,8 +69,9 @@ return [
     |
     | SMS definitions participate in the same reusable Messaging validation
     | infrastructure as email. Validate definition shape, payload requirements,
-    | registered dispatch keys, schedule shape, context-aware fields/tokens, and
-    | channel/purpose/scope compatibility before client handoff.
+    | registered dispatch keys, context-aware fields/tokens, forbidden template-owned
+    | lifecycle behavior fields, and channel/purpose/scope compatibility before
+    | client handoff.
     |
     | UI visibility is separate from runtime capability. A configured SMS template
     | may be valid while the channel remains hidden for a client surface; a route or

@@ -1,4 +1,3 @@
-
 # Broadcasts Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -158,10 +157,13 @@ ResolvedMessageDispatchBuilder
     assembles the exact Broadcast-owned send_at with the message content
 
 ScheduledMessage
-    may preserve behavior_owner = Broadcast
+    persists behavior_owner = Broadcast when Broadcast owns the dispatch timing
 ```
 
 Messaging must not reinterpret Broadcast timing from reusable template fields.
+
+Broadcast scheduling should also provide stable logical occurrence identity for each Broadcast-recipient dispatch. Retry/dedupe identity should be based on that logical occurrence rather than `send_at`, so recalculating or retrying the same Broadcast occurrence does not accidentally create a distinct message solely because the timestamp changed.
+
 
 Good:
 

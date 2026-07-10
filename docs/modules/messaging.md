@@ -1,4 +1,3 @@
-
 # Messaging Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -80,9 +79,9 @@ Owning module resolves behavior
 
 `ResolvedMessageDispatchBuilder` is Messaging-owned and generic. It combines reusable template data with behavior already resolved by the caller. It must not query or interpret Webinar, Campaign, Broadcast, FlowRoute, Task, InternalNotifications, or vertical-module tables.
 
-`ResolvedMessageDispatch` is the normalized final dispatch contract. It should contain the exact resolved `send_at` and the generic information required for Messaging to apply delivery safety and persist a `ScheduledMessage`.
+`ResolvedMessageDispatch` is the normalized final dispatch contract. It contains the exact resolved `send_at`, optional polymorphic `behaviorOwner` provenance, optional stable `occurrenceKey` identity, and the generic information required for Messaging to apply delivery safety and persist a `ScheduledMessage`.
 
-The builder may accept an optional polymorphic `behaviorOwner` model. `ScheduledMessage` may persist that provenance through `behavior_owner_type` / `behavior_owner_id`. Messaging stores the morph generically and does not import concrete feature-module models to understand their behavior.
+The builder accepts an optional polymorphic `behaviorOwner` model. When present, `ScheduledMessage` persists that provenance through `behavior_owner_type` / `behavior_owner_id`. Messaging stores the morph generically and does not import concrete feature-module models to understand their behavior.
 
 Examples:
 
@@ -103,6 +102,21 @@ FlowRoute send_message
 Not every message requires a behavior-owner record. The morph is provenance, not a requirement that every module adopt a profile/profile-item table pair.
 
 Missing module-owned behavior must never silently fall back to hidden timing or conditions from a reusable template. A consuming module should either resolve a valid dispatch intent or safely decline/fail according to its explicit runtime and setup-validation contract.
+
+There is no implicit immediate fallback. A resolved dispatch must provide either:
+
+```text
+exact caller-owned sendAt
+or
+explicit caller-owned behavior
+```
+
+Stable logical occurrence identity is separate from the scheduled timestamp. Module-owned dispatch paths should provide a stable `occurrenceKey` for retry/idempotency identity. The same logical occurrence should keep the same occurrence key even when `send_at` changes during a retry or recalculation. Messaging may use that occurrence identity when building dedupe keys; `send_at` alone must not be treated as logical occurrence identity.
+
+Reusable template data is content-only at the builder boundary. `ResolvedMessageDispatchBuilder` rejects behavior fields such as `timing`, `schedule`, `conditions`, and module-specific skip behavior when they arrive on the reusable template itself. Caller-owned behavior is merged only through the explicit behavior input.
+
+Some consuming-module resolvers may attach transient runtime-only keys such as `resolved_behavior` and `behavior_owner` to a resolved definition before calling `DispatchMessageAction`. `DispatchMessageAction` consumes and removes those transient keys before passing the reusable template into `ResolvedMessageDispatchBuilder`; they are not reusable template fields and must not be persisted as template ownership.
+
 
 ## Message template presets, catalog entries, and assignments
 
