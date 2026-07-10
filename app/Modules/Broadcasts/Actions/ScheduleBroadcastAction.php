@@ -77,7 +77,9 @@ class ScheduleBroadcastAction
                     dispatchKeys: $broadcast->dispatch_key,
                     payload: $broadcast->payload ?? [],
                     context: $broadcast,
-                    triggeredAt: $sendAt,
+                    triggeredAt: now(),
+                    sendAt: $sendAt,
+                    behaviorOwner: $broadcast,
                     meta: [
                         'queue' => $broadcast->queue,
                         'dispatch_keys' => [$broadcast->dispatch_key],
@@ -93,14 +95,8 @@ class ScheduleBroadcastAction
                             'channel' => $broadcast->channel,
                             'purpose' => $broadcast->purpose,
                             'scope' => $broadcast->scope,
-                            'timing' => 'scheduled',
                             'payload_class' => $broadcast->payload_class,
                             'queue' => $broadcast->queue,
-                            'conditions' => [],
-                            'schedule' => [
-                                'type' => 'delay',
-                                'minutes' => 0,
-                            ],
                             'payload' => $broadcast->payload ?? [],
                             'consent_policy' => $consentPolicy,
                             'meta' => [

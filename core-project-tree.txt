@@ -417,7 +417,8 @@
 │   │   │   │       ├── ConsentRevocationController.php
 │   │   │   │       └── ContactPermissionInvitationController.php
 │   │   │   ├── Data
-│   │   │   │   └── MessageData.php
+│   │   │   │   ├── MessageData.php
+│   │   │   │   └── ResolvedMessageDispatch.php
 │   │   │   ├── Enums
 │   │   │   │   ├── MessageChannel.php
 │   │   │   │   └── MessagePurpose.php
@@ -482,6 +483,7 @@
 │   │   │   │   ├── MessageTemplatePresetAssignmentResolver.php
 │   │   │   │   ├── MessageTemplateUsageResolver.php
 │   │   │   │   ├── PhoneNumberNormalizer.php
+│   │   │   │   ├── ResolvedMessageDispatchBuilder.php
 │   │   │   │   ├── ScheduledMessageGate.php
 │   │   │   │   └── Sms
 │   │   │   │       ├── SmsMessagingService.php
@@ -1276,6 +1278,7 @@
 │   │   ├── Broadcasts
 │   │   │   ├── BroadcastControllerTest.php
 │   │   │   ├── BroadcastModelTest.php
+│   │   │   ├── BroadcastResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── CancelBroadcastActionTest.php
 │   │   │   ├── MarkBroadcastRecipientSentTest.php
 │   │   │   ├── MarkBroadcastRecipientTerminalStatusTest.php
@@ -1346,10 +1349,14 @@
 │   │   │   ├── MessageDefinitionResolverTest.php
 │   │   │   ├── MessageEligibilityGateTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
+│   │   │   ├── MessageTemplateBehaviorOwnershipValidationTest.php
 │   │   │   ├── MessageTemplatePresetAssignmentResolverTest.php
 │   │   │   ├── MessageTemplatePresetControllerTest.php
 │   │   │   ├── MessageTemplatePresetSyncActionTest.php
 │   │   │   ├── MessagingSetupValidationContributorTest.php
+│   │   │   ├── ResolvedMessageDispatchBuilderTest.php
+│   │   │   ├── ResolvedMessageDispatchIntegrationTest.php
+│   │   │   ├── ResolvedMessageDispatchSchemaTest.php
 │   │   │   ├── ScheduleInternalNotificationActionTest.php
 │   │   │   ├── SendScheduledMessageJobTest.php
 │   │   │   ├── SmsMessagingServiceTest.php
@@ -1393,6 +1400,7 @@
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
 │   │   │   ├── WebinarRegistrationControllerTest.php
+│   │   │   ├── WebinarResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
 │   │   │   └── WebinarWaitlistSignupControllerTest.php
@@ -1401,4 +1409,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-455 directories, 947 files
+455 directories, 955 files

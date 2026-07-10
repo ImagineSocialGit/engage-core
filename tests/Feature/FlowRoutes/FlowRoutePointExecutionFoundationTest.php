@@ -307,7 +307,6 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
                 'channel' => 'sms',
                 'purpose' => 'marketing',
                 'scope' => 'webinar_nurture',
-                'timing' => 'immediate',
                 'payload_class' => SmsPayload::class,
                 'queue' => 'marketing',
                 'payload' => [
@@ -341,6 +340,75 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertSame(ContactFlowRouteProgress::STATUS_COMPLETED, $setup['progress']->status);
         $this->assertNull($setup['progress']->current_flow_route_point_id);
         $this->assertSame(0, ScheduledMessage::query()->count());
+    }
+
+    public function test_send_message_point_uses_flow_route_point_as_behavior_owner_at_execution_time(): void
+    {
+        Queue::fake();
+
+        config()->set('messaging.channel_availability.email', [
+            'runtime_supported' => true,
+            'provider_enabled' => true,
+            'requires_explicit_opt_in' => false,
+            'surfaces' => [
+                'route_send_message_points' => true,
+            ],
+            'purpose_scopes' => [
+                'transactional:general' => true,
+            ],
+        ]);
+
+        config()->set('messaging.email.transactional.general.route_message', [
+            'dispatch_key' => 'route_send_message_test',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'notifications',
+            'payload' => [
+                'subject' => 'Route message',
+                'body' => 'Route body',
+            ],
+        ]);
+
+        $setup = $this->createProgressWithPoints([
+            Point::TYPE_SEND_MESSAGE,
+        ]);
+
+        MessageConsent::query()->create([
+            'contact_id' => $setup['progress']->contact_id,
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'general',
+            'consented_at' => now()->subMinute(),
+            'source' => 'test',
+        ]);
+
+        $setup['flow_route_points'][0]->forceFill([
+            'definition' => [
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'scope' => 'general',
+                'dispatch_keys' => ['route_send_message_test'],
+                'on_no_messages' => 'failed',
+            ],
+        ])->save();
+
+        $before = now();
+        $result = app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']);
+        $after = now();
+
+        $this->assertSame(PointExecutionResult::STATUS_COMPLETED, $result->status);
+
+        $message = ScheduledMessage::query()->firstOrFail();
+        $flowRoutePoint = $setup['flow_route_points'][0];
+
+        $this->assertSame($flowRoutePoint->getMorphClass(), $message->behavior_owner_type);
+        $this->assertSame($flowRoutePoint->getKey(), $message->behavior_owner_id);
+        $this->assertTrue($message->behaviorOwner->is($flowRoutePoint));
+        $this->assertTrue(
+            $message->send_at->betweenIncluded(
+                $before->copy()->startOfSecond(),
+                $after->copy()->endOfSecond(),
+            ),
+        );
     }
 
     public function test_create_task_point_assigns_to_only_active_team_member(): void

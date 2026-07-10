@@ -15,6 +15,7 @@ class MessageDedupeKeyBuilder
         array $definition,
         ?Model $context,
         Carbon $sendAt,
+        ?Model $behaviorOwner = null,
     ): string {
         $identity = [
             'recipient_type' => $recipient->getMorphClass(),
@@ -35,9 +36,8 @@ class MessageDedupeKeyBuilder
                 ?? data_get($definition, 'meta.definition_config_path'),
             'message_template_preset_id' => data_get($definition, 'meta.message_template_preset.id'),
             'message_template_assignment_id' => data_get($definition, 'meta.message_template_preset.assignment_id'),
-            'timing' => $definition['timing'] ?? null,
-            'schedule_type' => $definition['schedule']['type'] ?? null,
-            'schedule_minutes' => $definition['schedule']['minutes'] ?? null,
+            'behavior_owner_type' => $behaviorOwner?->getMorphClass(),
+            'behavior_owner_id' => $behaviorOwner?->getKey(),
             'send_at' => $sendAt->toISOString(),
             'context_type' => $context?->getMorphClass(),
             'context_id' => $context?->getKey(),

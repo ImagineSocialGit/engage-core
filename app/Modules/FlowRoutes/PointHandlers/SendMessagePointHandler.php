@@ -65,7 +65,8 @@ class SendMessagePointHandler implements PointHandler
                 payload: $this->payload($definition, $context),
                 context: $context->progress,
                 triggeredAt: now(),
-                anchor: $this->anchor($definition, $context),
+                sendAt: now(),
+                behaviorOwner: $context->flowRoutePoint,
                 meta: $this->meta($definition, $context),
                 criteria: $definition->criteria,
             );
@@ -181,4 +182,3 @@ class SendMessagePointHandler implements PointHandler
         };
     }
 }
-

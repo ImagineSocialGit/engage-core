@@ -87,6 +87,9 @@ class CampaignStepVariantsTest extends TestCase
 
         $this->assertSame('email', $scheduledMessage->channel);
         $this->assertSame('webinar_attended_nurture_step_1', $scheduledMessage->message_type);
+        $this->assertSame($emailVariant->getMorphClass(), $scheduledMessage->behavior_owner_type);
+        $this->assertSame($emailVariant->getKey(), $scheduledMessage->behavior_owner_id);
+        $this->assertTrue($scheduledMessage->behaviorOwner->is($emailVariant));
         $this->assertSame($emailVariant->id, data_get($scheduledMessage->meta, 'campaign_step_variant_id'));
         $this->assertSame('email', data_get($scheduledMessage->meta, 'campaign_step_variant_key'));
         $this->assertSame('first_available', data_get($scheduledMessage->meta, 'campaign_variant_strategy'));
@@ -355,5 +358,3 @@ class CampaignStepVariantsTest extends TestCase
         return $contact;
     }
 }
-
-

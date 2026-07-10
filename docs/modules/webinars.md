@@ -97,7 +97,7 @@ Waitlist opt-in readiness is required when webinar-waitlist marketing messaging 
 
 When the corresponding messaging surface is unavailable, the opt-in area is `Optional / disabled` rather than a false blocker.
 
-Webinar-owned opt-in confirmations are lifecycle message contexts too. Even when their behavior is simply `immediate`, they should be represented by Webinar schedule-profile items rather than carrying hidden timing in reusable Messaging templates. Internal/default profile items may remain non-editable or hidden from client-facing UI when no operator choice is useful.
+Consent-event opt-in acknowledgements dispatched by Messaging are Messaging-owned behavior, even when the consent was collected on a Webinar surface. They remain reusable Webinar-scoped Messaging templates but are not Webinar schedule-profile items. Webinars still owns the registration/waitlist surface and readiness context; Messaging owns the consent-granted event and its acknowledgement behavior.
 
 ## Selectable webinar schedule profiles
 
@@ -105,7 +105,7 @@ Webinars supports DB-owned selectable schedule profiles for webinar-owned messag
 
 Schedule profiles decide whether, when, and under what Webinar lifecycle conditions messages are sent. Messaging template presets decide what those messages say and provide reusable delivery-template metadata.
 
-Every Webinar lifecycle message dispatched through the Webinar lifecycle should get its behavior from a `WebinarScheduleProfileItem`, including immediate confirmations or opt-in acknowledgements. A profile item may be internal/default and never exposed as a client-editable choice.
+Every Webinar lifecycle message dispatched through the Webinar lifecycle should get its behavior from a `WebinarScheduleProfileItem`, including immediate registration confirmations, waitlist alerts, and post-event follow-ups. Messaging-owned consent-event acknowledgements are the explicit exception because the consent-granted lifecycle belongs to Messaging.
 
 Profile items may cover categories such as:
 
@@ -204,7 +204,7 @@ Webinars should not transition Workflow status solely to trigger Campaign enroll
 Current outcome direction:
 
 1. Webinars records webinar registration/attendance/outcome state.
-2. Webinars resolves profile-owned lifecycle behavior for transactional messages such as confirmations, reminders, opt-in acknowledgements, waitlist alerts, and replay follow-ups, then hands the resulting dispatch intent to Messaging through the shared resolved-dispatch seam.
+2. Webinars resolves profile-owned lifecycle behavior for messages such as confirmations, reminders, waitlist alerts, and replay follow-ups, then hands the resulting dispatch intent to Messaging through the shared resolved-dispatch seam. Messaging-owned consent-event acknowledgements remain outside Webinar schedule profiles.
 3. Webinars emits `AutomationEventRecorded` for automation-worthy outcomes.
 4. FlowRoutes listens to the generic automation event seam.
 5. FlowRoutes maps generic automation events into `FlowRouteExternalEvent` internally.

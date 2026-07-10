@@ -245,9 +245,7 @@ class MessageConfigValidator
         bool $campaignTemplate,
     ): array {
         $issues = [];
-        $requiredKeys = $campaignTemplate
-            ? ['payload_class', 'queue', 'payload']
-            : ['payload_class', 'queue', 'payload', 'timing'];
+        $requiredKeys = ['payload_class', 'queue', 'payload'];
 
         foreach ($requiredKeys as $requiredKey) {
             if (! array_key_exists($requiredKey, $definition)) {
@@ -277,18 +275,14 @@ class MessageConfigValidator
             }
         }
 
-        $timing = $definition['timing'] ?? ($campaignTemplate ? 'immediate' : null);
-
-        if (! $campaignTemplate && (! is_string($timing) || ! in_array($timing, ['immediate', 'scheduled'], true))) {
-            $issues[] = $this->issue('error', "{$path}.timing", 'Message definition has invalid [timing].');
-        }
-
-        if ($timing === 'scheduled') {
-            $issues = array_merge($issues, $this->validateSchedule($definition['schedule'] ?? null, "{$path}.schedule"));
-        }
-
-        if (array_key_exists('conditions', $definition) && ! is_array($definition['conditions'])) {
-            $issues[] = $this->issue('error', "{$path}.conditions", 'Message definition has invalid [conditions].');
+        foreach (['timing', 'schedule', 'conditions'] as $behaviorField) {
+            if (array_key_exists($behaviorField, $definition)) {
+                $issues[] = $this->issue(
+                    'error',
+                    "{$path}.{$behaviorField}",
+                    "Reusable Messaging templates must not own [{$behaviorField}] behavior.",
+                );
+            }
         }
 
         $payload = $definition['payload'] ?? null;
@@ -534,4 +528,3 @@ class MessageConfigValidator
         return is_string($value) && trim($value) !== '';
     }
 }
-

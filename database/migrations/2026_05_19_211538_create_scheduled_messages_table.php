@@ -20,6 +20,7 @@ return new class extends Migration
 
             $table->morphs('recipient');
             $table->nullableMorphs('context');
+            $table->nullableMorphs('behavior_owner');
 
             $table->foreignIdFor(ContactFlowRouteProgress::class, 'flow_route_progress_id')
                 ->nullable()

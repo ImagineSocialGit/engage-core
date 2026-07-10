@@ -51,8 +51,6 @@ class MessageDispatchDefinitionNormalizer
                     ? trim($definition['config_path'])
                     : null,
                 'dispatch_keys' => $dispatchKeys,
-                'timing' => $definition['timing'] ?? 'immediate',
-                'schedule' => is_array($definition['schedule'] ?? null) ? $definition['schedule'] : null,
             ]);
 
             $normalized[] = $this->validateInlineDefinition($normalizedDefinition);
@@ -71,37 +69,28 @@ class MessageDispatchDefinitionNormalizer
             ? $definition['config_path']
             : 'inline message definition';
 
-        foreach (['payload_class', 'queue', 'payload', 'timing', 'dispatch_keys'] as $requiredKey) {
+        foreach (['payload_class', 'queue', 'payload', 'dispatch_keys'] as $requiredKey) {
             if (! array_key_exists($requiredKey, $definition)) {
                 throw new InvalidArgumentException("Inline message definition [{$definitionLabel}] is missing [{$requiredKey}].");
             }
         }
 
-        foreach (['channel', 'purpose', 'scope', 'message_type', 'payload_class', 'queue', 'timing'] as $requiredStringKey) {
+        foreach (['channel', 'purpose', 'scope', 'message_type', 'payload_class', 'queue'] as $requiredStringKey) {
             if (! is_string($definition[$requiredStringKey]) || trim($definition[$requiredStringKey]) === '') {
                 throw new InvalidArgumentException("Inline message definition [{$definitionLabel}] has invalid [{$requiredStringKey}].");
             }
         }
 
-        if (! in_array($definition['timing'], ['immediate', 'scheduled'], true)) {
-            throw new InvalidArgumentException("Inline message definition [{$definitionLabel}] has invalid [timing].");
-        }
 
         if (! is_array($definition['payload'])) {
             throw new InvalidArgumentException("Inline message definition [{$definitionLabel}] has invalid [payload].");
         }
 
-        if (array_key_exists('conditions', $definition) && ! is_array($definition['conditions'])) {
-            throw new InvalidArgumentException("Inline message definition [{$definitionLabel}] has invalid [conditions].");
-        }
 
         if (! is_array($definition['dispatch_keys']) || $definition['dispatch_keys'] === []) {
             throw new InvalidArgumentException("Inline message definition [{$definitionLabel}] has invalid [dispatch_keys].");
         }
 
-        if ($definition['timing'] === 'scheduled') {
-            $this->validateSchedule($definition);
-        }
 
         return $definition;
     }

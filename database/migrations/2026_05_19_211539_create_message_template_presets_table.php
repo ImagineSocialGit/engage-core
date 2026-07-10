@@ -24,9 +24,6 @@ return new class extends Migration
             $table->string('queue', 96)->nullable()->index();
 
             $table->json('dispatch_keys')->nullable();
-            $table->string('timing', 32)->default('immediate')->index();
-            $table->json('schedule')->nullable();
-            $table->json('conditions')->nullable();
             $table->json('payload');
             $table->json('tokens')->nullable();
 

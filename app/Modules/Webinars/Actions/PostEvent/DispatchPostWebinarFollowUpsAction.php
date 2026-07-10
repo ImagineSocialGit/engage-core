@@ -239,4 +239,3 @@ class DispatchPostWebinarFollowUpsAction
         return $webinar->fresh() ?? $webinar;
     }
 }
-

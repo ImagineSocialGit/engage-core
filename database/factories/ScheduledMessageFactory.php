@@ -22,6 +22,8 @@ class ScheduledMessageFactory extends Factory
 
             'context_type' => null,
             'context_id' => null,
+            'behavior_owner_type' => null,
+            'behavior_owner_id' => null,
 
             'flow_route_progress_id' => null,
             'flow_route_plan_id' => null,

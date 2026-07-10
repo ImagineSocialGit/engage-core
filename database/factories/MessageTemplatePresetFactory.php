@@ -23,9 +23,6 @@ class MessageTemplatePresetFactory extends Factory
             'payload_class' => EmailPayload::class,
             'queue' => 'emails',
             'dispatch_keys' => ['registration_created'],
-            'timing' => 'immediate',
-            'schedule' => null,
-            'conditions' => [],
             'payload' => [
                 'subject' => 'Registered',
                 'body' => 'Thanks',

@@ -21,6 +21,7 @@ class ScheduleMessageAction
         array $payload,
         Carbon|string|null $sendAt = null,
         ?Model $context = null,
+        ?Model $behaviorOwner = null,
         ?string $dedupeKey = null,
         ?array $meta = null,
     ): ScheduledMessage {
@@ -57,6 +58,11 @@ class ScheduleMessageAction
         if ($context) {
             $attributes['context_type'] = $context->getMorphClass();
             $attributes['context_id'] = $context->getKey();
+        }
+
+        if ($behaviorOwner) {
+            $attributes['behavior_owner_type'] = $behaviorOwner->getMorphClass();
+            $attributes['behavior_owner_id'] = $behaviorOwner->getKey();
         }
 
         $scheduledMessage = $dedupeKey
@@ -103,6 +109,8 @@ class ScheduleMessageAction
             'send_at' => $sendAt->toDateTimeString(),
             'context_type' => $context ? class_basename($context) : null,
             'context_id' => $context?->getKey(),
+            'behavior_owner_type' => $scheduledMessage->behavior_owner_type ? class_basename((string) $scheduledMessage->behavior_owner_type) : null,
+            'behavior_owner_id' => $scheduledMessage->behavior_owner_id,
             'dispatch_keys' => $scheduledMessage->dispatch_keys,
             'definition_config_path' => $scheduledMessage->definition_config_path,
             'campaign_key' => $scheduledMessage->meta['campaign_key'] ?? null,
@@ -131,4 +139,3 @@ class ScheduleMessageAction
     private function nullableString(mixed $value): ?string { return is_string($value) && trim($value) !== '' ? trim($value) : null; }
     private function nullableInt(mixed $value): ?int { return is_numeric($value) ? (int) $value : null; }
 }
-

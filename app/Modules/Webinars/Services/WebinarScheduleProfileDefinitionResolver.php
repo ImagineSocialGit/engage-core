@@ -26,7 +26,7 @@ class WebinarScheduleProfileDefinitionResolver
         $profile = $this->profileResolver->resolveForWebinar($webinar);
 
         if (! $profile instanceof WebinarScheduleProfile) {
-            return $definitions;
+            return [];
         }
 
         return $this->applyProfile(
@@ -51,7 +51,7 @@ class WebinarScheduleProfileDefinitionResolver
         $dispatchKeys = $this->normalizeList(is_string($dispatchKeys) ? [$dispatchKeys] : $dispatchKeys);
 
         if ($dispatchKeys === []) {
-            return $definitions;
+            return [];
         }
 
         $items = $profile->relationLoaded('items')
@@ -63,7 +63,7 @@ class WebinarScheduleProfileDefinitionResolver
             ->values();
 
         if ($items->isEmpty()) {
-            return $definitions;
+            return [];
         }
 
         $resolved = [];
@@ -76,7 +76,6 @@ class WebinarScheduleProfileDefinitionResolver
             $definitionDispatchKeys = $this->normalizeList($definition['dispatch_keys'] ?? []);
 
             if (array_intersect($definitionDispatchKeys, $dispatchKeys) === []) {
-                $resolved[] = $definition;
                 continue;
             }
 
@@ -88,7 +87,6 @@ class WebinarScheduleProfileDefinitionResolver
             ));
 
             if (! $item instanceof WebinarScheduleProfileItem) {
-                $resolved[] = $definition;
                 continue;
             }
 
@@ -99,11 +97,17 @@ class WebinarScheduleProfileDefinitionResolver
             $schedule = is_array($item->schedule) ? $item->schedule : null;
             $conditions = is_array($item->conditions) ? $item->conditions : [];
 
-            $resolved[] = array_replace_recursive($definition, [
+            $resolvedDefinition = array_replace($definition, [
                 'timing' => $item->timing,
                 'schedule' => $schedule,
-                'conditions' => array_replace_recursive($definition['conditions'] ?? [], $conditions),
-                'meta' => array_replace_recursive($definition['meta'] ?? [], [
+                'conditions' => $conditions,
+                'skip_when_join_clicked' => (bool) data_get($item->meta, 'skip_when_join_clicked', false),
+                'behavior_owner' => $item,
+            ]);
+
+            $resolvedDefinition['meta'] = array_replace_recursive(
+                is_array($definition['meta'] ?? null) ? $definition['meta'] : [],
+                [
                     'webinar_schedule_profile' => [
                         'id' => $profile->getKey(),
                         'key' => $profile->key,
@@ -112,8 +116,10 @@ class WebinarScheduleProfileDefinitionResolver
                         'item_key' => $item->key,
                         'item_label' => $item->label,
                     ],
-                ]),
-            ]);
+                ],
+            );
+
+            $resolved[] = $resolvedDefinition;
         }
 
         return array_values($resolved);

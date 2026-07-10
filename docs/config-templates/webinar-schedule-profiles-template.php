@@ -25,8 +25,8 @@ return [
     | reusable subject/body/message copy.
     |
     | Every Webinar lifecycle message dispatched through Webinars must have a
-    | matching profile item, including immediate/internal slots such as opt-in
-    | confirmations when Webinars owns that lifecycle moment.
+    | matching profile item. Messaging-owned consent-event acknowledgements are
+    | not Webinar schedule-profile items.
     |
     | Missing profile coverage must not silently fall back to template timing or
     | an implicit immediate send.
@@ -73,28 +73,6 @@ return [
                 'is_active' => true,
                 'sort_order' => 10,
                 'meta' => [],
-            ],
-
-            [
-                'key' => 'email_webinar_opt_in',
-                'label' => 'Email Webinar Opt-In Confirmation',
-                'context_key' => 'opt_ins',
-                'channel' => 'email',
-                'purpose' => 'transactional',
-                'scope' => 'webinar',
-                'surface' => 'webinar_registrations',
-                'message_type' => 'opt_in',
-                'dispatch_key' => 'consent_granted',
-                'source_config_path' => 'messaging.email.transactional.webinar.opt_ins.0',
-                'timing' => 'immediate',
-                'schedule' => null,
-                'conditions' => [],
-                'is_enabled' => true,
-                'is_active' => true,
-                'sort_order' => 15,
-                'meta' => [
-                    'visibility' => 'internal',
-                ],
             ],
 
             [

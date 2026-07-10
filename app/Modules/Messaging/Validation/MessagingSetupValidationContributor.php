@@ -544,4 +544,3 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
         );
     }
 }
-

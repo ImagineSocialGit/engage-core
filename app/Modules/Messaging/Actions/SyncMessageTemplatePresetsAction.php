@@ -354,26 +354,6 @@ class SyncMessageTemplatePresetsAction
             throw new InvalidArgumentException("Message template preset source [{$configPath}] has invalid [payload].");
         }
 
-        $timing = $campaignTemplate
-            ? (is_string($definition['timing'] ?? null) ? $this->normalizeSegment($definition['timing']) : 'immediate')
-            : $this->normalizeSegment((string) ($definition['timing'] ?? ''));
-
-        if (! in_array($timing, ['immediate', 'scheduled'], true)) {
-            throw new InvalidArgumentException("Message template preset source [{$configPath}] has invalid [timing].");
-        }
-
-        $schedule = is_array($definition['schedule'] ?? null) ? $definition['schedule'] : null;
-
-        if ($timing === 'scheduled') {
-            $this->validateSchedule($schedule, $configPath);
-        }
-
-        $conditions = $definition['conditions'] ?? [];
-
-        if (! is_array($conditions)) {
-            throw new InvalidArgumentException("Message template preset source [{$configPath}] has invalid [conditions].");
-        }
-
         $key = $this->presetKey(
             channel: $channel,
             purpose: $purpose,
@@ -418,10 +398,6 @@ class SyncMessageTemplatePresetsAction
             ],
         );
 
-        if (array_key_exists('skip_when_join_clicked', $definition)) {
-            $meta['skip_when_join_clicked'] = (bool) $definition['skip_when_join_clicked'];
-        }
-
         if (is_string($definition['notification_type'] ?? null)) {
             $meta['notification_type'] = trim($definition['notification_type']);
         }
@@ -439,9 +415,6 @@ class SyncMessageTemplatePresetsAction
                 'payload_class' => trim($definition['payload_class']),
                 'queue' => trim($definition['queue']),
                 'dispatch_keys' => $dispatchKeys,
-                'timing' => $timing,
-                'schedule' => $schedule,
-                'conditions' => $conditions,
                 'payload' => $payload,
                 'tokens' => $this->tokensFromPayload($payload),
                 'status' => MessageTemplatePreset::STATUS_ACTIVE,
@@ -787,7 +760,3 @@ class SyncMessageTemplatePresetsAction
         return str_replace('-', '_', strtolower(trim($value)));
     }
 }
-
-
-
-

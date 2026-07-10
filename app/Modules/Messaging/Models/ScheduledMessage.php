@@ -34,6 +34,8 @@ class ScheduledMessage extends Model
         'recipient_id',
         'context_type',
         'context_id',
+        'behavior_owner_type',
+        'behavior_owner_id',
         'flow_route_progress_id',
         'flow_route_plan_id',
         'flow_route_plan_item_id',
@@ -66,6 +68,7 @@ class ScheduledMessage extends Model
         return [
             'recipient_id' => 'integer',
             'context_id' => 'integer',
+            'behavior_owner_id' => 'integer',
             'flow_route_progress_id' => 'integer',
             'flow_route_plan_id' => 'integer',
             'flow_route_plan_item_id' => 'integer',
@@ -91,6 +94,11 @@ class ScheduledMessage extends Model
     public function context(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    public function behaviorOwner(): MorphTo
+    {
+        return $this->morphTo('behavior_owner');
     }
 
     public function flowRouteProgress(): BelongsTo

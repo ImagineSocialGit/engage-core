@@ -61,6 +61,7 @@ class CampaignMessageDefinitionResolver
             'campaign_step_variant_source_config_path' => $reference['variant_source_config_path'],
             'skip_when_join_clicked' => (bool) data_get($variant?->meta ?? $step->meta ?? [], 'skip_when_join_clicked', false),
             'notification_type' => data_get($variant?->meta ?? $step->meta ?? [], 'notification_type'),
+            'behavior_owner' => $variant,
             'meta' => array_replace_recursive(
                 $definition['meta'] ?? [],
                 [
@@ -202,6 +203,7 @@ class CampaignMessageDefinitionResolver
             'campaign_step_variant_source_config_path' => $reference['variant_source_config_path'],
             'skip_when_join_clicked' => (bool) data_get($variant?->meta ?? $step->meta ?? [], 'skip_when_join_clicked', false),
             'notification_type' => data_get($variant?->meta ?? $step->meta ?? [], 'notification_type'),
+            'behavior_owner' => $variant,
             'meta' => [
                 'campaign' => array_filter([
                     'campaign_id' => $campaign->id,

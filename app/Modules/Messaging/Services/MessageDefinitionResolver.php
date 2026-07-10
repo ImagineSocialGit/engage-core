@@ -255,12 +255,6 @@ class MessageDefinitionResolver
             'config_path' => $configPath,
             'dispatch_keys' => $dispatchKeys,
 
-            'timing' => $definition['timing'] ?? 'immediate',
-
-            'schedule' => [
-                'type' => data_get($definition, 'schedule.type'),
-                'minutes' => data_get($definition, 'schedule.minutes'),
-            ],
         ]);
     }
 
@@ -270,29 +264,23 @@ class MessageDefinitionResolver
      */
     private function validateDefinition(array $definition): array
     {
-        foreach (['payload_class', 'queue', 'payload', 'timing', 'dispatch_keys'] as $requiredKey) {
+        foreach (['payload_class', 'queue', 'payload', 'dispatch_keys'] as $requiredKey) {
             if (! array_key_exists($requiredKey, $definition)) {
                 throw new InvalidArgumentException("Message definition [{$definition['config_path']}] is missing [{$requiredKey}].");
             }
         }
 
-        foreach (['payload_class', 'queue', 'timing'] as $requiredStringKey) {
+        foreach (['payload_class', 'queue'] as $requiredStringKey) {
             if (! is_string($definition[$requiredStringKey]) || trim($definition[$requiredStringKey]) === '') {
                 throw new InvalidArgumentException("Message definition [{$definition['config_path']}] has invalid [{$requiredStringKey}].");
             }
         }
 
-        if (! in_array($definition['timing'], ['immediate', 'scheduled'], true)) {
-            throw new InvalidArgumentException("Message definition [{$definition['config_path']}] has invalid [timing].");
-        }
 
         if (! is_array($definition['payload'])) {
             throw new InvalidArgumentException("Message definition [{$definition['config_path']}] has invalid [payload].");
         }
 
-        if (array_key_exists('conditions', $definition) && ! is_array($definition['conditions'])) {
-            throw new InvalidArgumentException("Message definition [{$definition['config_path']}] has invalid [conditions].");
-        }
 
         if (! is_array($definition['dispatch_keys']) || $definition['dispatch_keys'] === []) {
             throw new InvalidArgumentException("Message definition [{$definition['config_path']}] has invalid [dispatch_keys].");
@@ -304,9 +292,6 @@ class MessageDefinitionResolver
             }
         }
 
-        if ($definition['timing'] === 'scheduled') {
-            $this->validateSchedule($definition);
-        }
 
         return $definition;
     }
@@ -342,9 +327,6 @@ class MessageDefinitionResolver
             throw new InvalidArgumentException("Campaign message definition [{$definitionLabel}] has invalid [payload].");
         }
 
-        if (array_key_exists('conditions', $definition) && ! is_array($definition['conditions'])) {
-            throw new InvalidArgumentException("Campaign message definition [{$definitionLabel}] has invalid [conditions].");
-        }
 
         if (! is_array($definition['dispatch_keys']) || $definition['dispatch_keys'] === []) {
             throw new InvalidArgumentException("Campaign message definition [{$definitionLabel}] has invalid [dispatch_keys].");
