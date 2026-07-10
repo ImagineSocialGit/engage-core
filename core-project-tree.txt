@@ -552,6 +552,7 @@
 │   │   │   │   ├── CreateTaskAction.php
 │   │   │   │   ├── CreateTaskFromTemplateAction.php
 │   │   │   │   ├── NotifyAssignedTaskRecipientsAction.php
+│   │   │   │   ├── RecordManualTaskAutomationBehaviorAction.php
 │   │   │   │   ├── SendTaskDigestNotificationsAction.php
 │   │   │   │   └── SyncTaskPresetsAction.php
 │   │   │   ├── Capabilities
@@ -719,6 +720,7 @@
 │       │       └── AutomationEventRecorded.php
 │       ├── AutomationOpportunities
 │       │   ├── Actions
+│       │   │   ├── AutomationBehaviorAction.php
 │       │   │   ├── EvaluateAutomationOpportunityAction.php
 │       │   │   └── RecordAutomationBehaviorOccurrenceAction.php
 │       │   ├── Data
@@ -1403,6 +1405,7 @@
 │   │   │   ├── SetupValidationRegistrationTest.php
 │   │   │   └── ValidateSetupCommandTest.php
 │   │   ├── Tasks
+│   │   │   ├── RecordManualTaskAutomationBehaviorActionTest.php
 │   │   │   ├── RuntimeTaskBehaviorTest.php
 │   │   │   └── TasksSetupValidationContributorTest.php
 │   │   ├── Webhooks
@@ -1430,4 +1433,4 @@
 │   └── TestCase.php
 └── vite.config.js
 
-461 directories, 970 files
+461 directories, 973 files

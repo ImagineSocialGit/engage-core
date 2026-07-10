@@ -7,6 +7,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Tasks\Actions\CompleteTaskAction;
 use App\Modules\Tasks\Actions\CreateTaskAction;
 use App\Modules\Tasks\Actions\NotifyAssignedTaskRecipientsAction;
+use App\Modules\Tasks\Actions\RecordManualTaskAutomationBehaviorAction;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Requests\StoreTaskRequest;
 use Illuminate\Http\RedirectResponse;
@@ -17,12 +18,18 @@ class TaskController extends Controller
     public function store(
         StoreTaskRequest $request,
         CreateTaskAction $createTask,
+        RecordManualTaskAutomationBehaviorAction $recordManualTaskAutomationBehavior,
         NotifyAssignedTaskRecipientsAction $notifyAssignedTaskRecipients,
     ): RedirectResponse {
         $task = $createTask->handle(
             data: array_replace($request->validated(), [
                 'source' => Task::SOURCE_MANUAL,
             ]),
+        );
+
+        $recordManualTaskAutomationBehavior->handle(
+            task: $task,
+            actor: $request->user(),
         );
 
         if ($request->boolean('notify_assignee') && $task->isAssigned()) {
