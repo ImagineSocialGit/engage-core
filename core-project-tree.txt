@@ -223,7 +223,8 @@
 │   │   │   │   └── PointHandler.php
 │   │   │   ├── Controllers
 │   │   │   │   └── CRM
-│   │   │   │       └── FlowRouteBindingController.php
+│   │   │   │       ├── FlowRouteBindingController.php
+│   │   │   │       └── FlowRouteController.php
 │   │   │   ├── Data
 │   │   │   │   ├── Events
 │   │   │   │   │   ├── FlowRouteExternalEvent.php
@@ -282,6 +283,7 @@
 │   │   │   │   │   └── ContactRoutesVisibilityDataProvider.php
 │   │   │   │   ├── ContactStatusAutomationImpactResolver.php
 │   │   │   │   ├── FlowRouteConditionEvaluatorRegistry.php
+│   │   │   │   ├── FlowRoutePresentationResolver.php
 │   │   │   │   ├── FlowRouteTriggerBindingResolver.php
 │   │   │   │   └── PointHandlerRegistry.php
 │   │   │   ├── Support
@@ -1292,8 +1294,11 @@
 │       │   ├── dashboard.blade.php
 │       │   ├── dashboard-tasks-print.blade.php
 │       │   ├── flow-routes
-│       │   │   └── bindings
-│       │   │       └── index.blade.php
+│       │   │   ├── bindings
+│       │   │   │   └── index.blade.php
+│       │   │   ├── index.blade.php
+│       │   │   └── partials
+│       │   │       └── navigation.blade.php
 │       │   ├── messaging
 │       │   │   └── message-templates
 │       │   │       └── index.blade.php
@@ -1381,6 +1386,7 @@
 │   │   │   ├── ContactStatusAutomationImpactResolverTest.php
 │   │   │   ├── FlowRouteBindingControllerTest.php
 │   │   │   ├── FlowRouteConditionBranchPointTest.php
+│   │   │   ├── FlowRouteControllerTest.php
 │   │   │   ├── FlowRoutePointExecutionFoundationTest.php
 │   │   │   ├── FlowRoutesModelSchemaTest.php
 │   │   │   ├── FlowRoutesSetupValidationContributorTest.php
@@ -1490,4 +1496,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-487 directories, 1004 files
+488 directories, 1009 files

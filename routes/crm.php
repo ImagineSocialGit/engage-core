@@ -8,6 +8,7 @@ use App\Modules\Core\Controllers\ContactImportBatchController;
 use App\Modules\Core\Controllers\ContactLookupController;
 use App\Modules\Core\Controllers\ContactNoteController;
 use App\Modules\FlowRoutes\Controllers\CRM\FlowRouteBindingController;
+use App\Modules\FlowRoutes\Controllers\CRM\FlowRouteController;
 use App\Modules\Messaging\Controllers\ContactImportBatchPermissionInvitationController;
 use App\Modules\Messaging\Controllers\CRM\MessageTemplatePresetController;
 use App\Modules\Tasks\Controllers\TaskController;
@@ -129,6 +130,9 @@ Route::middleware('auth')->group(function () {
         ->prefix('flow-routes')
         ->name('crm.flow-routes.')
         ->group(function () {
+            Route::get('/', [FlowRouteController::class, 'index'])
+                ->name('index');
+
             Route::get('/bindings', [FlowRouteBindingController::class, 'index'])
                 ->name('bindings.index');
 
@@ -243,4 +247,3 @@ Route::middleware('auth')->group(function () {
                 ->name('notes.destroy');
         });
 });
-

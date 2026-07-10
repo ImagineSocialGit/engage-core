@@ -1,49 +1,87 @@
 <x-layouts.crm
-    title="Automatic Follow-ups"
-    heading="Automatic Follow-ups"
-    subheading="Choose what should happen automatically when {{ $contactLabel['singular'] }} statuses or activity change."
+    title="Route Assignments"
+    heading="Routes"
+    subheading="Choose which Routes run when {{ $contactLabel['singular'] }} statuses or business activity change."
+    module="flow_routes"
 >
     @php
         $firstStatusKey = $contactStatusBindings->first()['status']->key ?? '';
+        $statusKeys = $contactStatusBindings->map(fn ($row) => $row['status']->key)->all();
+        $requestedStatusKey = (string) request()->query('status', '');
+        $initialStatusKey = in_array($requestedStatusKey, $statusKeys, true) ? $requestedStatusKey : $firstStatusKey;
+
         $firstActivityModuleKey = $automationEventGroups->first()['key'] ?? '';
+        $activityModuleKeys = $automationEventGroups->pluck('key')->all();
+        $requestedActivityModuleKey = (string) request()->query('module', '');
+        $initialActivityModuleKey = in_array($requestedActivityModuleKey, $activityModuleKeys, true)
+            ? $requestedActivityModuleKey
+            : $firstActivityModuleKey;
+
+        $requestedTab = (string) request()->query('tab', 'status');
+        $initialTab = in_array($requestedTab, ['status', 'activity'], true) ? $requestedTab : 'status';
     @endphp
 
     <div
         class="space-y-6"
         x-data="{
-            tab: 'status',
-            selectedStatus: @js($firstStatusKey),
-            selectedActivityModule: @js($firstActivityModuleKey),
+            tab: @js($initialTab),
+            selectedStatus: @js($initialStatusKey),
+            selectedActivityModule: @js($initialActivityModuleKey),
+            focusedTarget: null,
+            focusHashTarget() {
+                const targetId = window.location.hash.replace('#', '');
+
+                if (! targetId) return;
+
+                this.focusedTarget = targetId;
+
+                this.$nextTick(() => {
+                    const target = document.getElementById(targetId);
+
+                    if (! target) return;
+
+                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                    window.setTimeout(() => {
+                        if (this.focusedTarget === targetId) {
+                            this.focusedTarget = null;
+                        }
+                    }, 1800);
+                });
+            },
         }"
+        x-init="focusHashTarget()"
     >
+        @include('crm.flow-routes.partials.navigation')
+
         @if(session('status'))
             <x-ui.feedback.alert type="success">
                 {{ session('status') }}
             </x-ui.feedback.alert>
         @endif
 
-        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <section class="rounded-3xl border border-orange-200 bg-white/90 p-5 shadow-sm sm:p-6">
             <div class="max-w-3xl">
-                <p class="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Follow-up rules
+                <p class="text-sm font-semibold uppercase tracking-[0.16em] text-orange-800">
+                    Route assignments
                 </p>
 
-                <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                    When this happens, what should happen next?
+                <h2 class="mt-2 text-xl font-semibold tracking-tight text-slate-950">
+                    Choose what runs automatically
                 </h2>
 
-                <p class="mt-3 text-sm leading-6 text-slate-600">
-                    Use this page to choose the automatic follow-ups Engage Core runs after familiar business moments, such as a
+                <p class="mt-3 text-sm leading-6 text-slate-700">
+                    Use this page to choose which Routes run after familiar business moments, such as a
                     {{ $contactLabel['singular'] }} moving to a status or someone attending a webinar.
                 </p>
             </div>
 
-            <div class="mt-6 flex flex-wrap gap-2 rounded-2xl bg-slate-100 p-1 text-sm font-semibold">
+            <div class="mt-6 flex flex-wrap gap-2 rounded-2xl bg-orange-50 p-1 text-sm font-semibold ring-1 ring-orange-200">
                 <button
                     type="button"
                     x-on:click="tab = 'status'"
                     class="rounded-xl px-4 py-2 transition"
-                    x-bind:class="tab === 'status' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                    x-bind:class="tab === 'status' ? 'bg-white text-orange-950 shadow-sm ring-1 ring-orange-200' : 'text-slate-700 hover:text-slate-900'"
                 >
                     By Status
                 </button>
@@ -52,7 +90,7 @@
                     type="button"
                     x-on:click="tab = 'activity'"
                     class="rounded-xl px-4 py-2 transition"
-                    x-bind:class="tab === 'activity' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                    x-bind:class="tab === 'activity' ? 'bg-white text-orange-950 shadow-sm ring-1 ring-orange-200' : 'text-slate-700 hover:text-slate-900'"
                 >
                     By Activity
                 </button>
@@ -60,17 +98,16 @@
         </section>
 
         <section x-show="tab === 'status'" class="space-y-4">
-            <div class="rounded-3xl border border-slate-200 bg-white shadow-sm">
-                <div class="border-b border-slate-200 p-6">
+            <div class="rounded-3xl border border-orange-200 bg-white/90 shadow-sm">
+                <div class="border-b border-orange-100 p-6">
                     <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end">
                         <div>
                             <h2 class="text-lg font-semibold tracking-tight text-slate-950">
-                                Status follow-ups
+                                Status assignments
                             </h2>
 
-                            <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-                                Choose a status, then choose the one follow-up that should start when a
-                                {{ $contactLabel['singular'] }} moves into that status.
+                            <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
+                                Choose the one Route that should start when a {{ $contactLabel['singular'] }} moves into a status.
                             </p>
                         </div>
 
@@ -82,7 +119,7 @@
                             <select
                                 id="status-selector"
                                 x-model="selectedStatus"
-                                class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200"
                             >
                                 @foreach($contactStatusBindings as $row)
                                     <option value="{{ $row['status']->key }}">
@@ -101,13 +138,16 @@
                             $availableRoutes = $row['available_routes'];
                             $selectedRouteId = $row['selected_route_id'];
                             $selectedRoute = $row['selected_route'];
+                            $targetId = 'status-'.\Illuminate\Support\Str::slug($status->key);
                         @endphp
 
                         <form
+                            id="{{ $targetId }}"
                             method="POST"
                             action="{{ route('crm.flow-routes.bindings.update') }}"
                             x-show="selectedStatus === @js($status->key)"
-                            class="space-y-6"
+                            class="rounded-2xl p-5 ring-1 transition duration-300 {{ module_tone('workflow', 'item') }}"
+                            x-bind:class="focusedTarget === @js($targetId) ? 'scale-[1.01] !bg-orange-100 ring-2 ring-orange-500 shadow-md' : ''"
                         >
                             @csrf
                             @method('PATCH')
@@ -115,90 +155,65 @@
                             <input type="hidden" name="trigger_type" value="{{ \App\Modules\FlowRoutes\Models\FlowRoute::TRIGGER_CONTACT_STATUS }}">
                             <input type="hidden" name="trigger_key" value="{{ $status->key }}">
 
-                            <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
-                                <div class="space-y-4">
-                                    <div>
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            <h3 class="text-xl font-semibold tracking-tight text-slate-950">
-                                                {{ $status->name }}
-                                            </h3>
+                            <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h3 class="text-xl font-semibold tracking-tight text-slate-950">
+                                            {{ $status->name }}
+                                        </h3>
 
-                                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                                                Status
-                                            </span>
-                                        </div>
-
-                                        @if($status->description)
-                                            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                                                {{ $status->description }}
-                                            </p>
-                                        @endif
+                                        <span class="rounded-full px-2.5 py-1 text-xs font-semibold ring-1 {{ module_tone('workflow', 'badge') }}">
+                                            Status
+                                        </span>
                                     </div>
 
-                                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    @if($status->description)
+                                        <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-700">
+                                            {{ $status->description }}
+                                        </p>
+                                    @endif
+
+                                    <div class="mt-4">
                                         <p class="text-sm font-semibold text-slate-900">
-                                            Current follow-up
+                                            Current assignment
                                         </p>
 
                                         @if($selectedRoute)
-                                            <div class="mt-3 space-y-3">
-                                                <div>
-                                                    <p class="font-semibold text-slate-950">
-                                                        {{ $selectedRoute['name'] }}
-                                                    </p>
+                                            <p class="mt-1 font-semibold text-slate-950">
+                                                {{ $selectedRoute['name'] }}
+                                            </p>
 
-                                                    @if($selectedRoute['description'])
-                                                        <p class="mt-1 text-sm leading-6 text-slate-600">
-                                                            {{ $selectedRoute['description'] }}
-                                                        </p>
-                                                    @endif
-                                                </div>
-
-                                                @if(count($selectedRoute['summary_points']) > 0)
-                                                    <div>
-                                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                                            What will happen
-                                                        </p>
-
-                                                        <ul class="mt-2 space-y-2 text-sm text-slate-700">
-                                                            @foreach($selectedRoute['summary_points'] as $summaryPoint)
-                                                                <li class="flex gap-2">
-                                                                    <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400"></span>
-                                                                    <span>{{ $summaryPoint }}</span>
-                                                                </li>
-                                                            @endforeach
-                                                        </ul>
-                                                    </div>
-                                                @endif
-                                            </div>
+                                            <p class="mt-1 max-w-2xl text-sm leading-6 text-slate-700">
+                                                {{ $selectedRoute['compact_summary'] }}
+                                            </p>
                                         @else
-                                            <p class="mt-2 text-sm leading-6 text-slate-600">
-                                                No automatic follow-up is selected for this status.
+                                            <p class="mt-1 text-sm leading-6 text-slate-700">
+                                                No Route is assigned to this status.
                                             </p>
                                         @endif
 
                                         @if($row['active_binding_count'] > 1)
-                                            <p class="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
-                                                More than one active selection was found. Engage Core is currently using the newest one.
+                                            <p class="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+                                                More than one active selection was found. The newest active selection is currently being used.
                                             </p>
                                         @endif
                                     </div>
                                 </div>
 
-                                <div class="space-y-4 rounded-2xl border border-slate-200 p-4">
+                                <div class="space-y-3">
                                     <div>
                                         <label for="status-route-{{ $status->id }}" class="text-sm font-semibold text-slate-800">
-                                            Change follow-up
+                                            Assigned Route
                                         </label>
 
                                         <select
                                             id="status-route-{{ $status->id }}"
                                             name="flow_route_id"
-                                            class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                            class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200"
                                             @disabled($availableRoutes->isEmpty())
                                         >
                                             @if($availableRoutes->isEmpty())
-                                                <option value="">No follow-ups available yet</option>
+                                                <option value="">No Routes available yet</option>
                                             @else
                                                 @foreach($availableRoutes as $route)
                                                     <option value="{{ $route['id'] }}" @selected((int) $selectedRouteId === (int) $route['id'])>
@@ -209,28 +224,24 @@
                                         </select>
                                     </div>
 
-                                    <p class="text-sm leading-6 text-slate-600">
-                                        Only one status follow-up can run for this status. Saving replaces the current selection.
-                                    </p>
-
                                     <button
                                         type="submit"
                                         class="inline-flex w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                                         @disabled($availableRoutes->isEmpty())
                                     >
-                                        Save Status Follow-up
+                                        Save Assignment
                                     </button>
 
                                     @if($availableRoutes->isEmpty())
-                                        <p class="text-sm text-slate-500">
-                                            No active follow-up routes are available for {{ $status->name }} yet.
+                                        <p class="text-sm text-slate-700">
+                                            No active Routes are available for {{ $status->name }} yet.
                                         </p>
                                     @endif
                                 </div>
                             </div>
                         </form>
                     @empty
-                        <div class="py-10 text-center text-sm text-slate-500">
+                        <div class="py-10 text-center text-sm text-slate-700">
                             No active statuses are available.
                         </div>
                     @endforelse
@@ -239,14 +250,14 @@
         </section>
 
         <section x-show="tab === 'activity'" class="space-y-4">
-            <div class="rounded-3xl border border-slate-200 bg-white shadow-sm">
-                <div class="border-b border-slate-200 p-6">
+            <div class="rounded-3xl border border-orange-200 bg-white/90 shadow-sm">
+                <div class="border-b border-orange-100 p-6">
                     <h2 class="text-lg font-semibold tracking-tight text-slate-950">
-                        Activity follow-ups
+                        Activity assignments
                     </h2>
 
-                    <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-                        Choose what should happen automatically after activity in enabled modules. More than one follow-up can run from the same activity.
+                    <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
+                        Choose which Routes run after activity in enabled modules. More than one Route can run from the same activity.
                     </p>
 
                     @if($automationEventGroups->isNotEmpty())
@@ -256,7 +267,9 @@
                                     type="button"
                                     x-on:click="selectedActivityModule = @js($group['key'])"
                                     class="rounded-xl px-4 py-2 transition"
-                                    x-bind:class="selectedActivityModule === @js($group['key']) ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                                    x-bind:class="selectedActivityModule === @js($group['key'])
+                                        ? @js(module_tone($group['key'], 'badge').' shadow-sm')
+                                        : 'text-slate-700 hover:text-slate-900'"
                                 >
                                     {{ $group['label'] }}
                                 </button>
@@ -273,12 +286,15 @@
                                     $eventKey = $row['event_key'];
                                     $availableRoutes = $row['available_routes'];
                                     $selectedRouteIds = $row['selected_route_ids'];
+                                    $targetId = 'event-'.\Illuminate\Support\Str::of($eventKey)->replace('.', '-')->slug();
                                 @endphp
 
                                 <form
+                                    id="{{ $targetId }}"
                                     method="POST"
                                     action="{{ route('crm.flow-routes.bindings.update') }}"
-                                    class="rounded-2xl border border-slate-200 p-4"
+                                    class="rounded-2xl p-4 ring-1 transition duration-300 {{ module_tone($group['key'], 'item') }}"
+                                    x-bind:class="focusedTarget === @js((string) $targetId) ? 'scale-[1.01] !bg-orange-100 ring-2 ring-orange-500 shadow-md' : ''"
                                 >
                                     @csrf
                                     @method('PATCH')
@@ -292,18 +308,20 @@
                                                 {{ $row['label'] }}
                                             </h3>
 
-                                            <p class="mt-1 text-sm leading-6 text-slate-600">
+                                            <p class="mt-1 text-sm leading-6 text-slate-700">
                                                 {{ $row['description'] }}
                                             </p>
 
-                                            <p class="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            <p class="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-700">
                                                 {{ count($selectedRouteIds) }} selected
                                             </p>
                                         </div>
 
                                         <div class="grid gap-3 md:grid-cols-2">
                                             @forelse($availableRoutes as $route)
-                                                <label class="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm transition hover:border-slate-300 hover:bg-white">
+                                                @php($point = $route['presented_points'][0] ?? null)
+
+                                                <label class="flex gap-3 rounded-xl bg-white/90 px-4 py-3 text-sm shadow-sm ring-1 {{ $point ? module_tone($point['module_key'], 'item') : 'ring-slate-200' }}">
                                                     <input
                                                         type="checkbox"
                                                         name="flow_route_ids[]"
@@ -317,28 +335,20 @@
                                                             {{ $route['name'] }}
                                                         </span>
 
-                                                        @if($route['description'])
-                                                            <span class="mt-1 block text-sm leading-5 text-slate-600">
-                                                                {{ $route['description'] }}
-                                                            </span>
-                                                        @endif
+                                                        <span class="mt-1 block text-sm leading-5 text-slate-700">
+                                                            {{ $route['compact_summary'] }}
+                                                        </span>
 
-                                                        @if(count($route['summary_points']) > 0)
-                                                            <span class="mt-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                                                What it does
-                                                            </span>
-
-                                                            <span class="mt-1 block space-y-1 text-xs leading-5 text-slate-600">
-                                                                @foreach($route['summary_points'] as $summaryPoint)
-                                                                    <span class="block">• {{ $summaryPoint }}</span>
-                                                                @endforeach
+                                                        @if($route['has_campaign_enrollment'])
+                                                            <span class="mt-2 block text-xs leading-5 text-slate-700">
+                                                                Messages are sent only when communication permissions and delivery rules allow.
                                                             </span>
                                                         @endif
                                                     </span>
                                                 </label>
                                             @empty
-                                                <div class="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">
-                                                    No active follow-ups are available for this activity yet.
+                                                <div class="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-700">
+                                                    No active Routes are available for this activity yet.
                                                 </div>
                                             @endforelse
                                         </div>
@@ -357,8 +367,8 @@
                             @endforeach
                         </div>
                     @empty
-                        <div class="py-10 text-center text-sm text-slate-500">
-                            No activity follow-ups are available yet.
+                        <div class="py-10 text-center text-sm text-slate-700">
+                            No activity-triggered Routes are available yet.
                         </div>
                     @endforelse
                 </div>

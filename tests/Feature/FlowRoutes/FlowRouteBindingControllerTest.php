@@ -5,7 +5,9 @@ namespace Tests\Feature\FlowRoutes;
 use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
 use App\Modules\Core\Models\ContactStatus;
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Models\FlowRoute;
+use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -59,11 +61,161 @@ class FlowRouteBindingControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/flow-routes/bindings')
             ->assertOk()
-            ->assertSee('Automatic Follow-ups')
-            ->assertSee('When this happens, what should happen next?')
+            ->assertSee('Routes')
+            ->assertSee('Route assignments')
+            ->assertSee('Choose what runs automatically')
             ->assertSee('Prospect Route')
             ->assertSee('Webinar Attended Route')
-            ->assertSee('webinar.attended');
+            ->assertSee('webinar.attended')
+            ->assertDontSee('Engage Core');
+    }
+
+    public function test_status_assignment_keeps_route_context_brief(): void
+    {
+        config()->set('modules.enabled', [
+            'workflow',
+            'flow_routes',
+        ]);
+
+        config()->set('contacts.labels.singular', 'lead');
+
+        $user = User::factory()->create();
+
+        $status = ContactStatus::query()->create([
+            'key' => 'attempting_contact',
+            'name' => 'Attempting Contact',
+            'is_active' => true,
+            'sort_order' => 10,
+        ]);
+
+        $route = $this->createContactStatusRoute(
+            status: $status,
+            key: 'attempting_contact_follow_up',
+            name: 'Attempting Contact Follow-Up',
+        );
+
+        FlowRoutePoint::query()->create([
+            'flow_route_id' => $route->getKey(),
+            'flow_route_capability_id' => null,
+            'key' => 'wait_one_week',
+            'type' => FlowRoutePointType::Wait->value,
+            'name' => 'Wait one week',
+            'description' => null,
+            'sort_order' => 10,
+            'is_start' => true,
+            'is_active' => true,
+            'next_flow_route_point_id' => null,
+            'definition' => [
+                'weeks' => 1,
+            ],
+            'settings' => [],
+            'cancel_conditions' => [
+                [
+                    'type' => 'contact_status_changed',
+                ],
+            ],
+            'source_version' => null,
+            'is_customized' => false,
+            'customized_at' => null,
+            'meta' => [],
+        ]);
+
+        $this->createBinding(
+            triggerType: FlowRoute::TRIGGER_CONTACT_STATUS,
+            triggerKey: $status->key,
+            flowRoute: $route,
+        );
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/flow-routes/bindings')
+            ->assertOk()
+            ->assertSee('Attempting Contact Follow-Up')
+            ->assertSee('Wait 1 week.')
+            ->assertDontSee('What will happen')
+            ->assertDontSee('Continue only while the lead remains in Attempting Contact.');
+    }
+
+    public function test_assignment_page_accepts_contextual_activity_navigation_state(): void
+    {
+        config()->set('modules.enabled', [
+            'workflow',
+            'flow_routes',
+        ]);
+
+        $user = User::factory()->create();
+
+        $route = $this->createAutomationEventRoute(
+            eventKey: 'webinar.attended',
+            key: 'webinar_attended_route',
+            name: 'Webinar Attended Route',
+        );
+
+        $this->createBinding(
+            triggerType: FlowRoute::TRIGGER_AUTOMATION_EVENT,
+            triggerKey: 'webinar.attended',
+            flowRoute: $route,
+        );
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $response = $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/flow-routes/bindings?tab=activity&module=webinars&event=webinar.attended');
+
+        $response
+            ->assertOk()
+            ->assertSee('event-webinar-attended', false)
+            ->assertSee(
+                'selectedActivityModule: '.\Illuminate\Support\Js::from('webinars'),
+                false,
+            )
+            ->assertSee(
+                'tab: '.\Illuminate\Support\Js::from('activity'),
+                false,
+            )
+            ->assertSee('focusedTarget', false)
+            ->assertSee('ring-orange-500', false);
+    }
+
+    public function test_assignment_page_accepts_contextual_status_navigation_state(): void
+    {
+        config()->set('modules.enabled', [
+            'workflow',
+            'flow_routes',
+        ]);
+
+        $user = User::factory()->create();
+
+        $status = ContactStatus::query()->create([
+            'key' => 'attempting_contact',
+            'name' => 'Attempting Contact',
+            'is_active' => true,
+        ]);
+
+        $route = $this->createContactStatusRoute(
+            status: $status,
+            key: 'attempting_contact_follow_up',
+            name: 'Attempting Contact Follow-Up',
+        );
+
+        $this->createBinding(
+            triggerType: FlowRoute::TRIGGER_CONTACT_STATUS,
+            triggerKey: $status->key,
+            flowRoute: $route,
+        );
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/flow-routes/bindings?tab=status&status=attempting_contact#status-attempting-contact')
+            ->assertOk()
+            ->assertSee('status-attempting-contact', false)
+            ->assertSee(
+                'selectedStatus: '.\Illuminate\Support\Js::from('attempting_contact'),
+                false,
+            )
+            ->assertSee('focusedTarget', false);
     }
 
     public function test_it_updates_single_contact_status_binding(): void

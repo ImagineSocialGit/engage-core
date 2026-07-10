@@ -523,8 +523,8 @@ return [
                 'tone' => 'orange',
             ],
             'nav' => [
-                'label' => 'Automatic Follow-ups',
-                'route' => 'crm.flow-routes.bindings.index',
+                'label' => 'Routes',
+                'route' => 'crm.flow-routes.index',
                 'priority' => 90,
             ],
             'depends_on' => ['workflow'],

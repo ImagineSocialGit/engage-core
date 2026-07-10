@@ -1,8 +1,17 @@
-<x-layouts.app :title="$title ?? config('app.name')" :meta-description="$metaDescription ?? null">
+@props([
+    'title' => null,
+    'heading' => null,
+    'subheading' => null,
+    'metaDescription' => null,
+    'module' => null,
+])
+
+<x-layouts.app :title="$title ?? config('app.name')" :meta-description="$metaDescription">
     @php
         $moduleManager = app(\App\Support\Modules\ModuleManager::class);
         $navigationItems = $moduleManager->navigationItems();
         $navBaseClass = 'block rounded-lg px-3 py-2 font-medium text-slate-700 transition focus-visible:outline-none focus-visible:ring-2';
+        $mainSurfaceClass = $module ? module_tone($module, 'panel') : 'bg-slate-50';
     @endphp
 
     <div class="min-h-screen bg-slate-50 text-slate-900">
@@ -48,8 +57,8 @@
                                 {{ $heading ?? ($title ?? 'CRM') }}
                             </h1>
 
-                            @if(!empty($subheading ?? null))
-                                <p class="mt-1 text-sm text-slate-500">
+                            @if(!empty($subheading))
+                                <p class="mt-1 text-sm text-slate-600">
                                     {{ $subheading }}
                                 </p>
                             @endif
@@ -57,7 +66,7 @@
                     </div>
                 </header>
 
-                <main class="flex-1">
+                <main class="flex-1 {{ $mainSurfaceClass }}">
                     <div class="mx-auto w-full max-w-375 px-6 py-8">
                         {{ $slot }}
                     </div>
