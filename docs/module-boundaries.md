@@ -1,4 +1,5 @@
 
+
 # Engage Core Module Boundaries
 
 Engage Core is a modular contact engagement platform.
@@ -962,7 +963,7 @@ Do not route everything through automation events just for purity.
 
 ## Automation Opportunities shared infrastructure
 
-Automation Opportunities are app-level shared infrastructure for noticing repeated meaningful manual work and suggesting automation without acting autonomously.
+Automation Opportunities are app-level shared infrastructure for noticing repeated meaningful work and suggesting automation without acting autonomously.
 
 Detailed contract: `docs/automation-opportunities.md`.
 
@@ -973,22 +974,64 @@ AutomationEventRecorded
     neutral domain/business outcome that automation may react to
 
 AutomationBehaviorOccurrence
-    intentionally observed meaningful manual action
+    compact intentionally recorded behavior or correlation evidence
 
 AutomationOpportunity
-    repeated behavior pattern that may justify a suggestion
+    aggregate repeated pattern that may justify a suggestion
 
 FlowRoutes
     owns accepted automation/control-flow execution
 ```
 
-Participating modules explicitly opt in. Do not implement generic clickstream tracking, global Eloquent observation, or arbitrary request capture.
+Most evaluated opportunity occurrences come from explicit manual human behavior. Some occurrences are evidence only and must not create or advance an opportunity by themselves.
 
-The owning producer module decides what makes two actions meaningfully equivalent and supplies compact fingerprint parts/context. Shared infrastructure normalizes/hashes fingerprints, persists occurrences, aggregates opportunities, tracks lifecycle, and exposes suggestion read seams.
+Current evidence-only examples:
+
+```text
+task.completed_manually
+automation_event.recorded
+```
+
+The current selected automation-event evidence allowlist is intentionally small:
+
+```text
+webinar.attended
+webinar.missed
+permission_invitation.accepted
+inbound_message.normal_reply
+task.completed
+```
+
+The allowlist may change as usefulness becomes clearer. Adding an event to evidence collection is not equivalent to declaring it suggestion-worthy.
+
+Participating modules explicitly opt in. Do not implement generic clickstream tracking, global Eloquent observation, arbitrary request capture, or “record every event just in case.”
+
+The owning producer module decides what makes two actions meaningfully equivalent and supplies compact fingerprint parts/context. Shared infrastructure normalizes/hashes fingerprints, persists occurrences, aggregates opportunities, and applies generic count/distinct-subject/window qualification.
+
+The generic evaluator should not accumulate domain-specific branching for Tasks, Webinars, Messaging, InboundMessaging, or future modules.
+
+Current default qualification:
+
+```text
+3 occurrences
+3 distinct subjects
+30-day observation window
+```
+
+Current implemented compound correlation uses a 10-minute window.
 
 Shared opportunity infrastructure may reference stable automation capability keys. It should not canonically depend on FlowRoutes-owned database IDs merely to represent that a behavior could be automated.
 
 Producer modules must not depend on FlowRoutes to record occurrences. FlowRoutes remains the destination for accepted automation where applicable.
+
+A plain repeated manual Contact status change is not currently an opportunity producer. Current status-related opportunity patterns require additional causal context, such as:
+
+```text
+manual status change -> manual Task creation
+manual Task completion -> manual status change
+```
+
+Current event-evidence correlation may retain selected neutral automation events and later correlate them to a manual Task for the same Contact. Evidence alone remains silent.
 
 ## Core Module
 

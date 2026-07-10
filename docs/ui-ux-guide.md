@@ -1,5 +1,6 @@
 
 
+
 # Engage Core UI/UX Guide
 
 This guide turns Engage Core's product principles into practical interface rules.
@@ -685,16 +686,43 @@ What happens automatically, and why?
 Contextual automation suggestions are the discovery layer:
 
 ```text
-You just repeated something that may be worth handling automatically next time.
+You've repeated a meaningful pattern that may be worth handling automatically next time.
 ```
 
-Only show a suggestion when durable occurrence evidence and current eligibility support it.
+Only show a suggestion when durable occurrence evidence, generic qualification, and current suggestion-time validity support it.
+
+Evidence alone is not a prompt.
+
+Current examples of evidence-only state:
+
+```text
+task.completed_manually
+automation_event.recorded
+```
+
+Current evaluated compound patterns include:
+
+```text
+manual status change -> manual Task
+manual Task completion -> manual status change
+supported automation event -> manual Task
+```
 
 Good:
 
 ```text
-You've created this task for 3 contacts in Attempting Contact.
+You've created this Task for 3 Contacts in Attempting Contact.
 Add it to their Route so it happens automatically next time?
+```
+
+```text
+You've moved 3 Contacts to Approved after completing "Review application."
+Make that status change happen automatically when the Task is completed?
+```
+
+```text
+You've created "Follow up with contact" for 3 Contacts after they confirmed their communication preferences.
+Add that Task to the Route?
 ```
 
 Avoid:
@@ -713,9 +741,19 @@ explain the exact repeated pattern
 use plain business language
 avoid confidence scores or AI language
 avoid suggesting automation that already exists
+avoid suggesting when attribution is ambiguous
 provide one clear next action
 allow dismissal or snoozing
 never create or change automation without explicit approval
+```
+
+When a repeated workflow needs missing information, suggest an assisted next step instead of pretending the system can decide.
+
+Example:
+
+```text
+You usually schedule an appointment after intake is completed.
+Want to automatically send the customer a booking invitation with available times?
 ```
 
 Do not turn Engage Core into Clippy. Contextual assistance should be sparse, evidence-based, and useful.

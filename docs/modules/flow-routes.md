@@ -1,5 +1,6 @@
 
 
+
 # FlowRoutes Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -659,15 +660,18 @@ task.flow_route_capability_id
 
 ## Relationship to Automation Opportunities
 
-FlowRoutes does not own behavior observation or opportunity aggregation.
-
-Shared Automation Opportunities infrastructure may detect that a user repeatedly performs a meaningful manual action and may suggest that the behavior be added to a Route.
+FlowRoutes does not own behavior observation, correlation evidence, opportunity aggregation, or generic qualification.
 
 Responsibility split:
 
 ```text
+AutomationEventRecorded
+    neutral domain outcome seam
+
 Automation Opportunities
-    notices repeated manual behavior and determines suggestion eligibility
+    stores compact opted-in behavior/correlation evidence
+    aggregates repeated evaluated patterns
+    applies generic qualification
 
 Automation capability registry
     describes what can be automated
@@ -676,20 +680,60 @@ FlowRoutes
     owns accepted route/control-flow definition and execution
 ```
 
+Some `AutomationBehaviorOccurrence` rows are evidence only and must not create opportunities by themselves:
+
+```text
+task.completed_manually
+automation_event.recorded
+```
+
+Current evaluated patterns include:
+
+```text
+task.created_manually
+task.created_after_manual_status_change
+contact.status_changed_after_manual_task_completion
+task.created_after_automation_event
+```
+
+Current generic qualification defaults are:
+
+```text
+3 occurrences
+3 distinct subjects
+30-day observation window
+```
+
+The generic evaluator should remain free of FlowRoutes/module/event-specific branching.
+
 Automation Opportunities may reference stable capability keys where applicable. Shared infrastructure should not canonically depend on `flow_route_capability_id` merely to represent that a behavior is automatable.
 
 Equivalent-automation checks should be dynamic because Routes, points, capabilities, bindings, active state, and versions can change. Do not persist a permanent `already_automated` truth on an opportunity.
 
-Producer modules must not depend on FlowRoutes to record manual behavior occurrences.
+Producer modules must not depend on FlowRoutes to record manual behavior or evidence occurrences.
+
+Current selected event evidence may include:
+
+```text
+webinar.attended
+webinar.missed
+permission_invitation.accepted
+inbound_message.normal_reply
+task.completed
+```
+
+That allowlist is evidence policy, not a list of events that automatically deserve suggestions.
 
 Client-facing Route discovery may use contextual suggestions such as:
 
 ```text
-You've created this task for 3 contacts in Attempting Contact.
+You've created this Task for 3 Contacts in Attempting Contact.
 Add it to their Route so it happens automatically next time?
 ```
 
 Route Management remains the control center for reviewing what happens automatically. Contextual automation suggestions are the discovery layer.
+
+The backend opportunity foundation is complete and manually smoke-tested. The next work belongs in Route Management/product-completeness and contextual suggestion UX, not in expanding FlowRoutes ownership of the opportunity subsystem.
 
 ## Client-facing Route Management terminology
 

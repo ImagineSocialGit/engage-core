@@ -1,4 +1,5 @@
 
+
 # Engage Core TODO
 
 This file is intentionally disposable. Add work here when it is real but not yet ready for an implementation slice. Delete items as they are completed. Do not treat this as an architectural reference; long-lived decisions belong in `module-boundaries.md` or a feature-specific doc.
@@ -281,18 +282,26 @@ Deferred launch hardening:
 
 ### Automation opportunity foundation
 
-- [ ] Add `docs/automation-opportunities.md` and keep architecture/product rules current.
-- [ ] Add durable `automation_behavior_occurrences` and `automation_opportunities` schema using current migration conventions.
-- [ ] Add models and shared `app/Support/AutomationOpportunities` infrastructure.
-- [ ] Keep `AutomationEventRecorded` distinct from manual behavior occurrences.
-- [ ] Require explicit producer opt-in; do not add clickstream/global Eloquent observation.
-- [ ] Keep fingerprint semantics producer-owned and hashing/normalization shared.
-- [ ] Use stable capability keys where applicable instead of canonically depending on FlowRoutes DB IDs.
-- [ ] Add manual Contact-associated Task creation as the first producer.
-- [ ] Audit manual Contact status changes as the second producer and distinguish direct from exploratory suggestions.
-- [ ] Add eligibility checks for threshold, distinct subjects, recency, capability availability, dismissal/snooze state, conversion state, and equivalent existing automation.
-- [ ] Add focused tests, adjacent module tests, and boundary tests.
-- [ ] Continue Route Management/contextual UX only after the foundation and first producer behavior are trustworthy.
+- [x] Add `docs/automation-opportunities.md` and keep architecture/product rules current.
+- [x] Add durable `automation_behavior_occurrences` and `automation_opportunities` schema using current migration conventions.
+- [x] Add models and shared `app/Support/AutomationOpportunities` infrastructure.
+- [x] Keep `AutomationEventRecorded`, behavior/correlation evidence, and aggregate opportunities distinct.
+- [x] Require explicit producer/evidence opt-in; do not add clickstream/global Eloquent observation.
+- [x] Keep fingerprint semantics producer-owned and hashing/normalization shared.
+- [x] Keep the generic evaluator free of domain/event-specific branching.
+- [x] Use stable capability keys where applicable instead of canonically depending on FlowRoutes DB IDs.
+- [x] Add manual Contact-associated Task creation as the first evaluated producer.
+- [x] Add manual status change -> manual Task creation compound detection.
+- [x] Add manual Task completion evidence and manual Task completion -> manual status change compound detection.
+- [x] Do not create a generic standalone `contact.status_changed_manually` opportunity.
+- [x] Add selected `AutomationEventRecorded` evidence retention and supported event -> manual Task correlation.
+- [x] Add `inbound_message.normal_reply` as a neutral automation event only for known-Contact normal replies; keep HELP/STOP outside opportunity evidence.
+- [x] Use current generic defaults of 3 occurrences, 3 distinct subjects, and a 30-day observation window.
+- [x] Use the current 10-minute window for implemented compound correlations.
+- [x] Add focused tests, adjacent module tests, boundary protection, and real CRM/manual smoke validation.
+- [x] Verify negative cases: unsupported events ignored, old evidence does not correlate, same-Contact repetition stays observing, system-created Tasks do not count as manual behavior.
+- [ ] Add dynamic suggestion-time checks for current capability availability, equivalent existing automation, snooze/dismissal availability, conversion state, context validity, and attribution ambiguity when the first user-facing suggestion surface needs them.
+- [ ] Continue Route Management/contextual UX now that the backend opportunity foundation is trustworthy.
 
 ## One-off backlog
 

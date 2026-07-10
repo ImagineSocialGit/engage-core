@@ -2,6 +2,7 @@
 
 
 
+
 # Core Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -216,15 +217,39 @@ Core `ContactController` must not directly import module-specific models/service
 
 ## Automation opportunity producer boundary
 
-Core may host manual CRM entry points that produce meaningful behavior occurrences, but Core does not own cross-module Automation Opportunities infrastructure.
+Core may host manual CRM entry points that provide causal context for Automation Opportunities, but Core does not own cross-module Automation Opportunities infrastructure.
 
-Manual Contact status changes are a candidate producer because the CRM path already has explicit actor/source/reason context.
+A plain repeated manual Contact status change is **not currently an opportunity producer**.
 
-Repeated status transitions often prove a pattern without proving the correct automatic trigger. Treat those as exploratory opportunities unless enough context exists for a specific automation suggestion.
+The transition alone does not prove the correct automatic trigger. Do not create a generic `contact.status_changed_manually` opportunity merely because the CRM path has actor/source/reason context.
 
-Do not add automation-opportunity state to `contacts` or `contact_statuses`.
+Current implemented status-related patterns use additional causal evidence:
 
-Do not make Core depend on FlowRoutes merely to record an occurrence.
+```text
+manual Contact status change
+    -> manual Contact-associated Task creation within 10 minutes
+    -> task.created_after_manual_status_change
+
+manual Task completion
+    -> manual Contact status change within 10 minutes
+    -> contact.status_changed_after_manual_task_completion
+```
+
+Core/Workflow transition provenance supplies compact facts such as:
+
+```text
+from status
+to status
+reason
+source
+actor
+occurred_at
+meta
+```
+
+The shared opportunity layer or owning producer uses those facts without adding automation-opportunity state to `contacts` or `contact_statuses`.
+
+Do not make Core depend on FlowRoutes merely to record or correlate an occurrence.
 
 ## Contact show shell
 

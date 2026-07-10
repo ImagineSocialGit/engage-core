@@ -1,4 +1,5 @@
 
+
 # Workflow Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -60,7 +61,31 @@ Workflow should not call FlowRoutes directly.
 
 Workflow owns durable Contact workflow transitions and emits `ContactWorkflowStatusChanged` after real status changes.
 
-The CRM manual status-change path is a candidate source for Automation Opportunities because transition data already includes:
+A plain repeated manual status transition is **not currently an Automation Opportunity producer**.
+
+The transition alone does not prove whether the correct automatic trigger is a form submission, webinar outcome, Task completion, elapsed time, document upload, or another event.
+
+Do not add a generic:
+
+```text
+contact.status_changed_manually
+```
+
+opportunity merely because transition data exists.
+
+Current implemented Workflow-related compound patterns are:
+
+```text
+manual Contact status change
+    -> manual Contact-associated Task creation within 10 minutes
+    -> task.created_after_manual_status_change
+
+manual Task completion evidence
+    -> manual Contact status change within 10 minutes
+    -> contact.status_changed_after_manual_task_completion
+```
+
+Workflow transition data provides:
 
 ```text
 from status
@@ -72,9 +97,22 @@ occurred_at
 meta
 ```
 
-Do not make every Workflow transition a behavior occurrence. Only an unambiguous manual path should opt in.
+The Task-creation compound pattern uses recent explicit manual status-change provenance.
 
-Repeated manual transitions may be exploratory rather than directly automatable because the transition alone may not reveal whether the intended trigger is a form submission, webinar outcome, task completion, elapsed time, document upload, or another event.
+The Task-completion -> status-change compound pattern requires:
+
+```text
+real changed transition
+CRM manual status-update reason/source
+contact status form surface provenance
+same Contact
+same actor
+matching Task completion evidence within 10 minutes
+```
+
+Workflow should not make every transition a behavior occurrence.
 
 Workflow should not depend on FlowRoutes or own automation-opportunity aggregation.
+
+The shared opportunity evaluator remains generic; Workflow-specific semantics stay in the Workflow-owned producer action/listener.
 

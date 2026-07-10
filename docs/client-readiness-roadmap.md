@@ -1,4 +1,5 @@
 
+
 # Engage Core Client-Readiness Roadmap
 
 This roadmap tracks the near-term implementation order for getting Engage Core ready for real client operation without treating the work as a limited or throwaway MVP.
@@ -133,7 +134,7 @@ Current schema-discovery sequence:
 | 8 | Permission invitation cancellation / skip / failure bookkeeping | Complete | DB/schema + architecture | No schema change was needed. Pre-claim skips/cancellation create no invitation row; post-claim scheduled-message skips reconcile matching claimed invitations to failed; provider failures remain failed across Messaging and invitation state; failed invitations stay one-time-blocking. |
 | 9 | Webinar message readiness check | Complete | Architecture + operator safety | Computed Webinars-owned readiness now evaluates runtime Messaging resolution, channel availability, active schedule-profile effects, intentional disablement, registration/waitlist opt-ins, and post-event outcome-message enablement without persisting readiness state. |
 | 10 | Manual status-change automation warning foundation | Complete | Operator safety + architecture | Backend-only consequence preview is implemented through a read-only FlowRoutes-owned impact resolver. It reports whether selected status-based FlowRoutes would run and which routes are selected without starting route progress. The actual operator warning UX is deferred to Phase 11. |
-| 11 | Automation opportunity foundation + Automatic Follow-ups / FlowRoutes UX | In progress | DB/schema + architecture + UI/UX | Phase 11 expanded after UX audit revealed a durable product need: persist meaningful manual behavior occurrences, aggregate automation opportunities, integrate justified producers, then use those seams for contextual Route discovery and Route Management UX. |
+| 11 | Automation opportunity foundation + Automatic Follow-ups / FlowRoutes UX | In progress; backend foundation complete | DB/schema + architecture + UI/UX | Occurrence/opportunity schema, generic evaluator, justified manual/compound producers, selected event evidence, inbound normal-reply event support, automated tests, and real CRM/manual smoke validation are complete. Remaining work is Route Management product-completeness, contextual suggestion UX, consequence previews, and missing creation surfaces where justified. |
 | 12 | Dashboard / contact workspace polish audit | Planned | UI/UX + possible schema | Review orientation surfaces after core runtime pieces settle. Add persisted preferences/acknowledgements only when needed. |
 | 13 | FOSS-informed module schema audit | Planned | DB/schema audit | Compare Engage Core modules against mature FOSS patterns to identify likely missing persisted concepts before production. Pull FlowRoutes-specific FOSS/OSS pattern review earlier into Phase 4 if helpful. |
 
@@ -158,7 +159,7 @@ Do not build DB snapshot/export tooling during active pre-production schema disc
 
 ## Phase 11 automation opportunity foundation and Route discovery
 
-Phase 11 was expanded after the Route Management UX audit revealed a durable schema/architecture need before polish.
+Phase 11 expanded after the Route Management UX audit revealed a durable schema/architecture need before polish.
 
 The product goal is:
 
@@ -169,44 +170,126 @@ Suggest one clear next step.
 Never act without permission.
 ```
 
-The agreed sequence is:
+The backend Automation Opportunities foundation is now complete for the current slice.
 
-```text
-1. Audit current state.
-2. Update/add durable docs.
-3. Add automation behavior occurrence and opportunity migrations/models.
-4. Add justified producer integrations module by module.
-5. Add focused and adjacent tests.
-6. Continue Route Management and contextual UX work.
-```
-
-Current architecture direction:
+Implemented architecture:
 
 ```text
 automation_behavior_occurrences
-    append-style evidence for explicitly observed meaningful manual actions
+    append-style compact behavior/correlation evidence
 
 automation_opportunities
-    aggregate lifecycle for repeated patterns and suggestion eligibility
+    aggregate lifecycle for repeated evaluated patterns and suggestion eligibility
 
 app/Support/AutomationOpportunities
     shared infrastructure; not FlowRoutes-owned
 
 producer module
-    owns semantic fingerprint inputs for its manual action
+    owns semantic fingerprint inputs and explicit manual/evidence seams
 
 shared infrastructure
-    normalizes/hashes fingerprints, persists occurrences, aggregates opportunities
+    normalizes/hashes fingerprints
+    persists occurrences
+    records evidence-only rows without evaluation when requested
+    aggregates opportunities
+    applies generic count/distinct-subject/window qualification
 
 FlowRoutes
     remains the owner of accepted automation/control-flow execution
 ```
 
-The first producer should be manual Contact-associated Task creation.
+Current generic evaluator defaults:
 
-Manual Contact status changes are a strong second producer candidate, but often produce exploratory opportunities because repeated transitions do not necessarily reveal the correct automatic trigger.
+```text
+minimum occurrences = 3
+minimum distinct subjects = 3
+observation window = 30 days
+```
 
-Do not build clickstream tracking, generic AI recommendations, confidence scores, or autonomous Route creation.
+Current implemented compound correlation window:
+
+```text
+10 minutes
+```
+
+Current evaluated action keys:
+
+```text
+task.created_manually
+task.created_after_manual_status_change
+contact.status_changed_after_manual_task_completion
+task.created_after_automation_event
+```
+
+Current evidence-only action keys:
+
+```text
+task.completed_manually
+automation_event.recorded
+```
+
+Current selected neutral event evidence keys:
+
+```text
+webinar.attended
+webinar.missed
+permission_invitation.accepted
+inbound_message.normal_reply
+task.completed
+```
+
+The evidence allowlist may change as real usefulness becomes clearer. Adding an event to evidence collection does not mean it deserves a standalone opportunity or user-facing prompt.
+
+A plain repeated manual Contact status change is not currently an opportunity producer.
+
+Manual smoke validation passed for:
+
+```text
+3 equivalent manual Tasks across 3 Contacts
+    -> eligible
+
+manual status change -> same manual Task across 3 Contacts
+    -> eligible
+
+manual Task completion -> same manual status change across 3 Contacts
+    -> eligible
+
+supported automation event -> same manual Task across 3 Contacts
+    -> evidence remains evidence only
+    -> compound opportunity becomes eligible
+
+unsupported automation event
+    -> ignored
+
+supported event outside 10-minute window
+    -> evidence retained
+    -> no compound event->Task occurrence
+
+same manual behavior repeated 3 times on 1 Contact
+    -> distinct_subject_count = 1
+    -> remains observing
+
+system-created Task
+    -> no manual behavior occurrence
+```
+
+Focused and adjacent automated tests are green.
+
+The generic evaluator should remain protected from module/event-specific branching. Future suggestion-time checks such as capability availability, equivalent existing automation, snooze/dismissal state, conversion state, context validity, or attribution ambiguity should be added only where the first real suggestion surface needs them.
+
+The next Phase 11 work is Route Management product-completeness and UX:
+
+```text
+business-language Route Management
+contextual automation suggestions
+manual status-change consequence warning UX
+custom Route creation
+custom Point creation
+missing creation surfaces such as standalone Tasks where justified
+guided simple/advanced authoring decisions
+```
+
+Do not build clickstream tracking, generic AI recommendations, confidence scores, autonomous Route creation, or a recommendation feed.
 
 Detailed contract: `docs/automation-opportunities.md`.
 
@@ -281,7 +364,7 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | 8 | Permission invitation cancellation behavior | Complete | Pre-claim skips/cancellations create no invitation row; post-claim skips reconcile claimed invitations to failed; provider failures remain failed; no new invitation statuses or schema changes were required. |
 | 9 | Webinar message readiness check | Complete | Computed readiness is available for registration confirmations, registration opt-ins, reminders, waitlist alerts, waitlist opt-ins, and post-event follow-ups. Readiness is derived from runtime resolution, channel availability, active schedule-profile effects, and post-event enablement; no readiness state is persisted. |
 | 10 | Manual status-change automation warning foundation | Complete | FlowRoutes exposes a read-only `ContactStatusAutomationImpactResolver` and plural status-trigger route resolution. No schema, controller, or Blade changes were required. The actual warning interaction belongs to Phase 11 UX work. |
-| 11 | Automation opportunity foundation + Automatic Follow-ups / FlowRoutes UX | In progress | First complete shared occurrence/opportunity foundation and justified producers, then redesign Route Management around business outcomes, contextual discovery, and consequence previews. |
+| 11 | Automation opportunity foundation + Automatic Follow-ups / FlowRoutes UX | In progress; backend foundation complete | Shared occurrence/opportunity persistence, generic evaluation, justified producers/evidence, and manual smoke validation are complete. Next: Route Management product-completeness, contextual discovery, consequence previews, and guided creation UX. |
 | 12 | Dashboard / contact workspace polish audit | 1–2 sessions | Review shared orientation surfaces after runtime behavior settles. Add persisted state only for proven needs such as acknowledgements or preferences. |
 | 13 | FOSS-informed module schema audit | 2–6 sessions, split by module group | Compare Engage Core module tables against mature FOSS patterns to catch likely missing persisted concepts before production. |
 | Deferred | DB Snapshot / Export Safety Tool | 0.5–1.5 sessions near launch | Command-line SQL/JSONL snapshot tooling for production/launch hardening. Do not build during active pre-prod schema discovery unless real data preservation becomes necessary. |
@@ -687,9 +770,21 @@ This is durable schema/architecture work completed before production rollout, no
 
 Phases 9 and 10 are complete.
 
-Phase 11 is in progress. The first Route Management UX audit revealed a durable automation-opportunity foundation that should be completed before polish: record explicitly opted-in meaningful manual actions, aggregate repeated patterns, expose deterministic suggestion eligibility, integrate justified producer modules, then use those seams for contextual Route discovery and business-language Route Management UX.
+The Phase 11 Automation Opportunities backend foundation is also complete for the current slice and has passed focused/adjacent automated tests plus real CRM/manual smoke validation.
 
-Do not redesign existing FlowRoutes runtime architecture unless the implementation proves a genuine missing seam. Detailed direction lives in `docs/automation-opportunities.md`.
+The recommended next target is the remaining Phase 11 product work:
+
+```text
+Route Management product-completeness audit
+business-language Route Management UX
+contextual opportunity suggestion UX
+manual status-change consequence warning UX
+missing custom creation surfaces where justified
+```
+
+Do not expand the opportunity backend merely because more actions or events exist. Add producers/evidence only when a useful, truthful suggestion can be described.
+
+Do not redesign existing FlowRoutes runtime architecture unless the UX/product-completeness audit proves a genuine missing seam. Detailed opportunity direction lives in `docs/automation-opportunities.md`.
 
 ## What this roadmap intentionally avoids
 

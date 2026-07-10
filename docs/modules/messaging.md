@@ -1,3 +1,4 @@
+
 # Messaging Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -634,6 +635,8 @@ permission_invitation.accepted
 The acceptance transaction owns consent creation, invitation accepted state, accepted channels, and any submitted SMS phone update. The invitation row should be locked and accepted state rechecked inside the transaction so concurrent submissions cannot emit duplicate acceptance events.
 
 After the acceptance transaction succeeds, Messaging emits `AutomationEventRecorded` with the invitation as subject and compact accepted-channel/consent-scope context.
+
+Shared Automation Opportunities infrastructure may independently retain `permission_invitation.accepted` as evidence-only correlation data. That does not make Messaging responsible for opportunity qualification or suggestion UX, and the evidence row does not create a standalone opportunity by itself.
 
 Messaging must remain independent from consumers. It must not import FlowRoutes or decide downstream status changes, tasks, campaigns, notifications, or vertical behavior.
 

@@ -4,6 +4,7 @@
 
 
 
+
 # Tasks Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -302,41 +303,153 @@ This is not part of the Phase 3 schema-discovery requirement unless the task UX 
 
 ## Automation opportunity producer direction
 
-Tasks is the first recommended producer for the shared Automation Opportunities infrastructure.
+Tasks is the first implemented producer for shared Automation Opportunities infrastructure.
 
-The initial meaningful behavior is:
+Current implemented Task-related action keys:
 
 ```text
 task.created_manually
+    evaluated manual behavior
+
+task.created_after_manual_status_change
+    evaluated compound behavior
+
+task.completed_manually
+    evidence only
+
+contact.status_changed_after_manual_task_completion
+    evaluated by Workflow using recent Task-completion evidence
+
+task.created_after_automation_event
+    evaluated compound behavior after selected neutral event evidence
 ```
 
-The first slice should focus on manual Tasks related to a Contact because those can produce a specific, understandable Route suggestion.
+### Manual Contact-associated Task creation
+
+`task.created_manually` records only manual Tasks related to a Contact.
+
+The semantic fingerprint uses:
+
+```text
+related subject type
+Contact status key when available
+task_template_key when available
+normalized title only when no template exists
+```
 
 Example:
 
 ```text
-You've created this task for 3 contacts in Attempting Contact.
+You've created this Task for 3 Contacts in Attempting Contact.
 Add it to their Route so it happens automatically next time?
 ```
 
-Tasks owns the semantic fingerprint inputs for deciding whether two manual Task creations are meaningfully equivalent.
-
-Recommended inputs:
-
-```text
-related subject type
-task_template_key when available
-normalized title when no template exists
-Contact status key when available
-```
-
-Shared Automation Opportunities infrastructure owns deterministic normalization/hashing, occurrence persistence, aggregation, lifecycle, and generic eligibility state.
-
 Do not record FlowRoute-created, module-created, or system-created Tasks as manual behavior occurrences.
 
-Do not put manual behavior recording inside generic `CreateTaskAction` merely because all Task creation passes through it. Record from an unambiguous manual application/UI seam such as the manual Task controller path, unless a later Tasks-owned manual creation action is introduced.
+Do not put manual behavior recording inside generic `CreateTaskAction` merely because all Task creation passes through it. Record from an unambiguous manual application/UI seam such as the manual Task controller path.
 
-Standalone manual Tasks may become a producer later, but they do not have Contact-status Route context by default and should not be forced into the first slice.
+Standalone manual Tasks are not currently observed.
+
+### Manual status change -> manual Task
+
+The current compound key is:
+
+```text
+task.created_after_manual_status_change
+```
+
+It requires:
+
+```text
+manual Contact status transition provenance
+same actor for status change and Task creation
+same Contact
+Task created after the transition
+Task created within 10 minutes
+real from/to status change
+```
+
+Fingerprint:
+
+```text
+from_status_key
+to_status_key
+task_template_key
+normalized_title when no template exists
+```
+
+### Manual Task completion evidence
+
+The current evidence-only key is:
+
+```text
+task.completed_manually
+```
+
+It is recorded only for explicit CRM/manual completion provenance and does not create an opportunity by itself.
+
+This evidence supports:
+
+```text
+manual Task completion
+    -> manual Contact status change within 10 minutes
+    -> contact.status_changed_after_manual_task_completion
+```
+
+### Selected automation event -> manual Task
+
+Selected neutral automation events are retained by shared opportunity infrastructure as evidence-only `automation_event.recorded` rows.
+
+When a manual Contact-associated Task is created within 10 minutes of recent supported evidence for the same Contact, Tasks may record:
+
+```text
+task.created_after_automation_event
+```
+
+Fingerprint:
+
+```text
+event_key
+task_template_key
+normalized_title when no template exists
+```
+
+Current selected event evidence keys:
+
+```text
+webinar.attended
+webinar.missed
+permission_invitation.accepted
+inbound_message.normal_reply
+task.completed
+```
+
+The evidence allowlist may change as usefulness becomes clearer. It is not a promise that every retained event will produce a suggestion.
+
+Current correlation uses the most recent supported event evidence for the same Contact within the 10-minute window. If future evidence volume creates ambiguous attribution, prefer silence or a stricter correlation rule over a wrong suggestion.
+
+### Qualification and validation
+
+The shared generic evaluator currently uses:
+
+```text
+minimum occurrences = 3
+minimum distinct subjects = 3
+observation window = 30 days
+```
+
+Manual smoke testing confirmed:
+
+```text
+3 equivalent Tasks across 3 Contacts -> eligible
+3 equivalent Tasks on 1 Contact -> remains observing
+system-created Task -> no manual occurrence
+old event evidence outside 10 minutes -> no event->Task compound occurrence
+```
+
+Shared Automation Opportunities infrastructure owns deterministic normalization/hashing, occurrence persistence, aggregation, lifecycle, and generic qualification.
+
+Tasks owns only Task-specific semantics and explicit producer behavior.
 
 ## Events
 

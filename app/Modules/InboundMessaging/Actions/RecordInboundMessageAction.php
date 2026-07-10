@@ -2,14 +2,20 @@
 
 namespace App\Modules\InboundMessaging\Actions;
 
+use App\Modules\Core\Models\Contact;
 use App\Modules\InboundMessaging\Events\InboundMessageReceived;
 use App\Modules\InboundMessaging\Models\InboundMessage;
+use App\Support\AutomationEvents\Data\AutomationEventData;
+use App\Support\AutomationEvents\Events\AutomationEventRecorded;
+use BackedEnum;
 use Illuminate\Database\Eloquent\Model;
 
 class RecordInboundMessageAction
 {
+    public const NORMAL_REPLY_AUTOMATION_EVENT_KEY = 'inbound_message.normal_reply';
+
     /**
-     * @param  array<string, mixed>  $data
+     * @param array<string, mixed> $data
      */
     public function handle(array $data, ?Model $sender = null): InboundMessage
     {
@@ -47,6 +53,54 @@ class RecordInboundMessageAction
 
         event(new InboundMessageReceived($inboundMessage));
 
+        $this->emitNormalReplyAutomationEvent(
+            inboundMessage: $inboundMessage,
+            sender: $sender,
+        );
+
         return $inboundMessage;
+    }
+
+    private function emitNormalReplyAutomationEvent(
+        InboundMessage $inboundMessage,
+        ?Model $sender,
+    ): void {
+        if (! $sender instanceof Contact
+            || $inboundMessage->classification !== InboundMessage::CLASSIFICATION_NORMAL_REPLY
+        ) {
+            return;
+        }
+
+        event(new AutomationEventRecorded(
+            AutomationEventData::forSubject(
+                eventKey: self::NORMAL_REPLY_AUTOMATION_EVENT_KEY,
+                subject: $inboundMessage,
+                contactId: $sender->getKey(),
+                occurredAt: $inboundMessage->received_at,
+                payload: [
+                    'inbound_message' => [
+                        'id' => $inboundMessage->getKey(),
+                        'channel' => $this->value($inboundMessage->channel),
+                        'classification' => $inboundMessage->classification,
+                        'purpose' => $this->value($inboundMessage->purpose),
+                        'scope' => $inboundMessage->scope,
+                        'received_at' => $inboundMessage->received_at?->toISOString(),
+                    ],
+                ],
+                meta: [
+                    'source_module' => 'inbound_messaging',
+                    'source' => 'inbound_message_received',
+                ],
+            ),
+        ));
+    }
+
+    private function value(mixed $value): ?string
+    {
+        if ($value instanceof BackedEnum) {
+            return (string) $value->value;
+        }
+
+        return is_string($value) ? $value : null;
     }
 }

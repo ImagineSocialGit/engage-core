@@ -1,6 +1,7 @@
 
 
 
+
 # Engage Core Product Principles
 
 Engage Core is a dev-built operating system for small service businesses.
@@ -198,7 +199,7 @@ Never act without permission.
 Good:
 
 ```text
-You've created this task for 3 contacts in Attempting Contact.
+You've created this Task for 3 Contacts in Attempting Contact.
 Add it to their Route so it happens automatically next time?
 ```
 
@@ -210,7 +211,42 @@ Automation opportunity detected with confidence score 0.84.
 
 The system should stay silent after one-off actions, avoid constant prompting, explain why a suggestion appeared, avoid suggesting behavior that is already automated, and never create Routes or change business behavior without explicit approval.
 
-This is deterministic assistance intended to make the product feel easier and less intimidating. It is not a general AI agent, recommendation engine, or behavioral-surveillance system.
+Evidence collection and suggestion eligibility are different concerns:
+
+```text
+Evidence
+    may evolve as the product learns which explicit manual actions or selected domain events are useful to retain
+
+Opportunity qualification
+    should stay deterministic, generic, conservative, and protected from module/event-specific bloat
+
+Suggestion presentation
+    should remain sparse, specific, and current-context aware
+```
+
+An evidence-only occurrence does not deserve a prompt by itself.
+
+The current generic qualification defaults are 3 occurrences across 3 distinct subjects within 30 days. Current compound correlations use a 10-minute causal window. These defaults are implementation facts, not permission to add every event/action as evidence.
+
+When a repeated workflow cannot be completed automatically because required information is missing, prefer automating the collection of that information and continuing afterward.
+
+Examples:
+
+```text
+missing appointment choice
+    -> send booking invitation and wait
+
+missing document
+    -> send document request and wait
+
+missing consent
+    -> send opt-in invitation and wait
+
+missing approval
+    -> create an approval Task and wait
+```
+
+This is deterministic assistance intended to make the product feel easier and less intimidating. It is not a general AI agent, recommendation engine, confidence-scoring system, or behavioral-surveillance product.
 
 Detailed architecture lives in `automation-opportunities.md`.
 

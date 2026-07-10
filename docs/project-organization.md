@@ -1,6 +1,7 @@
 
 
 
+
 # Engage Core Project Organization
 
 This document is a quick orientation map for Engage Core. It classifies the project into Core, universal modules, vertical modules, and integrations/adapters.
@@ -97,10 +98,23 @@ app/Support/AutomationCapabilities
     module-contributed catalog of what can be automated
 
 app/Support/AutomationOpportunities
-    repeated meaningful manual behavior and suggestion lifecycle
+    compact behavior/correlation evidence, repeated-pattern aggregation, and suggestion lifecycle
 ```
 
-`AutomationOpportunities` should observe only explicitly contributed meaningful manual actions. It is not clickstream analytics and should not record arbitrary page views, clicks, requests, or model saves.
+`AutomationOpportunities` should observe only explicitly contributed meaningful manual actions or deliberately selected structured event evidence.
+
+Current implementation includes evaluated manual/compound patterns plus evidence-only occurrences such as:
+
+```text
+task.completed_manually
+automation_event.recorded
+```
+
+Evidence-only rows do not create opportunities by themselves.
+
+This is not clickstream analytics and should not record arbitrary page views, clicks, requests, model saves, or every automation event.
+
+The generic opportunity evaluator should stay free of module/event-specific branching. Producer actions own semantic fingerprints; shared infrastructure owns deterministic hashing, persistence, aggregation, and generic count/distinct-subject/window qualification.
 
 Detailed direction lives in `docs/automation-opportunities.md`.
 

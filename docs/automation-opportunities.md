@@ -1,3 +1,4 @@
+
 # Automation Opportunities
 
 This document defines Engage Core's durable architecture and product direction for noticing repeated meaningful manual work and suggesting automation without acting autonomously.
@@ -49,23 +50,44 @@ Automation Opportunities are different:
 
 ```text
 AutomationBehaviorOccurrence
-    A human performed a meaningful manual action that may be worth automating.
+    Intentionally recorded evidence that may help prove a repeated, potentially automatable pattern.
 
 AutomationOpportunity
-    Repeated occurrences now form a durable pattern that may justify a suggestion.
+    Repeated evaluated occurrences now form a durable pattern that may justify a suggestion.
 ```
 
-Examples:
+Most opportunity-producing occurrences represent explicit manual human behavior. Some occurrences are deliberately **evidence only** and do not create or advance an opportunity by themselves.
+
+Current examples:
 
 ```text
-task.completed
-    generic automation event
+task.created_manually
+    evaluated manual behavior occurrence
 
-manually creating the same task for several Contacts in the same status
-    automation behavior occurrences that may aggregate into an opportunity
+task.completed_manually
+    evidence only; used to correlate a later manual status change
+
+automation_event.recorded
+    evidence only; selected neutral domain events retained briefly enough to correlate a later manual action
+
+task.created_after_automation_event
+    evaluated compound occurrence produced only after a supported event and later manual Task are correlated
 ```
 
-Do not overload `AutomationEventRecorded` with manual behavior observation.
+Keep these seams distinct:
+
+```text
+AutomationEventRecorded
+    neutral domain outcome
+
+AutomationBehaviorOccurrence
+    compact behavior/correlation evidence
+
+AutomationOpportunity
+    aggregate suggestion lifecycle
+```
+
+Do not turn `AutomationEventRecorded` into clickstream tracking, and do not assume that every `AutomationBehaviorOccurrence` should create a user-facing opportunity.
 
 ## Architectural ownership
 
@@ -104,6 +126,83 @@ FlowRoutes
 
 The suggestion system should not create or mutate FlowRoutes directly merely because a threshold was reached.
 
+
+## Implemented foundation status
+
+The backend foundation is implemented and manually smoke-tested.
+
+Current shared location:
+
+```text
+app/Support/AutomationOpportunities/
+```
+
+Current persistence:
+
+```text
+automation_behavior_occurrences
+automation_opportunities
+```
+
+Current generic evaluation defaults:
+
+```text
+minimum occurrences = 3
+minimum distinct subjects = 3
+observation window = 30 days
+```
+
+The evaluator remains generic. It does not contain module/event-specific branching. Producer actions own semantic fingerprints and decide whether an occurrence should be evaluated or recorded as evidence only.
+
+Current opportunity lifecycle:
+
+```text
+observing
+eligible
+suggested
+dismissed
+converted
+invalidated
+```
+
+The current evaluator moves `observing -> eligible` when count/distinct-subject/window requirements are met and preserves later lifecycle states.
+
+Current implementation does **not** yet make capability availability, equivalent existing automation, dismissal/snooze availability, or UI presentation part of the generic threshold evaluator. Those checks belong in later suggestion/readiness resolution where current runtime truth can be consulted without bloating the evaluator with domain-specific branches.
+
+Manual smoke validation proved:
+
+```text
+3 equivalent manual Tasks across 3 Contacts
+    -> task.created_manually becomes eligible
+
+manual status change -> same manual Task across 3 Contacts
+    -> task.created_after_manual_status_change becomes eligible
+
+manual Task completion -> same manual status change across 3 Contacts
+    -> contact.status_changed_after_manual_task_completion becomes eligible
+
+supported automation event -> same manual Task across 3 Contacts
+    -> event evidence remains evidence only
+    -> task.created_after_automation_event becomes eligible
+
+unsupported automation event
+    -> no evidence row
+
+supported event older than 10-minute correlation window
+    -> evidence exists
+    -> no compound event->Task occurrence
+
+same manual behavior repeated 3 times on one Contact
+    -> occurrence_count = 3
+    -> distinct_subject_count = 1
+    -> remains observing
+
+system-created Task
+    -> no manual behavior occurrence
+```
+
+Focused and adjacent automated tests are green, and the real CRM/manual smoke paths above passed.
+
 ## No clickstream rule
 
 Do not record:
@@ -119,27 +218,39 @@ full Eloquent model arrays
 loaded relationship graphs
 ```
 
-Only explicitly participating manual business actions should produce behavior occurrences.
+Only explicitly participating business actions or deliberately selected structured event evidence should produce behavior occurrences.
 
-Good initial examples:
+Current implemented evaluated patterns:
 
 ```text
 task.created_manually
-contact.status_changed_manually
-document.requested_manually
-appointment.created_manually
-campaign.enrolled_manually
+task.created_after_manual_status_change
+contact.status_changed_after_manual_task_completion
+task.created_after_automation_event
 ```
 
-Possible later examples:
+Current implemented evidence-only patterns:
 
 ```text
-message.sent_manually
-broadcast.repeated
-document.replacement_requested_manually
+task.completed_manually
+automation_event.recorded
 ```
 
-A producer should be added only when the repeated behavior can produce a useful, truthful suggestion.
+The current selected event-evidence allowlist is intentionally small:
+
+```text
+webinar.attended
+webinar.missed
+permission_invitation.accepted
+inbound_message.normal_reply
+task.completed
+```
+
+This allowlist is allowed to change as real evidence accumulates about which events produce useful downstream suggestions. Adding an event to evidence collection does **not** mean that event deserves an opportunity or user-facing prompt.
+
+A producer or evidence source should be added only when there is a concrete, truthful reason to believe it can support a useful later suggestion.
+
+Do not let evidence collection silently expand into “record every event just in case.”
 
 ## Producer opt-in contract
 
@@ -157,21 +268,39 @@ TaskController::store()
 
 Avoid placing manual-behavior recording in a generic domain action when that action is also used by FlowRoutes, system code, imports, provider sync, or other modules.
 
-The first Tasks producer should distinguish:
+Current Tasks producer behavior:
 
 ```text
-Manual Contact-associated task
-    strong opportunity candidate
+Manual Contact-associated Task creation
+    evaluated as task.created_manually
 
-Manual standalone task
-    may be observable later, but has no Contact-status Route context by default
+Manual Contact status change -> manual Contact-associated Task creation
+    evaluated as task.created_after_manual_status_change
 
-FlowRoute-created task
+Manual Task completion
+    recorded as task.completed_manually evidence only
+
+Manual Task completion -> manual Contact status change
+    evaluated as contact.status_changed_after_manual_task_completion
+
+Supported AutomationEventRecorded evidence -> manual Contact-associated Task creation
+    evaluated as task.created_after_automation_event
+
+Manual standalone Task
+    not currently observed
+
+FlowRoute-created Task
     not manual behavior
 
-Module/system-created task
+Module/system-created Task
     not manual behavior
 ```
+
+The current correlation window for implemented compound patterns is 10 minutes.
+
+For manual-to-manual compound patterns, provenance must remain explicit enough to support trustworthy attribution. For the current status-change -> Task pattern, the same actor must perform both actions.
+
+For event-evidence -> Task correlation, the current implementation uses the same Contact and the most recent supported evidence occurrence within the window. As more trigger types are added, protect against ambiguous attribution rather than forcing a suggestion when multiple plausible triggers make the cause unclear.
 
 ## Persistence model
 
@@ -343,34 +472,51 @@ Does equivalent automation already exist?
 
 Eligibility should be deterministic and explainable.
 
-Recommended initial default for the first producer:
+Current implemented generic evaluator defaults:
 
 ```text
 minimum occurrences = 3
 minimum distinct subjects = 3
 observation window = 30 days
-required capability available = true
-equivalent automation already present = false
-currently snoozed = false
-already converted = false
 ```
 
-Thresholds should be configurable per action definition rather than permanently hard-coded as one global rule.
-
-Examples:
+The evaluator may accept explicit alternate values from a caller, but it should remain generic and free of domain-specific branching such as:
 
 ```text
-task.created_manually
-    3 distinct Contacts in 30 days
-
-document.requested_manually
-    possibly 3 distinct subjects in 60 days
-
-broadcast.repeated
-    possibly 2 repetitions
+if task.created_manually -> 3
+if document.requested_manually -> 5
+if webinar.attended -> special rule
 ```
 
-Do not add speculative thresholds for modules that have not yet opted in.
+Producer-specific meaning belongs in producer actions, fingerprints, or later suggestion/readiness resolvers—not in a central evaluator full of module/event cases.
+
+Current implemented behavior:
+
+```text
+observing
+    evidence exists but generic count/distinct-subject/window qualification is not met
+
+eligible
+    generic qualification is met
+
+later lifecycle states
+    preserved rather than reset by new occurrences
+```
+
+Additional suggestion-time checks may later include:
+
+```text
+required capability available
+equivalent automation already present
+currently snoozed
+already converted
+underlying context still valid
+attribution still unambiguous
+```
+
+Those checks should resolve current runtime truth dynamically where appropriate. Do not persist stale permanent truths such as `already_automated = true`.
+
+Do not add speculative per-action thresholds for modules that have not opted in.
 
 ## Direct vs exploratory opportunities
 
@@ -379,30 +525,75 @@ Some repetition directly implies a useful automation.
 Example:
 
 ```text
-The same task was manually created for several Contacts in the same status.
+The same Task was manually created for several Contacts in the same status.
 ```
 
 This can support a specific suggestion:
 
 ```text
-Add this task to the Route for Attempting Contact?
+Add this Task to the Route for Attempting Contact?
 ```
 
-Other repetition proves a pattern but not its trigger.
-
-Example:
+Some compound patterns are even more specific:
 
 ```text
-Several Contacts were manually moved from New Contact to Attempting Contact.
+Manual status change -> same manual Task
+Manual Task completion -> same manual status change
+Supported domain event -> same manual Task
 ```
 
-The system can truthfully explain the repetition, but it may not know whether the correct trigger is a form submission, webinar outcome, task completion, elapsed time, document upload, or another event.
+These may support suggestions such as:
 
-Treat these as exploratory opportunities unless enough context exists for a specific automation proposal.
+```text
+You've created "Call this contact" for 3 Contacts after moving them to Attempting Contact.
+Add that Task to the Route so it happens automatically next time?
+```
 
-Do not pretend to know a missing trigger.
+```text
+You've moved 3 Contacts to Approved after completing "Review application."
+Make that status change happen automatically when the Task is completed?
+```
 
-Whether this distinction becomes a first-class persisted field should be decided during implementation only if runtime/UI behavior requires it.
+```text
+You've created "Follow up with contact" for 3 Contacts after they confirmed their communication preferences.
+Add that Task to the Route?
+```
+
+A plain repeated manual Contact status change is **not currently an opportunity producer**. The transition alone does not prove the correct trigger and should not create a generic `contact.status_changed_manually` opportunity.
+
+When information is missing, classify the product response conceptually:
+
+```text
+direct
+    enough information exists to automate the next action
+
+assisted
+    the repeated pattern is clear, but required information must be collected first
+
+observe_only
+    repetition exists, but no trustworthy next step can be suggested
+```
+
+Example assisted flow:
+
+```text
+Intake becomes complete
+    -> find suitable available appointment times
+    -> send booking invitation
+    -> wait for customer selection
+    -> create appointment
+```
+
+Do not rush to persist these modes as columns unless runtime/UI behavior proves they are durable first-class state.
+
+Core rule:
+
+```text
+When a repeated workflow cannot be completed automatically because required information is missing,
+automate the collection of that information and continue afterward.
+```
+
+Do not pretend to know a missing trigger or missing human decision.
 
 ## Already-automated checks
 
@@ -504,20 +695,41 @@ Route Management remains the control center for reviewing what happens automatic
 
 ## First implementation sequence
 
-The agreed sequence is:
+The backend foundation sequence is complete:
 
 ```text
-1. Audit current state.
-2. Update/add docs that maintain the direction and goal.
-3. Add migrations and models.
-4. Add automation-opportunity producers module by module where justified.
-5. Add tests.
-6. Continue Route Management and contextual UX work.
+1. Audit current state.                                      COMPLETE
+2. Update/add durable docs.                                 COMPLETE
+3. Add occurrence/opportunity migrations and models.        COMPLETE
+4. Add justified producer integrations.                     COMPLETE for current slice
+5. Add focused/adjacent tests and manual CRM smoke tests.    COMPLETE
+6. Continue Route Management and contextual UX work.         NEXT
 ```
 
-The first producer should be manual Contact-associated Task creation.
+Implemented current-slice producers/evidence:
 
-Manual Contact status changes are a good second producer candidate, but repeated status changes are often exploratory because the correct automatic trigger may be unknown.
+```text
+task.created_manually
+task.created_after_manual_status_change
+task.completed_manually                         evidence only
+contact.status_changed_after_manual_task_completion
+automation_event.recorded                       evidence only
+task.created_after_automation_event
+```
+
+Current supported automation-event evidence keys:
+
+```text
+webinar.attended
+webinar.missed
+permission_invitation.accepted
+inbound_message.normal_reply
+task.completed
+```
+
+The evidence allowlist may change as actual usefulness becomes clearer. The generic evaluator and opportunity lifecycle should remain protected from event/module-specific bloat.
+
+Do not add another producer merely because a manual action exists. Add one only when the system can explain a useful repeated pattern and offer a trustworthy next step.
 
 ## Module integration checklist
 
@@ -539,8 +751,23 @@ Do not add a producer when these questions cannot be answered clearly.
 
 ## Retention and upkeep
 
-Do not add pruning in the first slice unless real volume requires it.
+Do not add pruning merely for symmetry.
+
+The current occurrence table intentionally stores compact evidence and has no speculative archival subsystem.
+
+Evidence collection may evolve:
+
+```text
+event repeatedly proves useful for later correlation
+    -> keep/add it
+
+event creates noise or never supports useful suggestions
+    -> remove it from future evidence collection
+```
+
+Removing an event from the allowlist should stop future evidence capture; it does not require rewriting history by default.
 
 The architecture should allow future retention rules such as pruning old, uninteresting occurrences after a defined period while preserving occurrences tied to suggested or converted opportunities.
 
-Do not add speculative archival infrastructure before actual data volume proves it necessary.
+Add retention/pruning only when real volume or operational needs justify it. Avoid long-term auditing/history storage with little product payoff.
+

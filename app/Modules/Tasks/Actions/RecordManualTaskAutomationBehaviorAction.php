@@ -6,6 +6,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Tasks\Models\Task;
 use App\Support\AutomationOpportunities\Actions\AutomationBehaviorAction;
+use App\Support\AutomationOpportunities\Actions\RecordAutomationEventCorrelationEvidenceAction;
 use App\Support\AutomationOpportunities\Data\AutomationBehaviorData;
 use App\Support\AutomationOpportunities\Models\AutomationBehaviorOccurrence;
 use Carbon\CarbonImmutable;
@@ -16,6 +17,8 @@ class RecordManualTaskAutomationBehaviorAction extends AutomationBehaviorAction
     public const ACTION_KEY = 'task.created_manually';
 
     public const COMPOUND_ACTION_KEY = 'task.created_after_manual_status_change';
+
+    public const AUTOMATION_EVENT_COMPOUND_ACTION_KEY = 'task.created_after_automation_event';
 
     public const CAPABILITY_KEY = 'tasks.create_task';
 
@@ -74,6 +77,14 @@ class RecordManualTaskAutomationBehaviorAction extends AutomationBehaviorAction
             normalizedTitle: $normalizedTitle,
         );
 
+        $this->recordRecentAutomationEventPattern(
+            task: $task,
+            contact: $contact,
+            actor: $actor,
+            taskTemplateKey: $taskTemplateKey,
+            normalizedTitle: $normalizedTitle,
+        );
+
         return $occurrence;
     }
 
@@ -125,6 +136,65 @@ class RecordManualTaskAutomationBehaviorAction extends AutomationBehaviorAction
                     'source' => 'task_controller.store',
                     'pattern' => 'manual_status_change_then_manual_task_creation',
                     'window_minutes' => self::RELATED_ACTION_WINDOW_MINUTES,
+                ],
+            ),
+        );
+    }
+
+    private function recordRecentAutomationEventPattern(
+        Task $task,
+        Contact $contact,
+        ?Model $actor,
+        ?string $taskTemplateKey,
+        ?string $normalizedTitle,
+    ): void {
+        $trigger = $this->recentAutomationEventEvidence(
+            contact: $contact,
+            task: $task,
+        );
+
+        if (! $trigger instanceof AutomationBehaviorOccurrence) {
+            return;
+        }
+
+        $eventKey = data_get($trigger->context, 'event_key');
+
+        if (! is_string($eventKey) || trim($eventKey) === '') {
+            return;
+        }
+
+        $this->record(
+            AutomationBehaviorData::make(
+                actionKey: self::AUTOMATION_EVENT_COMPOUND_ACTION_KEY,
+                actor: $actor,
+                subject: $contact,
+                capabilityKey: self::CAPABILITY_KEY,
+                fingerprintParts: [
+                    'event_key' => $eventKey,
+                    'task_template_key' => $taskTemplateKey,
+                    'normalized_title' => $normalizedTitle,
+                ],
+                context: [
+                    'event_key' => $eventKey,
+                    'automation_event_occurred_at' => $trigger->occurred_at?->toISOString(),
+                    'automation_event_subject_type' => data_get(
+                        $trigger->context,
+                        'automation_event_subject_type',
+                    ),
+                    'automation_event_subject_id' => data_get(
+                        $trigger->context,
+                        'automation_event_subject_id',
+                    ),
+                    'task_id' => $task->getKey(),
+                    'task_title' => $task->title,
+                    'task_template_key' => $taskTemplateKey,
+                    'task_created_at' => $task->created_at?->toISOString(),
+                ],
+                meta: [
+                    'source' => 'task_controller.store',
+                    'pattern' => 'automation_event_then_manual_task_creation',
+                    'window_minutes' => self::RELATED_ACTION_WINDOW_MINUTES,
+                    'trigger_occurrence_id' => $trigger->getKey(),
                 ],
             ),
         );
@@ -210,6 +280,29 @@ class RecordManualTaskAutomationBehaviorAction extends AutomationBehaviorAction
             'to_status' => $toStatus,
             'changed_at' => $changedAt,
         ];
+    }
+
+    private function recentAutomationEventEvidence(
+        Contact $contact,
+        Task $task,
+    ): ?AutomationBehaviorOccurrence {
+        if (! $task->created_at) {
+            return null;
+        }
+
+        $taskCreatedAt = CarbonImmutable::instance($task->created_at);
+
+        return AutomationBehaviorOccurrence::query()
+            ->forAction(RecordAutomationEventCorrelationEvidenceAction::ACTION_KEY)
+            ->where('subject_type', $contact->getMorphClass())
+            ->where('subject_id', $contact->getKey())
+            ->whereBetween('occurred_at', [
+                $taskCreatedAt->subMinutes(self::RELATED_ACTION_WINDOW_MINUTES),
+                $taskCreatedAt,
+            ])
+            ->latest('occurred_at')
+            ->latest('id')
+            ->first();
     }
 
     private function relatedContact(Task $task): ?Contact
