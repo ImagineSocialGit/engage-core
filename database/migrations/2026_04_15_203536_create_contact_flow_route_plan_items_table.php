@@ -5,7 +5,6 @@ use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRouteCapability;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
-use App\Modules\FlowRoutes\Models\Point;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -40,11 +39,6 @@ return new class extends Migration
                     table: 'flow_route_points',
                     indexName: 'cfr_plan_items_route_point_fk',
                 )
-                ->nullOnDelete();
-
-            $table->foreignIdFor(Point::class)
-                ->nullable()
-                ->constrained(indexName: 'cfr_plan_items_point_fk')
                 ->nullOnDelete();
 
             $table->foreignIdFor(FlowRouteCapability::class)
@@ -100,4 +94,3 @@ return new class extends Migration
         Schema::dropIfExists('contact_flow_route_plan_items');
     }
 };
-

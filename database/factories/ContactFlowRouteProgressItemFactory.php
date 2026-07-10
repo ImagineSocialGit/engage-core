@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem;
-use App\Modules\FlowRoutes\Models\Point;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -25,12 +25,11 @@ class ContactFlowRouteProgressItemFactory extends Factory
             'contact_flow_route_plan_item_id' => $planItem->getKey(),
             'flow_route_id' => $planItem->flow_route_id,
             'flow_route_point_id' => $planItem->flow_route_point_id,
-            'point_id' => $planItem->point_id,
             'flow_route_capability_id' => $planItem->flow_route_capability_id,
             'created_subject_type' => null,
             'created_subject_id' => null,
             'key' => $planItem->key,
-            'point_type' => $planItem->point_type ?? Point::TYPE_NOOP,
+            'point_type' => $planItem->point_type ?? FlowRoutePointType::Noop->value,
             'sequence' => $planItem->sequence,
             'attempt' => 1,
             'status' => ContactFlowRouteProgressItem::STATUS_STARTED,

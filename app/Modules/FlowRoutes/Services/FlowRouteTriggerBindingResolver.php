@@ -132,7 +132,7 @@ class FlowRouteTriggerBindingResolver
             ->active()
             ->forTrigger($triggerType, $triggerKey)
             ->whereHas('flowRoute', fn ($query) => $query->active())
-            ->with('flowRoute.activeFlowRoutePoints.point')
+            ->with('flowRoute.activeFlowRoutePoints')
             ->orderByDesc('id');
     }
 }

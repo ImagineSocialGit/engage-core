@@ -6,7 +6,7 @@ use App\Modules\Core\Models\ContactStatus;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
-use App\Modules\FlowRoutes\Models\Point;
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Modules\FlowRoutes\Validation\FlowRoutesSetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
@@ -97,7 +97,7 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
                 'type' => 'create_task',
                 'capability_key' => 'tasks.create_task',
                 'is_start' => true,
-                'default_definition' => [
+                'definition' => [
                     'task_template_key' => '__missing_task_template__',
                 ],
             ],
@@ -110,7 +110,7 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
                 'type' => 'change_status',
                 'capability_key' => 'flow_routes.change_status',
                 'is_start' => true,
-                'default_definition' => [
+                'definition' => [
                     'contact_status_key' => '__missing_status__',
                 ],
             ],
@@ -123,7 +123,7 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
                 'type' => 'enroll_campaign',
                 'capability_key' => 'campaigns.enroll_contact',
                 'is_start' => true,
-                'default_definition' => [
+                'definition' => [
                     'campaign_key' => '__missing_campaign__',
                 ],
             ],
@@ -148,25 +148,19 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
             'meta' => [],
         ]);
 
-        $point = Point::query()->create([
-            'key' => 'customized_point',
-            'type' => Point::TYPE_CREATE_TASK,
-            'name' => 'Customized point',
-            'is_active' => true,
-            'is_customized' => true,
-            'meta' => [],
-        ]);
-
         FlowRoutePoint::query()->create([
             'flow_route_id' => $route->id,
-            'point_id' => $point->id,
             'key' => 'customized_point',
+            'type' => FlowRoutePointType::CreateTask->value,
+            'name' => 'Customized point',
+            'description' => null,
             'sort_order' => 10,
             'is_start' => true,
             'is_active' => true,
             'definition' => [],
             'settings' => [],
             'cancel_conditions' => [],
+            'is_customized' => true,
             'meta' => [],
         ]);
 
@@ -191,7 +185,7 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
             key: 'noop_route',
             point: [
                 'key' => 'start',
-                'type' => Point::TYPE_NOOP,
+                'type' => FlowRoutePointType::Noop->value,
                 'is_start' => true,
             ],
         ));
@@ -209,10 +203,10 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
             key: 'create_task_route',
             point: [
                 'key' => 'create_task',
-                'type' => Point::TYPE_CREATE_TASK,
+                'type' => FlowRoutePointType::CreateTask->value,
                 'capability_key' => 'tasks.create_task',
                 'is_start' => true,
-                'default_definition' => [
+                'definition' => [
                     'title' => 'Follow up with contact',
                 ],
             ],
@@ -315,5 +309,3 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
         );
     }
 }
-
-

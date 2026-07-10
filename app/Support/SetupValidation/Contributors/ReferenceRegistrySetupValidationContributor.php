@@ -4,7 +4,7 @@ namespace App\Support\SetupValidation\Contributors;
 
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\FlowRoutes\Models\FlowRoute;
-use App\Modules\FlowRoutes\Models\Point;
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Tasks\Models\TaskTemplate;
@@ -42,7 +42,7 @@ class ReferenceRegistrySetupValidationContributor implements SetupValidationCont
 
         yield from $this->warnStaleRegistryKeys(
             category: 'point_types',
-            runtimeKeys: Point::TYPES,
+            runtimeKeys: FlowRoutePointType::values(),
         );
 
         yield from $this->warnStaleRegistryKeys(
@@ -62,7 +62,7 @@ class ReferenceRegistrySetupValidationContributor implements SetupValidationCont
 
         yield from $this->warnUndocumentedRuntimeKeys(
             category: 'point_types',
-            runtimeKeys: Point::TYPES,
+            runtimeKeys: FlowRoutePointType::values(),
         );
 
         yield from $this->warnUndocumentedRuntimeKeys(

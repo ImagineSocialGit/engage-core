@@ -18,7 +18,7 @@ class ContactRoutesVisibilityDataProvider implements ContactShowDataProvider
             ->with([
                 'flowRoute',
                 'contactStatus',
-                'currentFlowRoutePoint.point',
+                'currentFlowRoutePoint',
             ])
             ->forContact((int) $contact->id)
             ->orderByRaw("FIELD(status, 'active', 'waiting', 'failed', 'completed', 'cancelled', 'superseded')")
@@ -68,7 +68,7 @@ class ContactRoutesVisibilityDataProvider implements ContactShowDataProvider
 
     private function currentPointLabel(ContactFlowRouteProgress $progress): ?string
     {
-        $point = $progress->currentFlowRoutePoint?->point;
+        $point = $progress->currentFlowRoutePoint;
 
         if (! $point) {
             return null;

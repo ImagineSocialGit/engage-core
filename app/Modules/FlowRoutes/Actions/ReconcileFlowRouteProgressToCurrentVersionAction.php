@@ -66,14 +66,12 @@ class ReconcileFlowRouteProgressToCurrentVersionAction
 
             $newCurrentPoint = $currentFlowRoute->activeFlowRoutePoints()
                 ->where('key', $oldCurrentPoint->key)
-                ->whereHas('point', fn ($query) => $query->where('is_active', true))
                 ->first();
 
             if (! $newCurrentPoint instanceof FlowRoutePoint) {
                 throw new RuntimeException("FlowRoute progress [{$progress->getKey()}] cannot reconcile from point [{$oldCurrentPoint->key}] to FlowRoute [{$currentFlowRoute->key}] version [{$currentFlowRoute->version}] because that active point key does not exist in the new version.");
             }
 
-            $newCurrentPoint->loadMissing('point');
 
             $oldPlan = $progress->plan;
 
@@ -136,8 +134,7 @@ class ReconcileFlowRouteProgressToCurrentVersionAction
                 $waiting['flow_route_plan_item_id'] = $newCurrentItem->getKey();
                 $waiting['flow_route_point_id'] = $newCurrentPoint->getKey();
                 $waiting['flow_route_point_key'] = $newCurrentPoint->key;
-                $waiting['point_id'] = $newCurrentPoint->point_id;
-                $waiting['point_key'] = $newCurrentPoint->point?->key;
+                $waiting['point_type'] = $newCurrentPoint->type;
                 $meta['waiting'] = $waiting;
             }
 

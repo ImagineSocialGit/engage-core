@@ -7,7 +7,7 @@ use App\Modules\FlowRoutes\Data\Points\BranchEvaluatePointDefinition;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
-use App\Modules\FlowRoutes\Models\Point;
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Services\FlowRouteConditionEvaluatorRegistry;
 
 class BranchEvaluatePointHandler implements PointHandler
@@ -18,7 +18,7 @@ class BranchEvaluatePointHandler implements PointHandler
 
     public function type(): string
     {
-        return Point::TYPE_BRANCH_EVALUATE;
+        return FlowRoutePointType::BranchEvaluate->value;
     }
 
     public function handle(PointExecutionContext $context): PointExecutionResult
@@ -35,8 +35,6 @@ class BranchEvaluatePointHandler implements PointHandler
                     'branch_definition' => $definition->toMetaPayload(),
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
                     'flow_route_point_key' => $context->flowRoutePoint->key,
-                    'point_id' => $context->flowRoutePoint->point_id,
-                    'point_key' => $context->flowRoutePoint->point?->key,
                 ],
             );
         }
@@ -128,11 +126,9 @@ class BranchEvaluatePointHandler implements PointHandler
         }
 
         return FlowRoutePoint::query()
-            ->with('point')
             ->where('flow_route_id', $context->flowRoutePoint->flow_route_id)
             ->forKey($targetFlowRoutePointKey)
             ->active()
-            ->whereHas('point', fn ($pointQuery) => $pointQuery->active())
             ->first();
     }
 

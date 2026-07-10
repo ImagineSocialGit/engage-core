@@ -7,7 +7,7 @@ use App\Modules\FlowRoutes\Contracts\PointHandler;
 use App\Modules\FlowRoutes\Data\Points\CreateTaskPointDefinition;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
-use App\Modules\FlowRoutes\Models\Point;
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\Tasks\Actions\CreateTaskAction;
 use App\Modules\Tasks\Actions\CreateTaskFromTemplateAction;
 use App\Modules\Tasks\Models\Task;
@@ -24,7 +24,7 @@ class CreateTaskPointHandler implements PointHandler
 
     public function type(): string
     {
-        return Point::TYPE_CREATE_TASK;
+        return FlowRoutePointType::CreateTask->value;
     }
 
     public function handle(PointExecutionContext $context): PointExecutionResult
@@ -147,7 +147,6 @@ class CreateTaskPointHandler implements PointHandler
             '{flow_route_progress_item.id}' => (string) $context->progressItem?->getKey(),
             '{flow_route.id}' => (string) $context->progress->flow_route_id,
             '{flow_route_point.id}' => (string) $context->flowRoutePoint->getKey(),
-            '{point.id}' => (string) $context->flowRoutePoint->point_id,
             '{subject.type}' => (string) $context->progress->subject_type,
             '{subject.id}' => (string) $context->progress->subject_id,
         ]);

@@ -32,7 +32,7 @@ class CreateContactFlowRoutePlanAction
                 ->findOrFail($progress->flow_route_id);
 
             $flowRoutePoints = $flowRoute->activeFlowRoutePoints()
-                ->with(['point', 'capability'])
+                ->with('capability')
                 ->ordered()
                 ->get();
 
@@ -70,19 +70,14 @@ class CreateContactFlowRoutePlanAction
 
             /** @var FlowRoutePoint $flowRoutePoint */
             foreach ($flowRoutePoints as $flowRoutePoint) {
-                if (! $flowRoutePoint->point || ! $flowRoutePoint->point->is_active) {
-                    continue;
-                }
-
                 ContactFlowRoutePlanItem::query()->create([
                     'contact_flow_route_progress_id' => $progress->getKey(),
                     'contact_flow_route_plan_id' => $plan->getKey(),
                     'flow_route_id' => $flowRoute->getKey(),
                     'flow_route_point_id' => $flowRoutePoint->getKey(),
-                    'point_id' => $flowRoutePoint->point_id,
                     'flow_route_capability_id' => $flowRoutePoint->flow_route_capability_id,
                     'key' => $flowRoutePoint->key,
-                    'point_type' => $flowRoutePoint->point->type,
+                    'point_type' => $flowRoutePoint->type,
                     'sort_order' => $flowRoutePoint->sort_order,
                     'sequence' => $sequence++,
                     'attempt' => 0,
@@ -91,14 +86,8 @@ class CreateContactFlowRoutePlanAction
                         && (int) $progress->current_flow_route_point_id === (int) $flowRoutePoint->getKey()
                             ? ContactFlowRoutePlanItem::STATUS_ACTIVE
                             : ContactFlowRoutePlanItem::STATUS_PENDING,
-                    'definition_snapshot' => array_replace_recursive(
-                        $flowRoutePoint->point->default_definition ?? [],
-                        $flowRoutePoint->definition ?? [],
-                    ),
-                    'settings_snapshot' => array_replace_recursive(
-                        $flowRoutePoint->point->default_settings ?? [],
-                        $flowRoutePoint->settings ?? [],
-                    ),
+                    'definition_snapshot' => $flowRoutePoint->definition ?? [],
+                    'settings_snapshot' => $flowRoutePoint->settings ?? [],
                     'cancel_conditions_snapshot' => $flowRoutePoint->cancel_conditions ?? [],
                     'meta' => [
                         'flow_route_point_snapshot' => $this->flowRoutePointSnapshot($flowRoutePoint),
@@ -141,9 +130,9 @@ class CreateContactFlowRoutePlanAction
             'sort_order' => $flowRoutePoint->sort_order,
             'is_start' => $flowRoutePoint->is_start,
             'next_flow_route_point_id' => $flowRoutePoint->next_flow_route_point_id,
-            'point_id' => $flowRoutePoint->point_id,
-            'point_key' => $flowRoutePoint->point?->key,
-            'point_type' => $flowRoutePoint->point?->type,
+            'point_type' => $flowRoutePoint->type,
+            'name' => $flowRoutePoint->name,
+            'description' => $flowRoutePoint->description,
             'flow_route_capability_id' => $flowRoutePoint->flow_route_capability_id,
             'source_version' => $flowRoutePoint->source_version,
             'meta' => $flowRoutePoint->meta ?? [],

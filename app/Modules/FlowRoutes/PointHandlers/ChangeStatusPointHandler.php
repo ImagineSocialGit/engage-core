@@ -8,7 +8,7 @@ use App\Modules\FlowRoutes\Contracts\PointHandler;
 use App\Modules\FlowRoutes\Data\Points\ChangeStatusPointDefinition;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
-use App\Modules\FlowRoutes\Models\Point;
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\Workflow\Actions\TransitionContactWorkflowStatusAction;
 use Throwable;
 
@@ -20,7 +20,7 @@ class ChangeStatusPointHandler implements PointHandler
 
     public function type(): string
     {
-        return Point::TYPE_CHANGE_STATUS;
+        return FlowRoutePointType::ChangeStatus->value;
     }
 
     public function handle(PointExecutionContext $context): PointExecutionResult
@@ -37,7 +37,6 @@ class ChangeStatusPointHandler implements PointHandler
                     'change_status_definition' => $definition->toMetaPayload(),
                     'flow_route_progress_id' => $context->progress->getKey(),
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                    'point_id' => $context->flowRoutePoint->point_id,
                     'flow_routes' => $context->flowRouteProvenance(),
                 ],
             );
@@ -94,7 +93,6 @@ class ChangeStatusPointHandler implements PointHandler
                         'flow_route_progress_id' => $context->progress->getKey(),
                         'flow_route_id' => $context->progress->flow_route_id,
                         'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                        'point_id' => $context->flowRoutePoint->point_id,
                     ],
                 ],
                 force: $definition->force,
@@ -183,4 +181,3 @@ class ChangeStatusPointHandler implements PointHandler
         };
     }
 }
-

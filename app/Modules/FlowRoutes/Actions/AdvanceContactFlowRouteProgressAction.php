@@ -75,7 +75,7 @@ class AdvanceContactFlowRouteProgressAction
         }
 
         $query = ContactFlowRoutePlanItem::query()
-            ->with('flowRoutePoint.point')
+            ->with('flowRoutePoint')
             ->where('contact_flow_route_plan_id', $fromPlanItem->contact_flow_route_plan_id)
             ->whereKeyNot($fromPlanItem->getKey())
             ->runnable();
@@ -109,7 +109,7 @@ class AdvanceContactFlowRouteProgressAction
         }
 
         return ContactFlowRoutePlanItem::query()
-            ->with('flowRoutePoint.point')
+            ->with('flowRoutePoint')
             ->where('contact_flow_route_plan_id', $fromPlanItem->contact_flow_route_plan_id)
             ->where('flow_route_point_id', $nextFlowRoutePointId)
             ->runnable()
@@ -120,7 +120,7 @@ class AdvanceContactFlowRouteProgressAction
     private function nextSequentialPlanItem(ContactFlowRoutePlanItem $fromPlanItem): ?ContactFlowRoutePlanItem
     {
         return ContactFlowRoutePlanItem::query()
-            ->with('flowRoutePoint.point')
+            ->with('flowRoutePoint')
             ->where('contact_flow_route_plan_id', $fromPlanItem->contact_flow_route_plan_id)
             ->where('sequence', '>', (int) $fromPlanItem->sequence)
             ->runnable()

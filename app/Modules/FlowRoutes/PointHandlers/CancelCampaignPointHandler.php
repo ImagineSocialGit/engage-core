@@ -9,7 +9,7 @@ use App\Modules\FlowRoutes\Contracts\PointHandler;
 use App\Modules\FlowRoutes\Data\Points\CancelCampaignPointDefinition;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
-use App\Modules\FlowRoutes\Models\Point;
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use Throwable;
 
 class CancelCampaignPointHandler implements PointHandler
@@ -20,7 +20,7 @@ class CancelCampaignPointHandler implements PointHandler
 
     public function type(): string
     {
-        return Point::TYPE_CANCEL_CAMPAIGN;
+        return FlowRoutePointType::CancelCampaign->value;
     }
 
     public function handle(PointExecutionContext $context): PointExecutionResult
@@ -147,7 +147,6 @@ class CancelCampaignPointHandler implements PointHandler
             'flow_route_id' => $context->progress->flow_route_id,
             'flow_route_point_id' => $context->flowRoutePoint->getKey(),
             'flow_route_capability_id' => $context->flowRoutePoint->flow_route_capability_id,
-            'point_id' => $context->flowRoutePoint->point_id,
         ];
     }
 
@@ -206,7 +205,6 @@ class CancelCampaignPointHandler implements PointHandler
             '{flow_route_plan_item.id}' => (string) $context->planItem?->getKey(),
             '{flow_route_progress_item.id}' => (string) $context->progressItem?->getKey(),
             '{flow_route_point.id}' => (string) $context->flowRoutePoint->getKey(),
-            '{point.id}' => (string) $context->flowRoutePoint->point_id,
             '{subject.type}' => (string) $context->progress->subject_type,
             '{subject.id}' => (string) $context->progress->subject_id,
         ];

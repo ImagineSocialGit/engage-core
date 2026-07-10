@@ -2,6 +2,7 @@
 
 namespace App\Modules\FlowRoutes\Data\Presets;
 
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use InvalidArgumentException;
 
 class FlowRoutePointPresetDefinition
@@ -9,68 +10,60 @@ class FlowRoutePointPresetDefinition
     /**
      * @param array<string, mixed> $definition
      * @param array<string, mixed> $settings
-     * @param array<int, array<string, mixed>> $conditions
      * @param array<int, array<string, mixed>> $cancelConditions
      * @param array<string, mixed> $meta
      */
     public function __construct(
         public readonly string $key,
-        public readonly string $pointKey,
-        public readonly ?string $capabilityKey,
-        public readonly int $sortOrder,
+        public readonly string $type,
+        public readonly string $name,
+        public readonly ?string $description = null,
+        public readonly ?string $capabilityKey = null,
+        public readonly int $sortOrder = 0,
         public readonly bool $isStart = false,
         public readonly bool $isActive = true,
         public readonly ?string $nextPointKey = null,
         public readonly array $definition = [],
         public readonly array $settings = [],
-        public readonly array $conditions = [],
         public readonly array $cancelConditions = [],
         public readonly ?string $sourceVersion = null,
         public readonly array $meta = [],
     ) {}
 
     /**
-     * @param array<string, mixed> $pointData
+     * @param array<string, mixed> $data
      */
-    public static function fromEmbeddedPointArray(
-        array $pointData,
+    public static function fromArray(
+        array $data,
         int $fallbackSortOrder,
         ?string $fallbackSourceVersion = null,
     ): self {
-        $pointKey = self::requiredString($pointData, 'key');
+        $key = self::requiredString($data, 'key');
+        $type = self::requiredString($data, 'type');
 
-        $definition = $pointData['default_definition'] ?? [];
-
-        if (! is_array($definition)) {
-            $definition = [];
-        }
-
-        $settings = $pointData['default_settings'] ?? [];
-
-        if (! is_array($settings)) {
-            $settings = [];
+        if (! in_array($type, FlowRoutePointType::values(), true)) {
+            throw new InvalidArgumentException("Unsupported FlowRoutePoint type [{$type}] for preset route point [{$key}].");
         }
 
         return new self(
-            key: $pointKey,
-            pointKey: $pointKey,
-            capabilityKey: self::string($pointData, 'capability_key'),
-            sortOrder: self::int($pointData, 'sort_order') ?? $fallbackSortOrder,
-            isStart: (bool) ($pointData['is_start'] ?? false),
-            isActive: (bool) ($pointData['is_active'] ?? true),
-            nextPointKey: self::string($pointData, 'next_point_key'),
-            definition: $definition,
-            settings: $settings,
-            conditions: self::arrayList($pointData, 'conditions'),
-            cancelConditions: self::arrayList($pointData, 'cancel_conditions'),
-            sourceVersion: self::string($pointData, 'source_version') ?: $fallbackSourceVersion,
-            meta: self::array($pointData, 'meta'),
+            key: $key,
+            type: $type,
+            name: self::string($data, 'name') ?: self::nameFromKey($key),
+            description: self::string($data, 'description'),
+            capabilityKey: self::string($data, 'capability_key'),
+            sortOrder: self::int($data, 'sort_order') ?? $fallbackSortOrder,
+            isStart: (bool) ($data['is_start'] ?? false),
+            isActive: (bool) ($data['is_active'] ?? true),
+            nextPointKey: self::string($data, 'next_point_key'),
+            definition: self::array($data, 'definition'),
+            settings: self::array($data, 'settings'),
+            cancelConditions: self::arrayList($data, 'cancel_conditions'),
+            sourceVersion: self::string($data, 'source_version') ?: $fallbackSourceVersion,
+            meta: self::array($data, 'meta'),
         );
     }
 
-    /**
-     * @param array<string, mixed> $data
-     */
+    /** @param array<string, mixed> $data */
     private static function requiredString(array $data, string $key): string
     {
         $value = self::string($data, $key);
@@ -82,9 +75,7 @@ class FlowRoutePointPresetDefinition
         return $value;
     }
 
-    /**
-     * @param array<string, mixed> $data
-     */
+    /** @param array<string, mixed> $data */
     private static function string(array $data, string $key): ?string
     {
         $value = $data[$key] ?? null;
@@ -98,9 +89,7 @@ class FlowRoutePointPresetDefinition
         return $value !== '' ? $value : null;
     }
 
-    /**
-     * @param array<string, mixed> $data
-     */
+    /** @param array<string, mixed> $data */
     private static function int(array $data, string $key): ?int
     {
         $value = $data[$key] ?? null;
@@ -135,5 +124,10 @@ class FlowRoutePointPresetDefinition
             $value,
             fn (mixed $item): bool => is_array($item),
         ));
+    }
+
+    private static function nameFromKey(string $key): string
+    {
+        return str($key)->replace(['-', '_'], ' ')->headline()->toString();
     }
 }

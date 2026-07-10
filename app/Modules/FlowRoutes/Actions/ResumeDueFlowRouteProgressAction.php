@@ -28,7 +28,7 @@ class ResumeDueFlowRouteProgressAction
         ];
 
         $query = ContactFlowRouteProgress::query()
-            ->with(['currentFlowRoutePoint.point', 'plan.items'])
+            ->with(['currentFlowRoutePoint', 'plan.items'])
             ->dueToResume($now)
             ->oldest('resume_at')
             ->oldest('id');

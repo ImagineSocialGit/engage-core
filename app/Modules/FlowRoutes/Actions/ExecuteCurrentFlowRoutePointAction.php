@@ -29,12 +29,12 @@ class ExecuteCurrentFlowRoutePointAction
             $progress = ContactFlowRouteProgress::query()
                 ->lockForUpdate()
                 ->with([
-                    'currentFlowRoutePoint.point',
+                    'currentFlowRoutePoint',
                     'currentFlowRoutePoint.capability',
-                    'flowRoute.activeFlowRoutePoints.point',
+                    'flowRoute.activeFlowRoutePoints',
                     'flowRoute.activeFlowRoutePoints.capability',
                     'contactWorkflowProfile',
-                    'plan.items.flowRoutePoint.point',
+                    'plan.items.flowRoutePoint',
                 ])
                 ->findOrFail($progress->getKey());
 
@@ -83,7 +83,7 @@ class ExecuteCurrentFlowRoutePointAction
                 return $result;
             }
 
-            $flowRoutePoint->loadMissing(['point', 'capability']);
+            $flowRoutePoint->loadMissing('capability');
 
             $progressItem = $this->startProgressItem($progress, $plan, $planItem, $flowRoutePoint);
 
@@ -107,28 +107,7 @@ class ExecuteCurrentFlowRoutePointAction
                 return $result;
             }
 
-            if (! $flowRoutePoint->point || ! $flowRoutePoint->point->is_active) {
-                $result = PointExecutionResult::skipped(
-                    reason: 'point_inactive_or_missing',
-                    meta: [
-                        'progress_id' => $progress->getKey(),
-                        'flow_route_plan_id' => $plan->getKey(),
-                        'flow_route_plan_item_id' => $planItem->getKey(),
-                        'flow_route_progress_item_id' => $progressItem->getKey(),
-                        'flow_route_point_id' => $flowRoutePoint->getKey(),
-                        'flow_route_point_key' => $flowRoutePoint->key,
-                        'point_id' => $flowRoutePoint->point_id,
-                    ],
-                );
-
-                $this->finishProgressItem($progressItem, $planItem, $result);
-                $this->recordExecutionResult($progress, $plan, $planItem, $progressItem, $flowRoutePoint, $result);
-                $this->advanceContactFlowRouteProgress->handle($progress, $planItem, $flowRoutePoint, $result);
-
-                return $result;
-            }
-
-            $pointType = (string) $flowRoutePoint->point->type;
+            $pointType = (string) $flowRoutePoint->type;
             $handler = $this->pointHandlerRegistry->resolve($pointType);
 
             if (! $handler) {
@@ -141,7 +120,6 @@ class ExecuteCurrentFlowRoutePointAction
                         'flow_route_progress_item_id' => $progressItem->getKey(),
                         'flow_route_point_id' => $flowRoutePoint->getKey(),
                         'flow_route_point_key' => $flowRoutePoint->key,
-                        'point_id' => $flowRoutePoint->point_id,
                         'point_type' => $pointType,
                     ],
                 );
@@ -163,7 +141,6 @@ class ExecuteCurrentFlowRoutePointAction
                         'flow_route_progress_item_id' => $progressItem->getKey(),
                         'flow_route_point_id' => $flowRoutePoint->getKey(),
                         'flow_route_point_key' => $flowRoutePoint->key,
-                        'point_id' => $flowRoutePoint->point_id,
                         'point_type' => $pointType,
                         'exception_class' => $exception::class,
                         'exception_message' => $exception->getMessage(),
@@ -288,10 +265,9 @@ class ExecuteCurrentFlowRoutePointAction
             'contact_flow_route_plan_item_id' => $planItem->getKey(),
             'flow_route_id' => $progress->flow_route_id,
             'flow_route_point_id' => $flowRoutePoint->getKey(),
-            'point_id' => $flowRoutePoint->point_id,
             'flow_route_capability_id' => $flowRoutePoint->flow_route_capability_id,
             'key' => $planItem->key,
-            'point_type' => $flowRoutePoint->point?->type,
+            'point_type' => $flowRoutePoint->type,
             'sequence' => $planItem->sequence,
             'attempt' => $attempt,
             'status' => ContactFlowRouteProgressItem::STATUS_STARTED,
@@ -386,9 +362,7 @@ class ExecuteCurrentFlowRoutePointAction
             'flow_route_progress_item_id' => $progressItem->getKey(),
             'flow_route_point_id' => $flowRoutePoint->getKey(),
             'flow_route_point_key' => $flowRoutePoint->key,
-            'point_id' => $flowRoutePoint->point_id,
-            'point_key' => $flowRoutePoint->point?->key,
-            'point_type' => $flowRoutePoint->point?->type,
+            'point_type' => $flowRoutePoint->type,
             'result' => $result->toMetaPayload(),
         ];
 
@@ -443,4 +417,3 @@ class ExecuteCurrentFlowRoutePointAction
         ])->save();
     }
 }
-

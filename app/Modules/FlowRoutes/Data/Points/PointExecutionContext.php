@@ -28,7 +28,7 @@ class PointExecutionContext
 
     public function pointType(): string
     {
-        return (string) $this->flowRoutePoint->point->type;
+        return (string) $this->flowRoutePoint->type;
     }
 
     /**
@@ -44,7 +44,7 @@ class PointExecutionContext
             'flow_route_id' => $this->progress->flow_route_id,
             'flow_route_point_id' => $this->flowRoutePoint->getKey(),
             'flow_route_capability_id' => $this->flowRoutePoint->flow_route_capability_id,
-            'point_id' => $this->flowRoutePoint->point_id,
+            'point_type' => $this->flowRoutePoint->type,
             'subject_type' => $this->progress->subject_type,
             'subject_id' => $this->progress->subject_id,
         ];

@@ -184,7 +184,7 @@ class FlowRouteBindingController extends Controller
                 $availableRoutes = FlowRoute::query()
                     ->active()
                     ->forTrigger(FlowRoute::TRIGGER_CONTACT_STATUS, $status->key)
-                    ->with(['activeFlowRoutePoints.point'])
+                    ->with(['activeFlowRoutePoints'])
                     ->orderBy('name')
                     ->get()
                     ->map(fn (FlowRoute $route): array => $this->routeOption($route, $statusNamesByKey));
@@ -240,7 +240,7 @@ class FlowRouteBindingController extends Controller
                 $availableRoutes = FlowRoute::query()
                     ->active()
                     ->forTrigger(FlowRoute::TRIGGER_AUTOMATION_EVENT, $eventKey)
-                    ->with(['activeFlowRoutePoints.point'])
+                    ->with(['activeFlowRoutePoints'])
                     ->orderBy('name')
                     ->get()
                     ->map(fn (FlowRoute $route): array => $this->routeOption($route, $statusNamesByKey));
@@ -299,7 +299,7 @@ class FlowRouteBindingController extends Controller
      */
     private function routePointSummary($routePoint, array $statusNamesByKey): string
     {
-        $type = (string) ($routePoint->point?->type ?? '');
+        $type = (string) ($routePoint->type ?? '');
         $definition = is_array($routePoint->definition) ? $routePoint->definition : [];
 
         return match ($type) {

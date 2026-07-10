@@ -2,15 +2,13 @@
 
 namespace App\Modules\FlowRoutes\Data\Presets;
 
-use App\Modules\FlowRoutes\Data\Points\PointPresetDefinition;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use InvalidArgumentException;
 
 class FlowRoutePresetDefinition
 {
     /**
-     * @param array<int, PointPresetDefinition> $points
-     * @param array<int, FlowRoutePointPresetDefinition> $flowRoutePoints
+     * @param array<int, FlowRoutePointPresetDefinition> $points
      * @param array<string, mixed> $trigger
      * @param array<string, mixed> $meta
      */
@@ -28,7 +26,6 @@ class FlowRoutePresetDefinition
         public readonly ?string $ownerGroup = null,
         public readonly array $trigger = [],
         public readonly array $points = [],
-        public readonly array $flowRoutePoints = [],
         public readonly array $meta = [],
     ) {}
 
@@ -50,17 +47,14 @@ class FlowRoutePresetDefinition
         }
 
         $points = [];
-        $flowRoutePoints = [];
 
         foreach (self::arrayList($data, 'points') as $index => $pointData) {
             if (! is_array($pointData)) {
                 continue;
             }
 
-            $points[] = PointPresetDefinition::fromArray($pointData, $sourceVersion);
-
-            $flowRoutePoints[] = FlowRoutePointPresetDefinition::fromEmbeddedPointArray(
-                pointData: $pointData,
+            $points[] = FlowRoutePointPresetDefinition::fromArray(
+                data: $pointData,
                 fallbackSortOrder: (($index + 1) * 10),
                 fallbackSourceVersion: $sourceVersion,
             );
@@ -68,7 +62,7 @@ class FlowRoutePresetDefinition
 
         $isActive = (bool) ($data['is_active'] ?? true);
 
-        self::validateRoutePointContract($flowRoutePoints, $isActive);
+        self::validateRoutePointContract($points, $isActive);
 
         return new self(
             presetKey: $presetKey,
@@ -84,7 +78,6 @@ class FlowRoutePresetDefinition
             ownerGroup: self::string($data, 'owner_group'),
             trigger: $trigger,
             points: $points,
-            flowRoutePoints: $flowRoutePoints,
             meta: self::array($data, 'meta'),
         );
     }
@@ -135,9 +128,7 @@ class FlowRoutePresetDefinition
             && $this->triggerKey() !== null;
     }
 
-    /**
-     * @param array<string, mixed> $trigger
-     */
+    /** @param array<string, mixed> $trigger */
     private static function validateTriggerContract(?string $contactStatusKey, array $trigger): void
     {
         if ($contactStatusKey !== null && $trigger !== []) {
@@ -177,16 +168,14 @@ class FlowRoutePresetDefinition
         }
     }
 
-    /**
-     * @param array<int, FlowRoutePointPresetDefinition> $flowRoutePoints
-     */
-    private static function validateRoutePointContract(array $flowRoutePoints, bool $isActive): void
+    /** @param array<int, FlowRoutePointPresetDefinition> $points */
+    private static function validateRoutePointContract(array $points, bool $isActive): void
     {
         $keys = [];
         $activeStartCount = 0;
         $activePointCount = 0;
 
-        foreach ($flowRoutePoints as $point) {
+        foreach ($points as $point) {
             if (isset($keys[$point->key])) {
                 throw new InvalidArgumentException("Preset FlowRoute contains duplicate point key [{$point->key}].");
             }
@@ -210,7 +199,7 @@ class FlowRoutePresetDefinition
             throw new InvalidArgumentException("Active preset FlowRoute must contain exactly one active start point; found [{$activeStartCount}].");
         }
 
-        foreach ($flowRoutePoints as $point) {
+        foreach ($points as $point) {
             if ($point->nextPointKey === null) {
                 continue;
             }
@@ -221,9 +210,7 @@ class FlowRoutePresetDefinition
         }
     }
 
-    /**
-     * @param array<string, mixed> $data
-     */
+    /** @param array<string, mixed> $data */
     private static function requiredString(array $data, string $key): string
     {
         $value = self::string($data, $key);
@@ -235,9 +222,7 @@ class FlowRoutePresetDefinition
         return $value;
     }
 
-    /**
-     * @param array<string, mixed> $data
-     */
+    /** @param array<string, mixed> $data */
     private static function string(array $data, string $key): ?string
     {
         $value = $data[$key] ?? null;
@@ -251,9 +236,7 @@ class FlowRoutePresetDefinition
         return $value !== '' ? $value : null;
     }
 
-    /**
-     * @param array<string, mixed> $data
-     */
+    /** @param array<string, mixed> $data */
     private static function int(array $data, string $key): ?int
     {
         $value = $data[$key] ?? null;

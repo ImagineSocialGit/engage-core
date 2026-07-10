@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Models\FlowRouteCapability;
-use App\Modules\FlowRoutes\Models\Point;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -19,8 +19,8 @@ class FlowRouteCapabilityFactory extends Factory
             'key' => 'tasks.create_task',
             'module_key' => 'tasks',
             'capability_type' => FlowRouteCapability::TYPE_ACTION,
-            'point_type' => Point::TYPE_CREATE_TASK,
-            'handler_key' => Point::TYPE_CREATE_TASK,
+            'point_type' => FlowRoutePointType::CreateTask->value,
+            'handler_key' => FlowRoutePointType::CreateTask->value,
             'event_key' => null,
             'action_key' => 'create_task',
             'name' => 'Create task',
@@ -44,22 +44,24 @@ class FlowRouteCapabilityFactory extends Factory
 
     public function forModule(string $moduleKey): static
     {
-        return $this->state(fn (): array => [
+        return $this->state(fn (array $attributes): array => [
             'module_key' => $moduleKey,
         ]);
     }
 
-    public function pointType(string $pointType): static
+    public function pointType(FlowRoutePointType|string $pointType): static
     {
-        return $this->state(fn (): array => [
-            'point_type' => $pointType,
-            'handler_key' => $pointType,
+        $value = $pointType instanceof FlowRoutePointType ? $pointType->value : $pointType;
+
+        return $this->state(fn (array $attributes): array => [
+            'point_type' => $value,
+            'handler_key' => $value,
         ]);
     }
 
     public function inactive(): static
     {
-        return $this->state(fn (): array => [
+        return $this->state(fn (array $attributes): array => [
             'is_active' => false,
         ]);
     }

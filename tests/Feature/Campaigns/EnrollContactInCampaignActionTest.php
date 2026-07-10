@@ -448,7 +448,7 @@ class EnrollContactInCampaignActionTest extends TestCase
             'key' => 'test_capability_'.uniqid(),
             'module_key' => 'flow_routes',
             'capability_type' => \App\Modules\FlowRoutes\Models\FlowRouteCapability::TYPE_ACTION,
-            'point_type' => \App\Modules\FlowRoutes\Models\Point::TYPE_NOOP,
+            'point_type' => \App\Modules\FlowRoutes\Enums\FlowRoutePointType::Noop->value,
             'handler_key' => 'noop',
             'event_key' => null,
             'action_key' => 'noop',
@@ -470,23 +470,12 @@ class EnrollContactInCampaignActionTest extends TestCase
             'meta' => [],
         ]);        
 
-        $point = \App\Modules\FlowRoutes\Models\Point::query()->create([
-            'key' => 'test_point_'.uniqid(),
-            'type' => \App\Modules\FlowRoutes\Models\Point::TYPE_NOOP,
-            'name' => 'Test Point',
-            'description' => null,
-            'default_definition' => [],
-            'default_settings' => [],
-            'is_active' => true,
-            'source_version' => 'test',
-            'is_customized' => false,
-            'customized_at' => null,
-            'meta' => [],
-        ]);
 
         $flowRoutePoint = \App\Modules\FlowRoutes\Models\FlowRoutePoint::query()->create([
             'flow_route_id' => $flowRoute->getKey(),
-            'point_id' => $point->getKey(),
+            'type' => \App\Modules\FlowRoutes\Enums\FlowRoutePointType::Noop->value,
+            'name' => 'Test Point',
+            'description' => null,
             'flow_route_capability_id' => $capability->getKey(),
             'key' => 'test_flow_route_point',
             'sort_order' => 10,
@@ -535,10 +524,9 @@ class EnrollContactInCampaignActionTest extends TestCase
             'contact_flow_route_plan_id' => $plan->getKey(),
             'flow_route_id' => $flowRoute->getKey(),
             'flow_route_point_id' => $flowRoutePoint->getKey(),
-            'point_id' => $point->getKey(),
             'flow_route_capability_id' => $capability->getKey(),
             'key' => 'test_flow_route_plan_item',
-            'point_type' => $point->type,
+            'point_type' => $flowRoutePoint->type,
             'sort_order' => 10,
             'sequence' => 1,
             'attempt' => 1,
@@ -558,10 +546,9 @@ class EnrollContactInCampaignActionTest extends TestCase
             'contact_flow_route_plan_item_id' => $planItem->getKey(),
             'flow_route_id' => $flowRoute->getKey(),
             'flow_route_point_id' => $flowRoutePoint->getKey(),
-            'point_id' => $point->getKey(),
             'flow_route_capability_id' => $capability->getKey(),
             'key' => 'test_flow_route_progress_item',
-            'point_type' => $point->type,
+            'point_type' => $flowRoutePoint->type,
             'sequence' => 1,
             'attempt' => 1,
             'status' => \App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem::STATUS_COMPLETED,
@@ -588,5 +575,3 @@ class EnrollContactInCampaignActionTest extends TestCase
         parent::tearDown();
     }
 }
-
-

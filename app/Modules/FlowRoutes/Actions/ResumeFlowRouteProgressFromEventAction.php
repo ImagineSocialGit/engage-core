@@ -28,7 +28,7 @@ class ResumeFlowRouteProgressFromEventAction
 
         $query = ContactFlowRouteProgress::query()
             ->waitingForEvent($event->name)
-            ->with(['currentFlowRoutePoint.point', 'plan.items']);
+            ->with(['currentFlowRoutePoint', 'plan.items']);
 
         if ($event->contactId !== null) {
             $query->forContact($event->contactId);
@@ -90,7 +90,7 @@ class ResumeFlowRouteProgressFromEventAction
         return DB::transaction(function () use ($progress, $event) {
             $progress = ContactFlowRouteProgress::query()
                 ->lockForUpdate()
-                ->with(['currentFlowRoutePoint.point', 'plan.items'])
+                ->with(['currentFlowRoutePoint', 'plan.items'])
                 ->findOrFail($progress->getKey());
 
             if ($progress->isTerminal()) {

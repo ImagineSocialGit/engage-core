@@ -20,7 +20,7 @@ use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRouteCapability;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
-use App\Modules\FlowRoutes\Models\Point;
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Modules\Messaging\Services\MessageDefinitionResolver;
 use App\Modules\Tasks\Models\TaskTemplate;
@@ -242,7 +242,6 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
 
         foreach ($preset->points as $index => $point) {
             $pointPath = "{$path}.points.{$index}";
-            $routePoint = $preset->flowRoutePoints[$index] ?? null;
 
             if (! $point->isActive) {
                 continue;
@@ -260,36 +259,26 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
                 );
             }
 
-            if ($routePoint?->capabilityKey !== null) {
+            if ($point->capabilityKey !== null) {
                 yield from $this->validatePresetCapability(
                     routeKey: $routeKey,
                     pointKey: $point->key,
                     pointType: $point->type,
-                    capabilityKey: $routePoint->capabilityKey,
+                    capabilityKey: $point->capabilityKey,
                     path: "{$pointPath}.capability_key",
                     context: $context,
                 );
             }
 
-            $mergedDefinition = array_replace_recursive(
-                $point->defaultDefinition,
-                $routePoint?->definition ?? [],
-            );
-
-            $mergedSettings = array_replace_recursive(
-                $point->defaultSettings,
-                $routePoint?->settings ?? [],
-            );
-
             yield from $this->validatePointDefinition(
                 routeKey: $routeKey,
                 pointKey: $point->key,
                 pointType: $point->type,
-                definition: $mergedDefinition,
-                settings: $mergedSettings,
+                definition: $point->definition,
+                settings: $point->settings,
                 routePointKeys: array_map(
                     fn ($candidate): string => $candidate->key,
-                    $preset->flowRoutePoints,
+                    $preset->points,
                 ),
                 path: $pointPath,
                 context: $context,
@@ -376,15 +365,15 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
         array $context,
     ): iterable {
         $parsed = match ($pointType) {
-            Point::TYPE_WAIT => WaitPointDefinition::from($definition, $settings),
-            Point::TYPE_EVENT_WAIT => EventWaitPointDefinition::from($definition, $settings),
-            Point::TYPE_CONDITION => ConditionPointDefinition::from($definition, $settings),
-            Point::TYPE_BRANCH_EVALUATE => BranchEvaluatePointDefinition::from($definition, $settings),
-            Point::TYPE_CHANGE_STATUS => ChangeStatusPointDefinition::from($definition, $settings),
-            Point::TYPE_CREATE_TASK => CreateTaskPointDefinition::from($definition, $settings),
-            Point::TYPE_SEND_MESSAGE => SendMessagePointDefinition::from($definition, $settings),
-            Point::TYPE_ENROLL_CAMPAIGN => EnrollCampaignPointDefinition::from($definition, $settings),
-            Point::TYPE_CANCEL_CAMPAIGN => CancelCampaignPointDefinition::from($definition, $settings),
+            FlowRoutePointType::Wait->value => WaitPointDefinition::from($definition, $settings),
+            FlowRoutePointType::EventWait->value => EventWaitPointDefinition::from($definition, $settings),
+            FlowRoutePointType::Condition->value => ConditionPointDefinition::from($definition, $settings),
+            FlowRoutePointType::BranchEvaluate->value => BranchEvaluatePointDefinition::from($definition, $settings),
+            FlowRoutePointType::ChangeStatus->value => ChangeStatusPointDefinition::from($definition, $settings),
+            FlowRoutePointType::CreateTask->value => CreateTaskPointDefinition::from($definition, $settings),
+            FlowRoutePointType::SendMessage->value => SendMessagePointDefinition::from($definition, $settings),
+            FlowRoutePointType::EnrollCampaign->value => EnrollCampaignPointDefinition::from($definition, $settings),
+            FlowRoutePointType::CancelCampaign->value => CancelCampaignPointDefinition::from($definition, $settings),
             default => null,
         };
 
@@ -392,7 +381,7 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
             yield $this->error(
                 code: 'flow_routes.point_definition_invalid',
                 message: "FlowRoute [{$routeKey}] point [{$pointKey}] has invalid [{$pointType}] definition [{$parsed->invalidReason}].",
-                path: "{$path}.default_definition",
+                path: "{$path}.definition",
                 context: $context + [
                     'point_key' => $pointKey,
                     'point_type' => $pointType,
@@ -410,7 +399,7 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
             yield $this->error(
                 code: 'flow_routes.task_template_missing',
                 message: "FlowRoute [{$routeKey}] point [{$pointKey}] references unavailable TaskTemplate [{$parsed->taskTemplateKey}].",
-                path: "{$path}.default_definition.task_template_key",
+                path: "{$path}.definition.task_template_key",
                 context: $context + [
                     'point_key' => $pointKey,
                     'task_template_key' => $parsed->taskTemplateKey,
@@ -422,7 +411,7 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
             yield $this->error(
                 code: 'flow_routes.contact_status_missing',
                 message: "FlowRoute [{$routeKey}] point [{$pointKey}] references an unavailable ContactStatus target.",
-                path: "{$path}.default_definition",
+                path: "{$path}.definition",
                 context: $context + [
                     'point_key' => $pointKey,
                     'contact_status_id' => $parsed->contactStatusId,
@@ -438,7 +427,7 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
             yield $this->error(
                 code: 'flow_routes.campaign_missing',
                 message: "FlowRoute [{$routeKey}] point [{$pointKey}] references unavailable Campaign [{$parsed->campaignKey}].",
-                path: "{$path}.default_definition.campaign_key",
+                path: "{$path}.definition.campaign_key",
                 context: $context + [
                     'point_key' => $pointKey,
                     'campaign_key' => $parsed->campaignKey,
@@ -451,7 +440,7 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
                 routeKey: $routeKey,
                 pointKey: $pointKey,
                 parsed: $parsed,
-                path: "{$path}.default_definition",
+                path: "{$path}.definition",
                 context: $context,
             );
         }
@@ -464,7 +453,7 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
                     yield $this->error(
                         code: 'flow_routes.branch_target_missing',
                         message: "FlowRoute [{$routeKey}] point [{$pointKey}] branch references missing route point [{$target}].",
-                        path: "{$path}.default_definition.branches.{$branchIndex}.target_flow_route_point_key",
+                        path: "{$path}.definition.branches.{$branchIndex}.target_flow_route_point_key",
                         context: $context + [
                             'point_key' => $pointKey,
                             'target_flow_route_point_key' => $target,
@@ -479,7 +468,7 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
                 yield $this->error(
                     code: 'flow_routes.branch_default_target_missing',
                     message: "FlowRoute [{$routeKey}] point [{$pointKey}] references missing default branch target [{$parsed->defaultTargetFlowRoutePointKey}].",
-                    path: "{$path}.default_definition.default_target_flow_route_point_key",
+                    path: "{$path}.definition.default_target_flow_route_point_key",
                     context: $context + [
                         'point_key' => $pointKey,
                         'target_flow_route_point_key' => $parsed->defaultTargetFlowRoutePointKey,
@@ -618,9 +607,9 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
         }
 
         /** @var FlowRoute $route */
-        foreach (FlowRoute::query()->active()->with(['flowRoutePoints.point', 'flowRoutePoints.capability'])->get() as $route) {
+        foreach (FlowRoute::query()->active()->with(['flowRoutePoints.capability'])->get() as $route) {
             $activePoints = $route->flowRoutePoints
-                ->filter(fn (FlowRoutePoint $point): bool => $point->is_active && (bool) $point->point?->is_active)
+                ->filter(fn (FlowRoutePoint $point): bool => $point->is_active)
                 ->values();
 
             $startCount = $activePoints->where('is_start', true)->count();
@@ -648,28 +637,15 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
             $activeIds = $activePoints->pluck('id')->map(fn ($id): int => (int) $id)->all();
 
             foreach ($activePoints as $flowRoutePoint) {
-                $point = $flowRoutePoint->point;
-
-                if (! $point instanceof Point) {
-                    yield $this->error(
-                        code: 'flow_routes.runtime_point_missing',
-                        message: "FlowRoute [{$route->key}] route point [{$flowRoutePoint->key}] references a missing Point.",
-                        path: "flow_route_points.{$flowRoutePoint->getKey()}.point_id",
-                        context: ['route_key' => $route->key, 'point_key' => $flowRoutePoint->key],
-                    );
-
-                    continue;
-                }
-
-                if (! $this->pointHandlerRegistry->has($point->type)) {
+                if (! $this->pointHandlerRegistry->has($flowRoutePoint->type)) {
                     yield $this->error(
                         code: 'flow_routes.runtime_point_handler_missing',
-                        message: "Active FlowRoute [{$route->key}] point [{$flowRoutePoint->key}] cannot execute because handler [{$point->type}] is unavailable.",
-                        path: "flow_route_points.{$flowRoutePoint->getKey()}.point_id",
+                        message: "Active FlowRoute [{$route->key}] point [{$flowRoutePoint->key}] cannot execute because handler [{$flowRoutePoint->type}] is unavailable.",
+                        path: "flow_route_points.{$flowRoutePoint->getKey()}.type",
                         context: [
                             'route_key' => $route->key,
                             'point_key' => $flowRoutePoint->key,
-                            'point_type' => $point->type,
+                            'point_type' => $flowRoutePoint->type,
                         ],
                     );
                 }
@@ -701,10 +677,10 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
                                 'point_key' => $flowRoutePoint->key,
                             ],
                         );
-                    } elseif ($capability->point_type !== $point->type) {
+                    } elseif ($capability->point_type !== $flowRoutePoint->type) {
                         yield $this->error(
                             code: 'flow_routes.runtime_capability_point_mismatch',
-                            message: "Active FlowRoute [{$route->key}] point [{$flowRoutePoint->key}] capability [{$capability->key}] expects [{$capability->point_type}], not [{$point->type}].",
+                            message: "Active FlowRoute [{$route->key}] point [{$flowRoutePoint->key}] capability [{$capability->key}] expects [{$capability->point_type}], not [{$flowRoutePoint->type}].",
                             path: "flow_route_points.{$flowRoutePoint->getKey()}.flow_route_capability_id",
                             context: [
                                 'route_key' => $route->key,

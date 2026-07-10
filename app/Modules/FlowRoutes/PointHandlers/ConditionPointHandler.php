@@ -6,7 +6,7 @@ use App\Modules\FlowRoutes\Contracts\PointHandler;
 use App\Modules\FlowRoutes\Data\Points\ConditionPointDefinition;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
-use App\Modules\FlowRoutes\Models\Point;
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Services\FlowRouteConditionEvaluatorRegistry;
 
 class ConditionPointHandler implements PointHandler
@@ -17,7 +17,7 @@ class ConditionPointHandler implements PointHandler
 
     public function type(): string
     {
-        return Point::TYPE_CONDITION;
+        return FlowRoutePointType::Condition->value;
     }
 
     public function handle(PointExecutionContext $context): PointExecutionResult
@@ -33,7 +33,6 @@ class ConditionPointHandler implements PointHandler
                 meta: [
                     'condition_definition' => $definition->toMetaPayload(),
                     'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                    'point_id' => $context->flowRoutePoint->point_id,
                     'flow_routes' => $context->flowRouteProvenance(),
                 ],
             );
@@ -52,7 +51,6 @@ class ConditionPointHandler implements PointHandler
                 'condition_definition' => $definition->toMetaPayload(),
                 'condition_evaluation' => $evaluation->toMetaPayload(),
                 'flow_route_point_id' => $context->flowRoutePoint->getKey(),
-                'point_id' => $context->flowRoutePoint->point_id,
                 'flow_routes' => $context->flowRouteProvenance(),
             ],
         );

@@ -3,9 +3,9 @@
 namespace Tests\Feature\FlowRoutes;
 
 use App\Modules\Core\Models\ContactStatus;
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
-use App\Modules\FlowRoutes\Models\Point;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -71,20 +71,42 @@ class FlowRoutesModelSchemaTest extends TestCase
         $this->assertSame(1, FlowRoute::query()->notCustomized()->count());
     }
 
-    public function test_point_is_generic_type_based_and_not_task_specific(): void
+    public function test_flow_route_point_is_generic_type_based_and_not_task_specific(): void
     {
-        $point = Point::query()->create([
+        $contactStatus = ContactStatus::query()->create([
+            'key' => 'lead',
+            'name' => 'Lead',
+        ]);
+
+        $route = FlowRoute::query()->create([
+            'key' => 'generic_route',
+            'contact_status_id' => $contactStatus->id,
+            'name' => 'Generic Route',
+            'version' => 1,
+            'trigger_type' => FlowRoute::TRIGGER_CONTACT_STATUS,
+            'trigger_key' => $contactStatus->key,
+            'is_active' => true,
+            'is_customized' => false,
+            'meta' => [],
+        ]);
+
+        $routePoint = FlowRoutePoint::query()->create([
+            'flow_route_id' => $route->id,
             'key' => 'wait_three_days',
-            'type' => Point::TYPE_WAIT,
+            'type' => FlowRoutePointType::Wait->value,
             'name' => 'Wait Three Days',
             'description' => 'Pause route progression for three days.',
-            'default_definition' => [
+            'sort_order' => 10,
+            'is_start' => true,
+            'is_active' => true,
+            'next_flow_route_point_id' => null,
+            'definition' => [
                 'days' => 3,
             ],
-            'default_settings' => [
+            'settings' => [
                 'skip_weekends' => false,
             ],
-            'is_active' => true,
+            'cancel_conditions' => [],
             'source_version' => '2026-06-26',
             'is_customized' => false,
             'meta' => [
@@ -92,17 +114,16 @@ class FlowRoutesModelSchemaTest extends TestCase
             ],
         ]);
 
-        $this->assertTrue($point->is_active);
-        $this->assertTrue($point->isType(Point::TYPE_WAIT));
-        $this->assertSame(Point::TYPE_WAIT, $point->type);
-        $this->assertSame(3, $point->default_definition['days']);
-        $this->assertFalse($point->default_settings['skip_weekends']);
-        $this->assertSame('timing', $point->meta['category']);
+        $this->assertTrue($routePoint->is_active);
+        $this->assertSame(FlowRoutePointType::Wait->value, $routePoint->type);
+        $this->assertSame(3, $routePoint->definition['days']);
+        $this->assertFalse($routePoint->settings['skip_weekends']);
+        $this->assertSame('timing', $routePoint->meta['category']);
 
-        $this->assertSame(1, Point::query()->active()->count());
-        $this->assertSame(1, Point::query()->type(Point::TYPE_WAIT)->count());
-        $this->assertSame(1, Point::query()->forKey('wait_three_days')->count());
-        $this->assertSame(1, Point::query()->notCustomized()->count());
+        $this->assertSame(1, FlowRoutePoint::query()->active()->count());
+        $this->assertSame(1, FlowRoutePoint::query()->forPointType(FlowRoutePointType::Wait->value)->count());
+        $this->assertSame(1, FlowRoutePoint::query()->forKey('wait_three_days')->count());
+        $this->assertSame(1, FlowRoutePoint::query()->notCustomized()->count());
     }
 
     public function test_flow_route_point_stores_route_specific_configuration(): void
@@ -127,33 +148,19 @@ class FlowRoutesModelSchemaTest extends TestCase
             'meta' => [],
         ]);
 
-        $waitPoint = Point::query()->create([
-            'key' => 'wait_one_day',
-            'type' => Point::TYPE_WAIT,
-            'name' => 'Wait One Day',
-            'default_definition' => [
-                'days' => 1,
-            ],
-        ]);
-
-        $messagePoint = Point::query()->create([
-            'key' => 'send_follow_up_message',
-            'type' => Point::TYPE_SEND_MESSAGE,
-            'name' => 'Send Follow-Up Message',
-            'default_definition' => [
-                'message_key' => 'consultation.follow_up',
-            ],
-        ]);
-
         $secondRoutePoint = FlowRoutePoint::query()->create([
             'flow_route_id' => $route->id,
-            'point_id' => $messagePoint->id,
+            'type' => FlowRoutePointType::SendMessage->value,
+            'name' => 'Send Follow-Up Message',
+            'description' => null,
             'key' => 'send_follow_up',
             'sort_order' => 20,
             'is_start' => false,
             'is_active' => false,
             'next_flow_route_point_id' => null,
-            'definition' => [],
+            'definition' => [
+                'message_key' => 'consultation.follow_up',
+            ],
             'settings' => [],
             'cancel_conditions' => [],
             'source_version' => null,
@@ -164,7 +171,9 @@ class FlowRoutesModelSchemaTest extends TestCase
 
         $firstRoutePoint = FlowRoutePoint::query()->create([
             'flow_route_id' => $route->id,
-            'point_id' => $waitPoint->id,
+            'type' => FlowRoutePointType::Wait->value,
+            'name' => 'Wait One Day',
+            'description' => null,
             'key' => 'custom_wait',
             'sort_order' => 10,
             'is_start' => true,
@@ -190,7 +199,8 @@ class FlowRoutesModelSchemaTest extends TestCase
         ]);
 
         $this->assertTrue($firstRoutePoint->flowRoute->is($route));
-        $this->assertTrue($firstRoutePoint->point->is($waitPoint));
+        $this->assertSame(FlowRoutePointType::Wait->value, $firstRoutePoint->type);
+        $this->assertSame('Wait One Day', $firstRoutePoint->name);
         $this->assertSame('custom_wait', $firstRoutePoint->key);
         $this->assertTrue($firstRoutePoint->is_start);
         $this->assertSame($secondRoutePoint->getKey(), $firstRoutePoint->next_flow_route_point_id);
@@ -204,7 +214,7 @@ class FlowRoutesModelSchemaTest extends TestCase
         $this->assertSame(1, $route->activeFlowRoutePoints()->count());
         $this->assertSame(1, FlowRoutePoint::query()->forKey('custom_wait')->count());
         $this->assertSame(1, FlowRoutePoint::query()->start()->count());
-        $this->assertSame(1, FlowRoutePoint::query()->forPointType(Point::TYPE_WAIT)->count());
-        $this->assertSame(1, FlowRoutePoint::query()->forPointType(Point::TYPE_SEND_MESSAGE)->count());
+        $this->assertSame(1, FlowRoutePoint::query()->forPointType(FlowRoutePointType::Wait->value)->count());
+        $this->assertSame(1, FlowRoutePoint::query()->forPointType(FlowRoutePointType::SendMessage->value)->count());
     }
 }

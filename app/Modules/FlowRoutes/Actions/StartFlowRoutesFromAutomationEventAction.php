@@ -36,7 +36,7 @@ class StartFlowRoutesFromAutomationEventAction
                 continue;
             }
 
-            $flowRoute->loadMissing('activeFlowRoutePoints.point');
+            $flowRoute->loadMissing('activeFlowRoutePoints');
 
             $progress = $this->startProgress($flowRoute, $event);
 
@@ -115,4 +115,3 @@ class StartFlowRoutesFromAutomationEventAction
             ->first();
     }
 }
-

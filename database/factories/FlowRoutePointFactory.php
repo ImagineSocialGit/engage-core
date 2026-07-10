@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
-use App\Modules\FlowRoutes\Models\Point;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -18,9 +18,11 @@ class FlowRoutePointFactory extends Factory
     {
         return [
             'flow_route_id' => FlowRoute::factory(),
-            'point_id' => Point::factory(),
             'flow_route_capability_id' => null,
             'key' => 'point-'.fake()->unique()->bothify('########'),
+            'type' => FlowRoutePointType::Noop->value,
+            'name' => fake()->words(3, true),
+            'description' => fake()->optional()->sentence(),
             'sort_order' => fake()->unique()->numberBetween(1, 10000),
             'is_start' => false,
             'is_active' => true,
@@ -33,6 +35,13 @@ class FlowRoutePointFactory extends Factory
             'customized_at' => null,
             'meta' => [],
         ];
+    }
+
+    public function type(FlowRoutePointType|string $type): static
+    {
+        return $this->state(fn (): array => [
+            'type' => $type instanceof FlowRoutePointType ? $type->value : $type,
+        ]);
     }
 
     public function start(): static

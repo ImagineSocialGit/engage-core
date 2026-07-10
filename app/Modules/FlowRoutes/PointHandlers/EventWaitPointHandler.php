@@ -6,12 +6,12 @@ use App\Modules\FlowRoutes\Contracts\PointHandler;
 use App\Modules\FlowRoutes\Data\Points\EventWaitPointDefinition;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
-use App\Modules\FlowRoutes\Models\Point;
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use Carbon\CarbonImmutable;
 
 class EventWaitPointHandler implements PointHandler
 {
-    public function type(): string { return Point::TYPE_EVENT_WAIT; }
+    public function type(): string { return FlowRoutePointType::EventWait->value; }
 
     public function handle(PointExecutionContext $context): PointExecutionResult
     {
@@ -47,8 +47,7 @@ class EventWaitPointHandler implements PointHandler
             'wait' => [
                 ...$context->flowRouteProvenance(),
                 'flow_route_point_key' => $context->flowRoutePoint->key,
-                'point_key' => $context->flowRoutePoint->point?->key,
-                'point_type' => Point::TYPE_EVENT_WAIT,
+                'point_type' => FlowRoutePointType::EventWait->value,
                 'started_waiting_at' => $now->toISOString(),
                 'expected_event' => $definition->eventKey,
                 'correlation' => $definition->correlation,

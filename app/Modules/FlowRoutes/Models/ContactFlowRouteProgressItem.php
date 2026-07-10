@@ -26,7 +26,6 @@ class ContactFlowRouteProgressItem extends Model
         'contact_flow_route_plan_item_id',
         'flow_route_id',
         'flow_route_point_id',
-        'point_id',
         'flow_route_capability_id',
         'created_subject_type',
         'created_subject_id',
@@ -56,7 +55,6 @@ class ContactFlowRouteProgressItem extends Model
         'contact_flow_route_plan_item_id' => 'integer',
         'flow_route_id' => 'integer',
         'flow_route_point_id' => 'integer',
-        'point_id' => 'integer',
         'flow_route_capability_id' => 'integer',
         'created_subject_id' => 'integer',
         'sequence' => 'integer',
@@ -95,11 +93,6 @@ class ContactFlowRouteProgressItem extends Model
     public function flowRoutePoint(): BelongsTo
     {
         return $this->belongsTo(FlowRoutePoint::class);
-    }
-
-    public function point(): BelongsTo
-    {
-        return $this->belongsTo(Point::class);
     }
 
     public function capability(): BelongsTo
@@ -147,4 +140,3 @@ class ContactFlowRouteProgressItem extends Model
             ->where('resume_at', '<=', now());
     }
 }
-

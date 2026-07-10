@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\FlowRoutes;
 
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
+
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem;
@@ -10,7 +12,6 @@ use App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
-use App\Modules\FlowRoutes\Models\Point;
 use App\Modules\Workflow\Actions\TransitionContactWorkflowStatusAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -46,15 +47,14 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
 
         $this->bindRouteToContactStatus($flowRoute, $status);
 
-        $point = Point::query()->create([
-            'key' => 'mark_started',
-            'type' => Point::TYPE_NOOP,
-            'name' => 'Mark Started',
-        ]);
 
         $flowRoutePoint = FlowRoutePoint::query()->create([
             'flow_route_id' => $flowRoute->id,
-            'point_id' => $point->id,
+            'type' => FlowRoutePointType::Noop->value,
+
+            'name' => 'Wait For Next Status',
+
+            'description' => null,
             'key' => 'mark_started',
             'sort_order' => 10,
             'is_start' => true,
@@ -136,15 +136,14 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
         $this->bindRouteToContactStatus($oldRoute, $oldStatus);
         $this->bindRouteToContactStatus($newRoute, $newStatus);
 
-        $oldPoint = Point::query()->create([
-            'key' => 'old_wait',
-            'type' => Point::TYPE_WAIT,
-            'name' => 'Old Wait',
-        ]);
 
         FlowRoutePoint::query()->create([
             'flow_route_id' => $oldRoute->id,
-            'point_id' => $oldPoint->id,
+            'type' => FlowRoutePointType::Wait->value,
+
+            'name' => 'Old Wait',
+
+            'description' => null,
             'key' => 'old_wait',
             'sort_order' => 10,
             'is_start' => true,
@@ -161,15 +160,14 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
             'meta' => [],
         ]);
 
-        $newPoint = Point::query()->create([
-            'key' => 'new_noop',
-            'type' => Point::TYPE_NOOP,
-            'name' => 'New Noop',
-        ]);
 
         FlowRoutePoint::query()->create([
             'flow_route_id' => $newRoute->id,
-            'point_id' => $newPoint->id,
+            'type' => FlowRoutePointType::Noop->value,
+
+            'name' => 'New Noop',
+
+            'description' => null,
             'key' => 'new_noop',
             'sort_order' => 10,
             'is_start' => true,
@@ -272,15 +270,14 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
 
         $this->bindRouteToContactStatus($route, $oldStatus);
 
-        $point = Point::query()->create([
-            'key' => 'wait_for_next_status',
-            'type' => Point::TYPE_WAIT,
-            'name' => 'Wait For Next Status',
-        ]);
 
         FlowRoutePoint::query()->create([
             'flow_route_id' => $route->id,
-            'point_id' => $point->id,
+            'type' => FlowRoutePointType::Wait->value,
+
+            'name' => 'Wait For Next Status',
+
+            'description' => null,
             'key' => 'wait_for_next_status',
             'sort_order' => 10,
             'is_start' => true,
@@ -350,37 +347,15 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
 
         $this->bindRouteToContactStatus($flowRoute, $fromStatus);
 
-        $changeStatusPoint = Point::query()->create([
-            'key' => 'phase_4b_change_status',
-            'type' => Point::TYPE_CHANGE_STATUS,
-            'name' => 'Change Status',
-            'description' => null,
-            'default_definition' => [],
-            'default_settings' => [],
-            'is_active' => true,
-            'source_version' => 'test',
-            'is_customized' => false,
-            'customized_at' => null,
-            'meta' => [],
-        ]);
 
-        $noopPoint = Point::query()->create([
-            'key' => 'phase_4b_after_change_status_noop',
-            'type' => Point::TYPE_NOOP,
-            'name' => 'After Change Status Noop',
-            'description' => null,
-            'default_definition' => [],
-            'default_settings' => [],
-            'is_active' => true,
-            'source_version' => 'test',
-            'is_customized' => false,
-            'customized_at' => null,
-            'meta' => [],
-        ]);
 
         $noopRoutePoint = FlowRoutePoint::query()->create([
             'flow_route_id' => $flowRoute->getKey(),
-            'point_id' => $noopPoint->getKey(),
+            'type' => FlowRoutePointType::Noop->value,
+
+            'name' => 'After Change Status Noop',
+
+            'description' => null,
             'key' => 'after_change_status_noop',
             'sort_order' => 20,
             'is_start' => false,
@@ -397,7 +372,11 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
 
         FlowRoutePoint::query()->create([
             'flow_route_id' => $flowRoute->getKey(),
-            'point_id' => $changeStatusPoint->getKey(),
+            'type' => FlowRoutePointType::ChangeStatus->value,
+
+            'name' => 'Change Status',
+
+            'description' => null,
             'key' => 'change_status_to_phase_4b_to_status',
             'sort_order' => 10,
             'is_start' => true,

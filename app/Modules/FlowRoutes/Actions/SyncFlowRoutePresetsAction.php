@@ -3,7 +3,6 @@
 namespace App\Modules\FlowRoutes\Actions;
 
 use App\Modules\Core\Models\ContactStatus;
-use App\Modules\FlowRoutes\Data\Points\PointPresetDefinition;
 use App\Modules\FlowRoutes\Data\Presets\FlowRoutePointPresetDefinition;
 use App\Modules\FlowRoutes\Data\Presets\FlowRoutePresetDefinition;
 use App\Modules\FlowRoutes\Data\Presets\FlowRoutePresetSyncResult;
@@ -11,7 +10,6 @@ use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRouteCapability;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
-use App\Modules\FlowRoutes\Models\Point;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -227,52 +225,32 @@ class SyncFlowRoutePresetsAction
                 $result->{$flowRouteWasRecentlyCreated ? 'recordCreated' : 'recordUpdated'}('flow_routes');
             }
 
-            $pointsByKey = [];
-
-            foreach ($definition->points as $pointDefinition) {
-                $point = $this->syncPoint($definition, $pointDefinition, $result, $force);
-
-                if ($point instanceof Point) {
-                    $pointsByKey[$pointDefinition->key] = $point;
-                }
-            }
-
             $flowRoutePointsByKey = [];
 
-            foreach ($definition->flowRoutePoints as $flowRoutePointDefinition) {
-                $point = $pointsByKey[$flowRoutePointDefinition->pointKey]
-                    ?? Point::query()->where('key', $flowRoutePointDefinition->pointKey)->first();
-
-                if (! $point) {
-                    $result->warn("FlowRoute preset [{$definition->key}] route point skipped because Point [{$flowRoutePointDefinition->pointKey}] does not exist.");
-
-                    continue;
-                }
-
-                $capability = $flowRoutePointDefinition->capabilityKey !== null
+            foreach ($definition->points as $pointDefinition) {
+                $capability = $pointDefinition->capabilityKey !== null
                     ? FlowRouteCapability::query()
-                        ->where('key', $flowRoutePointDefinition->capabilityKey)
+                        ->where('key', $pointDefinition->capabilityKey)
                         ->first()
                     : null;
 
                 $flowRoutePoint = $this->syncFlowRoutePoint(
                     flowRoute: $flowRoute,
-                    point: $point,
                     capability: $capability,
                     routeDefinition: $definition,
-                    pointDefinition: $flowRoutePointDefinition,
+                    pointDefinition: $pointDefinition,
                     result: $result,
                     force: $force,
                 );
 
                 if ($flowRoutePoint instanceof FlowRoutePoint) {
-                    $flowRoutePointsByKey[$flowRoutePointDefinition->key] = $flowRoutePoint;
+                    $flowRoutePointsByKey[$pointDefinition->key] = $flowRoutePoint;
                 }
             }
 
             $this->syncNextFlowRoutePoints(
                 flowRoutePointsByKey: $flowRoutePointsByKey,
-                pointDefinitions: $definition->flowRoutePoints,
+                pointDefinitions: $definition->points,
                 result: $result,
             );
 
@@ -430,7 +408,7 @@ class SyncFlowRoutePresetsAction
     ): bool {
         $valid = true;
 
-        foreach ($definition->flowRoutePoints as $pointDefinition) {
+        foreach ($definition->points as $pointDefinition) {
             if ($pointDefinition->capabilityKey === null) {
                 continue;
             }
@@ -446,15 +424,8 @@ class SyncFlowRoutePresetsAction
                 continue;
             }
 
-            $pointDefinitionModel = collect($definition->points)
-                ->first(fn (PointPresetDefinition $point): bool => $point->key === $pointDefinition->pointKey);
-
-            if (! $pointDefinitionModel instanceof PointPresetDefinition) {
-                continue;
-            }
-
-            if ($capability->point_type !== $pointDefinitionModel->type) {
-                $result->error("FlowRoute preset [{$definition->key}] route point [{$pointDefinition->key}] capability [{$pointDefinition->capabilityKey}] expects point type [{$capability->point_type}], not [{$pointDefinitionModel->type}].");
+            if ($capability->point_type !== $pointDefinition->type) {
+                $result->error("FlowRoute preset [{$definition->key}] route point [{$pointDefinition->key}] capability [{$pointDefinition->capabilityKey}] expects point type [{$capability->point_type}], not [{$pointDefinition->type}].");
                 $valid = false;
             }
         }
@@ -462,53 +433,8 @@ class SyncFlowRoutePresetsAction
         return $valid;
     }
 
-    private function syncPoint(
-        FlowRoutePresetDefinition $routeDefinition,
-        PointPresetDefinition $definition,
-        FlowRoutePresetSyncResult $result,
-        bool $force,
-    ): ?Point {
-        $point = Point::query()->firstOrNew([
-            'key' => $definition->key,
-        ]);
-
-        $wasRecentlyCreated = ! $point->exists;
-
-        if ($point->exists && $point->is_customized && ! $force) {
-            $result->recordSkipped('points');
-
-            return $point;
-        }
-
-        $point->forceFill([
-            'key' => $definition->key,
-            'type' => $definition->type,
-            'name' => $definition->name,
-            'description' => $definition->description,
-            'default_definition' => $definition->defaultDefinition,
-            'default_settings' => $definition->defaultSettings,
-            'is_active' => $definition->isActive,
-            'source_version' => $definition->sourceVersion,
-            'is_customized' => $force ? false : (bool) $point->is_customized,
-            'customized_at' => $force ? null : $point->customized_at,
-            'meta' => array_replace_recursive($point->meta ?? [], [
-                'preset' => [
-                    'client_preset_key' => $routeDefinition->presetKey,
-                    'flow_route_key' => $routeDefinition->key,
-                    'point_key' => $definition->key,
-                ],
-                'definition' => $definition->meta,
-            ]),
-        ])->save();
-
-        $result->{$wasRecentlyCreated ? 'recordCreated' : 'recordUpdated'}('points');
-
-        return $point;
-    }
-
     private function syncFlowRoutePoint(
         FlowRoute $flowRoute,
-        Point $point,
         ?FlowRouteCapability $capability,
         FlowRoutePresetDefinition $routeDefinition,
         FlowRoutePointPresetDefinition $pointDefinition,
@@ -530,16 +456,16 @@ class SyncFlowRoutePresetsAction
 
         $flowRoutePoint->forceFill([
             'flow_route_id' => $flowRoute->getKey(),
-            'point_id' => $point->getKey(),
             'flow_route_capability_id' => $capability?->getKey(),
             'key' => $pointDefinition->key,
+            'type' => $pointDefinition->type,
+            'name' => $pointDefinition->name,
+            'description' => $pointDefinition->description,
             'sort_order' => $pointDefinition->sortOrder,
             'is_start' => $pointDefinition->isStart,
             'is_active' => $pointDefinition->isActive,
             'next_flow_route_point_id' => null,
-            'definition' => array_replace_recursive($pointDefinition->definition, [
-                'conditions' => $pointDefinition->conditions,
-            ]),
+            'definition' => $pointDefinition->definition,
             'settings' => $pointDefinition->settings,
             'cancel_conditions' => $pointDefinition->cancelConditions,
             'source_version' => $pointDefinition->sourceVersion,
@@ -550,7 +476,6 @@ class SyncFlowRoutePresetsAction
                     'client_preset_key' => $routeDefinition->presetKey,
                     'flow_route_key' => $routeDefinition->key,
                     'flow_route_point_key' => $pointDefinition->key,
-                    'point_key' => $pointDefinition->pointKey,
                     'capability_key' => $pointDefinition->capabilityKey,
                     'sort_order' => $pointDefinition->sortOrder,
                     'next_point_key' => $pointDefinition->nextPointKey,

@@ -14,9 +14,11 @@ class FlowRoutePoint extends Model
 
     protected $fillable = [
         'flow_route_id',
-        'point_id',
         'flow_route_capability_id',
         'key',
+        'type',
+        'name',
+        'description',
         'sort_order',
         'is_start',
         'is_active',
@@ -32,7 +34,6 @@ class FlowRoutePoint extends Model
 
     protected $casts = [
         'flow_route_id' => 'integer',
-        'point_id' => 'integer',
         'flow_route_capability_id' => 'integer',
         'sort_order' => 'integer',
         'is_start' => 'boolean',
@@ -49,11 +50,6 @@ class FlowRoutePoint extends Model
     public function flowRoute(): BelongsTo
     {
         return $this->belongsTo(FlowRoute::class);
-    }
-
-    public function point(): BelongsTo
-    {
-        return $this->belongsTo(Point::class);
     }
 
     public function capability(): BelongsTo
@@ -113,7 +109,7 @@ class FlowRoutePoint extends Model
 
     public function scopeForPointType(Builder $query, string $type): Builder
     {
-        return $query->whereHas('point', fn (Builder $pointQuery) => $pointQuery->where('type', $type));
+        return $query->where('type', $type);
     }
 
     public function scopeCustomized(Builder $query): Builder

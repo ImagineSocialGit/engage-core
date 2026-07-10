@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Models\ContactFlowRoutePlan;
 use App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem;
-use App\Modules\FlowRoutes\Models\Point;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -23,10 +23,9 @@ class ContactFlowRoutePlanItemFactory extends Factory
             'contact_flow_route_plan_id' => $plan->getKey(),
             'flow_route_id' => $plan->flow_route_id,
             'flow_route_point_id' => null,
-            'point_id' => null,
             'flow_route_capability_id' => null,
             'key' => 'plan-item-'.fake()->unique()->bothify('########'),
-            'point_type' => Point::TYPE_NOOP,
+            'point_type' => FlowRoutePointType::Noop->value,
             'sort_order' => 0,
             'sequence' => 0,
             'attempt' => 1,

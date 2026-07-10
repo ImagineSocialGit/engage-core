@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\FlowRoutes;
 
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
+
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Models\CampaignStep;
@@ -22,7 +24,6 @@ use App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
-use App\Modules\FlowRoutes\Models\Point;
 use App\Modules\FlowRoutes\PointHandlers\NoopPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\WaitPointHandler;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
@@ -52,17 +53,17 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             new WaitPointHandler(),
         ]);
 
-        $this->assertTrue($registry->has(Point::TYPE_NOOP));
-        $this->assertTrue($registry->has(Point::TYPE_WAIT));
-        $this->assertInstanceOf(NoopPointHandler::class, $registry->resolve(Point::TYPE_NOOP));
-        $this->assertInstanceOf(WaitPointHandler::class, $registry->resolve(Point::TYPE_WAIT));
+        $this->assertTrue($registry->has(FlowRoutePointType::Noop->value));
+        $this->assertTrue($registry->has(FlowRoutePointType::Wait->value));
+        $this->assertInstanceOf(NoopPointHandler::class, $registry->resolve(FlowRoutePointType::Noop->value));
+        $this->assertInstanceOf(WaitPointHandler::class, $registry->resolve(FlowRoutePointType::Wait->value));
     }
 
     public function test_noop_point_completes_and_advances_to_next_point(): void
     {
         $setup = $this->createProgressWithPoints([
-            Point::TYPE_NOOP,
-            Point::TYPE_WAIT,
+            FlowRoutePointType::Noop->value,
+            FlowRoutePointType::Wait->value,
         ]);
 
         $result = app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']);
@@ -73,13 +74,13 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
         $this->assertSame(ContactFlowRouteProgress::STATUS_ACTIVE, $setup['progress']->status);
         $this->assertSame($setup['flow_route_points'][1]->getKey(), $setup['progress']->current_flow_route_point_id);
-        $this->assertSame(Point::TYPE_WAIT, $setup['progress']->currentFlowRoutePoint->point->type);
+        $this->assertSame(FlowRoutePointType::Wait->value, $setup['progress']->currentFlowRoutePoint->type);
     }
 
     public function test_noop_point_completes_route_when_no_next_point_exists(): void
     {
         $setup = $this->createProgressWithPoints([
-            Point::TYPE_NOOP,
+            FlowRoutePointType::Noop->value,
         ]);
 
         $result = app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']);
@@ -100,8 +101,8 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         Queue::fake();
 
         $setup = $this->createProgressWithPoints([
-            Point::TYPE_WAIT,
-            Point::TYPE_NOOP,
+            FlowRoutePointType::Wait->value,
+            FlowRoutePointType::Noop->value,
         ]);
 
         $setup['flow_route_points'][0]->forceFill([
@@ -134,7 +135,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
                 new class implements \App\Modules\FlowRoutes\Contracts\PointHandler {
                     public function type(): string
                     {
-                        return Point::TYPE_CONDITION;
+                        return FlowRoutePointType::Condition->value;
                     }
 
                     public function handle(\App\Modules\FlowRoutes\Data\Points\PointExecutionContext $context): PointExecutionResult
@@ -152,8 +153,8 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         );
 
         $setup = $this->createProgressWithPoints([
-            Point::TYPE_CONDITION,
-            Point::TYPE_NOOP,
+            FlowRoutePointType::Condition->value,
+            FlowRoutePointType::Noop->value,
         ]);
 
         $result = app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']);
@@ -209,8 +210,8 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         Queue::fake();
 
         $setup = $this->createProgressWithPoints([
-            Point::TYPE_WAIT,
-            Point::TYPE_NOOP,
+            FlowRoutePointType::Wait->value,
+            FlowRoutePointType::Noop->value,
         ]);
 
         $setup['flow_route_points'][0]->forceFill([
@@ -316,7 +317,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         ]);
 
         $setup = $this->createProgressWithPoints([
-            Point::TYPE_SEND_MESSAGE,
+            FlowRoutePointType::SendMessage->value,
         ]);
 
         $setup['flow_route_points'][0]->forceFill([
@@ -369,7 +370,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         ]);
 
         $setup = $this->createProgressWithPoints([
-            Point::TYPE_SEND_MESSAGE,
+            FlowRoutePointType::SendMessage->value,
         ]);
 
         MessageConsent::query()->create([
@@ -420,7 +421,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         TeamMember::factory()->inactive()->create();
 
         $setup = $this->createProgressWithPoints([
-            Point::TYPE_CREATE_TASK,
+            FlowRoutePointType::CreateTask->value,
         ]);
 
         $setup['flow_route_points'][0]->forceFill([
@@ -445,7 +446,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
     public function test_inline_create_task_point_due_offset_minutes_sets_due_at(): void
     {
         $setup = $this->createProgressWithPoints([
-            Point::TYPE_CREATE_TASK,
+            FlowRoutePointType::CreateTask->value,
         ]);
 
         $setup['flow_route_points'][0]->forceFill([
@@ -482,7 +483,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         ]);
 
         $setup = $this->createProgressWithPoints([
-            Point::TYPE_CREATE_TASK,
+            FlowRoutePointType::CreateTask->value,
         ]);
 
         $setup['flow_route_points'][0]->forceFill([
@@ -586,7 +587,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         ]);
 
         $setup = $this->createProgressWithPoints([
-            Point::TYPE_ENROLL_CAMPAIGN,
+            FlowRoutePointType::EnrollCampaign->value,
         ]);
 
         MessageConsent::query()->create([
@@ -654,23 +655,13 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             'meta' => [],
         ]);
 
-        $point = Point::query()->create([
-            'key' => 'change_status_to_attended_webinar',
-            'type' => Point::TYPE_CHANGE_STATUS,
-            'name' => 'Change Status to Attended Webinar',
-            'description' => null,
-            'default_definition' => [],
-            'default_settings' => [],
-            'is_active' => true,
-            'source_version' => 'test',
-            'is_customized' => false,
-            'customized_at' => null,
-            'meta' => [],
-        ]);
 
         FlowRoutePoint::query()->create([
             'flow_route_id' => $flowRoute->getKey(),
-            'point_id' => $point->getKey(),
+            'type' => FlowRoutePointType::ChangeStatus->value,
+            'name' => 'Change Status to Attended Webinar',
+
+            'description' => null,
             'key' => 'change_status_to_attended_webinar',
             'sort_order' => 10,
             'is_start' => true,
@@ -734,9 +725,9 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
     public function test_task_completed_event_resumes_waiting_route_for_the_specific_route_created_task(): void
     {
         $setup = $this->createProgressWithPoints([
-            Point::TYPE_CREATE_TASK,
-            Point::TYPE_EVENT_WAIT,
-            Point::TYPE_NOOP,
+            FlowRoutePointType::CreateTask->value,
+            FlowRoutePointType::EventWait->value,
+            FlowRoutePointType::Noop->value,
         ]);
 
         $setup['flow_route_points'][0]->forceFill([
@@ -808,9 +799,9 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
     public function test_task_completed_event_can_resume_subject_scoped_route_created_task_without_contact_only_matching(): void
     {
         $setup = $this->createProgressWithPoints([
-            Point::TYPE_CREATE_TASK,
-            Point::TYPE_EVENT_WAIT,
-            Point::TYPE_NOOP,
+            FlowRoutePointType::CreateTask->value,
+            FlowRoutePointType::EventWait->value,
+            FlowRoutePointType::Noop->value,
         ]);
 
         $setup['progress']->forceFill([
@@ -866,10 +857,10 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
     public function test_task_completed_event_with_multiple_route_created_tasks_requires_explicit_correlation(): void
     {
         $setup = $this->createProgressWithPoints([
-            Point::TYPE_CREATE_TASK,
-            Point::TYPE_CREATE_TASK,
-            Point::TYPE_EVENT_WAIT,
-            Point::TYPE_NOOP,
+            FlowRoutePointType::CreateTask->value,
+            FlowRoutePointType::CreateTask->value,
+            FlowRoutePointType::EventWait->value,
+            FlowRoutePointType::Noop->value,
         ]);
 
         $setup['flow_route_points'][0]->forceFill([
@@ -933,10 +924,10 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         ]);
 
         $setup = $this->createProgressWithPoints([
-            Point::TYPE_CREATE_TASK,
-            Point::TYPE_CREATE_TASK,
-            Point::TYPE_EVENT_WAIT,
-            Point::TYPE_NOOP,
+            FlowRoutePointType::CreateTask->value,
+            FlowRoutePointType::CreateTask->value,
+            FlowRoutePointType::EventWait->value,
+            FlowRoutePointType::Noop->value,
         ]);
 
         $setup['flow_route_points'][0]->forceFill([
@@ -1008,9 +999,9 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
     public function test_complete_task_action_resumes_waiting_event_wait_route_through_automation_event_listener_chain(): void
     {
         $setup = $this->createProgressWithPoints([
-            Point::TYPE_CREATE_TASK,
-            Point::TYPE_EVENT_WAIT,
-            Point::TYPE_NOOP,
+            FlowRoutePointType::CreateTask->value,
+            FlowRoutePointType::EventWait->value,
+            FlowRoutePointType::Noop->value,
         ]);
 
         $setup['flow_route_points'][0]->forceFill([
@@ -1064,21 +1055,21 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertDatabaseHas('contact_flow_route_progress_items', [
             'contact_flow_route_progress_id' => $progress->getKey(),
             'flow_route_point_id' => $setup['flow_route_points'][0]->getKey(),
-            'point_type' => Point::TYPE_CREATE_TASK,
+            'point_type' => FlowRoutePointType::CreateTask->value,
             'status' => ContactFlowRouteProgressItem::STATUS_COMPLETED,
         ]);
 
         $this->assertDatabaseHas('contact_flow_route_progress_items', [
             'contact_flow_route_progress_id' => $progress->getKey(),
             'flow_route_point_id' => $setup['flow_route_points'][1]->getKey(),
-            'point_type' => Point::TYPE_EVENT_WAIT,
+            'point_type' => FlowRoutePointType::EventWait->value,
             'status' => ContactFlowRouteProgressItem::STATUS_COMPLETED,
         ]);
 
         $this->assertDatabaseHas('contact_flow_route_progress_items', [
             'contact_flow_route_progress_id' => $progress->getKey(),
             'flow_route_point_id' => $setup['flow_route_points'][2]->getKey(),
-            'point_type' => Point::TYPE_NOOP,
+            'point_type' => FlowRoutePointType::Noop->value,
             'status' => ContactFlowRouteProgressItem::STATUS_COMPLETED,
         ]);
     }
@@ -1199,23 +1190,14 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $flowRoutePoints = [];
 
         foreach ($types as $index => $type) {
-            $point = Point::query()->create([
-                'key' => 'test-'.$type.'-'.$index.'-'.uniqid(),
-                'type' => $type,
-                'name' => ucfirst(str_replace('_', ' ', $type)),
-                'description' => null,
-                'default_definition' => [],
-                'default_settings' => [],
-                'is_active' => true,
-                'source_version' => null,
-                'is_customized' => false,
-                'customized_at' => null,
-                'meta' => [],
-            ]);
 
             $flowRoutePoints[] = FlowRoutePoint::query()->create([
                 'flow_route_id' => $flowRoute->getKey(),
-                'point_id' => $point->getKey(),
+                'type' => $type,
+
+                'name' => ucfirst(str_replace('_', ' ', $type)),
+
+                'description' => null,
                 'key' => 'route-point-'.$index.'-'.uniqid(),
                 'sort_order' => ($index + 1) * 10,
                 'is_start' => $index === 0,

@@ -25,7 +25,7 @@ class ResumeContactFlowRouteProgressAction
         $prepared = DB::transaction(function () use ($progress, $now) {
             $progress = ContactFlowRouteProgress::query()
                 ->lockForUpdate()
-                ->with(['currentFlowRoutePoint.point', 'plan.items'])
+                ->with(['currentFlowRoutePoint', 'plan.items'])
                 ->findOrFail($progress->getKey());
 
             if ($progress->isTerminal()) {
@@ -115,4 +115,3 @@ class ResumeContactFlowRouteProgressAction
         return is_numeric($value) ? (int) $value : null;
     }
 }
-
