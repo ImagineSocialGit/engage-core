@@ -9,15 +9,18 @@ use App\Modules\FlowRoutes\Actions\SyncFlowRoutePresetsAction;
 use App\Modules\Messaging\Actions\SyncMessageTemplatePresetsAction;
 use App\Modules\Tasks\Actions\SyncTaskPresetsAction;
 use App\Modules\Webinars\Actions\SyncWebinarScheduleProfilesAction;
+use App\Support\Presets\Enums\PresetDomain;
+use App\Support\Presets\PresetCompositionResolver;
+use App\Support\Presets\PresetPackageResolver;
 use Illuminate\Console\Command;
 use Throwable;
 
 class SyncPresetsCommand extends Command
 {
     protected $signature = 'presets:sync
-        {preset? : Optional preset key, such as webinar_funnel or general_contact_engagement}
+        {preset? : Optional preset package key}
         {--force-contact-statuses : Overwrite customized contact statuses}
-        {--force-flow-routes : Overwrite customized FlowRoutes, Points, and FlowRoutePoints}
+        {--force-flow-routes : Overwrite customized FlowRoutes and FlowRoutePoints}
         {--force-tasks : Overwrite customized task templates}
         {--force-message-templates : Overwrite customized Messaging template presets and reactivate synced assignments}
         {--force-webinar-schedule-profiles : Overwrite customized webinar schedule profiles and profile items}';
@@ -32,8 +35,13 @@ class SyncPresetsCommand extends Command
         SyncCampaignPresetsAction $syncCampaignPresets,
         SyncFlowRouteCapabilitiesAction $syncFlowRouteCapabilities,
         SyncFlowRoutePresetsAction $syncFlowRoutePresets,
+        PresetCompositionResolver $compositionResolver,
+        PresetPackageResolver $packageResolver,
     ): int {
-        $presetKey = $this->resolvePresetKey();
+        $argumentPreset = $this->argument('preset');
+        $presetKey = $packageResolver->resolvePresetKey(
+            is_string($argumentPreset) ? $argumentPreset : null,
+        );
 
         if ($presetKey === null) {
             $this->error('No presets are configured.');
@@ -41,24 +49,22 @@ class SyncPresetsCommand extends Command
             return self::FAILURE;
         }
 
-        $preset = config("presets.packages.{$presetKey}");
-
-        if (! is_array($preset)) {
-            $this->error("Preset [{$presetKey}] does not exist.");
+        try {
+            $enabledModules = $packageResolver->effectiveModules($presetKey);
+        } catch (Throwable $exception) {
+            $this->error($exception->getMessage());
 
             return self::FAILURE;
         }
-
-        $enabledModules = $this->enabledModules($preset);
 
         $this->info("Syncing preset package [{$presetKey}]...");
         $this->line('Enabled modules: '.implode(', ', $enabledModules));
 
         try {
-            if ($this->hasConfiguredGroups($preset, 'contact_statuses')) {
+            if ($this->hasConfiguredGroups($packageResolver, $presetKey, PresetDomain::ContactStatuses)) {
                 $this->renderContactStatusResult(
                     $syncContactStatusPresets->handle(
-                        presetKey: $presetKey,
+                        resolved: $compositionResolver->resolve($presetKey, PresetDomain::ContactStatuses),
                         force: (bool) $this->option('force-contact-statuses'),
                     ),
                 );
@@ -67,10 +73,16 @@ class SyncPresetsCommand extends Command
                 $this->warn('Contact statuses: no groups configured; skipped.');
             }
 
-            if ($this->shouldSyncSection($preset, 'tasks', 'tasks', $enabledModules)) {
+            if ($this->shouldSyncDomain(
+                packageResolver: $packageResolver,
+                presetKey: $presetKey,
+                domain: PresetDomain::Tasks,
+                module: 'tasks',
+                enabledModules: $enabledModules,
+            )) {
                 $this->renderTaskResult(
                     $syncTaskPresets->handle(
-                        presetKey: $presetKey,
+                        resolved: $compositionResolver->resolve($presetKey, PresetDomain::Tasks),
                         force: (bool) $this->option('force-tasks'),
                     ),
                 );
@@ -101,9 +113,17 @@ class SyncPresetsCommand extends Command
                 $this->warn('Webinar schedule profiles: module disabled; skipped.');
             }
 
-            if ($this->shouldSyncSection($preset, 'campaigns', 'campaigns', $enabledModules)) {
+            if ($this->shouldSyncDomain(
+                packageResolver: $packageResolver,
+                presetKey: $presetKey,
+                domain: PresetDomain::Campaigns,
+                module: 'campaigns',
+                enabledModules: $enabledModules,
+            )) {
                 $this->renderCampaignResult(
-                    $syncCampaignPresets->handle($presetKey),
+                    $syncCampaignPresets->handle(
+                        $compositionResolver->resolve($presetKey, PresetDomain::Campaigns),
+                    ),
                 );
             } else {
                 $this->line('');
@@ -119,10 +139,16 @@ class SyncPresetsCommand extends Command
                 $this->warn('FlowRoute capabilities: module disabled; skipped.');
             }
 
-            if ($this->shouldSyncSection($preset, 'flow_routes', 'flow_routes', $enabledModules)) {
+            if ($this->shouldSyncDomain(
+                packageResolver: $packageResolver,
+                presetKey: $presetKey,
+                domain: PresetDomain::FlowRoutes,
+                module: 'flow_routes',
+                enabledModules: $enabledModules,
+            )) {
                 $this->renderFlowRouteResult(
                     $syncFlowRoutePresets->handle(
-                        presetKey: $presetKey,
+                        resolved: $compositionResolver->resolve($presetKey, PresetDomain::FlowRoutes),
                         force: (bool) $this->option('force-flow-routes'),
                     ),
                 );
@@ -142,105 +168,28 @@ class SyncPresetsCommand extends Command
         return self::SUCCESS;
     }
 
-    private function resolvePresetKey(): ?string
-    {
-        $argumentPreset = $this->argument('preset');
-
-        if (is_string($argumentPreset) && trim($argumentPreset) !== '') {
-            return trim($argumentPreset);
-        }
-
-        $clientPreset = config('client.preset');
-
-        if (is_string($clientPreset) && trim($clientPreset) !== '') {
-            return trim($clientPreset);
-        }
-
-        $defaultPreset = config('presets.default_package');
-
-        if (is_string($defaultPreset) && trim($defaultPreset) !== '') {
-            return trim($defaultPreset);
-        }
-
-        $presetKeys = array_keys(config('presets.packages', []));
-
-        $presetKeys = array_values(array_filter(
-            $presetKeys,
-            fn (mixed $key): bool => is_string($key) && trim($key) !== '',
-        ));
-
-        return $presetKeys[0] ?? null;
-    }
-
     /**
-     * @param array<string, mixed> $preset
-     * @return array<int, string>
-     */
-    private function enabledModules(array $preset): array
-    {
-        $packageModules = $this->stringList(data_get($preset, 'modules.enabled', []));
-        $addedModules = $this->stringList(config('client.modules.add', []));
-        $removedModules = $this->stringList(config('client.modules.remove', []));
-
-        $modules = array_values(array_unique([
-            'core',
-            ...$packageModules,
-            ...$addedModules,
-        ]));
-
-        return array_values(array_diff($modules, $removedModules));
-    }
-
-    /**
-     * @param array<string, mixed> $preset
      * @param array<int, string> $enabledModules
      */
-    private function shouldSyncSection(
-        array $preset,
-        string $section,
+    private function shouldSyncDomain(
+        PresetPackageResolver $packageResolver,
+        string $presetKey,
+        PresetDomain $domain,
         string $module,
         array $enabledModules,
     ): bool {
         return in_array($module, $enabledModules, true)
-            && $this->hasConfiguredGroups($preset, $section);
+            && $this->hasConfiguredGroups($packageResolver, $presetKey, $domain);
     }
 
-    /**
-     * @param array<string, mixed> $preset
-     */
-    private function hasConfiguredGroups(array $preset, string $section): bool
-    {
-        $groups = data_get($preset, "groups.{$section}");
-
-        return is_array($groups) && $groups !== [];
+    private function hasConfiguredGroups(
+        PresetPackageResolver $packageResolver,
+        string $presetKey,
+        PresetDomain $domain,
+    ): bool {
+        return $packageResolver->selectedGroups($presetKey, $domain) !== [];
     }
 
-    /**
-     * @param mixed $values
-     * @return array<int, string>
-     */
-    private function stringList(mixed $values): array
-    {
-        if (! is_array($values)) {
-            return [];
-        }
-
-        return array_values(array_unique(array_filter(array_map(
-            fn (mixed $value): ?string => is_string($value) && trim($value) !== ''
-                ? trim($value)
-                : null,
-            $values,
-        ))));
-    }
-
-    /**
-     * @param array{
-     *     created: int,
-     *     updated: int,
-     *     skipped: int,
-     *     errors: array<int, string>
-     * } $result
-     */
     private function renderContactStatusResult(array $result): void
     {
         $this->line('');
@@ -285,20 +234,6 @@ class SyncPresetsCommand extends Command
         }
     }
 
-
-    /**
-     * @param array{
-     *     created: int,
-     *     updated: int,
-     *     customized_skipped: int,
-     *     stale_removed: int,
-     *     assignments_created: int,
-     *     assignments_updated: int,
-     *     assignments_preserved: int,
-     *     catalog_entries_created: int,
-     *     catalog_entries_updated: int
-     * } $result
-     */
     private function renderMessageTemplateResult(array $result): void
     {
         $this->line('');
@@ -320,18 +255,6 @@ class SyncPresetsCommand extends Command
         );
     }
 
-
-    /**
-     * @param array{
-     *     profiles_created: int,
-     *     profiles_updated: int,
-     *     profiles_skipped: int,
-     *     items_created: int,
-     *     items_updated: int,
-     *     items_skipped: int,
-     *     items_disabled: int
-     * } $result
-     */
     private function renderWebinarScheduleProfileResult(array $result): void
     {
         $this->line('');
@@ -373,15 +296,6 @@ class SyncPresetsCommand extends Command
         );
     }
 
-    /**
-     * @param array{
-     *     created: int,
-     *     updated: int,
-     *     customized_skipped: int,
-     *     unavailable_handlers: int,
-     *     errors: array<int, string>
-     * } $result
-     */
     private function renderFlowRouteCapabilityResult(array $result): void
     {
         $this->line('');
@@ -417,12 +331,6 @@ class SyncPresetsCommand extends Command
                     $result->skipped['flow_routes'] ?? 0,
                 ],
                 [
-                    'Points',
-                    $result->created['points'] ?? 0,
-                    $result->updated['points'] ?? 0,
-                    $result->skipped['points'] ?? 0,
-                ],
-                [
                     'FlowRoutePoints',
                     $result->created['flow_route_points'] ?? 0,
                     $result->updated['flow_route_points'] ?? 0,
@@ -446,6 +354,3 @@ class SyncPresetsCommand extends Command
         }
     }
 }
-
-
-

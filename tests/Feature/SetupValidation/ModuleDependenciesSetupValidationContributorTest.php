@@ -59,6 +59,37 @@ class ModuleDependenciesSetupValidationContributorTest extends TestCase
         );
     }
 
+    public function test_it_uses_shared_preset_key_resolution_when_client_and_default_are_missing(): void
+    {
+        Config::set('client.preset', null);
+        Config::set('presets.default_package', null);
+        Config::set('modules.enabled', ['core']);
+        Config::set('modules.modules', [
+            'core' => [
+                'always_on' => true,
+                'depends_on' => [],
+                'providers' => [self::class],
+            ],
+            'tasks' => [
+                'depends_on' => ['core'],
+                'providers' => [self::class],
+            ],
+        ]);
+
+        Config::set('presets.packages', [
+            'first_package' => [
+                'modules' => [
+                    'enabled' => ['tasks'],
+                ],
+                'groups' => [],
+            ],
+        ]);
+
+        $this->assertContains(
+            'app.modules.preset_required_module_unavailable',
+            array_column($this->findings(), 'code'),
+        );
+    }
 
     public function test_dependency_loaded_module_satisfies_selected_preset_requirement_without_being_explicitly_enabled(): void
     {
@@ -92,7 +123,6 @@ class ModuleDependenciesSetupValidationContributorTest extends TestCase
             array_column($this->findings(), 'code'),
         );
     }
-
 
     public function test_providerless_available_module_does_not_report_missing_provider_when_explicitly_allowed(): void
     {
@@ -167,6 +197,3 @@ class ModuleDependenciesSetupValidationContributorTest extends TestCase
         );
     }
 }
-
-
-

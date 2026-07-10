@@ -118,7 +118,7 @@ class CampaignMessageTemplateControllerTest extends TestCase
             'campaign_key' => 'webinar_attended_nurture',
             'campaign_step' => 1,
             'campaign_step_variant_key' => 'email',
-            'source_config_path' => 'presets.campaigns.definitions.webinar_attended_nurture.steps.1.variants.email',
+            'source_config_path' => 'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps.1.variants.email',
             'is_active' => true,
         ]);
 
@@ -177,7 +177,7 @@ class CampaignMessageTemplateControllerTest extends TestCase
                     'campaign_key' => 'webinar_attended_nurture',
                     'campaign_step' => 1,
                     'campaign_step_variant_key' => 'sms',
-                    'campaign_step_variant_source_config_path' => 'presets.campaigns.definitions.webinar_attended_nurture.steps.1.variants.sms',
+                    'campaign_step_variant_source_config_path' => 'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps.1.variants.sms',
                 ],
             ]);
 
@@ -255,7 +255,7 @@ class CampaignMessageTemplateControllerTest extends TestCase
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
-            'source_config_path' => 'presets.campaigns.definitions.webinar_attended_nurture.steps.1.variants.email',
+            'source_config_path' => 'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps.1.variants.email',
         ]);
 
         $preset = $this->templateForCampaignStepVariant($campaign, $step, $emailVariant);
@@ -313,5 +313,3 @@ class CampaignMessageTemplateControllerTest extends TestCase
         return $preset;
     }
 }
-
-

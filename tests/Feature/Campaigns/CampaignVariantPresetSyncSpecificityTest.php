@@ -6,6 +6,8 @@ use App\Modules\Campaigns\Actions\SyncCampaignPresetsAction;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Campaigns\Models\CampaignStepVariant;
+use App\Support\Presets\Enums\PresetDomain;
+use App\Support\Presets\PresetCompositionResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
@@ -18,7 +20,12 @@ class CampaignVariantPresetSyncSpecificityTest extends TestCase
     {
         $this->configurePreset(['email', 'sms']);
 
-        app(SyncCampaignPresetsAction::class)->handle('test_client');
+        app(SyncCampaignPresetsAction::class)->handle(
+            app(PresetCompositionResolver::class)->resolve(
+                'test_client',
+                PresetDomain::Campaigns,
+            ),
+        );
 
         $campaign = Campaign::query()->where('key', 'webinar_attended_nurture')->firstOrFail();
         $step = $campaign->steps()->firstOrFail();
@@ -29,13 +36,18 @@ class CampaignVariantPresetSyncSpecificityTest extends TestCase
         $this->assertSame('1', $emailVariant->source_version);
 
         $this->assertSame(
-            'presets.campaigns.definitions.webinar_attended_nurture.steps.1.variants.email',
+            'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps.1.variants.email',
             $emailVariant->source_config_path,
         );
 
         $this->configurePreset(['email']);
 
-        app(SyncCampaignPresetsAction::class)->handle('test_client');
+        app(SyncCampaignPresetsAction::class)->handle(
+            app(PresetCompositionResolver::class)->resolve(
+                'test_client',
+                PresetDomain::Campaigns,
+            ),
+        );
 
         $this->assertDatabaseHas('campaign_step_variants', [
             'campaign_step_id' => $step->id,
@@ -52,7 +64,12 @@ class CampaignVariantPresetSyncSpecificityTest extends TestCase
     {
         $this->configurePreset(['email', 'sms']);
 
-        app(SyncCampaignPresetsAction::class)->handle('test_client');
+        app(SyncCampaignPresetsAction::class)->handle(
+            app(PresetCompositionResolver::class)->resolve(
+                'test_client',
+                PresetDomain::Campaigns,
+            ),
+        );
 
         $campaign = Campaign::query()->where('key', 'webinar_attended_nurture')->firstOrFail();
         $step = $campaign->steps()->firstOrFail();
@@ -66,7 +83,12 @@ class CampaignVariantPresetSyncSpecificityTest extends TestCase
 
         $this->configurePreset(['email']);
 
-        app(SyncCampaignPresetsAction::class)->handle('test_client');
+        app(SyncCampaignPresetsAction::class)->handle(
+            app(PresetCompositionResolver::class)->resolve(
+                'test_client',
+                PresetDomain::Campaigns,
+            ),
+        );
 
         $this->assertDatabaseHas('campaign_step_variants', [
             'id' => $smsVariant->id,
@@ -103,7 +125,12 @@ class CampaignVariantPresetSyncSpecificityTest extends TestCase
 
         $this->configurePreset(['email', 'sms'], includeSecondStep: true);
 
-        app(SyncCampaignPresetsAction::class)->handle('test_client');
+        app(SyncCampaignPresetsAction::class)->handle(
+            app(PresetCompositionResolver::class)->resolve(
+                'test_client',
+                PresetDomain::Campaigns,
+            ),
+        );
 
         $this->assertDatabaseMissing('campaign_steps', [
             'campaign_id' => $campaign->id,
@@ -128,7 +155,7 @@ class CampaignVariantPresetSyncSpecificityTest extends TestCase
     private function configurePreset(array $variantKeys, bool $includeSecondStep = false): void
     {
         Config::set('presets.packages.test_client.groups.campaigns', ['webinar_default']);
-        Config::set('presets.campaigns.groups.webinar_default', ['webinar_attended_nurture']);
+        Config::set('presets.modules.webinars.campaigns.groups.webinar_default', ['webinar_attended_nurture']);
 
         $steps = [
             [
@@ -149,7 +176,7 @@ class CampaignVariantPresetSyncSpecificityTest extends TestCase
                         'channel' => $variantKey === 'sms' ? 'sms' : 'email',
                         'purpose' => 'marketing',
                         'scope' => 'webinar_nurture',
-                        'source_config_path' => 'presets.campaigns.definitions.webinar_attended_nurture.steps.1.variants.'.$variantKey,
+                        'source_config_path' => 'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps.1.variants.'.$variantKey,
                     ],
                     $variantKeys,
                 )),
@@ -173,12 +200,12 @@ class CampaignVariantPresetSyncSpecificityTest extends TestCase
                     'channel' => 'email',
                     'purpose' => 'marketing',
                     'scope' => 'webinar_nurture',
-                    'source_config_path' => 'presets.campaigns.definitions.webinar_attended_nurture.steps.2.variants.email',
+                    'source_config_path' => 'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps.2.variants.email',
                 ]],
             ];
         }
 
-        Config::set('presets.campaigns.definitions.webinar_attended_nurture', [
+        Config::set('presets.modules.webinars.campaigns.definitions.webinar_attended_nurture', [
             'key' => 'webinar_attended_nurture',
             'name' => 'Webinar Attended Nurture',
             'description' => 'Follow-up sequence for webinar attendees.',

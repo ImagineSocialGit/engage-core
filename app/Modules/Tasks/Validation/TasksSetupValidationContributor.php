@@ -7,10 +7,14 @@ use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Models\TaskTemplate;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
+use App\Support\Presets\Enums\PresetDomain;
+use App\Support\Presets\PresetCompositionResolver;
+use App\Support\Presets\PresetPackageResolver;
+use Throwable;
 
 class TasksSetupValidationContributor implements SetupValidationContributor
 {
-    private const SOURCE = 'presets.tasks';
+    private const SOURCE = 'preset_composition.tasks';
     private const MODULE = 'tasks';
 
     private const CLIENT_FACING_NOUNS = [
@@ -43,155 +47,39 @@ class TasksSetupValidationContributor implements SetupValidationContributor
         'due_offset_minutes',
     ];
 
-    public function findings(): iterable
+    public function __construct(
+        private readonly PresetCompositionResolver $compositionResolver,
+        private readonly PresetPackageResolver $packageResolver,
+    ) {}
+public function findings(): iterable
     {
-        $presetKey = $this->selectedPresetKey();
+        $presetKey = $this->packageResolver->resolvePresetKey();
 
         if ($presetKey === null) {
             return;
         }
 
-        $package = config("presets.packages.{$presetKey}");
-
-        if (! is_array($package)) {
+        try {
+            $resolved = $this->compositionResolver->resolve(
+                presetKey: $presetKey,
+                domain: PresetDomain::Tasks,
+            );
+        } catch (Throwable) {
             return;
         }
 
-        $groups = $package['groups']['tasks'] ?? [];
+        foreach ($resolved->definitions as $templateKey => $definition) {
+            $groupKey = $resolved->definitionGroups[$templateKey][0] ?? 'selected';
+            $source = $resolved->provenance[$templateKey]['source'] ?? self::SOURCE;
+            $path = "{$source}.definitions.{$templateKey}";
 
-        if (! is_array($groups)) {
-            yield $this->error(
-                code: 'tasks.selected_groups_invalid',
-                message: "Preset package [{$presetKey}] groups.tasks must be an array.",
-                path: "presets.packages.{$presetKey}.groups.tasks",
-                context: [
-                    'preset_key' => $presetKey,
-                ],
+            yield from $this->validateDefinition(
+                presetKey: $presetKey,
+                groupKey: $groupKey,
+                templateKey: $templateKey,
+                definition: $definition,
+                path: $path,
             );
-
-            return;
-        }
-
-        $seenTemplateGroups = [];
-
-        foreach ($groups as $index => $groupKey) {
-            if (! $this->filledString($groupKey)) {
-                yield $this->error(
-                    code: 'tasks.selected_group_key_invalid',
-                    message: 'Selected Task preset group keys must be non-empty strings.',
-                    path: "presets.packages.{$presetKey}.groups.tasks.{$index}",
-                    context: [
-                        'preset_key' => $presetKey,
-                    ],
-                );
-
-                continue;
-            }
-
-            $groupKey = trim($groupKey);
-            $groupPath = "presets.tasks.groups.{$groupKey}";
-            $group = config($groupPath);
-
-            if (! is_array($group)) {
-                yield $this->error(
-                    code: 'tasks.group_missing',
-                    message: "Selected Task preset group [{$groupKey}] does not exist.",
-                    path: $groupPath,
-                    context: [
-                        'preset_key' => $presetKey,
-                        'group_key' => $groupKey,
-                    ],
-                );
-
-                continue;
-            }
-
-            if (array_is_list($group)) {
-                yield from $this->validateReferencedGroup(
-                    presetKey: $presetKey,
-                    groupKey: $groupKey,
-                    templateKeys: $group,
-                    seenTemplateGroups: $seenTemplateGroups,
-                );
-
-                continue;
-            }
-
-            $legacyTemplates = $group['templates'] ?? null;
-
-            if (! is_array($legacyTemplates)) {
-                yield $this->error(
-                    code: 'tasks.group_shape_invalid',
-                    message: "Task preset group [{$groupKey}] must be a list of TaskTemplate keys.",
-                    path: $groupPath,
-                    context: [
-                        'preset_key' => $presetKey,
-                        'group_key' => $groupKey,
-                    ],
-                );
-
-                continue;
-            }
-
-            yield $this->warning(
-                code: 'tasks.legacy_group_shape',
-                message: "Task preset group [{$groupKey}] uses the tolerated legacy [templates] shape instead of stable definition references.",
-                path: "{$groupPath}.templates",
-                context: [
-                    'preset_key' => $presetKey,
-                    'group_key' => $groupKey,
-                ],
-            );
-
-            foreach ($legacyTemplates as $templateIndex => $definition) {
-                if (! is_array($definition)) {
-                    yield $this->error(
-                        code: 'tasks.definition_invalid',
-                        message: "Task preset group [{$groupKey}] contains a non-array template definition.",
-                        path: "{$groupPath}.templates.{$templateIndex}",
-                        context: [
-                            'preset_key' => $presetKey,
-                            'group_key' => $groupKey,
-                        ],
-                    );
-
-                    continue;
-                }
-
-                $templateKey = $definition['key'] ?? null;
-
-                if (! $this->filledString($templateKey)) {
-                    yield $this->error(
-                        code: 'tasks.definition_key_missing',
-                        message: "Legacy TaskTemplate definition in group [{$groupKey}] is missing a non-empty [key].",
-                        path: "{$groupPath}.templates.{$templateIndex}.key",
-                        context: [
-                            'preset_key' => $presetKey,
-                            'group_key' => $groupKey,
-                        ],
-                    );
-
-                    continue;
-                }
-
-                $templateKey = trim($templateKey);
-
-                yield from $this->validateAmbiguousSelection(
-                    presetKey: $presetKey,
-                    groupKey: $groupKey,
-                    templateKey: $templateKey,
-                    path: "{$groupPath}.templates.{$templateIndex}.key",
-                    seenTemplateGroups: $seenTemplateGroups,
-                );
-
-                yield from $this->validateDefinition(
-                    presetKey: $presetKey,
-                    groupKey: $groupKey,
-                    templateKey: $templateKey,
-                    definition: $definition,
-                    path: "{$groupPath}.templates.{$templateIndex}",
-                );
-            }
         }
     }
 
@@ -200,99 +88,11 @@ class TasksSetupValidationContributor implements SetupValidationContributor
      * @param array<string, string> $seenTemplateGroups
      * @return iterable<int, SetupValidationFinding>
      */
-    private function validateReferencedGroup(
-        string $presetKey,
-        string $groupKey,
-        array $templateKeys,
-        array &$seenTemplateGroups,
-    ): iterable {
-        foreach ($templateKeys as $index => $templateKey) {
-            if (! $this->filledString($templateKey)) {
-                yield $this->error(
-                    code: 'tasks.group_reference_invalid',
-                    message: "Task preset group [{$groupKey}] contains an invalid TaskTemplate reference.",
-                    path: "presets.tasks.groups.{$groupKey}.{$index}",
-                    context: [
-                        'preset_key' => $presetKey,
-                        'group_key' => $groupKey,
-                    ],
-                );
-
-                continue;
-            }
-
-            $templateKey = trim($templateKey);
-            $definitionPath = "presets.tasks.definitions.{$templateKey}";
-
-            $definitions = config('presets.tasks.definitions', []);
-            $definition = is_array($definitions)
-                ? ($definitions[$templateKey] ?? null)
-                : null;
-
-            yield from $this->validateAmbiguousSelection(
-                presetKey: $presetKey,
-                groupKey: $groupKey,
-                templateKey: $templateKey,
-                path: "presets.tasks.groups.{$groupKey}.{$index}",
-                seenTemplateGroups: $seenTemplateGroups,
-            );
-
-            if (! is_array($definition)) {
-                yield $this->error(
-                    code: 'tasks.definition_missing',
-                    message: "TaskTemplate preset definition [{$templateKey}] referenced by group [{$groupKey}] does not exist.",
-                    path: $definitionPath,
-                    context: [
-                        'preset_key' => $presetKey,
-                        'group_key' => $groupKey,
-                        'task_template_key' => $templateKey,
-                    ],
-                );
-
-                continue;
-            }
-
-            yield from $this->validateDefinition(
-                presetKey: $presetKey,
-                groupKey: $groupKey,
-                templateKey: $templateKey,
-                definition: $definition,
-                path: $definitionPath,
-            );
-        }
-    }
 
     /**
      * @param array<string, string> $seenTemplateGroups
      * @return iterable<int, SetupValidationFinding>
      */
-    private function validateAmbiguousSelection(
-        string $presetKey,
-        string $groupKey,
-        string $templateKey,
-        string $path,
-        array &$seenTemplateGroups,
-    ): iterable {
-        $previousGroup = $seenTemplateGroups[$templateKey] ?? null;
-
-        if ($previousGroup !== null && $previousGroup !== $groupKey) {
-            yield $this->error(
-                code: 'tasks.template_key_ambiguous_across_groups',
-                message: "TaskTemplate key [{$templateKey}] is selected by multiple Task preset groups [{$previousGroup}] and [{$groupKey}].",
-                path: $path,
-                context: [
-                    'preset_key' => $presetKey,
-                    'task_template_key' => $templateKey,
-                    'first_group_key' => $previousGroup,
-                    'second_group_key' => $groupKey,
-                ],
-            );
-
-            return;
-        }
-
-        $seenTemplateGroups[$templateKey] = $groupKey;
-    }
 
     /**
      * @param array<string, mixed> $definition
@@ -402,7 +202,7 @@ class TasksSetupValidationContributor implements SetupValidationContributor
         }
 
         $normalizedDefinition = array_replace(['key' => $templateKey], $definition);
-        $presetDefinition = TaskPresetDefinition::fromArray($groupKey, $normalizedDefinition);
+        $presetDefinition = TaskPresetDefinition::fromArray($normalizedDefinition);
 
         if (! $presetDefinition->isValid()) {
             yield $this->error(
@@ -685,20 +485,6 @@ class TasksSetupValidationContributor implements SetupValidationContributor
                 ],
             );
         }
-    }
-
-    private function selectedPresetKey(): ?string
-    {
-        foreach ([
-            config('client.preset'),
-            config('presets.default_package'),
-        ] as $presetKey) {
-            if ($this->filledString($presetKey)) {
-                return trim($presetKey);
-            }
-        }
-
-        return null;
     }
 
     private function clientFacingNounInKey(string $key): ?string

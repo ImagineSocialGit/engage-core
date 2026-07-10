@@ -4,35 +4,61 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Client Presets
+    | Client Preset Packages
     |--------------------------------------------------------------------------
     |
-    | Presets provide starting defaults for common client shapes. They are not
-    | business logic and they do not replace explicit client configuration.
+    | Core intentionally ships with a small generic package surface.
+    | Rich vertical/client packages belong in client config.
     |
-    | Final precedence:
-    | system config -> selected preset defaults -> explicit client config
-    |
-    | Runtime systems must read DB-owned definitions. Preset definitions are only
-    | starter/default definitions that sync into editable database records.
+    | Runtime systems read DB-owned definitions. Preset packages select starter
+    | definitions that are materialized by preset sync.
     |
     */
 
-    'default_package' => env('CLIENT_PRESET'),
+    'default_package' => env('CLIENT_PRESET', 'basic'),
 
     'packages' => [
 
-        'general_contact_engagement' => [
+        'basic' => [
             'modules' => [
                 'enabled' => [
                     'tasks',
+                    'workflow',
+                ],
+            ],
+
+            'contacts' => [
+                'labels' => [
+                    'singular' => 'contact',
+                    'plural' => 'contacts',
+                ],
+
+                'routes' => [
+                    'plural' => 'contacts',
+                ],
+            ],
+
+            'groups' => [
+                'contact_statuses' => [
+                    'general_default',
+                ],
+                'tasks' => [
+                    'general_default',
+                ],
+                'flow_routes' => [],
+                'campaigns' => [],
+            ],
+        ],
+
+        'messaging' => [
+            'modules' => [
+                'enabled' => [
+                    'tasks',
+                    'workflow',
                     'messaging',
                     'inbound_messaging',
                     'internal_notifications',
-                    'campaigns',
                     'broadcasts',
-                    'integrations',
-                    'reporting',
                 ],
             ],
 
@@ -59,39 +85,7 @@ return [
             ],
         ],
 
-        'lightweight_task_workspace' => [
-            'modules' => [
-                'enabled' => [
-                    'tasks',
-                    'internal_notifications',
-                    'reporting',
-                ],
-            ],
-
-            'contacts' => [
-                'labels' => [
-                    'singular' => 'contact',
-                    'plural' => 'contacts',
-                ],
-
-                'routes' => [
-                    'plural' => 'contacts',
-                ],
-            ],
-
-            'groups' => [
-                'contact_statuses' => [
-                    'general_default',
-                ],
-                'tasks' => [
-                    'task_workspace_default',
-                ],
-                'flow_routes' => [],
-                'campaigns' => [],
-            ],
-        ],
-
-        'webinar_funnel' => [
+        'automated_messaging' => [
             'modules' => [
                 'enabled' => [
                     'tasks',
@@ -100,150 +94,24 @@ return [
                     'messaging',
                     'inbound_messaging',
                     'internal_notifications',
-                    'campaigns',
                     'broadcasts',
-                    'webinars',
-                    'integrations',
-                    'reporting',
                 ],
             ],
 
             'contacts' => [
                 'labels' => [
-                    'singular' => 'lead',
-                    'plural' => 'leads',
+                    'singular' => 'contact',
+                    'plural' => 'contacts',
                 ],
 
                 'routes' => [
-                    'plural' => 'leads',
-                ],
-
-                'sources' => [
-                    'webinar' => [
-                        'enabled' => true,
-                    ],
-
-                    'website' => [
-                        'enabled' => true,
-                    ],
-
-                    'manual' => [
-                        'enabled' => true,
-                    ],
+                    'plural' => 'contacts',
                 ],
             ],
 
             'groups' => [
                 'contact_statuses' => [
-                    'webinar_default',
-                ],
-                'tasks' => [
                     'general_default',
-                    'webinar_default',
-                ],
-                'flow_routes' => [
-                    'webinar_default',
-                ],
-                'campaigns' => [
-                    'webinar_default',
-                ],
-            ],
-        ],
-
-        'pet_service' => [
-            'modules' => [
-                'enabled' => [
-                    'tasks',
-                    'workflow',
-                    'messaging',
-                    'inbound_messaging',
-                    'internal_notifications',
-                    'campaigns',
-                    'broadcasts',
-                    'integrations',
-                    'reporting',
-                ],
-            ],
-
-            'contacts' => [
-                'labels' => [
-                    'singular' => 'client',
-                    'plural' => 'clients',
-                ],
-
-                'routes' => [
-                    'plural' => 'clients',
-                ],
-
-                'sources' => [
-                    'website' => [
-                        'enabled' => true,
-                    ],
-
-                    'manual' => [
-                        'enabled' => true,
-                    ],
-                ],
-            ],
-
-            'groups' => [
-                'contact_statuses' => [
-                    'pet_service_default',
-                ],
-                'tasks' => [
-                    'general_default',
-                ],
-                'flow_routes' => [],
-                'campaigns' => [],
-            ],
-        ],
-
-        'musician_fan_engagement' => [
-            'modules' => [
-                'enabled' => [
-                    'tasks',
-                    'messaging',
-                    'inbound_messaging',
-                    'internal_notifications',
-                    'campaigns',
-                    'broadcasts',
-                    'integrations',
-                    'reporting',
-                ],
-            ],
-
-            'contacts' => [
-                'labels' => [
-                    'singular' => 'fan',
-                    'plural' => 'fans',
-                ],
-
-                'routes' => [
-                    'plural' => 'fans',
-                ],
-
-                'sources' => [
-                    'website' => [
-                        'enabled' => true,
-                    ],
-
-                    'facebook' => [
-                        'enabled' => true,
-                    ],
-
-                    'google_ads' => [
-                        'enabled' => true,
-                    ],
-
-                    'manual' => [
-                        'enabled' => true,
-                    ],
-                ],
-            ],
-
-            'groups' => [
-                'contact_statuses' => [
-                    'musician_fan_default',
                 ],
                 'tasks' => [
                     'general_default',
@@ -256,4 +124,3 @@ return [
     ],
 
 ];
-

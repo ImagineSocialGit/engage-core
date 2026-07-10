@@ -14,6 +14,8 @@ use App\Modules\Tasks\Listeners\EmitTaskCompletedAutomationEvent;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Models\TaskTemplate;
 use App\Modules\Tasks\Services\ContactShow\ContactTasksShowDataProvider;
+use App\Support\Presets\Enums\PresetDomain;
+use App\Support\Presets\PresetCompositionResolver;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -126,13 +128,14 @@ class RuntimeTaskBehaviorTest extends TestCase
         $this->assertSame('high', $task->priority);
         $this->assertNotNull($task->due_at);
         $this->assertSame('test.follow_up', $task->meta['task_template']['key']);
+        $this->assertArrayNotHasKey('group_key', $task->meta['task_template']);
     }
 
     public function test_task_preset_sync_preserves_customized_templates_without_force(): void
     {
         config()->set('presets.packages.test_package.groups.tasks', ['test_group']);
-        config()->set('presets.tasks.groups.test_group', ['test.follow_up']);
-        config()->set('presets.tasks.definitions', [
+        config()->set('presets.modules.tasks.tasks.groups.test_group', ['test.follow_up']);
+        config()->set('presets.modules.tasks.tasks.definitions', [
             'test.follow_up' => [
                 'title' => 'Synced title',
                 'description' => 'Synced description',
@@ -144,12 +147,23 @@ class RuntimeTaskBehaviorTest extends TestCase
 
         TaskTemplate::factory()->customized()->create([
             'key' => 'test.follow_up',
-            'group_key' => 'test_group',
             'title' => 'Customized title',
             'description' => 'Customized description',
+            'meta' => [
+                'preset' => [
+                    'contributor' => 'tasks',
+                    'task_template_key' => 'test.follow_up',
+                    'source_version' => 'test',
+                ],
+            ],
         ]);
 
-        $result = app(SyncTaskPresetsAction::class)->handle('test_package');
+        $result = app(SyncTaskPresetsAction::class)->handle(
+            app(PresetCompositionResolver::class)->resolve(
+                'test_package',
+                PresetDomain::Tasks,
+            ),
+        );
 
         $template = TaskTemplate::query()->where('key', 'test.follow_up')->firstOrFail();
 
@@ -160,8 +174,8 @@ class RuntimeTaskBehaviorTest extends TestCase
     public function test_task_preset_sync_removes_stale_non_customized_templates(): void
     {
         config()->set('presets.packages.test_package.groups.tasks', ['test_group']);
-        config()->set('presets.tasks.groups.test_group', ['test.keep']);
-        config()->set('presets.tasks.definitions', [
+        config()->set('presets.modules.tasks.tasks.groups.test_group', ['test.keep']);
+        config()->set('presets.modules.tasks.tasks.definitions', [
             'test.keep' => [
                 'title' => 'Keep this task',
                 'description' => 'Kept description',
@@ -171,11 +185,22 @@ class RuntimeTaskBehaviorTest extends TestCase
 
         TaskTemplate::factory()->create([
             'key' => 'test.stale',
-            'group_key' => 'test_group',
             'is_customized' => false,
+            'meta' => [
+                'preset' => [
+                    'contributor' => 'tasks',
+                    'task_template_key' => 'test.stale',
+                    'source_version' => 'test',
+                ],
+            ],
         ]);
 
-        $result = app(SyncTaskPresetsAction::class)->handle('test_package');
+        $result = app(SyncTaskPresetsAction::class)->handle(
+            app(PresetCompositionResolver::class)->resolve(
+                'test_package',
+                PresetDomain::Tasks,
+            ),
+        );
 
         $this->assertSame(1, $result->removed);
         $this->assertDatabaseMissing('task_templates', [
@@ -190,8 +215,8 @@ class RuntimeTaskBehaviorTest extends TestCase
     public function test_task_preset_sync_overwrites_customized_templates_with_force(): void
     {
         config()->set('presets.packages.test_package.groups.tasks', ['test_group']);
-        config()->set('presets.tasks.groups.test_group', ['test.follow_up']);
-        config()->set('presets.tasks.definitions', [
+        config()->set('presets.modules.tasks.tasks.groups.test_group', ['test.follow_up']);
+        config()->set('presets.modules.tasks.tasks.definitions', [
             'test.follow_up' => [
                 'title' => 'Synced title',
                 'name' => 'Synced name',
@@ -204,13 +229,22 @@ class RuntimeTaskBehaviorTest extends TestCase
 
         TaskTemplate::factory()->customized()->create([
             'key' => 'test.follow_up',
-            'group_key' => 'test_group',
             'title' => 'Customized title',
             'description' => 'Customized description',
+            'meta' => [
+                'preset' => [
+                    'contributor' => 'tasks',
+                    'task_template_key' => 'test.follow_up',
+                    'source_version' => 'test',
+                ],
+            ],
         ]);
 
         $result = app(SyncTaskPresetsAction::class)->handle(
-            presetKey: 'test_package',
+            resolved: app(PresetCompositionResolver::class)->resolve(
+                'test_package',
+                PresetDomain::Tasks,
+            ),
             force: true,
         );
 

@@ -44,6 +44,60 @@ contact.first_name
 
 Do not create separate runtime payload fields, database columns, event keys, preset keys, route keys, or validation branches for each client noun. The alias layer exists for UX; canonical runtime identity remains stable.
 
+## Module-first preset contribution architecture
+
+Preset contributions are organized by owning contributor module and aggregated by preset domain.
+
+Current examples:
+
+```text
+config/presets/modules/core/contact-statuses.php
+config/presets/modules/tasks/tasks.php
+
+config/presets/modules/webinars/contact-statuses.php
+config/presets/modules/webinars/tasks.php
+config/presets/modules/webinars/campaigns.php
+config/presets/modules/webinars/flow-routes.php
+```
+
+Future modules and verticals may contribute only the domains they actually own or extend. Do not create empty symmetry files.
+
+The shared preset infrastructure is:
+
+```text
+PresetContributionRegistry
+    discovers explicitly registered module contributors
+
+PresetPackageResolver
+    resolves package selection, selected groups, and effective modules
+
+PresetCompositionResolver
+    resolves selected normalized definitions for one preset domain
+
+Domain sync action
+    receives ResolvedPresetDomain and persists only that resolved composition
+```
+
+Keep these concepts separate:
+
+```text
+module availability
+    runtime capability exists for the client
+
+preset contribution availability
+    installed contributors expose valid definitions independently of runtime enablement
+
+package selection
+    selected package chooses which contributed groups are installed/synced
+
+runtime activation/binding
+    DB-owned selections and bindings decide what actually runs
+```
+
+Enabling a module must not silently activate every preset it contributes. Preset contributions may remain discoverable even when a contributor module is runtime-disabled.
+
+Preset groups are composition-only. Durable preset ownership belongs to contributor identity plus stable definition key, not persisted group membership.
+
 ## Template files
 
 | Template | Use for |
@@ -82,7 +136,7 @@ messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_numbe
 
 - Campaign message templates resolve by channel, purpose, scope, campaign key, step number, and variant key, not author-created per-step message names.
 - Campaign step variants must reference Messaging-owned templates/assignments and must not own reusable copy.
-- FlowRoute presets own automation/control-flow routing and point definitions.
+- FlowRoute presets own automation/control-flow routing and concrete `FlowRoutePoint` definitions. `FlowRoutePoint` directly owns its type/configuration; there is no global reusable `Point` model/template layer.
 - Webinar post-event config owns provider orchestration, not reusable message copy.
 - Task presets create DB-owned task template definitions only. They do not create live tasks.
 - Use documented keys and tokens only.

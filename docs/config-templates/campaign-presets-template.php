@@ -7,9 +7,10 @@ return [
     | Campaign Presets Template
     |--------------------------------------------------------------------------
     |
-    | File path:
-    | config/presets/campaigns.php
-    | client/{client-key}/config/presets/campaigns.php, if client override exists
+    | Example module-first file paths:
+    | config/presets/modules/webinars/campaigns.php
+    | config/presets/modules/{contributor-module}/campaigns.php
+    | client/{client-key}/config/presets/modules/{contributor-module}/campaigns.php
     |
     | Campaign = enrolled multi-step journey.
     |
@@ -59,9 +60,13 @@ return [
     | Validation expectations
     |--------------------------------------------------------------------------
     |
-    | Campaigns owns validation of Campaign/Step/Variant preset shape, strategy,
-    | timing, dependency rules, stable variant identity, and Messaging template
-    | context references.
+    | Shared preset-composition validation owns package/group/definition structure,
+    | including missing selected groups and duplicate contributed group/definition
+    | keys.
+    |
+    | Campaigns owns semantic validation of selected Campaign/Step/Variant
+    | definitions: shape, strategy, timing, dependency rules, stable variant
+    | identity, and Messaging template context references.
     |
     | Missing required templates or impossible dependency references are hard
     | errors when they make intended runtime behavior unsafe or impossible.

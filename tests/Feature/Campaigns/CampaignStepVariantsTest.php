@@ -15,6 +15,8 @@ use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
+use App\Support\Presets\Enums\PresetDomain;
+use App\Support\Presets\PresetCompositionResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
@@ -29,7 +31,12 @@ class CampaignStepVariantsTest extends TestCase
     {
         $this->configurePresetWithVariants();
 
-        $result = app(SyncCampaignPresetsAction::class)->handle('test_client');
+        $result = app(SyncCampaignPresetsAction::class)->handle(
+            app(PresetCompositionResolver::class)->resolve(
+                'test_client',
+                PresetDomain::Campaigns,
+            ),
+        );
 
         $this->assertSame(1, $result->campaignsCreated);
         $this->assertSame(1, $result->stepsCreated);
@@ -162,8 +169,8 @@ class CampaignStepVariantsTest extends TestCase
     private function configurePresetWithVariants(): void
     {
         Config::set('presets.packages.test_client.groups.campaigns', ['webinar_default']);
-        Config::set('presets.campaigns.groups.webinar_default', ['webinar_attended_nurture']);
-        Config::set('presets.campaigns.definitions.webinar_attended_nurture', [
+        Config::set('presets.modules.webinars.campaigns.groups.webinar_default', ['webinar_attended_nurture']);
+        Config::set('presets.modules.webinars.campaigns.definitions.webinar_attended_nurture', [
             'key' => 'webinar_attended_nurture',
             'name' => 'Webinar Attended Nurture',
             'description' => 'Follow-up sequence for webinar attendees.',

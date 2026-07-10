@@ -31,7 +31,6 @@ class TaskTemplate extends Model
 
     protected $fillable = [
         'key',
-        'group_key',
         'source',
         'source_version',
         'owner_group',
@@ -86,11 +85,6 @@ class TaskTemplate extends Model
     public function scopeInactive(Builder $query): Builder
     {
         return $query->where('is_active', false);
-    }
-
-    public function scopeGroup(Builder $query, string $groupKey): Builder
-    {
-        return $query->where('group_key', $groupKey);
     }
 
     public function scopeForKey(Builder $query, string $key): Builder

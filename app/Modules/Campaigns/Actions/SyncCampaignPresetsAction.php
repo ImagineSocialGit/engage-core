@@ -11,6 +11,9 @@ use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Campaigns\Models\CampaignStepVariant;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Throwable;
+use App\Support\Presets\Data\ResolvedPresetDomain;
+use App\Support\Presets\Enums\PresetDomain;
 
 class SyncCampaignPresetsAction
 {
@@ -22,123 +25,59 @@ class SyncCampaignPresetsAction
      * non-customized preset-owned records. Add a force mode only as a
      * deliberate Campaigns feature, not as part of default preset cleanup.
      */
-    public function handle(?string $presetKey = null): CampaignPresetSyncResult
+    public function handle(ResolvedPresetDomain $resolved): CampaignPresetSyncResult
     {
-        $presetKey ??= $this->defaultPresetKey();
+        if ($resolved->domain !== PresetDomain::Campaigns) {
+            throw new InvalidArgumentException(sprintf(
+                'Campaign preset sync requires domain [%s]; received [%s].',
+                PresetDomain::Campaigns->value,
+                $resolved->domain->value,
+            ));
+        }
 
-        $campaignDefinitions = $this->campaignDefinitions($presetKey);
+        $result = new CampaignPresetSyncResult();
 
-        return DB::transaction(function () use ($campaignDefinitions) {
-            $result = new CampaignPresetSyncResult();
+        $definitions = [];
 
-            foreach ($campaignDefinitions as $definition) {
-                $campaign = $this->syncCampaign($definition, $result);
+        foreach ($resolved->definitions as $campaignKey => $definition) {
+            $definitions[] = array_replace(['key' => $campaignKey], $definition);
+        }
 
-                $this->syncSteps(
-                    campaign: $campaign,
-                    definition: $definition,
-                    result: $result,
+        foreach ($definitions as $definitionData) {
+            try {
+                $definition = CampaignPresetDefinition::fromArray($definitionData);
+            } catch (Throwable $exception) {
+                $result->campaignSkipped(
+                    $definitionData['key'] ?? 'unknown',
+                    $exception->getMessage(),
                 );
+
+                continue;
             }
 
-            return $result;
-        });
-    }
+            $campaign = $this->syncCampaign($definition, $result);
 
-    private function defaultPresetKey(): ?string
-    {
-        $presetKey = config('client.preset');
-
-        if (is_string($presetKey) && trim($presetKey) !== '') {
-            return trim($presetKey);
+            $this->syncSteps(
+                campaign: $campaign,
+                definition: $definition,
+                result: $result,
+            );
         }
 
-        $presetKey = config('presets.default_package');
-
-        if (is_string($presetKey) && trim($presetKey) !== '') {
-            return trim($presetKey);
-        }
-
-        $presetKeys = array_keys(config('presets.packages', []));
-
-        foreach ($presetKeys as $key) {
-            if (is_string($key) && trim($key) !== '') {
-                return trim($key);
-            }
-        }
-
-        return null;
+        return $result;
     }
 
     /**
      * @return array<int, CampaignPresetDefinition>
      */
-    private function campaignDefinitions(?string $presetKey): array
-    {
-        if ($presetKey === null) {
-            return [];
-        }
-
-        $groupKeys = config("presets.packages.{$presetKey}.groups.campaigns", []);
-
-        if (! is_array($groupKeys) || $groupKeys === []) {
-            return [];
-        }
-
-        $definitions = [];
-
-        foreach ($this->normalizeStringList($groupKeys) as $groupKey) {
-            $campaignKeys = config('presets.campaigns.groups.'.$groupKey);
-
-            if (! is_array($campaignKeys)) {
-                throw new InvalidArgumentException('Campaign preset group ['.$groupKey.'] does not exist.');
-            }
-
-            foreach ($this->normalizeStringList($campaignKeys) as $campaignKey) {
-                $definitions[] = CampaignPresetDefinition::fromArray(
-                    data: $this->campaignDefinition($campaignKey),
-                    definitionKey: $campaignKey,
-                );
-            }
-        }
-
-        return $definitions;
-    }
 
     /**
      * @return array<string, mixed>
      */
-    private function campaignDefinition(string $campaignKey): array
-    {
-        $definition = config('presets.campaigns.definitions.'.$campaignKey);
-
-        if (! is_array($definition)) {
-            throw new InvalidArgumentException('Campaign preset definition ['.$campaignKey.'] does not exist.');
-        }
-
-        return $definition;
-    }
 
     /**
      * @return array<int, string>
      */
-    private function normalizeStringList(mixed $values): array
-    {
-        if (is_string($values)) {
-            $values = [$values];
-        }
-
-        if (! is_array($values)) {
-            return [];
-        }
-
-        return array_values(array_unique(array_filter(array_map(
-            fn (mixed $value): ?string => is_string($value) && trim($value) !== ''
-                ? $this->normalizeSegment($value)
-                : null,
-            $values,
-        ))));
-    }
 
     private function syncCampaign(
         CampaignPresetDefinition $definition,

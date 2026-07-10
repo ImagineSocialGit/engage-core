@@ -2,6 +2,7 @@
 
 use App\Modules\Broadcasts\Providers\BroadcastsModuleServiceProvider;
 use App\Modules\Campaigns\Providers\CampaignsModuleServiceProvider;
+use App\Modules\Core\Presets\CorePresetContributor;
 use App\Modules\Core\Providers\CoreModuleServiceProvider;
 use App\Modules\Commerce\Providers\CommerceModuleServiceProvider;
 use App\Modules\Documents\Providers\DocumentsModuleServiceProvider;
@@ -15,7 +16,9 @@ use App\Modules\Mortgage\Providers\MortgageModuleServiceProvider;
 use App\Modules\Portal\Providers\PortalModuleServiceProvider;
 use App\Modules\Reporting\Providers\ReportingModuleServiceProvider;
 use App\Modules\Scheduling\Providers\SchedulingModuleServiceProvider;
+use App\Modules\Tasks\Presets\TasksPresetContributor;
 use App\Modules\Tasks\Providers\TasksModuleServiceProvider;
+use App\Modules\Webinars\Presets\WebinarsPresetContributor;
 use App\Modules\Webinars\Providers\WebinarsModuleServiceProvider;
 use App\Modules\Workflow\Providers\WorkflowModuleServiceProvider;
 use App\Providers\Modules\IntegrationsModuleServiceProvider;
@@ -375,6 +378,9 @@ return [
             ],
             'always_on' => true,
             'depends_on' => [],
+            'preset_contributors' => [
+                CorePresetContributor::class,
+            ],
             'providers' => [
                 CoreModuleServiceProvider::class,
             ],
@@ -424,6 +430,9 @@ return [
                 'tone' => 'emerald',
             ],
             'depends_on' => ['core'],
+            'preset_contributors' => [
+                TasksPresetContributor::class,
+            ],
             'providers' => [
                 TasksModuleServiceProvider::class,
             ],
@@ -560,6 +569,9 @@ return [
                 'priority' => 70,
             ],
             'depends_on' => ['core', 'messaging'],
+            'preset_contributors' => [
+                WebinarsPresetContributor::class,
+            ],
             'providers' => [
                 WebinarsModuleServiceProvider::class,
             ],

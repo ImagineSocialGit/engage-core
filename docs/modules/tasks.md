@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 # Tasks Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -88,25 +81,49 @@ Task template preset sync should create DB-owned default task templates only. It
 
 Normal sync should preserve customized templates unless an explicit force behavior is chosen.
 
+Task preset ownership is contributor-scoped:
+
+```text
+TaskTemplate.key
+    durable definition identity
+
+meta.preset.contributor
+    durable preset source owner
+
+meta.preset.task_template_key
+    explicit preset definition identity
+
+meta.preset.source_version
+    source revision/provenance
+
+preset group
+    composition-only
+    never persisted as TaskTemplate ownership
+```
+
+Stale cleanup is scoped to selected contributors. A selected contributor may retire its final definition. Unselected contributors are not touched. Customized rows remain preserved unless force is explicitly requested.
+
 
 ## Tasks setup validation ownership
 
 Tasks contributes Tasks-owned checks through `TasksSetupValidationContributor` to the shared app-level setup validation manager.
 
-Task preset/template validation uses the actual Task preset definitions and DB-owned TaskTemplate/runtime rules as executable truth. Tasks validates selected TaskTemplate groups/definitions, assignment and responsibility fields, due/default shapes, related-subject defaults, canonical terminology, legacy shapes, and ambiguous selected identities. Dotted TaskTemplate keys are treated as literal stable keys, not Laravel nested config paths. FlowRoutes owns validation of its own `create_task` references.
+Task preset/template validation uses resolved selected Task definitions and DB-owned TaskTemplate/runtime rules as executable truth.
+
+Shared preset-composition validation owns package/group/definition structure, including missing selected groups and duplicate contributed group/definition keys.
+
+Tasks validates selected Task definition semantics, assignment and responsibility fields, due/default shapes, related-subject defaults, canonical terminology, and DB/runtime TaskTemplate availability. Dotted TaskTemplate keys are treated as literal stable keys, not Laravel nested config paths. FlowRoutes owns validation of its own `create_task` references.
 
 At minimum, validate:
 
 ```text
-selected Task preset groups exist
-referenced Task preset definitions exist
-Task template keys are valid and unique
-definition keys match their config keys
+Task template keys are valid and stable
+definition keys match their definition identity
 required task-template fields are present
 due-offset/default assignment/responsibility shapes are valid
 related-subject defaults use supported generic shapes
 vertical-contributed task templates remain generic at the Tasks storage/runtime layer
-FlowRoute create_task references resolve to available TaskTemplate definitions
+DB/runtime TaskTemplate availability is safe where required
 internal identifiers do not use client-facing nouns such as lead/fan/customer in place of canonical contact terminology
 ```
 

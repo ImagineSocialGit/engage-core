@@ -7,17 +7,52 @@ use App\Console\Commands\ValidateSetupCommand;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use App\Support\AutomationOpportunities\Actions\RecordAutomationEventCorrelationEvidenceAction;
 use App\Support\Modules\ModuleManager;
+use App\Support\Presets\Contracts\PresetContributor;
+use App\Support\Presets\PresetCompositionResolver;
+use App\Support\Presets\PresetContributionRegistry;
+use App\Support\Presets\PresetPackageResolver;
 use App\Support\SetupValidation\Contributors\ModuleDependenciesSetupValidationContributor;
+use App\Support\SetupValidation\Contributors\PresetCompositionSetupValidationContributor;
 use App\Support\SetupValidation\Contributors\ReferenceRegistrySetupValidationContributor;
 use App\Support\SetupValidation\SetupValidationManager;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use InvalidArgumentException;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->app->singleton(ModuleManager::class);
+
+        $this->app->singleton(PresetContributionRegistry::class, function ($app): PresetContributionRegistry {
+            $contributors = [];
+
+            foreach ($app->make(ModuleManager::class)->presetContributorClasses() as $contributorClass) {
+                if (! class_exists($contributorClass)) {
+                    throw new InvalidArgumentException(
+                        "Configured preset contributor class [{$contributorClass}] does not exist."
+                    );
+                }
+
+                $contributor = $app->make($contributorClass);
+
+                if (! $contributor instanceof PresetContributor) {
+                    throw new InvalidArgumentException(sprintf(
+                        'Configured preset contributor [%s] must implement [%s].',
+                        $contributorClass,
+                        PresetContributor::class,
+                    ));
+                }
+
+                $contributors[] = $contributor;
+            }
+
+            return new PresetContributionRegistry($contributors);
+        });
+
+        $this->app->singleton(PresetPackageResolver::class);
+        $this->app->singleton(PresetCompositionResolver::class);
 
         $this->app->singleton(SetupValidationManager::class, function ($app): SetupValidationManager {
             return new SetupValidationManager(
@@ -27,6 +62,7 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->tag([
             ModuleDependenciesSetupValidationContributor::class,
+            PresetCompositionSetupValidationContributor::class,
             ReferenceRegistrySetupValidationContributor::class,
         ], 'setup.validation_contributors');
     }

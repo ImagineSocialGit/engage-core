@@ -185,7 +185,7 @@ class CampaignVariantSchedulingDurabilityTest extends TestCase
                 'is_active' => true,
                 'criteria' => [],
                 'dependency_rules' => [],
-                'source_config_path' => 'presets.campaigns.definitions.webinar_attended_nurture.steps.1.variants.'.$variant['key'],
+                'source_config_path' => 'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps.1.variants.'.$variant['key'],
                 'source_version' => 'test',
                 'meta' => [],
             ]);
@@ -260,5 +260,3 @@ class CampaignVariantSchedulingDurabilityTest extends TestCase
         parent::tearDown();
     }
 }
-
-

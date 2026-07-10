@@ -31,7 +31,7 @@ class SetupValidationRegistrationTest extends TestCase
         $result = app(SetupValidationManager::class)->validate();
 
         $this->assertContains(
-            'core.contact_status.group_missing',
+            'app.presets.selected_group_missing',
             array_map(
                 fn ($finding): string => $finding->code,
                 $result->findings(),

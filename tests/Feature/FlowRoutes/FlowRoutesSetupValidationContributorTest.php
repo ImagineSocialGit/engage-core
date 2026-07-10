@@ -32,32 +32,16 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
             ],
         ]);
 
-        Config::set('presets.flow-routes.groups', []);
-        Config::set('presets.flow-routes.definitions', []);
+        Config::set('presets.modules.webinars.flow-routes.groups', []);
+        Config::set('presets.modules.webinars.flow-routes.definitions', []);
     }
 
-    public function test_it_reports_missing_selected_group_and_definition(): void
-    {
-        Config::set('presets.packages.flow_routes_validation_test.groups.flow_routes', [
-            '__test_missing_group__',
-            'test_group',
-        ]);
-
-        Config::set('presets.flow-routes.groups.test_group', [
-            '__test_missing_route__',
-        ]);
-
-        $codes = array_column($this->findings(), 'code');
-
-        $this->assertContains('flow_routes.group_missing', $codes);
-        $this->assertContains('flow_routes.definition_missing', $codes);
-    }
 
     public function test_it_reports_invalid_graph_and_key_mismatch_through_existing_preset_dto(): void
     {
         Config::set('presets.packages.flow_routes_validation_test.groups.flow_routes', ['test_group']);
-        Config::set('presets.flow-routes.groups.test_group', ['route_one']);
-        Config::set('presets.flow-routes.definitions.route_one', [
+        Config::set('presets.modules.webinars.flow-routes.groups.test_group', ['route_one']);
+        Config::set('presets.modules.webinars.flow-routes.definitions.route_one', [
             'key' => 'different_key',
             'name' => 'Route One',
             'trigger' => [
@@ -84,13 +68,13 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
     {
         Config::set('modules.enabled', ['workflow', 'flow_routes', 'tasks', 'campaigns', 'messaging']);
         Config::set('presets.packages.flow_routes_validation_test.groups.flow_routes', ['test_group']);
-        Config::set('presets.flow-routes.groups.test_group', [
+        Config::set('presets.modules.webinars.flow-routes.groups.test_group', [
             'create_task_route',
             'change_status_route',
             'campaign_route',
         ]);
 
-        Config::set('presets.flow-routes.definitions.create_task_route', $this->routeDefinition(
+        Config::set('presets.modules.webinars.flow-routes.definitions.create_task_route', $this->routeDefinition(
             key: 'create_task_route',
             point: [
                 'key' => 'create_task',
@@ -103,7 +87,7 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
             ],
         ));
 
-        Config::set('presets.flow-routes.definitions.change_status_route', $this->routeDefinition(
+        Config::set('presets.modules.webinars.flow-routes.definitions.change_status_route', $this->routeDefinition(
             key: 'change_status_route',
             point: [
                 'key' => 'change_status',
@@ -116,7 +100,7 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
             ],
         ));
 
-        Config::set('presets.flow-routes.definitions.campaign_route', $this->routeDefinition(
+        Config::set('presets.modules.webinars.flow-routes.definitions.campaign_route', $this->routeDefinition(
             key: 'campaign_route',
             point: [
                 'key' => 'enroll',
@@ -179,9 +163,9 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
     public function test_it_accepts_valid_selected_noop_route_without_runtime_findings(): void
     {
         Config::set('presets.packages.flow_routes_validation_test.groups.flow_routes', ['test_group']);
-        Config::set('presets.flow-routes.groups.test_group', ['noop_route']);
+        Config::set('presets.modules.webinars.flow-routes.groups.test_group', ['noop_route']);
 
-        Config::set('presets.flow-routes.definitions.noop_route', $this->routeDefinition(
+        Config::set('presets.modules.webinars.flow-routes.definitions.noop_route', $this->routeDefinition(
             key: 'noop_route',
             point: [
                 'key' => 'start',
@@ -197,9 +181,9 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
     {
         Config::set('modules.enabled', ['workflow', 'flow_routes', 'tasks']);
         Config::set('presets.packages.flow_routes_validation_test.groups.flow_routes', ['test_group']);
-        Config::set('presets.flow-routes.groups.test_group', ['create_task_route']);
+        Config::set('presets.modules.webinars.flow-routes.groups.test_group', ['create_task_route']);
 
-        Config::set('presets.flow-routes.definitions.create_task_route', $this->routeDefinition(
+        Config::set('presets.modules.webinars.flow-routes.definitions.create_task_route', $this->routeDefinition(
             key: 'create_task_route',
             point: [
                 'key' => 'create_task',

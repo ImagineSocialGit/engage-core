@@ -285,14 +285,14 @@ If a referenced Messaging template is missing, fail loudly because the config is
 
 Campaigns contributes Campaign-owned checks through `CampaignsSetupValidationContributor` to the shared app-level setup validation manager.
 
-Campaign validation uses actual Campaign preset definitions, Campaign step/variant definition DTOs, supported variant strategies, active DB-owned Campaign runtime state, and Messaging-owned public reference/resolution seams as executable truth.
+Campaign validation uses resolved selected Campaign definitions, Campaign step/variant definition DTOs, supported variant strategies, active DB-owned Campaign runtime state, and Messaging-owned public reference/resolution seams as executable truth.
 
-At minimum, validate:
+Shared preset-composition validation owns package/group/definition structure, including missing selected groups and duplicate contributed group/definition keys.
+
+At minimum, Campaigns validates:
 
 ```text
-selected Campaign preset groups exist
-referenced Campaign definitions exist
-campaign definition keys match their config keys
+campaign definition keys match stable definition identity
 step numbers are valid and unique within a Campaign
 variant keys are valid and unique within a step
 variant_strategy is supported
@@ -300,8 +300,10 @@ variant dependency rules reference real sibling variant keys
 variant dependency states are supported
 variant channel/purpose/scope/template context is resolvable through Messaging-owned seams
 Campaign presets do not own reusable subject/body/message payload copy
-FlowRoute or other external references to campaign_key resolve to a real available Campaign definition
+active DB/runtime Campaign state remains safe and coherent
 ```
+
+FlowRoutes owns validation of its own external `campaign_key` references.
 
 A Campaign configuration that cannot execute safely is a hard error. A dormant but safe unused Campaign or variant may be a warning.
 

@@ -44,6 +44,15 @@ return [
     | Keep dependency direction one-way and intentional. Do not enable vertical
     | modules unless that vertical is installed.
     |
+    | Runtime providers and preset contributors are separate concerns.
+    | `providers` participate in runtime module bootstrapping.
+    | `preset_contributors` expose preset definitions independently of runtime
+    | module enablement so package composition can discover all installed
+    | contributions.
+    |
+    | Preset contributor registration is explicit. Do not scan directories for
+    | contribution files.
+    |
     */
 
     /*
@@ -77,6 +86,9 @@ return [
             'providers' => [
                 CoreModuleServiceProvider::class,
             ],
+            'preset_contributors' => [
+                \App\Modules\Core\Presets\CorePresetContributor::class,
+            ],
         ],
 
         'messaging' => [
@@ -108,6 +120,9 @@ return [
             'depends_on' => ['core'],
             'providers' => [
                 TasksModuleServiceProvider::class,
+            ],
+            'preset_contributors' => [
+                \App\Modules\Tasks\Presets\TasksPresetContributor::class,
             ],
         ],
 
@@ -196,6 +211,9 @@ return [
             'depends_on' => ['core', 'messaging'],
             'providers' => [
                 WebinarsModuleServiceProvider::class,
+            ],
+            'preset_contributors' => [
+                \App\Modules\Webinars\Presets\WebinarsPresetContributor::class,
             ],
         ],
 

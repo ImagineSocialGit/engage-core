@@ -1,4 +1,3 @@
-
 <?php
 
 return [
@@ -8,9 +7,10 @@ return [
     | Contact Status Presets Template
     |--------------------------------------------------------------------------
     |
-    | File path:
-    | config/presets/contact-statuses.php
-    | client/{client-key}/config/presets/contact-statuses.php, if client override exists
+    | Example module-first file paths:
+    | config/presets/modules/core/contact-statuses.php
+    | config/presets/modules/{contributor-module}/contact-statuses.php
+    | client/{client-key}/config/presets/modules/{contributor-module}/contact-statuses.php
     |
     | Core owns ContactStatus.
     | ContactStatus is available for manual CRM adjustment even when Workflow,
@@ -45,7 +45,11 @@ return [
     | Validation expectations
     |--------------------------------------------------------------------------
     |
-    | Core owns validation of ContactStatus preset groups and definitions. Stable
+    | Shared preset-composition validation owns package/group/definition structure,
+    | including missing selected groups and duplicate contributed group/definition
+    | keys.
+    |
+    | Core owns semantic validation of selected ContactStatus definitions. Stable
     | internal keys remain contact-neutral. Client-facing labels may use the
     | configured industry noun without changing the canonical key or runtime model.
     |
@@ -123,5 +127,3 @@ return [
     ],
 
 ];
-
-

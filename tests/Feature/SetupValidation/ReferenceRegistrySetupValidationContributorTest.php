@@ -37,7 +37,7 @@ class ReferenceRegistrySetupValidationContributorTest extends TestCase
             ],
         ]);
 
-        Config::set('presets.campaigns.definitions', []);
+        Config::set('presets.modules.webinars.campaigns.definitions', []);
 
         $stale = array_values(array_filter(
             $this->findings(),

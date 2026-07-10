@@ -18,12 +18,12 @@ class TasksSetupValidationContributorTest extends TestCase
             'general_default',
         ]);
 
-        Config::set('presets.tasks.groups.general_default', [
+        Config::set('presets.modules.tasks.tasks.groups.general_default', [
             'general.follow_up',
             'general.waiting_on_contact',
         ]);
 
-        Config::set('presets.tasks.definitions', [
+        Config::set('presets.modules.tasks.tasks.definitions', [
             'general.follow_up' => [
                 'name' => 'Follow up',
                 'title' => 'Follow up',
@@ -55,24 +55,6 @@ class TasksSetupValidationContributorTest extends TestCase
         $this->assertSame([], $this->findings());
     }
 
-    public function test_it_reports_missing_group_and_missing_definition(): void
-    {
-        $this->setPresetPackage([
-            '__test_missing_task_group__',
-            'general_default',
-        ]);
-
-        Config::set('presets.tasks.groups.general_default', [
-            '__test_missing_task_template__',
-        ]);
-
-        $findings = $this->findings();
-
-        $this->assertSame([
-            'tasks.group_missing',
-            'tasks.definition_missing',
-        ], array_column($findings, 'code'));
-    }
 
     public function test_it_reports_invalid_definition_contracts(): void
     {
@@ -80,7 +62,7 @@ class TasksSetupValidationContributorTest extends TestCase
             'general_default',
         ]);
 
-        Config::set('presets.tasks.groups.general_default', [
+        Config::set('presets.modules.tasks.tasks.groups.general_default', [
             '__test_missing_title__',
             '__test_bad_responsibility__',
             '__test_bad_assignment__',
@@ -89,7 +71,7 @@ class TasksSetupValidationContributorTest extends TestCase
             '__test_bad_defaults__',
         ]);
 
-        Config::set('presets.tasks.definitions', [
+        Config::set('presets.modules.tasks.tasks.definitions', [
             '__test_missing_title__' => [
                 'name' => 'Missing title',
             ],
@@ -127,23 +109,23 @@ class TasksSetupValidationContributorTest extends TestCase
         $this->assertContains('tasks.defaults_invalid', $codes);
     }
 
-    public function test_it_reports_key_mismatch_noncanonical_identity_and_ambiguous_cross_group_selection(): void
+    public function test_it_reports_key_mismatch_and_noncanonical_identity_while_allowing_cross_group_reuse(): void
     {
         $this->setPresetPackage([
             'first_group',
             'second_group',
         ]);
 
-        Config::set('presets.tasks.groups.first_group', [
+        Config::set('presets.modules.tasks.tasks.groups.first_group', [
             'general.call_lead',
             'shared.review',
         ]);
 
-        Config::set('presets.tasks.groups.second_group', [
+        Config::set('presets.modules.tasks.tasks.groups.second_group', [
             'shared.review',
         ]);
 
-        Config::set('presets.tasks.definitions', [
+        Config::set('presets.modules.tasks.tasks.definitions', [
             'general.call_lead' => [
                 'key' => 'general.call_contact',
                 'title' => 'Call contact',
@@ -157,7 +139,7 @@ class TasksSetupValidationContributorTest extends TestCase
 
         $this->assertContains('tasks.definition_key_mismatch', $codes);
         $this->assertContains('tasks.noncanonical_identifier', $codes);
-        $this->assertContains('tasks.template_key_ambiguous_across_groups', $codes);
+        $this->assertNotContains('tasks.template_key_ambiguous_across_groups', $codes);
     }
 
     public function test_it_reports_assignment_conflicts_and_incomplete_morphs(): void
@@ -166,13 +148,13 @@ class TasksSetupValidationContributorTest extends TestCase
             'general_default',
         ]);
 
-        Config::set('presets.tasks.groups.general_default', [
+        Config::set('presets.modules.tasks.tasks.groups.general_default', [
             '__test_assignment_conflict__',
             '__test_assigned_morph__',
             '__test_responsible_morph__',
         ]);
 
-        Config::set('presets.tasks.definitions', [
+        Config::set('presets.modules.tasks.tasks.definitions', [
             '__test_assignment_conflict__' => [
                 'title' => 'Assignment conflict',
                 'assigned_to_strategy' => TaskTemplate::ASSIGNED_TO_STRATEGY_UNASSIGNED,
@@ -201,11 +183,11 @@ class TasksSetupValidationContributorTest extends TestCase
             'general_default',
         ]);
 
-        Config::set('presets.tasks.groups.general_default', [
+        Config::set('presets.modules.tasks.tasks.groups.general_default', [
             '__test_legacy_task__',
         ]);
 
-        Config::set('presets.tasks.definitions.__test_legacy_task__', [
+        Config::set('presets.modules.tasks.tasks.definitions.__test_legacy_task__', [
             'title' => 'Legacy task',
             'due_offset_days' => 2,
             'defaults' => [
@@ -226,33 +208,6 @@ class TasksSetupValidationContributorTest extends TestCase
         ], array_column($findings, 'code'));
     }
 
-    public function test_it_validates_legacy_group_shape_without_treating_it_as_current_authoring_shape(): void
-    {
-        $this->setPresetPackage([
-            'legacy_group',
-        ]);
-
-        Config::set('presets.tasks.groups.legacy_group', [
-            'templates' => [
-                [
-                    'key' => '__test_legacy_template__',
-                    'title' => 'Legacy template',
-                ],
-            ],
-        ]);
-
-        $findings = $this->findings();
-
-        $this->assertCount(1, $findings);
-        $this->assertSame(
-            SetupValidationFinding::SEVERITY_WARNING,
-            $findings[0]['severity'],
-        );
-        $this->assertSame(
-            'tasks.legacy_group_shape',
-            $findings[0]['code'],
-        );
-    }
 
     public function test_manager_resolves_tagged_tasks_contributor(): void
     {
@@ -263,7 +218,7 @@ class TasksSetupValidationContributorTest extends TestCase
         $result = app(SetupValidationManager::class)->validate();
 
         $this->assertContains(
-            'tasks.group_missing',
+            'app.presets.selected_group_missing',
             array_map(
                 fn (SetupValidationFinding $finding): string => $finding->code,
                 $result->findings(),

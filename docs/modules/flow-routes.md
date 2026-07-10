@@ -1,6 +1,3 @@
-
-
-
 # FlowRoutes Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -15,7 +12,6 @@ FlowRoutes owns:
 
 - `FlowRoute`
 - `FlowRoutePoint`
-- `Point`
 - `ContactFlowRouteProgress`
 - `ContactFlowRoutePlan`
 - `ContactFlowRoutePlanItem`
@@ -40,6 +36,39 @@ FlowRoute preset sync assumes required Campaign definitions already exist when a
 Status-triggered FlowRoutes also assume required ContactStatus definitions already exist.
 
 Normal setup should use the app-level `presets:sync` command so dependencies are created first.
+
+
+### Module-first preset contribution architecture
+
+Preset contributions are module-first and explicitly registered.
+
+Examples:
+
+```text
+config/presets/modules/webinars/contact-statuses.php
+config/presets/modules/webinars/campaigns.php
+config/presets/modules/webinars/flow-routes.php
+
+config/presets/modules/{contributor-module}/tasks.php
+config/presets/modules/{contributor-module}/campaigns.php
+config/presets/modules/{contributor-module}/flow-routes.php
+```
+
+FlowRoutes does not care which contributor file supplied a normalized Route definition. `PresetContributionRegistry`, `PresetPackageResolver`, and `PresetCompositionResolver` resolve selected definitions before `SyncFlowRoutePresetsAction` receives a `ResolvedPresetDomain`.
+
+Keep these concepts separate:
+
+```text
+module availability
+preset contribution availability
+client package selection
+runtime trigger binding/activation
+```
+
+Enabling a module does not automatically activate every preset it contributes. Installed preset contributors may remain discoverable even when the runtime module is disabled.
+
+Preset groups are composition-only and are not persisted as durable route ownership.
+
 
 FlowRoutes depends on Workflow for status-triggered route behavior.
 
@@ -89,7 +118,6 @@ Current tables/models:
 
     flow_routes
     flow_route_trigger_bindings
-    points
     flow_route_points
     contact_flow_route_progress
     contact_flow_route_plans
@@ -102,7 +130,6 @@ Current models:
 
     FlowRoute
     FlowRouteTriggerBinding
-    Point
     FlowRoutePoint
     ContactFlowRouteProgress
     ContactFlowRoutePlan
@@ -126,10 +153,92 @@ Runtime meaning:
     ContactStatus may have one selected status-triggered FlowRoute binding per context
     Automation event keys may have selected event-triggered FlowRoute bindings per context
     FlowRoute has many FlowRoutePoints
-    FlowRoutePoint belongs to Point
+    FlowRoutePoint belongs to exactly one FlowRoute version
+    FlowRoutePoint directly owns type/name/description/definition/settings/cancel conditions
     ContactFlowRouteProgress records active/waiting/completed/cancelled execution state
 
-FlowRoutes runtime behavior should read DB-owned route/point definitions.
+FlowRoutes runtime behavior should read DB-owned `FlowRoute` / `FlowRoutePoint` definitions.
+
+
+## Completed global Point collapse
+
+The old global `Point` model/table/template layer has been removed.
+
+The durable definition model is now:
+
+```text
+FlowRoute
+    reusable logical Route revision
+
+FlowRoutePoint
+    one concrete configured action/wait/condition belonging to exactly one FlowRoute version
+
+FlowRouteCapability
+    describes what kinds of actions/waits/conditions/events are available
+
+ContactFlowRoutePlanItem
+    immutable runtime snapshot of one FlowRoutePoint for one route instance
+
+ContactFlowRouteProgressItem
+    execution attempt/result history for that plan item
+```
+
+Removed concepts:
+
+```text
+Point model
+points table
+PointPresetDefinition
+flow_route_points.point_id
+contact_flow_route_plan_items.point_id
+contact_flow_route_progress_items.point_id
+Point.default_definition
+Point.default_settings
+$flowRoutePoint->point
+{point.id}
+condition source = point
+```
+
+`FlowRoutePoint` now directly owns:
+
+```text
+flow_route_id
+flow_route_capability_id nullable
+key
+type
+name
+description
+sort_order
+is_start
+is_active
+next_flow_route_point_id nullable
+definition
+settings
+cancel_conditions
+source_version
+is_customized
+customized_at
+meta
+```
+
+`FlowRoutePointType` is the shared string-backed type vocabulary.
+
+`FlowRoutePoint.key` remains the durable cross-version reconciliation identity.
+
+Do not recreate global shared Point templates or shared mutable Point linkage across Routes.
+
+Reuse should happen at the correct domain layer:
+
+```text
+Tasks owns Task Templates.
+Messaging owns Message Templates.
+Campaigns owns Follow-up Sequences.
+FlowRoutes orchestrates those capabilities.
+FlowRoutePoint is one concrete configured action inside one Route version.
+```
+
+A Route editor may allow copying an existing `FlowRoutePoint` from another current Route, but cloning creates a new independent `FlowRoutePoint`. Later edits must not propagate back to the source Route.
+
 
 ## Send-message point behavior ownership
 
@@ -193,27 +302,108 @@ The eventual operator warning UX should consume this FlowRoutes-owned read seam 
 
 The actual warning/confirmation interaction is deferred to the Automatic Follow-ups / Route Management UX phase.
 
-## Automatic Follow-ups UI exploration
+## Automatic Follow-ups / Route Management product direction
 
-The current trigger binding runtime model is durable enough to support CRM selection, but the client/operator UI should not be redesigned until the product questions are answered.
+The product-completeness audit established that the current binding surface is not enough by itself.
 
-This is the current implementation focus after the backend runtime, capability, route-instance-plan, and status-change impact-preview foundations were completed. Start with an audit and Q&A pass before replacing the current UI.
-
-Questions to answer:
+Current operator capability includes:
 
 ```text
-Is the first product surface selection-only, route-editing, or split simple/advanced?
-Who is the intended user for each mode?
-How should a selected route's points be summarized into consequences?
-How should status-triggered one-route selection differ from activity-triggered multi-route selection?
-Which point types can be shown to clients?
-Which point types are operator/developer-only?
-How should unavailable module-owned point types appear when a module is disabled?
-Where should send-message point template assignment be edited?
-What confirmation is required before a manual status change starts one or more selected status routes, using the existing read-only impact preview?
+view active Contact statuses
+see available Routes for each status
+select one Route per status
+see automation-event Routes grouped by module/event
+select multiple Routes for the same automation event
+see plain-language Route summaries
+save trigger bindings
 ```
 
-Until those answers are captured, keep implementation focused on stable runtime bindings, capability-aware availability, and diagnostics.
+Current operator gaps include:
+
+```text
+create a Route
+edit a Route
+add/remove/reorder FlowRoutePoints
+configure actions/waits/conditions
+duplicate a Route
+activate/deactivate a Route
+change a Route trigger
+clone an action from another Route
+inspect advanced configuration in a dedicated Route editor
+```
+
+The chosen authoring model is Route-centric, not Point-template-centric.
+
+Preferred client-facing shape:
+
+```text
+Automatic Follow-ups
+
+By Status
+Attempting Contact -> Prospect Follow-up Route -> 4 automatic actions -> Edit Route
+
+By Activity
+Webinar attendance -> Attended Webinar Route -> 3 automatic actions -> Edit Route
+```
+
+Preferred Route editor:
+
+```text
+Prospect Follow-up Route
+
+When this happens...
+Contact becomes Attempting Contact
+
+Automatically...
+
+1. Create Task — "Follow up with contact" — Due immediately
+2. Wait — 2 days
+3. Create Task — "Schedule an appointment with contact"
+4. Wait until — Task is completed
+
++ Add automatic action
+```
+
+The editor should create concrete `FlowRoutePoint` records directly in Route context.
+
+It may offer:
+
+```text
+Create new action
+Copy from another Route
+```
+
+Copying from another Route is clone-only reuse. The resulting `FlowRoutePoint` is independent after creation.
+
+Do not introduce a reusable global Point library merely to make Route authoring easier.
+
+Client-facing wording should prefer:
+
+```text
+Routes
+Route Management
+Automatic Follow-ups
+What happens next
+Automatic actions
+Follow-up sequence
+```
+
+Avoid making these primary labels:
+
+```text
+FlowRouteProgress
+plan item
+progress item
+capability binding
+dispatch key
+point definition
+raw trigger internals
+```
+
+Contextual automation suggestions are the discovery layer. Route Management is the control center.
+
+The backend `ContactStatusAutomationImpactResolver` remains the source of truth for the eventual warning shown before a manual status change that would start selected Route automation.
+
 
 ## Trigger bindings
 
@@ -410,12 +600,12 @@ actual owning-module runtime truth or public resolvers for referenced Task templ
 
 Validation deliberately distinguishes declared capability metadata from actually registered executable handlers and from DB-owned capability/binding state. A DB capability row cannot make unavailable runtime behavior executable.
 
-At minimum, validate:
+Shared preset-composition validation owns package/group/definition structure, including missing selected groups and duplicate contributed group/definition keys.
+
+At minimum, FlowRoutes validates:
 
 ```text
-selected FlowRoute preset groups exist
-referenced FlowRoute definitions exist
-route definition keys match their config keys
+route definition keys match stable definition identity
 trigger type and trigger key shape are supported
 route point keys are unique within the route
 route point types have registered handlers for the current installation/context

@@ -1,5 +1,3 @@
-
-
 # Engage Core Module Boundaries
 
 Engage Core is a modular contact engagement platform.
@@ -299,6 +297,37 @@ Use `owner_group` for semantic grouping such as `sales`, `ops`, `compliance`, or
 Do not use `responsible_party` for FlowRoute ownership. `responsible_party` is already a Task-owned concept meaning who or what must perform a manual task action.
 
 
+## Selected preset contribution architecture
+
+The selected next preset architecture is module-first contribution layout, pending the dedicated audit and implementation.
+
+Target examples:
+
+```text
+config/presets/modules/webinars/contact-statuses.php
+config/presets/modules/webinars/campaigns.php
+config/presets/modules/webinars/flow-routes.php
+
+config/presets/modules/mortgage/tasks.php
+config/presets/modules/mortgage/campaigns.php
+config/presets/modules/mortgage/flow-routes.php
+```
+
+The eventual loader/registry should aggregate normalized definitions by preset domain. Sync actions and setup validators should consume that normalized source rather than depending directly on file/directory layout.
+
+Keep separate:
+
+```text
+module availability
+preset availability/contribution
+client package selection
+runtime activation/binding
+```
+
+Enabling a module must not automatically activate every preset it contributes.
+
+Until the composition audit/migration is implemented, current monolithic preset config paths remain authoritative.
+
 ## DB-owned definition sync and customization contract
 
 Config and preset files define reusable package-owned definitions. Sync actions materialize them into DB-owned records. Runtime should execute from DB state and selected DB-owned bindings/assignments rather than reading raw config as the only source of truth.
@@ -334,7 +363,7 @@ Campaign / CampaignStep / CampaignStepVariant
 FlowRouteCapability
     normal sync preserves customized capability rows
 
-FlowRoute / Point / FlowRoutePoint
+FlowRoute / FlowRoutePoint
     normal sync preserves customized definitions according to route sync semantics
     explicit FlowRoute force behavior is supported
 ```
@@ -1741,7 +1770,6 @@ FlowRoutes owns:
 
 - `FlowRoute`
 - `FlowRoutePoint`
-- `Point`
 - `ContactFlowRouteProgress`
 - route/point automation behavior
 - active route execution state
@@ -1807,7 +1835,6 @@ Current tables/models:
 
     flow_routes
     flow_route_trigger_bindings
-    points
     flow_route_points
     contact_flow_route_progress
     contact_flow_route_plans
@@ -1820,7 +1847,6 @@ Current models:
 
     FlowRoute
     FlowRouteTriggerBinding
-    Point
     FlowRoutePoint
     ContactFlowRouteProgress
     ContactFlowRoutePlan
@@ -1844,10 +1870,21 @@ Runtime meaning:
     ContactStatus may have one selected status-triggered FlowRoute binding per context
     Automation event keys may have one or more selected event-triggered FlowRoute bindings per context
     FlowRoute has many FlowRoutePoints
-    FlowRoutePoint belongs to Point
+    FlowRoutePoint belongs to exactly one FlowRoute version
+    FlowRoutePoint directly owns type/name/description/definition/settings/cancel conditions
     ContactFlowRouteProgress records active/waiting/completed/cancelled execution state
 
-FlowRoutes runtime behavior should read DB-owned route/point definitions.
+FlowRoutes runtime behavior should read DB-owned `FlowRoute` / `FlowRoutePoint` definitions.
+
+
+The old global `Point` model/table/template layer has been removed.
+
+`FlowRoutePoint` is now the concrete route-owned action/wait/condition definition and directly owns its type, name, description, definition, settings, cancel conditions, route ordering, and route-local durable key.
+
+`FlowRoutePointType` owns the shared type vocabulary.
+
+Do not recreate shared mutable Point templates across Routes. A Route authoring surface may clone an existing `FlowRoutePoint` from another current Route, but the clone becomes an independent new `FlowRoutePoint`.
+
 
 Preset config may create/update DB-owned FlowRoute definitions, but runtime execution should not depend directly on config definitions.
 
@@ -1921,8 +1958,8 @@ FlowRoutes uses first-class schema for route instances, route plans, route plan 
 The durable layer split is:
 
 ```text
-FlowRoute / FlowRoutePoint / Point
-    Reusable template/default route definition.
+FlowRoute / FlowRoutePoint
+    Reusable Route revision plus concrete Route-owned action/wait/condition definitions.
 
 ContactFlowRouteProgress
     Live route instance for one contact and optional subject.
@@ -3227,3 +3264,5 @@ Campaigns invents webinar URL fields without the enrollment caller supplying the
 ```
 
 Treat available-field validation as setup/config-validation work before every editor receives polished autocomplete.
+
+

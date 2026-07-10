@@ -3,8 +3,10 @@
 namespace App\Support\SetupValidation\Contributors;
 
 use App\Support\Modules\ModuleManager;
+use App\Support\Presets\PresetPackageResolver;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
+use Throwable;
 
 class ModuleDependenciesSetupValidationContributor implements SetupValidationContributor
 {
@@ -13,6 +15,7 @@ class ModuleDependenciesSetupValidationContributor implements SetupValidationCon
 
     public function __construct(
         private readonly ModuleManager $moduleManager,
+        private readonly PresetPackageResolver $packageResolver,
     ) {}
 
     public function findings(): iterable
@@ -177,15 +180,15 @@ class ModuleDependenciesSetupValidationContributor implements SetupValidationCon
      */
     private function validateSelectedPresetModuleRequirements(): iterable
     {
-        $presetKey = $this->selectedPresetKey();
+        $presetKey = $this->packageResolver->resolvePresetKey();
 
         if ($presetKey === null) {
             return;
         }
 
-        $package = config("presets.packages.{$presetKey}");
-
-        if (! is_array($package)) {
+        try {
+            $package = $this->packageResolver->package($presetKey);
+        } catch (Throwable) {
             return;
         }
 
@@ -318,17 +321,6 @@ class ModuleDependenciesSetupValidationContributor implements SetupValidationCon
         $visited[$moduleKey] = true;
     }
 
-    private function selectedPresetKey(): ?string
-    {
-        foreach ([config('client.preset'), config('presets.default_package')] as $presetKey) {
-            if (is_string($presetKey) && trim($presetKey) !== '') {
-                return trim($presetKey);
-            }
-        }
-
-        return null;
-    }
-
     /**
      * @param array<string, mixed> $context
      */
@@ -349,4 +341,3 @@ class ModuleDependenciesSetupValidationContributor implements SetupValidationCon
         );
     }
 }
-

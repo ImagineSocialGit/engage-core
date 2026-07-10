@@ -93,7 +93,6 @@ class CreateTaskFromTemplateAction
                     'task_template' => [
                         'id' => $template->getKey(),
                         'key' => $template->key,
-                        'group_key' => $template->group_key,
                         'source' => $template->source,
                         'source_version' => $template->source_version,
                     ],

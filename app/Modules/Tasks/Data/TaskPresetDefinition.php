@@ -13,7 +13,6 @@ class TaskPresetDefinition
      * @param array<string, mixed> $meta
      */
     public function __construct(
-        public readonly string $groupKey,
         public readonly ?string $key,
         public readonly ?string $name,
         public readonly ?string $title,
@@ -41,7 +40,7 @@ class TaskPresetDefinition
     /**
      * @param array<string, mixed> $data
      */
-    public static function fromArray(string $groupKey, array $data): self
+    public static function fromArray(array $data): self
     {
         $responsibleParty = self::string($data, 'responsible_party')
             ?? Task::RESPONSIBLE_PARTY_INTERNAL;
@@ -62,7 +61,6 @@ class TaskPresetDefinition
         };
 
         return new self(
-            groupKey: $groupKey,
             key: $key,
             name: $name,
             title: $title,
@@ -102,7 +100,6 @@ class TaskPresetDefinition
     public function attributes(): array
     {
         return [
-            'group_key' => $this->groupKey,
             'source' => $this->source,
             'source_version' => $this->sourceVersion,
             'owner_group' => $this->ownerGroup,

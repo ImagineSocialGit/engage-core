@@ -4,10 +4,14 @@ namespace App\Modules\Core\Validation;
 
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
+use App\Support\Presets\Enums\PresetDomain;
+use App\Support\Presets\PresetCompositionResolver;
+use App\Support\Presets\PresetPackageResolver;
+use Throwable;
 
 class CoreSetupValidationContributor implements SetupValidationContributor
 {
-    private const SOURCE = 'presets.contact-statuses';
+    private const SOURCE = 'preset_composition.contact_statuses';
     private const MODULE = 'core';
 
     private const CLIENT_FACING_NOUNS = [
@@ -34,9 +38,13 @@ class CoreSetupValidationContributor implements SetupValidationContributor
         'source_version',
     ];
 
-    public function findings(): iterable
+    public function __construct(
+        private readonly PresetCompositionResolver $compositionResolver,
+        private readonly PresetPackageResolver $packageResolver,
+    ) {}
+public function findings(): iterable
     {
-        $presetKey = $this->selectedPresetKey();
+        $presetKey = $this->packageResolver->resolvePresetKey();
 
         if ($presetKey === null) {
             yield $this->error(
@@ -48,71 +56,26 @@ class CoreSetupValidationContributor implements SetupValidationContributor
             return;
         }
 
-        $package = config("presets.packages.{$presetKey}");
-
-        if (! is_array($package)) {
-            yield $this->error(
-                code: 'core.contact_status.preset_package_missing',
-                message: "Selected preset package [{$presetKey}] does not exist.",
-                path: "presets.packages.{$presetKey}",
-                context: [
-                    'preset_key' => $presetKey,
-                ],
+        try {
+            $resolved = $this->compositionResolver->resolve(
+                presetKey: $presetKey,
+                domain: PresetDomain::ContactStatuses,
             );
-
+        } catch (Throwable) {
             return;
         }
 
-        $groups = $package['groups']['contact_statuses'] ?? [];
+        foreach ($resolved->definitions as $statusKey => $definition) {
+            $groupKey = $resolved->definitionGroups[$statusKey][0] ?? 'selected';
+            $source = $resolved->provenance[$statusKey]['source'] ?? self::SOURCE;
+            $path = "{$source}.definitions.{$statusKey}";
 
-        if (! is_array($groups)) {
-            yield $this->error(
-                code: 'core.contact_status.selected_groups_invalid',
-                message: "Preset package [{$presetKey}] groups.contact_statuses must be an array.",
-                path: "presets.packages.{$presetKey}.groups.contact_statuses",
-                context: [
-                    'preset_key' => $presetKey,
-                ],
-            );
-
-            return;
-        }
-
-        foreach ($groups as $index => $groupKey) {
-            if (! $this->filledString($groupKey)) {
-                yield $this->error(
-                    code: 'core.contact_status.selected_group_key_invalid',
-                    message: 'Selected ContactStatus preset group keys must be non-empty strings.',
-                    path: "presets.packages.{$presetKey}.groups.contact_statuses.{$index}",
-                    context: [
-                        'preset_key' => $presetKey,
-                    ],
-                );
-
-                continue;
-            }
-
-            $groupKey = trim($groupKey);
-            $statusKeys = config("presets.contact-statuses.groups.{$groupKey}");
-
-            if (! is_array($statusKeys)) {
-                yield $this->error(
-                    code: 'core.contact_status.group_missing',
-                    message: "Selected ContactStatus preset group [{$groupKey}] does not exist.",
-                    path: "presets.contact-statuses.groups.{$groupKey}",
-                    context: [
-                        'preset_key' => $presetKey,
-                        'group_key' => $groupKey,
-                    ],
-                );
-
-                continue;
-            }
-
-            yield from $this->validateGroup(
+            yield from $this->validateDefinition(
                 presetKey: $presetKey,
                 groupKey: $groupKey,
-                statusKeys: $statusKeys,
+                statusKey: $statusKey,
+                definition: $definition,
+                path: $path,
             );
         }
     }
@@ -121,53 +84,6 @@ class CoreSetupValidationContributor implements SetupValidationContributor
      * @param array<int|string, mixed> $statusKeys
      * @return iterable<int, SetupValidationFinding>
      */
-    private function validateGroup(
-        string $presetKey,
-        string $groupKey,
-        array $statusKeys,
-    ): iterable {
-        foreach ($statusKeys as $index => $statusKey) {
-            if (! $this->filledString($statusKey)) {
-                yield $this->error(
-                    code: 'core.contact_status.group_reference_invalid',
-                    message: "ContactStatus preset group [{$groupKey}] contains an invalid definition reference.",
-                    path: "presets.contact-statuses.groups.{$groupKey}.{$index}",
-                    context: [
-                        'preset_key' => $presetKey,
-                        'group_key' => $groupKey,
-                    ],
-                );
-
-                continue;
-            }
-
-            $statusKey = trim($statusKey);
-            $definitionPath = "presets.contact-statuses.definitions.{$statusKey}";
-            $definition = config($definitionPath);
-
-            if (! is_array($definition)) {
-                yield $this->error(
-                    code: 'core.contact_status.definition_missing',
-                    message: "ContactStatus preset definition [{$statusKey}] does not exist.",
-                    path: $definitionPath,
-                    context: [
-                        'preset_key' => $presetKey,
-                        'group_key' => $groupKey,
-                        'status_key' => $statusKey,
-                    ],
-                );
-
-                continue;
-            }
-
-            yield from $this->validateDefinition(
-                presetKey: $presetKey,
-                groupKey: $groupKey,
-                statusKey: $statusKey,
-                definition: $definition,
-            );
-        }
-    }
 
     /**
      * @param array<string, mixed> $definition
@@ -178,8 +94,8 @@ class CoreSetupValidationContributor implements SetupValidationContributor
         string $groupKey,
         string $statusKey,
         array $definition,
+        string $path,
     ): iterable {
-        $path = "presets.contact-statuses.definitions.{$statusKey}";
         $context = [
             'preset_key' => $presetKey,
             'group_key' => $groupKey,
@@ -269,20 +185,6 @@ class CoreSetupValidationContributor implements SetupValidationContributor
                 ],
             );
         }
-    }
-
-    private function selectedPresetKey(): ?string
-    {
-        foreach ([
-            config('client.preset'),
-            config('presets.default_package'),
-        ] as $presetKey) {
-            if ($this->filledString($presetKey)) {
-                return trim($presetKey);
-            }
-        }
-
-        return null;
     }
 
     private function clientFacingNounInKey(string $key): ?string

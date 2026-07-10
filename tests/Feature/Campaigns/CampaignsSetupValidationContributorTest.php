@@ -21,8 +21,8 @@ class CampaignsSetupValidationContributorTest extends TestCase
     {
         parent::setUp();
 
-        Config::set('presets.campaigns.groups', []);
-        Config::set('presets.campaigns.definitions', []);
+        Config::set('presets.modules.webinars.campaigns.groups', []);
+        Config::set('presets.modules.webinars.campaigns.definitions', []);
         Config::set('messaging.email', []);
         Config::set('messaging.sms', []);
 
@@ -33,11 +33,11 @@ class CampaignsSetupValidationContributorTest extends TestCase
     {
         $this->setPresetPackage(['general_default']);
 
-        Config::set('presets.campaigns.groups.general_default', [
+        Config::set('presets.modules.webinars.campaigns.groups.general_default', [
             'test_campaign',
         ]);
 
-        Config::set('presets.campaigns.definitions.test_campaign', [
+        Config::set('presets.modules.webinars.campaigns.definitions.test_campaign', [
             'key' => 'test_campaign',
             'name' => 'Test Campaign',
             'channel' => 'email',
@@ -76,11 +76,11 @@ class CampaignsSetupValidationContributorTest extends TestCase
     {
         $this->setPresetPackage(['general_default']);
 
-        Config::set('presets.campaigns.groups.general_default', [
+        Config::set('presets.modules.webinars.campaigns.groups.general_default', [
             'test_campaign',
         ]);
 
-        Config::set('presets.campaigns.definitions.test_campaign', [
+        Config::set('presets.modules.webinars.campaigns.definitions.test_campaign', [
             'key' => 'test_campaign',
             'name' => 'Test Campaign',
             'channel' => 'email',
@@ -147,32 +147,16 @@ class CampaignsSetupValidationContributorTest extends TestCase
         $this->assertSame('email', data_get($warnings[0], 'context.variant_key'));
     }
 
-    public function test_it_reports_missing_group_and_missing_definition(): void
-    {
-        $this->setPresetPackage([
-            '__test_missing_group__',
-            'general_default',
-        ]);
-
-        Config::set('presets.campaigns.groups.general_default', [
-            '__test_missing_campaign__',
-        ]);
-
-        $codes = array_column($this->findings(), 'code');
-
-        $this->assertContains('campaigns.group_missing', $codes);
-        $this->assertContains('campaigns.definition_missing', $codes);
-    }
 
     public function test_it_reports_invalid_strategy_duplicate_identity_and_reusable_copy(): void
     {
         $this->setPresetPackage(['general_default']);
 
-        Config::set('presets.campaigns.groups.general_default', [
+        Config::set('presets.modules.webinars.campaigns.groups.general_default', [
             'invalid_campaign',
         ]);
 
-        Config::set('presets.campaigns.definitions.invalid_campaign', [
+        Config::set('presets.modules.webinars.campaigns.definitions.invalid_campaign', [
             'key' => 'invalid_campaign',
             'name' => 'Invalid Campaign',
             'channel' => 'email',
@@ -234,11 +218,11 @@ class CampaignsSetupValidationContributorTest extends TestCase
     {
         $this->setPresetPackage(['general_default']);
 
-        Config::set('presets.campaigns.groups.general_default', [
+        Config::set('presets.modules.webinars.campaigns.groups.general_default', [
             'dependency_campaign',
         ]);
 
-        Config::set('presets.campaigns.definitions.dependency_campaign', [
+        Config::set('presets.modules.webinars.campaigns.definitions.dependency_campaign', [
             'key' => 'dependency_campaign',
             'name' => 'Dependency Campaign',
             'channel' => 'email',
@@ -285,11 +269,11 @@ class CampaignsSetupValidationContributorTest extends TestCase
     {
         $this->setPresetPackage(['general_default']);
 
-        Config::set('presets.campaigns.groups.general_default', [
+        Config::set('presets.modules.webinars.campaigns.groups.general_default', [
             'dormant_dependency_campaign',
         ]);
 
-        Config::set('presets.campaigns.definitions.dormant_dependency_campaign', [
+        Config::set('presets.modules.webinars.campaigns.definitions.dormant_dependency_campaign', [
             'key' => 'dormant_dependency_campaign',
             'name' => 'Dormant Dependency Campaign',
             'channel' => 'email',

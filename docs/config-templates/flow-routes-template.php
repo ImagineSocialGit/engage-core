@@ -1,4 +1,3 @@
-
 <?php
 
 return [
@@ -8,9 +7,18 @@ return [
     | FlowRoute Presets Template
     |--------------------------------------------------------------------------
     |
-    | File path:
-    | config/presets/flow-routes.php
-    | client/{client-key}/config/presets/flow-routes.php, if client override exists
+    | Example module-first file paths:
+    | config/presets/modules/webinars/flow-routes.php
+    | config/presets/modules/{contributor-module}/flow-routes.php
+    | client/{client-key}/config/presets/modules/{contributor-module}/flow-routes.php
+    |
+    | Preset contributions are explicitly registered by module contributors and
+    | aggregated by the shared preset registry. FlowRoute sync consumes a
+    | ResolvedPresetDomain and does not depend directly on contributor directory
+    | structure.
+    |
+    | Module availability, preset contribution availability, package selection,
+    | and runtime trigger binding remain separate decisions.
     |
     | FlowRoutes own automation/control flow.
     | Client/operator UI may call this Route Management or Routes, but config and code should keep the FlowRoutes domain name precise.
@@ -20,8 +28,14 @@ return [
     |
     | FlowRoute presets may reference DB-owned Campaigns, Tasks, Messaging
     | definitions, ContactStatus keys, and durable FlowRoute capabilities through
-    | point definitions. Capability references should use stable keys when the
-    | authoring/runtime path supports them.
+    | concrete FlowRoutePoint definitions.
+    |
+    | FlowRoutePoint directly owns its type, name, description, definition,
+    | settings, cancel conditions, route ordering, and route-local durable key.
+    | There is no separate global Point model/table/template layer.
+    |
+    | Capability references should use stable keys when the authoring/runtime path
+    | supports them.
     |
     | Global preset sync uses dependency-safe order:
     | contact_statuses -> tasks -> messaging -> webinar schedule profiles
@@ -48,10 +62,14 @@ return [
     | Validation expectations
     |--------------------------------------------------------------------------
     |
-    | FlowRoutes owns validation of route preset shape, trigger shape, point type,
-    | registered point-handler availability, capability references, route graph,
-    | subject support, route-instance/snapshot assumptions, and point-specific
-    | references.
+    | Shared preset-composition validation owns package/group/definition structure,
+    | including missing selected groups and duplicate contributed group/definition
+    | keys.
+    |
+    | FlowRoutes owns semantic and executable validation of selected route
+    | definitions: trigger shape, point type, registered point-handler availability,
+    | capability references, route graph, subject support, route-instance/snapshot
+    | assumptions, and point-specific references.
     |
     | Cross-module references must be checked through public/runtime truths:
     | - Tasks validates Task-template availability.
@@ -98,9 +116,10 @@ return [
                 [
                     'key' => 'enroll_webinar_attended_nurture',
                     'type' => 'enroll_campaign',
+                    'capability_key' => 'flow_routes.enroll_campaign',
                     'name' => 'Enroll Webinar Attended Nurture',
                     'description' => 'Enroll the contact into the attended webinar nurture campaign.',
-                    'default_definition' => [
+                    'definition' => [
                         'campaign_key' => 'webinar_attended_nurture',
                         'on_already_enrolled' => 'skipped',
                         'payload' => [],
@@ -108,6 +127,8 @@ return [
                             'source' => 'flow_route',
                         ],
                     ],
+                    'settings' => [],
+                    'cancel_conditions' => [],
                     'sort_order' => 10,
                     'is_start' => true,
                     'next_point_key' => null,
@@ -142,9 +163,10 @@ return [
                 [
                     'key' => 'enroll_webinar_missed_nurture',
                     'type' => 'enroll_campaign',
+                    'capability_key' => 'flow_routes.enroll_campaign',
                     'name' => 'Enroll Webinar Missed Nurture',
                     'description' => 'Enroll the contact into the missed webinar nurture campaign.',
-                    'default_definition' => [
+                    'definition' => [
                         'campaign_key' => 'webinar_missed_nurture',
                         'on_already_enrolled' => 'skipped',
                         'payload' => [],
@@ -152,6 +174,8 @@ return [
                             'source' => 'flow_route',
                         ],
                     ],
+                    'settings' => [],
+                    'cancel_conditions' => [],
                     'sort_order' => 10,
                     'is_start' => true,
                     'next_point_key' => null,
@@ -195,9 +219,10 @@ return [
                 [
                     'key' => 'wait_for_task_completed',
                     'type' => 'event_wait',
+                    'capability_key' => 'flow_routes.event_wait',
                     'name' => 'Wait for Task Completed',
                     'description' => 'Pause until a matching task.completed automation event is recorded.',
-                    'default_definition' => [
+                    'definition' => [
                         'event_key' => 'task.completed',
                         'correlation' => [
                             'task.task_template_key' => 'example.follow_up',
@@ -205,6 +230,8 @@ return [
                         ],
                         'timeout' => null,
                     ],
+                    'settings' => [],
+                    'cancel_conditions' => [],
                     'sort_order' => 10,
                     'is_start' => true,
                     'next_point_key' => null,
@@ -217,5 +244,3 @@ return [
     ],
 
 ];
-
-

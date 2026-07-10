@@ -5,6 +5,8 @@ namespace App\Modules\Core\Actions\ContactStatuses;
 use App\Modules\Core\Models\ContactStatus;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use App\Support\Presets\Data\ResolvedPresetDomain;
+use App\Support\Presets\Enums\PresetDomain;
 
 class SyncContactStatusPresetsAction
 {
@@ -16,31 +18,29 @@ class SyncContactStatusPresetsAction
      *     errors: array<int, string>,
      * }
      */
-    public function handle(?string $presetKey = null, bool $force = false): array
+/**
+     * @return array{
+     *     created: int,
+     *     updated: int,
+     *     skipped: int,
+     *     errors: array<int, string>,
+     * }
+     */
+    public function handle(ResolvedPresetDomain $resolved, bool $force = false): array
     {
-        $presetKey = $this->normalizePresetKey($presetKey);
-
-        if ($presetKey === null) {
-            return [
-                'created' => 0,
-                'updated' => 0,
-                'skipped' => 0,
-                'errors' => ['No preset key was provided and config[presets.default_package] is empty.'],
-            ];
+        if ($resolved->domain !== PresetDomain::ContactStatuses) {
+            throw new InvalidArgumentException(sprintf(
+                'ContactStatus preset sync requires domain [%s]; received [%s].',
+                PresetDomain::ContactStatuses->value,
+                $resolved->domain->value,
+            ));
         }
 
-        $package = config("presets.packages.{$presetKey}");
+        $statusDefinitions = [];
 
-        if (! is_array($package)) {
-            return [
-                'created' => 0,
-                'updated' => 0,
-                'skipped' => 0,
-                'errors' => ["Preset package [{$presetKey}] does not exist."],
-            ];
+        foreach ($resolved->definitions as $statusKey => $definition) {
+            $statusDefinitions[] = $this->normalizeDefinition($statusKey, $definition);
         }
-
-        $statusDefinitions = $this->statusDefinitions($presetKey);
 
         return DB::transaction(function () use ($statusDefinitions, $force) {
             $result = [
@@ -86,66 +86,9 @@ class SyncContactStatusPresetsAction
         });
     }
 
-    private function normalizePresetKey(?string $presetKey): ?string
-    {
-        $presetKey ??= config('presets.default_package');
-
-        if (! is_string($presetKey)) {
-            return null;
-        }
-
-        $presetKey = trim($presetKey);
-
-        return $presetKey !== '' ? $presetKey : null;
-    }
-
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function statusDefinitions(string $presetKey): array
-    {
-        $groups = config("presets.packages.{$presetKey}.groups.contact_statuses", []);
-
-        if (! is_array($groups)) {
-            throw new InvalidArgumentException("Preset package [{$presetKey}] groups.contact_statuses must be an array.");
-        }
-
-        $groups = $this->normalizeStringList($groups);
-
-        if ($groups === []) {
-            return [];
-        }
-
-        $statusKeys = [];
-
-        foreach ($groups as $group) {
-            $groupStatusKeys = config("presets.contact-statuses.groups.{$group}");
-
-            if (! is_array($groupStatusKeys)) {
-                throw new InvalidArgumentException("ContactStatus preset group [{$group}] does not exist.");
-            }
-
-            foreach ($this->normalizeStringList($groupStatusKeys) as $statusKey) {
-                $statusKeys[] = $statusKey;
-            }
-        }
-
-        $statusKeys = array_values(array_unique($statusKeys));
-
-        $definitions = [];
-
-        foreach ($statusKeys as $statusKey) {
-            $definition = config("presets.contact-statuses.definitions.{$statusKey}");
-
-            if (! is_array($definition)) {
-                throw new InvalidArgumentException("ContactStatus preset definition [{$statusKey}] does not exist.");
-            }
-
-            $definitions[] = $this->normalizeDefinition($statusKey, $definition);
-        }
-
-        return $definitions;
-    }
 
     /**
      * @param array<string, mixed> $definition
@@ -211,23 +154,6 @@ class SyncContactStatusPresetsAction
     /**
      * @return array<int, string>
      */
-    private function normalizeStringList(mixed $values): array
-    {
-        if (is_string($values)) {
-            $values = [$values];
-        }
-
-        if (! is_array($values)) {
-            return [];
-        }
-
-        return array_values(array_unique(array_filter(array_map(
-            fn (mixed $value): ?string => is_string($value) && trim($value) !== ''
-                ? trim($value)
-                : null,
-            $values,
-        ))));
-    }
 
     private function requiredString(mixed $value, string $field): string
     {

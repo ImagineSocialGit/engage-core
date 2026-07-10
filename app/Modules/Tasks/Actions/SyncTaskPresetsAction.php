@@ -5,49 +5,63 @@ namespace App\Modules\Tasks\Actions;
 use App\Modules\Tasks\Data\TaskPresetDefinition;
 use App\Modules\Tasks\Data\TaskPresetSyncResult;
 use App\Modules\Tasks\Models\TaskTemplate;
+use App\Support\Presets\Data\ResolvedPresetDomain;
+use App\Support\Presets\Enums\PresetDomain;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 class SyncTaskPresetsAction
 {
-    public function handle(string $presetKey, bool $force = false): TaskPresetSyncResult
-    {
-        $result = new TaskPresetSyncResult();
-
-        $groupKeys = $this->normalizeStringList(
-            config("presets.packages.{$presetKey}.groups.tasks", []),
-        );
-
-        if ($groupKeys === []) {
-            return $result;
+    public function handle(
+        ResolvedPresetDomain $resolved,
+        bool $force = false,
+    ): TaskPresetSyncResult {
+        if ($resolved->domain !== PresetDomain::Tasks) {
+            throw new InvalidArgumentException(sprintf(
+                'Task preset sync requires domain [%s]; received [%s].',
+                PresetDomain::Tasks->value,
+                $resolved->domain->value,
+            ));
         }
 
-        DB::transaction(function () use ($groupKeys, $result, $force): void {
-            foreach ($groupKeys as $groupKey) {
-                $definitions = $this->definitionsForGroup($groupKey, $result);
+        $result = new TaskPresetSyncResult();
 
-                if ($definitions === []) {
-                    continue;
-                }
+        DB::transaction(function () use ($resolved, $result, $force): void {
+            $activeKeysByContributor = array_fill_keys(
+                $resolved->selectedContributors,
+                [],
+            );
 
-                $seenKeys = [];
+            foreach ($resolved->definitions as $templateKey => $definitionData) {
+                $contributor = $resolved->provenance[$templateKey]['contributor'] ?? null;
 
-                foreach ($definitions as $definitionData) {
-                    $definition = TaskPresetDefinition::fromArray($groupKey, $definitionData);
-
-                    if ($definition->key !== null) {
-                        $seenKeys[] = $definition->key;
-                    }
-
-                    $this->syncTemplate(
-                        definition: $definition,
-                        result: $result,
-                        force: $force,
+                if (! is_string($contributor) || trim($contributor) === '') {
+                    throw new InvalidArgumentException(
+                        "Task preset definition [{$templateKey}] is missing contributor provenance."
                     );
                 }
 
+                $contributor = trim($contributor);
+
+                $activeKeysByContributor[$contributor] ??= [];
+                $activeKeysByContributor[$contributor][] = $templateKey;
+
+                $definition = TaskPresetDefinition::fromArray(
+                    array_replace(['key' => $templateKey], $definitionData),
+                );
+
+                $this->syncTemplate(
+                    definition: $definition,
+                    contributor: $contributor,
+                    result: $result,
+                    force: $force,
+                );
+            }
+
+            foreach ($activeKeysByContributor as $contributor => $activeKeys) {
                 $this->removeStaleTemplates(
-                    groupKey: $groupKey,
-                    activeKeys: array_values(array_unique($seenKeys)),
+                    contributor: $contributor,
+                    activeKeys: array_values(array_unique($activeKeys)),
                     result: $result,
                     force: $force,
                 );
@@ -57,99 +71,17 @@ class SyncTaskPresetsAction
         return $result;
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    private function definitionsForGroup(string $groupKey, TaskPresetSyncResult $result): array
-    {
-        $group = config("presets.tasks.groups.{$groupKey}");
-
-        if (! is_array($group)) {
-            $result->skipped();
-            $result->error("Task preset group [{$groupKey}] does not exist.");
-
-            return [];
-        }
-
-        if (array_is_list($group)) {
-            return $this->definitionsFromKeys($groupKey, $group, $result);
-        }
-
-        $legacyTemplates = $group['templates'] ?? null;
-
-        if (is_array($legacyTemplates)) {
-            return array_values(array_filter(
-                $legacyTemplates,
-                fn (mixed $template): bool => is_array($template),
-            ));
-        }
-
-        $result->skipped();
-        $result->error("Task preset group [{$groupKey}] has invalid template references.");
-
-        return [];
-    }
-
-    /**
-     * @param array<int, mixed> $templateKeys
-     * @return array<int, array<string, mixed>>
-     */
-    private function definitionsFromKeys(
-        string $groupKey,
-        array $templateKeys,
-        TaskPresetSyncResult $result,
-    ): array {
-        $definitions = [];
-
-        foreach ($this->normalizeStringList($templateKeys) as $templateKey) {
-            $definitionsConfig = config('presets.tasks.definitions', []);
-            $definition = is_array($definitionsConfig) ? ($definitionsConfig[$templateKey] ?? null) : null;
-
-            if (! is_array($definition)) {
-                $result->skipped();
-                $result->error("Task preset definition [{$templateKey}] referenced by group [{$groupKey}] does not exist.");
-
-                continue;
-            }
-
-            $definitions[] = array_replace(['key' => $templateKey], $definition);
-        }
-
-        return $definitions;
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function normalizeStringList(mixed $values): array
-    {
-        if (is_string($values)) {
-            $values = [$values];
-        }
-
-        if (! is_array($values)) {
-            return [];
-        }
-
-        return array_values(array_unique(array_filter(array_map(
-            fn (mixed $value): ?string => is_string($value) && trim($value) !== ''
-                ? trim($value)
-                : null,
-            $values,
-        ))));
-    }
-
     private function syncTemplate(
         TaskPresetDefinition $definition,
+        string $contributor,
         TaskPresetSyncResult $result,
         bool $force,
     ): void {
         if (! $definition->isValid()) {
             $result->skipped();
             $result->error(sprintf(
-                'Skipped task template [%s] in group [%s]: %s.',
+                'Skipped task template [%s]: %s.',
                 $definition->key ?? 'missing-key',
-                $definition->groupKey,
                 $definition->invalidReason ?? 'invalid_definition',
             ));
 
@@ -175,7 +107,7 @@ class SyncTaskPresetsAction
             'customized_at' => $force ? null : $template->customized_at,
             'meta' => array_replace_recursive($template->meta ?? [], [
                 'preset' => [
-                    'group_key' => $definition->groupKey,
+                    'contributor' => $contributor,
                     'task_template_key' => $definition->key,
                     'source_version' => $definition->sourceVersion,
                 ],
@@ -198,28 +130,29 @@ class SyncTaskPresetsAction
      * @param array<int, string> $activeKeys
      */
     private function removeStaleTemplates(
-        string $groupKey,
+        string $contributor,
         array $activeKeys,
         TaskPresetSyncResult $result,
         bool $force,
     ): void {
-        if ($activeKeys === []) {
-            return;
+        $query = TaskTemplate::query()
+            ->where('source', TaskTemplate::SOURCE_PRESET)
+            ->where('meta->preset->contributor', $contributor);
+
+        if ($activeKeys !== []) {
+            $query->whereNotIn('key', $activeKeys);
         }
 
-        TaskTemplate::query()
-            ->group($groupKey)
-            ->whereNotIn('key', $activeKeys)
-            ->each(function (TaskTemplate $template) use ($result, $force): void {
-                if ($template->is_customized && ! $force) {
-                    $result->customizedSkipped();
-                    $result->warn("Stale task template [{$template->key}] was preserved because it is customized.");
+        $query->each(function (TaskTemplate $template) use ($result, $force): void {
+            if ($template->is_customized && ! $force) {
+                $result->customizedSkipped();
+                $result->warn("Stale task template [{$template->key}] was preserved because it is customized.");
 
-                    return;
-                }
+                return;
+            }
 
-                $template->delete();
-                $result->removed();
-            });
+            $template->delete();
+            $result->removed();
+        });
     }
 }

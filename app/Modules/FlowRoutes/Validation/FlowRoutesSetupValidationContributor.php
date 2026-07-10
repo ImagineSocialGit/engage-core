@@ -31,10 +31,13 @@ use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 use Illuminate\Support\Collection;
 use Throwable;
+use App\Support\Presets\Enums\PresetDomain;
+use App\Support\Presets\PresetCompositionResolver;
+use App\Support\Presets\PresetPackageResolver;
 
 class FlowRoutesSetupValidationContributor implements SetupValidationContributor
 {
-    private const SOURCE = 'presets.flow-routes';
+    private const SOURCE = 'preset_composition.flow_routes';
     private const MODULE = 'flow_routes';
 
     public function __construct(
@@ -42,6 +45,8 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
         private readonly PointHandlerRegistry $pointHandlerRegistry,
         private readonly ModuleManager $moduleManager,
         private readonly MessageDefinitionResolver $messageDefinitionResolver,
+        private readonly PresetCompositionResolver $compositionResolver,
+        private readonly PresetPackageResolver $packageResolver,
     ) {}
 
     public function findings(): iterable
@@ -56,127 +61,35 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
     /**
      * @return iterable<int, SetupValidationFinding>
      */
-    private function validateSelectedPresetDefinitions(): iterable
+private function validateSelectedPresetDefinitions(): iterable
     {
-        $presetKey = $this->selectedPresetKey();
+        $presetKey = $this->packageResolver->resolvePresetKey();
 
         if ($presetKey === null) {
             return;
         }
 
-        $package = config("presets.packages.{$presetKey}");
-
-        if (! is_array($package)) {
-            return;
-        }
-
-        $groups = $package['groups']['flow_routes'] ?? [];
-
-        if (! is_array($groups)) {
-            yield $this->error(
-                code: 'flow_routes.selected_groups_invalid',
-                message: "Preset package [{$presetKey}] groups.flow_routes must be an array.",
-                path: "presets.packages.{$presetKey}.groups.flow_routes",
-                context: ['preset_key' => $presetKey],
+        try {
+            $resolved = $this->compositionResolver->resolve(
+                presetKey: $presetKey,
+                domain: PresetDomain::FlowRoutes,
             );
-
+        } catch (Throwable) {
             return;
         }
 
-        $allGroups = config('presets.flow-routes.groups', []);
-        $allDefinitions = config('presets.flow-routes.definitions', []);
+        foreach ($resolved->definitions as $routeKey => $definition) {
+            $groupKey = $resolved->definitionGroups[$routeKey][0] ?? 'selected';
+            $source = $resolved->provenance[$routeKey]['source'] ?? self::SOURCE;
+            $path = "{$source}.definitions.{$routeKey}";
 
-        $allGroups = is_array($allGroups) ? $allGroups : [];
-        $allDefinitions = is_array($allDefinitions) ? $allDefinitions : [];
-
-        $seenRouteGroups = [];
-
-        foreach ($groups as $groupIndex => $groupKey) {
-            if (! $this->filledString($groupKey)) {
-                yield $this->error(
-                    code: 'flow_routes.selected_group_key_invalid',
-                    message: 'Selected FlowRoute preset group keys must be non-empty strings.',
-                    path: "presets.packages.{$presetKey}.groups.flow_routes.{$groupIndex}",
-                    context: ['preset_key' => $presetKey],
-                );
-
-                continue;
-            }
-
-            $groupKey = trim($groupKey);
-            $routeKeys = $allGroups[$groupKey] ?? null;
-
-            if (! is_array($routeKeys)) {
-                yield $this->error(
-                    code: 'flow_routes.group_missing',
-                    message: "Selected FlowRoute preset group [{$groupKey}] does not exist.",
-                    path: "presets.flow-routes.groups.{$groupKey}",
-                    context: [
-                        'preset_key' => $presetKey,
-                        'group_key' => $groupKey,
-                    ],
-                );
-
-                continue;
-            }
-
-            foreach ($routeKeys as $routeIndex => $routeKey) {
-                if (! $this->filledString($routeKey)) {
-                    yield $this->error(
-                        code: 'flow_routes.group_reference_invalid',
-                        message: "FlowRoute preset group [{$groupKey}] contains an invalid route reference.",
-                        path: "presets.flow-routes.groups.{$groupKey}.{$routeIndex}",
-                        context: [
-                            'preset_key' => $presetKey,
-                            'group_key' => $groupKey,
-                        ],
-                    );
-
-                    continue;
-                }
-
-                $routeKey = trim($routeKey);
-
-                if (isset($seenRouteGroups[$routeKey]) && $seenRouteGroups[$routeKey] !== $groupKey) {
-                    yield $this->error(
-                        code: 'flow_routes.route_key_ambiguous_across_groups',
-                        message: "FlowRoute key [{$routeKey}] is selected by multiple FlowRoute preset groups.",
-                        path: "presets.flow-routes.groups.{$groupKey}.{$routeIndex}",
-                        context: [
-                            'preset_key' => $presetKey,
-                            'route_key' => $routeKey,
-                            'first_group_key' => $seenRouteGroups[$routeKey],
-                            'second_group_key' => $groupKey,
-                        ],
-                    );
-                } else {
-                    $seenRouteGroups[$routeKey] = $groupKey;
-                }
-
-                $definition = $allDefinitions[$routeKey] ?? null;
-
-                if (! is_array($definition)) {
-                    yield $this->error(
-                        code: 'flow_routes.definition_missing',
-                        message: "FlowRoute preset definition [{$routeKey}] does not exist.",
-                        path: "presets.flow-routes.definitions.{$routeKey}",
-                        context: [
-                            'preset_key' => $presetKey,
-                            'group_key' => $groupKey,
-                            'route_key' => $routeKey,
-                        ],
-                    );
-
-                    continue;
-                }
-
-                yield from $this->validatePresetDefinition(
-                    presetKey: $presetKey,
-                    groupKey: $groupKey,
-                    routeKey: $routeKey,
-                    definition: $definition,
-                );
-            }
+            yield from $this->validatePresetDefinition(
+                presetKey: $presetKey,
+                groupKey: $groupKey,
+                routeKey: $routeKey,
+                definition: $definition,
+                path: $path,
+            );
         }
     }
 
@@ -189,8 +102,8 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
         string $groupKey,
         string $routeKey,
         array $definition,
+        string $path,
     ): iterable {
-        $path = "presets.flow-routes.definitions.{$routeKey}";
         $context = [
             'preset_key' => $presetKey,
             'group_key' => $groupKey,
@@ -862,17 +775,6 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
         }
 
         return false;
-    }
-
-    private function selectedPresetKey(): ?string
-    {
-        foreach ([config('client.preset'), config('presets.default_package')] as $presetKey) {
-            if ($this->filledString($presetKey)) {
-                return trim($presetKey);
-            }
-        }
-
-        return null;
     }
 
     private function filledString(mixed $value): bool

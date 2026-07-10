@@ -15,12 +15,12 @@ class CoreSetupValidationContributorTest extends TestCase
             'general_default',
         ]);
 
-        Config::set('presets.contact-statuses.groups.general_default', [
+        Config::set('presets.modules.core.contact-statuses.groups.general_default', [
             'new',
             'engaged',
         ]);
 
-        Config::set('presets.contact-statuses.definitions', [
+        Config::set('presets.modules.core.contact-statuses.definitions', [
             'new' => [
                 'key' => 'new',
                 'name' => 'New',
@@ -42,40 +42,7 @@ class CoreSetupValidationContributorTest extends TestCase
         $this->assertSame([], $this->findings());
     }
 
-    public function test_it_reports_missing_selected_group_and_missing_definition(): void
-    {
-        $this->setPresetPackage([
-            '__test_missing_group__',
-            'general_default',
-        ]);
 
-        Config::set('presets.contact-statuses.groups.general_default', [
-            '__test_missing_status__',
-        ]);
-
-        $findings = $this->findings();
-
-        $this->assertSame([
-            'core.contact_status.group_missing',
-            'core.contact_status.definition_missing',
-        ], array_column($findings, 'code'));
-    }
-
-    public function test_it_reports_invalid_selected_group_shape(): void
-    {
-        Config::set('client.preset', 'test_package');
-        Config::set('presets.packages.test_package', [
-            'groups' => [
-                'contact_statuses' => 'general_default',
-            ],
-        ]);
-
-        $findings = $this->findings();
-
-        $this->assertSame([
-            'core.contact_status.selected_groups_invalid',
-        ], array_column($findings, 'code'));
-    }
 
     public function test_it_reports_required_fields_key_mismatch_and_invalid_meta(): void
     {
@@ -83,14 +50,14 @@ class CoreSetupValidationContributorTest extends TestCase
             'general_default',
         ]);
 
-        Config::set('presets.contact-statuses.groups.general_default', [
+        Config::set('presets.modules.core.contact-statuses.groups.general_default', [
             '__test_missing_key__',
             '__test_mismatched__',
             '__test_missing_name__',
             '__test_invalid_meta__',
         ]);
 
-        Config::set('presets.contact-statuses.definitions', [
+        Config::set('presets.modules.core.contact-statuses.definitions', [
             '__test_missing_key__' => [
                 'name' => 'Missing key',
                 'meta' => [],
@@ -127,11 +94,11 @@ class CoreSetupValidationContributorTest extends TestCase
             'general_default',
         ]);
 
-        Config::set('presets.contact-statuses.groups.general_default', [
+        Config::set('presets.modules.core.contact-statuses.groups.general_default', [
             'new_lead',
         ]);
 
-        Config::set('presets.contact-statuses.definitions.new_lead', [
+        Config::set('presets.modules.core.contact-statuses.definitions.new_lead', [
             'key' => 'new_lead',
             'name' => 'New Lead',
             'description' => 'Client-facing copy may use Lead.',
@@ -146,12 +113,12 @@ class CoreSetupValidationContributorTest extends TestCase
         ], array_column($findings, 'code'));
 
         $this->assertContains(
-            'presets.contact-statuses.definitions.new_lead',
+            'presets.modules.core.contact-statuses.definitions.new_lead',
             array_column($findings, 'path'),
         );
 
         $this->assertContains(
-            'presets.contact-statuses.definitions.new_lead.key',
+            'presets.modules.core.contact-statuses.definitions.new_lead.key',
             array_column($findings, 'path'),
         );
     }
@@ -162,11 +129,11 @@ class CoreSetupValidationContributorTest extends TestCase
             'general_default',
         ]);
 
-        Config::set('presets.contact-statuses.groups.general_default', [
+        Config::set('presets.modules.core.contact-statuses.groups.general_default', [
             'engaged',
         ]);
 
-        Config::set('presets.contact-statuses.definitions.engaged', [
+        Config::set('presets.modules.core.contact-statuses.definitions.engaged', [
             'key' => 'engaged',
             'name' => 'Engaged',
             'description' => 'Engaged contact.',
@@ -214,11 +181,11 @@ class CoreSetupValidationContributorTest extends TestCase
             ],
         ]);
 
-        Config::set('presets.contact-statuses.groups.client_group', [
+        Config::set('presets.modules.core.contact-statuses.groups.client_group', [
             'new',
         ]);
 
-        Config::set('presets.contact-statuses.definitions.new', [
+        Config::set('presets.modules.core.contact-statuses.definitions.new', [
             'key' => 'new',
             'name' => 'New',
             'meta' => [],
@@ -241,11 +208,11 @@ class CoreSetupValidationContributorTest extends TestCase
             ],
         ]);
 
-        Config::set('presets.contact-statuses.groups.default_group', [
+        Config::set('presets.modules.core.contact-statuses.groups.default_group', [
             'new',
         ]);
 
-        Config::set('presets.contact-statuses.definitions.new', [
+        Config::set('presets.modules.core.contact-statuses.definitions.new', [
             'key' => 'new',
             'name' => 'New',
             'meta' => [],
@@ -282,5 +249,3 @@ class CoreSetupValidationContributorTest extends TestCase
         );
     }
 }
-
-

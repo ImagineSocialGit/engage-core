@@ -1,5 +1,3 @@
-
-
 # Engage Core TODO
 
 This file is intentionally disposable. Add work here when it is real but not yet ready for an implementation slice. Delete items as they are completed. Do not treat this as an architectural reference; long-lived decisions belong in `module-boundaries.md` or a feature-specific doc.
@@ -258,11 +256,27 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Preview resolution does not start route progress or mutate Workflow/Contact state.
   - No schema, controller, or Blade changes were required.
   - The actual operator warning/confirmation UX remains part of Phase 11.
-- [ ] Phase 11 — Automatic Follow-ups / FlowRoutes UX polish.
-  - Rename side-panel to something that doesn't imply messaging, using the term "Routes" to help tie together the concepts of "Routes have points along them"
-  - Do not start until the FlowRoutes capability/instance-plan/runtime model is settled.
-  - Redesign Route Binding / Automatic Follow-ups around business outcomes, consequence previews, and client/operator language.
-  - Let the UX be informed by actual route capabilities and instance behavior.
+- [ ] Phase 11 — Automatic Follow-ups / FlowRoutes UX and preset-composition completion.
+  - [x] Automation Opportunities backend foundation complete for the current producer/evidence slice.
+  - [x] Route Management product-completeness audit complete.
+  - [x] Global `Point` model/table/template layer removed.
+  - [x] `FlowRoutePoint` now directly owns concrete action/wait/condition type and configuration.
+  - [x] Route authoring direction chosen: Route-centric concrete `FlowRoutePoint` creation with clone-only reuse from another current Route.
+  - [x] Direction B selected for preset config organization: module-first preset contributions.
+  - [ ] Audit current preset/config composition architecture before moving files.
+    - Inventory current preset domains, sync actions, validators, package/group assumptions, and client overrides.
+    - Decide the shared normalized contribution loader/registry seam.
+    - Keep module availability, preset availability, client package selection, and runtime activation/binding separate.
+    - Do not make enabled modules silently activate every preset they contribute.
+    - Migrate current monolithic preset files without unnecessary compatibility layers.
+  - [ ] Then continue Route Management product work.
+    - Business-language Automatic Follow-ups / Route Management.
+    - Custom Route creation/editing.
+    - Concrete FlowRoutePoint add/remove/reorder/configure.
+    - Clone action from another current Route without shared linkage.
+    - Contextual automation suggestion UX.
+    - Manual status-change consequence warning UX.
+    - Missing creation surfaces only where the audit proves they are necessary.
 - [ ] Phase 12 — Dashboard / contact workspace polish audit.
   - Review orientation surfaces after core runtime pieces settle.
   - Add persisted preferences/acknowledgements only if proven necessary.
@@ -425,3 +439,5 @@ These notes are intentionally retained while the schema-discovery phases continu
 - [ ] Hide technical specs behind details/debug affordances.
 - [ ] Replace raw timing such as `Delay 10 minutes` with human-readable schedule summaries.
 - [ ] Clean up repeated dropdown labels such as `Step 1 Email — Webinar Attended Nurture — Step 1 Email`.
+
+

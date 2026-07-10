@@ -13,7 +13,6 @@ return new class extends Migration
             $table->id();
 
             $table->string('key')->unique();
-            $table->string('group_key')->index();
             $table->string('source')->default('preset')->index();
             $table->string('source_version')->nullable();
             $table->string('owner_group')->nullable()->index();
@@ -46,7 +45,6 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index(['group_key', 'is_active']);
             $table->index(['source', 'source_version']);
             $table->index(['owner_group', 'is_active']);
             $table->index(['responsible_party', 'is_active']);

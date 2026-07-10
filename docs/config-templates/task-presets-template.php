@@ -1,4 +1,3 @@
-
 <?php
 
 return [
@@ -8,9 +7,10 @@ return [
     | Task Template Presets Template
     |--------------------------------------------------------------------------
     |
-    | File path:
-    | config/presets/tasks.php
-    | client/{client-key}/config/presets/tasks.php, if client override exists
+    | Example module-first file paths:
+    | config/presets/modules/tasks/tasks.php
+    | config/presets/modules/{contributor-module}/tasks.php
+    | client/{client-key}/config/presets/modules/{contributor-module}/tasks.php
     |
     | Task presets create/update DB-owned task templates only.
     | They must not create live tasks.
@@ -51,13 +51,18 @@ return [
     | Validation expectations
     |--------------------------------------------------------------------------
     |
-    | Tasks owns validation of task preset groups and task template definitions.
-    | Validation should catch missing groups, missing definitions, malformed
-    | definitions, duplicate/ambiguous stable keys, invalid responsibility or
-    | assignment strategies, and references that cannot create a safe live Task.
+    | Shared preset-composition validation owns package/group/definition structure,
+    | including missing selected groups and duplicate contributed group/definition
+    | keys.
     |
-    | FlowRoutes may reference Task templates by stable key, but Tasks remains the
-    | authority for whether that template definition is valid and available.
+    | Tasks owns semantic validation of selected Task template definitions:
+    | malformed definitions, stable key identity, invalid responsibility or
+    | assignment strategies, due/default shapes, and references that cannot create
+    | a safe live Task.
+    |
+    | FlowRoutes may reference Task templates by stable key. Tasks remains the
+    | authority for Task template definition semantics and DB/runtime availability,
+    | while FlowRoutes owns validation of its own create_task reference.
     |
     */
 
@@ -115,5 +120,3 @@ return [
     ],
 
 ];
-
-

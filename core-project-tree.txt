@@ -159,6 +159,8 @@
 │   │   │   │   ├── ContactStatus.php
 │   │   │   │   ├── ContactTag.php
 │   │   │   │   └── Note.php
+│   │   │   ├── Presets
+│   │   │   │   └── CorePresetContributor.php
 │   │   │   ├── Providers
 │   │   │   │   └── CoreModuleServiceProvider.php
 │   │   │   ├── Requests
@@ -574,6 +576,8 @@
 │   │   │   ├── Models
 │   │   │   │   ├── Task.php
 │   │   │   │   └── TaskTemplate.php
+│   │   │   ├── Presets
+│   │   │   │   └── TasksPresetContributor.php
 │   │   │   ├── Providers
 │   │   │   │   └── TasksModuleServiceProvider.php
 │   │   │   ├── Requests
@@ -655,6 +659,8 @@
 │   │   │   │   ├── WebinarScheduleProfile.php
 │   │   │   │   ├── WebinarSeries.php
 │   │   │   │   └── WebinarWaitlistSignup.php
+│   │   │   ├── Presets
+│   │   │   │   └── WebinarsPresetContributor.php
 │   │   │   ├── Providers
 │   │   │   │   └── WebinarsModuleServiceProvider.php
 │   │   │   ├── Requests
@@ -745,11 +751,23 @@
 │       │   └── DashboardPanelRegistry.php
 │       ├── Modules
 │       │   └── ModuleManager.php
+│       ├── Presets
+│       │   ├── Contracts
+│       │   │   └── PresetContributor.php
+│       │   ├── Data
+│       │   │   ├── PresetContribution.php
+│       │   │   └── ResolvedPresetDomain.php
+│       │   ├── Enums
+│       │   │   └── PresetDomain.php
+│       │   ├── PresetCompositionResolver.php
+│       │   ├── PresetContributionRegistry.php
+│       │   └── PresetPackageResolver.php
 │       └── SetupValidation
 │           ├── Contracts
 │           │   └── SetupValidationContributor.php
 │           ├── Contributors
 │           │   ├── ModuleDependenciesSetupValidationContributor.php
+│           │   ├── PresetCompositionSetupValidationContributor.php
 │           │   └── ReferenceRegistrySetupValidationContributor.php
 │           ├── Data
 │           │   ├── SetupValidationFinding.php
@@ -818,7 +836,10 @@
 │       │   │       └── transactional
 │       │   │           └── webinar.php
 │       │   ├── presets
-│       │   │   └── campaigns.php
+│       │   │   └── modules
+│       │   │       └── webinars
+│       │   │           └── campaigns.php
+│       │   ├── presets.php
 │       │   ├── theme.php
 │       │   └── webinars
 │       │       ├── content.php
@@ -913,10 +934,16 @@
 │   ├── messaging.php
 │   ├── modules.php
 │   ├── presets
-│   │   ├── campaigns.php
-│   │   ├── contact-statuses.php
-│   │   ├── flow-routes.php
-│   │   └── tasks.php
+│   │   └── modules
+│   │       ├── core
+│   │       │   └── contact-statuses.php
+│   │       ├── tasks
+│   │       │   └── tasks.php
+│   │       └── webinars
+│   │           ├── campaigns.php
+│   │           ├── contact-statuses.php
+│   │           ├── flow-routes.php
+│   │           └── tasks.php
 │   ├── presets.php
 │   ├── queue.php
 │   ├── reference
@@ -1397,12 +1424,16 @@
 │   │   │   └── ModuleRouteMiddlewareTest.php
 │   │   ├── Portal
 │   │   │   └── PortalFoundationTest.php
+│   │   ├── Presets
+│   │   │   ├── ModuleFirstPresetCompositionTest.php
+│   │   │   └── PresetCompositionSyncCutoverTest.php
 │   │   ├── Scheduling
 │   │   │   └── SchedulingFoundationTest.php
 │   │   ├── SetupValidation
 │   │   │   ├── MessageConfigValidatorTest.php
 │   │   │   ├── MessagingSetupValidationContributorTest.php
 │   │   │   ├── ModuleDependenciesSetupValidationContributorTest.php
+│   │   │   ├── PresetCompositionSetupValidationContributorTest.php
 │   │   │   ├── ReferenceRegistrySetupValidationContributorTest.php
 │   │   │   ├── SetupValidationManagerTest.php
 │   │   │   ├── SetupValidationRegistrationTest.php
@@ -1413,6 +1444,7 @@
 │   │   │   ├── RecordManualTaskCompletionAutomationBehaviorActionTest.php
 │   │   │   ├── RuntimeTaskBehaviorTest.php
 │   │   │   ├── TaskCompletionProvenanceTest.php
+│   │   │   ├── TaskPresetSyncOwnershipTest.php
 │   │   │   └── TasksSetupValidationContributorTest.php
 │   │   ├── Webhooks
 │   │   │   ├── EmailWebhookControllerTest.php
@@ -1437,7 +1469,11 @@
 │   │   └── Workflow
 │   │       ├── RecordManualStatusTransitionAutomationBehaviorActionTest.php
 │   │       └── TransitionContactWorkflowStatusActionTest.php
-│   └── TestCase.php
+│   ├── TestCase.php
+│   └── Unit
+│       └── Support
+│           └── Presets
+│               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-464 directories, 977 files
+481 directories, 996 files

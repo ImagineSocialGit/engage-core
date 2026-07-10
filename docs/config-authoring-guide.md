@@ -25,7 +25,7 @@ Primary references:
 11. Messaging template presets own reusable copy and safe DB-editable message payloads.
 12. Messaging template catalog entries own browsing/grouping metadata for template review; they do not own runtime behavior.
 13. Webinar schedule profiles/profile items own all Webinar lifecycle message timing, schedules, conditions, enablement, and Webinar-specific skip behavior, including immediate lifecycle messages.
-14. FlowRoute presets own automation/control-flow routing and reusable point definitions; reaching a `send_message` point determines when that action occurs unless the point itself explicitly owns additional behavior.
+14. FlowRoute presets own automation/control-flow routing and concrete `FlowRoutePoint` definitions. `FlowRoutePoint` directly owns its type/configuration; there is no global reusable `Point` model/template layer. Reaching a `send_message` point determines when that action occurs unless the point itself explicitly owns additional behavior.
 15. Broadcasts own their exact `send_at`, audience, channel choice, and batch intent.
 16. Webinar post-event config owns provider event orchestration, not message copy.
 17. Task presets create DB-owned task template definitions only. They do not create live tasks.
@@ -616,6 +616,89 @@ Automatic Follow-ups / send-message point editor
 
 The Messaging template editor should primarily edit/review reusable copy and show read-only usage links.
 
+## Module-first preset contribution architecture
+
+Preset contributions are organized by owning contributor module and aggregated by preset domain.
+
+Current examples:
+
+```text
+config/presets/modules/core/contact-statuses.php
+config/presets/modules/tasks/tasks.php
+
+config/presets/modules/webinars/contact-statuses.php
+config/presets/modules/webinars/tasks.php
+config/presets/modules/webinars/campaigns.php
+config/presets/modules/webinars/flow-routes.php
+```
+
+Future modules and verticals should contribute only the domains they genuinely own or extend. Do not create empty symmetry files.
+
+Shared preset infrastructure:
+
+```text
+PresetContributionRegistry
+    all available contributed groups/definitions by domain
+
+PresetPackageResolver
+    package selection
+    selected groups
+    effective modules
+
+PresetCompositionResolver
+    selected normalized definitions for one package/domain
+    returns ResolvedPresetDomain
+
+Domain sync actions
+    persist exactly the resolved selected definitions
+```
+
+Keep these concerns separate:
+
+```text
+module availability
+    runtime capability exists for the client
+
+preset contribution availability
+    installed contributors expose valid definitions independently of runtime enablement
+
+client package selection
+    selected groups determine what is installed/synced
+
+runtime activation/binding
+    DB-owned selections decide what actually runs
+```
+
+Do not automatically activate every preset merely because its module is enabled.
+
+Preset groups are composition-only. Do not persist group membership as durable ownership. Durable preset ownership belongs to contributor identity plus stable definition key.
+
+## Preset composition vs domain vs runtime validation
+
+Keep validation ownership layered:
+
+```text
+Shared preset-composition validation
+    package shape
+    selected group shape
+    missing selected groups
+    contributed group references to missing definitions
+    duplicate group keys across contributors
+    duplicate definition keys across contributors
+
+Domain validation
+    semantic validity of selected definitions for the owning domain
+
+Runtime validation
+    actual DB/runtime availability
+    executable handler/module/capability readiness
+    selected bindings/assignments where runtime truth matters
+```
+
+Do not reintroduce duplicate domain-specific `group_missing`, `definition_missing`, `selected_groups_invalid`, or generic `preset_composition_invalid` findings after shared composition validation has already established structural validity.
+
+Reference-registry drift validation compares registry keys against all available contributed definitions, not only the currently selected package composition.
+
 ## DB-owned definition sync semantics
 
 Do not assume all preset families sync identically.
@@ -651,7 +734,7 @@ Campaigns/Steps/Variants
 FlowRoute capabilities
     preserve customized rows
 
-FlowRoutes/Points/FlowRoutePoints
+FlowRoutes/FlowRoutePoints
     preserve customized definitions according to route semantics
     force supported
 ```
@@ -744,11 +827,12 @@ Use `dependency_aware` when one variant depends on another variant being schedul
 
 ## Campaign preset shape
 
-Campaign presets live under:
+Campaign presets live under module-first contribution paths such as:
 
 ```text
-config/presets/campaigns.php
-client/{client-key}/config/presets/campaigns.php
+config/presets/modules/webinars/campaigns.php
+config/presets/modules/{contributor-module}/campaigns.php
+client/{client-key}/config/presets/modules/{contributor-module}/campaigns.php
 ```
 
 Campaign presets define the journey and reference the Messaging template context.
@@ -933,6 +1017,63 @@ text
 ```
 
 Use soft borders, background washes, rings, and badges. Do not use tone config for urgency. Overdue, failed, blocked, skipped, or business-critical states should apply separate severity styling that visually wins over module tone.
+
+## FlowRoutePoint definition rule
+
+The obsolete global `Point` abstraction has been removed.
+
+Current durable model:
+
+```text
+FlowRoute
+    reusable logical Route revision
+
+FlowRoutePoint
+    one concrete configured action/wait/condition belonging to exactly one FlowRoute version
+
+FlowRouteCapability
+    describes available authorable/executable capability
+
+FlowRoutePointType
+    shared point-type vocabulary
+```
+
+`FlowRoutePoint` directly owns:
+
+```text
+type
+name
+description
+definition
+settings
+cancel_conditions
+sort_order
+is_start
+is_active
+next_flow_route_point_id
+route-local durable key
+```
+
+Do not author:
+
+```text
+global Point templates
+Point.default_definition
+Point.default_settings
+point_id links from FlowRoutePoint/plan/progress records
+shared mutable Point linkage across Routes
+```
+
+A future Route editor may offer `Copy from another Route`, but cloning creates a new independent `FlowRoutePoint`.
+
+Reuse belongs at the correct domain layer:
+
+```text
+Tasks -> Task Templates
+Messaging -> Message Templates
+Campaigns -> Follow-up Sequences
+FlowRoutes -> concrete Route orchestration
+```
 
 ## Runtime-selectable FlowRoutes
 

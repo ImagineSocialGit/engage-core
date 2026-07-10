@@ -2,12 +2,11 @@
 
 namespace App\Support\SetupValidation\Contributors;
 
-use App\Modules\Campaigns\Models\Campaign;
-use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
-use App\Modules\Tasks\Models\TaskTemplate;
+use App\Support\Presets\Enums\PresetDomain;
+use App\Support\Presets\PresetContributionRegistry;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 
@@ -15,6 +14,10 @@ class ReferenceRegistrySetupValidationContributor implements SetupValidationCont
 {
     private const SOURCE = 'reference.keys';
     private const MODULE = 'app';
+
+    public function __construct(
+        private readonly PresetContributionRegistry $presetContributionRegistry,
+    ) {}
 
     public function findings(): iterable
     {
@@ -45,40 +48,24 @@ class ReferenceRegistrySetupValidationContributor implements SetupValidationCont
             runtimeKeys: FlowRoutePointType::values(),
         );
 
-        yield from $this->warnStaleRegistryKeys(
-            category: 'campaign_keys',
-            runtimeKeys: $this->configuredKeys('presets.campaigns.definitions'),
-        );
-
-        yield from $this->warnStaleRegistryKeys(
-            category: 'flow_route_keys',
-            runtimeKeys: $this->configuredKeys('presets.flow-routes.definitions'),
-        );
-
-        yield from $this->warnStaleRegistryKeys(
-            category: 'task_template_keys',
-            runtimeKeys: $this->configuredKeys('presets.tasks.definitions'),
-        );
+        foreach ($this->presetReferenceDomains() as $category => $domain) {
+            yield from $this->warnStaleRegistryKeys(
+                category: $category,
+                runtimeKeys: $this->presetDefinitionKeys($domain),
+            );
+        }
 
         yield from $this->warnUndocumentedRuntimeKeys(
             category: 'point_types',
             runtimeKeys: FlowRoutePointType::values(),
         );
 
-        yield from $this->warnUndocumentedRuntimeKeys(
-            category: 'campaign_keys',
-            runtimeKeys: $this->configuredKeys('presets.campaigns.definitions'),
-        );
-
-        yield from $this->warnUndocumentedRuntimeKeys(
-            category: 'flow_route_keys',
-            runtimeKeys: $this->configuredKeys('presets.flow-routes.definitions'),
-        );
-
-        yield from $this->warnUndocumentedRuntimeKeys(
-            category: 'task_template_keys',
-            runtimeKeys: $this->configuredKeys('presets.tasks.definitions'),
-        );
+        foreach ($this->presetReferenceDomains() as $category => $domain) {
+            yield from $this->warnUndocumentedRuntimeKeys(
+                category: $category,
+                runtimeKeys: $this->presetDefinitionKeys($domain),
+            );
+        }
     }
 
     /**
@@ -199,20 +186,33 @@ class ReferenceRegistrySetupValidationContributor implements SetupValidationCont
     }
 
     /**
-     * @return array<int, string>
+     * @return array<string, PresetDomain>
      */
-    private function configuredKeys(string $path): array
+    private function presetReferenceDomains(): array
     {
-        $values = config($path, []);
+        $domains = [];
 
-        if (! is_array($values)) {
-            return [];
+        foreach (PresetDomain::cases() as $domain) {
+            $category = $domain->referenceRegistryCategory();
+
+            if ($category === null) {
+                continue;
+            }
+
+            $domains[$category] = $domain;
         }
 
-        return array_values(array_filter(
-            array_map('strval', array_keys($values)),
-            fn (string $key): bool => trim($key) !== '',
-        ));
+        return $domains;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function presetDefinitionKeys(PresetDomain $domain): array
+    {
+        return array_keys(
+            $this->presetContributionRegistry->definitions($domain),
+        );
     }
 
     /**

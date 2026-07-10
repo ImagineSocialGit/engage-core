@@ -107,6 +107,33 @@ class ModuleManager
     }
 
     /**
+     * Preset contributors are discovered from every installed module definition,
+     * independently from runtime module enablement.
+     *
+     * @return array<class-string>
+     */
+    public function presetContributorClasses(): array
+    {
+        $contributors = [];
+
+        foreach ($this->definitions() as $definition) {
+            if (! is_array($definition)) {
+                continue;
+            }
+
+            foreach (Arr::wrap($definition['preset_contributors'] ?? []) as $contributor) {
+                if (! is_string($contributor) || trim($contributor) === '') {
+                    continue;
+                }
+
+                $contributors[] = trim($contributor);
+            }
+        }
+
+        return array_values(array_unique($contributors));
+    }
+
+    /**
      * @return array<int, array{module: string, label: string, route: string, href: string, priority: int, class: string}>
      */
     public function navigationItems(): array

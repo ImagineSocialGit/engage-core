@@ -15,10 +15,13 @@ use App\Support\SetupValidation\Data\SetupValidationFinding;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use Throwable;
+use App\Support\Presets\Enums\PresetDomain;
+use App\Support\Presets\PresetCompositionResolver;
+use App\Support\Presets\PresetPackageResolver;
 
 class CampaignsSetupValidationContributor implements SetupValidationContributor
 {
-    private const SOURCE = 'presets.campaigns';
+    private const SOURCE = 'preset_composition.campaigns';
     private const MODULE = 'campaigns';
 
     private const VARIANT_STRATEGIES = [
@@ -39,6 +42,8 @@ class CampaignsSetupValidationContributor implements SetupValidationContributor
     public function __construct(
         private readonly CampaignMessageDefinitionResolver $campaignMessageDefinitionResolver,
         private readonly MessageChannelAvailability $messageChannelAvailability,
+        private readonly PresetCompositionResolver $compositionResolver,
+        private readonly PresetPackageResolver $packageResolver,
     ) {}
 
     public function findings(): iterable
@@ -50,136 +55,40 @@ class CampaignsSetupValidationContributor implements SetupValidationContributor
     /**
      * @return iterable<int, SetupValidationFinding>
      */
-    private function validateSelectedPresetDefinitions(): iterable
+private function validateSelectedPresetDefinitions(): iterable
     {
-        $presetKey = $this->selectedPresetKey();
+        $presetKey = $this->packageResolver->resolvePresetKey();
 
         if ($presetKey === null) {
             return;
         }
 
-        $package = config("presets.packages.{$presetKey}");
-
-        if (! is_array($package)) {
-            return;
-        }
-
-        $groups = $package['groups']['campaigns'] ?? [];
-
-        if (! is_array($groups)) {
-            yield $this->error(
-                code: 'campaigns.selected_groups_invalid',
-                message: "Preset package [{$presetKey}] groups.campaigns must be an array.",
-                path: "presets.packages.{$presetKey}.groups.campaigns",
-                context: [
-                    'preset_key' => $presetKey,
-                ],
+        try {
+            $resolved = $this->compositionResolver->resolve(
+                presetKey: $presetKey,
+                domain: PresetDomain::Campaigns,
             );
-
+        } catch (Throwable) {
             return;
         }
 
-        $allGroups = config('presets.campaigns.groups', []);
-        $allDefinitions = config('presets.campaigns.definitions', []);
+        foreach ($resolved->definitions as $campaignKey => $definition) {
+            $groupKey = $resolved->definitionGroups[$campaignKey][0] ?? 'selected';
+            $source = $resolved->provenance[$campaignKey]['source'] ?? self::SOURCE;
+            $path = "{$source}.definitions.{$campaignKey}";
 
-        $allGroups = is_array($allGroups) ? $allGroups : [];
-        $allDefinitions = is_array($allDefinitions) ? $allDefinitions : [];
-
-        $selectedCampaignKeys = [];
-
-        foreach ($groups as $index => $groupKey) {
-            if (! $this->filledString($groupKey)) {
-                yield $this->error(
-                    code: 'campaigns.selected_group_key_invalid',
-                    message: 'Selected Campaign preset group keys must be non-empty strings.',
-                    path: "presets.packages.{$presetKey}.groups.campaigns.{$index}",
-                    context: [
-                        'preset_key' => $presetKey,
-                    ],
-                );
-
-                continue;
-            }
-
-            $groupKey = $this->normalizeSegment($groupKey);
-            $campaignKeys = $allGroups[$groupKey] ?? null;
-
-            if (! is_array($campaignKeys)) {
-                yield $this->error(
-                    code: 'campaigns.group_missing',
-                    message: "Selected Campaign preset group [{$groupKey}] does not exist.",
-                    path: "presets.campaigns.groups.{$groupKey}",
-                    context: [
-                        'preset_key' => $presetKey,
-                        'group_key' => $groupKey,
-                    ],
-                );
-
-                continue;
-            }
-
-            foreach ($campaignKeys as $campaignIndex => $campaignKey) {
-                if (! $this->filledString($campaignKey)) {
-                    yield $this->error(
-                        code: 'campaigns.group_reference_invalid',
-                        message: "Campaign preset group [{$groupKey}] contains an invalid campaign reference.",
-                        path: "presets.campaigns.groups.{$groupKey}.{$campaignIndex}",
-                        context: [
-                            'preset_key' => $presetKey,
-                            'group_key' => $groupKey,
-                        ],
-                    );
-
-                    continue;
-                }
-
-                $campaignKey = $this->normalizeSegment($campaignKey);
-
-                if (isset($selectedCampaignKeys[$campaignKey])) {
-                    yield $this->error(
-                        code: 'campaigns.campaign_key_ambiguous_across_groups',
-                        message: "Campaign key [{$campaignKey}] is selected by multiple Campaign preset groups.",
-                        path: "presets.campaigns.groups.{$groupKey}.{$campaignIndex}",
-                        context: [
-                            'preset_key' => $presetKey,
-                            'campaign_key' => $campaignKey,
-                            'first_group_key' => $selectedCampaignKeys[$campaignKey],
-                            'second_group_key' => $groupKey,
-                        ],
-                    );
-                } else {
-                    $selectedCampaignKeys[$campaignKey] = $groupKey;
-                }
-
-                $definition = $allDefinitions[$campaignKey] ?? null;
-
-                if (! is_array($definition)) {
-                    yield $this->error(
-                        code: 'campaigns.definition_missing',
-                        message: "Campaign preset definition [{$campaignKey}] does not exist.",
-                        path: "presets.campaigns.definitions.{$campaignKey}",
-                        context: [
-                            'preset_key' => $presetKey,
-                            'group_key' => $groupKey,
-                            'campaign_key' => $campaignKey,
-                        ],
-                    );
-
-                    continue;
-                }
-
-                yield from $this->validatePresetDefinition(
-                    presetKey: $presetKey,
-                    groupKey: $groupKey,
-                    campaignKey: $campaignKey,
-                    definition: $definition,
-                );
-            }
+            yield from $this->validatePresetDefinition(
+                presetKey: $presetKey,
+                groupKey: $groupKey,
+                campaignKey: $campaignKey,
+                definition: $definition,
+                path: $path,
+            );
         }
 
         yield from $this->validateSelectedCampaignMessagingTemplateOrphans(
-            selectedCampaignKeys: array_keys($selectedCampaignKeys),
-            allDefinitions: $allDefinitions,
+            selectedCampaignKeys: array_keys($resolved->definitions),
+            allDefinitions: $resolved->definitions,
         );
     }
 
@@ -381,8 +290,8 @@ class CampaignsSetupValidationContributor implements SetupValidationContributor
         string $groupKey,
         string $campaignKey,
         array $definition,
+        string $path,
     ): iterable {
-        $path = "presets.campaigns.definitions.{$campaignKey}";
         $context = [
             'preset_key' => $presetKey,
             'group_key' => $groupKey,
@@ -1210,20 +1119,6 @@ class CampaignsSetupValidationContributor implements SetupValidationContributor
                 context: $context,
             );
         }
-    }
-
-    private function selectedPresetKey(): ?string
-    {
-        foreach ([
-            config('client.preset'),
-            config('presets.default_package'),
-        ] as $presetKey) {
-            if ($this->filledString($presetKey)) {
-                return trim($presetKey);
-            }
-        }
-
-        return null;
     }
 
     /**

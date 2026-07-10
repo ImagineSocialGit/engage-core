@@ -17,7 +17,6 @@ class TaskTemplateFactory extends Factory
     {
         return [
             'key' => fake()->unique()->slug(3),
-            'group_key' => 'general_default',
             'source' => TaskTemplate::SOURCE_PRESET,
             'source_version' => 'test',
             'owner_group' => null,
@@ -41,13 +40,6 @@ class TaskTemplateFactory extends Factory
             'customized_at' => null,
             'meta' => null,
         ];
-    }
-
-    public function group(string $groupKey): self
-    {
-        return $this->state([
-            'group_key' => $groupKey,
-        ]);
     }
 
     public function contactResponsible(): self
