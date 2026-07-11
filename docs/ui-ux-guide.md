@@ -1,6 +1,7 @@
 
 
 
+
 # Engage Core UI/UX Guide
 
 This guide turns Engage Core's product principles into practical interface rules.
@@ -135,7 +136,7 @@ Create or complete a task.
 Send a document request.
 Review a submitted form.
 Schedule an appointment.
-Start or stop a follow-up sequence.
+Start or stop a Campaign.
 Review webinar registrations and outcomes.
 ```
 
@@ -227,7 +228,7 @@ Internal names may appear in developer/debug views or compact diagnostic areas, 
 | Automation event | Activity, event, or “When this happens” |
 | `webinar.attended` | Someone attends a webinar |
 | `webinar.missed` | Someone misses a webinar |
-| Campaign enrollment | Start follow-up sequence |
+| Campaign enrollment | Start Campaign |
 | Message template preset | Message template |
 | MessageTemplateCatalogEntry | Template catalog item |
 | MessageTemplatePresetAssignment | Selected template |
@@ -381,31 +382,19 @@ Avoid dashboards filled with empty charts, duplicated widgets, broad module pane
 
 Use for automation, routing, follow-ups, event reactions, and status-triggered behavior.
 
-Do not treat this pattern as implementation-ready until the product questions for the specific surface are answered. For Automatic Follow-ups / FlowRoutes, run an exploration/Q&A pass before redesigning the page.
-
-Recommended structure:
+For current Routes UI, keep the product split explicit:
 
 ```text
-Page title: Automatic Follow-ups
-Intro: Choose what should happen automatically when a lead changes status or takes an action.
+Manage Routes
+    What does this Route do?
 
-Tabs:
-- By Status
-- By Activity
-
-By Status:
-- Select a status
-- Show current follow-up
-- Show consequence preview
-- Let user change selected follow-up
-
-By Activity:
-- Select module tab
-- Select activity
-- Show selected follow-ups
-- Show consequence preview
-- Let user enable/disable/change follow-ups
+Assignments
+    When does this automation run?
 ```
+
+Consequence previews belong near actions that may start automation, such as a manual status change or assignment change.
+
+Do not force every automation surface into the same tabbed builder pattern. Use the current Routes information architecture for Route management, and use focused selectors or confirmation previews where the user's actual task is assignment or consequence review.
 
 ### Status selector pattern
 
@@ -462,7 +451,7 @@ A consequence preview should summarize:
 ```text
 messages that will be sent;
 SMS/email channel requirements;
-campaigns or follow-up sequences that will start or stop;
+Campaigns that will start or stop;
 status changes that will occur;
 tasks that will be created;
 team notifications that will be sent;
@@ -536,142 +525,292 @@ Row-level save is acceptable only when each row is an independent, compact edit 
 
 ## Automation and route UI
 
-### Route Binding page replacement direction
+### Current Routes information architecture
 
-The current Route Trigger Bindings screen should be redesigned around business outcomes.
-
-Replace:
+Client/operator-facing FlowRoutes UI uses:
 
 ```text
-Route Trigger Bindings
-Contact status routes
-Automation event routes
-Workflow status
-webinar.attended
-0 available routes
-One route per status
-Multiple routes allowed
+Routes
+    Manage Routes
+    Assignments
 ```
 
-With:
+The distinction is:
 
 ```text
-Automatic Follow-ups
-By Status
-By Activity
-Status
+Manage Routes
+    What does this Route do?
+
+Assignments
+    When does this automation run?
+```
+
+Do not repeat assignment detail such as `Runs when` inside normal Route-detail disclosure on Manage Routes. Trigger selection and runtime assignment belong to Assignments.
+
+### Manage Routes pattern
+
+Manage Routes should feel like reviewing understandable paths, not configuring an automation engine.
+
+Current preferred structure:
+
+```text
+Route name
+Assigned / Not assigned state
+business-language trigger summary
+Point count
+Show route flow
+Edit Route
+Review Assignment / Assign Route
+```
+
+When expanded, Route flow should show Points in order using module-tone wayfinding for cross-module actions.
+
+Do not expose raw handler keys, event keys, dispatch keys, capability bindings, plan items, or progress internals as primary content.
+
+One-step automatic behavior may be grouped separately from multi-step Routes. Do not force a single automatic action to look like a large Route when that creates unnecessary visual weight.
+
+Search and assignment filters may stay hidden until the list is large enough to justify them. The current implementation shows them when five or more multi-step Routes exist.
+
+### Route editor pattern
+
+Editing an existing Route should preserve context.
+
+Current implemented pattern:
+
+```text
+Manage Routes index
+→ Edit Route
+→ large Route editor modal
+```
+
+Do not send normal editing into a separate full page when a focused modal can preserve the user's place.
+
+The editor should show:
+
+```text
+Route flow
+ordered Point cards
+Edit
+Remove
+move up/down fallback controls
+drag-and-drop when the Point is movable
+Save order only after drag order changes
+Add a Point
+```
+
+Point editing should use a focused modal, not expand a dense form inline inside every Point card.
+
+`Remove` should remain directly visible. Do not hide removal behind Edit.
+
+### Linear Route product rule
+
+Normal Routes are deliberately linear.
+
+Do not expose:
+
+```text
+arbitrary branching
+true/false path canvases
+joins
+nested branch trees
+connectors
+generic node editors
+arbitrary jump-back loops
+```
+
+Internal runtime support for advanced Point types does not require exposing them in normal client/operator authoring.
+
+The product purpose is:
+
+> Take repetitive coordination work off someone's plate.
+
+A useful test is:
+
+```text
+Would a human assistant normally have to remember to do this?
+    yes -> likely Route material
+
+Is the behavior inherently part of one module's domain?
+    yes -> likely module-owned automation instead
+```
+
+### Point labels and Campaign terminology
+
+Point previews should summarize outcomes in plain business language.
+
+Examples:
+
+```text
+Wait 3 days
+Create task: Call lead
+Send message: Webinar replay follow-up
+Change status to Prospect
+Start Campaign: Attended Webinar Nurture
+Stop Campaign: Missed Webinar Nurture
+```
+
+Use `Campaign` consistently for Campaign-owned journeys.
+
+Avoid:
+
+```text
+follow-up sequence
+enroll_campaign
+event_wait
+branch_evaluate
+campaign enrollment
+```
+
+as primary client-facing labels.
+
+Avoid redundant title repetition such as:
+
+```text
+Task
+Create task
+Create task: Call lead
+```
+
+Prefer one clear type label plus one useful summary.
+
+### Point placement guardrails
+
+The UI should reflect the same placement policy enforced by the backend.
+
+Current rules:
+
+```text
+Wait
+    cannot be the final Point
+
+Change Status
+    must be the final Point
+
+Create Task
+Send Message
+Start Campaign
+Stop Campaign
+    may occur anywhere when otherwise available
+```
+
+Do not show fake affordances.
+
+If Change Status is terminal and cannot move, it should not show a drag handle.
+
+If removing the Point after a Wait would leave Wait terminal:
+
+```text
+disable Remove
+gray it out
+provide a hover/focus explanation
+```
+
+Do not let the user submit first and discover the rule only through a page-level error.
+
+For drag-and-drop, avoid page-level warning banners that change layout and cause a bounce or glitch. Show invalid placement locally at the attempted terminal position, for example by darkening the final slot/card area and displaying:
+
+```text
+Wait cannot be the last Point.
+```
+
+The backend remains authoritative. Frontend guardrails should mirror domain policy, not replace it.
+
+### Current authorable Point types
+
+The current normal Route editor supports:
+
+```text
+Wait
+Change contact status
+Create task
+Send message
+Start Campaign
+Stop Campaign
+```
+
+`Stop Campaign` should be contextually hidden unless the current Route already contains a `Start Campaign` Point.
+
+`Send message` should be hidden when no Messaging template is explicitly eligible for direct Route use.
+
+Do not expose advanced internal Point types merely because runtime handlers exist.
+
+### Direct Route message-template eligibility
+
+The Route editor must not list every active Messaging template.
+
+Direct Route use is explicit opt-in through:
+
+```text
+MessageTemplatePreset.meta.route_authoring.eligible = true
+
+or
+
+active MessageTemplateCatalogEntry.meta.route_authoring.eligible = true
+```
+
+Internal-purpose templates are never eligible for direct Route authoring.
+
+This prevents lifecycle-owned templates such as webinar confirmations, webinar reminders, Campaign-step messages, permission invitations, and internal notifications from appearing in a generic Route message picker.
+
+### Assignments pattern
+
+Assignments answers when Routes run.
+
+Status and activity triggers should be described in business language.
+
+Examples:
+
+```text
+Status: Attempting Contact
 When someone attends a webinar
 When someone misses a webinar
-No follow-up is available yet
-One follow-up can run for this status
-More than one follow-up can run for this activity
 ```
 
-After the exploration/Q&A pass, the likely target direction is:
+Contact-status triggers normally select one Route per context.
 
-```text
-Automatic Follow-ups
-Choose what should happen automatically when a lead changes status or takes an action.
+Automation-event triggers may select multiple independent Routes for the same activity.
 
-Tabs:
-1. By Status
-2. By Activity
-```
-
-Do not treat this as a final spec until the Automatic Follow-ups product questions are answered.
-
-#### By Status
-
-```text
-Select a status: [New / Registered / Engaged / Prospect / ...]
-
-Current follow-up:
-Prospect follow-up
-
-What it does:
-- Stops attended-webinar nurture if it is running.
-- Creates a sales follow-up task.
-
-Change follow-up: [select]
-Save changes
-```
-
-#### By Activity
-
-```text
-Module tabs: Webinars / Tasks / Forms / Documents / Commerce / ...
-
-Webinars:
-- When someone attends a webinar
-- When someone misses a webinar
-
-Selected activity:
-When someone attends a webinar
-
-Current automatic follow-ups:
-- Move lead to Attended Webinar
-- Start attended-webinar follow-up sequence
-```
+Do not imply that `FlowRoute.is_active` means the Route is currently selected to run. Availability and assignment are different.
 
 ### FlowRoute names
 
-FlowRoute DB names may stay operator-oriented, but client-facing cards should prefer a display summary.
+FlowRoute DB names may stay operator-oriented, but client-facing cards should prefer understandable names and summaries.
 
-Good display:
+Good:
 
 ```text
-Start attended-webinar follow-up
-Move lead to Attended Webinar
-Create sales follow-up task
+Attempting Contact Follow-Up
+Move contact to Attended Webinar
+Start Attended Webinar Campaign
 ```
 
-Bad display:
+Bad:
 
 ```text
 Webinar Attended Status Transition - v1
 webinar_attended_status_transition
 ```
 
-### Route points
+### Remaining Route UX work
 
-Route point previews should summarize outcomes in plain language.
+The current editor is not the end of Route product work.
 
-Examples:
-
-```text
-Send email: Webinar replay follow-up
-Send SMS: Reminder text
-Create task: Call lead within 1 day
-Change status: Prospect
-Start campaign: Attended webinar nurture
-Stop campaign: Missed webinar nurture
-Wait: 3 days
-Wait until: Task is completed
-```
-
-Do not expose handler names such as `enroll_campaign`, `event_wait`, or `branch_evaluate` as primary labels.
-
-
-### Automatic Follow-ups exploration gate
-
-Before implementing the Automatic Follow-ups redesign, answer the product questions first.
-
-Questions to settle:
+Still deferred:
 
 ```text
-Who is the intended user for this surface: client, operator, or developer?
-Is the first version only selecting prebuilt routes, or also editing route point definitions?
-For status-triggered follow-ups, should the user select one route, a bundle of routes, or one route containing multiple points?
-For activity-triggered follow-ups, when should multiple selected routes be visible as separate independent follow-ups?
-How should route consequences be summarized from points?
-Which route point types are safe to expose to clients?
-Which point types are operator-only?
-How should unavailable point types appear when a module is disabled?
-What confirmation is needed before a manual status change runs automation?
-Where should template assignment changes happen for send-message points?
+new Route creation
+Route duplication
+activate/deactivate
+trigger changes
+clone Point from another Route
+task assignment/default authoring
+business-day/business-hour waits
+simple future Point eligibility / Route continuation rules
+manual status-change consequence confirmation
+contextual Automation Opportunity suggestions
 ```
 
-Until those answers are documented, implementation should focus on exploration, vocabulary, information architecture, and consequence-preview rules rather than replacing the binding UI with another incomplete cockpit.
+Do not expand into arbitrary branching while solving those gaps.
 
 ## Contextual automation discovery
 
@@ -791,19 +930,19 @@ Previously received the related Broadcast.
 
 ### Campaigns
 
-Campaign UI should present campaigns as follow-up sequences or journeys, not as raw scheduled message machinery.
+Campaign UI should use `Campaign` as the primary product term and describe the journey in business language rather than raw scheduled-message machinery.
 
 Good client/operator labels:
 
 ```text
-Follow-up sequence
+Campaign
+Message steps
 Step
-Message
-Delay
-Exit condition
-Start sequence
-Pause sequence
-Stop sequence
+Available channels
+When it sends
+Start Campaign
+Pause Campaign
+Stop Campaign
 ```
 
 Avoid as primary labels:
@@ -813,13 +952,23 @@ campaign_step_due
 message_type
 payload
 meta.message
+CampaignEnrollment
 ```
+
+Within Routes, use:
+
+```text
+Start Campaign
+Stop Campaign
+```
+
+Do not relabel Campaigns as follow-up sequences there.
 
 ### Messaging templates
 
 Template UI should show what the message says and where it is used.
 
-The Messaging template screen is a copy-review and copy-editing surface. It should not be the primary place where an operator chooses which template a Campaign step, Webinar reminder, or Automatic Follow-up uses.
+The Messaging template screen is a copy-review and copy-editing surface. It should not be the primary place where an operator chooses which template a Campaign step, Webinar reminder, or Route Point uses.
 
 Preferred template browsing path:
 
@@ -1094,34 +1243,19 @@ Prefer preset-backed choices over blank-canvas configuration.
 
 ### Route Trigger Bindings screen
 
-Current issues:
+The old technical Route Trigger Bindings direction has been replaced by the current Routes information architecture:
 
 ```text
-The page title exposes implementation language.
-“Workflow status” is unclear to clients.
-The screen says Contact where the client-facing noun should be Lead or the configured noun.
-Two large panels expose too much information at once.
-Every status row is shown even when most have no available routes.
-“0 available routes” is a system state, not a useful client explanation.
-“Automation event routes” exposes architecture instead of business activity.
-Raw event keys such as webinar.attended are primary labels.
-Route names and version labels are too internal.
-Repeated Save buttons make the page feel like a technical matrix.
-The page does not preview what the selected route actually does.
+Routes
+    Manage Routes
+    Assignments
 ```
 
-Target direction:
+Assignments should use business-language status/activity labels, configured contact nouns, and clear selected/unselected state.
 
-```text
-Rename the surface to Automatic Follow-ups.
-Use tabs: By Status and By Activity.
-Use configured lead/contact/customer nouns.
-Use a status dropdown for status-triggered behavior.
-Use module tabs and human-readable activity labels for event-triggered behavior.
-Show consequence previews for selected follow-ups.
-Hide raw keys and versions unless in details/debug mode.
-Use one focused save action per selected status or activity.
-```
+Keep raw event keys and version internals secondary.
+
+Do not repeat assignment detail inside Manage Routes. Manage Routes explains what a Route does; Assignments explains when it runs.
 
 ## UI review checklist
 
@@ -1293,36 +1427,33 @@ This is a UX pattern first, not a schema requirement. Only add persisted state w
 
 ## Route Management language
 
-FlowRoutes is the internal module/domain name.
+`FlowRoutes` is the internal module/domain name.
 
-Client/operator-facing UI may use simpler Route language when it helps the mental model.
-
-Preferred public labels:
+Client/operator-facing UI should use:
 
 ```text
 Routes
-Route Management
-Automatic routes
-Route points
-Automatic actions
-What happens next
+Manage Routes
+Assignments
+Edit Route
+Route flow
+Show route flow
+Hide route flow
+Point
+Automatic Behavior
+Start Campaign
+Stop Campaign
 ```
 
-Avoid making `FlowRoutes`, `FlowRouteTriggerBinding`, `automation_event`, `event_wait`, or raw event keys the primary client-facing language.
+Avoid making `FlowRoutes`, `FlowRouteTriggerBinding`, `automation_event`, `event_wait`, raw event keys, or handler configuration the primary client-facing language.
 
-A sidebar item such as `Route Management` should use a concise contextual hint:
+Use `Campaign` consistently for Campaign-owned journeys. Do not relabel Campaigns as follow-up sequences inside Routes.
 
-```text
-Choose what automatic actions happen after important contact activity.
-```
+The current navigation concept is `Routes`, with `Manage Routes` and `Assignments` as the two main surfaces.
 
-Alternative hint copy:
+Manage Routes answers what a Route does.
 
-```text
-Manage the automatic routes that create tasks, send messages, update statuses, and start follow-up sequences.
-```
-
-Use `FlowRoutes` in developer/module docs where precise ownership matters. Use `Routes` or `Route Management` in client/operator navigation and product copy when the screen is about selecting or understanding automatic behavior.
+Assignments answers when it runs.
 
 ## Broadcast authoring direction
 

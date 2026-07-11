@@ -77,6 +77,8 @@ class FlowRoutePresentationResolver
      *     key: string,
      *     type: string,
      *     module_key: string,
+     *     type_label: string,
+     *     label: string|null,
      *     summary: string,
      *     condition_summaries: array<int, string>
      * }>
@@ -95,7 +97,9 @@ class FlowRoutePresentationResolver
                     'key' => (string) $point->key,
                     'type' => (string) $point->type,
                     'module_key' => $this->pointModuleKey($point),
-                    'summary' => (string) ($summaries[0] ?? $point->name),
+                    'type_label' => $this->pointTypeLabel($point->type),
+                    'label' => $this->meaningfulPointLabel($point),
+                    'summary' => $this->pointEditorSummary($point, $route),
                     'condition_summaries' => array_slice($summaries, 1),
                 ];
             })
@@ -129,8 +133,8 @@ class FlowRoutePresentationResolver
 
         $primary = match ($point->type) {
             FlowRoutePointType::ChangeStatus->value => $this->changeStatusSummary($definition),
-            FlowRoutePointType::EnrollCampaign->value => 'Start follow-up sequence: '.$this->humanConfigLabel((string) data_get($definition, 'campaign_key', 'selected')).'.',
-            FlowRoutePointType::CancelCampaign->value => 'Stop follow-up sequence: '.$this->humanConfigLabel((string) data_get($definition, 'campaign_key', 'selected')).'.',
+            FlowRoutePointType::EnrollCampaign->value => 'Start Campaign: '.$this->humanConfigLabel((string) data_get($definition, 'campaign_key', 'selected')).'.',
+            FlowRoutePointType::CancelCampaign->value => 'Stop Campaign: '.$this->humanConfigLabel((string) data_get($definition, 'campaign_key', 'selected')).'.',
             FlowRoutePointType::CreateTask->value => 'Create task: '.$this->taskLabel($point, $definition).'.',
             FlowRoutePointType::SendMessage->value => 'Send a message.',
             FlowRoutePointType::Wait->value => $this->waitSummary($definition, $settings),
@@ -154,6 +158,71 @@ class FlowRoutePresentationResolver
             FlowRoute::TRIGGER_AUTOMATION_EVENT => 'When '.$this->humanAutomationEvent((string) $route->trigger_key).'.',
             FlowRoute::TRIGGER_MANUAL => 'Started manually.',
             default => Str::headline((string) $route->trigger_type).'.',
+        };
+    }
+
+    private function meaningfulPointLabel(FlowRoutePoint $point): ?string
+    {
+        $label = trim((string) $point->name);
+
+        if ($label === '') {
+            return null;
+        }
+
+        $normalized = Str::lower($label);
+
+        if (in_array($normalized, [
+            'wait',
+            'send message',
+            'create task',
+            'change contact status',
+            'start campaign',
+            'stop campaign',
+        ], true)) {
+            return null;
+        }
+
+        foreach ([
+            'create task:',
+            'create task from ',
+            'change status to ',
+            'start campaign:',
+            'stop campaign:',
+        ] as $generatedPrefix) {
+            if (str_starts_with($normalized, $generatedPrefix)) {
+                return null;
+            }
+        }
+
+        return $label;
+    }
+
+    private function pointTypeLabel(string $pointType): string
+    {
+        return match ($pointType) {
+            FlowRoutePointType::Wait->value => 'Wait',
+            FlowRoutePointType::ChangeStatus->value => 'Status',
+            FlowRoutePointType::CreateTask->value => 'Task',
+            FlowRoutePointType::SendMessage->value => 'Message',
+            FlowRoutePointType::EnrollCampaign->value,
+            FlowRoutePointType::CancelCampaign->value => 'Campaign',
+            default => Str::headline($pointType),
+        };
+    }
+
+    private function pointEditorSummary(FlowRoutePoint $point, FlowRoute $route): string
+    {
+        $definition = is_array($point->definition) ? $point->definition : [];
+        $settings = is_array($point->settings) ? $point->settings : [];
+
+        return match ($point->type) {
+            FlowRoutePointType::Wait->value => Str::of($this->waitSummary($definition, $settings))->rtrim('.')->toString(),
+            FlowRoutePointType::ChangeStatus->value => Str::of($this->changeStatusSummary($definition))->rtrim('.')->toString(),
+            FlowRoutePointType::CreateTask->value => $this->taskLabel($point, $definition),
+            FlowRoutePointType::SendMessage->value => $this->humanConfigLabel((string) data_get($definition, 'message_template_preset_key', 'Selected message')),
+            FlowRoutePointType::EnrollCampaign->value => 'Start '.$this->humanConfigLabel((string) data_get($definition, 'campaign_key', 'selected Campaign')),
+            FlowRoutePointType::CancelCampaign->value => 'Stop '.$this->humanConfigLabel((string) data_get($definition, 'campaign_key', 'selected Campaign')),
+            default => (string) ($point->description ?: $point->name),
         };
     }
 

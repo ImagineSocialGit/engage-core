@@ -2,6 +2,7 @@
 
 
 
+
 # Engage Core Product Principles
 
 Engage Core is a dev-built operating system for small service businesses.
@@ -51,7 +52,7 @@ Review a submitted form.
 Request documents.
 Mark a task complete.
 Update a lead status.
-Start a follow-up sequence.
+Start a Campaign.
 ```
 
 These workflows should normally take seconds to a few minutes.
@@ -277,7 +278,7 @@ The contact show page should feel like a person/customer workspace using the con
 
 ## Exploration before builders
 
-For powerful setup surfaces, especially Automatic Follow-ups / FlowRoutes, do not jump straight from architecture to UI implementation.
+For powerful setup surfaces, do not jump straight from architecture to a blank-canvas builder.
 
 First decide:
 
@@ -289,6 +290,19 @@ What consequences must be previewed before saving?
 Which raw keys or route details are useful only as diagnostics?
 ```
 
-A blank-canvas builder is not client-ready just because the underlying module supports many point types. The product direction is guided, preset-backed setup first, with advanced builder detail only where it is deliberately needed.
+Routes is the current example of this process producing a deliberate product boundary.
 
-Detailed language rules, reusable UI patterns, automation-warning patterns, and UI review checklists belong in `ui-ux-guide.md`.
+The selected direction is:
+
+```text
+Routes are linear.
+Manage Routes explains what a Route does.
+Assignments explains when it runs.
+Normal authoring does not expose arbitrary branching, joins, nested branch trees, connectors, generic node-editor behavior, or arbitrary jump-back loops.
+```
+
+A blank-canvas builder is not client-ready merely because the underlying runtime supports many Point types.
+
+The product direction is guided, preset-backed setup with focused editing and clear consequence/placement guardrails. Advanced runtime capability should remain internal unless a concrete product workflow proves it belongs in normal authoring.
+
+Detailed language rules, reusable UI patterns, automation-warning patterns, and UI review checklists live in `docs/ui-ux-guide.md`.

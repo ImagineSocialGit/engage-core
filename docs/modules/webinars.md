@@ -1,3 +1,4 @@
+
 # Webinars Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -264,7 +265,7 @@ Contact show webinar history panel.
 
 These surfaces should summarize webinar activity in business terms and hide empty passive context where appropriate. They should not make Webinars decide Campaign, Workflow, Task, or FlowRoute orchestration.
 
-## Automatic Follow-ups webinar usage
+## Routes webinar usage
 
 Webinar outcomes should continue to emit neutral automation events such as:
 
@@ -275,7 +276,7 @@ webinar.missed
 webinar.ended
 ```
 
-Automatic Follow-ups UI should translate those event keys into human-readable activity labels, such as:
+Routes / Assignments UI should translate those event keys into human-readable activity labels, such as:
 
 ```text
 Someone registers for a webinar.
@@ -284,6 +285,10 @@ Someone misses a webinar.
 ```
 
 Raw event keys may be shown as secondary diagnostic metadata when useful.
+
+A webinar outcome may start more than one independent selected Route for the same automation event. For example, one Route may change status while another starts a Campaign.
+
+Webinars must remain the event producer and must not import FlowRoutes or Campaigns to orchestrate those consequences directly.
 
 ## Dev/staging testing tools
 

@@ -1,3 +1,4 @@
+
 # Engage Core TODO
 
 This file is intentionally disposable. Add work here when it is real but not yet ready for an implementation slice. Delete items as they are completed. Do not treat this as an architectural reference; long-lived decisions belong in `module-boundaries.md` or a feature-specific doc.
@@ -13,20 +14,14 @@ These are repeatable checklists. Run the relevant checklist after a production s
   - The page should make the next action obvious before exposing module detail.
   - The page should avoid platform-cockpit sprawl: too many modules, widgets, logs, builders, raw keys, and settings at once.
   - Powerful features should default to summaries, presets, guided choices, and consequence previews.
-- [ ] Run an Automatic Follow-ups / FlowRoute binding UX exploration before implementation.
-  - Treat contextual automation opportunities as the discovery layer and Route Management as the control center.
-  - Do not prompt after one-off behavior; require durable evidence and current eligibility.
-  - Explain the repeated pattern in plain language and never act without approval.
-  - Do not start UX polish until the FlowRoutes capability/instance-plan/runtime model is settled.
-  - Decide whether the first version selects prebuilt routes only, edits route points, or only previews selected behavior.
-  - Decide intended user type: client, operator, developer, or split surfaces.
-  - Use configured lead/contact/customer nouns.
-  - Replace raw status/event terminology with Status and Activity language.
-  - Use a status selector for status-triggered follow-ups.
-  - Use module tabs and human-readable activity names for automation-event follow-ups.
+- [ ] Continue Routes / FlowRoutes product-completion work from the implemented baseline.
+  - Treat contextual Automation Opportunities as the discovery layer and Routes as the control center.
+  - Preserve the locked linear Route product boundary; do not add arbitrary branching, joins, nested branch trees, connectors, generic node-editor behavior, or arbitrary jump-back loops.
+  - Keep Manage Routes focused on what a Route does and Assignments focused on when it runs.
+  - Preserve the current server-authoritative placement policy: Wait cannot be terminal; Change Status must be terminal.
+  - Preserve explicit direct-Route Messaging eligibility; do not expose every active Messaging template.
   - Use the existing FlowRoutes-owned `ContactStatusAutomationImpactResolver` as the backend source of truth for manual-status-change consequence previews.
-  - Define the final warning/confirmation interaction before save and before manual status changes.
-  - Decide which point types are client-safe, operator-only, or developer-only.
+  - Remaining high-value gaps: new Route creation, duplication, activate/deactivate, trigger changes, clone Point from another Route, task assignment/default authoring, business-day/business-hour waits, manual-status warning UX, and contextual suggestion UX.
 - [ ] Apply the AJAX/preserve-context UI pattern to other CRM row/panel/modal workflows where page reloads would frustrate operators.
   - Tasks complete/reopen/cancel/archive.
   - Broadcast recipient/detail actions where applicable.
@@ -179,7 +174,7 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Added producer-level provenance tests and boundary guardrails for FlowRoutes internals.
   - Confirmed future modules should use the same provenance pattern when FlowRoutes creates Scheduling appointments, Document requests, Form requests/submissions, Portal invitations/access grants, Commerce records, or vertical-owned artifacts.
   - Kept module-owned business behavior behind public actions/services/contracts.
-  - Deferred polished Route Management UX, CRM provenance/debug views, and Automatic Follow-ups UX polish.
+  - Deferred polished Route Management UX and CRM provenance/debug views at that phase; a first Routes editor baseline has since been implemented.
 - [x] Phase 5 — FlowRoutes event-wait / task-completed resume implementation.
   - Resumes from neutral `task.completed` `AutomationEventRecorded` events.
   - Keeps Tasks independent from FlowRoutes.
@@ -256,27 +251,45 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Preview resolution does not start route progress or mutate Workflow/Contact state.
   - No schema, controller, or Blade changes were required.
   - The actual operator warning/confirmation UX remains part of Phase 11.
-- [ ] Phase 11 — Automatic Follow-ups / FlowRoutes UX and preset-composition completion.
+- [ ] Phase 11 — Automation Opportunities + Routes / FlowRoutes product completion.
   - [x] Automation Opportunities backend foundation complete for the current producer/evidence slice.
   - [x] Route Management product-completeness audit complete.
   - [x] Global `Point` model/table/template layer removed.
   - [x] `FlowRoutePoint` now directly owns concrete action/wait/condition type and configuration.
   - [x] Route authoring direction chosen: Route-centric concrete `FlowRoutePoint` creation with clone-only reuse from another current Route.
-  - [x] Direction B selected for preset config organization: module-first preset contributions.
-  - [ ] Audit current preset/config composition architecture before moving files.
-    - Inventory current preset domains, sync actions, validators, package/group assumptions, and client overrides.
-    - Decide the shared normalized contribution loader/registry seam.
-    - Keep module availability, preset availability, client package selection, and runtime activation/binding separate.
-    - Do not make enabled modules silently activate every preset they contribute.
-    - Migrate current monolithic preset files without unnecessary compatibility layers.
-  - [ ] Then continue Route Management product work.
-    - Business-language Automatic Follow-ups / Route Management.
-    - Custom Route creation/editing.
-    - Concrete FlowRoutePoint add/remove/reorder/configure.
-    - Clone action from another current Route without shared linkage.
-    - Contextual automation suggestion UX.
+  - [x] Module-first preset contribution architecture implemented.
+  - [x] `PresetContributionRegistry`, `PresetPackageResolver`, `PresetCompositionResolver`, and `ResolvedPresetDomain` are the shared preset-composition seams.
+  - [x] `Routes -> Manage Routes / Assignments` information architecture implemented.
+  - [x] Business-language Route cards and one-step Automatic Behavior presentation implemented.
+  - [x] Existing Route editing implemented in a modal.
+  - [x] Existing Point editing implemented in a modal.
+  - [x] Current authorable Point subset implemented: Wait, Change Status, Create Task, Send Message, Start Campaign, Stop Campaign.
+  - [x] Drag-and-drop ordering with explicit `Save order` implemented.
+  - [x] Move up/down fallback controls retained.
+  - [x] Direct Remove actions retained.
+  - [x] Stop Campaign is contextually hidden until the Route already contains Start Campaign.
+  - [x] Direct Route message-template eligibility is explicit opt-in through `meta.route_authoring.eligible = true`; internal-purpose templates remain ineligible.
+  - [x] Linear Route product boundary locked: no arbitrary branching canvas, joins, nested branch trees, connectors, generic node editor, or arbitrary jump-back loops.
+  - [x] Point placement policy implemented and enforced server-side:
+    - Wait cannot be terminal.
+    - Change Status must be terminal.
+    - Add/remove/move/reorder validate the proposed resulting sequence.
+  - [x] Placement UX guardrails implemented:
+    - Terminal Change Status has no drag handle.
+    - Invalid move controls are disabled.
+    - Removing the Point after a Wait is disabled when it would leave Wait terminal, with explanatory hover/focus text.
+    - Invalid terminal Wait drag feedback is local to the terminal position rather than a page-level warning.
+  - [ ] Continue focused Routes product work.
+    - New Route creation.
+    - Route duplication.
+    - Activate/deactivate.
+    - Trigger changes.
+    - Clone Point from another current Route without shared linkage.
+    - Task assignment/default authoring inside create-task Point UX.
+    - Business-day/business-hour waits.
     - Manual status-change consequence warning UX.
-    - Missing creation surfaces only where the audit proves they are necessary.
+    - Contextual Automation Opportunity suggestion UX.
+    - Simple future Point eligibility / Route continuation rules only if they remain linear and understandable.
 - [ ] Phase 12 — Dashboard / contact workspace polish audit.
   - Review orientation surfaces after core runtime pieces settle.
   - Add persisted preferences/acknowledgements only if proven necessary.
@@ -315,7 +328,7 @@ Deferred launch hardening:
 - [x] Add focused tests, adjacent module tests, boundary protection, and real CRM/manual smoke validation.
 - [x] Verify negative cases: unsupported events ignored, old evidence does not correlate, same-Contact repetition stays observing, system-created Tasks do not count as manual behavior.
 - [ ] Add dynamic suggestion-time checks for current capability availability, equivalent existing automation, snooze/dismissal availability, conversion state, context validity, and attribution ambiguity when the first user-facing suggestion surface needs them.
-- [ ] Continue Route Management/contextual UX now that the backend opportunity foundation is trustworthy.
+- [ ] Continue contextual suggestion UX against the implemented Routes baseline; do not create a parallel automation builder or recommendation feed.
 
 ## One-off backlog
 
@@ -406,12 +419,18 @@ These notes are intentionally retained while the schema-discovery phases continu
   - Hints should not expose schema/config/event keys as the main explanation.
   - Hints do not replace consequence previews for automation-triggering changes.
 
-### Route Management / Routes language
+### Routes product completion
 
-- [ ] “During Route Management UX polish, apply the established Routes / Route Management terminology and use FlowRouteCapability metadata for labels, hints, and consequence previews.”
-  - Candidate navigation label: `Route Management`.
-  - Candidate plain-language hint: `Choose what automatic actions happen after important contact activity.`
+- [ ] Continue from the current `Routes -> Manage Routes / Assignments` information architecture.
   - Keep `FlowRoutes` in developer/module docs where precision matters.
+  - Keep `Runs when` and trigger-selection detail in Assignments rather than repeating it in Route details.
+  - Preserve modal Route editing and modal Point editing.
+  - Preserve drag-and-drop with explicit `Save order` only after the order changes.
+  - Preserve direct visible Remove actions and contextual disabled-state explanations.
+  - Preserve `Campaign` terminology in Route UI; do not relabel Campaigns as follow-up sequences.
+  - Add new Route creation before treating the current authoring surface as product-complete.
+  - Consider duplication, activate/deactivate, trigger changes, and clone-from-another-Route as focused follow-up slices.
+  - Keep advanced internal Point types out of normal authoring unless a later product decision explicitly introduces a simple non-canvas rule.
 
 ### Broadcasts UX polish
 
@@ -439,5 +458,3 @@ These notes are intentionally retained while the schema-discovery phases continu
 - [ ] Hide technical specs behind details/debug affordances.
 - [ ] Replace raw timing such as `Delay 10 minutes` with human-readable schedule summaries.
 - [ ] Clean up repeated dropdown labels such as `Step 1 Email — Webinar Attended Nurture — Step 1 Email`.
-
-

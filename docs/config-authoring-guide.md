@@ -1,3 +1,4 @@
+
 # Engage Core Config Authoring Guide
 
 This guide is for creating or reviewing Engage Core default configs and client-specific configs.
@@ -611,7 +612,7 @@ Template assignment changes belong in the consuming module setup screen when pra
 ```text
 Campaign step editor
 Webinar schedule/profile editor
-Automatic Follow-ups / send-message point editor
+Routes / send-message Point editor
 ```
 
 The Messaging template editor should primarily edit/review reusable copy and show read-only usage links.
@@ -1071,18 +1072,38 @@ Reuse belongs at the correct domain layer:
 ```text
 Tasks -> Task Templates
 Messaging -> Message Templates
-Campaigns -> Follow-up Sequences
+Campaigns -> Campaign definitions and message steps
 FlowRoutes -> concrete Route orchestration
 ```
 
+Normal client/operator Route authoring is deliberately linear. Do not create config merely to expose arbitrary branching canvases, joins, nested branch trees, connectors, generic node-editor behavior, or arbitrary jump-back loops.
+
+Current normal authoring placement policy:
+
+```text
+wait
+    cannot be terminal
+
+change_status
+    must be terminal
+
+create_task
+send_message
+enroll_campaign
+cancel_campaign
+    may occur anywhere when otherwise valid
+```
+
+The CRM authoring service validates the proposed resulting sequence on add, remove, move, and reorder. Preset authors should follow the same product semantics for Routes intended for normal client/operator management.
+
 ## Runtime-selectable FlowRoutes
 
-FlowRoute configs should define available route definitions.
+FlowRoute configs define available Route definitions.
 
-Runtime route selection happens through `FlowRouteTriggerBinding`, not by assuming every active matching route should run.
+Runtime Route selection happens through `FlowRouteTriggerBinding`, not by assuming every active matching Route should run.
 
-Contact-status triggers normally select one route per context.
-Automation-event triggers may select multiple routes per context.
+Contact-status triggers normally select one Route per context.
+Automation-event triggers may select multiple independent Routes per context.
 
 `FlowRoute.is_active` means available/allowed.
 
@@ -1098,23 +1119,66 @@ owner_group
 
 Do not use Task `responsible_party` for FlowRoute ownership.
 
+### Current Routes authoring contract
 
-### Automatic Follow-ups UX exploration before config expansion
-
-Before adding new author-facing FlowRoute config keys for Automatic Follow-ups UI, answer the product questions for the surface.
-
-Do not add config just to support a premature builder.
-
-Questions to settle first:
+Current client/operator information architecture is:
 
 ```text
-Is the UI selecting existing routes only, editing route points, or both?
-Which route point summaries must be derivable for consequence previews?
-Which route point types are client-safe, operator-only, or developer-only?
-How should module-disabled point types be hidden or explained?
-How should send-message points reference Messaging template assignments?
-How should selected routes be grouped for a business activity such as webinar.attended?
+Routes
+    Manage Routes
+    Assignments
 ```
+
+The distinction is:
+
+```text
+Manage Routes
+    what the Route does
+
+Assignments
+    when the Route runs
+```
+
+Do not add config solely to duplicate assignment detail inside Manage Routes.
+
+The current normal Route editor supports:
+
+```text
+Wait
+Change contact status
+Create task
+Send message
+Start Campaign
+Stop Campaign
+```
+
+Advanced internal Point types may exist, but normal authoring is explicitly linear and does not expose arbitrary branching.
+
+`Stop Campaign` is contextually shown only when the Route already contains a `Start Campaign` Point.
+
+Direct `Send message` authoring must not expose every active Messaging template. A reusable template is eligible only when explicitly opted into Route authoring through:
+
+```text
+MessageTemplatePreset.meta.route_authoring.eligible = true
+
+or
+
+active MessageTemplateCatalogEntry.meta.route_authoring.eligible = true
+```
+
+Eligibility also requires:
+
+```text
+active template
+at least one dispatch key
+purpose is not internal
+```
+
+Internal-purpose templates are never eligible for direct Route authoring.
+
+This keeps webinar confirmations, webinar reminders, Campaign-step messages, permission invitations, internal notifications, and other lifecycle-owned templates out of the generic Route message picker unless the owning Messaging metadata deliberately makes direct Route use valid.
+
+Do not infer direct Route eligibility from naming conventions, broad scope, or the mere existence of a Messaging template.
 
 ## FlowRoute config shape
 

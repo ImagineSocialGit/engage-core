@@ -1,3 +1,4 @@
+
 # Campaigns Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -464,18 +465,24 @@ No implicit destructive Campaign reset during global preset sync.
 Customized Campaign structures are preserved.
 ```
 
-## Automatic Follow-ups campaign usage
+## Routes campaign usage
 
 FlowRoutes may enroll or cancel Campaigns through Campaign-owned public actions.
 
-Automatic Follow-ups UI should describe these as follow-up sequence consequences, such as:
+Client/operator Route UI should use Campaign terminology consistently:
 
 ```text
-Start follow-up sequence: Webinar Attended Nurture.
-Stop follow-up sequence: Webinar Missed Nurture.
+Start Campaign: Webinar Attended Nurture.
+Stop Campaign: Webinar Missed Nurture.
 ```
 
-It should not expose CampaignEnrollment internals or campaign step machinery as primary labels.
+Do not relabel Campaigns as `follow-up sequences` inside Routes.
+
+Do not expose `CampaignEnrollment` internals or Campaign step machinery as primary Route labels.
+
+The normal Route editor may hide `Stop Campaign` unless the current Route already contains a `Start Campaign` Point. That is a contextual authoring guardrail, not a claim that Campaign cancellation is technically impossible outside that exact sequence.
+
+Campaign runtime ownership remains unchanged: FlowRoutes calls Campaign-owned public actions; Campaigns owns enrollment lifecycle, progression, cancellation, and delivery behavior.
 
 ## CRM presentation and labels
 

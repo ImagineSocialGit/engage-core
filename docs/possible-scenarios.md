@@ -1,4 +1,5 @@
 
+
 # Possible Scenarios
 
 This document grounds Engage Core's abstract module architecture in concrete cross-industry workflows.
@@ -56,7 +57,7 @@ Good ownership split:
 ```text
 Commerce owns purchase facts and external order IDs.
 Music owns artist-specific fan/customer meaning and product-interest categories.
-Campaigns owns the follow-up sequence.
+Campaigns owns the Campaign journey.
 Messaging owns message templates and delivery.
 FlowRoutes owns route selection, automation path, and route-created artifact provenance.
 ```
@@ -332,9 +333,8 @@ Commerce/store integration and purchase facts.
 Show/event attendance model.
 Location-radius targeting model.
 Documents/Scheduling/Form/Portal scenario-specific route presets.
-Polished client-facing Route Management builder/editor.
+Product-complete new Route creation and remaining focused Routes authoring/discovery UX.
 Config/setup validation for preset references, event keys, route point definitions, task-template refs, campaign refs, messaging refs, available fields, capability availability, and unsupported module combinations.
 ```
 
 Phase 6 config/setup validation should use scenarios like these to ensure future presets fail clearly when they reference unavailable modules, missing templates, missing campaign keys, unsupported point types, invalid tokens/fields, unavailable capabilities, or unsafe route/event_wait correlation.
-

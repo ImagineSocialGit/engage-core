@@ -4,7 +4,24 @@
     subheading="Review and change the paths your system can run automatically."
     module="flow_routes"
 >
-    <div class="space-y-6">
+    <div
+        class="space-y-6"
+        x-data="{
+            openRouteEditor: @js($openRouteEditorId),
+            openRoute(id) {
+                this.openRouteEditor = Number(id);
+                const url = new URL(window.location.href);
+                url.searchParams.set('edit_route', String(id));
+                window.history.replaceState({}, '', url);
+            },
+            closeRoute() {
+                this.openRouteEditor = null;
+                const url = new URL(window.location.href);
+                url.searchParams.delete('edit_route');
+                window.history.replaceState({}, '', url);
+            },
+        }"
+    >
         @include('crm.flow-routes.partials.navigation')
 
         <section class="rounded-3xl border border-orange-200 bg-white/90 shadow-sm">
@@ -18,7 +35,7 @@
                 </h2>
 
                 <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-700">
-                    Routes connect multiple actions, waits, and decisions into a path. Review a Route below to understand what it does and where it runs.
+                    Routes connect repetitive actions, waits, and follow-up work into a clear path. Review a Route below to understand what it does.
                 </p>
 
                 @if($routeSummary['unassigned_routes'] > 0)
@@ -52,7 +69,7 @@
                         </h2>
 
                         <p class="mt-1 max-w-2xl text-sm leading-6 text-slate-700">
-                            Multi-step paths that coordinate actions, waits, and decisions.
+                            Multi-step paths that take repetitive coordination work off your plate.
                         </p>
                     </div>
 
@@ -141,8 +158,8 @@
                                     <details class="group mt-5">
                                         <summary class="inline-flex cursor-pointer list-none items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-950 transition hover:bg-orange-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400">
                                             <span>{{ $route['point_count'] }} {{ \Illuminate\Support\Str::plural('Point', $route['point_count']) }}</span>
-                                            <span class="text-orange-700 group-open:hidden">· Show flow</span>
-                                            <span class="hidden text-orange-700 group-open:inline">· Hide flow</span>
+                                            <span class="text-orange-700 group-open:hidden">· Show route flow</span>
+                                            <span class="hidden text-orange-700 group-open:inline">· Hide route flow</span>
                                         </summary>
 
                                         <ol class="mt-4 flex flex-col gap-2 lg:flex-row lg:items-stretch" aria-label="Route flow">
@@ -187,6 +204,14 @@
                             </div>
 
                             <div class="flex shrink-0 flex-wrap gap-2 xl:justify-end">
+                                <button
+                                    type="button"
+                                    @click="openRoute({{ $route['id'] }})"
+                                    class="inline-flex items-center justify-center rounded-xl border border-orange-300 bg-white px-4 py-2.5 text-sm font-semibold text-orange-900 shadow-sm transition hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
+                                >
+                                    Edit Route
+                                </button>
+
                                 <a
                                     href="{{ $assignmentUrl }}"
                                     class="inline-flex items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
@@ -196,23 +221,6 @@
                             </div>
                         </div>
 
-                        <details class="mt-5 border-t border-orange-100 pt-4">
-                            <summary class="cursor-pointer text-sm font-semibold text-slate-800 marker:text-slate-500 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300">
-                                Details
-                            </summary>
-
-                            <dl class="mt-4 grid gap-4 text-sm sm:grid-cols-2">
-                                <div>
-                                    <dt class="font-semibold text-slate-950">Runs when</dt>
-                                    <dd class="mt-1 text-slate-700">{{ $route['trigger_summary'] }}</dd>
-                                </div>
-
-                                <div>
-                                    <dt class="font-semibold text-slate-950">Source</dt>
-                                    <dd class="mt-1 text-slate-700">{{ $route['source_label'] }}</dd>
-                                </div>
-                            </dl>
-                        </details>
                     </article>
                 @empty
                     <div class="p-10 text-center">
@@ -348,5 +356,12 @@
                 </div>
             </section>
         @endif
+
+        @foreach($routeEditors as $editor)
+            @include('crm.flow-routes.partials.editor-modal', [
+                'editor' => $editor,
+                'editorOptions' => $editorOptions,
+            ])
+        @endforeach
     </div>
 </x-layouts.crm>

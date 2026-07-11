@@ -1,4 +1,5 @@
 
+
 # Automation Opportunities
 
 This document defines Engage Core's durable architecture and product direction for noticing repeated meaningful manual work and suggesting automation without acting autonomously.
@@ -703,8 +704,22 @@ The backend foundation sequence is complete:
 3. Add occurrence/opportunity migrations and models.        COMPLETE
 4. Add justified producer integrations.                     COMPLETE for current slice
 5. Add focused/adjacent tests and manual CRM smoke tests.    COMPLETE
-6. Continue Route Management and contextual UX work.         NEXT
 ```
+
+The first Routes management/editor baseline is also complete:
+
+```text
+Manage Routes / Assignments information architecture
+business-language Route presentation
+modal Route editing
+modal Point editing
+drag-and-drop ordering with explicit Save order
+linear authoring boundary
+explicit direct-Route Messaging eligibility
+Point placement policy and matching UI guardrails
+```
+
+Contextual Automation Opportunity suggestion UX remains future work.
 
 Implemented current-slice producers/evidence:
 
@@ -730,6 +745,8 @@ task.completed
 The evidence allowlist may change as actual usefulness becomes clearer. The generic evaluator and opportunity lifecycle should remain protected from event/module-specific bloat.
 
 Do not add another producer merely because a manual action exists. Add one only when the system can explain a useful repeated pattern and offer a trustworthy next step.
+
+The next suggestion work should integrate with the current Routes product rather than create a parallel automation builder or recommendation feed.
 
 ## Module integration checklist
 
@@ -770,4 +787,3 @@ Removing an event from the allowlist should stop future evidence capture; it doe
 The architecture should allow future retention rules such as pruning old, uninteresting occurrences after a defined period while preserving occurrences tied to suggested or converted opportunities.
 
 Add retention/pruning only when real volume or operational needs justify it. Avoid long-term auditing/history storage with little product payoff.
-

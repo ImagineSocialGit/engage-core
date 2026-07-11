@@ -1,3 +1,4 @@
+
 # Engage Core Client-Readiness Roadmap
 
 This roadmap tracks the near-term implementation order for getting Engage Core ready for real client operation without treating the work as a limited or throwaway MVP.
@@ -91,7 +92,7 @@ Completed runway pieces:
 
 Remaining near-term candidates:
 
-- Automatic Follow-ups / FlowRoutes UX polish around business-language route selection and consequence previews.
+- Routes / FlowRoutes product completion: new Route creation, remaining authoring gaps, consequence previews, and contextual suggestions.
 - Dashboard / contact workspace polish audit after the main runtime and route-management work settles.
 - FOSS-informed module schema audit before production rollout.
 
@@ -133,7 +134,7 @@ Current schema-discovery sequence:
 | 8 | Permission invitation cancellation / skip / failure bookkeeping | Complete | DB/schema + architecture | No schema change was needed. Pre-claim skips/cancellation create no invitation row; post-claim scheduled-message skips reconcile matching claimed invitations to failed; provider failures remain failed across Messaging and invitation state; failed invitations stay one-time-blocking. |
 | 9 | Webinar message readiness check | Complete | Architecture + operator safety | Computed Webinars-owned readiness now evaluates runtime Messaging resolution, channel availability, active schedule-profile effects, intentional disablement, registration/waitlist opt-ins, and post-event outcome-message enablement without persisting readiness state. |
 | 10 | Manual status-change automation warning foundation | Complete | Operator safety + architecture | Backend-only consequence preview is implemented through a read-only FlowRoutes-owned impact resolver. It reports whether selected status-based FlowRoutes would run and which routes are selected without starting route progress. The actual operator warning UX is deferred to Phase 11. |
-| 11 | Automation opportunity foundation + Automatic Follow-ups / FlowRoutes UX | In progress; backend foundation and Point collapse complete | DB/schema + architecture + UI/UX | Occurrence/opportunity infrastructure and real manual smoke validation are complete. The obsolete global Point layer has been removed. The Route-authoring direction is Route-centric with concrete FlowRoutePoints and clone-only reuse. Before deeper Route Management UI implementation, audit and implement the selected module-first preset contribution architecture (Direction B). |
+| 11 | Automation opportunity foundation + Routes / FlowRoutes UX | In progress; backend, preset architecture, and first Route authoring baseline complete | DB/schema + architecture + UI/UX | Automation Opportunities, global Point collapse, module-first preset contributions, Manage Routes/Assignments IA, modal Route/Point editing, drag ordering, explicit Route message eligibility, linear product boundaries, and Point placement policy are complete. Remaining work is new Route creation and focused authoring/discovery UX gaps. |
 | 12 | Dashboard / contact workspace polish audit | Planned | UI/UX + possible schema | Review orientation surfaces after core runtime pieces settle. Add persisted preferences/acknowledgements only when needed. |
 | 13 | FOSS-informed module schema audit | Planned | DB/schema audit | Compare Engage Core modules against mature FOSS patterns to identify likely missing persisted concepts before production. Pull FlowRoutes-specific FOSS/OSS pattern review earlier into Phase 4 if helpful. |
 
@@ -156,20 +157,11 @@ Deferred launch hardening:
 Do not build DB snapshot/export tooling during active pre-production schema discovery unless real data preservation becomes necessary. While the product is not yet in production, schema-heavy phases may replace branch migrations and reset local/staging data as needed. Add command-line SQL/JSONL snapshot tooling when schemas are stabilizing and production rollout is near.
 
 
-## Phase 11 automation opportunity foundation and Route discovery
+## Phase 11 automation opportunity foundation and Routes product work
 
-Phase 11 expanded after the Route Management UX audit revealed a durable schema/architecture need before polish.
+Phase 11 expanded after the Route Management UX audit revealed durable architecture and product questions that needed to be settled before deeper polish.
 
-The product goal is:
-
-```text
-Observe repetition.
-Explain the pattern.
-Suggest one clear next step.
-Never act without permission.
-```
-
-The backend Automation Opportunities foundation is now complete for the current slice.
+The Automation Opportunities backend foundation is complete for the current slice.
 
 Implemented architecture:
 
@@ -272,11 +264,9 @@ system-created Task
     -> no manual behavior occurrence
 ```
 
-Focused and adjacent automated tests are green.
-
 The generic evaluator should remain protected from module/event-specific branching. Future suggestion-time checks such as capability availability, equivalent existing automation, snooze/dismissal state, conversion state, context validity, or attribution ambiguity should be added only where the first real suggestion surface needs them.
 
-The Route Management architecture audit also completed a major FlowRoutes simplification:
+Phase 11 also completed the Route Management architecture simplification:
 
 ```text
 Removed:
@@ -292,55 +282,110 @@ Retained:
     flow_route_point_id / flow_route_point_key / point_type provenance
 ```
 
-`FlowRoutePoint` now directly owns its type, name, description, definition, settings, cancel conditions, ordering, and route-local durable key.
-
-The chosen Route-authoring direction is Route-centric. Users may clone an existing current `FlowRoutePoint` from another Route, but the clone becomes independent immediately. Do not recreate global shared Point templates.
-
-Before deeper Route Management UI implementation, the next Phase 11 audit target is preset/config composition.
-
-Selected direction:
+The module-first preset contribution architecture is implemented:
 
 ```text
-module-first preset contributions
-
-config/presets/modules/webinars/
-    contact-statuses.php
-    campaigns.php
-    flow-routes.php
-
-config/presets/modules/mortgage/
-    contact-statuses.php
-    tasks.php
-    campaigns.php
-    flow-routes.php
+PresetContributionRegistry
+PresetPackageResolver
+PresetCompositionResolver
+ResolvedPresetDomain
+explicit module preset contributors
+module-first preset files
 ```
 
-The selected architecture must keep these concepts separate:
+The selected architecture keeps separate:
 
 ```text
 module availability
-preset availability/contribution
+preset contribution availability
 client package selection
 runtime activation/binding
 ```
 
-The audit should determine the shared loader/registry seam so sync actions consume normalized aggregated definitions rather than knowing directory structure.
-
-After that config-composition audit/migration, the remaining Phase 11 work is Route Management product-completeness and UX:
+The current Routes product direction is now locked:
 
 ```text
-business-language Route Management
-contextual automation suggestions
-manual status-change consequence warning UX
-custom Route creation
-custom Point creation
-missing creation surfaces such as standalone Tasks where justified
-guided simple/advanced authoring decisions
+Routes
+    Manage Routes
+    Assignments
+
+Routes are linear.
+No arbitrary branching canvas.
+No joins.
+No nested branch trees.
+No generic node editor.
+No arbitrary jump-back loops.
 ```
 
-Do not build clickstream tracking, generic AI recommendations, confidence scores, autonomous Route creation, or a recommendation feed.
+Implemented Manage Routes baseline:
 
-Detailed contract: `docs/automation-opportunities.md`.
+```text
+business-language Route cards
+assigned/not-assigned state
+expandable Route flow
+one-step Automatic Behavior separated from multi-step Routes
+Route editing in a modal
+Point editing in a modal
+visible Remove action
+drag-and-drop ordering with explicit Save order
+move up/down fallback controls
+module-tone wayfinding
+contextual Stop Campaign availability
+explicit direct-Route Messaging template eligibility
+```
+
+Current authorable Point types:
+
+```text
+Wait
+Change contact status
+Create task
+Send message
+Start Campaign
+Stop Campaign
+```
+
+Current placement policy:
+
+```text
+Wait cannot be terminal.
+Change Status must be terminal.
+The backend validates the proposed resulting sequence on add, remove, move, and reorder.
+The UI mirrors those rules with disabled controls, missing fake drag affordances, tooltips, and local invalid-drop feedback.
+```
+
+The direct Route message picker is explicit opt-in only:
+
+```text
+MessageTemplatePreset.meta.route_authoring.eligible = true
+
+or
+
+active MessageTemplateCatalogEntry.meta.route_authoring.eligible = true
+```
+
+Internal-purpose templates remain ineligible even with opt-in.
+
+Remaining Phase 11 work:
+
+```text
+new Route creation
+Route duplication
+activate/deactivate
+trigger changes
+clone Point from another Route
+task assignment/default authoring in Route UX
+business-day/business-hour wait authoring
+simple future Point eligibility / Route continuation rules
+manual status-change consequence warning UX
+contextual Automation Opportunity suggestion UX
+```
+
+Do not build clickstream tracking, generic AI recommendations, confidence scores, autonomous Route creation, a recommendation feed, or arbitrary branching.
+
+Detailed Automation Opportunities contract: `docs/automation-opportunities.md`.
+
+Detailed FlowRoutes contract: `docs/modules/flow-routes.md`.
 
 ## Phase 4B FlowRoutes schema hardening completion
 
@@ -392,7 +437,7 @@ Client-readiness implementation should chase one main item at a time unless two 
 
 The current sequence is the pre-prod schema-discovery sequence above.
 
-Phases 7 and 8 permission-invitation hardening are complete. Accepted invitations emit a neutral automation event exactly once, and cancellation/skip/failure bookkeeping now has explicit lifecycle semantics across Messaging invitations, scheduled messages, and Broadcast bookkeeping. Route Management UI, CRM provenance/debug views, and polished Automatic Follow-ups UX remain deferred.
+Phases 7 and 8 permission-invitation hardening are complete. Accepted invitations emit a neutral automation event exactly once, and cancellation/skip/failure bookkeeping now has explicit lifecycle semantics across Messaging invitations, scheduled messages, and Broadcast bookkeeping. The first Route Management editor baseline is now implemented; CRM provenance/debug views and contextual suggestion UX remain deferred.
 
 Do not run parallel threads that modify the same controllers, views, routes, services, migrations, or tests unless one thread is paused and rebased onto the other.
 
@@ -413,7 +458,7 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | 8 | Permission invitation cancellation behavior | Complete | Pre-claim skips/cancellations create no invitation row; post-claim skips reconcile claimed invitations to failed; provider failures remain failed; no new invitation statuses or schema changes were required. |
 | 9 | Webinar message readiness check | Complete | Computed readiness is available for registration confirmations, registration opt-ins, reminders, waitlist alerts, waitlist opt-ins, and post-event follow-ups. Readiness is derived from runtime resolution, channel availability, active schedule-profile effects, and post-event enablement; no readiness state is persisted. |
 | 10 | Manual status-change automation warning foundation | Complete | FlowRoutes exposes a read-only `ContactStatusAutomationImpactResolver` and plural status-trigger route resolution. No schema, controller, or Blade changes were required. The actual warning interaction belongs to Phase 11 UX work. |
-| 11 | Automation opportunity foundation + Automatic Follow-ups / FlowRoutes UX | In progress; backend foundation complete | Shared occurrence/opportunity persistence, generic evaluation, justified producers/evidence, and manual smoke validation are complete. Next: Route Management product-completeness, contextual discovery, consequence previews, and guided creation UX. |
+| 11 | Automation opportunity foundation + Routes / FlowRoutes UX | In progress; first authoring baseline complete | Shared opportunity persistence/evaluation and the current Routes management/editor baseline are complete. Next: new Route creation and the remaining focused authoring/discovery UX gaps. |
 | 12 | Dashboard / contact workspace polish audit | 1–2 sessions | Review shared orientation surfaces after runtime behavior settles. Add persisted state only for proven needs such as acknowledgements or preferences. |
 | 13 | FOSS-informed module schema audit | 2–6 sessions, split by module group | Compare Engage Core module tables against mature FOSS patterns to catch likely missing persisted concepts before production. |
 | Deferred | DB Snapshot / Export Safety Tool | 0.5–1.5 sessions near launch | Command-line SQL/JSONL snapshot tooling for production/launch hardening. Do not build during active pre-prod schema discovery unless real data preservation becomes necessary. |
@@ -825,49 +870,44 @@ Completed within Phase 11:
 Automation Opportunities backend foundation
 manual/compound producer and evidence slice
 real CRM/manual smoke validation
-Route Management product-completeness audit
 global Point collapse
 FlowRoutePoint direct ownership model
-Route-centric authoring direction
-clone-only reuse direction
+module-first preset contribution architecture
+business-language Routes information architecture
+Manage Routes and Assignments split
+existing Route editing modal
+existing Point editing modal
+drag-and-drop ordering with explicit Save order
+current linear Point authoring subset
+direct Route message-template eligibility seam
+contextual Stop Campaign availability
+Point placement policy and matching UX guardrails
 ```
 
-The immediate next target is the preset/config composition audit before deeper Route Management UI implementation.
+The next Route work should continue from this real baseline rather than reopening already-settled product questions.
 
-The selected direction is module-first preset contribution layout:
-
-```text
-config/presets/modules/{module}/{preset-domain}.php
-```
-
-The audit must determine:
+Highest-value remaining candidates:
 
 ```text
-which preset/config domains exist today
-which sync actions assume monolithic config paths
-which setup validators assume monolithic paths
-which package/group logic assumes flat global groups
-whether an existing registry/loader can be extended
-whether a shared PresetContributionRegistry or equivalent is needed
-how duplicate keys and stale references are validated
-how module availability, preset availability, package selection, and runtime activation stay separate
-how current monolithic files migrate without unnecessary compatibility layers
-```
-
-After that architecture is settled and implemented, return to the remaining Phase 11 product work:
-
-```text
-business-language Route Management
-custom Route creation/editing
-concrete FlowRoutePoint authoring
-clone from another Route
-contextual automation suggestion UX
+new Route creation
+Route duplication
+activate/deactivate
+trigger changes
+clone Point from another Route
+task assignment/default authoring inside create-task Point UX
+business-day/business-hour wait authoring
 manual status-change consequence warning UX
-missing creation surfaces where justified
+contextual Automation Opportunity suggestion UX
+```
+
+Keep the locked product boundary:
+
+```text
+Routes are linear.
+Do not introduce arbitrary branching, joins, nested branch trees, connectors, generic node-editor behavior, or arbitrary jump-back loops.
 ```
 
 Do not expand the Automation Opportunities backend merely because more actions or events exist. Add producers/evidence only when a useful, truthful suggestion can be described.
-
 
 ## What this roadmap intentionally avoids
 
@@ -941,5 +981,3 @@ Routes
     Use Route Management / Routes in client-facing navigation.
     Use contextual hints to explain automatic actions in plain language.
 ```
-
-

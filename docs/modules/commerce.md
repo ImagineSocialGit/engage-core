@@ -1,3 +1,4 @@
+
 # Commerce Module
 
 Commerce is a current universal module.
@@ -31,7 +32,7 @@ Client-facing Commerce work:
 See what a contact purchased.
 See recent orders from a synced store.
 Send a message to contacts who previously purchased a T-shirt.
-Start a follow-up sequence for customers who bought a product.
+Start a Campaign for customers who bought a product.
 Review customer/order history before contacting someone.
 ```
 

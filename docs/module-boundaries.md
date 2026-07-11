@@ -1,3 +1,4 @@
+
 # Engage Core Module Boundaries
 
 Engage Core is a modular contact engagement platform.
@@ -1903,6 +1904,37 @@ Current point handler capabilities include:
 - enroll_campaign
 - cancel_campaign
 
+Normal client/operator Route authoring is deliberately linear even though advanced runtime Point types exist.
+
+Do not expose arbitrary branching canvases, joins, nested branch trees, connectors, generic node-editor behavior, or arbitrary jump-back loops as the normal Routes product.
+
+Current server-authoritative authoring placement policy:
+
+```text
+wait
+    cannot be the final Point
+
+change_status
+    must be the final Point
+```
+
+Other currently authorable Points may occur anywhere when otherwise valid. The proposed resulting sequence is validated for add, remove, move, and reorder operations so an indirect mutation cannot leave the Route structurally invalid.
+
+The normal Route editor currently exposes:
+
+```text
+Wait
+Change contact status
+Create task
+Send message
+Start Campaign
+Stop Campaign
+```
+
+Direct `send_message` authoring uses an explicit Messaging-owned opt-in seam. A template is eligible only when `meta.route_authoring.eligible = true` on the active `MessageTemplatePreset` or an active `MessageTemplateCatalogEntry`, it has dispatch keys, and its purpose is not internal.
+
+This is a cross-module correctness boundary: FlowRoutes must not treat every active Messaging template as safe for generic direct Route use.
+
 FlowRoutes may create Tasks through public task-facing services/contracts.
 
 FlowRoutes `create_task` points may create assigned or unassigned tasks.
@@ -2977,10 +3009,11 @@ Recommended direction:
 4. Add contact filters for Commerce or Location only when Broadcasts, Campaigns, Reporting, or another consuming surface needs them.
 5. Treat the dashboard and contact show page as shared orientation surfaces with module-contributed summaries, not module inventories.
 6. Webinars message/template setup and computed readiness are complete, including registration and waitlist opt-ins.
-7. FlowRoutes now has a read-only manual ContactStatus automation impact preview; use it during Automatic Follow-ups / Route Management UX work.
-8. Phase 6 contributor-based setup validation and Phases 7–10 client-readiness foundations are complete.
-9. Proceed with Automatic Follow-ups / FlowRoutes UX polish before the later dashboard/contact workspace polish audit.
-10. Regenerate `core-project-tree.txt` from the repo after each structural batch.
+7. FlowRoutes has a read-only manual ContactStatus automation impact preview for the eventual manual-status consequence warning UX.
+8. The module-first preset contribution architecture is implemented and must remain separate from runtime module availability and trigger assignment.
+9. Routes now has a real Manage Routes / Assignments baseline, modal Route/Point editing, linear authoring boundaries, explicit direct-message eligibility, and server-authoritative Point placement rules.
+10. Continue focused Routes product completion before the later dashboard/contact workspace polish audit.
+11. Regenerate `core-project-tree.txt` from the repo after each structural batch.
 
 Do not use this section as a backlog. Actionable items belong in `TODO.md`.
 
@@ -3264,5 +3297,3 @@ Campaigns invents webinar URL fields without the enrollment caller supplying the
 ```
 
 Treat available-field validation as setup/config-validation work before every editor receives polished autocomplete.
-
-

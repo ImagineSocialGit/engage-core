@@ -1,3 +1,4 @@
+
 # FlowRoutes Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -242,14 +243,14 @@ A Route editor may allow copying an existing `FlowRoutePoint` from another curre
 
 ## Send-message point behavior ownership
 
-A FlowRoute `send_message` point is reached because FlowRoutes execution has already progressed through the route's waits, conditions, branches, and prior points. Reusable Messaging templates must not inject a hidden second workflow layer.
+A FlowRoute `send_message` point is reached because FlowRoutes execution has already progressed through the Route's prior Points. Reusable Messaging templates must not inject a hidden second workflow layer.
 
 Durable rule:
 
 ```text
 FlowRoutes
-    owns when execution reaches the send_message point
-    owns route conditions, waits, branches, and point-specific behavior
+    owns when execution reaches the send_message Point
+    owns Route waits and Point-specific behavior
 
 Messaging template
     owns reusable content and delivery-template metadata
@@ -258,9 +259,31 @@ ResolvedMessageDispatchBuilder
     assembles the selected template with the FlowRoute-resolved dispatch behavior
 ```
 
-By default, reaching a `send_message` point means the message is eligible to send at the point's resolved execution time. Any additional delay or condition must be explicitly owned by the FlowRoute point/route definition, not inherited from reusable template timing.
+By default, reaching a `send_message` Point means the message is eligible to send at the Point's resolved execution time. Any additional delay or condition must be explicitly owned by the FlowRoute Point/Route definition, not inherited from reusable template timing.
 
-The resulting `ResolvedMessageDispatch` may preserve the `FlowRoutePoint` as polymorphic behavior provenance. Messaging should not import FlowRoutes internals to interpret the point.
+The resulting `ResolvedMessageDispatch` may preserve the `FlowRoutePoint` as polymorphic behavior provenance. Messaging should not import FlowRoutes internals to interpret the Point.
+
+Direct Route authoring must not expose every active Messaging template. A template is eligible for direct Route use only through the explicit Messaging-owned eligibility seam:
+
+```text
+MessageTemplatePreset.meta.route_authoring.eligible = true
+
+or
+
+active MessageTemplateCatalogEntry.meta.route_authoring.eligible = true
+```
+
+Additional rules:
+
+```text
+template must be active
+template must have at least one dispatch key
+internal-purpose templates are never eligible for direct Route authoring
+```
+
+This explicit opt-in prevents lifecycle-owned templates such as webinar confirmations, webinar reminders, Campaign-step messages, permission invitations, and internal notifications from leaking into the generic Route message picker merely because they exist.
+
+The Route editor should hide `Send message` entirely when no direct-Route-eligible Messaging template exists. Server-side authoring must validate the same eligibility rule and reject an ineligible template even when a request bypasses the UI.
 
 ## Manual contact-status automation impact preview
 
@@ -300,110 +323,124 @@ Rules:
 
 The eventual operator warning UX should consume this FlowRoutes-owned read seam rather than duplicating trigger-binding queries in Core or Workflow.
 
-The actual warning/confirmation interaction is deferred to the Automatic Follow-ups / Route Management UX phase.
+The actual warning/confirmation interaction remains deferred to a focused Routes consequence-warning UX slice.
 
-## Automatic Follow-ups / Route Management product direction
+## Routes / Route Management product direction
 
-The product-completeness audit established that the current binding surface is not enough by itself.
+The Route Management audit and first authoring slices established the current client/operator product direction.
 
-Current operator capability includes:
-
-```text
-view active Contact statuses
-see available Routes for each status
-select one Route per status
-see automation-event Routes grouped by module/event
-select multiple Routes for the same automation event
-see plain-language Route summaries
-save trigger bindings
-```
-
-Current operator gaps include:
-
-```text
-create a Route
-edit a Route
-add/remove/reorder FlowRoutePoints
-configure actions/waits/conditions
-duplicate a Route
-activate/deactivate a Route
-change a Route trigger
-clone an action from another Route
-inspect advanced configuration in a dedicated Route editor
-```
-
-The chosen authoring model is Route-centric, not Point-template-centric.
-
-Preferred client-facing shape:
-
-```text
-Automatic Follow-ups
-
-By Status
-Attempting Contact -> Prospect Follow-up Route -> 4 automatic actions -> Edit Route
-
-By Activity
-Webinar attendance -> Attended Webinar Route -> 3 automatic actions -> Edit Route
-```
-
-Preferred Route editor:
-
-```text
-Prospect Follow-up Route
-
-When this happens...
-Contact becomes Attempting Contact
-
-Automatically...
-
-1. Create Task — "Follow up with contact" — Due immediately
-2. Wait — 2 days
-3. Create Task — "Schedule an appointment with contact"
-4. Wait until — Task is completed
-
-+ Add automatic action
-```
-
-The editor should create concrete `FlowRoutePoint` records directly in Route context.
-
-It may offer:
-
-```text
-Create new action
-Copy from another Route
-```
-
-Copying from another Route is clone-only reuse. The resulting `FlowRoutePoint` is independent after creation.
-
-Do not introduce a reusable global Point library merely to make Route authoring easier.
-
-Client-facing wording should prefer:
+Client-facing information architecture:
 
 ```text
 Routes
-Route Management
-Automatic Follow-ups
-What happens next
-Automatic actions
-Follow-up sequence
+    Manage Routes
+    Assignments
 ```
 
-Avoid making these primary labels:
+Conceptually:
 
 ```text
-FlowRouteProgress
-plan item
-progress item
-capability binding
-dispatch key
-point definition
-raw trigger internals
+Manage Routes
+    What does this Route do?
+
+Assignments
+    When does this automation run?
 ```
 
-Contextual automation suggestions are the discovery layer. Route Management is the control center.
+`FlowRoutes` remains the internal/module name. Normal client/operator UI should use `Routes`, `Manage Routes`, `Assignments`, `Route flow`, and `Point` where those terms improve comprehension.
+
+Current implemented Manage Routes behavior:
+
+```text
+list multi-step Routes
+show assigned vs not assigned state
+show business-language trigger and consequence summaries
+expand/collapse Route flow
+open Route editing in a modal without leaving the index
+edit existing Points in a modal
+add supported Points
+remove Points directly from the Route flow
+move Points up/down
+drag Points to reorder
+save changed drag order explicitly
+preserve module-tone wayfinding for cross-module Points
+separate one-step automatic behavior from multi-step Routes
+show search/assignment filters only when five or more multi-step Routes exist
+```
+
+Current implemented authorable Point types:
+
+```text
+Wait
+Change contact status
+Create task
+Send message
+Start Campaign
+Stop Campaign
+```
+
+Advanced internal Point types may exist in the runtime model, but the normal Route editor does not expose arbitrary branching, graph editing, joins, connectors, nested branch trees, or generic node-canvas behavior.
+
+The durable product rule is:
+
+> Routes are explicitly linear. Their purpose is to remove repetitive coordination and managerial work, not to become a generic automation canvas.
+
+A useful product test is:
+
+```text
+Would a human assistant normally have to remember to do this?
+    yes -> likely Route material
+
+Is the behavior inherently part of one module's domain?
+    yes -> likely module-owned automation instead
+```
+
+Examples of good Route material:
+
+```text
+status changes to Attempting Contact
+→ create an initial task
+→ wait 5 days
+→ create another follow-up task
+
+webinar attended
+→ create internal follow-up work
+→ start a Campaign
+→ change status
+
+message sent
+→ wait
+→ create a follow-up task when later work is still needed
+```
+
+Examples that should normally remain module-owned:
+
+```text
+Scheduling sends an appointment reminder relative to appointment time.
+PetServices schedules a vaccination reminder from vaccination expiry.
+Music reacts to a new show through Music-owned show behavior.
+```
+
+Current product-completeness gaps include:
+
+```text
+create a new Route from the client/operator UI
+duplicate a Route
+activate/deactivate a Route
+change a Route trigger
+clone a Point from another Route
+task assignment/default authoring inside create-task Point UX
+business-day/business-hour wait authoring
+simple future point eligibility / route-continuation rules
+contextual Automation Opportunity suggestion UX
+manual status-change consequence warning UX
+```
+
+Do not reintroduce a reusable global Point library merely to make Route authoring easier. Copying from another Route, when added, must clone into a new independent `FlowRoutePoint`.
+
+Contextual automation suggestions are the discovery layer. Routes remains the control center for reviewing what happens automatically.
 
 The backend `ContactStatusAutomationImpactResolver` remains the source of truth for the eventual warning shown before a manual status change that would start selected Route automation.
-
 
 ## Trigger bindings
 
@@ -466,22 +503,101 @@ Do not use `responsible_party` for FlowRoute ownership. `responsible_party` belo
 
 ## Route points remain the multi-behavior mechanism
 
-A trigger binding should select a route.
+A trigger binding selects a Route.
 
-The selected route may contain many points.
+The selected Route may contain many Points.
 
 Example:
 
 ```text
 Prospect status changed
-→ selected Prospect route
+→ selected Prospect Route
     → create task
-    → enroll campaign
-    → notify admin
+    → wait
+    → send message
+    → change status
 ```
 
-Those are points in one route, not several unrelated active routes competing for the same trigger.
+Those are Points in one Route, not several unrelated active Routes competing for the same trigger.
 
+The normal client/operator authoring product is deliberately linear.
+
+Do not expose:
+
+```text
+arbitrary branching
+true/false path canvases
+joins
+nested branch trees
+connectors
+generic node-editor behavior
+arbitrary jump-back loops
+```
+
+Internal runtime support for advanced Point types does not make those concepts appropriate for normal Route authoring.
+
+Current Point placement policy:
+
+```text
+Wait
+    may be first or middle
+    cannot be the final Point
+
+Change Status
+    must be the final Point
+
+Create Task
+    may occur anywhere
+
+Send Message
+    may occur anywhere
+
+Start Campaign
+    may occur anywhere
+
+Stop Campaign
+    may occur anywhere when available
+```
+
+The placement policy is server-authoritative and is evaluated against the proposed resulting sequence for structural mutations such as:
+
+```text
+add
+remove
+move up/down
+drag-and-drop reorder
+```
+
+This matters because removing one Point can make another Point invalid. For example:
+
+```text
+Create task
+→ Wait
+→ Send message
+```
+
+Removing `Send message` would leave `Wait` terminal, so removal must be rejected.
+
+Current authoring behavior also preserves valid placement automatically where practical:
+
+```text
+adding Wait
+    inserts it before the current final Point
+
+adding a normal Point when Change Status is terminal
+    inserts the new Point before Change Status
+```
+
+The UI mirrors the domain policy:
+
+```text
+terminal Change Status has no drag handle
+invalid move controls are disabled
+a removal that would leave Wait terminal is disabled with an explanatory hover/focus tip
+an invalid attempt to drag Wait into the terminal position is shown locally at the terminal slot rather than as a page-level alert
+```
+
+The backend remains authoritative. Frontend restrictions are guidance, not the only enforcement.
 
 Preset config may create/update DB-owned FlowRoute definitions, but runtime execution should not depend directly on config definitions.
 
@@ -498,9 +614,11 @@ Current point handler capabilities include:
 - enroll_campaign
 - cancel_campaign
 
+The normal Route editor intentionally exposes only the supported linear subset documented above.
+
 FlowRoutes may create Tasks through public task-facing services/contracts.
 
-FlowRoutes `create_task` points may create assigned or unassigned tasks.
+FlowRoutes `create_task` Points may create assigned or unassigned Tasks at runtime. The current first authoring slice does not yet expose full task-assignment authoring.
 
 FlowRoutes should pass task responsibility fields through `CreateTaskAction` rather than encoding responsibility only in FlowRoute metadata.
 
@@ -539,14 +657,13 @@ Canonical ownership remains:
 - ContactWorkflowProfile belongs to Workflow.
 - ContactFlowRouteProgress belongs to FlowRoutes.
 
-For automation-event-started routes, `contact_status_id` and `contact_workflow_profile_id` may be null on `contact_flow_route_progress`.
+For automation-event-started Routes, `contact_status_id` and `contact_workflow_profile_id` may be null on `contact_flow_route_progress`.
 
 That is expected.
 
-It means the route started from an automation event rather than a Workflow status transition.
+It means the Route started from an automation event rather than a Workflow status transition.
 
-FlowRoutes may support Campaign, Messaging, Task, and status-related point types, but client-facing Route selection/building must be capability-aware. Point types whose owning modules are disabled should be hidden, disabled, or clearly marked unavailable. Campaign-related points must not appear as selectable client-facing behavior for clients without Campaigns enabled.
-
+FlowRoutes may support Campaign, Messaging, Task, and status-related Point types, but client-facing Route selection/building must be capability-aware. Point types whose owning modules are disabled should be hidden, disabled, or clearly marked unavailable. Campaign-related Points must not appear as selectable client-facing behavior for clients without Campaigns enabled.
 
 ## Relationship, capability, and instance-plan status
 
@@ -929,20 +1046,33 @@ The backend opportunity foundation is complete and manually smoke-tested. The ne
 
 `FlowRoutes` remains the module/domain name.
 
-Client/operator-facing UI may use simpler Route language when that improves comprehension.
+Client/operator-facing UI should use simpler Route language.
+
+Current information architecture:
+
+```text
+Routes
+    Manage Routes
+    Assignments
+```
 
 Preferred public labels:
 
 ```text
 Routes
-Route Management
-Automatic routes
-Route points
-Automatic actions
-What happens next
+Manage Routes
+Assignments
+Edit Route
+Route flow
+Show route flow
+Hide route flow
+Point
+Automatic Behavior
+Start Campaign
+Stop Campaign
 ```
 
-Avoid making these the primary client-facing labels:
+Avoid making these primary client-facing labels:
 
 ```text
 FlowRouteTriggerBinding
@@ -951,18 +1081,14 @@ event_wait
 FlowRouteExternalEvent
 raw event keys
 point handler config
+campaign enrollment
+follow-up sequence
 ```
 
-A navigation item such as `Route Management` may use a contextual hint like:
+Use `Campaign` consistently for Campaign-owned journeys. Do not rename Campaigns to `follow-up sequence` inside Routes.
 
-```text
-Choose what automatic actions happen after important contact activity.
-```
+The Route index should not repeat assignment detail inside Route details. `Runs when` belongs to Assignments; Manage Routes answers what the Route does.
 
-or:
+One-step automatic behavior may be presented separately from multi-step Routes so a simple action is not forced into the same visual weight as a real Route.
 
-```text
-Manage the automatic routes that create tasks, send messages, update statuses, and start follow-up sequences.
-```
-
-Route Management UX should explain available actions through FlowRouteCapability metadata rather than importing module internals.
+Route Management UX should explain available actions through `FlowRouteCapability` metadata and module-owned public seams rather than importing module internals.

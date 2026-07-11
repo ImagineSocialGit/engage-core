@@ -224,7 +224,8 @@
 │   │   │   ├── Controllers
 │   │   │   │   └── CRM
 │   │   │   │       ├── FlowRouteBindingController.php
-│   │   │   │       └── FlowRouteController.php
+│   │   │   │       ├── FlowRouteController.php
+│   │   │   │       └── FlowRouteEditorController.php
 │   │   │   ├── Data
 │   │   │   │   ├── Events
 │   │   │   │   │   ├── FlowRouteExternalEvent.php
@@ -277,12 +278,19 @@
 │   │   │   ├── Providers
 │   │   │   │   └── FlowRoutesModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   │   ├── StoreFlowRoutePointRequest.php
+│   │   │   │   ├── UpdateFlowRoutePointOrderRequest.php
+│   │   │   │   ├── UpdateFlowRoutePointRequest.php
 │   │   │   │   └── UpdateFlowRouteTriggerBindingRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── ContactShow
 │   │   │   │   │   └── ContactRoutesVisibilityDataProvider.php
 │   │   │   │   ├── ContactStatusAutomationImpactResolver.php
 │   │   │   │   ├── FlowRouteConditionEvaluatorRegistry.php
+│   │   │   │   ├── FlowRouteEditorCatalog.php
+│   │   │   │   ├── FlowRouteMessageTemplateEligibilityResolver.php
+│   │   │   │   ├── FlowRoutePointAuthoringService.php
+│   │   │   │   ├── FlowRoutePointPlacementPolicy.php
 │   │   │   │   ├── FlowRoutePresentationResolver.php
 │   │   │   │   ├── FlowRouteTriggerBindingResolver.php
 │   │   │   │   └── PointHandlerRegistry.php
@@ -1223,6 +1231,7 @@
 │   ├── js
 │   │   ├── app.js
 │   │   └── pages
+│   │       ├── flow-route-editor.js
 │   │       └── webinar-registration.js
 │   └── views
 │       ├── auth
@@ -1297,8 +1306,11 @@
 │       │   │   ├── bindings
 │       │   │   │   └── index.blade.php
 │       │   │   ├── index.blade.php
-│       │   │   └── partials
-│       │   │       └── navigation.blade.php
+│       │   │   ├── partials
+│       │   │   │   ├── editor-modal.blade.php
+│       │   │   │   ├── navigation.blade.php
+│       │   │   │   └── point-fields.blade.php
+│       │   │   └── show.blade.php
 │       │   ├── messaging
 │       │   │   └── message-templates
 │       │   │       └── index.blade.php
@@ -1387,7 +1399,11 @@
 │   │   │   ├── FlowRouteBindingControllerTest.php
 │   │   │   ├── FlowRouteConditionBranchPointTest.php
 │   │   │   ├── FlowRouteControllerTest.php
+│   │   │   ├── FlowRouteEditorControllerTest.php
+│   │   │   ├── FlowRouteIndexAuthoringLinkTest.php
+│   │   │   ├── FlowRouteMessageTemplateEligibilityResolverTest.php
 │   │   │   ├── FlowRoutePointExecutionFoundationTest.php
+│   │   │   ├── FlowRoutePointPlacementPolicyTest.php
 │   │   │   ├── FlowRoutesModelSchemaTest.php
 │   │   │   ├── FlowRoutesSetupValidationContributorTest.php
 │   │   │   ├── FlowRouteTriggerBindingTest.php
@@ -1496,4 +1512,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-488 directories, 1009 files
+488 directories, 1025 files

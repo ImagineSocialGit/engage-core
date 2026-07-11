@@ -1,4 +1,5 @@
 
+
 # Messaging Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -307,7 +308,7 @@ Examples:
 ```text
 Campaign step editor chooses which template each campaign step variant uses.
 Webinar schedule/profile editor chooses which confirmation/reminder/follow-up template applies.
-Automatic Follow-ups / FlowRoutes send-message point editor chooses which message template the point sends.
+Routes / FlowRoutes send-message Point editor chooses which message template the Point sends.
 ```
 
 The Messaging template page may show read-only usage, such as "Used by Campaigns -> Webinar Attended Nurture -> Step 1 Email," and link to the owning module UI when that UI exists.
@@ -541,13 +542,37 @@ Do not add `subject_type` / `subject_id` to `scheduled_messages`; `context_type`
 
 This makes route-created messages queryable and resumable without making Messaging import FlowRoutes execution internals.
 
-### Automatic Follow-ups message usage
+### Routes message usage
 
-FlowRoutes may use Messaging through public Messaging actions/services for send-message points.
+FlowRoutes may use Messaging through public Messaging actions/services for `send_message` Points.
 
-Automatic Follow-ups UI may eventually allow an operator to choose which Messaging template assignment a send-message point uses. That selection belongs on the consuming setup surface, not primarily on the Messaging template copy editor.
+Template choice belongs on the consuming Route setup surface, not primarily on the Messaging template copy editor.
 
-Before implementing that UI, decide whether the first Automatic Follow-ups surface edits send-message points at all or only previews existing selected routes.
+The current Route editor uses explicit direct-Route eligibility. A reusable Messaging template is eligible only when:
+
+```text
+MessageTemplatePreset.meta.route_authoring.eligible = true
+
+or
+
+active MessageTemplateCatalogEntry.meta.route_authoring.eligible = true
+```
+
+and:
+
+```text
+the template is active
+it has at least one dispatch key
+its purpose is not internal
+```
+
+Internal-purpose templates are never eligible for direct Route authoring.
+
+This prevents webinar confirmations, webinar reminders, Campaign-step templates, permission invitations, internal notifications, and other lifecycle-owned templates from leaking into the generic Route message picker merely because they are active.
+
+When no direct-Route-eligible Messaging template exists, the Route editor should hide the `Send message` capability.
+
+The backend must validate the same eligibility rule so direct requests cannot bypass the authoring boundary.
 
 ### Imported-contact permission invitations
 
