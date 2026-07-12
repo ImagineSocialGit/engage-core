@@ -1,6 +1,19 @@
 
 # FlowRoutes Module
 
+## Config contract
+
+FlowRoute preset definitions are closed by the registered `flow_routes.preset_definition`
+contract and the executable Point DTOs. The canonical authoring template no longer advertises
+route-level `status`, top-level Point `conditions`, or event-wait `timeout`, because those fields
+were not consumed. `enroll_campaign` points reference the public capability
+`campaigns.enroll_contact`.
+
+Active runtime routes must resolve to exactly one executable start point. A zero-start validation
+finding usually indicates preserved customized database state rather than permission to weaken the
+contract; reconcile the customized route or deliberately resync it. Capability availability and
+handler registration remain semantic checks in setup validation.
+
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
 
 FlowRoutes is optional and depends on Workflow.
@@ -1092,3 +1105,4 @@ The Route index should not repeat assignment detail inside Route details. `Runs 
 One-step automatic behavior may be presented separately from multi-step Routes so a simple action is not forced into the same visual weight as a real Route.
 
 Route Management UX should explain available actions through `FlowRouteCapability` metadata and module-owned public seams rather than importing module internals.
+

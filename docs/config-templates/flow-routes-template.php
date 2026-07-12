@@ -80,6 +80,12 @@ return [
     | A selected preset that contains a point whose required handler/module cannot
     | execute is a hard validation error, not merely a warning.
     |
+    | The executable `flow_routes.preset_definition` contract is closed by
+    | default and each Point `type` selects a Point-specific definition schema.
+    | Route-level `status`, Point-level `conditions`, and event-wait `timeout`
+    | are not preset fields because the current preset DTO/runtime ignores them.
+    | Put executable Point behavior inside that Point type's `definition` only.
+    |
     */
 
     'groups' => [
@@ -95,7 +101,6 @@ return [
             'key' => 'webinar_attended_to_nurture',
             'name' => 'Webinar Attended Follow-Up',
             'description' => 'Starts the attended nurture campaign when a contact-scoped webinar.attended automation event is recorded.',
-            'status' => 'active',
             'is_active' => true,
             'source_version' => 1,
             'owner_type' => null,
@@ -116,7 +121,7 @@ return [
                 [
                     'key' => 'enroll_webinar_attended_nurture',
                     'type' => 'enroll_campaign',
-                    'capability_key' => 'flow_routes.enroll_campaign',
+                    'capability_key' => 'campaigns.enroll_contact',
                     'name' => 'Enroll Webinar Attended Nurture',
                     'description' => 'Enroll the contact into the attended webinar nurture campaign.',
                     'definition' => [
@@ -132,7 +137,6 @@ return [
                     'sort_order' => 10,
                     'is_start' => true,
                     'next_point_key' => null,
-                    'conditions' => [],
                     'meta' => [],
                 ],
             ],
@@ -142,7 +146,6 @@ return [
             'key' => 'webinar_missed_to_nurture',
             'name' => 'Webinar Missed Follow-Up',
             'description' => 'Starts the missed webinar nurture campaign when a contact-scoped webinar.missed automation event is recorded.',
-            'status' => 'active',
             'is_active' => true,
             'source_version' => 1,
             'owner_type' => null,
@@ -163,7 +166,7 @@ return [
                 [
                     'key' => 'enroll_webinar_missed_nurture',
                     'type' => 'enroll_campaign',
-                    'capability_key' => 'flow_routes.enroll_campaign',
+                    'capability_key' => 'campaigns.enroll_contact',
                     'name' => 'Enroll Webinar Missed Nurture',
                     'description' => 'Enroll the contact into the missed webinar nurture campaign.',
                     'definition' => [
@@ -179,7 +182,6 @@ return [
                     'sort_order' => 10,
                     'is_start' => true,
                     'next_point_key' => null,
-                    'conditions' => [],
                     'meta' => [],
                 ],
             ],
@@ -199,7 +201,6 @@ return [
             'key' => 'task_completed_resume_example',
             'name' => 'Task Completed Resume Example',
             'description' => 'Example route showing how event_wait can resume from generic task.completed automation events.',
-            'status' => 'inactive',
             'is_active' => false,
             'source_version' => 1,
             'owner_type' => null,
@@ -228,14 +229,12 @@ return [
                             'task.task_template_key' => 'example.follow_up',
                             'task.flow_route_progress_id' => '{flow_route_progress.id}',
                         ],
-                        'timeout' => null,
                     ],
                     'settings' => [],
                     'cancel_conditions' => [],
                     'sort_order' => 10,
                     'is_start' => true,
                     'next_point_key' => null,
-                    'conditions' => [],
                     'meta' => [],
                 ],
             ],
@@ -244,3 +243,4 @@ return [
     ],
 
 ];
+

@@ -78,6 +78,8 @@
 │   │   │   │   └── SyncCampaignPresetsAction.php
 │   │   │   ├── Capabilities
 │   │   │   │   └── CampaignsAutomationCapabilityContributor.php
+│   │   │   ├── ConfigContracts
+│   │   │   │   └── CampaignPresetDefinitionConfigContract.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
 │   │   │   │       └── SyncCampaignPresetsCommand.php
@@ -106,6 +108,9 @@
 │   │   │   │   └── ContactShow
 │   │   │   │       └── ContactCampaignsVisibilityDataProvider.php
 │   │   │   ├── Support
+│   │   │   ├── TokenContracts
+│   │   │   │   ├── CampaignTokenContextProvider.php
+│   │   │   │   └── CampaignTokenSourceProvider.php
 │   │   │   └── Validation
 │   │   │       └── CampaignsSetupValidationContributor.php
 │   │   ├── Commerce
@@ -219,6 +224,8 @@
 │   │   │   │   └── FlowRoutesAutomationCapabilityContributor.php
 │   │   │   ├── ConditionEvaluators
 │   │   │   │   └── FlowRouteDataConditionEvaluator.php
+│   │   │   ├── ConfigContracts
+│   │   │   │   └── FlowRoutePresetDefinitionConfigContract.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
 │   │   │   │       └── SyncFlowRoutePresetsCommand.php
@@ -643,6 +650,9 @@
 │   │   │   │   ├── ResolveWebinarPlaybackUrlAction.php
 │   │   │   │   ├── SyncWebinarScheduleProfilesAction.php
 │   │   │   │   └── SyncWebinarSeriesFromProviderAction.php
+│   │   │   ├── ConfigContracts
+│   │   │   │   ├── WebinarPostEventConfigContract.php
+│   │   │   │   └── WebinarScheduleProfileConfigContract.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
 │   │   │   │       └── SyncWebinarScheduleProfilesCommand.php
@@ -707,6 +717,10 @@
 │   │   │   │   ├── WebinarPlaybackLinkGenerator.php
 │   │   │   │   ├── WebinarRegisterPageConfig.php
 │   │   │   │   └── WebinarRegistrationCancelLinkGenerator.php
+│   │   │   ├── TokenContracts
+│   │   │   │   ├── WebinarMessageTokenValueProvider.php
+│   │   │   │   ├── WebinarTokenContextProvider.php
+│   │   │   │   └── WebinarTokenSourceProvider.php
 │   │   │   └── Validation
 │   │   │       └── WebinarsSetupValidationContributor.php
 │   │   └── Workflow
@@ -1174,6 +1188,9 @@
 │   ├── automation-opportunities.md
 │   ├── client-readiness-roadmap.md
 │   ├── config-authoring-guide.md
+│   ├── config-contracts.md
+│   ├── config-generation-lock-in-roadmap.md
+│   ├── config-hardening-audit.md
 │   ├── config-templates
 │   │   ├── campaign-presets-template.php
 │   │   ├── client-request-intake-template.md
@@ -1218,7 +1235,6 @@
 │   ├── project-organization.md
 │   ├── TODO.md
 │   └── ui-ux-guide.md
-├── INSTALL.md
 ├── package.json
 ├── package-lock.json
 ├── phpunit.xml
@@ -1414,6 +1430,7 @@
 │   │   │   └── CommerceFoundationTest.php
 │   │   ├── ConfigContracts
 │   │   │   ├── ConfigContractRegistryTest.php
+│   │   │   ├── DomainConfigContractTest.php
 │   │   │   ├── MessagingConfigContractTest.php
 │   │   │   └── TokenContractRegistryTest.php
 │   │   ├── ConfigGeneration
@@ -1553,4 +1570,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-501 directories, 1053 files
+506 directories, 1065 files

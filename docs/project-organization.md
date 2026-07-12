@@ -4,6 +4,22 @@
 
 # Engage Core Project Organization
 
+## Shared config and token contract infrastructure
+
+Executable authoring contracts live under `app/Support/ConfigContracts` and
+`app/Support/TokenContracts`. Each owning module places concrete registrations in its own
+`ConfigContracts` and/or `TokenContracts` directory and registers them from its service provider.
+
+`ConfigContracts` is intentionally separate from a module's general `Contracts` directory:
+`Contracts` contains PHP collaboration interfaces, while `ConfigContracts` describes the shape,
+ownership, and validation of external PHP-array configuration. Keeping the names distinct makes
+searching and future schema-driven authoring clearer.
+
+Shared code owns the registry and neutral schema primitives. A module owns the meaning of its
+fields, token sources, producer contexts, computed values, and semantic validation. No UI or
+documentation layer should maintain a parallel list. See
+[`config-contracts.md`](config-contracts.md).
+
 This document is a quick orientation map for Engage Core. It classifies the project into Core, universal modules, vertical modules, and integrations/adapters.
 
 Use `module-boundaries.md` for detailed ownership and dependency rules. Use `TODO.md` for actionable implementation backlog.
@@ -287,3 +303,4 @@ Avoid:
 ```text
 New Core columns for feature or vertical state
 ```
+

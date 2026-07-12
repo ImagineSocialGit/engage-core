@@ -5,6 +5,21 @@
 
 # Engage Core Product Principles
 
+## Config authoring and export
+
+Client configuration is an executable product surface, not merely installation documentation.
+The authoring UI, exporter, setup validation, sync actions, runtime resolvers, and documentation
+must derive from compatible registered contracts.
+
+An export is acceptable only when it is structurally valid, reference-closed, token-valid for its
+producer contexts, sync-safe in a fresh database, and semantically reloadable. Friendly aliases
+may improve authoring, but they normalize to canonical fields and keys rather than creating new
+runtime concepts. Arbitrary metadata and sensitive provider values are not general token sources.
+
+Slam Dunk is the first golden vertical slice and regression target. Exact text snapshots are useful
+for deterministic output, but normalized semantic round-trip equality and runtime execution are
+the stronger guarantees.
+
 Engage Core is a dev-built operating system for small service businesses.
 
 It is not trying to recreate WordPress, Squarespace, Mailchimp, a generic CRM, a generic form builder, or a pile of disconnected SaaS tools inside one app.
@@ -306,3 +321,4 @@ A blank-canvas builder is not client-ready merely because the underlying runtime
 The product direction is guided, preset-backed setup with focused editing and clear consequence/placement guardrails. Advanced runtime capability should remain internal unless a concrete product workflow proves it belongs in normal authoring.
 
 Detailed language rules, reusable UI patterns, automation-warning patterns, and UI review checklists live in `docs/ui-ux-guide.md`.
+

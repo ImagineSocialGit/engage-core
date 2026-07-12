@@ -1,6 +1,27 @@
 
 # Engage Core TODO
 
+## Config generation lock-in
+
+- [x] Freeze Slam Dunk effective config and representative runtime behavior as golden fixtures.
+- [x] Add shared closed config-contract primitives and register foundational, Messaging,
+  Campaigns, FlowRoutes, and Webinars contracts.
+- [x] Add token source/context contracts based on real columns and explicit computed providers;
+  exclude arbitrary metadata and sensitive/raw values.
+- [x] Prove the broad `test_everything` package sync and zero-finding setup validation.
+- [ ] Run registered closed config contracts from `setup:validate` so structural rules are not
+  duplicated across tests and contributor code.
+- [ ] Add closed contracts for complete file envelopes, reference keys, conditional objects, and
+  producer-owned campaign start payloads.
+- [ ] Add strict reference and token closure validation for every exported definition.
+- [ ] Generate field/token tables and contract-derived authoring references in CI.
+- [ ] Build a minimal deterministic exporter and semantic round trip using Slam Dunk as the first
+  full-package fixture.
+- [ ] Build preview and authoring UX as consumers of the same registries and strict validator.
+
+Detailed sequencing and open decisions are in
+[`config-generation-lock-in-roadmap.md`](config-generation-lock-in-roadmap.md).
+
 This file is intentionally disposable. Add work here when it is real but not yet ready for an implementation slice. Delete items as they are completed. Do not treat this as an architectural reference; long-lived decisions belong in `module-boundaries.md` or a feature-specific doc.
 
 ## Run through after completing an item or system update
@@ -458,3 +479,4 @@ These notes are intentionally retained while the schema-discovery phases continu
 - [ ] Hide technical specs behind details/debug affordances.
 - [ ] Replace raw timing such as `Delay 10 minutes` with human-readable schedule summaries.
 - [ ] Clean up repeated dropdown labels such as `Step 1 Email — Webinar Attended Nurture — Step 1 Email`.
+

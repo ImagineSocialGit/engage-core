@@ -1,5 +1,11 @@
 <?php
 
+/*
+| The executable definition shape is owned by the registered
+| `campaigns.preset_definition` config contract. Keep this example aligned with that
+| contract and with CampaignPresetDefinition; unsupported fields must fail validation.
+*/
+
 return [
 
     /*
@@ -276,3 +282,4 @@ return [
     ],
 
 ];
+

@@ -1,6 +1,26 @@
 
 # Engage Core Client-Readiness Roadmap
 
+## Config generation lock-in checkpoint
+
+The first hardening vertical slice is complete. Slam Dunk is frozen as a semantic golden fixture;
+its effective package syncs into a fresh database and representative registration, waitlist,
+post-event, status-change, campaign-enrollment, and message-resolution paths execute in tests.
+Closed config contracts now cover module definitions, preset packages, contact statuses, tasks,
+email, SMS, permission invitations, Campaign presets, FlowRoute presets, Webinar schedule profiles,
+and Webinar post-event configuration. Token sources and producer contexts are registered from real
+model columns and explicit computed providers.
+
+The broad `test_everything` package has also completed sync with no unavailable capability
+handlers, and `setup:validate` reports no findings. This proves the current checked-in setup is
+internally coherent; it does not yet prove arbitrary future UI-generated configurations.
+
+The next work is enforcement and generation: integrate closed contracts into the setup-validation
+pipeline, close remaining file-envelope/reference/condition contracts, add strict export
+validation and semantic round-trip tests, generate reference documentation from registries, then
+build the authoring UX on those same registries. See
+[Config Generation Lock-In Roadmap](config-generation-lock-in-roadmap.md).
+
 This roadmap tracks the near-term implementation order for getting Engage Core ready for real client operation without treating the work as a limited or throwaway MVP.
 
 The goal is not to build temporary shortcuts.
@@ -981,3 +1001,4 @@ Routes
     Use Route Management / Routes in client-facing navigation.
     Use contextual hints to explain automatic actions in plain language.
 ```
+

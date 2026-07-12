@@ -1,6 +1,18 @@
 
 # Campaigns Module
 
+## Config and token contracts
+
+Campaign preset definitions are closed by the registered `campaigns.preset_definition` contract.
+Campaign token providers expose real Campaign and CampaignEnrollment columns and producer context;
+they do not make `meta` or arbitrary start context globally selectable. Start-context fields become
+authorable only when the enrolling producer declares a compatible payload contract.
+
+Campaign step variants use semantic identity—campaign key, step number, variant key, channel,
+purpose, and scope. `source_config_path` remains migration/legacy fallback metadata, not the primary
+identity. The Slam Dunk golden runtime fixture proves variant resolution and enrollment through
+this path.
+
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
 
 Campaigns is optional.
@@ -586,3 +598,4 @@ source event or route point, when available
 ```
 
 Do not persist summary text unless a concrete reporting/audit reason appears. Prefer deriving it from the canonical step/variant timing definition.
+

@@ -93,6 +93,13 @@ return [
         'missed' => [
             'event_key' => 'webinar.missed',
         ],
+
+        // Optional override. ResolveWebinarPlaybackAction falls back to this
+        // canonical event key when the entry is omitted.
+        'replay_available' => [
+            'event_key' => 'webinar.replay_available',
+        ],
     ],
 
 ];
+

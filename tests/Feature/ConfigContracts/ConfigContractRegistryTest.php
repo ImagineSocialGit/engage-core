@@ -15,11 +15,15 @@ class ConfigContractRegistryTest extends TestCase
         $this->assertSame([
             'app.module_definition',
             'app.preset_package',
+            'campaigns.preset_definition',
             'core.contact_status_definition',
+            'flow_routes.preset_definition',
             'messaging.email_definition',
             'messaging.permission_invitation',
             'messaging.sms_definition',
             'tasks.preset_definition',
+            'webinars.post_event',
+            'webinars.schedule_profile',
         ], array_keys($registry->all()));
 
         $this->assertSame('app', $registry->get('app.module_definition')->owner());

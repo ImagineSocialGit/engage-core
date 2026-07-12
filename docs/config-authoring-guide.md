@@ -13,6 +13,26 @@ Primary references:
 
 ## Core rules
 
+### Executable contract authority
+
+Config shape is represented by `App\Support\ConfigContracts\ConfigContractRegistry`, and
+field/token availability is represented by `App\Support\TokenContracts\TokenContractRegistry`.
+The templates in `docs/config-templates` are authoring examples; they must remain projections of
+those executable contracts, not an independent schema.
+
+When sources disagree, resolve them in this order:
+
+1. database schema for persisted fields;
+2. runtime DTOs, sync actions, and consumers for executable behavior;
+3. registered config and token contracts;
+4. setup validators and tests;
+5. default and client configuration;
+6. templates and prose documentation.
+
+Any mismatch is a defect to close. Do not broaden a contract merely to preserve an ignored field.
+See [Config Contracts and Token Contracts](config-contracts.md) and the
+[Config Hardening Audit](config-hardening-audit.md).
+
 1. Messaging configs own reusable message copy and delivery-template metadata.
 2. Reusable Messaging templates do not own business timing, lifecycle conditions, sequencing, dependencies, lifecycle enablement, or module-specific skip behavior for module-owned flows.
 3. The consuming module owns whether a message should exist, when it should send, and the lifecycle rules that govern it.
@@ -1747,16 +1767,17 @@ DB-customized template copy follows the same token rules as config copy
 unsupported fields produce actionable validation messages
 ```
 
-Potential provider shape to audit later:
+Implemented provider shape:
 
 ```text
-AvailableFieldProvider
-AvailableFieldRegistry
-AvailableFieldContext
-AvailableFieldOption
+TokenSourceProvider
+TokenContextProvider
+ComputedTokenValueProvider
+TokenContractRegistry
 ```
 
-Do not build a polished autocomplete editor before the available-field source of truth and validation behavior are settled.
+Authoring surfaces should consume this registry directly. Strict export validation and
+server-side setup validation remain required even when the UI prevents invalid selections.
 
 ## Human-readable schedule summaries
 
@@ -1792,3 +1813,4 @@ business context label
 ```
 
 Do not persist schedule summary text unless a concrete reason appears. Prefer deriving it from the canonical schedule/profile/criteria definition.
+

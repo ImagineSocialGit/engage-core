@@ -198,6 +198,32 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
                 ),
             );
         }
+
+        foreach (config('presets.modules.webinars.campaigns.definitions', []) as $key => $definition) {
+            $this->assertSame([], $registry->get('campaigns.preset_definition')->schema()->validate(
+                $definition,
+                "presets.modules.webinars.campaigns.definitions.{$key}",
+            ));
+        }
+
+        foreach (config('presets.modules.webinars.flow-routes.definitions', []) as $key => $definition) {
+            $this->assertSame([], $registry->get('flow_routes.preset_definition')->schema()->validate(
+                $definition,
+                "presets.modules.webinars.flow-routes.definitions.{$key}",
+            ));
+        }
+
+        foreach (config('webinars.schedule_profiles', []) as $key => $profile) {
+            $this->assertSame([], $registry->get('webinars.schedule_profile')->schema()->validate(
+                $profile,
+                "webinars.schedule_profiles.{$key}",
+            ));
+        }
+
+        $this->assertSame([], $registry->get('webinars.post_event')->schema()->validate(
+            config('webinars.post_event'),
+            'webinars.post_event',
+        ));
     }
 
     protected function tearDown(): void

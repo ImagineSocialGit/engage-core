@@ -3,6 +3,7 @@
 namespace App\Modules\FlowRoutes\Providers;
 
 use App\Modules\FlowRoutes\Capabilities\FlowRoutesAutomationCapabilityContributor;
+use App\Modules\FlowRoutes\ConfigContracts\FlowRoutePresetDefinitionConfigContract;
 use App\Modules\FlowRoutes\ConditionEvaluators\FlowRouteDataConditionEvaluator;
 use App\Modules\FlowRoutes\Console\Commands\SyncFlowRoutePresetsCommand;
 use App\Modules\FlowRoutes\Listeners\HandleContactWorkflowStatusChanged;
@@ -39,6 +40,8 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
 
     public function register(): void
     {
+        $this->app->tag(FlowRoutePresetDefinitionConfigContract::class, 'config.contracts');
+
         $this->app->tag([
             FlowRoutesAutomationCapabilityContributor::class,
         ], 'automation.capability_contributors');
@@ -169,3 +172,4 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
         return class_exists(self::CANCEL_CAMPAIGN_ENROLLMENT_ACTION);
     }
 }
+

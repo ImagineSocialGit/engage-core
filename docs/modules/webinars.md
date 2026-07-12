@@ -1,6 +1,18 @@
 
 # Webinars Module
 
+## Config and token contracts
+
+Webinar schedule profiles and post-event automation are covered by registered closed contracts.
+`source_version` is numeric. `replay_available` is a supported optional post-event automation
+event. The Webinar token source/context providers expose real non-sensitive model columns and
+explicit computed links.
+
+`webinar.status` is not a valid token because the `webinars` table has no such column. Waitlist
+source data uses `source_page`. Join tokens, playback tokens/passcodes, provider settings, raw
+provider data, and arbitrary `meta` remain excluded; join/cancel/registration/playback URLs are
+available only in producer contexts that explicitly compute or supply them.
+
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
 
 Webinars is optional.
@@ -312,3 +324,4 @@ Dev testing actions should still use public module seams:
 The dev UI should behave like an operator console. Actions inside testing modals should use AJAX/fetch where practical so the modal, selected registration, loaded message options, and activity log are not lost after each action.
 
 Sim Join should skip already-queued live reminders when the real definition has skip_when_join_clicked enabled. Manual dev sends are forced sends and may still send a selected reminder afterward so the exact payload can be tested.
+

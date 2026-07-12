@@ -1,5 +1,27 @@
 # Engage Core Messaging Token Reference
 
+## Executable authority
+
+This page explains the token contract, but the executable source of truth is
+`App\Support\TokenContracts\TokenContractRegistry`. Module service providers register
+`TokenSourceProvider`, `TokenContextProvider`, and, where necessary,
+`ComputedTokenValueProvider` implementations.
+
+A model-backed token must correspond to a real, non-sensitive table column. Do not expose
+arbitrary `meta`, raw provider payloads, credentials, join/playback tokens, or provider settings
+as general authoring tokens. A derived value must have an explicit computed-value provider and a
+producer context that guarantees it can be resolved.
+
+The registry currently includes Contact, Messaging, Campaign, and Webinar sources and contexts.
+Use it for selectable fields and validation; do not maintain a separate UI-only token list.
+
+Current schema corrections:
+
+- `webinar.status` is not valid because `webinars` has no `status` column.
+- waitlist source data is `source_page`, not `source`.
+- join, cancel, registration, and playback links are available only in registered runtime
+  contexts that explicitly compute or supply them.
+
 Messaging tokens are resolved from:
 
 1. universal recipient/contact message data supplied by Messaging;
@@ -260,7 +282,8 @@ Prefer these replacements:
 
 ## Available field picker direction
 
-Client/operator editors should eventually expose available tokens as friendly fields through an `Insert field` / `Add field` interaction.
+Client/operator editors should expose available tokens from `TokenContractRegistry` as friendly
+fields through an `Insert field` / `Add field` interaction.
 
 The picker should show friendly labels and insert stable syntax such as:
 
@@ -273,3 +296,4 @@ The picker should show friendly labels and insert stable syntax such as:
 The runtime may normalize this to the current internal token syntax, but validation must still use the documented token/field source of truth.
 
 Do not add a field to the picker unless the current message/context can actually supply it.
+

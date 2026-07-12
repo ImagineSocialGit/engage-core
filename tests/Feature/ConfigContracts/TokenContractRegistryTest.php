@@ -62,4 +62,17 @@ class TokenContractRegistryTest extends TestCase
             column: 'meta',
         );
     }
+
+    public function test_producer_contexts_exclude_stale_or_secret_webinar_fields(): void
+    {
+        $registry = app(TokenContractRegistry::class);
+
+        $this->assertArrayNotHasKey('webinar.status', $registry->sources());
+        $this->assertArrayNotHasKey('webinar.playback_token', $registry->sources());
+        $this->assertArrayNotHasKey('webinar_registration.join_token', $registry->sources());
+        $this->assertArrayHasKey('webinar_waitlist_signup.source_page', $registry->sources());
+        $this->assertArrayNotHasKey('webinar_waitlist_signup.source', $registry->sources());
+        $this->assertContains('webinar_join_url', $registry->authorableTokens('registration_created'));
+        $this->assertContains('webinar_playback_url', $registry->authorableTokens('webinar_ended'));
+    }
 }

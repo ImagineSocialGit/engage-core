@@ -3,9 +3,13 @@
 namespace App\Modules\Webinars\Providers;
 
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
+use App\Modules\Webinars\ConfigContracts\WebinarPostEventConfigContract;
+use App\Modules\Webinars\ConfigContracts\WebinarScheduleProfileConfigContract;
 use App\Modules\Webinars\Console\Commands\SyncWebinarScheduleProfilesCommand;
 use App\Modules\Webinars\Services\ContactPanels\WebinarContactPanelProvider;
 use App\Modules\Webinars\Services\Dashboard\WebinarActivityDashboardPanelProvider;
+use App\Modules\Webinars\TokenContracts\WebinarTokenContextProvider;
+use App\Modules\Webinars\TokenContracts\WebinarTokenSourceProvider;
 use App\Modules\Webinars\Validation\WebinarsSetupValidationContributor;
 use App\Support\Dashboard\DashboardPanelRegistry;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -17,6 +21,13 @@ class WebinarsModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->tag([
+            WebinarPostEventConfigContract::class,
+            WebinarScheduleProfileConfigContract::class,
+        ], 'config.contracts');
+        $this->app->tag(WebinarTokenSourceProvider::class, 'token.source_providers');
+        $this->app->tag(WebinarTokenContextProvider::class, 'token.context_providers');
+
         $this->app->tag([
             WebinarActivityDashboardPanelProvider::class,
         ], DashboardPanelRegistry::providerTag());
@@ -101,4 +112,5 @@ class WebinarsModuleServiceProvider extends ServiceProvider
         };
     }
 }
+
 

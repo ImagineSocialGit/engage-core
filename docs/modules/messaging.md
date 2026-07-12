@@ -2,6 +2,18 @@
 
 # Messaging Module
 
+## Config and token contracts
+
+Email, SMS, and permission-invitation definitions are covered by registered closed config
+contracts. Messaging registers producer contexts in `TokenContractRegistry`; module-specific
+sources remain owned by their producer modules.
+
+MessageTemplatePreset assignment resolution uses semantic message/variant identity. A
+variant-specific request does not silently fall back to a broad step assignment, and a
+context-specific active assignment outranks a global assignment. `source_config_path` is retained
+only for legacy lookup/migration compatibility. Field pickers and strict validation must query the
+token registry rather than infer availability from template text.
+
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
 
 Messaging is a reusable capability module.
@@ -774,3 +786,4 @@ available-field/token picker UX
 No persistent validation-result tables are required unless a later operator workflow proves retained history or acknowledgement state is needed.
 
 Fields should be filtered by authoring/runtime context so operators cannot insert a field that will be unavailable when the message sends.
+

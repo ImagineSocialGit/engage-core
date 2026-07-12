@@ -29,6 +29,7 @@ class ConfigSchema
         private readonly array $options = [],
         private readonly array $allowedValues = [],
         private readonly array $atLeastOne = [],
+        private readonly array $atMostOne = [],
     ) {}
 
     /**
@@ -62,6 +63,7 @@ class ConfigSchema
         bool $allowUnknown = false,
         bool $nullable = false,
         array $atLeastOne = [],
+        array $atMostOne = [],
     ): self
     {
         foreach ($fields as $key => $field) {
@@ -82,12 +84,19 @@ class ConfigSchema
             }
         }
 
+        foreach ($atMostOne as $group) {
+            if (! is_array($group) || count($group) < 2 || array_diff($group, array_keys($fields)) !== []) {
+                throw new InvalidArgumentException('Config object atMostOne groups must contain declared field names.');
+            }
+        }
+
         return new self(
             kind: self::KIND_OBJECT,
             nullable: $nullable,
             fields: $fields,
             allowUnknown: $allowUnknown,
             atLeastOne: $atLeastOne,
+            atMostOne: $atMostOne,
         );
     }
 
@@ -158,6 +167,9 @@ class ConfigSchema
             'allow_unknown' => $this->kind === self::KIND_OBJECT ? $this->allowUnknown : null,
             'at_least_one' => $this->kind === self::KIND_OBJECT && $this->atLeastOne !== []
                 ? $this->atLeastOne
+                : null,
+            'at_most_one' => $this->kind === self::KIND_OBJECT && $this->atMostOne !== []
+                ? $this->atMostOne
                 : null,
             'allowed_values' => $this->allowedValues !== [] ? $this->allowedValues : null,
             'fields' => $this->fields !== []
@@ -270,6 +282,22 @@ class ConfigSchema
                     $path,
                     sprintf('[%s] requires at least one of [%s].', $path, implode(', ', $group)),
                     ['fields' => $group],
+                );
+            }
+        }
+
+        foreach ($this->atMostOne as $group) {
+            $present = array_values(array_filter(
+                $group,
+                fn (string $key): bool => array_key_exists($key, $value) && $value[$key] !== null,
+            ));
+
+            if (count($present) > 1) {
+                $violations[] = $this->violation(
+                    'mutually_exclusive_fields_present',
+                    $path,
+                    sprintf('[%s] allows at most one of [%s].', $path, implode(', ', $group)),
+                    ['fields' => $group, 'present' => $present],
                 );
             }
         }

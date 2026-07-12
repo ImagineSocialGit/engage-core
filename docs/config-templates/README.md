@@ -6,6 +6,16 @@ Use this file as the template index. Use `docs/config-authoring-guide.md` for th
 
 ## Primary references
 
+Executable schemas and field availability are registered in `ConfigContractRegistry` and
+`TokenContractRegistry`. These templates are maintained examples of those contracts; they are
+not allowed to invent fields or tokens that runtime ignores.
+
+Permanent implementation references:
+
+- [`../config-contracts.md`](../config-contracts.md)
+- [`../config-hardening-audit.md`](../config-hardening-audit.md)
+- [`../config-generation-lock-in-roadmap.md`](../config-generation-lock-in-roadmap.md)
+
 Read these before authoring or reviewing configs:
 
 ```text
@@ -288,3 +298,4 @@ Client request:
 
 Return complete config files and list any recommended new keys/tokens separately.
 ```
+

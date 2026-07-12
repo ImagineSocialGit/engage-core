@@ -38,6 +38,9 @@ return [
     | Do not create schedule-specific Messaging message types such as
     | reminder_30_minute.
     |
+    | `source_version` is numeric. Sync persists numeric versions only; do not
+    | use descriptive release strings in this field.
+    |
     */
 
     'full_10_day' => [

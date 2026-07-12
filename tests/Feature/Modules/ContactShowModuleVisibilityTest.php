@@ -120,7 +120,8 @@ class ContactShowModuleVisibilityTest extends TestCase
             ->assertSee('Automatic follow-ups')
             ->assertSee('Follow-up sequences')
             ->assertSee('Messages already handled')
-            ->assertDontSee('Routes');
+            ->assertDontSee('FlowRoutes')
+            ->assertDontSee('Flow Routes');
     }
 
 }

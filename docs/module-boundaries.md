@@ -1,6 +1,24 @@
 
 # Engage Core Module Boundaries
 
+## Executable config and token contract ownership
+
+`ConfigContractRegistry` and `TokenContractRegistry` are shared coordination seams. They do not
+transfer domain ownership to Core or Support.
+
+- Support owns neutral schema nodes, violations, definitions, provider interfaces, and registries.
+- Each module owns and registers the config contracts for definitions it parses or syncs.
+- The module that supplies a model or runtime payload owns its token source.
+- The producer of a dispatch path owns the token context that states which sources are available.
+- Computed fields require an explicit value provider; arbitrary `meta`, raw payloads, and secrets
+  are not implicit token namespaces.
+- Setup validation and future export must consume these registrations rather than copying field
+  lists into app-level code.
+
+Current registered config domains include foundational module/package definitions plus Core,
+Tasks, Messaging, Campaigns, FlowRoutes, and Webinars definitions. See
+[`config-contracts.md`](config-contracts.md) for the concrete registry and extension rules.
+
 Engage Core is a modular contact engagement platform.
 
 The goal is to let each client enable only the capabilities they need without forcing every client into CRM, sales, webinar, marketing, internal notifications, automation, or vertical-specific workflows.
@@ -3297,3 +3315,4 @@ Campaigns invents webinar URL fields without the enrollment caller supplying the
 ```
 
 Treat available-field validation as setup/config-validation work before every editor receives polished autocomplete.
+

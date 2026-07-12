@@ -7,5 +7,5 @@ interface ComputedTokenValueProvider
     /**
      * @param array<string, mixed> $context
      */
-    public function value(array $context): mixed;
+    public function value(string $sourcePath, array $context): mixed;
 }
