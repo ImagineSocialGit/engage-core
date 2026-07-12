@@ -4,6 +4,9 @@ namespace App\Modules\Messaging\Providers;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Capabilities\MessagingAutomationCapabilityContributor;
+use App\Modules\Messaging\ConfigContracts\EmailMessageDefinitionConfigContract;
+use App\Modules\Messaging\ConfigContracts\PermissionInvitationConfigContract;
+use App\Modules\Messaging\ConfigContracts\SmsMessageDefinitionConfigContract;
 use App\Modules\Messaging\Console\Commands\SyncMessageTemplatePresetsCommand;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Listeners\MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped;
@@ -16,6 +19,7 @@ use App\Modules\Messaging\Services\Email\EmailProviderManager;
 use App\Modules\Messaging\Services\MessageRecipientGateRegistry;
 use App\Modules\Messaging\Services\MessageRecipientPayloadProviderRegistry;
 use App\Modules\Messaging\Services\Sms\SmsProviderManager;
+use App\Modules\Messaging\TokenContracts\MessagingTokenContextProvider;
 use App\Modules\Messaging\Validation\MessagingSetupValidationContributor;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Event;
@@ -28,6 +32,17 @@ class MessagingModuleServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(config_path('messaging/sms.php'), 'messaging.sms');
         $this->mergeConfigFrom(config_path('messaging/email.php'), 'messaging.email');
+
+        $this->app->tag([
+            EmailMessageDefinitionConfigContract::class,
+            SmsMessageDefinitionConfigContract::class,
+            PermissionInvitationConfigContract::class,
+        ], 'config.contracts');
+
+        $this->app->tag(
+            MessagingTokenContextProvider::class,
+            'token.context_providers',
+        );
 
         $this->app->tag([
             MessagingAutomationCapabilityContributor::class,

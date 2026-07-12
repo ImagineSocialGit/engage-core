@@ -70,9 +70,9 @@ class MessageTemplatePresetAssignmentResolver
             }
         }
 
-        if ($sourceConfigPath !== null) {
+        if ($variantKey !== null) {
             $assignment = $this->campaignStepQuery($channel, $purpose, $scope, $campaignKey, $stepNumber)
-                ->where('source_config_path', $sourceConfigPath)
+                ->where('campaign_step_variant_key', $variantKey)
                 ->whereNull('context_type')
                 ->whereNull('context_id')
                 ->with('messageTemplatePreset')
@@ -85,9 +85,9 @@ class MessageTemplatePresetAssignmentResolver
             }
         }
 
-        if ($variantKey !== null) {
+        if ($sourceConfigPath !== null) {
             $assignment = $this->campaignStepQuery($channel, $purpose, $scope, $campaignKey, $stepNumber)
-                ->where('campaign_step_variant_key', $variantKey)
+                ->where('source_config_path', $sourceConfigPath)
                 ->whereNull('context_type')
                 ->whereNull('context_id')
                 ->with('messageTemplatePreset')
@@ -207,4 +207,5 @@ class MessageTemplatePresetAssignmentResolver
         return $value !== '' ? $value : null;
     }
 }
+
 

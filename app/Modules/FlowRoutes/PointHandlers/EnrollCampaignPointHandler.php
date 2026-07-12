@@ -335,9 +335,6 @@ class EnrollCampaignPointHandler implements PointHandler
             'contact_id' => $enrollment->contact_id,
             'campaign_id' => $enrollment->campaign_id,
             'campaign_key' => $enrollment->campaign_key,
-            'channel' => $enrollment->channel,
-            'purpose' => $enrollment->purpose,
-            'scope' => $enrollment->scope,
             'status' => $enrollment->status,
             'current_step' => $enrollment->current_step,
             'current_campaign_step_id' => $enrollment->current_campaign_step_id,
@@ -355,3 +352,4 @@ class EnrollCampaignPointHandler implements PointHandler
         ];
     }
 }
+

@@ -4,6 +4,7 @@ namespace App\Modules\Tasks\Providers;
 
 use App\Modules\Tasks\Actions\RecordManualTaskCompletionAutomationBehaviorAction;
 use App\Modules\Tasks\Capabilities\TasksAutomationCapabilityContributor;
+use App\Modules\Tasks\ConfigContracts\TaskPresetDefinitionConfigContract;
 use App\Modules\Tasks\Events\TaskCompleted;
 use App\Modules\Tasks\Listeners\EmitTaskCompletedAutomationEvent;
 use App\Modules\Tasks\Services\AssignedRecipients\TeamMemberTaskAssignedRecipientResolver;
@@ -29,6 +30,10 @@ class TasksModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             TasksSetupValidationContributor::class,
         ], 'setup.validation_contributors');
+
+        $this->app->tag([
+            TaskPresetDefinitionConfigContract::class,
+        ], 'config.contracts');
 
         $this->app->tag([
             TeamMemberTaskAssignedRecipientResolver::class,
@@ -69,3 +74,4 @@ class TasksModuleServiceProvider extends ServiceProvider
         );
     }
 }
+
