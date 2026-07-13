@@ -205,7 +205,10 @@ class ModuleDependenciesSetupValidationContributor implements SetupValidationCon
             return;
         }
 
-        $available = $this->moduleManager->enabledKeysWithDependencies();
+        $available = array_values(array_unique([
+            ...$this->moduleManager->enabledKeysWithDependencies(),
+            ...$required,
+        ]));
 
         foreach ($required as $index => $moduleKey) {
             if (! is_string($moduleKey) || trim($moduleKey) === '') {
