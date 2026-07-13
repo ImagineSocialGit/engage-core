@@ -70,6 +70,49 @@ class WebinarScheduleProfileTest extends TestCase
         ]);
     }
 
+    public function test_sync_accepts_and_persists_next_day_at_schedule(): void
+    {
+        Config::set('webinars.schedule_profiles', [
+            'next_day_profile' => [
+                'name' => 'Next Day Profile',
+                'is_default' => true,
+                'items' => [
+                    [
+                        'key' => 'email_post_attended',
+                        'context_key' => 'post_event',
+                        'channel' => 'email',
+                        'purpose' => 'transactional',
+                        'scope' => 'webinar',
+                        'surface' => 'webinar_registrations',
+                        'message_type' => 'post_attended',
+                        'dispatch_key' => 'webinar_ended',
+                        'message_template_key' => 'post_attended',
+                        'timing' => 'scheduled',
+                        'schedule' => [
+                            'type' => 'next_day_at',
+                            'time' => '09:00',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $result = app(SyncWebinarScheduleProfilesAction::class)->handle();
+
+        $this->assertSame(1, $result['profiles_created']);
+        $this->assertSame(1, $result['items_created']);
+
+        $item = WebinarScheduleProfileItem::query()
+            ->where('key', 'email_post_attended')
+            ->firstOrFail();
+
+        $this->assertSame('scheduled', $item->timing);
+        $this->assertSame([
+            'type' => 'next_day_at',
+            'time' => '09:00',
+        ], $item->schedule);
+    }
+
     public function test_series_schedule_profile_controls_future_registration_message_timing(): void
     {
         Queue::fake();

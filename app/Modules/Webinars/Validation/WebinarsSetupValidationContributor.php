@@ -675,20 +675,42 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
             return;
         }
 
-        if (! in_array($schedule['type'] ?? null, ['delay', 'anchored'], true)) {
+        $type = $schedule['type'] ?? null;
+
+        if (! in_array($type, ['delay', 'anchored', 'next_day_at'], true)) {
             yield $this->error(
                 code: 'webinars.schedule_profiles.schedule_type_invalid',
                 message: "Webinar schedule profile item [{$profileKey}:{$itemKey}] has invalid [schedule.type].",
                 path: "{$path}.schedule.type",
                 context: $context,
             );
+
+            return;
         }
 
-        if (! is_int($schedule['minutes'] ?? null)) {
+        if (in_array($type, ['delay', 'anchored'], true)) {
+            if (! is_int($schedule['minutes'] ?? null)) {
+                yield $this->error(
+                    code: 'webinars.schedule_profiles.schedule_minutes_invalid',
+                    message: "Webinar schedule profile item [{$profileKey}:{$itemKey}] has invalid [schedule.minutes].",
+                    path: "{$path}.schedule.minutes",
+                    context: $context,
+                );
+            }
+
+            return;
+        }
+
+        $time = $schedule['time'] ?? null;
+
+        if (
+            ! is_string($time)
+            || preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $time) !== 1
+        ) {
             yield $this->error(
-                code: 'webinars.schedule_profiles.schedule_minutes_invalid',
-                message: "Webinar schedule profile item [{$profileKey}:{$itemKey}] has invalid [schedule.minutes].",
-                path: "{$path}.schedule.minutes",
+                code: 'webinars.schedule_profiles.schedule_time_invalid',
+                message: "Webinar schedule profile item [{$profileKey}:{$itemKey}] has invalid [schedule.time]. Expected [HH:MM].",
+                path: "{$path}.schedule.time",
                 context: $context,
             );
         }

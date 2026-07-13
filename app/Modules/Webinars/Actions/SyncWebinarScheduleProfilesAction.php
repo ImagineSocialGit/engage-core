@@ -342,15 +342,32 @@ class SyncWebinarScheduleProfilesAction
             );
         }
 
-        if (! in_array($schedule['type'] ?? null, ['delay', 'anchored'], true)) {
+        $type = $schedule['type'] ?? null;
+
+        if (! in_array($type, ['delay', 'anchored', 'next_day_at'], true)) {
             throw new InvalidArgumentException(
                 "Webinar schedule profile item [{$profileKey}:{$itemKey}] has invalid [schedule.type]."
             );
         }
 
-        if (! is_int($schedule['minutes'] ?? null)) {
+        if (in_array($type, ['delay', 'anchored'], true)) {
+            if (! is_int($schedule['minutes'] ?? null)) {
+                throw new InvalidArgumentException(
+                    "Webinar schedule profile item [{$profileKey}:{$itemKey}] has invalid [schedule.minutes]."
+                );
+            }
+
+            return;
+        }
+
+        $time = $schedule['time'] ?? null;
+
+        if (
+            ! is_string($time)
+            || preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $time) !== 1
+        ) {
             throw new InvalidArgumentException(
-                "Webinar schedule profile item [{$profileKey}:{$itemKey}] has invalid [schedule.minutes]."
+                "Webinar schedule profile item [{$profileKey}:{$itemKey}] has invalid [schedule.time]. Expected [HH:MM]."
             );
         }
     }

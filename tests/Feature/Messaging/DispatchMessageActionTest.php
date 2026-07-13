@@ -236,7 +236,7 @@ class DispatchMessageActionTest extends TestCase
         $contact = $this->contactWithConsent(
             channel: 'sms',
             purpose: 'marketing',
-            scope: 'webinar_waitlist',
+            scope: 'webinar',
             attributes: [
                 'email' => 'person@example.com',
                 'phone' => '+15555550123',
@@ -626,6 +626,62 @@ class DispatchMessageActionTest extends TestCase
         $this->assertSame('Follow up', $message->payload['subject']);
         $this->assertSame('attended', data_get($message->payload, 'runtime_context.webinar.outcome'));
         $this->assertSame(123, data_get($message->payload, 'runtime_context.webinar.id'));
+    }
+
+    public function test_it_persists_resolved_conditions_for_send_time_revalidation(): void
+    {
+        Queue::fake();
+
+        $contact = $this->contactWithConsent(
+            attributes: [
+                'source' => 'webinar',
+            ],
+        );
+
+        $conditions = [
+            [
+                'field' => 'contact.source',
+                'operator' => 'eq',
+                'value' => 'webinar',
+            ],
+        ];
+
+        $messages = app(DispatchMessageAction::class)->handle(
+            recipient: $contact,
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+            dispatchKeys: 'registration_created',
+            definitions: [
+                [
+                    'key' => 'confirmation',
+                    'dispatch_key' => 'registration_created',
+                    'message_type' => 'confirmation',
+                    'channel' => 'email',
+                    'purpose' => 'transactional',
+                    'scope' => 'webinar',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Registered',
+                        'body' => 'Hello {first_name}',
+                    ],
+                    'resolved_behavior' => [
+                        'timing' => 'immediate',
+                        'schedule' => null,
+                        'conditions' => $conditions,
+                    ],
+                ],
+            ],
+        );
+
+        $this->assertCount(1, $messages);
+
+        $message = ScheduledMessage::query()->firstOrFail();
+
+        $this->assertSame('contact.source', $message->meta['conditions'][0]['field']);
+        $this->assertSame('eq', $message->meta['conditions'][0]['operator']);
+        $this->assertSame('webinar', $message->meta['conditions'][0]['value']);
     }
 
     private function contactWithConsent(

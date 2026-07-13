@@ -175,6 +175,9 @@ class DispatchMessageAction
                 'dispatch_keys' => $definition['dispatch_keys'],
                 'campaign_key' => $definition['campaign_key'] ?? null,
                 'campaign_step' => $definition['step'] ?? null,
+                'conditions' => is_array($definition['conditions'] ?? null)
+                    ? $definition['conditions']
+                    : [],
                 'skip_when_join_clicked' => $definition['skip_when_join_clicked'] ?? false,
                 'notification_type' => $definition['notification_type'] ?? null,
             ],

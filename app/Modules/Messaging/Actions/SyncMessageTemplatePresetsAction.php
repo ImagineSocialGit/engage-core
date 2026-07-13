@@ -559,24 +559,6 @@ class SyncMessageTemplatePresetsAction
     }
 
     /**
-     * @param array<string, mixed>|null $schedule
-     */
-    private function validateSchedule(?array $schedule, string $configPath): void
-    {
-        if (! is_array($schedule)) {
-            throw new InvalidArgumentException("Message template preset source [{$configPath}] is missing [schedule].");
-        }
-
-        if (! in_array($schedule['type'] ?? null, ['delay', 'anchored'], true)) {
-            throw new InvalidArgumentException("Message template preset source [{$configPath}] has invalid [schedule.type].");
-        }
-
-        if (! is_int($schedule['minutes'] ?? null)) {
-            throw new InvalidArgumentException("Message template preset source [{$configPath}] has invalid [schedule.minutes].");
-        }
-    }
-
-    /**
      * @param array<string, mixed> $definition
      * @return array<int, string>
      */

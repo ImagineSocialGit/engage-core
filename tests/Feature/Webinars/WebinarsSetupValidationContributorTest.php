@@ -92,9 +92,16 @@ class WebinarsSetupValidationContributorTest extends TestCase
                         'timing' => 'later',
                     ]),
                     $this->validConfigItem([
-                        'key' => 'bad_schedule',
+                        'key' => 'bad_schedule_type',
                         'schedule' => [
                             'type' => 'calendar_magic',
+                            'minutes' => 'soon',
+                        ],
+                    ]),
+                    $this->validConfigItem([
+                        'key' => 'bad_schedule_minutes',
+                        'schedule' => [
+                            'type' => 'delay',
                             'minutes' => 'soon',
                         ],
                     ]),
@@ -107,6 +114,54 @@ class WebinarsSetupValidationContributorTest extends TestCase
         $this->assertContains('webinars.schedule_profiles.timing_invalid', $codes);
         $this->assertContains('webinars.schedule_profiles.schedule_type_invalid', $codes);
         $this->assertContains('webinars.schedule_profiles.schedule_minutes_invalid', $codes);
+    }
+
+    public function test_it_validates_next_day_at_schedule_time(): void
+    {
+        Config::set('webinars.schedule_profiles', [
+            'valid_profile' => [
+                'name' => 'Valid profile',
+                'items' => [
+                    $this->validConfigItem([
+                        'key' => 'valid_next_day_at',
+                        'schedule' => [
+                            'type' => 'next_day_at',
+                            'time' => '09:00',
+                        ],
+                    ]),
+                ],
+            ],
+            'invalid_profile' => [
+                'name' => 'Invalid profile',
+                'items' => [
+                    $this->validConfigItem([
+                        'key' => 'invalid_next_day_at',
+                        'schedule' => [
+                            'type' => 'next_day_at',
+                            'time' => '9am',
+                        ],
+                    ]),
+                ],
+            ],
+        ]);
+
+        $findings = $this->findings();
+        $codes = array_column($findings, 'code');
+
+        $this->assertContains(
+            'webinars.schedule_profiles.schedule_time_invalid',
+            $codes,
+        );
+
+        $validItemFindings = array_values(array_filter(
+            $findings,
+            fn (array $finding): bool => data_get(
+                $finding,
+                'context.item_key',
+            ) === 'valid_next_day_at',
+        ));
+
+        $this->assertSame([], $validItemFindings);
     }
 
     public function test_it_reports_conflicting_active_default_profiles_in_db_state(): void

@@ -596,6 +596,17 @@ class WebinarDevController extends Controller
     private function scheduleLabel(array $schedule): string
     {
         $type = $schedule['type'] ?? null;
+
+        if ($type === 'next_day_at') {
+            $time = $schedule['time'] ?? null;
+
+            if (! is_string($time) || preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $time) !== 1) {
+                return '';
+            }
+
+            return 'next day at '.$time;
+        }
+
         $minutes = $schedule['minutes'] ?? null;
 
         if (! is_int($minutes)) {

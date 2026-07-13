@@ -209,7 +209,7 @@ class WebinarMessageTemplateControllerTest extends TestCase
             ->assertSessionHasErrors(['message_template_preset_id']);
     }
 
-    public function test_index_displays_effective_timing_from_the_active_webinar_schedule_profile(): void
+    public function test_index_displays_delay_timing_from_the_active_webinar_schedule_profile(): void
     {
         config()->set('modules.enabled', [
             'webinars',
@@ -270,6 +270,66 @@ class WebinarMessageTemplateControllerTest extends TestCase
             ->assertDontSee('Timing</dt>
                                                             <dd class="mt-1 font-semibold text-slate-900">
                                                                 Immediate', false);
+    }
+
+    public function test_index_displays_next_day_at_timing_from_the_active_webinar_schedule_profile(): void
+    {
+        config()->set('modules.enabled', [
+            'webinars',
+            'messaging',
+        ]);
+
+        $user = User::factory()->create();
+
+        $preset = $this->webinarTemplate([
+            'message_type' => 'post_attended',
+            'usage_type' => 'webinar_post_attended',
+            'group_label' => 'Post-Webinar Follow-Up',
+            'item_label' => 'Attended Follow-Up Email',
+        ]);
+
+        MessageTemplatePresetAssignment::factory()
+            ->forPreset($preset)
+            ->create([
+                'surface' => 'webinar_registrations',
+                'message_type' => 'post_attended',
+            ]);
+
+        $profile = WebinarScheduleProfile::factory()->create([
+            'key' => 'default_profile',
+            'name' => 'Default profile',
+            'status' => WebinarScheduleProfile::STATUS_ACTIVE,
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+
+        WebinarScheduleProfileItem::factory()->create([
+            'webinar_schedule_profile_id' => $profile->getKey(),
+            'key' => 'email_post_attended',
+            'context_key' => 'post_event',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'surface' => 'webinar_registrations',
+            'message_type' => 'post_attended',
+            'dispatch_key' => 'webinar_ended',
+            'message_template_key' => $preset->key,
+            'source_config_path' => $preset->source_config_path,
+            'is_enabled' => true,
+            'is_active' => true,
+            'timing' => 'scheduled',
+            'schedule' => [
+                'type' => 'next_day_at',
+                'time' => '09:00',
+            ],
+        ]);
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/webinars/message-templates?section=post_attended')
+            ->assertOk()
+            ->assertSee('Next day at 09:00');
     }
 
     /**
