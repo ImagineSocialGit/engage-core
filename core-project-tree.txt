@@ -672,6 +672,7 @@
 │   │   │   │   └── WebinarsConfigContractTargetProvider.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
+│   │   │   │       ├── ImportWebinarRegistrationsCommand.php
 │   │   │   │       └── SyncWebinarScheduleProfilesCommand.php
 │   │   │   ├── Contracts
 │   │   │   │   └── WebinarProvider.php
@@ -874,13 +875,14 @@
 │   │   │   ├── generated
 │   │   │   │   └── images.php
 │   │   │   ├── messaging
-│   │   │   │   └── messaging
-│   │   │   │       ├── email
-│   │   │   │       │   └── definitions
-│   │   │   │       │       └── transactional
-│   │   │   │       └── sms
-│   │   │   │           └── definitions
-│   │   │   │               └── transactional
+│   │   │   │   ├── email
+│   │   │   │   │   └── definitions
+│   │   │   │   │       └── transactional
+│   │   │   │   │           └── webinar.php
+│   │   │   │   └── sms
+│   │   │   │       └── definitions
+│   │   │   │           └── transactional
+│   │   │   │               └── webinar.php
 │   │   │   ├── presets.php
 │   │   │   ├── theme.php
 │   │   │   └── webinars
@@ -1464,7 +1466,8 @@
 │   │   │   ├── CampaignVariantSchedulingDurabilityTest.php
 │   │   │   ├── EnrollContactInCampaignActionTest.php
 │   │   │   ├── ScheduleNextCampaignStepActionTest.php
-│   │   │   └── ScheduleNextCampaignStepAfterScheduledMessageSentTest.php
+│   │   │   ├── ScheduleNextCampaignStepAfterScheduledMessageSentTest.php
+│   │   │   └── WebinarNurtureFirstAvailableVariantTest.php
 │   │   ├── Clients
 │   │   │   └── ClientConfigFallbackTest.php
 │   │   ├── Commerce
@@ -1606,6 +1609,7 @@
 │   │   │   ├── DispatchWebinarWaitlistMessagesActionTest.php
 │   │   │   ├── ImportWebinarRegistrationActionTest.php
 │   │   │   ├── ImportWebinarRegistrationReminderDispatchTest.php
+│   │   │   ├── ImportWebinarRegistrationsCommandTest.php
 │   │   │   ├── PostEvent
 │   │   │   │   └── ProcessPostWebinarEventJobTest.php
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
@@ -1625,4 +1629,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-519 directories, 1107 files
+518 directories, 1112 files
