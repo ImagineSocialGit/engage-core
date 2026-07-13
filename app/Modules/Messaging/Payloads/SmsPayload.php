@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Payloads;
 
 use App\Modules\Messaging\Contracts\Sms\SmsMessage;
+use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use Illuminate\Support\Arr;
 use InvalidArgumentException;
 use Stringable;
@@ -128,7 +129,13 @@ class SmsPayload implements SmsMessage
 
     private function payloadConfigPath(string $key): string
     {
-        return "messaging.{$this->channel}.{$this->purpose}.{$this->scope}.{$this->messageType}.payload.{$key}";
+        return MessageDefinitionConfigPath::payloadField(
+            channel: $this->channel,
+            purpose: $this->purpose,
+            scope: $this->scope,
+            messageType: $this->messageType,
+            field: $key,
+        );
     }
 
     private function shouldPrefixBrand(): bool

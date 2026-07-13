@@ -87,9 +87,9 @@ PHP);
     {
         $root = $this->makeTempDirectory();
 
-        mkdir($root.'/messaging/email/marketing', 0777, true);
+        mkdir($root.'/messaging/email/definitions/marketing', 0777, true);
 
-        file_put_contents($root.'/messaging/email/marketing/webinar_nurture.php', <<<'PHP'
+        file_put_contents($root.'/messaging/email/definitions/marketing/webinar_nurture.php', <<<'PHP'
     <?php
 
     return [

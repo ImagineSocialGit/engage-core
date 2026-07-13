@@ -17,7 +17,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
     public function test_it_syncs_message_configs_into_presets_assignments_and_variant_campaign_catalog_entries(): void
     {
         Config::set('messaging.sms', []);
-        Config::set('messaging.email', [
+        Config::set('messaging.email.definitions', [
             'transactional' => [
                 'webinar' => [
                     'confirmation' => [
@@ -106,7 +106,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
     public function test_it_rejects_legacy_step_level_campaign_message_templates(): void
     {
         Config::set('messaging.sms', []);
-        Config::set('messaging.email', [
+        Config::set('messaging.email.definitions', [
             'marketing' => [
                 'webinar_nurture' => [
                     'campaigns' => [
@@ -137,7 +137,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
     public function test_it_keeps_list_based_message_types_generic_and_distinguishes_by_source_config_path(): void
     {
         Config::set('messaging.sms', []);
-        Config::set('messaging.email', [
+        Config::set('messaging.email.definitions', [
             'transactional' => [
                 'webinar' => [
                     'reminders' => [
@@ -203,7 +203,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
     public function test_it_does_not_overwrite_customized_presets_unless_forced(): void
     {
         Config::set('messaging.sms', []);
-        Config::set('messaging.email', [
+        Config::set('messaging.email.definitions', [
             'transactional' => [
                 'webinar' => [
                     'confirmation' => [
@@ -253,7 +253,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
     public function test_normal_sync_preserves_existing_assignment_for_same_context(): void
     {
         Config::set('messaging.sms', []);
-        Config::set('messaging.email', [
+        Config::set('messaging.email.definitions', [
             'transactional' => [
                 'webinar' => [
                     'confirmation' => [
@@ -305,7 +305,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
     public function test_force_sync_repoints_existing_assignment_to_config_preset(): void
     {
         Config::set('messaging.sms', []);
-        Config::set('messaging.email', [
+        Config::set('messaging.email.definitions', [
             'transactional' => [
                 'webinar' => [
                     'confirmation' => [
@@ -356,7 +356,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
     public function test_it_syncs_multiple_reminders_as_separate_presets_without_schedule_specific_message_types(): void
     {
         Config::set('messaging.sms', []);
-        Config::set('messaging.email', [
+        Config::set('messaging.email.definitions', [
             'transactional' => [
                 'webinar' => [
                     'reminders' => [

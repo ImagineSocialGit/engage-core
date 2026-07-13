@@ -740,7 +740,10 @@ class SyncMessageTemplatePresetsAction
             ]);
         }
 
-        return str_replace('-', '_', strtolower(preg_replace('/^messaging\./', '', $configPath) ?? $configPath));
+        $relativePath = preg_replace('/^messaging\./', '', $configPath) ?? $configPath;
+        $relativePath = preg_replace('/^([^.]+)\.definitions\./', '$1.', $relativePath) ?? $relativePath;
+
+        return str_replace('-', '_', strtolower($relativePath));
     }
 
     private function headline(string $value): string
