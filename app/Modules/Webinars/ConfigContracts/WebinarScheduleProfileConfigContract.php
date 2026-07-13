@@ -16,9 +16,17 @@ class WebinarScheduleProfileConfigContract implements ConfigContract
     {
         $version = ConfigSchema::integer(nullable: true);
         $condition = ConfigSchema::object([], allowUnknown: true);
-        $schedule = ConfigSchema::object([
-            'type' => ConfigField::required(ConfigSchema::string(allowedValues: ['delay', 'anchored'])),
+        $delaySchedule = ConfigSchema::object([
+            'type' => ConfigField::required(ConfigSchema::string(allowedValues: ['delay'])),
             'minutes' => ConfigField::required(ConfigSchema::integer()),
+        ]);
+        $anchoredSchedule = ConfigSchema::object([
+            'type' => ConfigField::required(ConfigSchema::string(allowedValues: ['anchored'])),
+            'minutes' => ConfigField::required(ConfigSchema::integer()),
+        ]);
+        $nextDayAtSchedule = ConfigSchema::object([
+            'type' => ConfigField::required(ConfigSchema::string(allowedValues: ['next_day_at'])),
+            'time' => ConfigField::required(ConfigSchema::string()),
         ]);
         $item = ConfigSchema::object([
             'key' => ConfigField::required(ConfigSchema::string()),
@@ -33,7 +41,7 @@ class WebinarScheduleProfileConfigContract implements ConfigContract
             'message_template_key' => ConfigField::required(ConfigSchema::string()),
             'source_config_path' => ConfigField::optional(ConfigSchema::string(nullable: true)),
             'timing' => ConfigField::defaulted(ConfigSchema::string(allowedValues: ['immediate', 'scheduled']), 'immediate'),
-            'schedule' => ConfigField::optional(ConfigSchema::oneOf([$schedule], nullable: true)),
+            'schedule' => ConfigField::optional(ConfigSchema::oneOf([$delaySchedule, $anchoredSchedule, $nextDayAtSchedule], nullable: true)),
             'conditions' => ConfigField::defaulted(ConfigSchema::listOf($condition), []),
             'is_enabled' => ConfigField::defaulted(ConfigSchema::boolean(), true),
             'is_active' => ConfigField::defaulted(ConfigSchema::boolean(), true),

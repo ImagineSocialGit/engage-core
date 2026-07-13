@@ -161,6 +161,7 @@ class DispatchPostWebinarFollowUpsAction
                     payload: $payload,
                     context: $registration,
                     triggeredAt: now(),
+                    anchor: $webinar->ends_at,
                     meta: $meta + ['webinar_schedule_profile_applied' => true],
                     definitions: $definitions,
                     occurrenceKey: implode(':', [
