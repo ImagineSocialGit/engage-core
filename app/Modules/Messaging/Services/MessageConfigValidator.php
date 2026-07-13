@@ -4,6 +4,7 @@ namespace App\Modules\Messaging\Services;
 
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use Illuminate\Support\Arr;
 
 class MessageConfigValidator
@@ -32,7 +33,7 @@ class MessageConfigValidator
             $issues[] = $this->issue('error', 'messaging.'.$channel.'.'.$purpose, 'Unsupported message purpose.');
         }
 
-        $scopePath = "messaging.{$channel}.{$purpose}.{$scope}";
+        $scopePath = MessageDefinitionConfigPath::scope($channel, $purpose, $scope);
         $scopeConfig = config($scopePath);
 
         if (! is_array($scopeConfig)) {

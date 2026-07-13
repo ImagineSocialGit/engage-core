@@ -108,4 +108,56 @@ class MessagingConfigContractTargetProviderTest extends TestCase
             'messaging.email.transactional.webinar.reminder.1',
         ));
     }
+
+    public function test_it_ignores_channel_infrastructure_that_is_not_a_message_definition_purpose(): void
+    {
+        $provider = new MessagingConfigContractTargetProvider;
+        $context = ConfigContractTargetContext::proposed([
+            'messaging' => [
+                'email' => [
+                    'provider' => 'resend',
+                    'from' => [
+                        'marketing' => [
+                            'address' => 'marketing@example.test',
+                        ],
+                    ],
+                    'providers' => [
+                        'resend' => [
+                            'provider' => 'ExampleProvider',
+                        ],
+                    ],
+                    'transactional' => [
+                        'webinar' => [
+                            'confirmation' => [
+                                'dispatch_key' => 'registration_created',
+                                'payload_class' => 'EmailPayload',
+                                'queue' => 'messages',
+                                'payload' => [
+                                    'subject' => 'Registered',
+                                    'body' => 'Thanks',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+                'sms' => [
+                    'inbound' => [
+                        'stop_keywords' => ['STOP'],
+                    ],
+                ],
+                'permission_invitations' => [],
+            ],
+        ]);
+
+        $targets = collect($provider->targets($context));
+
+        $this->assertNotNull($targets->firstWhere(
+            'path',
+            'messaging.email.transactional.webinar.confirmation',
+        ));
+
+        $this->assertNull($targets->firstWhere('path', 'messaging.email.from.marketing.address'));
+        $this->assertNull($targets->firstWhere('path', 'messaging.email.providers.resend.provider'));
+        $this->assertNull($targets->firstWhere('path', 'messaging.sms.inbound.stop_keywords.0'));
+    }
 }

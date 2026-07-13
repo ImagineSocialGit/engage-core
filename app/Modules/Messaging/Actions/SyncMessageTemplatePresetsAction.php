@@ -5,6 +5,7 @@ namespace App\Modules\Messaging\Actions;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
+use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -151,7 +152,7 @@ class SyncMessageTemplatePresetsAction
     {
         foreach (['email', 'sms'] as $channel) {
             foreach (['transactional', 'marketing', 'internal'] as $purpose) {
-                $purposeConfig = config("messaging.{$channel}.{$purpose}");
+                $purposeConfig = config(MessageDefinitionConfigPath::purpose($channel, $purpose));
 
                 if (! is_array($purposeConfig)) {
                     continue;
@@ -186,7 +187,7 @@ class SyncMessageTemplatePresetsAction
         $channel = $this->normalizeSegment($channel);
         $purpose = $this->normalizeSegment($purpose);
         $scope = $this->normalizeSegment($scope);
-        $scopeConfigPath = "messaging.{$channel}.{$purpose}.{$scope}";
+        $scopeConfigPath = MessageDefinitionConfigPath::scope($channel, $purpose, $scope);
 
         foreach ($scopeConfig as $messageType => $definition) {
             if ($messageType === 'campaigns') {

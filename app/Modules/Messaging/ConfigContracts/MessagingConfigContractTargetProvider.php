@@ -2,6 +2,8 @@
 
 namespace App\Modules\Messaging\ConfigContracts;
 
+use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Support\ConfigContracts\Contracts\ConfigContractTargetProvider;
 use App\Support\ConfigContracts\Data\ConfigContractTarget;
 use App\Support\ConfigContracts\Data\ConfigContractTargetContext;
@@ -39,13 +41,18 @@ final class MessagingConfigContractTargetProvider implements ConfigContractTarge
         ConfigContractTargetContext $context,
         string $channel,
     ): iterable {
-        $channelConfig = $context->config("messaging.{$channel}", []);
+        $definitionsConfig = $context->config(
+            MessageDefinitionConfigPath::definitionsRoot($channel),
+            [],
+        );
 
-        if (! is_array($channelConfig)) {
+        if (! is_array($definitionsConfig)) {
             return;
         }
 
-        foreach ($channelConfig as $purpose => $purposeConfig) {
+        foreach (MessagePurpose::values() as $purpose) {
+            $purposeConfig = $definitionsConfig[$purpose] ?? null;
+
             if (! is_array($purposeConfig)) {
                 continue;
             }
@@ -55,10 +62,9 @@ final class MessagingConfigContractTargetProvider implements ConfigContractTarge
                     continue;
                 }
 
-                $scopePath = sprintf(
-                    'messaging.%s.%s.%s',
+                $scopePath = MessageDefinitionConfigPath::scope(
                     $channel,
-                    (string) $purpose,
+                    $purpose,
                     (string) $scope,
                 );
 

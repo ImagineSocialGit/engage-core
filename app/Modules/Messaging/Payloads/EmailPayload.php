@@ -5,6 +5,7 @@ namespace App\Modules\Messaging\Payloads;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Contracts\Email\EmailMessage;
 use App\Modules\Messaging\Support\EmailConsentRevocationLinkGenerator;
+use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Support\Clients\ViewResolver;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Arr;
@@ -295,7 +296,13 @@ class EmailPayload implements EmailMessage
 
     private function payloadConfigPath(string $key): string
     {
-        return "messaging.{$this->channel}.{$this->purpose}.{$this->scope}.{$this->messageType}.payload.{$key}";
+        return MessageDefinitionConfigPath::payloadField(
+            channel: $this->channel,
+            purpose: $this->purpose,
+            scope: $this->scope,
+            messageType: $this->messageType,
+            field: $key,
+        );
     }
 
     private function interpolate(string $value): string

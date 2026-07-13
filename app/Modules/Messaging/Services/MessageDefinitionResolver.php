@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Services;
 
 use App\Modules\Messaging\Enums\MessageChannel;
+use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -39,7 +40,7 @@ class MessageDefinitionResolver
             scope: $scope,
         );
 
-        $scopeConfigPath = "messaging.{$channel}.{$purpose}.{$scope}";
+        $scopeConfigPath = MessageDefinitionConfigPath::scope($channel, $purpose, $scope);
         $definitions = config($scopeConfigPath);
 
         if (! is_array($definitions)) {
@@ -166,7 +167,14 @@ class MessageDefinitionResolver
             );
         }
 
-        $configPath = "messaging.{$channel}.{$purpose}.{$scope}.campaigns.{$campaignKey}.steps.{$stepNumber}.variants.{$variantKey}";
+        $configPath = MessageDefinitionConfigPath::campaignVariant(
+            channel: $channel,
+            purpose: $purpose,
+            scope: $scope,
+            campaignKey: $campaignKey,
+            stepNumber: $stepNumber,
+            variantKey: $variantKey,
+        );
         $definition = config($configPath);
 
         if (! is_array($definition) || ! ($definition['enabled'] ?? true)) {

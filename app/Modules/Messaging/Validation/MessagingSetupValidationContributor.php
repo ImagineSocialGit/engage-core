@@ -7,6 +7,7 @@ use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Services\MessageConfigValidator;
+use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 use Illuminate\Support\Collection;
@@ -36,14 +37,15 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
     private function validateConfigRoutes(array $allowedTokens): iterable
     {
         foreach (['email', 'sms'] as $channel) {
-            $channelConfig = config("messaging.{$channel}", []);
+            $definitionsPath = MessageDefinitionConfigPath::definitionsRoot($channel);
+            $definitionsConfig = config($definitionsPath, []);
 
-            if (! is_array($channelConfig)) {
+            if (! is_array($definitionsConfig)) {
                 yield $this->error(
                     code: 'messaging.channel_config_invalid',
-                    message: "Messaging channel config [{$channel}] must be an array.",
-                    source: "messaging.{$channel}",
-                    path: "messaging.{$channel}",
+                    message: "Messaging definition config for channel [{$channel}] must be an array.",
+                    source: $definitionsPath,
+                    path: $definitionsPath,
                     context: [
                         'channel' => $channel,
                     ],
@@ -52,8 +54,9 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
                 continue;
             }
 
-            foreach (['transactional', 'marketing', 'internal'] as $purpose) {
-                $purposeConfig = $channelConfig[$purpose] ?? null;
+            foreach (MessagePurpose::values() as $purpose) {
+                $purposePath = MessageDefinitionConfigPath::purpose($channel, $purpose);
+                $purposeConfig = $definitionsConfig[$purpose] ?? null;
 
                 if ($purposeConfig === null) {
                     continue;
@@ -63,8 +66,8 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
                     yield $this->error(
                         code: 'messaging.purpose_config_invalid',
                         message: "Messaging purpose config [{$channel}.{$purpose}] must be an array.",
-                        source: "messaging.{$channel}.{$purpose}",
-                        path: "messaging.{$channel}.{$purpose}",
+                        source: $purposePath,
+                        path: $purposePath,
                         context: [
                             'channel' => $channel,
                             'purpose' => $purpose,
@@ -79,8 +82,8 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
                         yield $this->error(
                             code: 'messaging.scope_key_invalid',
                             message: "Messaging purpose config [{$channel}.{$purpose}] contains an invalid scope key.",
-                            source: "messaging.{$channel}.{$purpose}",
-                            path: "messaging.{$channel}.{$purpose}",
+                            source: $purposePath,
+                            path: $purposePath,
                             context: [
                                 'channel' => $channel,
                                 'purpose' => $purpose,
@@ -90,12 +93,14 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
                         continue;
                     }
 
+                    $scopePath = MessageDefinitionConfigPath::scope($channel, $purpose, $scope);
+
                     if (! is_array($scopeConfig)) {
                         yield $this->error(
                             code: 'messaging.scope_config_invalid',
                             message: "Messaging scope config [{$channel}.{$purpose}.{$scope}] must be an array.",
-                            source: "messaging.{$channel}.{$purpose}.{$scope}",
-                            path: "messaging.{$channel}.{$purpose}.{$scope}",
+                            source: $scopePath,
+                            path: $scopePath,
                             context: [
                                 'channel' => $channel,
                                 'purpose' => $purpose,
@@ -116,7 +121,7 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
                     foreach ($issues as $issue) {
                         yield $this->findingFromIssue(
                             issue: $issue,
-                            source: "messaging.{$channel}.{$purpose}.{$scope}",
+                            source: $scopePath,
                             context: [
                                 'channel' => $channel,
                                 'purpose' => $purpose,
