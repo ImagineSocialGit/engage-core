@@ -11,7 +11,7 @@ class MessageTemplateBehaviorOwnershipValidationTest extends TestCase
 {
     public function test_reusable_message_template_rejects_timing_schedule_and_conditions(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'payload_class' => EmailPayload::class,
@@ -41,7 +41,7 @@ class MessageTemplateBehaviorOwnershipValidationTest extends TestCase
 
     public function test_content_only_reusable_message_template_is_valid(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'payload_class' => EmailPayload::class,
@@ -62,3 +62,4 @@ class MessageTemplateBehaviorOwnershipValidationTest extends TestCase
         $this->assertSame([], $issues);
     }
 }
+

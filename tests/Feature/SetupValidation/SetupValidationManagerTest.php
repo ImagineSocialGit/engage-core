@@ -59,7 +59,7 @@ class SetupValidationManagerTest extends TestCase
             severity: SetupValidationFinding::SEVERITY_WARNING,
             code: 'messaging.token.unknown',
             message: 'Token is not declared for this context.',
-            source: 'messaging.email.transactional.webinar',
+            source: 'messaging.email.definitions.transactional.webinar',
             path: 'payload.body',
             module: 'messaging',
         );
@@ -236,3 +236,4 @@ class SetupValidationManagerTest extends TestCase
         );
     }
 }
+

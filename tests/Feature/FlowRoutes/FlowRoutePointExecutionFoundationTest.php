@@ -302,7 +302,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             'marketing:webinar_nurture' => true,
         ]);
 
-        config()->set('messaging.sms.marketing.webinar_nurture.route_send_messages', [
+        config()->set('messaging.sms.definitions.marketing.webinar_nurture.route_send_messages', [
             [
                 'dispatch_key' => 'route_send_message_test',
                 'channel' => 'sms',
@@ -359,7 +359,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             ],
         ]);
 
-        config()->set('messaging.email.transactional.general.route_message', [
+        config()->set('messaging.email.definitions.transactional.general.route_message', [
             'dispatch_key' => 'route_send_message_test',
             'payload_class' => EmailPayload::class,
             'queue' => 'notifications',
@@ -527,7 +527,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             ],
         ]);
 
-        config()->set('messaging.email.marketing.webinar.campaigns.route_campaign.steps.1.variants.email', [
+        config()->set('messaging.email.definitions.marketing.webinar.campaigns.route_campaign.steps.1.variants.email', [
             'dispatch_key' => 'campaign_step_due',
             'payload_class' => EmailPayload::class,
             'queue' => 'marketing',
@@ -582,7 +582,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             'is_active' => true,
             'criteria' => [],
             'dependency_rules' => [],
-            'source_config_path' => 'messaging.email.marketing.webinar.campaigns.route_campaign.steps.1.variants.email',
+            'source_config_path' => 'messaging.email.definitions.marketing.webinar.campaigns.route_campaign.steps.1.variants.email',
             'meta' => [],
         ]);
 
@@ -1246,3 +1246,5 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         ];
     }
 }
+
+

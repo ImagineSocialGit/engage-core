@@ -90,7 +90,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
         $this->assertSame('webinar', $nextMessage->scope);
         $this->assertSame('marketing', $nextMessage->queue);
         $this->assertSame(['campaign_step_due'], $nextMessage->dispatch_keys);
-        $this->assertSame('messaging.email.marketing.webinar.campaigns.webinar_attended.steps.2.variants.email', $nextMessage->definition_config_path);
+        $this->assertSame('messaging.email.definitions.marketing.webinar.campaigns.webinar_attended.steps.2.variants.email', $nextMessage->definition_config_path);
         $this->assertSame($enrollment->id, $nextMessage->meta['campaign_enrollment_id']);
         $this->assertSame($campaign->id, $nextMessage->meta['campaign_id']);
         $this->assertSame('webinar_attended', $nextMessage->meta['campaign_key']);
@@ -355,7 +355,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             'is_active' => true,
             'criteria' => [],
             'dependency_rules' => [],
-            'source_config_path' => "messaging.email.marketing.webinar.campaigns.{$campaign->key}.steps.{$stepNumber}.variants.email",
+            'source_config_path' => "messaging.email.definitions.marketing.webinar.campaigns.{$campaign->key}.steps.{$stepNumber}.variants.email",
             'meta' => [],
         ]);
 
@@ -364,7 +364,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
 
     private function defineCampaignStepVariantMessageTemplate(int $stepNumber, string $body): void
     {
-        config()->set("messaging.email.marketing.webinar.campaigns.webinar_attended.steps.{$stepNumber}.variants.email", [
+        config()->set("messaging.email.definitions.marketing.webinar.campaigns.webinar_attended.steps.{$stepNumber}.variants.email", [
             'dispatch_key' => 'campaign_step_due',
             'payload_class' => EmailPayload::class,
             'queue' => 'marketing',
@@ -383,5 +383,6 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
         parent::tearDown();
     }
 }
+
 
 

@@ -38,7 +38,7 @@ class MessageTemplatePresetControllerTest extends TestCase
                 'body' => 'Thanks for registering.',
             ],
             'tokens' => ['first_name'],
-            'source_config_path' => 'messaging.email.transactional.webinar.confirmations.0',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmations.0',
         ]);
 
         MessageTemplateCatalogEntry::factory()
@@ -147,11 +147,11 @@ class MessageTemplatePresetControllerTest extends TestCase
 
         MessageTemplatePresetAssignment::factory()
             ->forPreset($preset)
-            ->forCampaignStepVariant('webinar_attended_nurture', 2, 'email', 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.2.variants.email')
+            ->forCampaignStepVariant('webinar_attended_nurture', 2, 'email', 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.2.variants.email')
             ->create([
                 'meta' => [
                     'source' => 'config_sync',
-                    'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.2.variants.email',
+                    'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.2.variants.email',
                     'campaign_step_variant_key' => 'email',
                     'catalog' => [
                         'group_label' => 'Webinar Attended Nurture',
@@ -323,5 +323,6 @@ class MessageTemplatePresetControllerTest extends TestCase
             ->assertSessionHasErrors(['payload.subject', 'payload.body']);
     }
 }
+
 
 

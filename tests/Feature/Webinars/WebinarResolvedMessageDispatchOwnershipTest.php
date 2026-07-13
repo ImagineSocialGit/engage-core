@@ -105,7 +105,7 @@ class WebinarResolvedMessageDispatchOwnershipTest extends TestCase
             'payload_class' => EmailPayload::class,
             'queue' => 'confirmation_messages',
             'dispatch_keys' => ['registration_created'],
-            'config_path' => 'messaging.email.transactional.webinar.confirmations.0',
+            'config_path' => 'messaging.email.definitions.transactional.webinar.confirmations.0',
             'payload' => [
                 'subject' => 'Registered',
                 'body' => 'Thanks',
@@ -114,3 +114,5 @@ class WebinarResolvedMessageDispatchOwnershipTest extends TestCase
         ];
     }
 }
+
+

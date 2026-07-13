@@ -278,7 +278,7 @@ class CampaignVariantDependencyAwareTest extends TestCase
             'is_active' => true,
             'criteria' => [],
             'dependency_rules' => [],
-            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
+            'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
             'meta' => [],
         ]);
 
@@ -294,7 +294,7 @@ class CampaignVariantDependencyAwareTest extends TestCase
             'is_active' => true,
             'criteria' => [],
             'dependency_rules' => $smsDependencyRules,
-            'source_config_path' => 'messaging.sms.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.sms',
+            'source_config_path' => 'messaging.sms.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.sms',
             'meta' => [],
         ]);
 
@@ -371,7 +371,7 @@ class CampaignVariantDependencyAwareTest extends TestCase
 
     private function configureCampaignMessagingDefinitions(): void
     {
-        Config::set('messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email', [
+        Config::set('messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email', [
             'dispatch_key' => 'campaign_step_due',
             'payload_class' => EmailPayload::class,
             'queue' => 'marketing',
@@ -381,7 +381,7 @@ class CampaignVariantDependencyAwareTest extends TestCase
             ],
         ]);
 
-        Config::set('messaging.sms.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.sms', [
+        Config::set('messaging.sms.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.sms', [
             'dispatch_key' => 'campaign_step_due',
             'payload_class' => SmsPayload::class,
             'queue' => 'marketing',
@@ -459,4 +459,5 @@ class CampaignVariantDependencyAwareTest extends TestCase
         parent::tearDown();
     }
 }
+
 

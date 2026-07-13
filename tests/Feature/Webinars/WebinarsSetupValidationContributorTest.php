@@ -239,7 +239,7 @@ class WebinarsSetupValidationContributorTest extends TestCase
 
     private function configureValidMessagingDefinition(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'key' => 'confirmation',
                 'dispatch_key' => 'registration_created',
@@ -356,3 +356,5 @@ class WebinarsSetupValidationContributorTest extends TestCase
         );
     }
 }
+
+

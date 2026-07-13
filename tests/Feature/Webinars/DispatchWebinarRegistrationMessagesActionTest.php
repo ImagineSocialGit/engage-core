@@ -214,7 +214,7 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
 
     private function configureRegistrationMessages(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'key' => 'confirmation',
                 'dispatch_key' => 'registration_created',
@@ -238,7 +238,7 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
             ],
         ]);
 
-        Config::set('messaging.sms.transactional.webinar', [
+        Config::set('messaging.sms.definitions.transactional.webinar', [
             'confirmation' => [
                 'key' => 'confirmation',
                 'dispatch_key' => 'registration_created',
@@ -405,3 +405,5 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
         Config::set('messaging.channel_availability.sms.surfaces.webinar_registrations', true);
     }
 }
+
+

@@ -172,7 +172,7 @@ class CampaignMessageTemplateControllerTest extends TestCase
                 'item_label' => 'Step 1 SMS',
                 'item_order' => 1,
                 'usage_type' => 'campaign_step',
-                'source_config_path' => 'messaging.sms.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.sms',
+                'source_config_path' => 'messaging.sms.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.sms',
                 'meta' => [
                     'campaign_key' => 'webinar_attended_nurture',
                     'campaign_step' => 1,
@@ -286,7 +286,7 @@ class CampaignMessageTemplateControllerTest extends TestCase
                 'subject' => 'Step '.$step->step_number,
                 'body' => 'Message '.$step->step_number.'.',
             ],
-            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.'.$campaign->key.'.steps.'.$step->step_number.'.variants.'.$variant->key,
+            'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.'.$campaign->key.'.steps.'.$step->step_number.'.variants.'.$variant->key,
         ], $overrides));
 
         MessageTemplateCatalogEntry::factory()
@@ -313,3 +313,4 @@ class CampaignMessageTemplateControllerTest extends TestCase
         return $preset;
     }
 }
+

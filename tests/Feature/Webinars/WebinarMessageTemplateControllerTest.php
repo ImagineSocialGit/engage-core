@@ -296,7 +296,7 @@ class WebinarMessageTemplateControllerTest extends TestCase
                 'subject' => 'Registered',
                 'body' => 'You are registered.',
             ],
-            'source_config_path' => 'messaging.email.transactional.webinar.confirmation',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmation',
         ], $overrides));
 
         MessageTemplateCatalogEntry::factory()
@@ -321,3 +321,5 @@ class WebinarMessageTemplateControllerTest extends TestCase
         return $preset;
     }
 }
+
+

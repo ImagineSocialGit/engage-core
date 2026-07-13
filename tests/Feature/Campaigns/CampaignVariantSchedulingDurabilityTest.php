@@ -210,7 +210,7 @@ class CampaignVariantSchedulingDurabilityTest extends TestCase
                 'subject' => $subject,
                 'body' => 'Body for '.$subject.'.',
             ],
-            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.'.$variant->key,
+            'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.'.$variant->key,
         ]);
     }
 
@@ -260,3 +260,4 @@ class CampaignVariantSchedulingDurabilityTest extends TestCase
         parent::tearDown();
     }
 }
+

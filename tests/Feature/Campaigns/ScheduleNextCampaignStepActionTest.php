@@ -58,7 +58,7 @@ class ScheduleNextCampaignStepActionTest extends TestCase
         $this->assertSame('webinar', $scheduledMessage->scope);
         $this->assertSame('marketing', $scheduledMessage->queue);
         $this->assertSame(['campaign_step_due'], $scheduledMessage->dispatch_keys);
-        $this->assertSame('messaging.email.marketing.webinar.campaigns.webinar_attended.steps.2.variants.email', $scheduledMessage->definition_config_path);
+        $this->assertSame('messaging.email.definitions.marketing.webinar.campaigns.webinar_attended.steps.2.variants.email', $scheduledMessage->definition_config_path);
         $this->assertSame($campaign->id, $scheduledMessage->meta['campaign_id']);
         $this->assertSame('webinar_attended', $scheduledMessage->meta['campaign_key']);
         $this->assertSame(2, $scheduledMessage->meta['campaign_step']);
@@ -175,7 +175,7 @@ class ScheduleNextCampaignStepActionTest extends TestCase
         config()->set('messaging.channel_availability.sms.provider_enabled', true);
         config()->set('messaging.channel_availability.sms.surfaces.campaigns', false);
         config()->set('messaging.channel_availability.sms.purpose_scopes', ['marketing:webinar' => true]);
-        config()->set('messaging.sms.marketing.webinar.campaigns.webinar_sms.steps.1.variants.sms', [
+        config()->set('messaging.sms.definitions.marketing.webinar.campaigns.webinar_sms.steps.1.variants.sms', [
             'dispatch_key' => 'campaign_step_due',
             'payload_class' => SmsPayload::class,
             'queue' => 'marketing',
@@ -357,7 +357,7 @@ class ScheduleNextCampaignStepActionTest extends TestCase
             'is_active' => true,
             'criteria' => [],
             'dependency_rules' => [],
-            'source_config_path' => "messaging.email.marketing.webinar.campaigns.{$campaign->key}.steps.{$stepNumber}.variants.email",
+            'source_config_path' => "messaging.email.definitions.marketing.webinar.campaigns.{$campaign->key}.steps.{$stepNumber}.variants.email",
             'meta' => [],
         ]);
 
@@ -366,7 +366,7 @@ class ScheduleNextCampaignStepActionTest extends TestCase
 
     private function defineCampaignStepVariantMessageTemplate(string $campaignKey, int $stepNumber, string $body): void
     {
-        config()->set("messaging.email.marketing.webinar.campaigns.{$campaignKey}.steps.{$stepNumber}.variants.email", [
+        config()->set("messaging.email.definitions.marketing.webinar.campaigns.{$campaignKey}.steps.{$stepNumber}.variants.email", [
             'dispatch_key' => 'campaign_step_due',
             'payload_class' => EmailPayload::class,
             'queue' => 'marketing',
@@ -548,3 +548,4 @@ class ScheduleNextCampaignStepActionTest extends TestCase
         parent::tearDown();
     }
 }
+

@@ -47,7 +47,7 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
                 'subject' => 'DB confirmation for {first_name}',
                 'body' => 'DB selected confirmation copy.',
             ],
-            'source_config_path' => 'messaging.email.transactional.webinar.confirmation',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmation',
         ]);
 
         $this->configureRegistrationScheduleProfile($preset->key);
@@ -113,7 +113,7 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame('Config reminder', $reminder->payload['subject']);
-        $this->assertSame('messaging.email.transactional.webinar.reminder', $reminder->definition_config_path);
+        $this->assertSame('messaging.email.definitions.transactional.webinar.reminder', $reminder->definition_config_path);
 
         $this->assertSame(2, ScheduledMessage::query()->count());
         Queue::assertPushed(SendScheduledMessageJob::class, 2);
@@ -121,7 +121,7 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
 
     private function configureRegistrationMessages(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'key' => 'confirmation',
                 'dispatch_key' => 'registration_created',
@@ -268,3 +268,5 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
         ]);
     }
 }
+
+

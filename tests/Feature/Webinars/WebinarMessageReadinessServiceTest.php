@@ -70,7 +70,7 @@ class WebinarMessageReadinessServiceTest extends TestCase
 
     public function test_it_needs_attention_when_a_required_message_context_does_not_resolve(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => $this->definition(
                 dispatchKey: 'registration_created',
                 subject: 'Registered',
@@ -90,7 +90,7 @@ class WebinarMessageReadinessServiceTest extends TestCase
 
     public function test_it_needs_attention_when_registration_opt_in_is_missing_from_available_registration_messaging(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => $this->definition(
                 dispatchKey: 'registration_created',
                 subject: 'Registered',
@@ -116,7 +116,7 @@ class WebinarMessageReadinessServiceTest extends TestCase
 
         Config::set('messaging.channel_availability.email.surfaces.webinar_waitlists', true);
 
-        Config::set('messaging.email.marketing.webinar_waitlist', [
+        Config::set('messaging.email.definitions.marketing.webinar_waitlist', [
             'alert' => $this->definition(
                 dispatchKey: 'webinar_added',
                 subject: 'New webinar',
@@ -173,7 +173,7 @@ class WebinarMessageReadinessServiceTest extends TestCase
 
     private function configureRequiredRegistrationDefinitions(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => $this->definition(
                 dispatchKey: 'registration_created',
                 subject: 'Registered',
@@ -205,3 +205,5 @@ class WebinarMessageReadinessServiceTest extends TestCase
         ];
     }
 }
+
+

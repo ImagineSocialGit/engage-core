@@ -153,7 +153,7 @@ class WebinarScheduleProfileTest extends TestCase
 
     private function configureRegistrationMessages(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'key' => 'confirmation',
                 'dispatch_key' => 'registration_created',
@@ -222,3 +222,5 @@ class WebinarScheduleProfileTest extends TestCase
         parent::tearDown();
     }
 }
+
+

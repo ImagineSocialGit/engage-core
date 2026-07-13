@@ -16,7 +16,7 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
 
     public function test_standard_message_resolution_prefers_active_assignment_before_config(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'payload_class' => EmailPayload::class,
@@ -41,7 +41,7 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
                 'subject' => 'DB subject',
                 'body' => 'DB body.',
             ],
-            'source_config_path' => 'messaging.email.transactional.webinar.confirmation',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmation',
         ]);
 
         MessageTemplatePresetAssignment::factory()
@@ -62,7 +62,7 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
 
     public function test_campaign_step_variant_resolution_prefers_active_assignment_before_config(): void
     {
-        Config::set('messaging.email.marketing.webinar_nurture', [
+        Config::set('messaging.email.definitions.marketing.webinar_nurture', [
             'campaigns' => [
                 'webinar_attended_nurture' => [
                     'steps' => [
@@ -97,7 +97,7 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
                 'subject' => 'DB campaign subject',
                 'body' => 'DB campaign body.',
             ],
-            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
+            'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
         ]);
 
         MessageTemplatePresetAssignment::factory()
@@ -126,7 +126,7 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
 
     public function test_resolution_falls_back_to_config_when_no_assignment_exists(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'payload_class' => EmailPayload::class,
@@ -146,12 +146,12 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
 
         $this->assertCount(1, $definitions);
         $this->assertSame('Config subject', $definitions[0]['payload']['subject']);
-        $this->assertSame('messaging.email.transactional.webinar.confirmation', $definitions[0]['config_path']);
+        $this->assertSame('messaging.email.definitions.transactional.webinar.confirmation', $definitions[0]['config_path']);
     }
 
     public function test_standard_resolution_uses_newest_active_assignment_for_same_message_context(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'payload_class' => EmailPayload::class,
@@ -214,7 +214,7 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
 
     public function test_expired_assignment_is_ignored_and_resolution_falls_back_to_config(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'payload_class' => EmailPayload::class,
@@ -255,7 +255,8 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
 
         $this->assertCount(1, $definitions);
         $this->assertSame('Config subject', $definitions[0]['payload']['subject']);
-        $this->assertSame('messaging.email.transactional.webinar.confirmation', $definitions[0]['config_path']);
+        $this->assertSame('messaging.email.definitions.transactional.webinar.confirmation', $definitions[0]['config_path']);
     }
 
 }
+

@@ -316,7 +316,7 @@ class ProcessPostWebinarEventJobTest extends TestCase
 
     private function configurePostEventMessagesAndScheduleProfile(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'post_attended' => [
                 'key' => 'post_attended',
                 'dispatch_key' => 'webinar_ended',
@@ -339,7 +339,7 @@ class ProcessPostWebinarEventJobTest extends TestCase
             ],
         ]);
 
-        Config::set('messaging.sms.transactional.webinar', [
+        Config::set('messaging.sms.definitions.transactional.webinar', [
             'post_attended' => [
                 'key' => 'post_attended',
                 'dispatch_key' => 'webinar_ended',
@@ -464,3 +464,5 @@ class ProcessPostWebinarEventJobTest extends TestCase
         });
     }
 }
+
+

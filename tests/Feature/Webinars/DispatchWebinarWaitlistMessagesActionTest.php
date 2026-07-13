@@ -330,7 +330,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
 
     private function configureWaitlistMessages(): void
     {
-        Config::set('messaging.email.marketing.webinar_waitlist', [
+        Config::set('messaging.email.definitions.marketing.webinar_waitlist', [
             'scheduled_notice' => [
                 'key' => 'scheduled_notice',
                 'dispatch_key' => 'webinar_added',
@@ -347,7 +347,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
             ],
         ]);
 
-        Config::set('messaging.sms.marketing.webinar_waitlist', [
+        Config::set('messaging.sms.definitions.marketing.webinar_waitlist', [
             'scheduled_notice' => [
                 'key' => 'scheduled_notice',
                 'dispatch_key' => 'webinar_added',
@@ -507,3 +507,5 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         Config::set('messaging.channel_availability.sms.surfaces.webinar_waitlists', true);
     }
 }
+
+
