@@ -1,4 +1,3 @@
-
 # Engage Core Client-Readiness Roadmap
 
 ## Config generation lock-in checkpoint
@@ -76,6 +75,83 @@ The imported-contact onboarding, Broadcast visibility, dashboard, contact worksp
 - The obsolete global FlowRoutes `Point` model/table/template layer has been removed. `FlowRoutePoint` now directly owns concrete point type/configuration, `FlowRoutePointType` owns the shared type vocabulary, and runtime plans/progress preserve `flow_route_point_id`, `flow_route_point_key`, `point_type`, capability identity, and definition/settings snapshots without `point_id`.
 - Dev/client smoke testing exposed and the subsequent refactor corrected a cross-module message-behavior ownership flaw: reusable Messaging templates no longer carry lifecycle `timing`, `schedule`, `conditions`, or module-specific skip behavior for module-owned flows. Consuming modules are authoritative for lifecycle behavior, and `ResolvedMessageDispatchBuilder` / `ResolvedMessageDispatch` is the universal runtime assembly seam.
 
+## Messaging, consent, and Rob Webinar production-prep completion
+
+The current production-prep Messaging/Webinar slice is complete and green.
+
+Completed ownership cleanup:
+
+```text
+Core Webinar Messaging
+    small
+    complete enough to work out of the box
+    vertical-neutral
+    7d / 24h / 30m / live reminder baseline
+    one attended nurture step after 7 days
+    one missed nurture step after 7 days
+
+Slam Dunk client config
+    retains rich branded mortgage copy
+    retains richer 10d / 7d / 24h / 30m / 10m / live cadence
+    retains richer attended/missed nurture strategy
+
+Rob The Mortgage Coach client config
+    client-owned mortgage preset package
+    modern Messaging definitions
+    10d / 7d / 24h / 1h / 10m / live cadence
+    attended/missed transactional follow-ups next morning at 09:00 client local time
+```
+
+Durable hardening completed in the same slice:
+
+```text
+TokenContractRegistry
+    executable token source/context authority
+
+MessageTemplateTokenValidator
+    reused by config/setup validation
+    reused by MessageTemplatePreset sync
+    reused by CRM template create/update validation
+
+ConsentDomainRegistry
+    separates message scope from consent identity
+    exact mapping wins
+    longest matching prefix wins
+    ambiguity fails loudly
+    unknown scopes remain narrow
+
+ConsentOptInDefinitionResolver
+    generic Messaging-owned acknowledgement copy
+    human-readable module/domain consent topic
+    optional module/client override
+    no per-scope Webinar opt_ins definitions
+
+MessageSendTimeResolver
+    delay(minutes)
+    anchored(minutes)
+    next_day_at(time = HH:MM)
+    next_day_at uses client timezone
+
+Delayed-message conditions
+    checked during planning
+    persisted with ScheduledMessage metadata
+    rechecked by ScheduledMessageGate before provider delivery
+```
+
+The immediate operational priority before importing Rob's 11 real production Webinar contacts is:
+
+```text
+1. Re-verify final consent-domain and opt-in acknowledgement behavior.
+2. Confirm imported consent normalizes without MessageConsentGranted or opt-in sends.
+3. Confirm Rob presets:sync and setup:validate are clean.
+4. Review/finalize importer dry-run and --apply behavior.
+5. Dry-run the real 11-contact CSV.
+6. Apply only after exact output is verified.
+7. Verify consent rows, registrations, future reminders, no confirmations/opt-ins, and idempotent rerun.
+```
+
+Phase 11 remains the broader product-roadmap phase, but this production migration checkpoint is the immediate client-operational priority.
+
 ## Architecture runway after staging smoke success
 
 The staging smoke test confirmed the need for runtime-selectable definitions.
@@ -96,6 +172,8 @@ Completed architecture correction before deeper UX polish:
 - `ResolvedMessageDispatch` carries the exact `send_at` and normalized generic dispatch contract.
 - `ScheduledMessage` supports polymorphic `behavior_owner` provenance without importing concrete feature modules into Messaging.
 - Missing module-owned behavior does not silently fall back to hidden template timing or implicit immediate delivery. Dispatch requires either an exact caller-owned `sendAt` or explicit caller-owned behavior.
+- Resolved lifecycle conditions are persisted into `ScheduledMessage.meta.conditions` and rechecked by `ScheduledMessageGate` immediately before provider delivery.
+- Webinar scheduling supports `next_day_at(time = HH:MM)` using client timezone; post-event follow-ups can anchor to `webinar.ends_at` so delayed provider processing does not shift the intended next-morning date.
 
 Completed runway pieces:
 
@@ -106,6 +184,9 @@ Completed runway pieces:
 - Campaign Message Templates assignment UI and access links for selecting active campaign-step templates.
 - Webinars message/template setup surface.
 - DB-owned webinar schedule profiles and items.
+- Core/client Webinar Messaging ownership cleanup with generic Core defaults and authoritative client list overrides.
+- Messaging consent domains and generic/module/client consent acknowledgement resolution.
+- Shared context-aware MessageTemplate token validation across config/setup, preset sync, and CRM editing.
 - DB-owned campaign step variants and strategy-aware scheduling.
 - FlowRoutes event-wait/task-completed resume behavior on top of route plan/progress item correlation.
 - `task.completed` resume through the generic `AutomationEventRecorded` seam without broad contact-only fallback.
@@ -152,7 +233,7 @@ Current schema-discovery sequence:
 | 6 | Config validation / setup validation | Complete | Architecture + safety | 6A–6E are complete. Engage Core now has a shared `SetupValidationManager`, structured findings/results, module-owned contributors, app-level dependency and registry-drift contributors, the non-mutating `setup:validate` CLI, focused validation coverage, adjacent regression coverage, and broader client/default-preset fallback coverage. |
 | 7 | Permission invitation accepted automation event | Complete | Architecture | Accepted invitations emit neutral `permission_invitation.accepted` events after transactional acceptance, with row locking/idempotency and no Messaging dependency on consumers. |
 | 8 | Permission invitation cancellation / skip / failure bookkeeping | Complete | DB/schema + architecture | No schema change was needed. Pre-claim skips/cancellation create no invitation row; post-claim scheduled-message skips reconcile matching claimed invitations to failed; provider failures remain failed across Messaging and invitation state; failed invitations stay one-time-blocking. |
-| 9 | Webinar message readiness check | Complete | Architecture + operator safety | Computed Webinars-owned readiness now evaluates runtime Messaging resolution, channel availability, active schedule-profile effects, intentional disablement, registration/waitlist opt-ins, and post-event outcome-message enablement without persisting readiness state. |
+| 9 | Webinar message readiness check | Complete | Architecture + operator safety | Computed Webinars-owned readiness now evaluates runtime Messaging resolution, channel availability, active schedule-profile effects, intentional disablement, registration/waitlist consent acknowledgement readiness, and post-event outcome-message enablement without persisting readiness state. |
 | 10 | Manual status-change automation warning foundation | Complete | Operator safety + architecture | Backend-only consequence preview is implemented through a read-only FlowRoutes-owned impact resolver. It reports whether selected status-based FlowRoutes would run and which routes are selected without starting route progress. The actual operator warning UX is deferred to Phase 11. |
 | 11 | Automation opportunity foundation + Routes / FlowRoutes UX | In progress; backend, preset architecture, and first Route authoring baseline complete | DB/schema + architecture + UI/UX | Automation Opportunities, global Point collapse, module-first preset contributions, Manage Routes/Assignments IA, modal Route/Point editing, drag ordering, explicit Route message eligibility, linear product boundaries, and Point placement policy are complete. Remaining work is new Route creation and focused authoring/discovery UX gaps. |
 | 12 | Dashboard / contact workspace polish audit | Planned | UI/UX + possible schema | Review orientation surfaces after core runtime pieces settle. Add persisted preferences/acknowledgements only when needed. |
@@ -476,7 +557,7 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | 6 | Config validation / setup validation | Complete | Shared contributor-based validation is implemented across Core, Tasks, Messaging, Webinars, Campaigns, FlowRoutes, module dependencies, and reference-registry drift. `setup:validate` fails on errors, succeeds on warnings-only/clean results, and does not mutate state. Focused and broader regression coverage are green. |
 | 7 | Permission invitation accepted automation event | Complete | Accepted invitations emit one neutral `permission_invitation.accepted` event after transactional acceptance. The invitation row is locked/rechecked for idempotency, submitted SMS phone updates occur inside the same transaction, and Messaging remains independent from consumers. |
 | 8 | Permission invitation cancellation behavior | Complete | Pre-claim skips/cancellations create no invitation row; post-claim skips reconcile claimed invitations to failed; provider failures remain failed; no new invitation statuses or schema changes were required. |
-| 9 | Webinar message readiness check | Complete | Computed readiness is available for registration confirmations, registration opt-ins, reminders, waitlist alerts, waitlist opt-ins, and post-event follow-ups. Readiness is derived from runtime resolution, channel availability, active schedule-profile effects, and post-event enablement; no readiness state is persisted. |
+| 9 | Webinar message readiness check | Complete | Computed readiness is available for registration confirmations, registration consent acknowledgement readiness, reminders, waitlist alerts, waitlist consent acknowledgement readiness, and post-event follow-ups. Readiness is derived from runtime resolution, channel availability, active schedule-profile effects, and post-event enablement; no readiness state is persisted. |
 | 10 | Manual status-change automation warning foundation | Complete | FlowRoutes exposes a read-only `ContactStatusAutomationImpactResolver` and plural status-trigger route resolution. No schema, controller, or Blade changes were required. The actual warning interaction belongs to Phase 11 UX work. |
 | 11 | Automation opportunity foundation + Routes / FlowRoutes UX | In progress; first authoring baseline complete | Shared opportunity persistence/evaluation and the current Routes management/editor baseline are complete. Next: new Route creation and the remaining focused authoring/discovery UX gaps. |
 | 12 | Dashboard / contact workspace polish audit | 1–2 sessions | Review shared orientation surfaces after runtime behavior settles. Add persisted state only for proven needs such as acknowledgements or preferences. |
@@ -569,6 +650,9 @@ Completed baseline:
 - Webinars owns DB-backed `WebinarScheduleProfile` and `WebinarScheduleProfileItem` records.
 - Schedule profiles decide when webinar lifecycle messages are sent; Messaging template presets decide what those messages say.
 - Profiles can be selected at the webinar series or webinar level, with an active default fallback.
+- Generic schedule resolution supports `delay(minutes)`, `anchored(minutes)`, and `next_day_at(time = HH:MM)`.
+- `next_day_at` uses client timezone; Webinar post-event follow-ups may anchor to `webinar.ends_at`.
+- Resolved lifecycle conditions persist into ScheduledMessage metadata and are rechecked immediately before provider delivery.
 - Schedule profile items reference stable runtime dimensions such as channel, purpose, scope, surface, message type, dispatch key, and `message_template_key`. `source_config_path` is provenance/debug location only.
 - Multiple reminder slots may share `message_type = reminder`; the schedule profile item key owns the Webinar lifecycle slot, while `message_template_key` identifies the reusable Messaging template. `source_config_path` is provenance only.
 - Existing scheduled messages are not rewritten retroactively when a profile or template assignment changes.
@@ -579,15 +663,15 @@ Completed baseline:
 
 Completed functional baseline:
 
-- Webinars has a Webinars-owned message setup surface for registration confirmations, registration opt-ins, reminders, waitlist availability messages, waitlist opt-ins, post-attended transactional follow-ups, and post-missed transactional follow-ups.
+- Webinars has a Webinars-owned message setup surface for registration confirmations, registration consent acknowledgement/readiness, reminders, waitlist availability messages, waitlist consent acknowledgement/readiness, post-attended transactional follow-ups, and post-missed transactional follow-ups.
 - The surface shows the currently selected Messaging template per webinar message context.
 - Operators can choose compatible `MessageTemplatePreset` records from the Webinars setup surface.
 - Selection saves through `MessageTemplatePresetAssignment` while copy editing remains on the Message Templates page.
 - Runtime resolution remains DB-first with config fallback.
 - Computed readiness exposes `Ready`, `Needs attention`, and `Optional / disabled` states without persisting readiness records.
 - Readiness considers Messaging runtime definition resolution, channel visibility, active schedule profiles actually in use, explicit profile disablement, missing/inactive selected profile references, conflicting active defaults, and post-event outcome-message enablement.
-- Registration and waitlist opt-in readiness is included when the corresponding messaging surface has an available channel.
-- Opt-in contexts are immediate consent-event messages and are not forced into Webinar schedule-profile items.
+- Registration and waitlist consent acknowledgement readiness is included when the corresponding messaging surface has an available channel.
+- Consent acknowledgement contexts are Messaging-owned consent-domain messages resolved through `ConsentOptInDefinitionResolver`; they are not per-scope Webinar `opt_ins` templates and are not forced into Webinar schedule-profile items.
 - This is a functional setup/readiness UI, not the final UX-polished communication-plan experience.
 
 ### Campaign channel variants
@@ -745,7 +829,7 @@ adjacent module/runtime regression tests
 broader client/default-preset fallback coverage
 ```
 
-The intentionally deferred available-field/token picker remains future authoring UX work. Current setup validation validates the reference/token contexts that already have executable sources of truth; it does not invent a universal field-provider architecture before a real consumer requires it.
+The polished available-field/token picker remains future authoring UX work, but the executable source-of-truth/validation seam is now implemented through `TokenContractRegistry` and `MessageTemplateTokenValidator`. Config/setup validation, MessageTemplatePreset sync, and CRM template editing reuse that context-aware validator. Future picker UX should consume the same registry rather than invent a parallel field list.
 
 ## Phase 7 permission invitation accepted automation event completion
 
@@ -775,10 +859,10 @@ Webinars now owns a computed readiness layer for these message areas:
 
 ```text
 registration confirmations
-registration opt-in confirmations
+registration consent acknowledgement/readiness
 reminders
 waitlist availability messages
-waitlist opt-in confirmations
+waitlist consent acknowledgement/readiness
 post-attended transactional follow-up
 post-missed transactional follow-up
 ```
@@ -882,7 +966,9 @@ This is durable schema/architecture work completed before production rollout, no
 
 ## Recommended next implementation target
 
-Phase 11 remains the current phase.
+The immediate client-operational target is the Rob production Webinar contact migration checkpoint described above: first re-verify final consent-domain/opt-in behavior, then finalize dry-run/apply import execution.
+
+Phase 11 remains the current broader product-roadmap phase.
 
 Completed within Phase 11:
 
@@ -969,8 +1055,8 @@ Schema/code-sensitive notes:
 
 ```text
 Shared available-field/token picker
-    Requires a provider/registry source of truth and validation by authoring/runtime context.
-    Phase 6 should establish the reusable source-of-truth/validation seam before polished editors consume it.
+    TokenContractRegistry and MessageTemplateTokenValidator now provide the reusable source-of-truth/validation seam.
+    Remaining work is polished `Insert field` / `Add field` UX consuming the same exact producer contexts.
 
 Route terminology and capability labels
     Route Management / Routes language should use FlowRouteCapability metadata, labels, hints, supported subjects, required modules, and available fields so client-facing screens can explain available actions without importing module internals.
@@ -1001,4 +1087,3 @@ Routes
     Use Route Management / Routes in client-facing navigation.
     Use contextual hints to explain automatic actions in plain language.
 ```
-

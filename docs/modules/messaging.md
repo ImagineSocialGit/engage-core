@@ -6,6 +6,11 @@ Email, SMS, and permission-invitation definitions are covered by registered clos
 contracts. Messaging registers producer contexts in `TokenContractRegistry`; module-specific
 sources remain owned by their producer modules.
 
+`MessageTemplateTokenValidator` is the canonical reusable validator for authorable Messaging
+copy. Config/setup validation, MessageTemplatePreset sync, and CRM template create/update paths
+reuse it so unknown or registered-but-unavailable tokens fail consistently for the exact producer
+context.
+
 MessageTemplatePreset assignment resolution uses semantic message/variant identity. A
 variant-specific request does not silently fall back to a broad step assignment, and a
 context-specific active assignment outranks a global assignment. `source_config_path` is retained
@@ -22,6 +27,8 @@ Messaging owns:
 
 - scheduled messages
 - message consents
+- consent-domain resolution
+- consent acknowledgement resolution
 - consent revocations
 - message suppressions
 - contact permission invitations
@@ -128,6 +135,9 @@ Stable logical occurrence identity is separate from the scheduled timestamp. Mod
 Reusable template data is content-only at the builder boundary. `ResolvedMessageDispatchBuilder` rejects behavior fields such as `timing`, `schedule`, `conditions`, and module-specific skip behavior when they arrive on the reusable template itself. Caller-owned behavior is merged only through the explicit behavior input.
 
 Some consuming-module resolvers may attach transient runtime-only keys such as `resolved_behavior` and `behavior_owner` to a resolved definition before calling `DispatchMessageAction`. `DispatchMessageAction` consumes and removes those transient keys before passing the reusable template into `ResolvedMessageDispatchBuilder`; they are not reusable template fields and must not be persisted as template ownership.
+
+
+Resolved lifecycle conditions are planning-time behavior and must also survive to send time. `DispatchMessageAction` persists resolved `conditions` into `ScheduledMessage.meta.conditions`, and `ScheduledMessageGate` re-evaluates them immediately before provider delivery. A delayed message that no longer satisfies its conditions is skipped rather than sent merely because it was valid when originally scheduled.
 
 
 ## Message template presets, catalog entries, and assignments
@@ -428,7 +438,7 @@ SMS provider integrations, consent gates, revocations, suppressions, STOP/HELP h
 
 Messaging owns reusable message copy and delivery templates, including subject/body/CTA payloads.
 
-Reusable copy includes campaign nurture messages, webinar confirmation/reminder/post-event messages, waitlist messages, opt-in messages, and internal notification payload templates.
+Reusable copy includes campaign nurture messages, webinar confirmation/reminder/post-event messages, waitlist messages, and internal notification payload templates. Consent acknowledgements are resolved separately from consent-domain configuration rather than authored as per-scope `opt_ins` groups inside reusable Webinar definition files.
 
 Campaigns, Webinars, and FlowRoutes may reference Messaging templates or assignments, but they should not become the primary home for reusable subject/body/message copy.
 
@@ -455,7 +465,79 @@ Campaign presets own journey identity, step order, and step timing.
 
 Messaging owns the delivery template for the campaign step.
 
-Post-webinar transactional follow-ups should use the same Messaging definition shape as confirmations, reminders, opt-ins, and campaign message templates.
+Post-webinar transactional follow-ups should use the same reusable Messaging definition shape as confirmations, reminders, and campaign message templates. Consent acknowledgements use the separate consent-domain resolver.
+
+
+
+### Consent domains and opt-in acknowledgements
+
+Message scope and consent identity are intentionally separate:
+
+```text
+Message identity
+    channel + purpose + scope
+
+Consent identity
+    channel + purpose + consent domain
+```
+
+`ConsentDomainRegistry` maps a precise message scope to the consent domain that authorizes it.
+
+Resolution rules:
+
+```text
+1. exact scope mapping wins
+2. otherwise the longest matching registered prefix wins
+3. equal-specificity ambiguity fails loudly
+4. unknown unmapped scopes fall back to themselves
+```
+
+The narrow fallback is deliberate. An undeclared scope must never accidentally inherit broader consent.
+
+Current Webinar example:
+
+```text
+message scopes
+    webinar
+    webinar_waitlist
+    webinar_nurture
+
+consent domain
+    webinar
+```
+
+The Webinar domain declares exact `webinar` coverage plus the `webinar_` prefix, so future scopes such as `webinar_reengagement` can share the same domain without per-scope consent wiring when that broadening is intentional.
+
+`GrantMessageConsentAction`, `ImportMessageConsentAction`, `RevokeMessageConsentAction`, and `MessageGate` normalize through the consent-domain registry. The existing physical `scope` column on `message_consents` and `consent_revocations` stores the resolved consent-domain key; no schema rename is required merely to express the new semantic layer.
+
+`ConsentOptInDefinitionResolver` owns consent acknowledgement resolution. Generic acknowledgement copy comes from Messaging config and receives human-readable domain context such as:
+
+```text
+client name
+consent topic
+channel
+purpose
+```
+
+Owning modules/domains supply human-readable topics, for example:
+
+```text
+webinars and webinar follow-up
+```
+
+Module/client config may override acknowledgement copy for a consent domain. Do not inject raw technical scope keys into customer-facing acknowledgement text.
+
+System markers such as `:client_name` and `:consent_topic` are resolved by the consent acknowledgement path. They are not ordinary `{token}` values and must not be exposed as authorable Messaging tokens unless `TokenContractRegistry` explicitly registers them.
+
+Do not add scope-specific Webinar `opt_ins` groups such as:
+
+```text
+transactional:webinar opt_ins
+marketing:webinar_waitlist opt_ins
+marketing:webinar_nurture opt_ins
+```
+
+Normal consent granting may emit `MessageConsentGranted` and resolve an acknowledgement. Imported consent uses `ImportMessageConsentAction` specifically so imported state is normalized without emitting the grant event or sending an opt-in acknowledgement.
 
 
 Good:
@@ -685,7 +767,17 @@ Messaging must remain independent from consumers. It must not import FlowRoutes 
 
 Messaging owns universal Contact-recipient message fields and the reusable template/runtime validation path.
 
-Client/operator editors should eventually expose an `Insert field` / `Add field` interaction instead of requiring users to memorize token syntax.
+The implemented executable source of truth is:
+
+```text
+TokenSourceProvider
+TokenContextProvider
+ComputedTokenValueProvider
+TokenContractRegistry
+MessageTemplateTokenValidator
+```
+
+Client/operator editors should eventually expose an `Insert field` / `Add field` interaction instead of requiring users to memorize token syntax, but the picker must consume the same context-aware registry and validator used by server-side authoring paths.
 
 Messaging should not become the owner of every module-specific field.
 
@@ -701,16 +793,7 @@ Commerce contributes commerce fields.
 Vertical modules contribute vertical subject fields.
 ```
 
-Potential public seam to audit:
-
-```text
-AvailableFieldProvider
-AvailableFieldRegistry
-AvailableFieldContext
-AvailableFieldOption
-```
-
-Message template validation should apply to DB-customized templates as well as config-synced templates. Editing copy in CRM/admin UI does not make an unsupported token valid.
+Message template validation applies to DB-customized templates as well as config-synced templates. Editing copy in CRM/admin UI does not make an unsupported token valid. Config/setup validation, MessageTemplatePreset sync, and CRM template create/update paths should all use `MessageTemplateTokenValidator` rather than maintaining separate token parsing or allowlists.
 
 
 ## Canonical available fields and client-facing aliases
@@ -754,7 +837,9 @@ A client-facing alias must never be offered unless it resolves unambiguously to 
 
 Messaging contributes Messaging-owned checks through `MessagingSetupValidationContributor`, adapting the existing `MessageConfigValidator` instead of placing Messaging-specific logic directly in a global command.
 
-The existing `MessageConfigValidator` is reused/adapted rather than duplicated. Messaging setup validation covers current email/SMS config routes, customized DB-owned `MessageTemplatePreset` records, active assignments, unsupported channel/purpose values, incomplete assignment context/campaign identity, inactive or missing presets, and exact active-assignment ambiguity using the runtime identity dimensions.
+`MessageConfigValidator` delegates authorable token checks to `MessageTemplateTokenValidator`, which resolves allowed tokens from `TokenContractRegistry` for the exact producer context. The same validator is reused by MessageTemplatePreset sync and CRM template create/update validation.
+
+Messaging setup validation covers current email/SMS config routes, customized DB-owned `MessageTemplatePreset` records, active assignments, unsupported channel/purpose values, incomplete assignment context/campaign identity, inactive or missing presets, exact active-assignment ambiguity using the runtime identity dimensions, and consent-domain configuration ambiguity.
 
 Messaging validation should cover, as applicable:
 
@@ -790,5 +875,3 @@ available-field/token picker UX
 No persistent validation-result tables are required unless a later operator workflow proves retained history or acknowledgement state is needed.
 
 Fields should be filtered by authoring/runtime context so operators cannot insert a field that will be unavailable when the message sends.
-
-

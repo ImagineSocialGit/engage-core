@@ -14,6 +14,14 @@ return [
     | This file composes preset packages and tells `php artisan presets:sync`
     | which module preset groups to sync.
     |
+    | Core should keep a small generic package surface. Rich vertical/client
+    | packages belong in `client/{client-key}/config/presets.php`.
+    |
+    | If `client.preset` selects a client-specific key such as `mortgage`, that
+    | package must exist in the effective merged `presets.packages` config.
+    | Do not add vertical-rich packages to Core merely to silence a missing-package
+    | setup-validation error.
+    |
     | Global preset sync remains dependency-safe across the actual synced domains
     | and supporting catalogs:
     |
@@ -82,7 +90,7 @@ return [
     |
     */
 
-    'default_package' => env('PRESET_PACKAGE', 'basic'),
+    'default_package' => env('CLIENT_PRESET', 'basic'),
 
     /*
     |--------------------------------------------------------------------------

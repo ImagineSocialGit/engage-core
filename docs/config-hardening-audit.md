@@ -193,6 +193,41 @@ The final checkpoint produced:
 
 The stale assertion prohibited the legitimate global label `Routes` while testing plain-language contact sections. It now prohibits only technical `FlowRoutes`/`Flow Routes` wording.
 
+## Subsequent hardening after the audit checkpoint
+
+Later production-prep work strengthened the audited foundation without changing the authority order below.
+
+Completed additions:
+
+```text
+Context-aware Messaging token validation
+    MessageTemplateTokenValidator resolves authorable tokens through TokenContractRegistry.
+    Config/setup validation, MessageTemplatePreset sync, and CRM template editing reuse it.
+    Unknown and registered-but-unavailable tokens are hard errors.
+    A global reference token list is not executable authority.
+
+Consent domains
+    Message identity remains channel + purpose + scope.
+    Consent identity is channel + purpose + consent domain.
+    ConsentDomainRegistry resolves exact and longest-prefix mappings, fails on ambiguity,
+    and keeps unknown unmapped scopes narrow.
+    Webinar-related scopes intentionally resolve to the webinar consent domain.
+    Scope-specific Webinar opt_ins definitions were removed in favor of
+    ConsentOptInDefinitionResolver and generic/module/client acknowledgement copy.
+
+Webinar schedule contract expansion
+    delay(minutes)
+    anchored(minutes)
+    next_day_at(time = HH:MM)
+    next_day_at uses client timezone rather than per-item timezone.
+
+Delayed-message safety
+    resolved lifecycle conditions persist into ScheduledMessage metadata
+    and ScheduledMessageGate rechecks them before provider delivery.
+```
+
+Core Webinar Messaging was also returned to a small, vertical-neutral baseline, while richer branded sequences remain client-owned. This ownership cleanup is covered by regression/golden tests rather than by broadening Core contracts.
+
 ## Current guarantee boundary
 
 The contract registry and golden tests prove substantially more than the original documentation, but generated export is not yet fully locked in.
@@ -227,4 +262,3 @@ When sources disagree, use this order:
 6. Templates and prose documentation.
 
 Fix lower layers when they drift. Do not expand a contract merely to preserve an ignored or stale documented field.
-

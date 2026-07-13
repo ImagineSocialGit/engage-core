@@ -42,6 +42,12 @@ return [
     | Email is the primary implementation path for most workflows.
     | Mirror SMS only after the email config path passes.
     |
+    | Consent acknowledgements are not authored as per-scope `opt_ins` groups in
+    | reusable Webinar definition files. Messaging resolves them through
+    | ConsentDomainRegistry + ConsentOptInDefinitionResolver using generic
+    | Messaging copy, a human-readable consent topic, and optional module/client
+    | overrides.
+    |
     | Campaign SMS templates use the same structure as email campaign templates:
     |
     | campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
@@ -71,7 +77,8 @@ return [
     | infrastructure as email. Validate definition shape, payload requirements,
     | registered dispatch keys, context-aware fields/tokens, forbidden template-owned
     | lifecycle behavior fields, and channel/purpose/scope compatibility before
-    | client handoff.
+    | client handoff. MessageTemplateTokenValidator is the shared context-aware
+    | authority used by config validation, preset sync, and CRM template editing.
     |
     | UI visibility is separate from runtime capability. A configured SMS template
     | may be valid while the channel remains hidden for a client surface; a route or
@@ -90,6 +97,7 @@ return [
         [
             'key' => 'confirmation',
             'dispatch_key' => 'registration_created',
+            'message_type' => 'confirmation',
             'channel' => 'sms',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -105,8 +113,41 @@ return [
 
     'reminders' => [
         [
+            'key' => 'reminder_1_week',
+            'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
+            'channel' => 'sms',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+
+            'payload_class' => SmsPayload::class,
+            'queue' => 'reminders',
+
+            'payload' => [
+                'message' => '{webinar_title} is one week away on {webinar_start_date} at {webinar_start_time}.',
+            ],
+        ],
+
+        [
             'key' => 'reminder_1_day',
             'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
+            'channel' => 'sms',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+
+            'payload_class' => SmsPayload::class,
+            'queue' => 'reminders',
+
+            'payload' => [
+                'message' => '{webinar_title} is tomorrow at {webinar_start_time}. Join: {webinar_join_url}',
+            ],
+        ],
+
+        [
+            'key' => 'reminder_30_minute',
+            'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
             'channel' => 'sms',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -120,8 +161,9 @@ return [
         ],
 
         [
-            'key' => 'reminder_10_minute',
+            'key' => 'reminder_live',
             'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
             'channel' => 'sms',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -130,7 +172,7 @@ return [
             'queue' => 'reminders',
 
             'payload' => [
-                'message' => '{webinar_title} is live. Join now: {webinar_join_url}',
+                'message' => '{webinar_title} is live now. Join: {webinar_join_url}',
             ],
         ],
     ],
@@ -139,6 +181,7 @@ return [
         [
             'key' => 'post_attended',
             'dispatch_key' => 'webinar_ended',
+            'message_type' => 'post_attended',
             'channel' => 'sms',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -156,6 +199,7 @@ return [
         [
             'key' => 'post_missed',
             'dispatch_key' => 'webinar_ended',
+            'message_type' => 'post_missed',
             'channel' => 'sms',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -214,4 +258,3 @@ return [
     ],
 
 ];
-

@@ -24,6 +24,9 @@ app/Modules/{Owner}/TokenContracts
 
 `Contracts/` elsewhere in a module remains appropriate for PHP interfaces and public behavioral seams. `ConfigContracts/` is intentionally separate because it contains concrete executable configuration schemas.
 
+
+`MessageTemplateTokenValidator` is the shared Messaging validation consumer for authorable template tokens. It resolves availability through `TokenContractRegistry` for the exact producer context and is reused by config/setup validation, MessageTemplatePreset sync, and CRM template editing.
+
 ## Registered configuration contracts
 
 | Key | Owner | Purpose |
@@ -39,6 +42,22 @@ app/Modules/{Owner}/TokenContracts
 | `flow_routes.preset_definition` | FlowRoutes | Route and Point-type-specific definitions |
 | `webinars.schedule_profile` | Webinars | Schedule profiles and lifecycle items |
 | `webinars.post_event` | Webinars | Post-provider orchestration and emitted events |
+
+
+The `webinars.schedule_profile` contract supports three closed schedule shapes:
+
+```text
+delay
+    minutes: integer
+
+anchored
+    minutes: integer
+
+next_day_at
+    time: HH:MM
+```
+
+`next_day_at` intentionally does not accept a per-item timezone. Runtime resolves it from client configuration.
 
 ## Schema rules
 
@@ -61,6 +80,7 @@ Examples:
 - Messaging owns reusable copy and delivery-template metadata.
 - Campaigns owns journey sequencing, timing, conditions, variant strategy, and dependencies.
 - Webinars owns lifecycle schedules, conditions, enablement, and Webinar skip rules.
+- Messaging owns consent-domain resolution and consent acknowledgements; message scopes and consent domains are separate identities.
 - FlowRoutes owns route triggers, graph/order, Point type, and Point-specific executable definitions.
 - Tasks owns task-template responsibility, assignment, and due defaults.
 
@@ -90,6 +110,9 @@ Computed providers must not become a backdoor for arbitrary metadata exposure.
 ## Producer contexts
 
 A token being registered does not mean it is available everywhere. Producer contexts select the sources available to a concrete runtime path.
+
+
+Authorable Messaging copy should not maintain a parallel allowlist. `MessageTemplateTokenValidator` extracts referenced tokens and asks the registry for the exact context; unknown or registered-but-unavailable tokens are blocking errors for config, preset-sync, and CRM template-authoring paths.
 
 Current contexts include:
 
@@ -172,4 +195,3 @@ Strict export should require:
 - merged client configuration passes setup validation;
 - fresh-database sync succeeds;
 - representative runtime resolution/execution succeeds.
-

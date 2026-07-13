@@ -15,6 +15,20 @@ producer context that guarantees it can be resolved.
 The registry currently includes Contact, Messaging, Campaign, and Webinar sources and contexts.
 Use it for selectable fields and validation; do not maintain a separate UI-only token list.
 
+
+`MessageTemplateTokenValidator` is the canonical reusable validator for authorable Messaging copy. It extracts referenced tokens, resolves the allowed set from `TokenContractRegistry` for the exact producer context, and reports unknown or registered-but-unavailable tokens as hard errors.
+
+The same validator is reused by:
+
+```text
+Messaging config/setup validation
+MessageTemplatePreset sync
+CRM Message Template create/update validation
+future authoring/export consumers
+```
+
+Do not pass arbitrary caller-owned `allowedTokens` lists. If `config/reference/tokens.php` or another prose/reference file exists, treat it as documentation only; it is not the executable allowlist.
+
 Current schema corrections:
 
 - `webinar.status` is not valid because `webinars` has no `status` column.
@@ -66,6 +80,21 @@ payload.secondary_link.url
 ```
 
 Runtime-only URL tokens must still be supplied by the owning runtime data object or caller payload. A DB-customized template must not guess URLs that the runtime context does not provide.
+
+## Consent acknowledgement system markers are not message tokens
+
+Consent acknowledgement copy is resolved through `ConsentOptInDefinitionResolver`, not through ordinary per-scope Messaging templates.
+
+System markers such as:
+
+```text
+:client_name
+:consent_topic
+```
+
+belong to that consent acknowledgement resolver. They are not normal authorable `{token}` values and should not appear in regular reusable message templates.
+
+Do not substitute `{client_name}` or another brace token unless `TokenContractRegistry` explicitly registers it for the exact producer context.
 
 ## Token ownership model
 
@@ -288,12 +317,11 @@ fields through an `Insert field` / `Add field` interaction.
 The picker should show friendly labels and insert stable syntax such as:
 
 ```text
-{{ first_name }}
-{{ webinar_title }}
-{{ contact.email }}
+{first_name}
+{webinar_title}
+{contact.email}
 ```
 
-The runtime may normalize this to the current internal token syntax, but validation must still use the documented token/field source of truth.
+Use the current runtime token syntax. The UI should hide syntax complexity from operators where possible, but stored copy must remain directly valid for `MessageTemplateTokenValidator`.
 
 Do not add a field to the picker unless the current message/context can actually supply it.
-

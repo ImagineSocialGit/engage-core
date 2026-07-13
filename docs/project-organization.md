@@ -1,7 +1,3 @@
-
-
-
-
 # Engage Core Project Organization
 
 ## Shared config and token contract infrastructure
@@ -19,6 +15,11 @@ Shared code owns the registry and neutral schema primitives. A module owns the m
 fields, token sources, producer contexts, computed values, and semantic validation. No UI or
 documentation layer should maintain a parallel list. See
 [`config-contracts.md`](config-contracts.md).
+
+
+For Messaging copy, `MessageTemplateTokenValidator` is the shared context-aware consumer of
+`TokenContractRegistry`. Config/setup validation, MessageTemplatePreset sync, and CRM template
+editing reuse it instead of maintaining separate token parsers or allowlists.
 
 This document is a quick orientation map for Engage Core. It classifies the project into Core, universal modules, vertical modules, and integrations/adapters.
 
@@ -227,6 +228,9 @@ Owning module records/resolves its own behavior
 
 The builder is universal and Messaging-owned, but it must not query or interpret concrete feature-module tables. The caller supplies already-resolved behavior.
 
+
+When caller-owned behavior includes lifecycle conditions, those conditions should persist into `ScheduledMessage.meta.conditions`. `ScheduledMessageGate` re-evaluates them immediately before provider delivery so a delayed message does not send merely because its conditions passed when it was first planned.
+
 `ScheduledMessage` may preserve an optional polymorphic `behavior_owner` reference to the exact module-owned record responsible for the behavior. This provenance must not create a hard Messaging dependency on concrete feature-module classes.
 
 Examples:
@@ -303,4 +307,3 @@ Avoid:
 ```text
 New Core columns for feature or vertical state
 ```
-

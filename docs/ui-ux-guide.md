@@ -1,7 +1,3 @@
-
-
-
-
 # Engage Core UI/UX Guide
 
 This guide turns Engage Core's product principles into practical interface rules.
@@ -1310,17 +1306,17 @@ Selecting it inserts the hidden token syntax at the cursor.
 
 The UI should show friendly labels, examples, and categories. The stored value should use a stable hidden syntax that is unambiguous and unlikely to conflict with normal user copy.
 
-Default hidden syntax:
+Stored syntax should use the current runtime token format:
 
 ```text
-{{ first_name }}
-{{ webinar_title }}
-{{ contact.email }}
+{first_name}
+{webinar_title}
+{contact.email}
 ```
 
-The runtime may normalize this into the current internal token syntax when needed, but the UI should avoid requiring users to manually type braces or exact keys.
+The UI should avoid requiring users to manually type braces or exact keys, but stored copy should already be directly valid for the runtime validator rather than depending on an undocumented double-brace normalization layer.
 
-Do not invent available fields in the UI. Available fields should come from a shared provider/registry that knows the current authoring context.
+Do not invent available fields in the UI. The implemented source of truth is `TokenContractRegistry`, with `MessageTemplateTokenValidator` enforcing exact producer-context availability for Messaging copy. Future pickers should consume that same registry/validator path rather than create a separate UI-only field list.
 
 Examples of context-specific field groups:
 

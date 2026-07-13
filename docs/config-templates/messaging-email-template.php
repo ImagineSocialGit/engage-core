@@ -62,6 +62,15 @@ return [
     | Keep default webinar copy vertical-neutral.
     | Put vertical-specific copy in vertical-specific scopes.
     |
+    | Consent acknowledgements are not authored as per-scope `opt_ins` groups in
+    | reusable Webinar definition files. Messaging resolves them through
+    | ConsentDomainRegistry + ConsentOptInDefinitionResolver using generic
+    | Messaging copy, a human-readable consent topic supplied by the owning
+    | module/domain, and optional module/client overrides.
+    |
+    | System markers such as :client_name and :consent_topic belong to the
+    | consent acknowledgement resolver. They are not message-template tokens.
+    |
     | Normal Broadcasts usually provide ad hoc payloads inline from the
     | Broadcast record. Email Broadcast payloads use subject/body. Do not add
     | reusable Broadcast copy here unless a future workflow intentionally
@@ -83,8 +92,10 @@ return [
     |
     | Validate definition shape, required payload fields, registered dispatch keys,
     | payload classes, channel/purpose/scope compatibility, forbidden template-owned
-    | lifecycle behavior fields, and
-    | available fields/tokens for the exact runtime context that supplies them.
+    | lifecycle behavior fields, and available fields/tokens for the exact runtime
+    | context that supplies them. MessageTemplateTokenValidator is the shared
+    | context-aware authority used by config validation, preset sync, and CRM
+    | template editing.
     |
     | Client-facing field aliases may differ by configured contact noun, but must
     | normalize to canonical Contact fields before runtime validation/rendering.
@@ -101,6 +112,7 @@ return [
         [
             'key' => 'confirmation',
             'dispatch_key' => 'registration_created',
+            'message_type' => 'confirmation',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -134,28 +146,28 @@ TEXT,
         ],
     ],
 
-    'opt_ins' => [
+    'reminders' => [
         [
-            'key' => 'opt_in',
-            'dispatch_key' => 'consent_granted',
+            'key' => 'reminder_1_week',
+            'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',
 
             'payload_class' => EmailPayload::class,
-            'queue' => 'opt_in_messages',
+            'queue' => 'reminders',
 
             'payload' => [
-                'subject' => 'You’re subscribed to webinar emails',
-                'body' => 'Thanks for subscribing to receive webinar-related emails. You can opt out using the link in any webinar email.',
+                'subject' => 'Your webinar is one week away',
+                'body' => 'Hi {first_name}, {webinar_title} is one week away. We’ll send another reminder as the event gets closer.',
             ],
         ],
-    ],
 
-    'reminders' => [
         [
             'key' => 'reminder_1_day',
             'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -165,7 +177,7 @@ TEXT,
 
             'payload' => [
                 'subject' => 'Your webinar is tomorrow',
-                'body' => 'Hi {first_name}, your webinar is tomorrow. Use the link below when it is time to join.',
+                'body' => 'Hi {first_name}, {webinar_title} is tomorrow at {webinar_start_time}. Use the link below when it is time to join.',
                 'cta' => [
                     'label' => 'Join Webinar',
                     'url' => '{webinar_join_url}',
@@ -176,6 +188,28 @@ TEXT,
         [
             'key' => 'reminder_30_minute',
             'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+
+            'payload_class' => EmailPayload::class,
+            'queue' => 'reminders',
+
+            'payload' => [
+                'subject' => 'Your webinar starts in 30 minutes',
+                'body' => 'Hi {first_name}, {webinar_title} starts in 30 minutes. Use the link below to join.',
+                'cta' => [
+                    'label' => 'Join Webinar',
+                    'url' => '{webinar_join_url}',
+                ],
+            ],
+        ],
+
+        [
+            'key' => 'reminder_live',
+            'dispatch_key' => 'registration_created',
+            'message_type' => 'reminder',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -185,7 +219,7 @@ TEXT,
 
             'payload' => [
                 'subject' => 'Your webinar is live',
-                'body' => 'Hi {first_name}, {webinar_title} is live. Use the link below to join now.',
+                'body' => 'Hi {first_name}, {webinar_title} is live now. Use the link below to join.',
                 'cta' => [
                     'label' => 'Join Now',
                     'url' => '{webinar_join_url}',
@@ -198,6 +232,7 @@ TEXT,
         [
             'key' => 'post_attended',
             'dispatch_key' => 'webinar_ended',
+            'message_type' => 'post_attended',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -220,6 +255,7 @@ TEXT,
         [
             'key' => 'post_missed',
             'dispatch_key' => 'webinar_ended',
+            'message_type' => 'post_missed',
             'channel' => 'email',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -317,4 +353,3 @@ TEXT,
     ],
 
 ];
-

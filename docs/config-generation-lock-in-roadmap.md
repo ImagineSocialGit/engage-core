@@ -16,7 +16,9 @@ The system should expose only capabilities registered by installed code and refu
 - Campaign, FlowRoute, Webinar schedule, and Webinar post-event contracts.
 - Model-column and computed token-source registry.
 - Producer-context token registry.
+- Shared context-aware `MessageTemplateTokenValidator` reused by config/setup validation, MessageTemplatePreset sync, and CRM template editing.
 - Database-column proof and sensitive-field exclusions.
+- Closed Webinar schedule-profile support for `delay(minutes)`, `anchored(minutes)`, and client-timezone `next_day_at(time = HH:MM)`.
 - Successful `test_everything` preset sync.
 - Setup validation with no findings.
 - Green full test suite at the audit checkpoint.
@@ -90,6 +92,9 @@ Strict export should resolve at least:
 ## Token closure
 
 Token validation must use producer context, not a global union.
+
+
+The implemented `MessageTemplateTokenValidator` already enforces that rule for Messaging config/setup validation, MessageTemplatePreset sync, and CRM template editing. Strict export must reuse that validator/registry path rather than create a second token engine.
 
 Examples:
 
@@ -287,4 +292,3 @@ Config generation is locked in when:
 - representative runtime paths execute;
 - templates and references cannot drift from contracts unnoticed;
 - the dev UX is a projection of these registries rather than a parallel schema.
-

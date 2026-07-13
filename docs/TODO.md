@@ -1,4 +1,3 @@
-
 # Engage Core TODO
 
 ## Config generation lock-in
@@ -67,11 +66,16 @@ These are repeatable checklists. Run the relevant checklist after a production s
 
 - [ ] Confirm every config key is supported by the relevant template, guide, or feature doc.
 - [ ] Confirm client copy uses documented tokens only.
+- [ ] Confirm Messaging copy passes `MessageTemplateTokenValidator` for the exact producer context; do not use a global token allowlist.
 - [ ] Confirm runtime-only URLs/tokens are not guessed or hard-coded in static config.
 - [ ] Confirm Campaign presets do not own reusable message payload/copy.
 - [ ] Confirm campaign variants reference Messaging-owned template presets/assignments when variant architecture is used.
 - [ ] Confirm Campaign preset step message references use first-class `channel`, `purpose`, and `scope` keys.
 - [ ] Confirm Messaging templates live under the expected channel/purpose/scope path.
+- [ ] Confirm Webinar Messaging definition files do not reintroduce per-scope `opt_ins`; consent acknowledgements should resolve through Messaging consent domains.
+- [ ] Confirm message scopes map to intentional consent domains and unknown scopes remain narrow.
+- [ ] Confirm `next_day_at` schedules use strict `HH:MM` and client timezone rather than embedding timezone.
+- [ ] Confirm delayed lifecycle conditions remain available for send-time revalidation.
 - [ ] Confirm MessageTemplatePreset sync/assignment rules are preserved when DB-backed templates are involved.
 - [ ] Confirm Task presets create DB-owned task template definitions only and do not create live tasks.
 - [ ] Confirm FlowRoute presets use public action/service/capability references rather than private module internals.
@@ -83,6 +87,8 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [x] Confirm hard errors block staging/client handoff.
 - [x] Confirm warnings give useful operator/debug guidance without blocking safe runtime behavior.
 - [ ] Confirm client config overrides preserve unspecified nested defaults where fallback is expected.
+- [ ] Confirm numeric/list overrides intentionally replace default lists where that is the current merge contract; verify client reminder/profile lists do not append duplicate Core slots.
+- [ ] Confirm any client-selected preset package exists in effective merged `presets.packages`; keep rich vertical/client packages in client config rather than Core.
 
 ### After each permission-invitation update
 
@@ -353,6 +359,43 @@ Deferred launch hardening:
 
 ## One-off backlog
 
+### Rob production Webinar contact migration
+
+Immediate production-prep checkpoint:
+
+- [ ] Re-verify `ConsentDomainRegistry` behavior before touching real contacts.
+  - Exact mapping wins.
+  - Longest prefix wins.
+  - Equal-specificity ambiguity fails loudly.
+  - Unknown unmapped scopes remain narrow.
+- [ ] Re-verify Webinar consent domain behavior.
+  - `webinar`, `webinar_waitlist`, and `webinar_nurture` resolve to the intended `webinar` consent domain.
+  - No per-scope Webinar `opt_ins` definitions are required.
+  - Generic/module/client acknowledgement copy resolves correctly.
+- [ ] Re-verify normal consent grant behavior.
+  - Correct domain row is created/updated.
+  - Duplicate related-scope grants do not create duplicate consent identities.
+  - Appropriate acknowledgement behavior is resolved.
+- [ ] Re-verify imported consent behavior.
+  - `ImportMessageConsentAction` normalizes to the consent domain.
+  - No `MessageConsentGranted` event.
+  - No opt-in acknowledgement send.
+- [ ] Confirm Rob runtime is clean.
+  - `php artisan presets:sync`
+  - `php artisan setup:validate`
+- [ ] Review/finalize import command dry-run-by-default and explicit `--apply`.
+- [ ] Confirm malformed phone + SMS-consent rows produce actionable row-level output.
+- [ ] Prepare/verify the exact 11-row CSV.
+- [ ] Dry-run and inspect exact output before apply.
+- [ ] After apply, verify:
+  - 11 contacts.
+  - expected consent rows/domains.
+  - 11 Webinar registrations.
+  - no opt-in acknowledgement sends.
+  - no registration confirmations.
+  - only future-valid reminders.
+  - no duplicates after idempotent rerun.
+
 ### CRM dashboard and contact workspace
 
 Completed baseline:
@@ -429,9 +472,9 @@ These notes are intentionally retained while the schema-discovery phases continu
   - Use client-facing language such as `Insert field` or `Add field`, not `token`, on normal operator screens.
   - Preserve cursor/focus in the input/textarea when the picker opens.
   - Provide autocomplete search from available fields for the current context.
-  - Insert stable hidden syntax such as `{{ first_name }}` or normalize to the current runtime token format.
+  - Insert the current runtime syntax such as `{first_name}` without requiring operators to type braces or exact keys manually.
   - Do not let users select fields that the current message/context cannot resolve.
-  - Reuse the Phase 6 validation/registry direction and only add a universal available-field provider seam when a real authoring consumer requires it.
+  - Consume `TokenContractRegistry` and `MessageTemplateTokenValidator`; do not create a second UI-only field list or validator.
 
 ### Contextual hints
 
@@ -479,4 +522,3 @@ These notes are intentionally retained while the schema-discovery phases continu
 - [ ] Hide technical specs behind details/debug affordances.
 - [ ] Replace raw timing such as `Delay 10 minutes` with human-readable schedule summaries.
 - [ ] Clean up repeated dropdown labels such as `Step 1 Email — Webinar Attended Nurture — Step 1 Email`.
-

@@ -143,6 +143,24 @@ Scopes are configured at:
 messaging.permission_invitations.consent.scopes
 ```
 
+
+These configured values are requested Messaging scopes. Consent persistence still passes through `ConsentDomainRegistry`.
+
+That means:
+
+```text
+mapped related scope
+    -> store/check the resolved consent domain
+
+unknown unmapped scope
+    -> remain narrow by falling back to itself
+
+ambiguous equal-specificity mapping
+    -> fail loudly
+```
+
+Permission invitations do not bypass consent-domain normalization and should not create a second parallel consent model.
+
 The default purpose for consent records created from accepted preferences is:
 
 ```text
@@ -200,7 +218,7 @@ return [
 
 `email` controls the invitation email subject/body and CTA labels.
 
-`consent.scopes` controls which scopes receive consent records.
+`consent.scopes` controls which Messaging scopes are requested after acceptance; the consent grant path normalizes each through `ConsentDomainRegistry` before persistence.
 
 `content` controls public-page copy.
 

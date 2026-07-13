@@ -107,62 +107,19 @@ return [
             'source_version' => 1,
             'meta' => [
                 'domain' => 'webinar',
-                'strategy' => 'email_primary_sms_supplemental',
+                'strategy' => 'email_primary',
             ],
             'steps' => [
                 [
                     'step_number' => 1,
-                    'name' => 'Attended thank-you and next step',
+                    'name' => 'Attended one-week follow-up',
                     'is_active' => true,
                     'variant_strategy' => 'first_available',
 
                     'criteria' => [
                         'timing' => [
                             'type' => 'delay',
-                            'hours' => 2,
-                        ],
-                    ],
-
-                    'variants' => [
-                        [
-                            'key' => 'email',
-                            'name' => 'Email follow-up',
-                            'sort_order' => 0,
-                            'dispatch_key' => 'campaign_step_due',
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
-
-                        // Add only when the SMS Messaging template exists and
-                        // the campaigns surface exposes SMS through Messaging
-                        // channel availability.
-                        [
-                            'key' => 'sms',
-                            'name' => 'SMS follow-up',
-                            'sort_order' => 1,
-                            'dispatch_key' => 'campaign_step_due',
-                            'channel' => 'sms',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
-                    ],
-
-                    'meta' => [
-                        'type' => 'message',
-                    ],
-                ],
-
-                [
-                    'step_number' => 2,
-                    'name' => 'Common next-step questions',
-                    'is_active' => true,
-                    'variant_strategy' => 'first_available',
-
-                    'criteria' => [
-                        'timing' => [
-                            'type' => 'delay',
-                            'days' => 3,
+                            'days' => 7,
                         ],
                     ],
 
@@ -197,19 +154,19 @@ return [
             'source_version' => 1,
             'meta' => [
                 'domain' => 'webinar',
-                'strategy' => 'email_primary_sms_supplemental',
+                'strategy' => 'email_primary',
             ],
             'steps' => [
                 [
                     'step_number' => 1,
-                    'name' => 'Missed webinar next step',
+                    'name' => 'Missed one-week follow-up',
                     'is_active' => true,
                     'variant_strategy' => 'first_available',
 
                     'criteria' => [
                         'timing' => [
                             'type' => 'delay',
-                            'hours' => 2,
+                            'days' => 7,
                         ],
                     ],
 
@@ -282,5 +239,3 @@ return [
     ],
 
 ];
-
-

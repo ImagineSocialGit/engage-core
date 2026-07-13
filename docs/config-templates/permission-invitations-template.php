@@ -23,10 +23,14 @@ return [
     | Consent scopes created after public acceptance
     |--------------------------------------------------------------------------
     |
-    | These scopes receive normal MessageConsent records for each accepted
-    | channel. The one-time invitation send remains email-only; SMS consent is
-    | created only when the contact explicitly selects SMS and provides/confirms
-    | a phone number.
+    | These configured values are requested Messaging scopes. Granting consent
+    | resolves each through ConsentDomainRegistry before persistence, so related
+    | scopes may intentionally collapse to one consent domain while unknown
+    | unmapped scopes remain narrow.
+    |
+    | The one-time invitation send remains email-only; SMS consent is created
+    | only when the contact explicitly selects SMS and provides/confirms a phone
+    | number.
     |
     */
     'consent' => [

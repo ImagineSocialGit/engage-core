@@ -22,16 +22,17 @@ Read these before authoring or reviewing configs:
 docs/config-authoring-guide.md
 docs/module-boundaries.md
 docs/modules/*.md
+docs/config-templates/TOKEN_REFERENCE.md
 config/reference/keys.php
-config/reference/tokens.php
 ```
 
-Optional client-specific registries may exist at:
+Optional client-specific key registries may exist at:
 
 ```text
 client/{client-key}/config/reference/keys.php
-client/{client-key}/config/reference/tokens.php
 ```
+
+Token availability is not created by adding a string to a reference file. The executable authority is `TokenContractRegistry`, and authorable Messaging copy is validated through `MessageTemplateTokenValidator` against the exact producer context. A client-specific token requires a real registered source/context/provider path that runtime can supply.
 
 ## Canonical contact fields and client-facing aliases
 
@@ -53,6 +54,66 @@ contact.first_name
 ```
 
 Do not create separate runtime payload fields, database columns, event keys, preset keys, route keys, or validation branches for each client noun. The alias layer exists for UX; canonical runtime identity remains stable.
+
+## Consent domains and opt-in acknowledgements
+
+Message identity and consent identity are intentionally separate:
+
+```text
+Message identity
+    channel + purpose + scope
+
+Consent identity
+    channel + purpose + consent domain
+```
+
+Do not add per-scope `opt_ins` groups to Webinar Messaging definition files. Messaging resolves consent acknowledgements through `ConsentDomainRegistry` and `ConsentOptInDefinitionResolver`.
+
+Current Webinar direction:
+
+```text
+message scopes
+    webinar
+    webinar_waitlist
+    webinar_nurture
+
+consent domain
+    webinar
+```
+
+Exact mappings win, otherwise the longest matching registered prefix wins. Ambiguous equal-specificity mappings fail loudly. Unknown unmapped scopes remain narrow by falling back to themselves.
+
+Generic acknowledgement copy is Messaging-owned and may receive system markers such as:
+
+```text
+:client_name
+:consent_topic
+```
+
+Those markers are resolved by the consent acknowledgement path. They are not normal message-template tokens and must not be replaced with `{client_name}` or another authorable token unless `TokenContractRegistry` explicitly registers it.
+
+Imported consent uses the dedicated import action so state can be normalized without emitting `MessageConsentGranted` or sending an opt-in acknowledgement.
+
+## Webinar schedule types and client timezone
+
+Generic Messaging schedule resolution supports:
+
+```text
+delay
+    minutes: integer
+
+anchored
+    minutes: integer
+
+next_day_at
+    time: HH:MM
+```
+
+`next_day_at` uses `config('client.timezone')`, with application timezone fallback. Do not duplicate timezone in each schedule item.
+
+For delayed lifecycle messages, resolved conditions should be persisted with the `ScheduledMessage` and re-evaluated by `ScheduledMessageGate` immediately before provider delivery.
+
+Client associative config merges over defaults. Numeric/list arrays replace the default list when present, so a client reminder cadence replaces the Core reminder list rather than appending duplicate slots.
 
 ## Module-first preset contribution architecture
 
@@ -154,6 +215,12 @@ messaging.{channel}.definitions.{purpose}.{scope}.campaigns.{campaign_key}.steps
 - Runtime artifact payloads must stay compact; source/debug/template identity belongs in metadata where appropriate.
 - SMS visibility belongs to Messaging channel availability for the relevant surface, not one-off provider checks.
 - Imported-contact permission invitations are a distinct Messaging-owned one-time consent flow, not a normal Broadcast bypass.
+- Message scopes and consent domains are separate. Do not create a new consent identity merely because a new message scope exists.
+- Webinar consent acknowledgements come from consent-domain resolution, not scope-specific `opt_ins` groups in reusable message definition files.
+- Authorable message tokens are validated through `TokenContractRegistry` + `MessageTemplateTokenValidator`; do not use a global token allowlist.
+- Webinar schedule profiles may use `delay`, `anchored`, or `next_day_at`. `next_day_at` uses client timezone and strict `HH:MM`.
+- Core Webinar Messaging should stay small, complete, generic, and vertical-neutral. Rich branded copy/cadence belongs in client config.
+- Rich vertical/client preset packages belong in `client/{client-key}/config/presets.php`; any selected package key must exist after effective merge.
 
 ## Campaign config split
 
@@ -250,13 +317,17 @@ Before accepting a config change, confirm:
 
 - The owning module supports the behavior.
 - Every key exists in the key registry or client key registry.
-- Every token exists in the token registry or client token registry.
+- Every authorable token resolves through `TokenContractRegistry` for the exact producer context and passes `MessageTemplateTokenValidator`.
 - Campaign presets are free of reusable copy and payload overrides.
 - Messaging templates are free of module-owned timing, lifecycle conditions, sequencing, dependencies, enablement, and module-specific skip behavior.
 - Campaign variants use first-class `key`, `dispatch_key`, `channel`, `purpose`, and `scope` fields.
 - Campaign Messaging templates are under `steps.{step_number}.variants.{variant_key}`.
 - Runtime-only URLs are not guessed in static config.
 - Purpose/scope pairs are correct.
+- Consent domains are intentional and do not accidentally create one consent identity per message scope.
+- Webinar Messaging definition files do not reintroduce per-scope `opt_ins` groups.
+- Webinar schedule items use supported schedule shapes and do not embed timezone on `next_day_at`.
+- Client list/numeric-array overrides intentionally replace, rather than append to, default lists.
 - SMS exposure is controlled by Messaging channel availability for the relevant surface.
 - Permission invitation configs preserve email-only bypass sending and explicit SMS opt-in.
 - Runtime artifacts will persist compact IDs/scalars/context/source metadata, not full model graphs.
@@ -268,9 +339,13 @@ We are generating Engage Core configs.
 
 Read these first:
 - config/reference/keys.php
-- config/reference/tokens.php
 - docs/config-authoring-guide.md
 - docs/config-templates/README.md
+- docs/config-templates/TOKEN_REFERENCE.md
+
+Executable token authority:
+- App\Support\TokenContracts\TokenContractRegistry
+- App\Modules\Messaging\Services\MessageTemplateTokenValidator
 
 Rules:
 - Use existing keys when behavior matches.
@@ -288,6 +363,10 @@ Rules:
 - Default webinar copy should be vertical-neutral.
 - Mortgage-specific copy should use mortgage-specific scopes or client overrides.
 - Use documented tokens only.
+- Validate authorable tokens against the exact producer context; do not use a global token allowlist.
+- Keep message scope separate from consent domain.
+- Do not add per-scope `opt_ins` groups to Webinar Messaging definitions; use consent-domain acknowledgement resolution.
+- For Webinar schedule items, use only `delay(minutes)`, `anchored(minutes)`, or `next_day_at(time=HH:MM)`. `next_day_at` uses client timezone.
 - If the client request needs a missing token, recommend adding that token to the runtime payload or changing the copy.
 - Use `contact` for canonical internal keys and runtime concepts. Client-facing copy may use the configured industry noun such as Lead, Fan, Customer, Borrower, or Owner.
 - Keep SMS options config-toggleable in UI.
@@ -298,5 +377,3 @@ Client request:
 
 Return complete config files and list any recommended new keys/tokens separately.
 ```
-
-

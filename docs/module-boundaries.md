@@ -9,6 +9,7 @@ transfer domain ownership to Core or Support.
 - Each module owns and registers the config contracts for definitions it parses or syncs.
 - The module that supplies a model or runtime payload owns its token source.
 - The producer of a dispatch path owns the token context that states which sources are available.
+- `MessageTemplateTokenValidator` is the shared Messaging validation consumer for authorable template tokens; config/setup validation, MessageTemplatePreset sync, and CRM template editing reuse it against the exact registered context.
 - Computed fields require an explicit value provider; arbitrary `meta`, raw payloads, and secrets
   are not implicit token namespaces.
 - Setup validation and future export must consume these registrations rather than copying field
@@ -317,12 +318,16 @@ Do not use `responsible_party` for FlowRoute ownership. `responsible_party` is a
 
 ## Selected preset contribution architecture
 
-The selected next preset architecture is module-first contribution layout, pending the dedicated audit and implementation.
+The module-first preset contribution architecture is implemented.
 
-Target examples:
+Current examples:
 
 ```text
+config/presets/modules/core/contact-statuses.php
+config/presets/modules/tasks/tasks.php
+
 config/presets/modules/webinars/contact-statuses.php
+config/presets/modules/webinars/tasks.php
 config/presets/modules/webinars/campaigns.php
 config/presets/modules/webinars/flow-routes.php
 
@@ -331,7 +336,21 @@ config/presets/modules/mortgage/campaigns.php
 config/presets/modules/mortgage/flow-routes.php
 ```
 
-The eventual loader/registry should aggregate normalized definitions by preset domain. Sync actions and setup validators should consume that normalized source rather than depending directly on file/directory layout.
+The shared infrastructure is:
+
+```text
+PresetContributionRegistry
+    aggregates explicitly registered contributor groups/definitions by preset domain
+
+PresetPackageResolver
+    resolves selected package, selected groups, and effective module defaults/overrides
+
+PresetCompositionResolver
+    produces ResolvedPresetDomain for one selected package/domain
+
+Domain sync actions
+    persist exactly the selected resolved composition
+```
 
 Keep separate:
 
@@ -344,7 +363,7 @@ runtime activation/binding
 
 Enabling a module must not automatically activate every preset it contributes.
 
-Until the composition audit/migration is implemented, current monolithic preset config paths remain authoritative.
+Core should keep a small generic package surface. Rich vertical/client packages belong in `client/{client-key}/config/presets.php`. Any `client.preset` key must exist in the effective merged `presets.packages` configuration.
 
 ## DB-owned definition sync and customization contract
 
@@ -1242,6 +1261,9 @@ Canonical reusable template shape:
 
 For module-owned flows, `timing`, `schedule`, `conditions`, lifecycle enablement, sequencing, dependencies, and module-specific skip rules belong to the consuming module rather than the reusable Messaging template. The consuming module resolves that behavior before `ResolvedMessageDispatchBuilder` assembles the final `ResolvedMessageDispatch`.
 
+
+Resolved lifecycle conditions are checked during planning and must also survive to send time. `DispatchMessageAction` persists resolved conditions into `ScheduledMessage.meta.conditions`, and `ScheduledMessageGate` rechecks them immediately before provider delivery.
+
 Messaging template presets are DB-owned reusable message definitions created from config and optionally edited through CRM/admin UI.
 
 Messaging owns:
@@ -1321,8 +1343,53 @@ Campaign presets own journey identity, step order, and step timing.
 
 Messaging owns the delivery template for the campaign step.
 
-Post-webinar transactional follow-ups should use the same Messaging definition shape as confirmations, reminders, opt-ins, and campaign message templates.
+Post-webinar transactional follow-ups should use the same reusable Messaging definition shape as confirmations, reminders, and campaign message templates. Consent acknowledgements resolve separately through Messaging consent domains.
 
+
+
+
+### Messaging consent domains
+
+Message identity and consent identity are separate:
+
+```text
+Message identity
+    channel + purpose + scope
+
+Consent identity
+    channel + purpose + consent domain
+```
+
+Messaging owns `ConsentDomainRegistry`, consent normalization, consent gates, revocation, and `ConsentOptInDefinitionResolver`.
+
+Resolution rules are omission-resistant:
+
+```text
+exact scope mapping wins
+otherwise longest registered prefix wins
+equal-specificity ambiguity fails loudly
+unknown unmapped scopes fall back to themselves
+```
+
+The narrow fallback prevents an undeclared scope from accidentally inheriting broader consent.
+
+Current Webinar example:
+
+```text
+message scopes
+    webinar
+    webinar_waitlist
+    webinar_nurture
+
+consent domain
+    webinar
+```
+
+The existing `scope` columns on `message_consents` and `consent_revocations` store the resolved consent-domain key. No schema rename is required merely to express the semantic distinction.
+
+Consent acknowledgements are not per-scope reusable Webinar `opt_ins` definitions. `ConsentOptInDefinitionResolver` combines generic Messaging copy, human-readable module/domain topic metadata, and optional module/client overrides. System markers such as `:client_name` and `:consent_topic` belong to that resolver and are not ordinary authorable `{token}` values.
+
+Imported consent uses `ImportMessageConsentAction` so imported state is normalized without emitting `MessageConsentGranted` or sending an opt-in acknowledgement.
 
 Good:
 
@@ -2587,7 +2654,7 @@ Webinars may depend on:
 - Core
 - Messaging
 
-Webinars may use Messaging to send registration confirmations, reminders, opt-ins, and post-webinar transactional follow-ups.
+Webinars may use Messaging to send registration confirmations, reminders, waitlist notices, and post-webinar transactional follow-ups. Webinar surfaces may collect consent, but consent-domain storage and acknowledgement resolution remain Messaging-owned.
 
 Webinar reminder, confirmation, and post-event timing is selectable through DB-owned schedule profiles and profile items.
 
@@ -2599,14 +2666,41 @@ A webinar series or webinar may select a schedule profile, with webinar selectio
 
 Schedule profile items identify timing/slot identity and must not embed reusable copy.
 
+
+Supported generic schedule shapes are:
+
+```text
+delay
+    minutes: integer
+
+anchored
+    minutes: integer
+
+next_day_at
+    time: HH:MM
+```
+
+`next_day_at` uses `config('client.timezone')` with application timezone fallback. Webinar post-event follow-ups may pass `webinar.ends_at` as the anchor so next-morning scheduling is based on the webinar's actual ending calendar day rather than delayed webhook processing time.
+
+Core's generic Webinar reminder baseline should stay vertical-neutral and small:
+
+```text
+7 days
+24 hours
+30 minutes
+live
+```
+
+Richer client-specific cadences belong in client config. Numeric/list arrays replace defaults when present, so client reminder/profile-item lists do not append duplicate Core slots.
+
 Webinars also owns computed message readiness for:
 
 ```text
 registration confirmations
-registration opt-in confirmations
+registration consent acknowledgement/readiness
 reminders
 waitlist availability messages
-waitlist opt-in confirmations
+waitlist consent acknowledgement/readiness
 post-attended transactional follow-up
 post-missed transactional follow-up
 ```
@@ -2615,7 +2709,7 @@ Readiness is derived from runtime Messaging resolution, channel availability, ac
 
 Readiness is not persisted.
 
-Immediate consent-event opt-in messages are Webinar-scoped Messaging templates but are not forced into Webinar schedule-profile items.
+Consent-event acknowledgements are Messaging-owned consent-domain messages. They are not per-scope Webinar `opt_ins` templates and are not Webinar schedule-profile items.
 
 Post-webinar transactional follow-ups are not campaign nurture.
 
@@ -3025,7 +3119,7 @@ Recommended direction:
 3. Add public seams only when a concrete consumer/workflow needs them.
 4. Add contact filters for Commerce or Location only when Broadcasts, Campaigns, Reporting, or another consuming surface needs them.
 5. Treat the dashboard and contact show page as shared orientation surfaces with module-contributed summaries, not module inventories.
-6. Webinars message/template setup and computed readiness are complete, including registration and waitlist opt-ins.
+6. Webinars message/template setup and computed readiness are complete, including registration and waitlist consent acknowledgement readiness through Messaging consent domains.
 7. FlowRoutes has a read-only manual ContactStatus automation impact preview for the eventual manual-status consequence warning UX.
 8. The module-first preset contribution architecture is implemented and must remain separate from runtime module availability and trigger assignment.
 9. Routes now has a real Manage Routes / Assignments baseline, modal Route/Point editing, linear authoring boundaries, explicit direct-message eligibility, and server-authoritative Point placement rules.
@@ -3271,7 +3365,19 @@ Add schema only when the audit proves a durable first-class concept is missing. 
 
 Many modules author reusable copy, task descriptions, instructions, route send-message points, or other text that may include dynamic fields.
 
-The long-term source of truth for available fields should be provider/registry based rather than hardcoded separately in every UI.
+The executable token source/context foundation is implemented:
+
+```text
+TokenSourceProvider
+TokenContextProvider
+ComputedTokenValueProvider
+TokenContractRegistry
+MessageTemplateTokenValidator
+```
+
+`MessageTemplateTokenValidator` is reused by Messaging config/setup validation, MessageTemplatePreset sync, and CRM template editing. Unknown or registered-but-unavailable tokens are hard errors for those authoring paths.
+
+The polished `Insert field` / `Add field` picker remains future UX, but it must consume the same registry/context source of truth rather than introduce a UI-only token list.
 
 Potential consumers:
 
@@ -3288,7 +3394,7 @@ Permission invitations
 Vertical modules
 ```
 
-The registry should preserve module ownership:
+The registry preserves module ownership:
 
 ```text
 Messaging owns universal Contact/recipient message fields.
@@ -3311,8 +3417,7 @@ Bad:
 Core hardcodes every module and vertical token.
 Messaging guesses provider/module fields that the runtime cannot supply.
 Campaigns invents webinar URL fields without the enrollment caller supplying them.
+A config/reference file is treated as an executable global allowlist.
 ```
 
-Treat available-field validation as setup/config-validation work before every editor receives polished autocomplete.
-
-
+Treat available-field validation as setup/config-validation work. Future editor autocomplete should be a consumer of the existing registry/validator, not a second validation system.
