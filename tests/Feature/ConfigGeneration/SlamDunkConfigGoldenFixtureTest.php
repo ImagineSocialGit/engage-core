@@ -90,6 +90,19 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
         $this->assertCount(6, config('messaging.email.definitions.transactional.webinar.reminders'));
         $this->assertCount(6, config('messaging.sms.definitions.transactional.webinar.reminders'));
         $this->assertCount(20, config('webinars.schedule_profiles.full_10_day.items'));
+
+        $this->assertStringContainsString(
+            'Stacey',
+            (string) config('messaging.email.definitions.transactional.webinar.confirmations.0.payload.body'),
+        );
+        $this->assertStringContainsString(
+            'mortgage game plan',
+            strtolower((string) config('messaging.email.definitions.transactional.webinar.confirmations.0.payload.body')),
+        );
+        $this->assertStringContainsString(
+            'Stacey',
+            (string) config('messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email.payload.body'),
+        );
     }
 
     public function test_slam_dunk_package_syncs_cleanly_into_a_fresh_database_and_resolves_all_selected_runtime_records(): void

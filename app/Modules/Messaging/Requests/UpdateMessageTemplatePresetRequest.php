@@ -2,10 +2,13 @@
 
 namespace App\Modules\Messaging\Requests;
 
+use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
+use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class UpdateMessageTemplatePresetRequest extends FormRequest
 {
@@ -34,6 +37,63 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
             'payload.secondary_link.label' => ['nullable', 'string', 'max:255'],
             'payload.secondary_link.url' => ['nullable', 'string', 'max:1000'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
+
+            $preset = $this->route('messageTemplatePreset');
+
+            if (! $preset instanceof MessageTemplatePreset) {
+                return;
+            }
+
+            $submittedPayload = $this->input('payload', []);
+            $submittedPayload = is_array($submittedPayload)
+                ? $this->cleanPayload($submittedPayload)
+                : [];
+
+            $payload = array_replace_recursive(
+                is_array($preset->payload) ? $preset->payload : [],
+                $submittedPayload,
+            );
+
+            $surface = $preset->catalogEntries()
+                ->active()
+                ->orderBy('item_order')
+                ->orderBy('id')
+                ->value('surface');
+
+            $issues = app(MessageTemplateTokenValidator::class)->validatePayload(
+                payload: $payload,
+                dispatchKeys: $preset->dispatchKeys(),
+                channel: $preset->channel,
+                purpose: $preset->purpose,
+                scope: $preset->scope,
+                surface: is_string($surface) && trim($surface) !== '' ? trim($surface) : null,
+                path: 'payload',
+            );
+
+            foreach ($issues as $issue) {
+                if (($issue['level'] ?? null) !== 'error') {
+                    continue;
+                }
+
+                $path = is_string($issue['path'] ?? null) && trim($issue['path']) !== ''
+                    ? $issue['path']
+                    : 'payload';
+
+                $message = is_string($issue['message'] ?? null) && trim($issue['message']) !== ''
+                    ? $issue['message']
+                    : 'The message template contains an invalid token.';
+
+                $validator->errors()->add($path, $message);
+            }
+        });
     }
 
     /**
@@ -113,7 +173,8 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
     {
         $preset = $this->route('messageTemplatePreset');
 
-        return $preset && is_string($preset->payload_class ?? null)
+        return $preset instanceof MessageTemplatePreset
+            && is_string($preset->payload_class)
             && $preset->payload_class === $expected;
     }
 }

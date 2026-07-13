@@ -52,7 +52,10 @@ class SyncPresetsCommand extends Command
         try {
             $enabledModules = $packageResolver->effectiveModules($presetKey);
         } catch (Throwable $exception) {
-            $this->error($exception->getMessage());
+            $this->renderPresetResolutionFailure(
+                presetKey: $presetKey,
+                exception: $exception,
+            );
 
             return self::FAILURE;
         }
@@ -188,6 +191,65 @@ class SyncPresetsCommand extends Command
         PresetDomain $domain,
     ): bool {
         return $packageResolver->selectedGroups($presetKey, $domain) !== [];
+    }
+
+    private function renderPresetResolutionFailure(
+        string $presetKey,
+        Throwable $exception,
+    ): void {
+        $this->error($exception->getMessage());
+
+        $availablePackages = array_values(array_filter(
+            array_keys(config('presets.packages', [])),
+            fn (mixed $key): bool => is_string($key) && trim($key) !== '',
+        ));
+
+        $this->line('');
+        $this->info('Available preset packages');
+
+        if ($availablePackages === []) {
+            $this->line('  None configured.');
+        } else {
+            foreach ($availablePackages as $package) {
+                $this->line("  - {$package}");
+            }
+        }
+
+        $clientKey = config('client.key');
+        $clientConfigPath = config('client.config_path');
+
+        $presetConfigPath = is_string($clientConfigPath) && trim($clientConfigPath) !== ''
+            ? rtrim($clientConfigPath, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.'presets.php'
+            : null;
+
+        $displayPath = $this->displayPath($presetConfigPath);
+
+        $this->line('');
+        $this->info('Client preset config');
+        $this->line('Client: '.(
+            is_string($clientKey) && trim($clientKey) !== ''
+                ? trim($clientKey)
+                : 'unknown'
+        ));
+        $this->line('Expected path: '.($displayPath ?? 'unknown'));
+        $this->line('Exists: '.(
+            is_string($presetConfigPath) && is_file($presetConfigPath)
+                ? 'yes'
+                : 'no'
+        ));
+    }
+
+    private function displayPath(?string $path): ?string
+    {
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+
+        $basePath = rtrim(base_path(), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
+
+        return str_starts_with($path, $basePath)
+            ? substr($path, strlen($basePath))
+            : $path;
     }
 
     private function renderContactStatusResult(array $result): void

@@ -5,19 +5,20 @@ namespace App\Modules\Messaging\Services;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
-use Illuminate\Support\Arr;
 
 class MessageConfigValidator
 {
+    public function __construct(
+        private readonly MessageTemplateTokenValidator $messageTemplateTokenValidator,
+    ) {}
+
     /**
-     * @param array<int, string> $allowedTokens
      * @return array<int, array{level: string, path: string, message: string}>
      */
     public function validateRoute(
         MessageChannel|string $channel,
         MessagePurpose|string $purpose,
         string $scope,
-        array $allowedTokens = [],
     ): array {
         $channel = $this->normalizeEnumValue($channel);
         $purpose = $this->normalizeEnumValue($purpose);
@@ -50,7 +51,8 @@ class MessageConfigValidator
                         campaigns: $definition,
                         basePath: "{$scopePath}.campaigns",
                         channel: $channel,
-                        allowedTokens: $allowedTokens,
+                        purpose: $purpose,
+                        scope: $scope,
                     ),
                 );
 
@@ -90,8 +92,9 @@ class MessageConfigValidator
                         definition: $nestedDefinition,
                         path: $definitionPath,
                         channel: $channel,
-                        allowedTokens: $allowedTokens,
-                        campaignTemplate: false,
+                        purpose: $purpose,
+                        scope: $scope,
+                        surface: null,
                     ),
                 );
             }
@@ -101,16 +104,15 @@ class MessageConfigValidator
     }
 
     /**
-     * @param array<int, string> $allowedTokens
      * @return array<int, array{level: string, path: string, message: string}>
      */
     private function validateCampaigns(
         mixed $campaigns,
         string $basePath,
         string $channel,
-        array $allowedTokens,
-    ): array
-    {
+        string $purpose,
+        string $scope,
+    ): array {
         if (! is_array($campaigns)) {
             return [$this->issue('error', $basePath, 'Campaign message templates must be an array.')];
         }
@@ -198,8 +200,9 @@ class MessageConfigValidator
                             definition: $variantDefinition,
                             path: $variantPath,
                             channel: $channel,
-                            allowedTokens: $allowedTokens,
-                            campaignTemplate: true,
+                            purpose: $purpose,
+                            scope: $scope,
+                            surface: 'campaigns',
                         ),
                     );
                 }
@@ -211,39 +214,48 @@ class MessageConfigValidator
 
     /**
      * @param array<string, mixed> $definition
-     * @param array<int, string> $allowedTokens
      * @return array<int, array{level: string, path: string, message: string}>
      */
     public function validateDefinitionArray(
         array $definition,
         string $path,
         MessageChannel|string|null $channel = null,
-        array $allowedTokens = [],
+        MessagePurpose|string|null $purpose = null,
+        ?string $scope = null,
+        ?string $surface = null,
     ): array {
         $channel = $channel === null
             ? null
             : $this->normalizeEnumValue($channel);
 
+        $purpose = $purpose === null
+            ? null
+            : $this->normalizeEnumValue($purpose);
+
+        $scope = $scope !== null ? $this->normalizeSegment($scope) : null;
+        $surface = $surface !== null ? $this->normalizeSegment($surface) : null;
+
         return $this->validateDefinition(
             definition: $definition,
             path: $path,
             channel: $channel,
-            allowedTokens: $allowedTokens,
-            campaignTemplate: false,
+            purpose: $purpose,
+            scope: $scope,
+            surface: $surface,
         );
     }
 
     /**
      * @param array<string, mixed> $definition
-     * @param array<int, string> $allowedTokens
      * @return array<int, array{level: string, path: string, message: string}>
      */
     private function validateDefinition(
         array $definition,
         string $path,
         ?string $channel,
-        array $allowedTokens,
-        bool $campaignTemplate,
+        ?string $purpose,
+        ?string $scope,
+        ?string $surface,
     ): array {
         $issues = [];
         $requiredKeys = ['payload_class', 'queue', 'payload'];
@@ -302,35 +314,21 @@ class MessageConfigValidator
                 channel: $channel,
                 payloadClass: is_string($payloadClass) ? $payloadClass : null,
             ),
-            $this->validatePayloadTokens(
-                payload: $payload,
-                path: "{$path}.payload",
-                allowedTokens: $allowedTokens,
-            ),
         );
 
-        return $issues;
-    }
-
-    /**
-     * @return array<int, array{level: string, path: string, message: string}>
-     */
-    private function validateSchedule(mixed $schedule, string $path): array
-    {
-        if (! is_array($schedule)) {
-            return [$this->issue('error', $path, 'Scheduled message definition is missing [schedule].')];
-        }
-
-        $issues = [];
-        $type = $schedule['type'] ?? null;
-        $minutes = $schedule['minutes'] ?? null;
-
-        if (! in_array($type, ['delay', 'anchored'], true)) {
-            $issues[] = $this->issue('error', "{$path}.type", 'Schedule type must be delay or anchored.');
-        }
-
-        if (! is_int($minutes)) {
-            $issues[] = $this->issue('error', "{$path}.minutes", 'Schedule minutes must be an integer.');
+        if ($dispatchKeys !== []) {
+            $issues = array_merge(
+                $issues,
+                $this->messageTemplateTokenValidator->validatePayload(
+                    payload: $payload,
+                    dispatchKeys: $dispatchKeys,
+                    channel: $channel,
+                    purpose: $purpose,
+                    scope: $scope,
+                    surface: $surface,
+                    path: "{$path}.payload",
+                ),
+            );
         }
 
         return $issues;
@@ -340,8 +338,12 @@ class MessageConfigValidator
      * @param array<string, mixed> $payload
      * @return array<int, array{level: string, path: string, message: string}>
      */
-    private function validatePayloadShape(array $payload, string $path, ?string $channel, ?string $payloadClass): array
-    {
+    private function validatePayloadShape(
+        array $payload,
+        string $path,
+        ?string $channel,
+        ?string $payloadClass,
+    ): array {
         $issues = [];
 
         if (($channel === MessageChannel::Email->value || str_ends_with((string) $payloadClass, '\\EmailPayload'))) {
@@ -382,39 +384,7 @@ class MessageConfigValidator
     }
 
     /**
-     * @param array<string, mixed> $payload
-     * @param array<int, string> $allowedTokens
-     * @return array<int, array{level: string, path: string, message: string}>
-     */
-    private function validatePayloadTokens(array $payload, string $path, array $allowedTokens): array
-    {
-        $issues = [];
-        $allowedTokens = array_values(array_unique(array_merge($this->universalTokens(), $allowedTokens)));
-
-        foreach (Arr::dot($payload) as $key => $value) {
-            if (! is_string($value) || trim($value) === '') {
-                continue;
-            }
-
-            foreach ($this->tokensIn($value) as $token) {
-                if ($this->isAllowedRenderSlot($token, $payload)) {
-                    continue;
-                }
-
-                if (! $this->tokenAllowed($token, $allowedTokens)) {
-                    $issues[] = $this->issue(
-                        'warning',
-                        "{$path}.{$key}",
-                        "Payload references token [{{$token}}] that is not declared for this config validation context.",
-                    );
-                }
-            }
-        }
-
-        return $issues;
-    }
-
-    /**
+     * @param array<string, mixed> $definition
      * @return array<int, string>
      */
     private function normalizeDispatchKeys(array $definition): array
@@ -435,69 +405,6 @@ class MessageConfigValidator
                 : null,
             $dispatchKeys,
         ))));
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function tokensIn(string $value): array
-    {
-        preg_match_all('/\{([a-zA-Z_][a-zA-Z0-9_.:-]*)\}/', $value, $matches);
-
-        return array_values(array_unique($matches[1] ?? []));
-    }
-
-    /**
-     * @param array<int, string> $allowedTokens
-     */
-    private function tokenAllowed(string $token, array $allowedTokens): bool
-    {
-        if (in_array($token, $allowedTokens, true)) {
-            return true;
-        }
-
-        foreach ($allowedTokens as $allowedToken) {
-            if (str_ends_with($allowedToken, '.*') && str_starts_with($token, rtrim($allowedToken, '*'))) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param array<string, mixed> $payload
-     */
-    private function isAllowedRenderSlot(string $token, array $payload): bool
-    {
-        $value = $payload[$token] ?? null;
-
-        return is_array($value)
-            && $this->filledString($value['label'] ?? null)
-            && $this->filledString($value['url'] ?? null);
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function universalTokens(): array
-    {
-        return [
-            'contact_id',
-            'contact_first_name',
-            'contact_last_name',
-            'contact_full_name',
-            'contact_email',
-            'contact_phone',
-            'first_name',
-            'last_name',
-            'full_name',
-            'name',
-            'email',
-            'phone',
-            'request_ip',
-            'contact.*',
-        ];
     }
 
     /**

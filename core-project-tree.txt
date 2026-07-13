@@ -167,7 +167,8 @@
 │   │   │   │   ├── Contact.php
 │   │   │   │   ├── ContactStatus.php
 │   │   │   │   ├── ContactTag.php
-│   │   │   │   └── Note.php
+│   │   │   │   ├── Note.php
+│   │   │   │   └── SiteSetting.php
 │   │   │   ├── Presets
 │   │   │   │   └── CorePresetContributor.php
 │   │   │   ├── Providers
@@ -178,16 +179,20 @@
 │   │   │   │   ├── StoreContactNoteRequest.php
 │   │   │   │   └── StoreContactRequest.php
 │   │   │   ├── Services
-│   │   │   │   └── Contacts
-│   │   │   │       ├── ContactFilterResolver.php
-│   │   │   │       └── ContactImportStatusMapper.php
+│   │   │   │   ├── Contacts
+│   │   │   │   │   ├── ContactFilterResolver.php
+│   │   │   │   │   └── ContactImportStatusMapper.php
+│   │   │   │   └── SiteSettings
+│   │   │   │       └── SiteSettingResolver.php
 │   │   │   ├── Support
 │   │   │   │   └── Contacts
 │   │   │   │       ├── ContactImportRegistry.php
 │   │   │   │       ├── ContactPanelRegistry.php
 │   │   │   │       └── ContactShowDataRegistry.php
 │   │   │   ├── TokenContracts
-│   │   │   │   └── ContactTokenSourceProvider.php
+│   │   │   │   ├── ContactTokenSourceProvider.php
+│   │   │   │   ├── SiteSettingComputedTokenValueProvider.php
+│   │   │   │   └── SiteSettingTokenSourceProvider.php
 │   │   │   └── Validation
 │   │   │       └── CoreSetupValidationContributor.php
 │   │   ├── Documents
@@ -417,6 +422,7 @@
 │   │   │   │   ├── CreateContactPermissionInvitationsForImportBatchAction.php
 │   │   │   │   ├── DispatchMessageAction.php
 │   │   │   │   ├── GrantMessageConsentAction.php
+│   │   │   │   ├── ImportMessageConsentAction.php
 │   │   │   │   ├── RevokeMessageConsentAction.php
 │   │   │   │   ├── ScheduleMessageAction.php
 │   │   │   │   ├── SkipScheduledMessagesAction.php
@@ -513,6 +519,7 @@
 │   │   │   │   ├── MessageSendTimeResolver.php
 │   │   │   │   ├── MessageSuppressionService.php
 │   │   │   │   ├── MessageTemplatePresetAssignmentResolver.php
+│   │   │   │   ├── MessageTemplateTokenValidator.php
 │   │   │   │   ├── MessageTemplateUsageResolver.php
 │   │   │   │   ├── PhoneNumberNormalizer.php
 │   │   │   │   ├── ResolvedMessageDispatchBuilder.php
@@ -646,6 +653,7 @@
 │   │   │   │   ├── FlushWebinarCachesAction.php
 │   │   │   │   ├── GetActiveWebinarSeriesAction.php
 │   │   │   │   ├── GetNextUpcomingWebinarAction.php
+│   │   │   │   ├── ImportWebinarRegistrationAction.php
 │   │   │   │   ├── PostEvent
 │   │   │   │   │   ├── DispatchPostWebinarFollowUpsAction.php
 │   │   │   │   │   ├── HandleWebinarProviderWebhookEventAction.php
@@ -684,7 +692,9 @@
 │   │   │   │   ├── ProviderWebhookEvent.php
 │   │   │   │   ├── ProviderWebinarData.php
 │   │   │   │   ├── WebinarAttendanceRecord.php
-│   │   │   │   └── WebinarMessageData.php
+│   │   │   │   ├── WebinarMessageData.php
+│   │   │   │   ├── WebinarRegistrationImportResult.php
+│   │   │   │   └── WebinarRegistrationImportRow.php
 │   │   │   ├── Enums
 │   │   │   │   └── WebinarTag.php
 │   │   │   ├── Jobs
@@ -717,6 +727,7 @@
 │   │   │   │   │   └── WebinarActivityDashboardPanelProvider.php
 │   │   │   │   ├── WebinarMessageReadinessService.php
 │   │   │   │   ├── WebinarProviderManager.php
+│   │   │   │   ├── WebinarRegistrationCsvReader.php
 │   │   │   │   ├── WebinarScheduleProfileDefinitionResolver.php
 │   │   │   │   └── WebinarScheduleProfileResolver.php
 │   │   │   ├── Support
@@ -861,6 +872,13 @@
 │   │   │   ├── generated
 │   │   │   │   └── images.php
 │   │   │   ├── messaging
+│   │   │   │   └── messaging
+│   │   │   │       ├── email
+│   │   │   │       │   └── definitions
+│   │   │   │       │       └── transactional
+│   │   │   │       └── sms
+│   │   │   │           └── definitions
+│   │   │   │               └── transactional
 │   │   │   ├── theme.php
 │   │   │   └── webinars
 │   │   │       ├── content.php
@@ -873,6 +891,7 @@
 │   │   │       ├── register
 │   │   │       │   ├── content.php
 │   │   │       │   └── style.php
+│   │   │       ├── schedule_profiles.php
 │   │   │       ├── style.php
 │   │   │       └── thank-you
 │   │   │           ├── content.php
@@ -1194,6 +1213,7 @@
 │   │   ├── 2026_07_02_000007_create_commerce_orders_table.php
 │   │   ├── 2026_07_02_000008_create_commerce_order_items_table.php
 │   │   ├── 2026_07_02_000009_create_commerce_order_events_table.php
+│   │   ├── 2026_07_13_120000_create_site_settings_table.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -1456,6 +1476,7 @@
 │   │   │   ├── MessagingConfigContractTest.php
 │   │   │   └── TokenContractRegistryTest.php
 │   │   ├── ConfigGeneration
+│   │   │   ├── CoreWebinarMessagingDefaultsTest.php
 │   │   │   ├── SlamDunkConfigGoldenFixtureTest.php
 │   │   │   └── SlamDunkRuntimeGoldenFixtureTest.php
 │   │   ├── Core
@@ -1522,6 +1543,9 @@
 │   │   │   ├── MessageTemplatePresetAssignmentResolverTest.php
 │   │   │   ├── MessageTemplatePresetControllerTest.php
 │   │   │   ├── MessageTemplatePresetSyncActionTest.php
+│   │   │   ├── MessageTemplatePresetTokenValidationSyncTest.php
+│   │   │   ├── MessageTemplateTokenValidationControllerTest.php
+│   │   │   ├── MessageTemplateTokenValidatorTest.php
 │   │   │   ├── MessagingSetupValidationContributorTest.php
 │   │   │   ├── ResolvedMessageDispatchBuilderTest.php
 │   │   │   ├── ResolvedMessageDispatchIntegrationTest.php
@@ -1575,6 +1599,8 @@
 │   │   │   ├── DispatchWebinarRegistrationMessagesActionTest.php
 │   │   │   ├── DispatchWebinarRegistrationMessagesTemplateAssignmentTest.php
 │   │   │   ├── DispatchWebinarWaitlistMessagesActionTest.php
+│   │   │   ├── ImportWebinarRegistrationActionTest.php
+│   │   │   ├── ImportWebinarRegistrationReminderDispatchTest.php
 │   │   │   ├── PostEvent
 │   │   │   │   └── ProcessPostWebinarEventJobTest.php
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
@@ -1594,4 +1620,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-511 directories, 1084 files
+519 directories, 1102 files

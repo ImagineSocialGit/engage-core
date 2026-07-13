@@ -10,6 +10,7 @@ use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Core\Support\Contacts\ContactShowDataRegistry;
 use App\Modules\Core\TokenContracts\ContactTokenSourceProvider;
+use App\Modules\Core\TokenContracts\SiteSettingTokenSourceProvider;
 use App\Modules\Core\Validation\CoreSetupValidationContributor;
 use Illuminate\Support\ServiceProvider;
 
@@ -118,6 +119,11 @@ class CoreModuleServiceProvider extends ServiceProvider
 
         $this->app->tag(
             ContactTokenSourceProvider::class,
+            'token.source_providers',
+        );
+
+        $this->app->tag(
+            SiteSettingTokenSourceProvider::class,
             'token.source_providers',
         );
     }

@@ -5,6 +5,7 @@ namespace App\Modules\Messaging\Actions;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
+use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -12,6 +13,10 @@ use InvalidArgumentException;
 
 class SyncMessageTemplatePresetsAction
 {
+    public function __construct(
+        private readonly MessageTemplateTokenValidator $messageTemplateTokenValidator,
+    ) {}
+
     /**
      * @return array{created: int, updated: int, customized_skipped: int, stale_removed: int, assignments_created: int, assignments_updated: int, assignments_preserved: int, catalog_entries_created: int, catalog_entries_updated: int}
      */
@@ -380,6 +385,16 @@ class SyncMessageTemplatePresetsAction
             presetKey: $key,
         );
 
+        $this->assertValidPayloadTokens(
+            payload: $payload,
+            dispatchKeys: $dispatchKeys,
+            channel: $channel,
+            purpose: $purpose,
+            scope: $scope,
+            surface: $surface,
+            configPath: $configPath,
+        );
+
         $meta = array_replace_recursive(
             is_array($definition['meta'] ?? null) ? $definition['meta'] : [],
             [
@@ -417,7 +432,7 @@ class SyncMessageTemplatePresetsAction
                 'queue' => trim($definition['queue']),
                 'dispatch_keys' => $dispatchKeys,
                 'payload' => $payload,
-                'tokens' => $this->tokensFromPayload($payload),
+                'tokens' => $this->messageTemplateTokenValidator->tokensFromPayload($payload),
                 'status' => MessageTemplatePreset::STATUS_ACTIVE,
                 'is_active' => true,
                 'source' => 'config',
@@ -587,23 +602,47 @@ class SyncMessageTemplatePresetsAction
 
     /**
      * @param array<string, mixed> $payload
-     * @return array<int, string>
+     * @param array<int, string> $dispatchKeys
      */
-    private function tokensFromPayload(array $payload): array
-    {
-        $tokens = [];
+    private function assertValidPayloadTokens(
+        array $payload,
+        array $dispatchKeys,
+        string $channel,
+        string $purpose,
+        string $scope,
+        ?string $surface,
+        string $configPath,
+    ): void {
+        $issues = $this->messageTemplateTokenValidator->validatePayload(
+            payload: $payload,
+            dispatchKeys: $dispatchKeys,
+            channel: $channel,
+            purpose: $purpose,
+            scope: $scope,
+            surface: $surface,
+            path: "{$configPath}.payload",
+        );
 
-        array_walk_recursive($payload, function (mixed $value) use (&$tokens): void {
-            if (! is_string($value) || trim($value) === '') {
-                return;
-            }
+        $errors = array_values(array_filter(
+            $issues,
+            fn (array $issue): bool => ($issue['level'] ?? null) === 'error',
+        ));
 
-            preg_match_all('/\{([a-zA-Z_][a-zA-Z0-9_.:-]*)\}/', $value, $matches);
+        if ($errors === []) {
+            return;
+        }
 
-            $tokens = array_merge($tokens, $matches[1] ?? []);
-        });
+        $first = $errors[0];
+        $path = is_string($first['path'] ?? null) && trim($first['path']) !== ''
+            ? $first['path']
+            : "{$configPath}.payload";
+        $message = is_string($first['message'] ?? null) && trim($first['message']) !== ''
+            ? $first['message']
+            : 'Message template payload contains invalid tokens.';
 
-        return array_values(array_unique($tokens));
+        throw new InvalidArgumentException(
+            "Message template preset source [{$configPath}] failed token validation at [{$path}]: {$message}"
+        );
     }
 
     private function surfaceForScope(string $scope): ?string

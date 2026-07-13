@@ -84,6 +84,11 @@ class TokenContractRegistry
         return $this->contexts;
     }
 
+    public function hasContext(string $key): bool
+    {
+        return isset($this->contexts[$key]);
+    }
+
     public function source(string $token): TokenSourceDefinition
     {
         return $this->sources[$token]
@@ -130,6 +135,19 @@ class TokenContractRegistry
     }
 
     /** @return array<int, string> */
+    public function allAuthorableTokens(): array
+    {
+        $tokens = [];
+
+        foreach ($this->sources as $source) {
+            $tokens[] = $source->token;
+            array_push($tokens, ...$source->aliases);
+        }
+
+        return array_values(array_unique($tokens));
+    }
+
+    /** @return array<int, string> */
     public function authorableTokens(string $contextKey): array
     {
         $tokens = [];
@@ -141,5 +159,38 @@ class TokenContractRegistry
         }
 
         return array_values(array_unique($tokens));
+    }
+
+    /**
+     * A reusable message with multiple dispatch contexts may only use tokens
+     * that every declared context can provide.
+     *
+     * @param array<int, string> $contextKeys
+     * @return array<int, string>
+     */
+    public function authorableTokensForContexts(array $contextKeys): array
+    {
+        $contextKeys = array_values(array_unique(array_filter(array_map(
+            fn (mixed $contextKey): ?string => is_string($contextKey) && trim($contextKey) !== ''
+                ? trim($contextKey)
+                : null,
+            $contextKeys,
+        ))));
+
+        if ($contextKeys === []) {
+            return [];
+        }
+
+        $allowed = null;
+
+        foreach ($contextKeys as $contextKey) {
+            $contextTokens = $this->authorableTokens($contextKey);
+
+            $allowed = $allowed === null
+                ? $contextTokens
+                : array_values(array_intersect($allowed, $contextTokens));
+        }
+
+        return $allowed ?? [];
     }
 }

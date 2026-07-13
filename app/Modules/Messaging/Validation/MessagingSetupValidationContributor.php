@@ -22,19 +22,16 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
 
     public function findings(): iterable
     {
-        $allowedTokens = $this->documentedTokens();
-
-        yield from $this->validateConfigRoutes($allowedTokens);
-        yield from $this->validateCustomizedPresets($allowedTokens);
+        yield from $this->validateConfigRoutes();
+        yield from $this->validateCustomizedPresets();
         yield from $this->validateActiveAssignments();
         yield from $this->validateExactAssignmentAmbiguity();
     }
 
     /**
-     * @param array<int, string> $allowedTokens
      * @return iterable<int, SetupValidationFinding>
      */
-    private function validateConfigRoutes(array $allowedTokens): iterable
+    private function validateConfigRoutes(): iterable
     {
         foreach (['email', 'sms'] as $channel) {
             $definitionsPath = MessageDefinitionConfigPath::definitionsRoot($channel);
@@ -115,7 +112,6 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
                         channel: $channel,
                         purpose: $purpose,
                         scope: $scope,
-                        allowedTokens: $allowedTokens,
                     );
 
                     foreach ($issues as $issue) {
@@ -135,14 +131,16 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
     }
 
     /**
-     * @param array<int, string> $allowedTokens
      * @return iterable<int, SetupValidationFinding>
      */
-    private function validateCustomizedPresets(array $allowedTokens): iterable
+    private function validateCustomizedPresets(): iterable
     {
         /** @var Collection<int, MessageTemplatePreset> $presets */
         $presets = MessageTemplatePreset::query()
             ->where('is_customized', true)
+            ->with([
+                'catalogEntries' => fn ($query) => $query->active()->orderBy('item_order')->orderBy('id'),
+            ])
             ->orderBy('key')
             ->get();
 
@@ -210,7 +208,9 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
                 definition: $preset->toMessageDefinition(),
                 path: $path,
                 channel: $preset->channel,
-                allowedTokens: $allowedTokens,
+                purpose: $preset->purpose,
+                scope: $preset->scope,
+                surface: $preset->catalogEntries->first()?->surface,
             );
 
             foreach ($issues as $issue) {
@@ -408,64 +408,6 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
         return $this->nullableString($assignment->source_config_path)
             ?? $this->nullableString(data_get($assignment->meta, 'source_config_path'))
             ?? $this->nullableString($assignment->messageTemplatePreset?->source_config_path);
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function documentedTokens(): array
-    {
-        $reference = config('reference.tokens', []);
-
-        if (! is_array($reference)) {
-            return [];
-        }
-
-        $tokens = [];
-        $listTokenKeys = [
-            'approved_aliases',
-            'caller_supplied_aliases',
-            'flow_route_only_tokens',
-        ];
-
-        $collect = function (mixed $value, ?string $parentKey = null) use (&$collect, &$tokens, $listTokenKeys): void {
-            if (is_string($value)) {
-                if (preg_match('/^\{([a-zA-Z_][a-zA-Z0-9_.:-]*)\}$/', trim($value), $matches) === 1) {
-                    $tokens[] = $matches[1];
-
-                    return;
-                }
-
-                if (in_array($parentKey, $listTokenKeys, true) && trim($value) !== '') {
-                    $tokens[] = trim($value);
-                }
-
-                return;
-            }
-
-            if (! is_array($value)) {
-                return;
-            }
-
-            if ($parentKey === 'aliases' && ! array_is_list($value)) {
-                foreach (array_keys($value) as $alias) {
-                    if (is_string($alias) && trim($alias) !== '') {
-                        $tokens[] = trim($alias);
-                    }
-                }
-            }
-
-            foreach ($value as $key => $nestedValue) {
-                $collect(
-                    value: $nestedValue,
-                    parentKey: is_string($key) ? $key : $parentKey,
-                );
-            }
-        };
-
-        $collect($reference);
-
-        return array_values(array_unique($tokens));
     }
 
     /**

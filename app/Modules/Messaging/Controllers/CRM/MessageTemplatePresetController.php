@@ -8,6 +8,7 @@ use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Requests\UpdateMessageTemplatePresetRequest;
+use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
 use App\Modules\Messaging\Services\MessageTemplateUsageResolver;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -77,6 +78,7 @@ class MessageTemplatePresetController extends Controller
     public function update(
         UpdateMessageTemplatePresetRequest $request,
         MessageTemplatePreset $messageTemplatePreset,
+        MessageTemplateTokenValidator $messageTemplateTokenValidator,
     ): RedirectResponse {
         $payload = array_replace_recursive(
             $messageTemplatePreset->payload ?? [],
@@ -87,7 +89,7 @@ class MessageTemplatePresetController extends Controller
             'name' => $request->validated('name'),
             'description' => $request->validated('description'),
             'payload' => $payload,
-            'tokens' => $this->tokensFromPayload($payload),
+            'tokens' => $messageTemplateTokenValidator->tokensFromPayload($payload),
             'is_customized' => true,
             'customized_at' => now(),
         ])->save();
@@ -305,27 +307,6 @@ class MessageTemplatePresetController extends Controller
         }
 
         return $payload;
-    }
-
-    /**
-     * @param array<string, mixed> $payload
-     * @return array<int, string>
-     */
-    private function tokensFromPayload(array $payload): array
-    {
-        $tokens = [];
-
-        array_walk_recursive($payload, function (mixed $value) use (&$tokens): void {
-            if (! is_string($value) || trim($value) === '') {
-                return;
-            }
-
-            preg_match_all('/\{([a-zA-Z_][a-zA-Z0-9_.:-]*)\}/', $value, $matches);
-
-            $tokens = array_merge($tokens, $matches[1] ?? []);
-        });
-
-        return array_values(array_unique($tokens));
     }
 
     private function channelLabel(string $channel): string

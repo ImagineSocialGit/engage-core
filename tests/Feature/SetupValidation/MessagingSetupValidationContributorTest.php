@@ -11,27 +11,24 @@ class MessagingSetupValidationContributorTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_documented_webinar_aliases_are_accepted_by_config_validation(): void
+    protected function setUp(): void
     {
-        Config::set('reference.tokens.models.webinar.aliases', [
-            'webinar_title' => 'webinar.title',
-            'webinar_join_url' => 'webinar.join_url',
-        ]);
+        parent::setUp();
 
-        Config::set('reference.tokens.contexts.registration_created.approved_aliases', [
-            'webinar_title',
-            'webinar_join_url',
-        ]);
+        Config::set('messaging.email.definitions', []);
+        Config::set('messaging.sms.definitions', []);
+    }
 
+    public function test_registry_backed_webinar_aliases_are_accepted_by_setup_validation(): void
+    {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [[
+            'confirmations' => [[
                 'dispatch_key' => 'registration_created',
                 'payload_class' => TestContributorEmailPayload::class,
                 'queue' => 'confirmation_messages',
-                'timing' => 'immediate',
                 'payload' => [
                     'subject' => '{webinar_title}',
-                    'body' => 'Join us',
+                    'body' => "Hi {first_name}.\n{cta}",
                     'cta' => [
                         'label' => 'Join',
                         'url' => '{webinar_join_url}',
@@ -40,16 +37,58 @@ class MessagingSetupValidationContributorTest extends TestCase
             ]],
         ]);
 
-        Config::set('messaging.email.marketing', []);
-        Config::set('messaging.email.internal', []);
-        Config::set('messaging.sms.transactional', []);
-        Config::set('messaging.sms.marketing', []);
-        Config::set('messaging.sms.internal', []);
+        $tokenFindings = collect(app(MessagingSetupValidationContributor::class)->findings())
+            ->filter(fn ($finding): bool => str_contains($finding->message, 'token'));
 
-        $warnings = collect(app(MessagingSetupValidationContributor::class)->findings())
-            ->filter(fn ($finding): bool => str_contains($finding->code, 'payload_references_token'));
+        $this->assertCount(0, $tokenFindings);
+    }
 
-        $this->assertCount(0, $warnings);
+    public function test_reference_config_cannot_make_an_unregistered_token_valid(): void
+    {
+        Config::set('reference.tokens.models.webinar.aliases', [
+            'invented_token' => 'webinar.title',
+        ]);
+
+        Config::set('messaging.email.definitions.transactional.webinar', [
+            'confirmations' => [[
+                'dispatch_key' => 'registration_created',
+                'payload_class' => TestContributorEmailPayload::class,
+                'queue' => 'confirmation_messages',
+                'payload' => [
+                    'subject' => '{invented_token}',
+                    'body' => 'Join us.',
+                ],
+            ]],
+        ]);
+
+        $finding = collect(app(MessagingSetupValidationContributor::class)->findings())
+            ->first(fn ($finding): bool => str_contains($finding->message, '{invented_token}'));
+
+        $this->assertNotNull($finding);
+        $this->assertSame('error', $finding->severity);
+        $this->assertStringContainsString('unknown token', $finding->message);
+    }
+
+    public function test_registered_but_unavailable_tokens_block_setup_validation(): void
+    {
+        Config::set('messaging.email.definitions.transactional.webinar', [
+            'confirmations' => [[
+                'dispatch_key' => 'registration_created',
+                'payload_class' => TestContributorEmailPayload::class,
+                'queue' => 'confirmation_messages',
+                'payload' => [
+                    'subject' => 'Registered',
+                    'body' => 'Replay: {webinar_playback_url}',
+                ],
+            ]],
+        ]);
+
+        $finding = collect(app(MessagingSetupValidationContributor::class)->findings())
+            ->first(fn ($finding): bool => str_contains($finding->message, '{webinar_playback_url}'));
+
+        $this->assertNotNull($finding);
+        $this->assertSame('error', $finding->severity);
+        $this->assertStringContainsString('registration_created', $finding->message);
     }
 }
 
