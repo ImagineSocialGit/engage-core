@@ -8,6 +8,7 @@ use App\Modules\FlowRoutes\Validation\FlowRoutesSetupValidationContributor;
 use App\Modules\Messaging\Validation\MessagingSetupValidationContributor;
 use App\Modules\Tasks\Validation\TasksSetupValidationContributor;
 use App\Modules\Webinars\Validation\WebinarsSetupValidationContributor;
+use App\Support\SetupValidation\Contributors\ConfigContractsSetupValidationContributor;
 use App\Support\SetupValidation\Contributors\ModuleDependenciesSetupValidationContributor;
 use App\Support\SetupValidation\Contributors\ReferenceRegistrySetupValidationContributor;
 use App\Support\SetupValidation\SetupValidationManager;
@@ -52,6 +53,7 @@ class SetupValidationRegistrationTest extends TestCase
         );
 
         foreach ([
+            ConfigContractsSetupValidationContributor::class,
             ModuleDependenciesSetupValidationContributor::class,
             ReferenceRegistrySetupValidationContributor::class,
             CoreSetupValidationContributor::class,
@@ -66,5 +68,3 @@ class SetupValidationRegistrationTest extends TestCase
     }
 
 }
-
-

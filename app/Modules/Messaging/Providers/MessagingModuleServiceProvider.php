@@ -5,6 +5,7 @@ namespace App\Modules\Messaging\Providers;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Capabilities\MessagingAutomationCapabilityContributor;
 use App\Modules\Messaging\ConfigContracts\EmailMessageDefinitionConfigContract;
+use App\Modules\Messaging\ConfigContracts\MessagingConfigContractTargetProvider;
 use App\Modules\Messaging\ConfigContracts\PermissionInvitationConfigContract;
 use App\Modules\Messaging\ConfigContracts\SmsMessageDefinitionConfigContract;
 use App\Modules\Messaging\Console\Commands\SyncMessageTemplatePresetsCommand;
@@ -38,6 +39,11 @@ class MessagingModuleServiceProvider extends ServiceProvider
             SmsMessageDefinitionConfigContract::class,
             PermissionInvitationConfigContract::class,
         ], 'config.contracts');
+
+        $this->app->tag(
+            MessagingConfigContractTargetProvider::class,
+            'config.contract_target_providers',
+        );
 
         $this->app->tag(
             MessagingTokenContextProvider::class,

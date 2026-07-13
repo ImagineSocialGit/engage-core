@@ -7,13 +7,16 @@ use App\Console\Commands\ValidateSetupCommand;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use App\Support\AutomationOpportunities\Actions\RecordAutomationEventCorrelationEvidenceAction;
 use App\Support\ConfigContracts\ConfigContractRegistry;
+use App\Support\ConfigContracts\ConfigContractTargetRegistry;
 use App\Support\ConfigContracts\Contracts\ModuleDefinitionConfigContract;
 use App\Support\ConfigContracts\Contracts\PresetPackageConfigContract;
+use App\Support\ConfigContracts\TargetProviders\AppConfigContractTargetProvider;
 use App\Support\Modules\ModuleManager;
 use App\Support\Presets\Contracts\PresetContributor;
 use App\Support\Presets\PresetCompositionResolver;
 use App\Support\Presets\PresetContributionRegistry;
 use App\Support\Presets\PresetPackageResolver;
+use App\Support\SetupValidation\Contributors\ConfigContractsSetupValidationContributor;
 use App\Support\SetupValidation\Contributors\ModuleDependenciesSetupValidationContributor;
 use App\Support\SetupValidation\Contributors\PresetCompositionSetupValidationContributor;
 use App\Support\SetupValidation\Contributors\ReferenceRegistrySetupValidationContributor;
@@ -39,6 +42,18 @@ class AppServiceProvider extends ServiceProvider
             ModuleDefinitionConfigContract::class,
             PresetPackageConfigContract::class,
         ], 'config.contracts');
+
+        $this->app->tag(
+            AppConfigContractTargetProvider::class,
+            'config.contract_target_providers',
+        );
+
+        $this->app->singleton(ConfigContractTargetRegistry::class, function ($app): ConfigContractTargetRegistry {
+            return new ConfigContractTargetRegistry(
+                contracts: $app->make(ConfigContractRegistry::class),
+                providers: $app->tagged('config.contract_target_providers'),
+            );
+        });
 
         $this->app->singleton(TokenContractRegistry::class, function ($app): TokenContractRegistry {
             return new TokenContractRegistry(
@@ -83,6 +98,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->tag([
+            ConfigContractsSetupValidationContributor::class,
             ModuleDependenciesSetupValidationContributor::class,
             PresetCompositionSetupValidationContributor::class,
             ReferenceRegistrySetupValidationContributor::class,

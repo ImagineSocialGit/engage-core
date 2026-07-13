@@ -4,6 +4,7 @@ namespace App\Modules\Webinars\Providers;
 
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Webinars\ConfigContracts\WebinarPostEventConfigContract;
+use App\Modules\Webinars\ConfigContracts\WebinarsConfigContractTargetProvider;
 use App\Modules\Webinars\ConfigContracts\WebinarScheduleProfileConfigContract;
 use App\Modules\Webinars\Console\Commands\SyncWebinarScheduleProfilesCommand;
 use App\Modules\Webinars\Services\ContactPanels\WebinarContactPanelProvider;
@@ -25,6 +26,11 @@ class WebinarsModuleServiceProvider extends ServiceProvider
             WebinarPostEventConfigContract::class,
             WebinarScheduleProfileConfigContract::class,
         ], 'config.contracts');
+
+        $this->app->tag(
+            WebinarsConfigContractTargetProvider::class,
+            'config.contract_target_providers',
+        );
         $this->app->tag(WebinarTokenSourceProvider::class, 'token.source_providers');
         $this->app->tag(WebinarTokenContextProvider::class, 'token.context_providers');
 
@@ -112,5 +118,3 @@ class WebinarsModuleServiceProvider extends ServiceProvider
         };
     }
 }
-
-

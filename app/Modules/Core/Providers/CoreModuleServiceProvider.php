@@ -2,6 +2,7 @@
 
 namespace App\Modules\Core\Providers;
 
+use App\Modules\Core\ConfigContracts\ContactStatusConfigContractTargetProvider;
 use App\Modules\Core\ConfigContracts\ContactStatusDefinitionConfigContract;
 use App\Modules\Core\Console\Commands\SyncContactStatusPresetsCommand;
 use App\Modules\Core\Data\Contacts\ContactImportField;
@@ -108,6 +109,11 @@ class CoreModuleServiceProvider extends ServiceProvider
         $this->app->tag(
             ContactStatusDefinitionConfigContract::class,
             'config.contracts',
+        );
+
+        $this->app->tag(
+            ContactStatusConfigContractTargetProvider::class,
+            'config.contract_target_providers',
         );
 
         $this->app->tag(

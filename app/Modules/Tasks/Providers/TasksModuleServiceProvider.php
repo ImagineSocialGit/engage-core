@@ -4,6 +4,7 @@ namespace App\Modules\Tasks\Providers;
 
 use App\Modules\Tasks\Actions\RecordManualTaskCompletionAutomationBehaviorAction;
 use App\Modules\Tasks\Capabilities\TasksAutomationCapabilityContributor;
+use App\Modules\Tasks\ConfigContracts\TaskPresetConfigContractTargetProvider;
 use App\Modules\Tasks\ConfigContracts\TaskPresetDefinitionConfigContract;
 use App\Modules\Tasks\Events\TaskCompleted;
 use App\Modules\Tasks\Listeners\EmitTaskCompletedAutomationEvent;
@@ -34,6 +35,10 @@ class TasksModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             TaskPresetDefinitionConfigContract::class,
         ], 'config.contracts');
+
+        $this->app->tag([
+            TaskPresetConfigContractTargetProvider::class,
+        ], 'config.contract_target_providers');
 
         $this->app->tag([
             TeamMemberTaskAssignedRecipientResolver::class,
@@ -74,4 +79,3 @@ class TasksModuleServiceProvider extends ServiceProvider
         );
     }
 }
-

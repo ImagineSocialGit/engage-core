@@ -79,6 +79,7 @@
 │   │   │   ├── Capabilities
 │   │   │   │   └── CampaignsAutomationCapabilityContributor.php
 │   │   │   ├── ConfigContracts
+│   │   │   │   ├── CampaignPresetConfigContractTargetProvider.php
 │   │   │   │   └── CampaignPresetDefinitionConfigContract.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
@@ -138,6 +139,7 @@
 │   │   │   │   └── ContactStatuses
 │   │   │   │       └── SyncContactStatusPresetsAction.php
 │   │   │   ├── ConfigContracts
+│   │   │   │   ├── ContactStatusConfigContractTargetProvider.php
 │   │   │   │   └── ContactStatusDefinitionConfigContract.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
@@ -225,6 +227,7 @@
 │   │   │   ├── ConditionEvaluators
 │   │   │   │   └── FlowRouteDataConditionEvaluator.php
 │   │   │   ├── ConfigContracts
+│   │   │   │   ├── FlowRoutePresetConfigContractTargetProvider.php
 │   │   │   │   └── FlowRoutePresetDefinitionConfigContract.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
@@ -423,6 +426,7 @@
 │   │   │   ├── ConfigContracts
 │   │   │   │   ├── EmailMessageDefinitionConfigContract.php
 │   │   │   │   ├── MessageDefinitionSchema.php
+│   │   │   │   ├── MessagingConfigContractTargetProvider.php
 │   │   │   │   ├── PermissionInvitationConfigContract.php
 │   │   │   │   └── SmsMessageDefinitionConfigContract.php
 │   │   │   ├── Console
@@ -589,6 +593,7 @@
 │   │   │   ├── Capabilities
 │   │   │   │   └── TasksAutomationCapabilityContributor.php
 │   │   │   ├── ConfigContracts
+│   │   │   │   ├── TaskPresetConfigContractTargetProvider.php
 │   │   │   │   └── TaskPresetDefinitionConfigContract.php
 │   │   │   ├── Contracts
 │   │   │   │   ├── TaskAssignedRecipientResolver.php
@@ -652,7 +657,8 @@
 │   │   │   │   └── SyncWebinarSeriesFromProviderAction.php
 │   │   │   ├── ConfigContracts
 │   │   │   │   ├── WebinarPostEventConfigContract.php
-│   │   │   │   └── WebinarScheduleProfileConfigContract.php
+│   │   │   │   ├── WebinarScheduleProfileConfigContract.php
+│   │   │   │   └── WebinarsConfigContractTargetProvider.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
 │   │   │   │       └── SyncWebinarScheduleProfilesCommand.php
@@ -784,14 +790,21 @@
 │       │   └── ViewResolver.php
 │       ├── ConfigContracts
 │       │   ├── ConfigContractRegistry.php
+│       │   ├── ConfigContractTargetRegistry.php
 │       │   ├── Contracts
 │       │   │   ├── ConfigContract.php
+│       │   │   ├── ConfigContractTargetProvider.php
 │       │   │   ├── ModuleDefinitionConfigContract.php
 │       │   │   └── PresetPackageConfigContract.php
-│       │   └── Data
-│       │       ├── ConfigContractViolation.php
-│       │       ├── ConfigField.php
-│       │       └── ConfigSchema.php
+│       │   ├── Data
+│       │   │   ├── ConfigContractTargetContext.php
+│       │   │   ├── ConfigContractTarget.php
+│       │   │   ├── ConfigContractViolation.php
+│       │   │   ├── ConfigField.php
+│       │   │   └── ConfigSchema.php
+│       │   └── TargetProviders
+│       │       ├── AppConfigContractTargetProvider.php
+│       │       └── ComposedPresetConfigContractTargetProvider.php
 │       ├── Dashboard
 │       │   ├── Contracts
 │       │   │   └── DashboardPanelProvider.php
@@ -814,6 +827,7 @@
 │       │   ├── Contracts
 │       │   │   └── SetupValidationContributor.php
 │       │   ├── Contributors
+│       │   │   ├── ConfigContractsSetupValidationContributor.php
 │       │   │   ├── ModuleDependenciesSetupValidationContributor.php
 │       │   │   ├── PresetCompositionSetupValidationContributor.php
 │       │   │   └── ReferenceRegistrySetupValidationContributor.php
@@ -1429,8 +1443,11 @@
 │   │   ├── Commerce
 │   │   │   └── CommerceFoundationTest.php
 │   │   ├── ConfigContracts
+│   │   │   ├── ComposedPresetConfigContractTargetProviderTest.php
 │   │   │   ├── ConfigContractRegistryTest.php
+│   │   │   ├── ConfigContractTargetRegistryTest.php
 │   │   │   ├── DomainConfigContractTest.php
+│   │   │   ├── MessagingConfigContractTargetProviderTest.php
 │   │   │   ├── MessagingConfigContractTest.php
 │   │   │   └── TokenContractRegistryTest.php
 │   │   ├── ConfigGeneration
@@ -1524,6 +1541,7 @@
 │   │   ├── Scheduling
 │   │   │   └── SchedulingFoundationTest.php
 │   │   ├── SetupValidation
+│   │   │   ├── ConfigContractsSetupValidationContributorTest.php
 │   │   │   ├── MessageConfigValidatorTest.php
 │   │   │   ├── MessagingSetupValidationContributorTest.php
 │   │   │   ├── ModuleDependenciesSetupValidationContributorTest.php
@@ -1570,4 +1588,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-506 directories, 1065 files
+507 directories, 1082 files
