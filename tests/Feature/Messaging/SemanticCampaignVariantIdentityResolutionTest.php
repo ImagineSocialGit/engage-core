@@ -120,7 +120,7 @@ class SemanticCampaignVariantIdentityResolutionTest extends TestCase
 
     private function sourceConfigPath(string $variantKey): string
     {
-        return 'messaging.email.marketing.webinar_nurture.campaigns.'
+        return 'messaging.email.definitions.marketing.webinar_nurture.campaigns.'
             .'webinar_attended_nurture.steps.1.variants.'.$variantKey;
     }
 }

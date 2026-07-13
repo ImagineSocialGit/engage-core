@@ -12,7 +12,7 @@ class MessageConfigValidatorTest extends TestCase
 {
     public function test_it_accepts_valid_contact_only_campaign_templates(): void
     {
-        Config::set('messaging.email.marketing.webinar_nurture', [
+        Config::set('messaging.email.definitions.marketing.webinar_nurture', [
             'campaigns' => [
                 'webinar_attended_nurture' => [
                     'steps' => [
@@ -45,7 +45,7 @@ class MessageConfigValidatorTest extends TestCase
 
     public function test_it_reports_invalid_definition_shape(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'timing' => 'scheduled',
@@ -74,7 +74,7 @@ class MessageConfigValidatorTest extends TestCase
 
     public function test_it_reports_undeclared_payload_tokens_but_accepts_declared_module_tokens(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'payload_class' => EmailPayload::class,
@@ -119,7 +119,7 @@ class MessageConfigValidatorTest extends TestCase
 
     public function test_it_accepts_waitlist_alert_tokens_and_opt_in_copy_without_registration_url(): void
     {
-        Config::set('messaging.email.marketing.webinar_waitlist', [
+        Config::set('messaging.email.definitions.marketing.webinar_waitlist', [
             'alerts' => [
                 [
                     'dispatch_key' => 'webinar_added',
@@ -164,7 +164,7 @@ class MessageConfigValidatorTest extends TestCase
 
     public function test_it_accepts_valid_sms_with_declared_webinar_tokens(): void
     {
-        Config::set('messaging.sms.transactional.webinar', [
+        Config::set('messaging.sms.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'payload_class' => SmsPayload::class,

@@ -6,7 +6,7 @@ final class MessageDefinitionConfigPath
 {
     public static function definitionsRoot(string $channel): string
     {
-        return 'messaging.'.self::segment($channel);
+        return 'messaging.'.self::segment($channel).'.definitions';
     }
 
     public static function purpose(string $channel, string $purpose): string

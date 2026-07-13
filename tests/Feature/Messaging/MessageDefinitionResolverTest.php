@@ -14,7 +14,7 @@ class MessageDefinitionResolverTest extends TestCase
 
     public function test_it_resolves_content_only_message_definitions_for_scope(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'payload_class' => EmailPayload::class,
@@ -51,7 +51,7 @@ class MessageDefinitionResolverTest extends TestCase
 
         $this->assertSame('confirmation', $definitions[0]['message_type']);
         $this->assertSame(['registration_created'], $definitions[0]['dispatch_keys']);
-        $this->assertSame('messaging.email.transactional.webinar.confirmation', $definitions[0]['config_path']);
+        $this->assertSame('messaging.email.definitions.transactional.webinar.confirmation', $definitions[0]['config_path']);
     }
 
     public function test_it_returns_empty_when_scope_missing(): void

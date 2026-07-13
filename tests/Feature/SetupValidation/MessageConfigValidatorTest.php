@@ -10,7 +10,7 @@ class MessageConfigValidatorTest extends TestCase
 {
     public function test_campaign_message_validation_traverses_variant_definitions_instead_of_step_containers(): void
     {
-        Config::set('messaging.email.marketing.webinar_nurture', [
+        Config::set('messaging.email.definitions.marketing.webinar_nurture', [
             'campaigns' => [
                 'webinar_attended_nurture' => [
                     'steps' => [
@@ -47,7 +47,7 @@ class MessageConfigValidatorTest extends TestCase
 
     public function test_campaign_message_validation_reports_missing_variants_at_the_variant_path(): void
     {
-        Config::set('messaging.email.marketing.webinar_nurture', [
+        Config::set('messaging.email.definitions.marketing.webinar_nurture', [
             'campaigns' => [
                 'webinar_attended_nurture' => [
                     'steps' => [
@@ -65,7 +65,7 @@ class MessageConfigValidatorTest extends TestCase
 
         $this->assertTrue(collect($issues)->contains(
             fn (array $issue): bool => ($issue['path'] ?? null)
-                === 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants',
+                === 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants',
         ));
     }
 }

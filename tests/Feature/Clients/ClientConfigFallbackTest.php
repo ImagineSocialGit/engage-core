@@ -116,7 +116,7 @@ PHP);
             'client.config_path' => $root,
             'client.env_path' => $root.'/.env',
             'client.preset' => null,
-            'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps' => [
+            'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps' => [
                 1 => [
                     'variants' => [
                         'email' => ['subject' => 'Default step 1'],
@@ -146,7 +146,7 @@ PHP);
                     ],
                 ],
             ],
-            config('messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps'),
+            config('messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps'),
         );
     }
 

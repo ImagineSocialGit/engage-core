@@ -41,7 +41,7 @@ class EmailPayloadTest extends TestCase
     public function test_it_resolves_subject_from_config(): void
     {
         Config::set(
-            'messaging.email.transactional.webinar.confirmation.payload.subject',
+            'messaging.email.definitions.transactional.webinar.confirmation.payload.subject',
             'Welcome {first_name}'
         );
 
@@ -64,7 +64,7 @@ class EmailPayloadTest extends TestCase
     public function test_it_resolves_body_from_config(): void
     {
         Config::set(
-            'messaging.email.transactional.webinar.confirmation.payload.body',
+            'messaging.email.definitions.transactional.webinar.confirmation.payload.body',
             'Hello {first_name}'
         );
 
@@ -87,7 +87,7 @@ class EmailPayloadTest extends TestCase
     public function test_it_uses_explicit_subject_before_config(): void
     {
         Config::set(
-            'messaging.email.transactional.webinar.confirmation.payload.subject',
+            'messaging.email.definitions.transactional.webinar.confirmation.payload.subject',
             'Config'
         );
 
@@ -132,17 +132,17 @@ class EmailPayloadTest extends TestCase
     public function test_it_uses_default_view(): void
     {
         Config::set(
-            'messaging.email.transactional.webinar.confirmation.payload.view',
+            'messaging.email.definitions.transactional.webinar.confirmation.payload.view',
             null
         );
 
         Config::set(
-            'messaging.email.transactional.webinar.confirmation.payload.subject',
+            'messaging.email.definitions.transactional.webinar.confirmation.payload.subject',
             'Subject'
         );
 
         Config::set(
-            'messaging.email.transactional.webinar.confirmation.payload.body',
+            'messaging.email.definitions.transactional.webinar.confirmation.payload.body',
             'Body'
         );
 
@@ -164,12 +164,12 @@ class EmailPayloadTest extends TestCase
     public function test_it_renders_html(): void
     {
         Config::set(
-            'messaging.email.transactional.webinar.confirmation.payload.subject',
+            'messaging.email.definitions.transactional.webinar.confirmation.payload.subject',
             'Hello'
         );
 
         Config::set(
-            'messaging.email.transactional.webinar.confirmation.payload.body',
+            'messaging.email.definitions.transactional.webinar.confirmation.payload.body',
             'Welcome {first_name}'
         );
 
@@ -199,12 +199,12 @@ class EmailPayloadTest extends TestCase
     public function test_it_implements_email_message_contract(): void
     {
         Config::set(
-            'messaging.email.transactional.webinar.confirmation.payload.subject',
+            'messaging.email.definitions.transactional.webinar.confirmation.payload.subject',
             'Hello'
         );
 
         Config::set(
-            'messaging.email.transactional.webinar.confirmation.payload.body',
+            'messaging.email.definitions.transactional.webinar.confirmation.payload.body',
             'Body'
         );
 
@@ -236,7 +236,7 @@ class EmailPayloadTest extends TestCase
     public function test_it_throws_when_body_missing(): void
     {
         Config::set(
-            'messaging.email.transactional.missing_scope.missing_message.payload.subject',
+            'messaging.email.definitions.transactional.missing_scope.missing_message.payload.subject',
             'Hello'
         );
 
@@ -253,22 +253,22 @@ class EmailPayloadTest extends TestCase
     public function test_it_resolves_from_sender_by_purpose(): void
     {
         Config::set(
-            'messaging.email.transactional.webinar.confirmation.payload.subject',
+            'messaging.email.definitions.transactional.webinar.confirmation.payload.subject',
             'Transactional Subject'
         );
 
         Config::set(
-            'messaging.email.transactional.webinar.confirmation.payload.body',
+            'messaging.email.definitions.transactional.webinar.confirmation.payload.body',
             'Transactional Body'
         );
 
         Config::set(
-            'messaging.email.marketing.webinar.follow_up.payload.subject',
+            'messaging.email.definitions.marketing.webinar.follow_up.payload.subject',
             'Marketing Subject'
         );
 
         Config::set(
-            'messaging.email.marketing.webinar.follow_up.payload.body',
+            'messaging.email.definitions.marketing.webinar.follow_up.payload.body',
             'Marketing Body'
         );
 

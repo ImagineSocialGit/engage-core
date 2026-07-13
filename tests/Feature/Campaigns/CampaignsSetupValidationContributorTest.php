@@ -106,7 +106,7 @@ class CampaignsSetupValidationContributorTest extends TestCase
             ],
         ]);
 
-        Config::set('messaging.email.marketing.webinar_nurture.campaigns.test_campaign.steps', [
+        Config::set('messaging.email.definitions.marketing.webinar_nurture.campaigns.test_campaign.steps', [
             1 => [
                 'variants' => [
                     'email' => [
@@ -390,7 +390,7 @@ class CampaignsSetupValidationContributorTest extends TestCase
             'is_active' => true,
             'criteria' => [],
             'dependency_rules' => [],
-            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.runtime_campaign.steps.1.variants.email',
+            'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.runtime_campaign.steps.1.variants.email',
             'meta' => [],
         ]);
 
@@ -432,7 +432,7 @@ class CampaignsSetupValidationContributorTest extends TestCase
 
     private function configureCampaignMessagingDefinition(): void
     {
-        Config::set('messaging.email.marketing.webinar_nurture', [
+        Config::set('messaging.email.definitions.marketing.webinar_nurture', [
             'campaigns' => [
                 'runtime_campaign' => [
                     'steps' => [

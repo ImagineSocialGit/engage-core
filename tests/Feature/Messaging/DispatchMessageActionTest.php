@@ -26,7 +26,7 @@ class DispatchMessageActionTest extends TestCase
     {
         Queue::fake();
 
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'payload_class' => EmailPayload::class,
@@ -74,7 +74,7 @@ class DispatchMessageActionTest extends TestCase
     {
         Queue::fake();
 
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'consent_granted',
                 'payload_class' => EmailPayload::class,
@@ -104,7 +104,7 @@ class DispatchMessageActionTest extends TestCase
     {
         Queue::fake();
 
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
 
@@ -150,7 +150,7 @@ class DispatchMessageActionTest extends TestCase
         $this->assertSame('person@example.com', $message->payload['to']);
 
         $this->assertSame(
-            'messaging.email.transactional.webinar.confirmation',
+            'messaging.email.definitions.transactional.webinar.confirmation',
             $message->meta['definition_config_path'],
         );
     }
@@ -159,7 +159,7 @@ class DispatchMessageActionTest extends TestCase
     {
         Queue::fake();
 
-        Config::set('messaging.sms.marketing.broadcast', [
+        Config::set('messaging.sms.definitions.marketing.broadcast', [
             'broadcast' => [
                 'dispatch_key' => 'broadcast_send',
                 'payload_class' => SmsPayload::class,
@@ -222,7 +222,7 @@ class DispatchMessageActionTest extends TestCase
     {
         Queue::fake();
 
-        Config::set('messaging.sms.marketing.webinar_waitlist', [
+        Config::set('messaging.sms.definitions.marketing.webinar_waitlist', [
             'opt_in' => [
                 'dispatch_key' => 'consent_granted',
                 'payload_class' => SmsPayload::class,
@@ -268,7 +268,7 @@ class DispatchMessageActionTest extends TestCase
     {
         Queue::fake();
 
-        Config::set('messaging.sms.marketing.broadcast', [
+        Config::set('messaging.sms.definitions.marketing.broadcast', [
             'broadcast' => [
                 'dispatch_key' => 'broadcast_send',
                 'payload_class' => SmsPayload::class,
@@ -313,7 +313,7 @@ class DispatchMessageActionTest extends TestCase
     {
         Queue::fake();
 
-        Config::set('messaging.email.marketing.webinar', [
+        Config::set('messaging.email.definitions.marketing.webinar', [
             'first_drip' => [
                 'dispatch_key' => 'campaign_step_due',
                 'campaign_key' => 'webinar_attended',
@@ -372,7 +372,7 @@ class DispatchMessageActionTest extends TestCase
     {
         Queue::fake();
 
-        Config::set('messaging.email.marketing.webinar', [
+        Config::set('messaging.email.definitions.marketing.webinar', [
             'first_drip' => [
                 'dispatch_key' => 'campaign_step_due',
                 'campaign_key' => 'webinar_attended',
@@ -413,7 +413,7 @@ class DispatchMessageActionTest extends TestCase
     {
         Queue::fake();
 
-        Config::set('messaging.email.marketing.webinar', [
+        Config::set('messaging.email.definitions.marketing.webinar', [
             'first_drip_a' => [
                 'dispatch_key' => 'campaign_step_due',
                 'campaign_key' => 'webinar_attended',
@@ -486,7 +486,7 @@ class DispatchMessageActionTest extends TestCase
     {
         Queue::fake();
 
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'payload_class' => EmailPayload::class,
@@ -511,7 +511,7 @@ class DispatchMessageActionTest extends TestCase
                 'subject' => 'DB subject',
                 'body' => 'DB body.',
             ],
-            'source_config_path' => 'messaging.email.transactional.webinar.confirmation',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmation',
         ]);
 
         $assignment = MessageTemplatePresetAssignment::factory()
@@ -537,7 +537,7 @@ class DispatchMessageActionTest extends TestCase
         $this->assertNull($message->meta['definition_config_path']);
         $this->assertSame($preset->getKey(), data_get($message->meta, 'message_template_preset.id'));
         $this->assertSame($assignment->getKey(), data_get($message->meta, 'message_template_preset.assignment_id'));
-        $this->assertSame('messaging.email.transactional.webinar.confirmation', data_get($message->meta, 'message_template_preset.source_config_path'));
+        $this->assertSame('messaging.email.definitions.transactional.webinar.confirmation', data_get($message->meta, 'message_template_preset.source_config_path'));
     }
 
 
@@ -545,7 +545,7 @@ class DispatchMessageActionTest extends TestCase
     {
         Queue::fake();
 
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'payload_class' => EmailPayload::class,
@@ -589,7 +589,7 @@ class DispatchMessageActionTest extends TestCase
     {
         Queue::fake();
 
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'follow_up' => [
                 'dispatch_key' => 'webinar_ended',
                 'payload_class' => EmailPayload::class,

@@ -75,7 +75,7 @@ class SmsPayloadTest extends TestCase
     public function test_it_resolves_message_from_config(): void
     {
         Config::set(
-            'messaging.sms.transactional.webinar.confirmation.payload.message',
+            'messaging.sms.definitions.transactional.webinar.confirmation.payload.message',
             'Hello {first_name}'
         );
 
@@ -99,7 +99,7 @@ class SmsPayloadTest extends TestCase
     public function test_it_prefers_runtime_message_over_config(): void
     {
         Config::set(
-            'messaging.sms.transactional.webinar.confirmation.payload.message',
+            'messaging.sms.definitions.transactional.webinar.confirmation.payload.message',
             'Config'
         );
 
@@ -150,12 +150,12 @@ class SmsPayloadTest extends TestCase
         Config::set('brand.name', 'Engage Core');
 
         Config::set(
-            'messaging.sms.transactional.webinar.confirmation.payload.message',
+            'messaging.sms.definitions.transactional.webinar.confirmation.payload.message',
             'Welcome'
         );
 
         Config::set(
-            'messaging.sms.transactional.webinar.confirmation.payload.prefix_brand',
+            'messaging.sms.definitions.transactional.webinar.confirmation.payload.prefix_brand',
             true
         );
 
@@ -175,7 +175,7 @@ class SmsPayloadTest extends TestCase
     public function test_it_builds_dev_payload(): void
     {
         Config::set(
-            'messaging.sms.transactional.webinar.confirmation.payload.message',
+            'messaging.sms.definitions.transactional.webinar.confirmation.payload.message',
             'Hello'
         );
 
@@ -224,7 +224,7 @@ class SmsPayloadTest extends TestCase
     public function test_it_implements_sms_contract(): void
     {
         Config::set(
-            'messaging.sms.transactional.webinar.confirmation.payload.message',
+            'messaging.sms.definitions.transactional.webinar.confirmation.payload.message',
             'Hello'
         );
 

@@ -7,30 +7,30 @@ use Tests\TestCase;
 
 class MessageDefinitionConfigPathTest extends TestCase
 {
-    public function test_it_builds_current_canonical_definition_paths_consistently(): void
+    public function test_it_builds_explicit_definitions_namespace_paths_consistently(): void
     {
         $this->assertSame(
-            'messaging.email',
+            'messaging.email.definitions',
             MessageDefinitionConfigPath::definitionsRoot('email'),
         );
 
         $this->assertSame(
-            'messaging.email.transactional',
+            'messaging.email.definitions.transactional',
             MessageDefinitionConfigPath::purpose('email', 'transactional'),
         );
 
         $this->assertSame(
-            'messaging.email.transactional.webinar',
+            'messaging.email.definitions.transactional.webinar',
             MessageDefinitionConfigPath::scope('email', 'transactional', 'webinar'),
         );
 
         $this->assertSame(
-            'messaging.email.transactional.webinar.reminders.0',
+            'messaging.email.definitions.transactional.webinar.reminders.0',
             MessageDefinitionConfigPath::definition('email', 'transactional', 'webinar', 'reminders', 0),
         );
 
         $this->assertSame(
-            'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
+            'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
             MessageDefinitionConfigPath::campaignVariant(
                 channel: 'email',
                 purpose: 'marketing',
@@ -42,7 +42,7 @@ class MessageDefinitionConfigPathTest extends TestCase
         );
 
         $this->assertSame(
-            'messaging.email.transactional.webinar.confirmation.payload.subject',
+            'messaging.email.definitions.transactional.webinar.confirmation.payload.subject',
             MessageDefinitionConfigPath::payloadField(
                 channel: 'email',
                 purpose: 'transactional',

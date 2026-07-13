@@ -23,7 +23,7 @@ class MessagingSetupValidationContributorTest extends TestCase
             'webinar_join_url',
         ]);
 
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [[
                 'dispatch_key' => 'registration_created',
                 'payload_class' => TestContributorEmailPayload::class,

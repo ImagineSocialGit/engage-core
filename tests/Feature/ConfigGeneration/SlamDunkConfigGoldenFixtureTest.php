@@ -87,8 +87,8 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
         $this->assertSame(range(1, 9), array_column($attendedSteps, 'step_number'));
         $this->assertSame(range(1, 19), array_column($missedSteps, 'step_number'));
 
-        $this->assertCount(6, config('messaging.email.transactional.webinar.reminders'));
-        $this->assertCount(6, config('messaging.sms.transactional.webinar.reminders'));
+        $this->assertCount(6, config('messaging.email.definitions.transactional.webinar.reminders'));
+        $this->assertCount(6, config('messaging.sms.definitions.transactional.webinar.reminders'));
         $this->assertCount(20, config('webinars.schedule_profiles.full_10_day.items'));
     }
 

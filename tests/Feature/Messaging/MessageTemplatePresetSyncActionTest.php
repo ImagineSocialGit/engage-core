@@ -72,14 +72,14 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         $this->assertSame('confirmation', $confirmation->message_type);
         $this->assertSame(['registration_created'], $confirmation->dispatch_keys);
         $this->assertSame(['first_name'], $confirmation->tokens);
-        $this->assertSame('messaging.email.transactional.webinar.confirmation', $confirmation->source_config_path);
+        $this->assertSame('messaging.email.definitions.transactional.webinar.confirmation', $confirmation->source_config_path);
 
         $campaignVariant = MessageTemplatePreset::query()
             ->where('key', 'email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email')
             ->firstOrFail();
 
         $this->assertSame('webinar_attended_nurture_step_1', $campaignVariant->message_type);
-        $this->assertSame('messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email', $campaignVariant->source_config_path);
+        $this->assertSame('messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email', $campaignVariant->source_config_path);
 
         $this->assertDatabaseHas('message_template_catalog_entries', [
             'message_template_preset_id' => $campaignVariant->getKey(),
@@ -89,7 +89,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             'item_label' => 'Step 1 Email',
             'item_order' => 1,
             'usage_type' => 'campaign_step',
-            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
+            'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
         ]);
 
         $this->assertDatabaseHas('message_template_preset_assignments', [
@@ -98,7 +98,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             'campaign_key' => 'webinar_attended_nurture',
             'campaign_step' => 1,
             'campaign_step_variant_key' => 'email',
-            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
+            'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
             'is_active' => true,
         ]);
     }
@@ -177,8 +177,8 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             ->get();
 
         $this->assertSame([
-            'messaging.email.transactional.webinar.reminders.0',
-            'messaging.email.transactional.webinar.reminders.1',
+            'messaging.email.definitions.transactional.webinar.reminders.0',
+            'messaging.email.definitions.transactional.webinar.reminders.1',
         ], $presets->pluck('source_config_path')->all());
 
         $this->assertSame([
@@ -234,7 +234,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             'customized_at' => now(),
         ])->save();
 
-        Config::set('messaging.email.transactional.webinar.confirmation.payload.subject', 'Changed config subject');
+        Config::set('messaging.email.definitions.transactional.webinar.confirmation.payload.subject', 'Changed config subject');
 
         $result = app(SyncMessageTemplatePresetsAction::class)->handle();
 
@@ -395,14 +395,14 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             'key' => 'email.transactional.webinar.webinar_reminder_30_minute',
             'message_type' => 'reminder',
             'name' => 'Webinar Reminders — Reminder Email',
-            'source_config_path' => 'messaging.email.transactional.webinar.reminders.0',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.0',
         ]);
 
         $this->assertDatabaseHas('message_template_presets', [
             'key' => 'email.transactional.webinar.webinar_reminder_10_minute',
             'message_type' => 'reminder',
             'name' => 'Webinar Reminders — Reminder 2 Email',
-            'source_config_path' => 'messaging.email.transactional.webinar.reminders.1',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.1',
         ]);
 
         $this->assertDatabaseMissing('message_template_presets', [
@@ -418,7 +418,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             'item_label' => 'Reminder Email',
             'item_order' => 0,
             'usage_type' => 'webinar_reminder',
-            'source_config_path' => 'messaging.email.transactional.webinar.reminders.0',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.0',
         ]);
 
         $this->assertDatabaseHas('message_template_catalog_entries', [
@@ -426,7 +426,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             'item_label' => 'Reminder 2 Email',
             'item_order' => 1,
             'usage_type' => 'webinar_reminder',
-            'source_config_path' => 'messaging.email.transactional.webinar.reminders.1',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.1',
         ]);
     }
 

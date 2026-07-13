@@ -522,7 +522,8 @@
 │   │   │   │       ├── SmsProviderManager.php
 │   │   │   │       └── SmsSendGuard.php
 │   │   │   ├── Support
-│   │   │   │   └── EmailConsentRevocationLinkGenerator.php
+│   │   │   │   ├── EmailConsentRevocationLinkGenerator.php
+│   │   │   │   └── MessageDefinitionConfigPath.php
 │   │   │   ├── TokenContracts
 │   │   │   │   └── MessagingTokenContextProvider.php
 │   │   │   └── Validation
@@ -894,6 +895,12 @@
 │   │   │   │   └── images.php
 │   │   │   ├── messaging
 │   │   │   │   ├── email
+│   │   │   │   │   ├── definitions
+│   │   │   │   │   │   ├── marketing
+│   │   │   │   │   │   │   ├── webinar_nurture.php
+│   │   │   │   │   │   │   └── webinar_waitlist.php
+│   │   │   │   │   │   └── transactional
+│   │   │   │   │   │       └── webinar.php
 │   │   │   │   │   ├── marketing
 │   │   │   │   │   │   ├── webinar_nurture.php
 │   │   │   │   │   │   └── webinar_waitlist.php
@@ -901,6 +908,12 @@
 │   │   │   │   │       └── webinar.php
 │   │   │   │   ├── permission_invitations.php
 │   │   │   │   └── sms
+│   │   │   │       ├── definitions
+│   │   │   │       │   ├── marketing
+│   │   │   │       │   │   ├── webinar_nurture.php
+│   │   │   │       │   │   └── webinar_waitlist.php
+│   │   │   │       │   └── transactional
+│   │   │   │       │       └── webinar.php
 │   │   │   │       ├── marketing
 │   │   │   │       │   ├── webinar_nurture.php
 │   │   │   │       │   └── webinar_waitlist.php
@@ -1000,6 +1013,12 @@
 │   ├── mail.php
 │   ├── messaging
 │   │   ├── email
+│   │   │   ├── definitions
+│   │   │   │   ├── marketing
+│   │   │   │   │   ├── webinar_nurture.php
+│   │   │   │   │   └── webinar_waitlist.php
+│   │   │   │   └── transactional
+│   │   │   │       └── webinar.php
 │   │   │   ├── marketing
 │   │   │   │   ├── webinar_nurture.php
 │   │   │   │   └── webinar_waitlist.php
@@ -1008,6 +1027,13 @@
 │   │   ├── email.php
 │   │   ├── permission_invitations.php
 │   │   ├── sms
+│   │   │   ├── definitions
+│   │   │   │   ├── marketing
+│   │   │   │   │   ├── webinar_nurture.php
+│   │   │   │   │   ├── webinar.php
+│   │   │   │   │   └── webinar_waitlist.php
+│   │   │   │   └── transactional
+│   │   │   │       └── webinar.php
 │   │   │   ├── marketing
 │   │   │   │   ├── webinar_nurture.php
 │   │   │   │   ├── webinar.php
@@ -1509,6 +1535,7 @@
 │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest.php
 │   │   │   ├── MessageChannelAvailabilityTest.php
 │   │   │   ├── MessageConfigValidatorTest.php
+│   │   │   ├── MessageDefinitionConfigPathTest.php
 │   │   │   ├── MessageDefinitionResolverTest.php
 │   │   │   ├── MessageEligibilityGateTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
@@ -1588,4 +1615,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-507 directories, 1082 files
+519 directories, 1097 files

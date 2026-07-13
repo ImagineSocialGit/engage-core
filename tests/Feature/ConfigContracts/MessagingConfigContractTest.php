@@ -3,6 +3,7 @@
 namespace Tests\Feature\ConfigContracts;
 
 use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Support\ConfigContracts\ConfigContractRegistry;
 use Tests\TestCase;
 
@@ -16,7 +17,7 @@ class MessagingConfigContractTest extends TestCase
             $contract = $registry->get("messaging.{$channel}_definition");
 
             foreach (['transactional', 'marketing', 'internal'] as $purpose) {
-                foreach (config("messaging.{$channel}.{$purpose}", []) as $scope => $scopeConfig) {
+                foreach (config(MessageDefinitionConfigPath::purpose($channel, $purpose), []) as $scope => $scopeConfig) {
                     if (! is_array($scopeConfig)) {
                         continue;
                     }
@@ -24,7 +25,7 @@ class MessagingConfigContractTest extends TestCase
                     foreach ($this->definitions($scopeConfig) as $path => $definition) {
                         $violations = $contract->schema()->validate(
                             $definition,
-                            "messaging.{$channel}.{$purpose}.{$scope}.{$path}",
+                            MessageDefinitionConfigPath::scope($channel, $purpose, (string) $scope).".{$path}",
                         );
 
                         $this->assertSame(
@@ -62,7 +63,7 @@ class MessagingConfigContractTest extends TestCase
                 'subject' => 'Subject',
                 'body' => 'Body',
             ],
-        ], 'messaging.email.marketing.example');
+        ], 'messaging.email.definitions.marketing.example');
 
         $smsViolations = $registry->get('messaging.sms_definition')->schema()->validate([
             'dispatch_key' => 'campaign_step_due',
@@ -71,7 +72,7 @@ class MessagingConfigContractTest extends TestCase
             'payload' => [
                 'body' => 'Compatibility aliases are not exported schema.',
             ],
-        ], 'messaging.sms.marketing.example');
+        ], 'messaging.sms.definitions.marketing.example');
 
         $this->assertSame(['unknown_field', 'value_not_allowed'], $this->codes($emailViolations));
         $this->assertSame(['unknown_field', 'required_field_missing'], $this->codes($smsViolations));
@@ -89,7 +90,7 @@ class MessagingConfigContractTest extends TestCase
                     'subject' => 'Subject',
                     'body' => 'Body',
                 ],
-            ], 'messaging.email.marketing.example');
+            ], 'messaging.email.definitions.marketing.example');
 
         $this->assertSame(['required_field_group_missing'], $this->codes($violations));
     }

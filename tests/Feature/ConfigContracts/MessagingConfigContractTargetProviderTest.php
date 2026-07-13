@@ -14,32 +14,34 @@ class MessagingConfigContractTargetProviderTest extends TestCase
         $context = ConfigContractTargetContext::proposed([
             'messaging' => [
                 'email' => [
-                    'marketing' => [
-                        'newsletter' => [
-                            'welcome' => [
-                                'dispatch_key' => 'welcome',
-                                'payload_class' => 'App\\Modules\\Messaging\\Payloads\\EmailPayload',
-                                'queue' => 'marketing_messages',
-                                'payload' => [
-                                    'subject' => 'Welcome',
-                                    'body' => 'Hello {first_name}',
+                    'definitions' => [
+                        'marketing' => [
+                            'newsletter' => [
+                                'welcome' => [
+                                    'dispatch_key' => 'welcome',
+                                    'payload_class' => 'App\\Modules\\Messaging\\Payloads\\EmailPayload',
+                                    'queue' => 'marketing_messages',
+                                    'payload' => [
+                                        'subject' => 'Welcome',
+                                        'body' => 'Hello {first_name}',
+                                    ],
+                                    'invented_field' => 'must_survive_discovery',
                                 ],
-                                'invented_field' => 'must_survive_discovery',
-                            ],
-                            'campaigns' => [
-                                'nurture' => [
-                                    'steps' => [
-                                        1 => [
-                                            'variants' => [
-                                                'email' => [
-                                                    'dispatch_key' => 'campaign_step_due',
-                                                    'payload_class' => 'App\\Modules\\Messaging\\Payloads\\EmailPayload',
-                                                    'queue' => 'campaign_messages',
-                                                    'payload' => [
-                                                        'subject' => 'Follow up',
-                                                        'body' => 'Hello again',
+                                'campaigns' => [
+                                    'nurture' => [
+                                        'steps' => [
+                                            1 => [
+                                                'variants' => [
+                                                    'email' => [
+                                                        'dispatch_key' => 'campaign_step_due',
+                                                        'payload_class' => 'App\\Modules\\Messaging\\Payloads\\EmailPayload',
+                                                        'queue' => 'campaign_messages',
+                                                        'payload' => [
+                                                            'subject' => 'Follow up',
+                                                            'body' => 'Hello again',
+                                                        ],
+                                                        'invented_campaign_field' => true,
                                                     ],
-                                                    'invented_campaign_field' => true,
                                                 ],
                                             ],
                                         ],
@@ -49,15 +51,17 @@ class MessagingConfigContractTargetProviderTest extends TestCase
                         ],
                     ],
                 ],
-                'sms' => [],
+                'sms' => [
+                    'definitions' => [],
+                ],
                 'permission_invitations' => [],
             ],
         ]);
 
         $targets = collect($provider->targets($context))->keyBy('path');
 
-        $standard = $targets->get('messaging.email.marketing.newsletter.welcome');
-        $campaign = $targets->get('messaging.email.marketing.newsletter.campaigns.nurture.steps.1.variants.email');
+        $standard = $targets->get('messaging.email.definitions.marketing.newsletter.welcome');
+        $campaign = $targets->get('messaging.email.definitions.marketing.newsletter.campaigns.nurture.steps.1.variants.email');
 
         $this->assertNotNull($standard);
         $this->assertNotNull($campaign);
@@ -73,26 +77,30 @@ class MessagingConfigContractTargetProviderTest extends TestCase
         $context = ConfigContractTargetContext::proposed([
             'messaging' => [
                 'email' => [
-                    'transactional' => [
-                        'webinar' => [
-                            'reminder' => [
-                                [
-                                    'dispatch_key' => 'reminder_one',
-                                    'payload_class' => 'FirstPayload',
-                                    'queue' => 'messages',
-                                    'payload' => ['subject' => 'One', 'body' => 'One'],
-                                ],
-                                [
-                                    'dispatch_key' => 'reminder_two',
-                                    'payload_class' => 'SecondPayload',
-                                    'queue' => 'messages',
-                                    'payload' => ['subject' => 'Two', 'body' => 'Two'],
+                    'definitions' => [
+                        'transactional' => [
+                            'webinar' => [
+                                'reminder' => [
+                                    [
+                                        'dispatch_key' => 'reminder_one',
+                                        'payload_class' => 'FirstPayload',
+                                        'queue' => 'messages',
+                                        'payload' => ['subject' => 'One', 'body' => 'One'],
+                                    ],
+                                    [
+                                        'dispatch_key' => 'reminder_two',
+                                        'payload_class' => 'SecondPayload',
+                                        'queue' => 'messages',
+                                        'payload' => ['subject' => 'Two', 'body' => 'Two'],
+                                    ],
                                 ],
                             ],
                         ],
                     ],
                 ],
-                'sms' => [],
+                'sms' => [
+                    'definitions' => [],
+                ],
                 'permission_invitations' => [],
             ],
         ]);
@@ -101,15 +109,15 @@ class MessagingConfigContractTargetProviderTest extends TestCase
 
         $this->assertNotNull($targets->firstWhere(
             'path',
-            'messaging.email.transactional.webinar.reminder.0',
+            'messaging.email.definitions.transactional.webinar.reminder.0',
         ));
         $this->assertNotNull($targets->firstWhere(
             'path',
-            'messaging.email.transactional.webinar.reminder.1',
+            'messaging.email.definitions.transactional.webinar.reminder.1',
         ));
     }
 
-    public function test_it_ignores_channel_infrastructure_that_is_not_a_message_definition_purpose(): void
+    public function test_it_ignores_channel_infrastructure_outside_the_definitions_envelope(): void
     {
         $provider = new MessagingConfigContractTargetProvider;
         $context = ConfigContractTargetContext::proposed([
@@ -126,15 +134,17 @@ class MessagingConfigContractTargetProviderTest extends TestCase
                             'provider' => 'ExampleProvider',
                         ],
                     ],
-                    'transactional' => [
-                        'webinar' => [
-                            'confirmation' => [
-                                'dispatch_key' => 'registration_created',
-                                'payload_class' => 'EmailPayload',
-                                'queue' => 'messages',
-                                'payload' => [
-                                    'subject' => 'Registered',
-                                    'body' => 'Thanks',
+                    'definitions' => [
+                        'transactional' => [
+                            'webinar' => [
+                                'confirmation' => [
+                                    'dispatch_key' => 'registration_created',
+                                    'payload_class' => 'EmailPayload',
+                                    'queue' => 'messages',
+                                    'payload' => [
+                                        'subject' => 'Registered',
+                                        'body' => 'Thanks',
+                                    ],
                                 ],
                             ],
                         ],
@@ -144,6 +154,7 @@ class MessagingConfigContractTargetProviderTest extends TestCase
                     'inbound' => [
                         'stop_keywords' => ['STOP'],
                     ],
+                    'definitions' => [],
                 ],
                 'permission_invitations' => [],
             ],
@@ -153,7 +164,7 @@ class MessagingConfigContractTargetProviderTest extends TestCase
 
         $this->assertNotNull($targets->firstWhere(
             'path',
-            'messaging.email.transactional.webinar.confirmation',
+            'messaging.email.definitions.transactional.webinar.confirmation',
         ));
 
         $this->assertNull($targets->firstWhere('path', 'messaging.email.from.marketing.address'));

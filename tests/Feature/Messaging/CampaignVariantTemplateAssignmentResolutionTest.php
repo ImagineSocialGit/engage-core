@@ -16,7 +16,7 @@ class CampaignVariantTemplateAssignmentResolutionTest extends TestCase
 
     public function test_campaign_step_resolution_distinguishes_variant_specific_assignments(): void
     {
-        Config::set('messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_primary', [
+        Config::set('messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_primary', [
             'dispatch_key' => 'campaign_step_due',
             'payload_class' => EmailPayload::class,
             'queue' => 'marketing',
@@ -26,7 +26,7 @@ class CampaignVariantTemplateAssignmentResolutionTest extends TestCase
             ],
         ]);
 
-        Config::set('messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_alternate', [
+        Config::set('messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_alternate', [
             'dispatch_key' => 'campaign_step_due',
             'payload_class' => EmailPayload::class,
             'queue' => 'marketing',
@@ -39,13 +39,13 @@ class CampaignVariantTemplateAssignmentResolutionTest extends TestCase
         $primaryPreset = $this->campaignVariantPreset(
             key: 'webinar_attended_nurture.step_1.email_primary',
             subject: 'Primary email subject',
-            sourceConfigPath: 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_primary',
+            sourceConfigPath: 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_primary',
         );
 
         $alternatePreset = $this->campaignVariantPreset(
             key: 'webinar_attended_nurture.step_1.email_alternate',
             subject: 'Alternate email subject',
-            sourceConfigPath: 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_alternate',
+            sourceConfigPath: 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_alternate',
         );
 
         $primaryAssignment = MessageTemplatePresetAssignment::factory()
@@ -104,7 +104,7 @@ class CampaignVariantTemplateAssignmentResolutionTest extends TestCase
 
     public function test_campaign_step_resolution_requires_variant_context(): void
     {
-        Config::set('messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_primary', [
+        Config::set('messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_primary', [
             'dispatch_key' => 'campaign_step_due',
             'payload_class' => EmailPayload::class,
             'queue' => 'marketing',
@@ -131,7 +131,7 @@ class CampaignVariantTemplateAssignmentResolutionTest extends TestCase
         $broadPreset = $this->campaignVariantPreset(
             key: 'webinar_attended_nurture.step_1.broad',
             subject: 'Broad step subject',
-            sourceConfigPath: 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1',
+            sourceConfigPath: 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1',
         );
 
         MessageTemplatePresetAssignment::factory()
@@ -154,7 +154,7 @@ class CampaignVariantTemplateAssignmentResolutionTest extends TestCase
 
     public function test_context_specific_campaign_step_variant_assignment_beats_global_source_assignment(): void
     {
-        $sourceConfigPath = 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_primary';
+        $sourceConfigPath = 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_primary';
 
         $globalPreset = $this->campaignVariantPreset(
             key: 'webinar_attended_nurture.step_1.email_primary.global',
@@ -240,4 +240,3 @@ class CampaignVariantTemplateAssignmentResolutionTest extends TestCase
         ]);
     }
 }
-

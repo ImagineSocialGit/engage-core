@@ -2,6 +2,7 @@
 
 namespace App\Modules\Campaigns\Validation;
 
+use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Modules\Campaigns\Data\CampaignPresetDefinition;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignStep;
@@ -115,7 +116,7 @@ private function validateSelectedPresetDefinitions(): iterable
 
             foreach (['email', 'sms'] as $channel) {
                 foreach (['transactional', 'marketing', 'internal'] as $purpose) {
-                    $purposeConfig = config("messaging.{$channel}.{$purpose}", []);
+                    $purposeConfig = config(MessageDefinitionConfigPath::purpose($channel, $purpose), []);
 
                     if (! is_array($purposeConfig)) {
                         continue;
@@ -181,7 +182,14 @@ private function validateSelectedPresetDefinitions(): iterable
                                 yield $this->warning(
                                     code: 'campaigns.messaging_template_orphaned_from_selected_campaign',
                                     message: "Messaging campaign template [{$campaignKey}:{$stepNumber}:{$variantKey}] has no matching step variant in the selected Campaign definition.",
-                                    path: "messaging.{$channel}.{$purpose}.{$normalizedScope}.campaigns.{$campaignKey}.steps.{$stepNumber}.variants.{$variantKey}",
+                                    path: MessageDefinitionConfigPath::campaignVariant(
+                                        channel: $channel,
+                                        purpose: $purpose,
+                                        scope: $normalizedScope,
+                                        campaignKey: $campaignKey,
+                                        stepNumber: $stepNumber,
+                                        variantKey: $variantKey,
+                                    ),
                                     context: [
                                         'campaign_key' => $campaignKey,
                                         'step_number' => $stepNumber,

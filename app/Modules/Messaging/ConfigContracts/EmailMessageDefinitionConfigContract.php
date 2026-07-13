@@ -21,7 +21,7 @@ class EmailMessageDefinitionConfigContract implements ConfigContract
 
     public function sourcePattern(): string
     {
-        return 'messaging.email.{purpose}.{scope}.{message_type_or_campaign_variant}';
+        return 'messaging.email.definitions.{purpose}.{scope}.{message_type_or_campaign_variant}';
     }
 
     public function schema(): ConfigSchema

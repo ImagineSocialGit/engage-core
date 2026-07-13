@@ -37,7 +37,7 @@ class MessagingSetupValidationContributorTest extends TestCase
 
     public function test_it_accepts_valid_config_and_empty_db_runtime_state(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'payload_class' => EmailPayload::class,
@@ -54,7 +54,7 @@ class MessagingSetupValidationContributorTest extends TestCase
 
     public function test_it_adapts_message_config_validator_issues_into_shared_findings(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'payload_class' => 'Missing\\Payload',
@@ -147,12 +147,12 @@ class MessagingSetupValidationContributorTest extends TestCase
     {
         $firstPreset = $this->preset([
             'key' => 'confirmation.first',
-            'source_config_path' => 'messaging.email.transactional.webinar.confirmations.0',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmations.0',
         ]);
 
         $secondPreset = $this->preset([
             'key' => 'confirmation.second',
-            'source_config_path' => 'messaging.email.transactional.webinar.confirmations.0',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmations.0',
         ]);
 
         MessageTemplatePresetAssignment::query()->create(
@@ -177,13 +177,13 @@ class MessagingSetupValidationContributorTest extends TestCase
         $firstPreset = $this->preset([
             'key' => 'campaign.email.primary',
             'message_type' => 'webinar_attended_nurture_step_1',
-            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_primary',
+            'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_primary',
         ]);
 
         $secondPreset = $this->preset([
             'key' => 'campaign.email.alternate',
             'message_type' => 'webinar_attended_nurture_step_1',
-            'source_config_path' => 'messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_alternate',
+            'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_alternate',
         ]);
 
         MessageTemplatePresetAssignment::query()->create(
@@ -220,7 +220,7 @@ class MessagingSetupValidationContributorTest extends TestCase
 
     public function test_manager_resolves_tagged_messaging_contributor(): void
     {
-        Config::set('messaging.email.transactional.webinar', [
+        Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => [
                 'dispatch_key' => 'registration_created',
                 'payload_class' => 'Missing\\Payload',
