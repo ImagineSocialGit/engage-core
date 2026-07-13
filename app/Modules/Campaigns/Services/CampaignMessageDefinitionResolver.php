@@ -32,6 +32,7 @@ class CampaignMessageDefinitionResolver
             surface: 'campaigns',
             purpose: $reference['purpose'],
             scope: $reference['scope'],
+            requireProvider: true,
         )) {
             return $this->unavailableChannelDefinition(
                 campaign: $campaign,

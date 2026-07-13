@@ -18,11 +18,11 @@ return [
             'scope' => 'webinar_nurture',
             'status' => 'active',
             'is_active' => true,
-            'source_version' => 'core_generic_2026_07_1',
+            'source_version' => 'core_generic_2026_07_2',
             'meta' => [
                 'domain' => 'webinar',
-                'strategy' => 'email_only',
-                'notes' => 'Transactional replay delivery belongs to Webinars. This campaign provides a simple later marketing follow-up.',
+                'strategy' => 'sms_preferred_email_fallback',
+                'notes' => 'Transactional replay delivery belongs to Webinars. This campaign provides one later marketing follow-up and prefers SMS when eligible, with email fallback.',
             ],
             'steps' => [
                 [
@@ -30,7 +30,7 @@ return [
                     'name' => 'Attended webinar follow-up',
                     'variant_strategy' => 'first_available',
                     'is_active' => true,
-                    'source_version' => 'core_generic_2026_07_1',
+                    'source_version' => 'core_generic_2026_07_2',
                     'criteria' => [
                         'timing' => [
                             'type' => 'delay',
@@ -42,8 +42,20 @@ return [
                     ],
                     'variants' => [
                         [
+                            'key' => 'sms',
+                            'name' => 'SMS follow-up',
+                            'sort_order' => 10,
+                            'channel' => 'sms',
+                            'purpose' => 'marketing',
+                            'scope' => 'webinar_nurture',
+                            'dispatch_key' => 'campaign_step_due',
+                            'is_active' => true,
+                            'source_config_path' => 'messaging.sms.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.sms',
+                        ],
+                        [
                             'key' => 'email',
-                            'name' => 'Email follow-up',
+                            'name' => 'Email fallback',
+                            'sort_order' => 20,
                             'channel' => 'email',
                             'purpose' => 'marketing',
                             'scope' => 'webinar_nurture',
@@ -65,11 +77,11 @@ return [
             'scope' => 'webinar_nurture',
             'status' => 'active',
             'is_active' => true,
-            'source_version' => 'core_generic_2026_07_1',
+            'source_version' => 'core_generic_2026_07_2',
             'meta' => [
                 'domain' => 'webinar',
-                'strategy' => 'email_only',
-                'notes' => 'Transactional replay delivery belongs to Webinars. This campaign provides a simple later marketing follow-up.',
+                'strategy' => 'sms_preferred_email_fallback',
+                'notes' => 'Transactional replay delivery belongs to Webinars. This campaign provides one later marketing follow-up and prefers SMS when eligible, with email fallback.',
             ],
             'steps' => [
                 [
@@ -77,7 +89,7 @@ return [
                     'name' => 'Missed webinar follow-up',
                     'variant_strategy' => 'first_available',
                     'is_active' => true,
-                    'source_version' => 'core_generic_2026_07_1',
+                    'source_version' => 'core_generic_2026_07_2',
                     'criteria' => [
                         'timing' => [
                             'type' => 'delay',
@@ -89,8 +101,20 @@ return [
                     ],
                     'variants' => [
                         [
+                            'key' => 'sms',
+                            'name' => 'SMS follow-up',
+                            'sort_order' => 10,
+                            'channel' => 'sms',
+                            'purpose' => 'marketing',
+                            'scope' => 'webinar_nurture',
+                            'dispatch_key' => 'campaign_step_due',
+                            'is_active' => true,
+                            'source_config_path' => 'messaging.sms.definitions.marketing.webinar_nurture.campaigns.webinar_missed_nurture.steps.1.variants.sms',
+                        ],
+                        [
                             'key' => 'email',
-                            'name' => 'Email follow-up',
+                            'name' => 'Email fallback',
+                            'sort_order' => 20,
                             'channel' => 'email',
                             'purpose' => 'marketing',
                             'scope' => 'webinar_nurture',

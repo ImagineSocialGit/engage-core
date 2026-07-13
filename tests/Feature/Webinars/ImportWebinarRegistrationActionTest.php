@@ -127,7 +127,7 @@ class ImportWebinarRegistrationActionTest extends TestCase
             'contact_id' => $contact->getKey(),
             'channel' => 'email',
             'purpose' => 'marketing',
-            'scope' => 'webinar_nurture',
+            'scope' => 'webinar',
             'source' => 'webinar_registration_import',
         ]);
 
@@ -135,7 +135,7 @@ class ImportWebinarRegistrationActionTest extends TestCase
             'contact_id' => $contact->getKey(),
             'channel' => 'sms',
             'purpose' => 'marketing',
-            'scope' => 'webinar_nurture',
+            'scope' => 'webinar',
         ]);
 
         $this->assertDatabaseCount('scheduled_messages', 0);
