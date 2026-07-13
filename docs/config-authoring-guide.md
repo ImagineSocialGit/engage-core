@@ -1,4 +1,3 @@
-
 # Engage Core Config Authoring Guide
 
 This guide is for creating or reviewing Engage Core default configs and client-specific configs.
@@ -469,20 +468,28 @@ Do not guess URLs in static config.
 Messaging configs live under:
 
 ```text
-config/messaging/{channel}/{purpose}/{scope}.php
-client/{client-key}/config/messaging/{channel}/{purpose}/{scope}.php
+config/messaging/{channel}/definitions/{purpose}/{scope}.php
+client/{client-key}/config/messaging/{channel}/definitions/{purpose}/{scope}.php
 ```
 
 Examples:
 
 ```text
-config/messaging/email/transactional/webinar.php
-config/messaging/email/marketing/webinar_nurture.php
-config/messaging/email/marketing/mortgage_homebuyer_nurture.php
+config/messaging/email/definitions/transactional/webinar.php
+config/messaging/email/definitions/marketing/webinar_nurture.php
+config/messaging/email/definitions/marketing/mortgage_homebuyer_nurture.php
 config/messaging/permission_invitations.php
-client/slam-dunk-crm/config/messaging/email/transactional/webinar.php
-client/slam-dunk-crm/config/messaging/email/marketing/webinar_nurture.php
+client/slam-dunk-crm/config/messaging/email/definitions/transactional/webinar.php
+client/slam-dunk-crm/config/messaging/email/definitions/marketing/webinar_nurture.php
 ```
+
+Messaging reusable definitions live behind an explicit `definitions` envelope:
+
+```text
+messaging.{channel}.definitions.{purpose}.{scope}
+```
+
+Channel infrastructure remains outside that envelope. For example, `messaging.email.provider`, `messaging.email.providers`, `messaging.email.from`, and `messaging.sms.inbound` are not message definitions and must not be traversed or validated as reusable templates.
 
 ## Normal Messaging template definition shape
 
@@ -769,7 +776,7 @@ For FlowRoutes, stable `FlowRoute.key` identifies the logical route and `version
 Campaign message copy still lives in Messaging, but campaign step variant templates use a nested campaign path:
 
 ```text
-messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
+messaging.{channel}.definitions.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
 ```
 
 Example:
@@ -1249,8 +1256,8 @@ It should not own reusable message copy.
 Message copy belongs in:
 
 ```text
-config/messaging/email/transactional/webinar.php
-config/messaging/sms/transactional/webinar.php
+config/messaging/email/definitions/transactional/webinar.php
+config/messaging/sms/definitions/transactional/webinar.php
 ```
 
 Transactional post-event follow-ups use:
@@ -1813,4 +1820,5 @@ business context label
 ```
 
 Do not persist schedule summary text unless a concrete reason appears. Prefer deriving it from the canonical schedule/profile/criteria definition.
+
 

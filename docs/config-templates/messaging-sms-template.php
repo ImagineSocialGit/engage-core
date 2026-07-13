@@ -10,8 +10,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | File path pattern:
-    | config/messaging/sms/{purpose}/{scope}.php
-    | client/{client-key}/config/messaging/sms/{purpose}/{scope}.php
+    | config/messaging/sms/definitions/{purpose}/{scope}.php
+    | client/{client-key}/config/messaging/sms/definitions/{purpose}/{scope}.php
     |
     | Create one file per purpose/scope pair.
     |
@@ -214,3 +214,4 @@ return [
     ],
 
 ];
+

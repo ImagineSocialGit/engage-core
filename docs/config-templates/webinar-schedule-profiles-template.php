@@ -63,7 +63,7 @@ return [
                 'message_type' => 'confirmation',
                 'dispatch_key' => 'registration_created',
                 'message_template_key' => 'confirmation',
-                'source_config_path' => 'messaging.email.transactional.webinar.confirmations.0',
+                'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmations.0',
                 'timing' => 'scheduled',
                 'schedule' => [
                     'type' => 'delay',
@@ -93,7 +93,7 @@ return [
                 'message_type' => 'reminder',
                 'dispatch_key' => 'registration_created',
                 'message_template_key' => 'reminder_1_day',
-                'source_config_path' => 'messaging.email.transactional.webinar.reminders.0',
+                'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.0',
                 'timing' => 'scheduled',
                 'schedule' => [
                     'type' => 'anchored',
@@ -117,7 +117,7 @@ return [
                 'message_type' => 'reminder',
                 'dispatch_key' => 'registration_created',
                 'message_template_key' => 'reminder_30_minute',
-                'source_config_path' => 'messaging.email.transactional.webinar.reminders.1',
+                'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.1',
                 'timing' => 'scheduled',
                 'schedule' => [
                     'type' => 'anchored',
@@ -143,7 +143,7 @@ return [
                 'message_type' => 'post_attended',
                 'dispatch_key' => 'webinar_ended',
                 'message_template_key' => 'post_attended',
-                'source_config_path' => 'messaging.email.transactional.webinar.post_attended.0',
+                'source_config_path' => 'messaging.email.definitions.transactional.webinar.post_attended.0',
                 'timing' => 'immediate',
                 'schedule' => null,
                 'conditions' => [],

@@ -10,8 +10,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | File path pattern:
-    | config/messaging/email/{purpose}/{scope}.php
-    | client/{client-key}/config/messaging/email/{purpose}/{scope}.php
+    | config/messaging/email/definitions/{purpose}/{scope}.php
+    | client/{client-key}/config/messaging/email/definitions/{purpose}/{scope}.php
     |
     | Create one file per purpose/scope pair.
     |
@@ -32,12 +32,13 @@ return [
 
     |
     | Examples:
-    | config/messaging/email/transactional/webinar.php
-    | config/messaging/email/transactional/permission_invitation.php
-    | config/messaging/email/marketing/webinar_nurture.php
-    | config/messaging/email/marketing/broadcast.php
-    | config/messaging/email/marketing/mortgage_homebuyer_nurture.php
-    | config/messaging/email/marketing/webinar_waitlist.php
+    | config/messaging/email/definitions/transactional/webinar.php
+    | Permission-invitation page/email config is separate:
+    | config/messaging/permission_invitations.php
+    | config/messaging/email/definitions/marketing/webinar_nurture.php
+    | config/messaging/email/definitions/marketing/broadcast.php
+    | config/messaging/email/definitions/marketing/mortgage_homebuyer_nurture.php
+    | config/messaging/email/definitions/marketing/webinar_waitlist.php
     |
     | Non-campaign top-level keys describe message definition groups. For
     | list-based groups such as confirmations or reminders, the reusable runtime
@@ -316,3 +317,4 @@ TEXT,
     ],
 
 ];
+

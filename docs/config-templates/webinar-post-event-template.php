@@ -21,13 +21,13 @@ return [
     |
     | Transactional replay/follow-up copy belongs in:
     |
-    | config/messaging/email/transactional/webinar.php
-    | config/messaging/sms/transactional/webinar.php
+    | config/messaging/email/definitions/transactional/webinar.php
+    | config/messaging/sms/definitions/transactional/webinar.php
     |
     | Campaign nurture copy belongs in:
     |
-    | config/messaging/email/marketing/webinar_nurture.php
-    | config/messaging/sms/marketing/webinar_nurture.php
+    | config/messaging/email/definitions/marketing/webinar_nurture.php
+    | config/messaging/sms/definitions/marketing/webinar_nurture.php
     |
     | Webinars dispatch transactional follow-ups with:
     |
@@ -102,4 +102,5 @@ return [
     ],
 
 ];
+
 

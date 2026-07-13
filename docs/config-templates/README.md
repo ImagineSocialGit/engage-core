@@ -141,7 +141,7 @@ Preset groups are composition-only. Durable preset ownership belongs to contribu
 - Campaign message templates live in Messaging configs under:
 
 ```text
-messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
+messaging.{channel}.definitions.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
 ```
 
 - Campaign message templates resolve by channel, purpose, scope, campaign key, step number, and variant key, not author-created per-step message names.
@@ -298,4 +298,5 @@ Client request:
 
 Return complete config files and list any recommended new keys/tokens separately.
 ```
+
 

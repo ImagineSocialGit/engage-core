@@ -1,4 +1,3 @@
-
 # Engage Core Module Boundaries
 
 ## Executable config and token contract ownership
@@ -2180,7 +2179,7 @@ Campaign message templates are resolved from Messaging by:
 
 The matching Messaging config path is:
 
-    messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
+    messaging.{channel}.definitions.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
 
 Campaign preset step variants should reference the message template context only through first-class variant fields:
 
@@ -3315,4 +3314,5 @@ Campaigns invents webinar URL fields without the enrollment caller supplying the
 ```
 
 Treat available-field validation as setup/config-validation work before every editor receives polished autocomplete.
+
 

@@ -58,7 +58,7 @@ return [
     |
     | Campaign message templates resolve by:
     |
-    | messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
+    | messaging.{channel}.definitions.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
     */
 
     /*
@@ -282,4 +282,5 @@ return [
     ],
 
 ];
+
 

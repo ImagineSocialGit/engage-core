@@ -1,5 +1,3 @@
-
-
 # Messaging Module
 
 ## Config and token contracts
@@ -308,7 +306,7 @@ source_config_path
 `source_config_path` should point at the concrete template source, such as:
 
 ```text
-messaging.email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email
+messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email
 ```
 
 This keeps variant-specific assignments distinct even when variants share the same campaign key, step number, dispatch key, and broad message type.
@@ -434,6 +432,12 @@ Reusable copy includes campaign nurture messages, webinar confirmation/reminder/
 
 Campaigns, Webinars, and FlowRoutes may reference Messaging templates or assignments, but they should not become the primary home for reusable subject/body/message copy.
 
+
+Reusable config-defined Messaging templates live only under:
+
+    messaging.{channel}.definitions.{purpose}.{scope}
+
+The `definitions` envelope is the canonical boundary between reusable templates and channel infrastructure. Channel-level settings such as `messaging.email.provider`, `messaging.email.providers`, `messaging.email.from`, and `messaging.sms.inbound` remain outside it and must not be inferred to be message definitions.
 
 Campaign-owned message templates live inside Messaging configs under:
 
@@ -786,4 +790,5 @@ available-field/token picker UX
 No persistent validation-result tables are required unless a later operator workflow proves retained history or acknowledgement state is needed.
 
 Fields should be filtered by authoring/runtime context so operators cannot insert a field that will be unavailable when the message sends.
+
 

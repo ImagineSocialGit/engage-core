@@ -1,4 +1,3 @@
-
 # Campaigns Module
 
 ## Config and token contracts
@@ -240,7 +239,7 @@ Campaign runtime should also keep variant progression/dependency checks tied to 
 
 The matching Messaging config path is:
 
-    messaging.{channel}.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
+    messaging.{channel}.definitions.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
 
 Campaign preset steps should define the business moment and strategy.
 
@@ -598,4 +597,5 @@ source event or route point, when available
 ```
 
 Do not persist summary text unless a concrete reporting/audit reason appears. Prefer deriving it from the canonical step/variant timing definition.
+
 
