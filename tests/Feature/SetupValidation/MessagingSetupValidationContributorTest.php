@@ -98,4 +98,15 @@ class TestContributorEmailPayload
     {
         return new self();
     }
+
+    public function test_invalid_consent_domain_configuration_is_reported_as_setup_error(): void
+    {
+        \Illuminate\Support\Facades\Config::set('webinars.consent_domains.webinar.topic', '');
+
+        $codes = collect(app(\App\Support\SetupValidation\SetupValidationManager::class)->validate()->findings())
+            ->pluck('code')
+            ->all();
+
+        $this->assertContains('messaging.consent_domain.topic_missing', $codes);
+    }
 }

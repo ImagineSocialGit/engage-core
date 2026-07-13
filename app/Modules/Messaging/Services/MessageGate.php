@@ -13,6 +13,7 @@ class MessageGate
     public function __construct(
         private readonly MessageSuppressionService $messageSuppressionService,
         private readonly ContactPermissionInvitationService $permissionInvitationService,
+        private readonly ConsentDomainRegistry $consentDomainRegistry,
     ) {}
 
     /**
@@ -29,7 +30,7 @@ class MessageGate
     ): bool {
         $channel = $this->normalizeChannel($channel);
         $purpose = $this->normalizePurpose($purpose);
-        $scope = trim($scope);
+        $scope = $this->normalizeNullableSegment($scope) ?? '';
         $messageKey = $this->normalizeNullableSegment($messageKey);
         $context ??= [];
 
@@ -47,8 +48,10 @@ class MessageGate
             return false;
         }
 
+        $consentDomain = $this->consentDomainRegistry->domainForScope($scope);
+
         if (
-            ! $this->hasActiveConsent($contact, $channel, $purpose, $scope)
+            ! $this->hasActiveConsent($contact, $channel, $purpose, $consentDomain)
             && ! $this->allowsImportedContactInvitationPass($contact, $channel, $messageKey, $context)
         ) {
             return false;

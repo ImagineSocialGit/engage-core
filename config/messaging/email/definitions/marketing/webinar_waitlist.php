@@ -26,22 +26,5 @@ return [
         ],
     ],
 
-    'opt_ins' => [
-        [
-            'key' => 'opt_in',
-            'dispatch_key' => 'consent_granted',
-            'message_type' => 'opt_in',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar_waitlist',
-            'payload_class' => EmailPayload::class,
-            'queue' => 'opt_in_messages',
-
-            'payload' => [
-                'subject' => 'You’re on the webinar waitlist',
-                'body' => 'Thanks for subscribing to webinar updates. We’ll let you know when a new session is available.',
-            ],
-        ],
-    ],
 
 ];

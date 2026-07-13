@@ -73,6 +73,41 @@ return [
 
     'consent' => [
         'require_active_consent' => true,
+
+        /*
+        | Generic consent acknowledgements are Messaging-owned system copy.
+        | Module-owned consent domains supply the human-readable topic and may
+        | override copy per channel/purpose from their own config when needed.
+        |
+        | These use :client_name and :consent_topic runtime markers rather than
+        | Messaging template tokens, so consent acknowledgement copy does not
+        | create cross-module token ownership requirements.
+        */
+        'opt_in_defaults' => [
+            'email' => [
+                'marketing' => [
+                    'subject' => 'You’re subscribed',
+                    'body' => 'You’re subscribed to receive marketing emails from :client_name related to :consent_topic. You can unsubscribe at any time.',
+                    'queue' => 'opt_in_messages',
+                ],
+                'transactional' => [
+                    'subject' => 'Your email updates are enabled',
+                    'body' => 'You’re subscribed to receive email updates from :client_name related to :consent_topic.',
+                    'queue' => 'opt_in_messages',
+                ],
+            ],
+
+            'sms' => [
+                'marketing' => [
+                    'message' => 'You’re subscribed to receive marketing text messages from :client_name related to :consent_topic. Reply HELP for help. Msg & data rates may apply. Reply STOP to opt out.',
+                    'queue' => 'opt_in_messages',
+                ],
+                'transactional' => [
+                    'message' => 'You’re subscribed to receive text message updates from :client_name related to :consent_topic. Reply HELP for help. Msg & data rates may apply. Reply STOP to opt out.',
+                    'queue' => 'opt_in_messages',
+                ],
+            ],
+        ],
     ],
 
     'suppression' => [

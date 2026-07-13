@@ -111,6 +111,12 @@ class GrantMessageConsentActionTest extends TestCase
                 string $scope,
                 string|array $dispatchKeys,
                 array $payload,
+                ?\Illuminate\Database\Eloquent\Model $context,
+                mixed $triggeredAt,
+                mixed $anchor,
+                ?array $meta,
+                array $criteria,
+                array $definitions,
             ) use ($contact): bool {
                 return $passedContact->is($contact)
                     && $channel === 'email'
@@ -121,7 +127,10 @@ class GrantMessageConsentActionTest extends TestCase
                         'tokens' => [
                             'first_name' => 'Jeff',
                         ],
-                    ];
+                    ]
+                    && $definitions[0]['scope'] === 'webinar'
+                    && $definitions[0]['message_type'] === 'opt_in'
+                    && str_contains($definitions[0]['payload']['body'], 'webinars and webinar follow-up');
             })
             ->andReturn([]);
 
@@ -205,6 +214,46 @@ class GrantMessageConsentActionTest extends TestCase
                 'consented_at' => now(),
             ],
         );
+    }
+
+    public function test_different_webinar_message_scopes_share_one_stored_consent_domain(): void
+    {
+        $contact = Contact::factory()->create();
+
+        $this->mockDispatchMessageActionOnce();
+
+        app(GrantMessageConsentAction::class)->handle(
+            contact: $contact,
+            data: [
+                'channel' => 'email',
+                'purpose' => 'marketing',
+                'scope' => 'webinar_waitlist',
+                'source' => 'waitlist',
+                'consented_at' => now(),
+            ],
+        );
+
+        $this->mockDispatchMessageActionNever();
+
+        app(GrantMessageConsentAction::class)->handle(
+            contact: $contact,
+            data: [
+                'channel' => 'email',
+                'purpose' => 'marketing',
+                'scope' => 'webinar_nurture',
+                'source' => 'registration',
+                'consented_at' => now(),
+            ],
+        );
+
+        $this->assertDatabaseCount('message_consents', 1);
+        $this->assertDatabaseHas('message_consents', [
+            'contact_id' => $contact->id,
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar',
+            'source' => 'registration',
+        ]);
     }
 
     public function test_granting_marketing_consent_does_not_mutate_campaign_enrollments(): void

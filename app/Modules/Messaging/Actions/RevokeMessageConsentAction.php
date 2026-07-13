@@ -7,6 +7,7 @@ use App\Modules\Messaging\Models\ConsentRevocation;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Rules\ConsentRevocationRules;
+use App\Modules\Messaging\Services\ConsentDomainRegistry;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -14,6 +15,10 @@ use Illuminate\Validation\ValidationException;
 
 class RevokeMessageConsentAction
 {
+    public function __construct(
+        private readonly ConsentDomainRegistry $consentDomainRegistry,
+    ) {}
+
     /**
      * @return array{revocations: Collection<int, ConsentRevocation>, created: bool}
      *
@@ -24,7 +29,9 @@ class RevokeMessageConsentAction
         $validated = Validator::make($data, ConsentRevocationRules::rules())->validate();
 
         return DB::transaction(function () use ($contact, $validated): array {
-            $scope = $validated['scope'] ?? null;
+            $scope = isset($validated['scope'])
+                ? $this->consentDomainRegistry->domainForScope($validated['scope'])
+                : null;
 
             if ($scope !== null) {
                 $result = $this->revokeScope($contact, $validated, $scope);

@@ -65,6 +65,21 @@ class CoreWebinarMessagingDefaultsTest extends TestCase
             $configs['sms_nurture'],
             'Core Webinar nurture should stay email-only; richer mixed-channel campaign strategy belongs to client config.',
         );
+
+        foreach ([
+            'email_transactional',
+            'sms_transactional',
+            'email_waitlist',
+            'sms_waitlist',
+            'email_nurture',
+            'sms_nurture',
+        ] as $configKey) {
+            $this->assertArrayNotHasKey(
+                'opt_ins',
+                $configs[$configKey],
+                "Scope-specific opt-in copy must not return to Messaging definition config [{$configKey}].",
+            );
+        }
     }
 
     public function test_core_webinar_campaign_defaults_are_one_step_email_follow_ups_after_seven_days(): void

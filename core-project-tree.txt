@@ -495,6 +495,8 @@
 │   │   │   │   └── MessageConsentRules.php
 │   │   │   ├── Services
 │   │   │   │   ├── ConditionChecker.php
+│   │   │   │   ├── ConsentDomainRegistry.php
+│   │   │   │   ├── ConsentOptInDefinitionResolver.php
 │   │   │   │   ├── ContactPermissionInvitationEligibility.php
 │   │   │   │   ├── ContactPermissionInvitationService.php
 │   │   │   │   ├── ContactShow
@@ -879,6 +881,7 @@
 │   │   │   │       └── sms
 │   │   │   │           └── definitions
 │   │   │   │               └── transactional
+│   │   │   ├── presets.php
 │   │   │   ├── theme.php
 │   │   │   └── webinars
 │   │   │       ├── content.php
@@ -1034,7 +1037,6 @@
 │   │   │   └── definitions
 │   │   │       ├── marketing
 │   │   │       │   ├── webinar_nurture.php
-│   │   │       │   ├── webinar.php
 │   │   │       │   └── webinar_waitlist.php
 │   │   │       └── transactional
 │   │   │           └── webinar.php
@@ -1523,6 +1525,9 @@
 │   │   ├── Messaging
 │   │   │   ├── CampaignVariantTemplateAssignmentResolutionTest.php
 │   │   │   ├── ConditionCheckerTest.php
+│   │   │   ├── ConsentDomainActionIntegrationTest.php
+│   │   │   ├── ConsentDomainRegistryTest.php
+│   │   │   ├── ConsentOptInDefinitionResolverTest.php
 │   │   │   ├── ConsentRevocationControllerTest.php
 │   │   │   ├── ContactPermissionInvitationControllerTest.php
 │   │   │   ├── CreateContactPermissionInvitationsForImportBatchActionTest.php
@@ -1620,4 +1625,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-519 directories, 1102 files
+519 directories, 1107 files

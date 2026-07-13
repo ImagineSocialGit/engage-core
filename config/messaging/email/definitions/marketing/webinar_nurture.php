@@ -3,22 +3,6 @@
 use App\Modules\Messaging\Payloads\EmailPayload;
 
 return [
-    'opt_ins' => [
-        [
-            'key' => 'opt_in',
-            'dispatch_key' => 'consent_granted',
-            'message_type' => 'opt_in',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar_nurture',
-            'payload_class' => EmailPayload::class,
-            'queue' => 'opt_in_messages',
-            'payload' => [
-                'subject' => 'You’re subscribed to webinar follow-up emails',
-                'body' => 'Thanks for subscribing to webinar follow-up emails. You can unsubscribe at any time.',
-            ],
-        ],
-    ],
 
     'campaigns' => [
         'webinar_attended_nurture' => [

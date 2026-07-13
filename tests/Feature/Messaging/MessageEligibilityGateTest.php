@@ -52,6 +52,81 @@ class MessageEligibilityGateTest extends TestCase
         );
     }
 
+    public function test_webinar_domain_consent_allows_waitlist_and_nurture_message_scopes(): void
+    {
+        $contact = Contact::factory()->create([
+            'email' => 'person@example.com',
+        ]);
+
+        MessageConsent::query()->create([
+            'contact_id' => $contact->id,
+            'channel' => MessageChannel::Email->value,
+            'purpose' => MessagePurpose::Marketing->value,
+            'scope' => 'webinar',
+            'consented_at' => now(),
+            'source' => 'test',
+        ]);
+
+        $gate = app(MessageEligibilityGate::class);
+
+        $this->assertTrue($gate->canSend(
+            $contact,
+            MessageChannel::Email,
+            MessagePurpose::Marketing,
+            'webinar_waitlist',
+        ));
+
+        $this->assertTrue($gate->canSend(
+            $contact,
+            MessageChannel::Email,
+            MessagePurpose::Marketing,
+            'webinar_nurture',
+        ));
+    }
+
+    public function test_revoking_webinar_domain_blocks_all_webinar_message_scopes_for_that_channel_and_purpose(): void
+    {
+        $contact = Contact::factory()->create([
+            'email' => 'person@example.com',
+        ]);
+
+        $consent = MessageConsent::query()->create([
+            'contact_id' => $contact->id,
+            'channel' => MessageChannel::Email->value,
+            'purpose' => MessagePurpose::Marketing->value,
+            'scope' => 'webinar',
+            'consented_at' => now()->subMinute(),
+            'source' => 'test',
+        ]);
+
+        ConsentRevocation::query()->create([
+            'contact_id' => $contact->id,
+            'message_consent_id' => $consent->id,
+            'channel' => MessageChannel::Email->value,
+            'purpose' => MessagePurpose::Marketing->value,
+            'scope' => 'webinar',
+            'revoked_at' => now(),
+            'reason' => ConsentRevocation::REASON_UNSUBSCRIBE,
+            'source' => 'test',
+        ]);
+
+        $gate = app(MessageEligibilityGate::class);
+
+        $this->assertFalse($gate->canSend(
+            $contact,
+            MessageChannel::Email,
+            MessagePurpose::Marketing,
+            'webinar_waitlist',
+        ));
+
+        $this->assertFalse($gate->canSend(
+            $contact,
+            MessageChannel::Email,
+            MessagePurpose::Marketing,
+            'webinar_nurture',
+        ));
+    }
+
     public function test_imported_contact_permission_invitation_allows_email_without_existing_consent(): void
     {
         $contact = Contact::factory()->create([

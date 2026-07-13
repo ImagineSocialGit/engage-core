@@ -118,7 +118,7 @@ class WebinarWaitlistSignupControllerTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'webinar_waitlist',
+            'scope' => 'webinar',
             'source' => 'webinar_waitlist',
         ]);
 
@@ -149,7 +149,7 @@ class WebinarWaitlistSignupControllerTest extends TestCase
         $message = ScheduledMessage::query()
             ->where('channel', MessageChannel::Email->value)
             ->where('purpose', MessagePurpose::Marketing->value)
-            ->where('scope', 'webinar_waitlist')
+            ->where('scope', 'webinar')
             ->where('message_type', 'opt_in')
             ->first();
 
@@ -186,7 +186,7 @@ class WebinarWaitlistSignupControllerTest extends TestCase
         $message = ScheduledMessage::query()
             ->where('channel', MessageChannel::Sms->value)
             ->where('purpose', MessagePurpose::Marketing->value)
-            ->where('scope', 'webinar_waitlist')
+            ->where('scope', 'webinar')
             ->where('message_type', 'opt_in')
             ->first();
 
@@ -311,7 +311,7 @@ class WebinarWaitlistSignupControllerTest extends TestCase
                 'contact_id' => $contact->id,
                 'channel' => $channel,
                 'purpose' => MessagePurpose::Marketing->value,
-                'scope' => 'webinar_waitlist',
+                'scope' => 'webinar',
                 'source' => 'webinar_waitlist',
             ]);
         }

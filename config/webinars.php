@@ -1,4 +1,3 @@
-
 <?php
 
 return [
@@ -6,6 +5,26 @@ return [
     'enabled' => env('WEBINARS_ENABLED', true),
 
     'provider' => env('WEBINAR_PROVIDER', 'zoom'),
+
+
+    /*
+    | Consent domains are module-owned permission boundaries. Message scopes
+    | remain precise runtime identities; this mapping controls which scopes share
+    | one stored consent decision. Exact [webinar] plus the [webinar_] prefix
+    | automatically covers current and future Webinar-owned message scopes.
+    */
+    'consent_domains' => [
+        'webinar' => [
+            'topic' => 'webinars and webinar follow-up',
+            'scopes' => [
+                'webinar',
+            ],
+            'scope_prefixes' => [
+                'webinar_',
+            ],
+            'opt_in' => [],
+        ],
+    ],
 
     'providers' => [
         'zoom' => [

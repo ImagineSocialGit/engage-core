@@ -6,6 +6,7 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
+use App\Modules\Messaging\Services\ConsentDomainRegistry;
 use App\Modules\Messaging\Services\MessageConfigValidator;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
@@ -18,14 +19,32 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
 
     public function __construct(
         private readonly MessageConfigValidator $messageConfigValidator,
+        private readonly ConsentDomainRegistry $consentDomainRegistry,
     ) {}
 
     public function findings(): iterable
     {
+        yield from $this->validateConsentDomains();
         yield from $this->validateConfigRoutes();
         yield from $this->validateCustomizedPresets();
         yield from $this->validateActiveAssignments();
         yield from $this->validateExactAssignmentAmbiguity();
+    }
+
+    /**
+     * @return iterable<int, SetupValidationFinding>
+     */
+    private function validateConsentDomains(): iterable
+    {
+        foreach ($this->consentDomainRegistry->validationIssues() as $issue) {
+            yield $this->error(
+                code: $issue['code'],
+                message: $issue['message'],
+                source: 'consent_domains',
+                path: $issue['path'],
+                context: $issue['context'],
+            );
+        }
     }
 
     /**

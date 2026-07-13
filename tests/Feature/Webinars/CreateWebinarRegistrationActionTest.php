@@ -157,7 +157,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => 'email',
             'purpose' => 'marketing',
-            'scope' => 'webinar_nurture',
+            'scope' => 'webinar',
         ]);
 
         $this->assertDatabaseMissing('message_consents', [
@@ -283,7 +283,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => 'sms',
             'purpose' => 'marketing',
-            'scope' => 'webinar_nurture',
+            'scope' => 'webinar',
         ]);
 
         $this->assertSame(

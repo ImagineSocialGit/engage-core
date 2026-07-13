@@ -39,22 +39,6 @@ TEXT,
         ],
     ],
 
-    'opt_ins' => [
-        [
-            'key' => 'opt_in',
-            'dispatch_key' => 'consent_granted',
-            'message_type' => 'opt_in',
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-            'payload_class' => EmailPayload::class,
-            'queue' => 'opt_in_messages',
-            'payload' => [
-                'subject' => 'You’re subscribed to webinar emails',
-                'body' => 'Thanks for subscribing to receive webinar access details, reminders, replay information, and related transactional updates.',
-            ],
-        ],
-    ],
 
     'reminders' => [
         [

@@ -4,10 +4,15 @@ namespace App\Modules\Messaging\Actions;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\MessageConsent;
+use App\Modules\Messaging\Services\ConsentDomainRegistry;
 use Illuminate\Support\Carbon;
 
 class ImportMessageConsentAction
 {
+    public function __construct(
+        private readonly ConsentDomainRegistry $consentDomainRegistry,
+    ) {}
+
     /**
      * Import consent state without dispatching consent events or opt-in messages.
      *
@@ -23,11 +28,14 @@ class ImportMessageConsentAction
         string $source = 'import',
         array $meta = [],
     ): array {
+        $requestedScope = $this->normalizeSegment($scope);
+        $consentDomain = $this->consentDomainRegistry->domainForScope($requestedScope);
+
         $consent = MessageConsent::query()->firstOrNew([
             'contact_id' => $contact->getKey(),
             'channel' => $this->normalizeSegment($channel),
             'purpose' => $this->normalizeSegment($purpose),
-            'scope' => $this->normalizeSegment($scope),
+            'scope' => $consentDomain,
         ]);
 
         $created = ! $consent->exists;
@@ -38,6 +46,12 @@ class ImportMessageConsentAction
             'meta' => array_replace_recursive(
                 is_array($consent->meta) ? $consent->meta : [],
                 $meta,
+                [
+                    'consent' => [
+                        'requested_scope' => $requestedScope,
+                        'domain' => $consentDomain,
+                    ],
+                ],
             ),
         ])->save();
 

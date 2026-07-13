@@ -381,7 +381,6 @@ class TelnyxInboundSmsWebhookTest extends TestCase
         ]);
 
         $this->grantSmsConsent($contact, 'marketing', 'webinar');
-        $this->grantSmsConsent($contact, 'marketing', 'webinar_waitlist');
         $this->grantSmsConsent($contact, 'transactional', 'webinar');
 
         $this->postTelnyxWebhook([
@@ -401,20 +400,12 @@ class TelnyxInboundSmsWebhookTest extends TestCase
         $this->assertDatabaseHas('consent_revocations', [
             'contact_id' => $contact->id,
             'channel' => 'sms',
-            'purpose' => 'marketing',
-            'scope' => 'webinar_waitlist',
-            'reason' => ConsentRevocation::REASON_STOP,
-        ]);
-
-        $this->assertDatabaseHas('consent_revocations', [
-            'contact_id' => $contact->id,
-            'channel' => 'sms',
             'purpose' => 'transactional',
             'scope' => 'webinar',
             'reason' => ConsentRevocation::REASON_STOP,
         ]);
 
-        $this->assertDatabaseCount('consent_revocations', 3);
+        $this->assertDatabaseCount('consent_revocations', 2);
     }
 
     public function test_telnyx_stop_with_no_matching_contact_stores_inbound_message_but_does_not_revoke(): void
