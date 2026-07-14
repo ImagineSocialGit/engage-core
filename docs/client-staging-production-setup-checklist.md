@@ -49,6 +49,7 @@ Replace every placeholder before staging or production handoff.
 <WEB_USER>                   Example: www-data
 <PHP_BIN>                    Example: /usr/bin/php8.3
 <SUPERVISOR_PROGRAM>         Example: <ROOT_DOMAIN>-horizon
+<CLIENT_HORIZON_PROGRAM>     Actual Supervisor program that runs this client's Horizon process
 <GITHUB_ORG>                 Example: YourGitHubOrg
 <ENGAGE_CORE_REPO>           Example: engage-core
 <CLIENT_REPO>                Example: <CLIENT_KEY>
@@ -461,9 +462,33 @@ ps aux | grep "[a]rtisan horizon"
 
 Do not trust Supervisor config alone. Confirm the process that is actually running.
 
+Before restarting Horizon, inspect the actual Supervisor program name instead of guessing it:
+
+```bash
+sudo supervisorctl status
+sudo grep -R "^\[program:" /etc/supervisor /etc/supervisor/conf.d 2>/dev/null
+```
+
+Use the exact matching program name as:
+
+```text
+<CLIENT_HORIZON_PROGRAM>
+```
+
+Operational rule:
+
+> After deploying PHP changes that affect queued job execution, job validation, payload rendering, gates, providers, or other queue-worker runtime behavior, restart the Supervisor-managed Horizon process so all workers load the new code.
+
+```bash
+sudo supervisorctl restart <CLIENT_HORIZON_PROGRAM>
+ps aux | grep "[a]rtisan horizon"
+```
+
+Supervisor is the lifecycle source of truth for this deployment path. Do not substitute an Artisan Horizon lifecycle command for the Supervisor restart when Supervisor owns the process.
+
 ## 18. Configure the Horizon queue list explicitly
 
-The provided Core configs can currently dispatch work to queues including:
+The current executable/configured queue set includes:
 
 ```text
 default
@@ -473,22 +498,29 @@ opt_in_messages
 reminders
 post_event
 marketing
-campaigns
-waitlist
+emails
 sms
 webinars
 webhooks
 ```
 
-Use an explicit `HORIZON_SUPERVISOR_1_QUEUES` value until Core's built-in Horizon defaults are updated to reflect all executable queue paths.
+Use an explicit `HORIZON_SUPERVISOR_1_QUEUES` value until Core's built-in Horizon defaults are confirmed to reflect every executable queue path.
 
 Example:
 
 ```env
-HORIZON_SUPERVISOR_1_QUEUES=default,notifications,confirmation_messages,opt_in_messages,reminders,post_event,marketing,campaigns,waitlist,sms,webinars,webhooks
+HORIZON_SUPERVISOR_1_QUEUES=default,notifications,confirmation_messages,opt_in_messages,reminders,post_event,marketing,emails,sms,webinars,webhooks
 ```
 
-Do not add an `emails` queue merely because it appeared in an older env file; the supplied current Core configs do not dispatch to that queue.
+Current runtime notes:
+
+```text
+emails is an active queue path.
+Webinar waitlist delivery uses notifications; there is no canonical separate waitlist queue requirement.
+Do not preserve an old campaigns queue requirement from stale Webinar nurture config.
+```
+
+Horizon must consume every queue the current runtime can actually dispatch to. Verify effective runtime configuration rather than trusting a historical `.env` queue list.
 
 ## 19. Run migrations
 
@@ -612,6 +644,7 @@ When SMS is enabled:
 ```text
 SMS_ENABLED=true
 provider resolves to telnyx unless intentionally changed
+effective Messaging channel availability reports provider_enabled = true for the intended SMS surface/purpose/scope
 transactional number resolves
 marketing number resolves
 profile IDs resolve when required
@@ -641,7 +674,9 @@ personalized join URL is stored
 registration confirmation planning works
 schedule profile is selected and active
 future reminders are scheduled correctly
-webhook endpoint receives signed events
+webhook endpoint receives and successfully verifies real signed provider delivery before a live event
+attendance-report capability works through the exact provider call used by runtime
+cloud-recording lookup/access works when replay follow-ups are enabled
 attendance retrieval works
 recording.completed can resolve playback
 post-event follow-ups wait for required playback conditions
@@ -662,6 +697,29 @@ webinar.recording_completed
 ```
 
 Do not assume `webinar.ended` alone sends replay follow-ups.
+
+Use `client-third-party-services-checklist.md` for the current Zoom capability/scope checklist. The current provider implementation requires distinct capabilities for registration/lookup, attendance reports, and cloud recording lookup; do not assume one Zoom permission category implies the others. The first production run specifically required participant-report capability equivalent to `report:read:list_webinar_participants:admin` before attendance reconciliation could succeed.
+
+Do not treat route existence or webhook subscription configuration as proof of webhook readiness. Before relying on a live Webinar, verify that a real signed provider webhook reaches the intended environment, passes signature verification, dispatches to a consumed queue, and produces the expected domain action.
+
+For production post-event handling, use this safe sequence:
+
+```text
+1. Verify the Zoom app has the capabilities required by the current provider implementation.
+2. Verify attendance state.
+3. Resolve duplicate/cancelled registration conflicts before follow-up dispatch when necessary.
+4. Retry only the failed post-event provider job.
+5. Confirm Webinar.playback_url contains the real recording URL.
+6. Confirm follow_ups_dispatched_at is populated.
+7. Inspect the actual ScheduledMessage rows.
+8. Verify replay URL, expected CTAs/links, recipient eligibility, statuses, and send timing.
+9. Inspect Horizon Delayed Until and/or serialized queue delay metadata before touching Redis.
+10. Restart Supervisor-managed Horizon after queued-job code changes.
+11. Surgically retry only the affected skipped/failed messages.
+12. Verify final message statuses.
+```
+
+Do not use a broad queue reset, Redis flush, or indiscriminate message retry as normal recovery for a narrow post-event failure.
 
 ## 30. Use local/staging-only Webinar dev tools where available
 
@@ -777,12 +835,16 @@ Resolve errors before launch.
 
 ## 38. Restart Horizon through Supervisor
 
-Use the actual Supervisor program and verify the process path afterward:
+Inspect and use the actual Supervisor program name rather than guessing it:
 
 ```bash
-sudo supervisorctl restart <SUPERVISOR_PROGRAM>
+sudo supervisorctl status
+sudo grep -R "^\[program:" /etc/supervisor /etc/supervisor/conf.d 2>/dev/null
+sudo supervisorctl restart <CLIENT_HORIZON_PROGRAM>
 ps aux | grep "[a]rtisan horizon"
 ```
+
+This restart is mandatory after deploying PHP changes that alter queued-job runtime behavior, including job execution, validation, payload rendering, gates, or providers, because long-running workers otherwise continue executing the old code already loaded in memory.
 
 ## 39. Verify production routes and hosts
 
@@ -953,7 +1015,7 @@ For normal post-launch deployments:
 7. Run php artisan migrate --force.
 8. Run php artisan presets:sync when config/presets changed.
 9. Run php artisan setup:validate when setup/config changed.
-10. Restart Horizon through Supervisor.
+10. Restart Horizon through Supervisor after any queued-job runtime code change; use the exact `<CLIENT_HORIZON_PROGRAM>` discovered from Supervisor.
 11. Verify actual Horizon process path and queue list.
 12. Run focused production-safe smoke checks for touched providers/modules.
 ```
@@ -962,3 +1024,5 @@ Do not clear Redis indiscriminately during ordinary deployments.
 Do not regenerate `APP_KEY`.
 Do not destructively reset a production database containing real data.
 Do not assume preset changes rewrite already scheduled message payloads.
+
+

@@ -62,6 +62,46 @@ Do not stop after reading the Supervisor config. Confirm the live process path.
 5. Verify the actual process path.
 6. Inspect failed/pending queues for jobs serialized by the wrong application state.
 
+## Stale long-running workers after a code deploy
+
+A second failure mode is subtler: Supervisor points to the correct checkout, but long-running Horizon workers still have the old PHP code loaded in memory.
+
+Symptom pattern:
+
+```text
+deploy queued-job/runtime fix
+→ some later jobs behave correctly
+→ other retried jobs still execute obsolete validation/rendering behavior
+```
+
+This can affect changes to:
+
+```text
+queued job classes
+job validation
+payload rendering
+unresolved-token guards
+message gates
+providers
+other queue-worker runtime behavior
+```
+
+Inspect the actual Supervisor program name instead of guessing:
+
+```bash
+sudo supervisorctl status
+sudo grep -R "^\[program:" /etc/supervisor /etc/supervisor/conf.d 2>/dev/null
+```
+
+Then restart the Supervisor-managed Horizon process:
+
+```bash
+sudo supervisorctl restart <CLIENT_HORIZON_PROGRAM>
+ps aux | grep "[a]rtisan horizon"
+```
+
+Supervisor is the lifecycle source of truth for this deployment path. Do not rely on an Artisan Horizon lifecycle command as a substitute when Supervisor owns the process.
+
 ---
 
 # 2. Stale Redis jobs after destructive database reset
@@ -153,11 +193,31 @@ Never inspect an unprefixed key, see zero, and conclude the app queue is empty w
 
 ---
 
-# 4. Horizon queue list does not cover actual dispatch queues
+# 4. Delayed-job diagnostics: database `send_at` is not enough
+
+When debugging delayed delivery, do not infer the actual Redis delay solely from `scheduled_messages.send_at`.
+
+A queued Laravel job can preserve timezone-aware delay metadata even when a persisted timestamp was normalized incorrectly. Before manipulating Redis or requeueing a job, inspect:
+
+```text
+Horizon Delayed Until
+serialized queue delay metadata
+the timezone and instant carried by the serialized delay object
+```
+
+Diagnostic rule:
+
+> Inspect the actual Horizon `Delayed Until` value and/or serialized queue delay metadata before manipulating Redis or requeueing jobs. Do not assume a persisted database `send_at` value proves the Redis delay is wrong.
+
+Timezone-aware Carbon values should be normalized consistently before persistence so `ScheduledMessage.send_at` represents the same instant as the queue delay. A persistence discrepancy is a code/data consistency issue to fix; it is not, by itself, proof that the queued delay is wrong.
+
+---
+
+# 5. Horizon queue list does not cover actual dispatch queues
 
 ## Current known risk
 
-The supplied Core Horizon defaults do not cover every queue that current Core configs may dispatch to.
+Horizon must consume every queue that current runtime/config can actually dispatch to.
 
 Current executable/configured queues include:
 
@@ -169,23 +229,26 @@ opt_in_messages
 reminders
 post_event
 marketing
-campaigns
-waitlist
+emails
 sms
 webinars
 webhooks
 ```
 
-Current `config/horizon.php` built-in default list omits some of these.
+Current runtime notes:
 
-Additionally, Core SMS webinar-nurture templates currently use `campaigns`, while the queue registry does not list `campaigns`.
+```text
+emails is an active queue path.
+Webinar waitlist delivery uses notifications; there is no canonical separate waitlist queue requirement.
+Do not preserve an old campaigns queue requirement from stale Webinar nurture config.
+```
 
 ## Deployment protection
 
-Set an explicit queue list:
+Set and verify an explicit queue list when the built-in Horizon defaults are not confirmed to cover the current runtime:
 
 ```env
-HORIZON_SUPERVISOR_1_QUEUES=default,notifications,confirmation_messages,opt_in_messages,reminders,post_event,marketing,campaigns,waitlist,sms,webinars,webhooks
+HORIZON_SUPERVISOR_1_QUEUES=default,notifications,confirmation_messages,opt_in_messages,reminders,post_event,marketing,emails,sms,webinars,webhooks
 ```
 
 Then verify effective Horizon environment config:
@@ -194,21 +257,11 @@ Then verify effective Horizon environment config:
 php artisan tinker --execute="dump(config('horizon.environments.'.app()->environment()));"
 ```
 
-## Code/config follow-up
-
-Normalize the queue contract:
-
-```text
-Either register and intentionally support the campaigns queue,
-or move those SMS campaign templates to the intended existing marketing queue.
-Then align config/reference/keys.php and config/horizon.php defaults.
-```
-
-Do not leave queue behavior dependent on one hand-maintained production `.env` forever.
+Do not leave queue behavior dependent on one hand-maintained historical `.env` forever. Reconcile queue registry/config, Horizon defaults, and deployed environment values whenever executable queue paths change.
 
 ---
 
-# 5. Placeholder domains and stale config cache
+# 6. Placeholder domains and stale config cache
 
 ## Failure mode
 
@@ -219,7 +272,6 @@ APP_URL=https://DOMAIN
 ROOT_DOMAIN=DOMAIN.com
 WEBINAR_APP_URL=https://webinar.DOMAIN
 CRM_APP_URL=https://crm.DOMAIN
-WEBHOOKS_APP_URL=https://webhooks.DOMAIN
 ```
 
 can produce wrong route hosts and 404s.
@@ -240,11 +292,13 @@ webinar
 webhooks
 ```
 
+The current application derives the webhooks host from `ROOT_DOMAIN`; `WEBHOOKS_APP_URL` is not the active app environment contract. Operators must still verify `webhooks.<root domain>` for DNS, Nginx, SSL, route registration, and provider webhook configuration.
+
 Also verify Nginx points every hostname at the intended new checkout, not only the root domain.
 
 ---
 
-# 6. Setup validation failures
+# 7. Setup validation failures
 
 Run:
 
@@ -267,6 +321,8 @@ clean
 
 Do not assume every validation failure means client config is wrong. A validator itself can drift from runtime truth.
 
+A first-production-run example was a preset/module validation false positive involving a selected preset that required the Mortgage module. When setup validation contradicts the effective preset/module runtime state, inspect the validator against the project authority order rather than broadening config, inventing aliases, or disabling a required module merely to silence the finding.
+
 Use the project authority order:
 
 ```text
@@ -282,7 +338,7 @@ Fix the wrong layer.
 
 ---
 
-# 7. Resend failures
+# 8. Resend failures
 
 Check:
 
@@ -309,7 +365,7 @@ For the canonical Resend transport, SMTP variables such as `MAIL_HOST`, `MAIL_PO
 
 ---
 
-# 8. Telnyx failures and hidden SMS
+# 9. Telnyx failures and hidden SMS
 
 A valid API key does not guarantee SMS is available.
 
@@ -319,6 +375,7 @@ Check:
 SMS_ENABLED
 SMS_PROVIDER
 Messaging channel availability
+effective provider_enabled value for the intended surface/purpose/scope
 surface visibility
 purpose/scope eligibility
 recipient phone
@@ -343,7 +400,7 @@ Do not expose SMS to client/admin UI solely because code and provider credential
 
 ---
 
-# 9. Zoom scopes: basic webinar access is not attendance access
+# 10. Zoom scopes: basic webinar access is not attendance access
 
 A common failure is having enough Zoom scope to read webinars/register users but not enough scope to retrieve past participant reports.
 
@@ -366,9 +423,11 @@ retest OAuth token
 retest exact API call
 ```
 
+Do not stop at successful authentication. The first production run had enough Zoom access for basic Webinar operations while attendance reconciliation and recording resolution still failed until the missing participant-report and recording capabilities were added.
+
 ---
 
-# 10. Zoom webhook and post-event debugging
+# 11. Zoom webhook and post-event debugging
 
 Current Core normalization includes:
 
@@ -413,9 +472,11 @@ Debug order:
 10. Did Messaging schedule/send or skip with a recorded reason?
 ```
 
+Before a live Webinar, verify real webhook delivery end to end. A configured route and provider subscription are not enough. A missed `webinar.ended` delivery can force manual recovery through the real post-event job path and makes attendance/follow-up sequencing harder to reason about under pressure.
+
 ---
 
-# 11. Duplicate registrations can create conflicting outcomes
+# 12. Duplicate registrations can create conflicting outcomes
 
 Before a live webinar or legacy import, inspect for duplicate registrations for the same person/webinar.
 
@@ -443,7 +504,7 @@ legacy duplicates
 
 ---
 
-# 12. Join-link scanners and prefetchers
+# 13. Join-link scanners and prefetchers
 
 Do not treat every GET request to a personalized join redirect as guaranteed human intent.
 
@@ -476,7 +537,7 @@ Until architecture changes, remember this limitation during production debugging
 
 ---
 
-# 13. Existing scheduled messages do not automatically change when config changes
+# 14. Existing scheduled messages do not automatically change when config changes
 
 Preset/template/config changes affect future resolution/scheduling unless an explicit rescheduling/rebuild path exists.
 
@@ -498,7 +559,39 @@ Fix future definition state and separately decide what to do with already schedu
 
 ---
 
-# 14. Diagnostic command set
+# 15. Safe surgical recovery for skipped scheduled messages
+
+For a narrow production failure, recover only the exact affected ScheduledMessage instances after the code/config/runtime cause is fixed.
+
+Safe recovery principle:
+
+```text
+1. Identify the exact affected scheduled-message IDs.
+2. Filter by channel.
+3. Filter by current status.
+4. Filter by the exact skip or failure reason.
+5. Reset only those rows to pending.
+6. Clear skipped_at, skip_reason, and stale failure state only as appropriate for those rows.
+7. Dispatch only those specific SendScheduledMessageJob instances.
+8. Verify final statuses.
+```
+
+Do not perform broad status resets, indiscriminate retries, queue flushes, or Redis destruction for a small, identified failure set.
+
+Before retrying jobs after a PHP runtime fix:
+
+```text
+deploy the fix
+→ restart <CLIENT_HORIZON_PROGRAM> through Supervisor
+→ verify the running Horizon process
+→ retry only the exact affected messages
+```
+
+The production correction should be narrower than the incident whenever possible.
+
+---
+
+# 16. Diagnostic command set
 
 ## Environment/client
 
@@ -554,7 +647,7 @@ php artisan setup:validate
 
 ---
 
-# 15. Incident-prevention gate
+# 17. Incident-prevention gate
 
 Before launch or a live Webinar event:
 
@@ -578,3 +671,5 @@ Before launch or a live Webinar event:
 [ ] Post-event recording/playback dependency understood
 [ ] Already scheduled messages reviewed before copy/CTA changes
 ```
+
+

@@ -1,3 +1,4 @@
+
 # Engage Core Module Boundaries
 
 ## Executable config and token contract ownership
@@ -481,7 +482,6 @@ Current ownership:
 | contact_workflow_profiles | Workflow |
 | flow_routes | FlowRoutes |
 | flow_route_trigger_bindings | FlowRoutes |
-| points | FlowRoutes |
 | flow_route_points | FlowRoutes |
 | contact_flow_route_progress | FlowRoutes |
 | contact_flow_route_plans | FlowRoutes |

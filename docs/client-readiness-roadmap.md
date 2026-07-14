@@ -685,7 +685,8 @@ Completed baseline:
 - `campaign_steps.variant_strategy` controls `first_available`, `send_all_eligible`, or `dependency_aware` behavior.
 - `send_all_eligible` schedules multiple eligible variants.
 - `dependency_aware` can require sibling variants from the same campaign enrollment and same campaign step to reach explicit states before scheduling.
-- Supported dependency states include scheduled, pending, sent, skipped, failed, and terminal.
+- Supported dependency states include scheduled, pending, sent, skipped, failed, terminal, and unavailable.
+- "Unavailable" means the required sibling variant's channel is unavailable for the current client/runtime configuration; it is not a delivery outcome and does not mean an individual contact merely lacks consent.
 - Dependency checks consider both same-pass scheduled siblings and persisted ScheduledMessage records.
 - Dependency checks are scoped to the same campaign enrollment, same campaign step, and required variant key.
 - Preset sync creates variants, removes stale non-customized variants, preserves customized stale variants, and protects customized campaigns.

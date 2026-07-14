@@ -18,6 +18,14 @@ Webinars contributes the `webinar` Messaging consent domain. Exact `webinar` sco
 `webinar_nurture`, while Messaging remains the owner of consent storage, normalization, gates,
 revocation, and acknowledgement resolution.
 
+### Canonical waitlist registration token
+
+Waitlist availability messages use the canonical `{webinar_registration_url}` token.
+
+The obsolete `{webinar_waitlist_registration_url}` token is not supported and must not be reintroduced.
+
+When `WebinarMessageData` is created from a waitlist signup, `{webinar_registration_url}` resolves to the signed, contact-specific local waitlist registration URL. Do not create a second waitlist-specific registration token merely because the producer context is a waitlist signup.
+
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
 
 Webinars is optional.
@@ -198,6 +206,8 @@ Scheduled-message payloads created by Webinars must remain compact. They should 
 
 For post-event follow-ups, Webinars should pass `webinar.ends_at` as the schedule anchor. This keeps `next_day_at` tied to the webinar's actual ending calendar day even when provider webhook processing is delayed past midnight.
 
+Timezone-aware send times must be normalized consistently before persistence so `ScheduledMessage.send_at` represents the same instant as the queued job delay. During production debugging, a persisted `send_at` discrepancy is not enough to prove the Redis delay is wrong: inspect Horizon `Delayed Until` and/or serialized queue delay metadata before requeueing or manipulating Redis.
+
 Profile-owned conditions are checked when planning the message. Resolved conditions are persisted into `ScheduledMessage.meta.conditions`, and `ScheduledMessageGate` re-evaluates them immediately before provider delivery. A delayed replay follow-up must not send if a required recording/playback criterion is no longer satisfied at send time.
 
 Webinar dispatch paths should also provide stable module-owned occurrence identity. Registration messages, waitlist notices, and post-event follow-ups should use stable logical occurrence keys based on the owning Webinar records/context rather than treating `send_at` as identity. A retry or recalculated timestamp for the same logical message occurrence should retain the same occurrence identity.
@@ -344,6 +354,30 @@ A webinar outcome may start more than one independent selected Route for the sam
 
 Webinars must remain the event producer and must not import FlowRoutes or Campaigns to orchestrate those consequences directly.
 
+## Production post-event operational sequence
+
+Use the following order when recovering or validating a production webinar follow-up flow:
+
+```text
+1. Verify Zoom capabilities required by the current provider implementation:
+   registration/lookup as applicable, attendance reporting, and cloud recording lookup/access.
+2. Verify attendance state.
+3. Resolve duplicate/cancelled registration conflicts before follow-up dispatch when necessary.
+4. Retry only the failed post-event provider job.
+5. Confirm Webinar.playback_url contains the real recording URL.
+6. Confirm follow_ups_dispatched_at is populated.
+7. Inspect the actual ScheduledMessage rows.
+8. Verify real replay URL, expected CTAs/links, recipient eligibility, statuses, and send timing.
+9. Inspect Horizon Delayed Until and/or serialized queue delay metadata before touching Redis.
+10. Restart Supervisor-managed Horizon after queued-job runtime code changes.
+11. Surgically retry only the affected skipped/failed messages.
+12. Verify final message statuses.
+```
+
+Zoom capability requirements should follow the current provider calls and the dedicated production/provider setup checklist; do not assume basic webinar access also grants participant-report or cloud-recording access.
+
+Do not use broad ScheduledMessage resets, queue flushes, or destructive Redis commands as the normal recovery path for a narrow post-event failure.
+
 ## Dev/staging testing tools
 
 Webinars may expose local/staging-only CRM testing tools to help operators/developers verify webinar messaging, join-click behavior, attendance outcomes, replay URLs, post-event follow-ups, and downstream FlowRoute behavior without relying on Zoom.
@@ -366,3 +400,5 @@ Dev testing actions should still use public module seams:
 The dev UI should behave like an operator console. Actions inside testing modals should use AJAX/fetch where practical so the modal, selected registration, loaded message options, and activity log are not lost after each action.
 
 Sim Join should skip already-queued live reminders when the real definition has skip_when_join_clicked enabled. Manual dev sends are forced sends and may still send a selected reminder afterward so the exact payload can be tested.
+
+

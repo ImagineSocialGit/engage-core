@@ -1,3 +1,4 @@
+
 # Engage Core TODO
 
 ## Config generation lock-in
@@ -155,7 +156,7 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Campaign step variant is the channel-specific delivery option.
   - `send_all_eligible` schedules multiple eligible variants.
   - `dependency_aware` is hardened for same-enrollment/same-step sibling variant states.
-  - Supported dependency states include scheduled, pending, sent, skipped, failed, and terminal.
+  - Supported dependency states include scheduled, pending, sent, skipped, failed, terminal, and unavailable.
   - Dependency checks consider same-pass scheduled siblings and persisted ScheduledMessage records.
   - Dependency checks are scoped to the same campaign enrollment, same campaign step, and required variant key.
   - Preset sync creates variants, removes stale non-customized variants, preserves customized stale variants, and protects customized campaigns.
@@ -356,6 +357,58 @@ Deferred launch hardening:
 - [x] Verify negative cases: unsupported events ignored, old evidence does not correlate, same-Contact repetition stays observing, system-created Tasks do not count as manual behavior.
 - [ ] Add dynamic suggestion-time checks for current capability availability, equivalent existing automation, snooze/dismissal availability, conversion state, context validity, and attribution ambiguity when the first user-facing suggestion surface needs them.
 - [ ] Continue contextual suggestion UX against the implemented Routes baseline; do not create a parallel automation builder or recommendation feed.
+
+## Error Tracking
+
+These are open code/runtime investigations surfaced by the first production Webinar run and the follow-up audit. Operational incidents that were setup/deployment issues belong in the staging/production checklist and troubleshooting docs rather than being mislabeled as product bugs.
+
+### Messaging, scheduling, and queue diagnostics
+
+- [ ] Verify `ScheduledMessage.send_at` persists the same absolute instant as the timezone-aware queued delay.
+  - A production case persisted the wrong UTC value while the actual queued delay retained the correct execution instant.
+  - Treat this as a persistence/runtime consistency issue; do not infer the Redis delay is wrong from the database timestamp alone.
+- [ ] Make queued send-time diagnostics timezone-explicit.
+  - Current Horizon/debug `send_at` metadata that uses `toDateTimeString()` drops timezone information and can make a correct instant look ambiguous.
+- [ ] Normalize multi-CTA support across config validation and runtime unresolved-token validation.
+  - Config validation accepted `ctas` with `{cta}` while runtime unresolved-token validation did not consistently accept the same shape.
+- [ ] Add a safer first-class operational recovery mechanism for exact skipped/failed `ScheduledMessage` rows.
+  - Current recovery still depends on surgical Tinker commands for narrow incidents.
+  - Preserve the current safety principle: identify exact rows, exact channel, exact status, and exact reason; never broaden recovery into indiscriminate retries or queue resets.
+- [ ] Improve first-class queued-job diagnostics.
+  - Surface effective queue connection, queue name, Redis prefix, delayed/reserved key identity, Horizon metadata, and delayed-until information so operators do not need manual Redis spelunking.
+- [ ] Evaluate whether deployment tooling should enforce or automate the Supervisor-managed Horizon restart requirement after queued-job runtime PHP changes.
+  - Deployment docs already require the restart; the remaining question is whether tooling should reduce the chance of human omission.
+
+### Webinar join-signal integrity
+
+- [ ] Separate raw join-link resolver hits from trusted human interaction.
+  - A resolver `GET` can be triggered by scanners or prefetchers and currently may set `join_clicked_at`, increment `join_click_count`, and suppress a live reminder.
+  - Preserve raw resolver evidence separately, for example `join_resolved_at` / `join_resolve_count` or equivalent.
+  - Set trusted click evidence only after a stronger browser-side confirmation such as a signed `POST` or comparable interaction signal.
+- [ ] Preserve enough join-link history to distinguish scanner/prefetch hits from later genuine interaction.
+  - The current latest timestamp plus cumulative count overwrites earlier event detail.
+  - Do not add event-history schema until the minimum useful operational/debug requirement is clear.
+
+### Webinar duplicate registration and conflicting outcome safety
+
+- [ ] Add a safe first-class duplicate-outcome suppression mechanism before contradictory attended/missed follow-ups are created.
+  - Duplicate registrations for the same likely person and Webinar can independently generate conflicting automation, follow-up, status, and Campaign paths.
+  - Do not solve this by globally merging contacts solely because phone numbers match.
+- [ ] Define an explicit Webinar-scoped precedence rule for likely duplicate conflicting outcomes.
+  - Candidate safe rule: attended wins over missed for likely duplicates within the same Webinar.
+  - Identity matching must remain narrow, auditable, and separate from global Contact merge semantics.
+
+### Webinar attendance and post-event provider reliability
+
+- [ ] Review `RecordWebinarProviderAttendanceAction` behavior when Zoom still returns zero attendance records after the retry window expires.
+  - Confirm whether zero attendance should permanently set `attendance_ready = true` and `attendance_recorded_at` or remain unresolved with an actionable state.
+- [ ] Distinguish legitimate empty attendance from provider-readiness and authorization failures.
+  - Empty provider results and access/scope failures need clearly different operational signals and retry behavior.
+- [ ] Review empty attendance caching semantics around `Cache::remember()`.
+  - A legitimate or premature empty result may be cached and reused on retries; verify whether empty responses should be cached, for how long, and under which provider states.
+- [ ] Make post-event sequencing and recovery intent easier to inspect.
+  - `webinar.ended` handles attendance while recording completion resolves playback and dispatches follow-ups.
+  - Runtime behavior is valid, but current operational sequencing is easy to misread during recovery; improve first-class status/introspection before considering orchestration changes.
 
 ## One-off backlog
 

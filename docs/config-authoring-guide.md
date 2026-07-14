@@ -1,3 +1,4 @@
+
 # Engage Core Config Authoring Guide
 
 This guide is for creating or reviewing Engage Core default configs and client-specific configs.
@@ -920,7 +921,21 @@ Use `first_available` when email/SMS are alternatives.
 
 Use `send_all_eligible` when each eligible channel should send.
 
-Use `dependency_aware` when one variant depends on another variant being scheduled or sent.
+Use `dependency_aware` when one sibling variant depends on another sibling variant reaching an allowed state. Supported dependency states are:
+
+```text
+scheduled
+pending
+sent
+skipped
+failed
+terminal
+unavailable
+```
+
+`unavailable` means the required sibling variant's channel is unavailable for the current client/runtime configuration. It is not a `ScheduledMessage` delivery status and does not mean that one specific contact merely lacks consent.
+
+Dependency checks must remain scoped to the same campaign enrollment, same campaign step, and required sibling variant key. Another contact's message state must never satisfy the dependency.
 
 ## Campaign preset shape
 
@@ -1030,7 +1045,17 @@ Current Webinar ownership example:
 
 ```text
 Core webinar_attended_nurture
-    1 generic email step after 7 days
+    1 generic dependency-aware step after 7 days
+
+Core webinar_missed_nurture
+    1 generic dependency-aware step after 7 days
+
+Core dependency behavior
+    SMS is preferred when the SMS channel is available and the contact is eligible.
+    Email does not send simultaneously with the SMS sibling.
+    Email becomes eligible after the same enrollment's same-step SMS sibling is sent,
+    or when the SMS channel is unavailable for the current client/runtime configuration.
+    Another contact's SMS state never satisfies this dependency.
 
 Slam Dunk webinar_attended_nurture
     richer client-owned 9-step journey
@@ -1038,6 +1063,8 @@ Slam Dunk webinar_attended_nurture
 Effective Slam Dunk
     9 client-owned steps, not Core's generic step appended underneath
 ```
+
+Richer multi-step, branded, or client-specific Webinar nurture remains client-owned.
 
 Current reminder-list example:
 
