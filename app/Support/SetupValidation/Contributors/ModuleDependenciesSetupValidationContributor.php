@@ -205,10 +205,7 @@ class ModuleDependenciesSetupValidationContributor implements SetupValidationCon
             return;
         }
 
-        $available = array_values(array_unique([
-            ...$this->moduleManager->enabledKeysWithDependencies(),
-            ...$required,
-        ]));
+        $runtimeEnabled = $this->moduleManager->enabledKeysWithDependencies();
 
         foreach ($required as $index => $moduleKey) {
             if (! is_string($moduleKey) || trim($moduleKey) === '') {
@@ -238,14 +235,15 @@ class ModuleDependenciesSetupValidationContributor implements SetupValidationCon
                 continue;
             }
 
-            if (! in_array($moduleKey, $available, true)) {
+            if (! in_array($moduleKey, $runtimeEnabled, true)) {
                 yield $this->error(
                     code: 'app.modules.preset_required_module_unavailable',
-                    message: "Selected preset package [{$presetKey}] requires unavailable module [{$moduleKey}].",
+                    message: "Selected preset package [{$presetKey}] requires module [{$moduleKey}], but it is not runtime-enabled.",
                     path: "presets.packages.{$presetKey}.modules.enabled.{$index}",
                     context: [
                         'preset_key' => $presetKey,
                         'module_key' => $moduleKey,
+                        'runtime_enabled_modules' => $runtimeEnabled,
                     ],
                 );
             }

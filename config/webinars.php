@@ -2,8 +2,6 @@
 
 return [
 
-    'enabled' => env('WEBINARS_ENABLED', true),
-
     'provider' => env('WEBINAR_PROVIDER', 'zoom'),
 
 

@@ -24,7 +24,7 @@ class ResumeFlowRouteProgressJob implements ShouldQueue
     public function __construct(
         public readonly int $contactFlowRouteProgressId,
     ) {
-        $this->onQueue((string) config('queue.flow_routes_queue', 'default'));
+        $this->onQueue('default');
     }
 
     public function handle(ResumeContactFlowRouteProgressAction $resumeContactFlowRouteProgress): void

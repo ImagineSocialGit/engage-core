@@ -1227,7 +1227,10 @@
 │       └── WebinarSeeder.php
 ├── docs
 │   ├── automation-opportunities.md
+│   ├── client-environment-reference.md
 │   ├── client-readiness-roadmap.md
+│   ├── client-staging-production-setup-checklist.md
+│   ├── client-third-party-services-checklist.md
 │   ├── config-authoring-guide.md
 │   ├── config-contracts.md
 │   ├── config-generation-lock-in-roadmap.md
@@ -1247,7 +1250,7 @@
 │   │   ├── TOKEN_REFERENCE.md
 │   │   ├── webinar-post-event-template.php
 │   │   └── webinar-schedule-profiles-template.php
-│   ├── engage-core-production-setup-checklist.md
+│   ├── deployment-safety-and-troubleshooting.md
 │   ├── module-boundaries.md
 │   ├── modules
 │   │   ├── broadcasts.md
@@ -1628,4 +1631,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-519 directories, 1110 files
+519 directories, 1113 files

@@ -15,7 +15,7 @@ return [
                             'purpose' => 'marketing',
                             'scope' => 'webinar_nurture',
                             'payload_class' => SmsPayload::class,
-                            'queue' => 'campaigns',
+                            'queue' => 'marketing',
                             'payload' => [
                                 'message' => 'Hi {first_name}, thanks again for joining the webinar. If you still have questions or want help figuring out your next step, just reply to this message.',
                             ],
@@ -36,7 +36,7 @@ return [
                             'purpose' => 'marketing',
                             'scope' => 'webinar_nurture',
                             'payload_class' => SmsPayload::class,
-                            'queue' => 'campaigns',
+                            'queue' => 'marketing',
                             'payload' => [
                                 'message' => 'Hi {first_name}, sorry we missed you at the webinar. If you still have questions or want help figuring out your next step, just reply to this message.',
                             ],
