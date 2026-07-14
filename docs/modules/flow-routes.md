@@ -1,4 +1,3 @@
-
 # FlowRoutes Module
 
 ## Config contract
@@ -680,7 +679,7 @@ FlowRoutes may support Campaign, Messaging, Task, and status-related Point types
 
 ## Relationship, capability, and instance-plan status
 
-The Phase 4A audit and Phase 4B implementation are complete for backend/schema readiness. FlowRoutes now has subject-scoped route instances, instance-specific route plans, plan items, progress/execution items, capability catalog/bindings, and route-created artifact provenance.
+The Phase 4A audit and Phase 4B implementation are complete for backend/schema readiness. FlowRoutes now has subject-scoped route instances, instance-specific route plans, plan items, progress/execution items, capability catalog/bindings, and durable created-artifact tracking/correlation. Phase 12 revises the Tasks-specific direct provenance coupling while preserving FlowRoutes-owned correlation.
 
 This foundation exists before Phase 5 task-completed event-wait resume behavior so resume behavior can target a specific route instance plan/progress item rather than only a raw reusable route point.
 
@@ -759,13 +758,48 @@ Do not make one global validator import every producer module's private models/c
 
 ## TaskTemplate requirement for create_task points
 
-Task templates are the durable foundation for reusable FlowRoutes `create_task` behavior.
+Task templates are required for automation-created Tasks.
 
-FlowRoutes `create_task` points may reference DB-owned `TaskTemplate` records by stable key, then create live tasks through Tasks-owned public actions. Inline create_task definitions remain supported for route-specific cases.
+FlowRoutes `create_task` points are automation creation paths and therefore must resolve a DB-owned `TaskTemplate` by stable key before creating a live Task.
 
-Tasks remains the owner of task creation, assignment strategy, responsibility fields, related subject handling, due offsets, and task lifecycle behavior. FlowRoutes passes task intent and route provenance; it does not write Task internals directly.
+Durable rule:
 
-`tasks.task_template_id` may be treated as a soft/current DB reference while `task_template_key` preserves durable historical identity for route-created tasks.
+```text
+no-template Task
+    manual only
+
+template-backed Task
+    manual or automation-created
+```
+
+Inline arbitrary no-template `create_task` definitions are not part of the durable target.
+
+FlowRoutes should call Tasks-owned public actions/services. Tasks remains the owner of:
+
+```text
+Task creation
+TaskTemplate resolution rules
+assignment strategy
+responsibility fields
+TaskLink creation
+TaskLink role vocabulary
+due offsets
+Task lifecycle behavior
+```
+
+FlowRoutes owns automation intent, route execution, created-artifact identity, correlation, and resume matching.
+
+The target creation path is:
+
+```text
+FlowRoute create_task point
+    -> resolve TaskTemplate by stable key
+    -> call Tasks public action
+    -> create live Task and TaskLinks
+    -> record created Task type/id in FlowRoutes-owned progress state
+```
+
+`tasks.task_template_id` may remain a soft/current DB reference while `task_template_key` preserves durable historical TaskTemplate identity.
 
 ## FlowRoute definition versioning and live-instance reconciliation
 
@@ -867,44 +901,48 @@ Plan items store definition/settings snapshots so template edits do not unexpect
 Blocked, cancelled, and superseded route behavior should leave plan/progress items in accurate non-success states.
 Operators may later insert/repeat/skip/cancel specific plan items for one contact/subject when Route Management UX supports it.
 Phase 5 event waits and task completion should resume a specific plan/progress item.
-Tasks/messages/campaign enrollments/appointments/documents/forms/portal records created by route points attach back through standard FlowRoutes provenance fields.
+Route-created artifacts should be correlated through FlowRoutes-owned created-subject references and explicit correlation state without forcing every artifact-owning module to store FlowRoutes-specific foreign keys.
 ```
 
 
-## Uniform route-created artifact provenance
+## Route-created artifact provenance and correlation
 
-Any module-owned artifact created by FlowRoutes should use the same provenance shape where practical:
+FlowRoutes owns route provenance, created-artifact references, correlation, and resume matching.
+
+Do not interpret that ownership as a requirement for every artifact-owning module to import FlowRoutes models or add the same `flow_route_*` foreign keys.
+
+Preferred shape:
 
 ```text
-flow_route_progress_id
-flow_route_plan_id
-flow_route_plan_item_id
-flow_route_progress_item_id
-flow_route_id
-flow_route_point_id
-flow_route_capability_id
+FlowRoutes progress/execution item
+    created_subject_type
+    created_subject_id
+    correlation when needed
+
+Owning module artifact
+    owns business state and lifecycle
+    remains independent from FlowRoutes internals
 ```
 
-Current targets:
+For Tasks specifically, the durable target is:
 
 ```text
-tasks
-scheduled_messages
-campaign_enrollments
+FlowRoute create_task point
+    -> Tasks public action
+    -> template-backed Task
+    -> FlowRoutes records created Task identity
+    -> Task lifecycle proceeds independently
+    -> Task emits neutral automation event
+    -> FlowRoutes matches/resumes through FlowRoutes-owned correlation state
 ```
 
-Future targets should follow the same process:
+Tasks should not store FlowRoutes-specific foreign keys or import FlowRoutes-owned models merely to preserve route provenance.
 
-```text
-appointments
-document_requests
-form submissions/requests
-portal invitations/access grants
-commerce records where appropriate
-vertical-owned records
-```
+The same ownership test should be applied to future route-created Appointments, DocumentRequests, Forms, Portal records, Commerce records, and vertical-owned records.
 
-The owning module still owns lifecycle and business state. FlowRoutes owns route provenance, route instance correlation, and route resume matching.
+Uniformity is useful only when it preserves module ownership. Do not add provenance columns merely for schema symmetry.
+
+Some existing artifact families may retain established provenance fields where independently justified. That does not make those columns a universal requirement for future modules.
 
 ## Event-wait and task-completed resume behavior
 
@@ -932,51 +970,36 @@ Supported safe matching paths:
 
 ```text
 1. Explicit event_wait correlation.
-2. Unambiguous route-created Task artifact provenance when the route created exactly one Task before the wait.
+2. Unambiguous FlowRoutes-owned created Task identity when the route created exactly one Task before the wait.
 ```
 
 Explicit correlation should be used when a route may create more than one Task before the wait.
 
-Good examples:
+The matching state belongs to FlowRoutes. Tasks should emit neutral Task identity/context and remain independent from FlowRoutes internals.
 
-```php
-'correlation' => [
-    'task.task_template_key' => 'route.follow_up',
-    'task.flow_route_progress_id' => '{flow_route_progress.id}',
-]
-```
+Use TaskTemplate identity when the author wants to wait for a specific kind of Task created by the Route.
 
-```php
-'correlation' => [
-    'task.flow_route_progress_item_id' => '{flow_route_progress_item.id}',
-]
-```
+Use FlowRoutes-owned created-subject identity and explicit correlation state when the wait must be tied to a specific Route instance or progress item.
 
-Use task-template correlation when the author wants to wait for a specific kind of task created by the route.
+Generic Contact context may be used as a safety filter, but it must not be the only matching rule for Task completion waits.
 
-Use route progress/plan/progress-item correlation when the wait must be tied to a specific route instance.
+A Task may carry Contact context through TaskLinks or responsibility. A Task may also be completely contactless.
 
-Generic contact context may be used as a safety filter, but it must not be the only matching rule for task completion waits.
-
-Tasks may carry contact context from related/responsible Contact records or from FlowRoute provenance when the task is subject-scoped to another record such as a dog, appointment, document request, or other future route subject.
-
-Potential matching dimensions:
+Durable matching dimensions may include:
 
 ```text
 event_key
-contact_id
-subject_type / subject_id
+contact_id nullable
+event subject_type / subject_id = Task
 task.id
 task.task_template_id
 task.task_template_key
-task.flow_route_progress_id
-task.flow_route_plan_id
-task.flow_route_plan_item_id
-task.flow_route_progress_item_id
-task.flow_route_id
-task.flow_route_point_id
-task.flow_route_capability_id
+TaskLink context when explicitly needed
+FlowRoutes-owned created_subject_type / created_subject_id
+FlowRoutes-owned explicit correlation state
 ```
+
+Do not document `task.flow_route_*` fields as durable matching dimensions. Phase 12 removes that Tasks-owned structural dependency. Exact authoring syntax for any replacement correlation tokens should be finalized with the code implementation so documentation matches the executable contract.
 
 ## Relationship to Automation Opportunities
 
@@ -1105,4 +1128,6 @@ The Route index should not repeat assignment detail inside Route details. `Runs 
 One-step automatic behavior may be presented separately from multi-step Routes so a simple action is not forced into the same visual weight as a real Route.
 
 Route Management UX should explain available actions through `FlowRouteCapability` metadata and module-owned public seams rather than importing module internals.
+
+
 

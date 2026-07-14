@@ -1,4 +1,3 @@
-
 # Engage Core TODO
 
 ## Config generation lock-in
@@ -164,7 +163,7 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
 - [x] Phase 3 — Task templates / task defaults.
   - Audit `task_templates` table/model shape for generated/manual tasks.
   - Confirm FlowRoutes `create_task` points can reference `TaskTemplate` records.
-  - Confirm task templates can define title/body/default due offsets/assigned_to/responsible_party/related-subject rules.
+  - Confirm task templates can define title/body/default due offsets/assigned_to/responsible_party and the then-current related-subject rules. Phase 12 supersedes the relationship shape with TaskLinks.
   - Confirm task templates are generic enough for PetServices, Mortgage, Music, Webinars, Documents, Scheduling, etc.
   - Confirm task template preset sync creates DB-owned default task templates only and does not create live tasks.
   - Confirm customized templates are preserved.
@@ -187,7 +186,7 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Decide whether active route plans need plan item snapshots so template edits do not unexpectedly change live instances.
   - Decide whether operators can insert/repeat/skip/cancel route instance plan items for one contact/subject.
   - Decide how event waits, task completion, appointment completion, document completion, etc. resume specific plan items.
-  - Audit conclusion: subject-scoped route instances, route instance plans/items, progress/execution items, capability catalog/bindings, and uniform artifact provenance are required before production.
+  - Audit conclusion at that phase: subject-scoped route instances, route instance plans/items, progress/execution items, capability catalog/bindings, and durable created-artifact tracking/correlation were required before production. Phase 12 revises the Tasks-specific direct provenance coupling.
 - [x] Phase 4B — FlowRoutes schema hardening.
   - Added `subject_type` / `subject_id` to `contact_flow_route_progress`.
   - Added `contact_flow_route_plans`.
@@ -195,12 +194,12 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Added `contact_flow_route_progress_items`.
   - Added `flow_route_capabilities`.
   - Added `flow_route_capability_bindings`.
-  - Added uniform FlowRoutes provenance fields to route-created artifacts: Tasks, ScheduledMessages, and CampaignEnrollments.
+  - Added direct FlowRoutes provenance fields to Tasks, ScheduledMessages, and CampaignEnrollments at that phase. Phase 12 intentionally removes the Tasks-specific structural dependency and keeps correlation in FlowRoutes-owned state.
   - Hardened blocked/cancelled/superseded runtime behavior so open plan/progress items do not remain successful-looking or resumable incorrectly.
   - Normalized route wait/resume metadata and automation-event started_at fallback behavior.
   - Added full structured FlowRoutes provenance to task-completed automation/debug paths where applicable.
   - Added producer-level provenance tests and boundary guardrails for FlowRoutes internals.
-  - Confirmed future modules should use the same provenance pattern when FlowRoutes creates Scheduling appointments, Document requests, Form requests/submissions, Portal invitations/access grants, Commerce records, or vertical-owned artifacts.
+  - Superseded by the Phase 12 boundary decision: future modules should preserve created-artifact correlation without automatically copying FlowRoutes foreign keys into every artifact-owning module.
   - Kept module-owned business behavior behind public actions/services/contracts.
   - Deferred polished Route Management UX and CRM provenance/debug views at that phase; a first Routes editor baseline has since been implemented.
 - [x] Phase 5 — FlowRoutes event-wait / task-completed resume implementation.
@@ -318,10 +317,52 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
     - Manual status-change consequence warning UX.
     - Contextual Automation Opportunity suggestion UX.
     - Simple future Point eligibility / Route continuation rules only if they remain linear and understandable.
-- [ ] Phase 12 — Dashboard / contact workspace polish audit.
+- [ ] Phase 12 — Standalone and multi-link Tasks.
+  - [x] Audit current Task schema, models, creation paths, UI assumptions, notifications/digests, automation events, FlowRoutes integration, tests, and docs.
+  - [x] Lock the Task mental model as independent dimensions rather than mutually exclusive Task categories.
+    - Template-backed vs no-template.
+    - Unlinked vs linked to zero/one/many module-owned records.
+    - Manual vs automation-created.
+  - [x] Lock invariant: no-template Tasks are manual only; automation-created Tasks must be template-backed.
+  - [x] Lock generic relationship target: replace the single `related` morph with zero-to-many `task_links`.
+  - [x] Lock initial TaskLink roles: `subject`, `context`, `result`.
+  - [x] Lock one canonical relationship system; do not retain both `related` and `task_links`.
+  - [x] Lock UX barometer: Task surfaces must quickly explain WHY the Task exists, WHAT to do, and HOW to complete/advance it.
+  - [x] Include dedicated Task index and Task show surfaces in the phase; first pass may be information-dense and function-first.
+  - [x] Lock Core-only operational contract: Tasks creation/lifecycle/templates/links/index/show/events must work with only Core enabled.
+  - [x] Lock module boundary: Tasks must not structurally depend on FlowRoutes internals; FlowRoutes owns route correlation/resume state.
+  - [ ] Replace `tasks.related_type / related_id` with `task_links` in branch schema/model/runtime code.
+  - [ ] Preserve unlinked Tasks.
+  - [ ] Preserve Contact-linked Tasks through TaskLinks.
+  - [ ] Prove one existing non-Contact linked model cleanly.
+  - [ ] Support Task links that grow over time, including `result` links added after work creates/selects a record.
+  - [ ] Add Tasks-owned linked-record presentation resolver/provider seams and safe fallback behavior.
+  - [ ] Ensure linked modules own presentation of their own records without Tasks importing those module models.
+  - [ ] Add dedicated Task index route/controller/view.
+  - [ ] Add dedicated Task show route/controller/view.
+  - [ ] Keep Task show valid with zero links and readable with multiple links.
+  - [ ] Generalize Contact show Task queries to the TaskLink model without including unrelated Tasks accidentally.
+  - [ ] Keep dashboard Task rendering valid for unlinked and multi-link Tasks.
+  - [ ] Move direct TeamMember/InternalNotifications coupling out of Tasks core creation/request/provider paths behind optional public seams.
+  - [ ] Keep notification copy/CTA behavior valid when a Task has no links.
+  - [ ] Keep digests independent of Contact or any specific linked module.
+  - [ ] Remove Tasks-owned FlowRoutes-specific foreign keys/model imports.
+  - [ ] Preserve FlowRoutes-created Task correlation through FlowRoutes-owned created-artifact/correlation state and neutral Task events.
+  - [ ] Update FlowRoutes `create_task` behavior so automation-created Tasks are template-backed.
+  - [ ] Update Task completion automation payload/context for TaskLinks while preserving valid contactless events.
+  - [ ] Update Automation Opportunity Task producer behavior so repeated similar manual no-template Tasks are the primary Task-created suggestion signal.
+  - [ ] Preserve useful existing Contact-specific compound opportunity behavior through TaskLinks/public linked-record context.
+  - [ ] Update Task setup validation/config contracts for TaskLink roles/defaults/supported link types without importing module internals.
+  - [ ] Add tests for unlinked, Contact-linked, non-Contact-linked, and multi-link Tasks.
+  - [ ] Add tests for template/no-template and manual/automation invariants.
+  - [ ] Add tests for dedicated index/show surfaces.
+  - [ ] Add tests proving Tasks core operation without InternalNotifications, Messaging, or FlowRoutes enabled.
+  - [ ] Run focused Tasks, Dashboard, Contact show, FlowRoutes, module-boundary, setup-validation, and automation-opportunity tests.
+  - [ ] Run final docs audit after code work and remove/update stale implementation-gap notes.
+- [ ] Phase 13 — Dashboard / contact workspace polish audit.
   - Review orientation surfaces after core runtime pieces settle.
   - Add persisted preferences/acknowledgements only if proven necessary.
-- [ ] Phase 13 — FOSS-informed module schema audit.
+- [ ] Phase 14 — FOSS-informed module schema audit.
   - Compare module schemas against mature FOSS patterns to catch likely missing persisted concepts before production.
   - Pull FlowRoutes-specific FOSS/OSS pattern review earlier into Phase 4 if useful.
   - Split by module group rather than one monster branch.
@@ -581,3 +622,5 @@ These notes are intentionally retained while the schema-discovery phases continu
 - [ ] Hide technical specs behind details/debug affordances.
 - [ ] Replace raw timing such as `Delay 10 minutes` with human-readable schedule summaries.
 - [ ] Clean up repeated dropdown labels such as `Step 1 Email — Webinar Attended Nurture — Step 1 Email`.
+
+

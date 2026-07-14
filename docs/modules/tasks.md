@@ -6,7 +6,189 @@ Tasks is a reusable capability module.
 
 Tasks owns tracked manual human actions and dependencies.
 
-A Task represents something a human needs to do, complete, provide, review, confirm, or manually resolve.
+A Task is one generic live work record representing something a human needs to do, complete, provide, review, confirm, or manually resolve.
+
+Do not model Tasks as mutually exclusive categories such as “standalone task,” “Contact task,” “automation task,” or “template task.” A Task is instead described by independent dimensions.
+
+## Core Task dimensions
+
+Every Task is described across three independent dimensions.
+
+### 1. Template linkage
+
+```text
+template-backed
+or
+no template
+```
+
+A template-backed Task references reusable `TaskTemplate` definition/default infrastructure.
+
+A no-template Task is an ad hoc manual Task.
+
+A TaskTemplate is optional for manual Task creation. It is not a prerequisite for a live Task to exist.
+
+Repeated similar manual no-template Tasks are the primary Task-created signal for Automation Opportunity suggestions. The product should be able to notice repeated ad hoc work and suggest converting that repeated pattern into reusable automation rather than requiring the user to design automation first.
+
+### 2. Domain linkage
+
+```text
+unlinked
+or
+linked to one or more relevant domain records
+```
+
+A Task may have zero, one, or many generic cross-module links.
+
+Examples:
+
+```text
+Standalone internal work
+    Task: Prepare quarterly marketing plan
+    links: none
+
+Contact follow-up
+    Task: Call Jane about financing questions
+    links:
+        Contact Jane Smith -> subject
+
+Pet Services scheduling work
+    Task: Schedule Max's annual vaccination appointment
+    links:
+        Pet Max -> subject
+        Contact Jane Smith -> context
+
+After the appointment is created
+    Task: Schedule Max's annual vaccination appointment
+    links:
+        Pet Max -> subject
+        Contact Jane Smith -> context
+        Appointment #482 -> result
+```
+
+Domain links are independent of template linkage and creation origin.
+
+### 3. Creation origin
+
+```text
+manual
+or
+automation-created
+```
+
+Durable rule:
+
+```text
+no template
+    -> manual only
+
+template-backed
+    -> may be manual or automation-created
+```
+
+Any non-manual Task creation path should identify the reusable TaskTemplate that defined the work. Automation should not silently create arbitrary no-template Tasks.
+
+The three dimensions combine freely within those rules. For example, a template-backed Task may be manually created and unlinked, or automation-created and linked to several module-owned records.
+
+## Task relationship architecture
+
+The durable target is one generic relationship system owned by Tasks.
+
+Do not preserve two competing relationship models such as:
+
+```text
+tasks.related_type / tasks.related_id
+plus
+task_links
+```
+
+The target is to replace the single nullable `related` morph with zero-to-many polymorphic Task links.
+
+Minimum target structure:
+
+```text
+task_links
+    id
+    task_id
+    linkable_type
+    linkable_id
+    role
+    timestamps
+```
+
+Initial generic roles:
+
+```text
+subject
+    What the work is principally about.
+
+context
+    An additional record that helps explain why the Task exists or how to understand it.
+
+result
+    A record produced, selected, or attached as the outcome of doing the Task.
+```
+
+Keep this role vocabulary intentionally small. Do not add Task-owned roles such as `pet`, `borrower`, `appointment`, `loan`, `customer`, or other module-specific concepts.
+
+The linked module owns the domain meaning of its records. Tasks owns only the generic connection and generic role.
+
+### Relationship design rules
+
+- A Task may be unlinked.
+- A Task may link to one record.
+- A Task may link to several records across different modules.
+- Links may be added as work progresses. A Task may begin with `subject` and `context` links and later gain a `result` link.
+- The same linked record may appear on its own module-owned page, the global Tasks index, and the Task show page without Tasks understanding that module's private semantics.
+- Core Contact pages may query Tasks through Tasks-owned public read/provider seams. Core must not import Tasks.
+- Other modules may query or create Task links through Tasks-owned public seams rather than writing `task_links` directly when a public action/service exists.
+- Do not store canonical Task relationships as unindexed IDs inside `meta`.
+- Do not add module-specific nullable foreign keys such as `contact_id`, `pet_id`, `appointment_id`, `document_request_id`, or `mortgage_file_id` to `tasks`.
+
+### Linked-record presentation
+
+Persistence and presentation are separate questions.
+
+A Task may be linked to several records, but the UI should present those links in a way that immediately answers:
+
+```text
+Why does this Task exist?
+What is this Task about?
+What does the user need to do next?
+Where should the user go to complete or review it?
+```
+
+Tasks should own a resolver/provider seam for presenting linked records generically.
+
+Conceptual direction:
+
+```text
+Tasks
+    owns TaskLink storage
+    owns linked-record presentation contract/registry
+    owns fallback presentation
+
+Core
+    may provide Contact presentation because Tasks depends on Core
+
+Scheduling
+    may contribute Appointment presentation
+
+Documents
+    may contribute DocumentRequest presentation
+
+PetServices
+    may contribute Pet presentation
+
+Mortgage
+    may contribute Mortgage-owned record presentation
+```
+
+Tasks must not import Scheduling, Documents, PetServices, Mortgage, FlowRoutes, or other higher-level module models merely to understand their records.
+
+Each linked module owns the label, name, useful details, and destination URL for its own records through Tasks-owned extension seams.
+
+## Ownership and dependencies
 
 Tasks owns:
 
@@ -14,53 +196,84 @@ Tasks owns:
 - task templates;
 - task template preset sync;
 - task creation from templates;
+- ad hoc manual Task creation;
+- TaskLink records and generic link roles;
 - task lifecycle state;
 - task completion, cancellation, reopen, archive, and restore behavior;
 - task assignment and responsible-party semantics;
 - task due dates and priority/default metadata;
-- task contact/context relationships;
+- Task index/show surfaces;
+- linked-record presentation seams and fallback behavior;
 - task events such as `task.completed` when automation-worthy.
 
-Tasks may depend on:
+Tasks depends on:
 
-- Core, for Contact-owned task association and generic identity.
+- Core, for generic Contact identity, Contact-linked visibility, and Core-owned extension seams.
 
-Tasks should remain standalone-capable with Core only for core task creation, lifecycle, template/default behavior, and contact-related visibility.
+Tasks must remain fully useful with only Core enabled.
 
-Current assignment behavior may resolve active `TeamMember` records when InternalNotifications is installed and enabled, because TeamMember is the current internal assignee model. That is an optional assignment/notification capability path, not a requirement for Tasks to create, complete, reopen, cancel, archive, restore, or display basic tasks.
+With only Core and Tasks enabled, the user must still be able to:
 
-InternalNotifications and Messaging are optional consumers/capabilities for assignment notifications and digests. Tasks must not require them for its core model, lifecycle, or template/default behavior.
-
-Tasks owns the business trigger and cadence for task assignment notifications and task digests. Reusable Messaging templates must not own task digest schedules, task-assignment trigger timing, or Task-specific eligibility rules.
-
-When Tasks/InternalNotifications deliver through the shared resolved-dispatch seam, the owning task/notification code resolves the behavior first and `ResolvedMessageDispatchBuilder` assembles it with reusable Messaging content. Messaging then applies generic delivery safety, persistence, queueing, and provider delivery.
+```text
+create an ad hoc no-template Task
+create a template-backed manual Task
+create an unlinked Task
+create a Contact-linked Task
+view the global Task index
+view an individual Task
+complete, cancel, reopen, archive, and restore Tasks
+use TaskTemplate defaults
+emit valid neutral Task lifecycle events
+```
 
 Tasks does not own:
 
 - Messaging scheduled messages;
-- InternalNotifications team notification preferences;
-- FlowRoutes route progress;
+- InternalNotifications team members or notification preferences;
+- FlowRoutes route progress, plans, points, capabilities, or correlation state;
 - Campaign enrollment;
 - Workflow status/profile state;
-- vertical-specific domain records such as dogs, mortgage loans, music fans, documents, appointments, or commerce orders.
+- vertical-specific domain records such as pets, mortgage files, music fans, documents, appointments, or commerce orders.
 
-Other modules may request task creation through Tasks public actions/services. They should not directly create task records when a public task creation action exists.
+### Optional integrations
+
+InternalNotifications, Messaging, FlowRoutes, Scheduling, Documents, Mortgage, PetServices, and other modules are optional integrations or consumers. They are not structural prerequisites for Tasks.
+
+InternalNotifications may contribute TeamMember assignment/notification behavior through public seams when enabled.
+
+Messaging may be used indirectly for delivery through InternalNotifications-owned behavior. Tasks core lifecycle and UI must not require Messaging.
+
+FlowRoutes may create template-backed Tasks through Tasks public actions and consume neutral Task automation events. Tasks must not import FlowRoutes internals.
+
+Other modules may request Task creation and TaskLink creation through Tasks public actions/services. They should not directly create `Task` or `TaskLink` rows when a public Tasks seam exists.
 
 Good:
 
-    CreateTaskAction
-    CreateTaskFromTemplateAction
-    CompleteTaskAction
+```text
+CreateTaskAction
+CreateTaskFromTemplateAction
+CompleteTaskAction
+Tasks-owned link action/service
+Tasks-owned linked-record presenter registry
+```
 
 Bad:
 
-    Task::create(...)
+```text
+Another module -> Task::create(...)
+Another module -> TaskLink::create(...)
+Tasks -> Appointment model
+Tasks -> DocumentRequest model
+Tasks -> FlowRoute progress model
+```
 
-unless the code is inside Tasks itself or there is an intentional, documented exception.
+unless there is an intentional, documented exception.
 
 ## Task templates and defaults
 
 Task templates are DB-owned reusable task definitions.
+
+A TaskTemplate is optional for manual Tasks and required for automation-created Tasks.
 
 Task template-backed live task creation resolves defaults in this order:
 
@@ -72,10 +285,6 @@ Task template-backed live task creation resolves defaults in this order:
 ```
 
 `TaskTemplate.defaults` is real generic fallback data. It is not a dumping ground for values that already have first-class TaskTemplate columns.
-
-Task templates are not optional if FlowRoutes `create_task` points need reusable tasks.
-
-FlowRoutes should not hardcode every reusable task shape inline forever.
 
 Task template preset sync should create DB-owned default task templates only. It should not create live tasks.
 
@@ -103,6 +312,22 @@ preset group
 
 Stale cleanup is scoped to selected contributors. A selected contributor may retire its final definition. Unselected contributors are not touched. Customized rows remain preserved unless force is explicitly requested.
 
+Task templates may be contributed by universal or vertical modules, but Tasks must remain generic at the storage/runtime layer.
+
+Examples:
+
+```text
+PetServices contributes:
+    Call owner after behavior evaluation
+
+Documents contributes:
+    Review requested document upload
+
+Scheduling contributes:
+    Confirm appointment setup
+```
+
+The contributing module owns domain meaning. Tasks stores reusable generic TaskTemplate definitions and creates live Tasks through public actions.
 
 ## Tasks setup validation ownership
 
@@ -112,115 +337,210 @@ Task preset/template validation uses resolved selected Task definitions and DB-o
 
 Shared preset-composition validation owns package/group/definition structure, including missing selected groups and duplicate contributed group/definition keys.
 
-Tasks validates selected Task definition semantics, assignment and responsibility fields, due/default shapes, related-subject defaults, canonical terminology, and DB/runtime TaskTemplate availability. Dotted TaskTemplate keys are treated as literal stable keys, not Laravel nested config paths. FlowRoutes owns validation of its own `create_task` references.
-
-At minimum, validate:
+Tasks owns semantic validation of:
 
 ```text
-Task template keys are valid and stable
-definition keys match their definition identity
-required task-template fields are present
-due-offset/default assignment/responsibility shapes are valid
-related-subject defaults use supported generic shapes
-vertical-contributed task templates remain generic at the Tasks storage/runtime layer
-DB/runtime TaskTemplate availability is safe where required
-internal identifiers do not use client-facing nouns such as lead/fan/customer in place of canonical contact terminology
+Task template keys and stable identity
+required template fields
+due/default shapes
+assignment strategy shapes
+responsibility shapes
+TaskLink role vocabulary
+Task-link default shapes once the implementation contract is finalized
+supported linked model/type declarations
+vertical-contributed TaskTemplate genericity
+DB/runtime TaskTemplate availability
+canonical internal terminology
 ```
 
-A missing TaskTemplate referenced by a selected FlowRoute is a hard error.
+FlowRoutes owns validation of its own `create_task` references.
+
+A missing TaskTemplate referenced by an automation-created Task definition or selected FlowRoute is a hard error.
 
 An unused but valid TaskTemplate may be a warning or omitted from findings depending on whether unused-definition visibility is useful to the operator.
 
 Tasks validation should return shared structured findings and should not persist validation history by default.
 
-Task templates should be generic enough to support:
+Do not make one Tasks validator import every linked module's private models/config internals. Validate cross-module link support through Tasks-owned registries/config contracts/public seams.
+
+## Standalone and multi-link Tasks phase
+
+The current implementation already proves some standalone behavior:
 
 ```text
-FlowRoutes-created tasks
-manually-created tasks with defaults
-Webinars follow-up/admin tasks
-Documents review/request tasks
-Scheduling preparation/follow-up tasks
-Mortgage vertical tasks
-PetServices vertical tasks
-Music vertical tasks
+tasks.related is nullable
+CreateTaskAction can create unrelated Tasks
+TaskFactory supports unrelated Tasks
+dashboard Task rendering can show unrelated Tasks
+task.completed can emit with nullable contact_id
 ```
 
-Task templates may be contributed by vertical modules through presets, but Tasks must not become vertical-specific.
-
-Good:
+The current implementation does not yet satisfy the full durable target because it still includes:
 
 ```text
-PetServices contributes a “Call owner after behavior evaluation” task template.
-Tasks stores it as a generic TaskTemplate with metadata/source.
-FlowRoutes references the TaskTemplate through a stable key/id and asks Tasks to create the live task.
+single related_type / related_id relationship
+Contact-only allowed related types
+Contact-only related-subject presenter registration
+no dedicated Task index/show routes
+Tasks-owned direct InternalNotifications/TeamMember coupling in core paths
+Tasks-owned FlowRoutes-specific provenance columns/model imports
 ```
 
-Bad:
+The implementation phase should close those gaps without rebuilding already-generic Task lifecycle behavior unnecessarily.
+
+Minimum implementation target:
 
 ```text
-Tasks adds pet-specific columns.
-FlowRoutes hardcodes dog-training task copy inline.
-PetServices directly creates Task records instead of using a Tasks public action.
+[ ] Replace single related morph with TaskLink zero-to-many relationships.
+[ ] Support initial generic roles: subject, context, result.
+[ ] Preserve unlinked Tasks.
+[ ] Preserve Contact-linked Tasks through TaskLinks.
+[ ] Prove one existing non-Contact linked model cleanly.
+[ ] Add Tasks-owned linked-record presentation registry/resolver behavior.
+[ ] Add dedicated Task index and Task show surfaces.
+[ ] Keep Task UI useful when links are absent.
+[ ] Make core Task creation/lifecycle/UI work with only Core enabled.
+[ ] Move optional TeamMember/InternalNotifications behavior behind optional seams.
+[ ] Remove Tasks structural dependency on FlowRoutes internals.
+[ ] Preserve automation-created Task correlation through FlowRoutes-owned state/public event seams.
+[ ] Protect template/no-template and manual/automation invariants with tests.
 ```
 
-## Phase 3 audit scope
+Do not add speculative module-specific roles, a giant universal subject registry, or a generic graph system.
 
-Phase 3 should audit and implement the task template/default foundation before deeper FlowRoutes runtime work.
+## Dedicated Task index and show surfaces
 
-Goals:
+Dedicated Task index and show surfaces are part of this phase.
+
+The first implementation may be information-dense and function-first. Final UI polish can happen later.
+
+### Task index
+
+The Task index should show all relevant live Tasks, including:
 
 ```text
-Audit existing task_templates table and model shape.
-Confirm task templates can support generated/manual tasks.
-Confirm FlowRoutes create_task points can reference TaskTemplate records.
-Confirm task templates can define title/body/default due offsets/assigned_to/responsible_party/related-subject rules.
-Confirm task templates are generic enough for PetServices, Mortgage, Music, Webinars, Documents, Scheduling, and other modules.
-Confirm task template preset sync creates DB-owned default task templates only and does not create live tasks.
-Confirm customized templates are preserved.
-Decide whether direct template reference is enough or whether template assignment/selection is needed.
-Build UI only if needed for client/operator management.
+unlinked Tasks
+Contact-linked Tasks
+non-Contact-linked Tasks
+single-link Tasks
+multi-link Tasks
+template-backed manual Tasks
+no-template manual Tasks
+automation-created template-backed Tasks
 ```
 
-Fields/concepts to audit:
+The UI should not present these as separate Task categories. They are one Task record described by independent dimensions.
+
+Initial index information may include:
 
 ```text
-key
-name/title
-summary/body/description
-category/type
+title
+status
+due date
 priority
-default due offset
-default assigned_to_type / assigned_to_id
-responsible_party
-related subject rules
-source module / source preset
-owner group / visibility
-active/customized/synced flags
-meta/config_snapshot
+assignment
+responsible party
+template identity when present
+manual/automation origin
+compact linked-record context grouped by role
 ```
 
-If current schema lacks a required field, replace the branch migration while still pre-prod instead of layering unnecessary modify-table migrations.
+Filters and visual refinement can be added later when real usage proves the need.
+
+### Task show
+
+A Task show page should work when the Task has zero, one, or many links.
+
+The page should make the following clear without requiring training:
+
+```text
+WHY am I seeing this Task?
+WHAT needs to be done?
+HOW do I finish or advance it quickly?
+```
+
+Initial Task show information may include:
+
+```text
+title and description
+status and lifecycle timestamps
+due date and priority
+assigned owner when available
+responsible party/responsible model when available
+template identity/default provenance when present
+manual vs automation origin
+subject links
+context links
+result links
+actions such as complete, reopen, cancel, archive, restore
+```
+
+Raw morph types, IDs, registry keys, or module internals should not be primary UI labels.
+
+## Assignment and responsibility
+
+Task assignment and responsible-party semantics belong to Tasks.
+
+A Task may be:
+
+```text
+unassigned
+assigned when a supported assignee provider is available
+assigned later by an operator
+owned/grouped by a module or preset source
+```
+
+Tasks should support optional assignment without requiring InternalNotifications.
+
+InternalNotifications may contribute TeamMember assignment notification behavior through public seams, but Tasks must remain usable with Core only.
+
+Current responsible-party concepts remain:
+
+```text
+internal
+contact
+third_party
+unknown
+```
+
+Meaning:
+
+```text
+assigned_to
+    who internally owns/tracks the task when a supported assignee model exists
+
+responsible_party
+    who or what must actually do the manual action
+
+responsible
+    optional concrete responsible model when one exists
+```
+
+Responsibility does not imply notification delivery, Messaging consent, login access, or direct task completion ability.
+
+Those behaviors belong to separate capabilities.
 
 ## FlowRoutes integration
 
-FlowRoutes may create tasks through Tasks public services/actions.
+FlowRoutes may create template-backed Tasks through Tasks public services/actions.
 
-FlowRoutes `create_task` points should be able to reference a TaskTemplate record or stable task template key.
-
-The expected direction is:
+Durable direction:
 
 ```text
 FlowRoute create_task point
-→ Tasks public action/service
-→ TaskTemplate resolution
-→ live Task creation
-→ optional task.created/task.completed automation events
+    -> resolves TaskTemplate
+    -> calls Tasks public action
+    -> Tasks creates live Task and TaskLinks
+    -> Tasks owns lifecycle
+    -> Tasks emits neutral automation events
+    -> FlowRoutes owns route correlation/resume state
 ```
 
-FlowRoutes should not directly create `Task` records.
+FlowRoutes should not directly create `Task` or `TaskLink` records.
 
-FlowRoutes should not require Tasks to know route internals.
+Tasks should not know FlowRoutes internals.
+
+Automation-created Tasks must be template-backed. FlowRoutes should not create arbitrary no-template Tasks.
 
 Task completion should emit a neutral automation event when automation-worthy:
 
@@ -228,74 +548,60 @@ Task completion should emit a neutral automation event when automation-worthy:
 task.completed
 ```
 
-FlowRoutes can listen to generic `AutomationEventRecorded` and resume matching event-wait/progress/plan items internally.
+FlowRoutes may listen to generic `AutomationEventRecorded` and resume matching event-wait/progress/plan items internally.
 
-Tasks should not import FlowRoutes to resume route progress.
+### FlowRoutes correlation and provenance
 
-## Assignment and responsibility
+Tasks must not store FlowRoutes-specific foreign keys or import FlowRoutes-owned models merely to preserve route provenance.
 
-Task assignment and responsible-party semantics belong to Tasks.
-
-A task may be:
+FlowRoutes owns:
 
 ```text
-unassigned
-assigned to a User
-assigned to a TeamMember when InternalNotifications exists
-assigned later by an operator
-owned/grouped by a module or preset source
+route progress
+route plans
+plan items
+progress/execution items
+created artifact references
+explicit correlation state
+resume matching
 ```
 
-Tasks should support optional assignment without requiring InternalNotifications.
+When FlowRoutes creates a Task, it should preserve the created Task identity in FlowRoutes-owned state and use neutral Task event identity plus explicit correlation when later resume matching is required.
 
-InternalNotifications may contribute TeamMember notification behavior through public seams, but Tasks must remain usable with Core only.
-
-
-## FlowRoutes-created task provenance
-
-When FlowRoutes creates a Task, Tasks should continue to own task creation, assignment strategy, due-date resolution, responsibility, lifecycle, and task template behavior. FlowRoutes should call Tasks public actions/services, not create tasks directly.
-
-Route-created tasks should store structured FlowRoutes provenance so task completion can resume the correct route instance without meta-heavy correlation:
+Conceptual direction:
 
 ```text
-flow_route_progress_id
-flow_route_plan_id
-flow_route_plan_item_id
-flow_route_progress_item_id
-flow_route_id
-flow_route_point_id
-flow_route_capability_id
-task_template_id
-task_template_key
+FlowRoutes progress item
+    created_subject_type = Task morph
+    created_subject_id = Task id
+    correlation = FlowRoutes-owned data when needed
+
+Task
+    owns task state
+    owns TaskTemplate identity
+    owns TaskLinks
+    does not own flow_route_* foreign keys
 ```
 
-`task_template_id` links to the current DB template when available. `task_template_key` preserves the durable stable key for debugging, historical context, and null-on-delete cases.
+A Task may still preserve durable `task_template_id` plus `task_template_key` identity because TaskTemplate is Tasks-owned.
 
-This split is intentional. `tasks.task_template_id` should be treated as a soft/current database reference to the template that existed when the live task was created. It may be nullable and should not be the only historical identity for the task.
+Broad Contact-only task completion matching remains unsafe. FlowRoutes should correlate against its own created-artifact/correlation state and the neutral event payload.
 
-`tasks.task_template_key` is the durable historical identity. It should remain available for debugging, reporting, provenance, route correlation, and future template deletion/replacement scenarios.
-
-`tasks.task_template_id` is a real nullable foreign key with `nullOnDelete()`. Deleting or replacing a TaskTemplate must not delete historical Task rows or erase durable template identity.
-
-`tasks.task_template_key` remains the durable historical identity even when the referenced DB template is later deleted, replaced, or re-synced.
-
-Template-backed task creation must preserve the same structured FlowRoutes provenance as inline task creation. `CreateTaskFromTemplateAction` should pass route provenance through to the Tasks-owned live task creation path and persist both `task_template_id` and `task_template_key`.
-
-Task completion automation events should include enough task identity and structured FlowRoutes provenance for FlowRoutes to resume a specific waiting route progress/plan/progress item. Broad contact-only task completion matching is unsafe.
+The exact implementation shape should preserve the already-proven event-wait behavior without retaining a structural Tasks -> FlowRoutes dependency.
 
 ## Task template UI
 
 A client/operator task template UI is only needed if clients/operators need to manage templates themselves.
 
-Before building a polished UI, prove the schema and public action/service shape.
+Before building a polished template builder, prove the schema, public action/service shape, TaskLink model, and dedicated Task workspace.
 
-The first Phase 3 target is the durable task template/default foundation, not a polished task-template builder.
+The immediate phase needs Task index/show surfaces, not necessarily a polished TaskTemplate builder.
 
 ### Task action interaction direction
 
-Task actions should eventually follow the CRM preserve-context pattern where it improves operator flow.
+Task actions should follow the CRM preserve-context pattern where it improves operator flow.
 
-Dashboard task rows, contact task panels, and future task workspaces may support actions such as:
+Dashboard task rows, contact task panels, the Task index, and the Task show page may support actions such as:
 
 - Print
 - View
@@ -307,16 +613,16 @@ Dashboard task rows, contact task panels, and future task workspaces may support
 - Restore
 - Reassign
 
-For small row/card actions, the preferred long-term behavior is an inline update that preserves the operator’s current dashboard, filter, panel, or modal context instead of forcing a full reload.
+For small row/card actions, the preferred long-term behavior is an inline update that preserves the operator's current dashboard, filter, panel, or modal context instead of forcing a full reload.
 
 Examples:
 
 - completing a task should update the row/card state and counts in place when practical;
 - reopening a task should restore it without losing the current task list context;
 - broadcasting selected tasks should preserve the current selection or clearly report what happened;
-- viewing a task may link to the task detail page, the related contact, or a contact task section depending on the final task workspace model.
+- viewing a task should use the dedicated Task show surface, with linked records available as contextual destinations.
 
-This is not part of the Phase 3 schema-discovery requirement unless the task UX reveals missing persisted concepts such as saved task views, per-user task panel state, task action acknowledgements, selected-task batches, or durable task broadcast batches.
+Do not add persisted saved views, selected-task batches, or per-user Task workspace state until real UI usage proves those concepts are necessary.
 
 ## Automation opportunity producer direction
 
@@ -341,31 +647,24 @@ task.created_after_automation_event
     evaluated compound behavior after selected neutral event evidence
 ```
 
-### Manual Contact-associated Task creation
+### Manual Task creation target
 
-`task.created_manually` records only manual Tasks related to a Contact.
+The durable Task-created automation suggestion should focus on repeated similar manual no-template Tasks.
 
-The semantic fingerprint uses:
-
-```text
-related subject type
-Contact status key when available
-task_template_key when available
-normalized title only when no template exists
-```
-
-Example:
+Conceptual rule:
 
 ```text
-You've created this Task for 3 Contacts in Attempting Contact.
-Add it to their Route so it happens automatically next time?
+manual + no template + semantically similar repeated work
+    -> observe
+    -> qualify through shared Automation Opportunities rules
+    -> suggest reusable automation/template behavior when truthful
 ```
 
-Do not record FlowRoute-created, module-created, or system-created Tasks as manual behavior occurrences.
+Do not record automation-created Tasks as manual behavior occurrences.
 
-Do not put manual behavior recording inside generic `CreateTaskAction` merely because all Task creation passes through it. Record from an unambiguous manual application/UI seam such as the manual Task controller path.
+Do not put manual behavior recording inside generic `CreateTaskAction` merely because all Task creation passes through it. Record from an unambiguous manual application/UI seam.
 
-Standalone manual Tasks are not currently observed.
+The current implementation is more Contact-oriented and should be generalized carefully during the code phase without breaking existing compound behaviors.
 
 ### Manual status change -> manual Task
 
@@ -375,7 +674,7 @@ The current compound key is:
 task.created_after_manual_status_change
 ```
 
-It requires:
+It currently requires:
 
 ```text
 manual Contact status transition provenance
@@ -394,6 +693,8 @@ to_status_key
 task_template_key
 normalized_title when no template exists
 ```
+
+This Contact-specific compound behavior may continue where useful. It should use TaskLinks/public linked-record context rather than requiring a single `related` morph.
 
 ### Manual Task completion evidence
 
@@ -417,19 +718,7 @@ manual Task completion
 
 Selected neutral automation events are retained by shared opportunity infrastructure as evidence-only `automation_event.recorded` rows.
 
-When a manual Contact-associated Task is created within 10 minutes of recent supported evidence for the same Contact, Tasks may record:
-
-```text
-task.created_after_automation_event
-```
-
-Fingerprint:
-
-```text
-event_key
-task_template_key
-normalized_title when no template exists
-```
+When a manual Task is created within the supported correlation window after relevant evidence, Tasks may record a compound occurrence when correlation is truthful and unambiguous.
 
 Current selected event evidence keys:
 
@@ -443,7 +732,7 @@ task.completed
 
 The evidence allowlist may change as usefulness becomes clearer. It is not a promise that every retained event will produce a suggestion.
 
-Current correlation uses the most recent supported event evidence for the same Contact within the 10-minute window. If future evidence volume creates ambiguous attribution, prefer silence or a stricter correlation rule over a wrong suggestion.
+Prefer silence or a stricter correlation rule over a wrong suggestion.
 
 ### Qualification and validation
 
@@ -455,18 +744,33 @@ minimum distinct subjects = 3
 observation window = 30 days
 ```
 
-Manual smoke testing confirmed:
-
-```text
-3 equivalent Tasks across 3 Contacts -> eligible
-3 equivalent Tasks on 1 Contact -> remains observing
-system-created Task -> no manual occurrence
-old event evidence outside 10 minutes -> no event->Task compound occurrence
-```
-
 Shared Automation Opportunities infrastructure owns deterministic normalization/hashing, occurrence persistence, aggregation, lifecycle, and generic qualification.
 
 Tasks owns only Task-specific semantics and explicit producer behavior.
+
+## Notifications and digests
+
+Tasks owns the business trigger and cadence for task assignment notifications and task digests.
+
+Reusable Messaging templates must not own task digest schedules, task-assignment trigger timing, or Task-specific eligibility rules.
+
+InternalNotifications and Messaging are optional capabilities.
+
+Core Task creation, lifecycle, index/show UI, TaskTemplate behavior, and TaskLink behavior must not require them.
+
+When optional notification capabilities are unavailable:
+
+```text
+Task creation still works.
+Task assignment data may remain null or use another supported provider.
+Task completion still works.
+Task index/show still work.
+Assignment notification and digest delivery no-op or remain unavailable.
+```
+
+Task assignment notifications should resolve linked-record presentation generically. Notification copy and CTA behavior must remain valid when a Task has no links.
+
+Digests must not assume a Contact or any specific linked module.
 
 ## Events
 
@@ -482,6 +786,23 @@ task.reopened
 ```
 
 Only emit events after Tasks records its own state.
+
+A valid Task event may be contactless.
+
+Target event shape should preserve:
+
+```text
+event_key
+contact_id nullable
+subject = Task
+Task identity
+TaskTemplate identity when present
+manual/automation origin
+TaskLink context in a neutral form when useful
+occurred_at
+payload
+meta
+```
 
 Tasks must not import FlowRoutes, Campaigns, Webinars, Documents, Scheduling, or vertical modules to trigger downstream behavior.
 
@@ -499,8 +820,8 @@ task_description
 task_due_date
 task_priority
 task_responsible_party
-related contact fields
-related subject fields, when present
+linked subject fields when provided by a registered linked-record context
+linked context fields when provided by a registered linked-record context
 ```
 
-Do not make Phase 3 depend on a polished token picker. Phase 3 should first prove the DB-owned task-template/default shape. The field picker belongs to shared authoring UX and Phase 6 validation unless the task-template schema audit proves a missing persisted field/source concept.
+Do not expose arbitrary model columns, raw morph data, `meta`, or private module fields as implicit Task template token namespaces.

@@ -75,6 +75,8 @@ The imported-contact onboarding, Broadcast visibility, dashboard, contact worksp
 - The obsolete global FlowRoutes `Point` model/table/template layer has been removed. `FlowRoutePoint` now directly owns concrete point type/configuration, `FlowRoutePointType` owns the shared type vocabulary, and runtime plans/progress preserve `flow_route_point_id`, `flow_route_point_key`, `point_type`, capability identity, and definition/settings snapshots without `point_id`.
 - Dev/client smoke testing exposed and the subsequent refactor corrected a cross-module message-behavior ownership flaw: reusable Messaging templates no longer carry lifecycle `timing`, `schedule`, `conditions`, or module-specific skip behavior for module-owned flows. Consuming modules are authoritative for lifecycle behavior, and `ResolvedMessageDispatchBuilder` / `ResolvedMessageDispatch` is the universal runtime assembly seam.
 
+The immediate schema/architecture target is **Phase 12 — Standalone and multi-link Tasks**. This phase generalizes Tasks before new modules depend on it, adds dedicated Task index/show surfaces, enforces the Core-only operational contract, replaces the single `related` morph with generic zero-to-many TaskLinks, and removes structural Tasks dependencies on optional modules.
+
 ## Messaging, consent, and Rob Webinar production-prep completion
 
 The current production-prep Messaging/Webinar slice is complete and green.
@@ -226,9 +228,9 @@ Current schema-discovery sequence:
 | -: | --- | --- | --- | --- |
 | 1 | Webinar schedule profiles | Complete | DB/schema | DB-owned webinar schedule profiles/items exist. Series/webinars can select profiles with fallback. Webinars owns timing/slot identity. Messaging owns reusable copy/templates. Scheduled-message payloads stay compact; schedule/profile/template/debug identity belongs in meta. |
 | 2 | Campaign channel variants | Complete | DB/schema | DB-owned campaign step variants exist. Campaign enrollment is lifecycle, campaign step is the business moment, and campaign step variant is the channel-specific delivery option. Variant strategy and dependency-aware scheduling are hardened. Scheduled-message payloads stay compact; campaign/step/variant/template/debug identity belongs in meta. |
-| 3 | Task templates / task defaults | Complete | DB/schema | DB-owned reusable `task_templates` exist. FlowRoutes `create_task` points may reference stable task template keys and create live tasks through Tasks public actions. Tasks owns due offsets, assignment strategy, responsibility, and related-subject defaults. |
+| 3 | Task templates / task defaults | Complete | DB/schema | DB-owned reusable `task_templates` exist. Phase 3 established due offsets, assignment strategy, responsibility, and the then-current single related-subject defaults. Phase 12 supersedes that relationship shape with zero-to-many TaskLinks and requires automation-created Tasks to be template-backed. |
 | 4A | FlowRoutes relationship, capability, and instance-plan audit | Complete | DB/schema + architecture | Audit confirmed that future subject-scoped route instance adjustment and durable capability discovery are guaranteed requirements before production. FlowRoutes should harden schema now instead of relying on meta-heavy execution/correlation. |
-| 4B | FlowRoutes schema hardening | Complete | DB/schema + architecture | Subject-scoped route progress, contact route plans, plan items, progress/execution items, capability catalog/bindings, uniform route-created artifact provenance, blocked/cancelled runtime handling, provenance/debug consistency, and boundary guardrails are in place. |
+| 4B | FlowRoutes schema hardening | Complete | DB/schema + architecture | Subject-scoped route progress, contact route plans, plan items, progress/execution items, capability catalog/bindings, created-artifact tracking/correlation, blocked/cancelled runtime handling, provenance/debug consistency, and boundary guardrails are in place. Phase 12 revises the Tasks-specific direct FlowRoutes provenance coupling. |
 | 5 | FlowRoutes event-wait / task-completed resume implementation | Complete | Runtime | Resume from neutral `task.completed` automation events now uses the Phase 4B route progress/plan/progress-item foundation and created Task identity rather than broad contact-only waits. Direct resume and real CompleteTaskAction → TaskCompleted → AutomationEventRecorded → FlowRoutes listener behavior are covered. |
 | 6 | Config validation / setup validation | Complete | Architecture + safety | 6A–6E are complete. Engage Core now has a shared `SetupValidationManager`, structured findings/results, module-owned contributors, app-level dependency and registry-drift contributors, the non-mutating `setup:validate` CLI, focused validation coverage, adjacent regression coverage, and broader client/default-preset fallback coverage. |
 | 7 | Permission invitation accepted automation event | Complete | Architecture | Accepted invitations emit neutral `permission_invitation.accepted` events after transactional acceptance, with row locking/idempotency and no Messaging dependency on consumers. |
@@ -236,8 +238,9 @@ Current schema-discovery sequence:
 | 9 | Webinar message readiness check | Complete | Architecture + operator safety | Computed Webinars-owned readiness now evaluates runtime Messaging resolution, channel availability, active schedule-profile effects, intentional disablement, registration/waitlist consent acknowledgement readiness, and post-event outcome-message enablement without persisting readiness state. |
 | 10 | Manual status-change automation warning foundation | Complete | Operator safety + architecture | Backend-only consequence preview is implemented through a read-only FlowRoutes-owned impact resolver. It reports whether selected status-based FlowRoutes would run and which routes are selected without starting route progress. The actual operator warning UX is deferred to Phase 11. |
 | 11 | Automation opportunity foundation + Routes / FlowRoutes UX | In progress; backend, preset architecture, and first Route authoring baseline complete | DB/schema + architecture + UI/UX | Automation Opportunities, global Point collapse, module-first preset contributions, Manage Routes/Assignments IA, modal Route/Point editing, drag ordering, explicit Route message eligibility, linear product boundaries, and Point placement policy are complete. Remaining work is new Route creation and focused authoring/discovery UX gaps. |
-| 12 | Dashboard / contact workspace polish audit | Planned | UI/UX + possible schema | Review orientation surfaces after core runtime pieces settle. Add persisted preferences/acknowledgements only when needed. |
-| 13 | FOSS-informed module schema audit | Planned | DB/schema audit | Compare Engage Core modules against mature FOSS patterns to identify likely missing persisted concepts before production. Pull FlowRoutes-specific FOSS/OSS pattern review earlier into Phase 4 if helpful. |
+| 12 | Standalone and multi-link Tasks | In progress | DB/schema + architecture + UI foundation | Replace the single Task `related` morph with zero-to-many generic TaskLinks; preserve unlinked Tasks; lock template/no-template and manual/automation invariants; add dedicated Task index/show surfaces; enforce Tasks usefulness with only Core enabled; remove structural dependencies on InternalNotifications/TeamMember and FlowRoutes internals while preserving optional integrations through public seams. |
+| 13 | Dashboard / contact workspace polish audit | Planned | UI/UX + possible schema | Review orientation surfaces after core runtime pieces settle. Add persisted preferences/acknowledgements only when needed. |
+| 14 | FOSS-informed module schema audit | Planned | DB/schema audit | Compare Engage Core modules against mature FOSS patterns to identify likely missing persisted concepts before production. Pull FlowRoutes-specific FOSS/OSS pattern review earlier into Phase 4 if helpful. |
 
 Run each phase on its own branch when practical. At the end of each phase, bring this context forward into the next branch:
 
@@ -516,19 +519,18 @@ FlowRouteCapability / FlowRouteCapabilityBinding
     Durable catalog and client/context availability records for actions, waits, conditions, events, labels, input schema, output context, and supported subject types.
 ```
 
-Uniform route-created artifact provenance should be first-class on module-owned artifacts when FlowRoutes creates them:
+Phase 4B established durable created-artifact provenance/correlation, including direct `flow_route_*` fields on Tasks, ScheduledMessages, and CampaignEnrollments.
+
+Phase 12 intentionally revises the Tasks-specific part of that decision. The durable cross-module rule is now:
 
 ```text
-flow_route_progress_id
-flow_route_plan_id
-flow_route_plan_item_id
-flow_route_progress_item_id
-flow_route_id
-flow_route_point_id
-flow_route_capability_id
+FlowRoutes owns route progress, created-artifact identity, correlation, and resume matching.
+Artifact-owning modules own their own business records and should not import FlowRoutes internals merely for provenance symmetry.
 ```
 
-This shape applies to Tasks, ScheduledMessages, and CampaignEnrollments. Future modules such as Scheduling, Documents, Forms, Portal, Commerce, Mortgage, PetServices, and Music should follow the same integration process rather than adding bespoke FlowRoutes correlation metadata.
+For Tasks, FlowRoutes should store created Task identity and correlation in FlowRoutes-owned state rather than requiring `tasks` to carry FlowRoutes-specific foreign keys.
+
+Future modules should apply the same ownership test instead of automatically copying one fixed provenance-column bundle onto every route-created artifact.
 
 Phase 5 task-completed resume should depend on this foundation and resume specific route progress/plan/progress items from neutral `task.completed` automation events.
 
@@ -551,7 +553,7 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | 1 | Webinar schedule profiles | Complete | DB-owned `webinar_schedule_profiles` and `webinar_schedule_profile_items` are the durable schedule-selection path. Series and webinars may select profiles; existing scheduled messages remain stable. |
 | 2 | Campaign channel variants | Complete | DB-owned `campaign_step_variants` are the durable channel-coordination path. Steps own business moment and strategy; variants own channel/purpose/scope/dispatch references and do not own copy. |
 | 3 | Task templates / task defaults | Complete | DB-owned task templates support generated/manual task defaults. FlowRoutes can reference task template keys and must create live tasks through Tasks public actions. Task template UI remains deferred until needed. |
-| 4A | FlowRoutes relationship, capability, and instance-plan audit | Complete | Audit confirmed schema should support subject-scoped route instances, instance plans, plan items, progress/execution items, capability catalog/bindings, and uniform route-created artifact provenance before production. |
+| 4A | FlowRoutes relationship, capability, and instance-plan audit | Complete | Audit confirmed schema should support subject-scoped route instances, instance plans, plan items, progress/execution items, capability catalog/bindings, and durable created-artifact tracking/correlation before production. |
 | 4B | FlowRoutes schema hardening | Complete | FlowRoutes now has subject-capable progress, route instance plans, plan items, progress/execution items, capability/binding schema, uniform provenance, blocked/cancelled handling, and backend guardrails. Polished Route Management UX remains deferred. |
 | 5 | FlowRoutes event-wait / task-completed resume implementation | Complete | Resume from neutral `task.completed` automation events now uses the Phase 4B route progress/plan/progress-item foundation and created Task identity rather than broad contact-only waits. Direct resume and real CompleteTaskAction → TaskCompleted → AutomationEventRecorded → FlowRoutes listener behavior are covered. |
 | 6 | Config validation / setup validation | Complete | Shared contributor-based validation is implemented across Core, Tasks, Messaging, Webinars, Campaigns, FlowRoutes, module dependencies, and reference-registry drift. `setup:validate` fails on errors, succeeds on warnings-only/clean results, and does not mutate state. Focused and broader regression coverage are green. |
@@ -559,9 +561,10 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | 8 | Permission invitation cancellation behavior | Complete | Pre-claim skips/cancellations create no invitation row; post-claim skips reconcile claimed invitations to failed; provider failures remain failed; no new invitation statuses or schema changes were required. |
 | 9 | Webinar message readiness check | Complete | Computed readiness is available for registration confirmations, registration consent acknowledgement readiness, reminders, waitlist alerts, waitlist consent acknowledgement readiness, and post-event follow-ups. Readiness is derived from runtime resolution, channel availability, active schedule-profile effects, and post-event enablement; no readiness state is persisted. |
 | 10 | Manual status-change automation warning foundation | Complete | FlowRoutes exposes a read-only `ContactStatusAutomationImpactResolver` and plural status-trigger route resolution. No schema, controller, or Blade changes were required. The actual warning interaction belongs to Phase 11 UX work. |
-| 11 | Automation opportunity foundation + Routes / FlowRoutes UX | In progress; first authoring baseline complete | Shared opportunity persistence/evaluation and the current Routes management/editor baseline are complete. Next: new Route creation and the remaining focused authoring/discovery UX gaps. |
-| 12 | Dashboard / contact workspace polish audit | 1–2 sessions | Review shared orientation surfaces after runtime behavior settles. Add persisted state only for proven needs such as acknowledgements or preferences. |
-| 13 | FOSS-informed module schema audit | 2–6 sessions, split by module group | Compare Engage Core module tables against mature FOSS patterns to catch likely missing persisted concepts before production. |
+| 11 | Automation opportunity foundation + Routes / FlowRoutes UX | In progress; first authoring baseline complete | Shared opportunity persistence/evaluation and the current Routes management/editor baseline are complete. Remaining focused Routes work continues after the schema-sensitive Task slice. |
+| 12 | Standalone and multi-link Tasks | In progress | Make Task one generic live work record across independent dimensions: template/no-template, zero-to-many domain links, and manual/automation origin. Add TaskLinks with subject/context/result roles, dedicated index/show surfaces, Core-only operation, generic linked-record presentation seams, and Tasks/FlowRoutes boundary correction. |
+| 13 | Dashboard / contact workspace polish audit | 1–2 sessions | Review shared orientation surfaces after runtime behavior settles. Add persisted state only for proven needs such as acknowledgements or preferences. |
+| 14 | FOSS-informed module schema audit | 2–6 sessions, split by module group | Compare Engage Core module tables against mature FOSS patterns to catch likely missing persisted concepts before production. |
 | Deferred | DB Snapshot / Export Safety Tool | 0.5–1.5 sessions near launch | Command-line SQL/JSONL snapshot tooling for production/launch hardening. Do not build during active pre-prod schema discovery unless real data preservation becomes necessary. |
 | Ongoing | Feature-specific docs as modules stabilize | Ongoing | Keep module docs current when architecture/operator behavior changes. Do not turn docs into speculative backlog. |
 | Later | Client self-serve readiness audit | 0.5–1 session | Separate controlled beta/operator-assisted readiness from true client self-serve readiness. |
@@ -967,54 +970,94 @@ This is durable schema/architecture work completed before production rollout, no
 
 ## Recommended next implementation target
 
-The immediate client-operational target is the Rob production Webinar contact migration checkpoint described above: first re-verify final consent-domain/opt-in behavior, then finalize dry-run/apply import execution.
+The immediate implementation target is **Phase 12 — Standalone and multi-link Tasks**.
 
-Phase 11 remains the current broader product-roadmap phase.
+The phase exists to make Tasks a genuinely reusable work capability before new universal or vertical modules depend on it.
 
-Completed within Phase 11:
-
-```text
-Automation Opportunities backend foundation
-manual/compound producer and evidence slice
-real CRM/manual smoke validation
-global Point collapse
-FlowRoutePoint direct ownership model
-module-first preset contribution architecture
-business-language Routes information architecture
-Manage Routes and Assignments split
-existing Route editing modal
-existing Point editing modal
-drag-and-drop ordering with explicit Save order
-current linear Point authoring subset
-direct Route message-template eligibility seam
-contextual Stop Campaign availability
-Point placement policy and matching UX guardrails
-```
-
-The next Route work should continue from this real baseline rather than reopening already-settled product questions.
-
-Highest-value remaining candidates:
+Locked Task mental model:
 
 ```text
-new Route creation
-Route duplication
-activate/deactivate
-trigger changes
-clone Point from another Route
-task assignment/default authoring inside create-task Point UX
-business-day/business-hour wait authoring
-manual status-change consequence warning UX
-contextual Automation Opportunity suggestion UX
+Task
+    one generic live work record
+
+Dimension 1: template linkage
+    template-backed or no template
+
+Dimension 2: domain linkage
+    unlinked or linked to one or more module-owned records
+
+Dimension 3: creation origin
+    manual or automation-created
 ```
 
-Keep the locked product boundary:
+Locked invariant:
+
+```text
+no template
+    -> manual only
+
+template-backed
+    -> manual or automation-created
+```
+
+Locked relationship target:
+
+```text
+task_links
+    task_id
+    linkable_type
+    linkable_id
+    role
+
+initial roles
+    subject
+    context
+    result
+```
+
+Do not keep both `tasks.related_type / related_id` and `task_links` as competing relationship systems.
+
+Phase 12 implementation goals:
+
+```text
+Replace the single Task related morph with zero-to-many TaskLinks.
+Preserve unlinked Tasks.
+Preserve Contact-linked Tasks through the generic link system.
+Prove one existing non-Contact linked model cleanly.
+Allow Task links to grow over time, including result links added after work produces a record.
+Keep Tasks generic; linked modules own presentation of their own records through Tasks-owned resolver/provider seams.
+Add dedicated Task index and Task show surfaces.
+Keep the first Task workspace information-dense and function-first; refine UI later.
+Make every Task surface answer WHY the user is there, WHAT to do, and HOW to complete/advance the work quickly.
+Enforce that Tasks remains useful with only Core enabled.
+Move optional TeamMember/InternalNotifications behavior behind optional seams.
+Keep Messaging optional.
+Remove Tasks structural dependency on FlowRoutes internals and FlowRoutes-specific Task foreign keys.
+Preserve FlowRoutes-created Task correlation through FlowRoutes-owned created-artifact/correlation state and neutral Task events.
+Require automation-created Tasks to be template-backed.
+Use repeated similar manual no-template Tasks as the primary Task-created Automation Opportunity signal.
+Protect existing Contact-specific compound automation-opportunity behavior where still useful.
+```
+
+Do not expand this phase into:
+
+```text
+a giant universal subject graph
+module-specific TaskLink roles
+a polished TaskTemplate builder
+saved Task views or per-user workspace state without proven need
+a generalized activity system
+arbitrary relationship IDs stored in meta
+```
+
+Phase 11 Routes work remains real and should continue after this schema-sensitive Task slice without reopening settled Route product boundaries.
+
+The locked Route boundary remains:
 
 ```text
 Routes are linear.
 Do not introduce arbitrary branching, joins, nested branch trees, connectors, generic node-editor behavior, or arbitrary jump-back loops.
 ```
-
-Do not expand the Automation Opportunities backend merely because more actions or events exist. Add producers/evidence only when a useful, truthful suggestion can be described.
 
 ## What this roadmap intentionally avoids
 
@@ -1088,3 +1131,5 @@ Routes
     Use Route Management / Routes in client-facing navigation.
     Use contextual hints to explain automatic actions in plain language.
 ```
+
+

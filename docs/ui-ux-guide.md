@@ -1023,7 +1023,116 @@ Choose a documented token or update the workflow to supply it.
 
 ## Tasks UI
 
-Task UI should keep the mental model simple:
+Task UI should present one generic work record, not a menu of Task categories.
+
+A Task may vary independently by:
+
+```text
+template linkage
+    template-backed or no template
+
+domain linkage
+    unlinked or linked to one or more records
+
+creation origin
+    manual or automation-created
+```
+
+Do not make users learn those implementation dimensions before they can act.
+
+The Task UX standard is:
+
+```text
+WHY am I seeing this Task?
+WHAT needs to be done?
+HOW do I complete or advance it quickly?
+```
+
+A user should be able to reach a Task page and understand those three answers without an hour-long course on the platform.
+
+### Task relationship presentation
+
+Task links use generic roles:
+
+```text
+subject
+context
+result
+```
+
+The UI should translate those links into useful human context through module-provided presentation data.
+
+Example:
+
+```text
+Schedule annual vaccination appointment
+
+For: Max
+Owner: Jane Smith
+Due: July 20
+
+What to do:
+Schedule Max's annual vaccination appointment.
+
+[Schedule appointment]
+```
+
+After an Appointment exists:
+
+```text
+Result:
+July 24 at 10:00 AM
+
+[View appointment]
+[Mark task complete]
+```
+
+The user should not need to understand primary morphs, secondary morphs, registry keys, model classes, or module ownership.
+
+### Dedicated Task index
+
+The Task index should include unlinked, single-link, and multi-link Tasks in one workspace.
+
+Do not split Tasks into separate UI categories merely because they differ by template, links, or origin.
+
+The first implementation may be information-dense and function-first.
+
+Useful initial information:
+
+```text
+title
+status
+due date
+priority
+assigned owner
+responsible party
+template identity when present
+manual/automation origin
+compact linked-record context
+```
+
+Filters, saved views, and visual refinement should be added only when real usage proves they are needed.
+
+### Dedicated Task show
+
+The Task show page must work when the Task has zero, one, or many links.
+
+It should prioritize:
+
+```text
+1. What the Task is.
+2. Why it exists / what records give it context.
+3. What action is expected.
+4. Due date, assignment, and responsibility.
+5. Result links when work produces a record.
+6. Lifecycle actions.
+```
+
+For the first implementation, it is acceptable to stack useful information rather than prematurely optimizing the final visual hierarchy.
+
+### Assignment and responsibility labels
+
+Keep the mental model simple:
 
 ```text
 Assigned to = internal person tracking the task.
@@ -1037,7 +1146,9 @@ Good:
 ```text
 Assigned to
 Responsible party
-Related lead
+For: Max
+Customer: Jane Smith
+Result: July 24 appointment
 Due date
 Priority
 ```
@@ -1051,7 +1162,11 @@ responsible_type
 responsible_id
 related_type
 related_id
+linkable_type
+linkable_id
 ```
+
+Module-specific record labels should come from module-owned presentation behavior through Tasks-owned extension seams.
 
 ## Imports and permission invitations UI
 
@@ -1576,3 +1691,5 @@ customer_first_name
 when those names make the authoring experience clearer for the current client. The UI should resolve those aliases to one canonical internal Contact field such as `contact.first_name`.
 
 The product should optimize for the user's vocabulary without duplicating runtime concepts, token sources, schema, or validation logic.
+
+

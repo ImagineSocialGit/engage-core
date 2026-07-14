@@ -1,4 +1,3 @@
-
 # Engage Core Config Authoring Guide
 
 This guide is for creating or reviewing Engage Core default configs and client-specific configs.
@@ -1786,9 +1785,21 @@ Task presets create DB-owned task template definitions only. They do not create 
 
 Task templates must remain generic and reusable. Vertical modules may contribute task template presets, labels, and defaults without making Tasks vertical-specific.
 
+TaskTemplate usage follows the durable Task origin invariant:
+
+```text
+no-template Task
+    manual only
+
+template-backed Task
+    manual or automation-created
+```
+
 FlowRoute presets own automation/control-flow route definitions and point definitions.
 
-FlowRoute `create_task` points should reference TaskTemplate records or stable task template keys once task-template support is confirmed.
+Because FlowRoutes `create_task` is an automation creation path, every selected `create_task` point must reference a DB-owned TaskTemplate through a stable task template key. Inline arbitrary no-template automated Task creation is not part of the durable target.
+
+Task relationship defaults are moving from the single `related_subject` concept to generic zero-to-many TaskLinks. Do not invent a replacement preset shape until the Tasks-owned TaskLink config/runtime contract is implemented and validated. The first TaskLink roles are `subject`, `context`, and `result`.
 
 FlowRoute presets should call other module capabilities through public actions/services/contracts, not private table internals.
 
@@ -1985,3 +1996,5 @@ business context label
 ```
 
 Do not persist schedule summary text unless a concrete reason appears. Prefer deriving it from the canonical schedule/profile/criteria definition.
+
+

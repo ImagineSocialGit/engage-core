@@ -44,6 +44,15 @@ return [
     | task_template_key identity. Historical tasks must survive template
     | deletion/replacement safely.
     |
+    | Durable origin rule:
+    |
+    | - no-template Tasks are manual only;
+    | - template-backed Tasks may be manual or automation-created.
+    |
+    | Task relationships are moving to zero-to-many TaskLinks with the generic
+    | roles subject, context, and result. Do not add new related_subject examples
+    | here until the Tasks-owned TaskLink preset/default contract is implemented.
+    |
     */
 
     /*
@@ -88,9 +97,6 @@ return [
             'category' => 'follow_up',
             'is_active' => true,
             'due_offset_minutes' => 1440,
-            'related_subject' => [
-                'default' => 'current_contact',
-            ],
             'defaults' => [
                 'due' => [
                     'type' => 'delay',
@@ -120,3 +126,5 @@ return [
     ],
 
 ];
+
+
