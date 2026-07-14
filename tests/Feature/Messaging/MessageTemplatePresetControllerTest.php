@@ -322,6 +322,105 @@ class MessageTemplatePresetControllerTest extends TestCase
             ])
             ->assertSessionHasErrors(['payload.subject', 'payload.body']);
     }
+
+    public function test_it_updates_email_template_multiple_ctas(): void
+    {
+        config()->set('modules.enabled', [
+            'messaging',
+        ]);
+
+        $user = User::factory()->create();
+
+        $preset = MessageTemplatePreset::factory()->create([
+            'name' => 'Replay Follow-Up',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'post_attended',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'post_event',
+            'dispatch_keys' => ['webinar_ended'],
+            'payload' => [
+                'subject' => 'Thanks for Joining',
+                'body' => 'Watch the replay here: {cta}',
+                'ctas' => [
+                    [
+                        'label' => 'Watch the Recording',
+                        'url' => '{webinar_playback_url}',
+                    ],
+                    [
+                        'label' => 'Get Pre-Approved',
+                        'url' => 'https://robthemortgagecoach.my1003app.com/322051/register',
+                    ],
+                ],
+            ],
+            'tokens' => ['webinar_playback_url'],
+            'is_customized' => false,
+            'customized_at' => null,
+        ]);
+
+        MessageTemplateCatalogEntry::factory()
+            ->forPreset($preset)
+            ->create([
+                'module_key' => 'webinars',
+                'module_label' => 'Webinars',
+                'surface' => 'webinar_registrations',
+                'group_key' => 'webinars:transactional:webinar:post_attended',
+                'group_label' => 'Post-Webinar Follow-Up',
+                'item_key' => 'email.transactional.webinar.post_attended',
+                'item_label' => 'Attended Follow-Up Email',
+                'item_order' => 0,
+                'usage_type' => 'webinar_post_attended',
+            ]);
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/message-templates?preset='.$preset->getKey())
+            ->assertOk()
+            ->assertSee('Watch the Recording')
+            ->assertSee('Get Pre-Approved')
+            ->assertSee('https://robthemortgagecoach.my1003app.com/322051/register');
+
+        $this->actingAs($user)
+            ->patch('http://crm.'.config('app.root_domain').'/message-templates/'.$preset->getKey(), [
+                'name' => 'Replay Follow-Up',
+                'description' => null,
+                'payload' => [
+                    'subject' => 'Replay ready {first_name}',
+                    'body' => 'Watch the replay and take the next step. {cta}',
+                    'ctas' => [
+                        [
+                            'label' => 'Watch Replay',
+                            'url' => '{webinar_playback_url}',
+                        ],
+                        [
+                            'label' => 'Start Pre-Approval',
+                            'url' => 'https://robthemortgagecoach.my1003app.com/322051/register',
+                        ],
+                    ],
+                ],
+            ])
+            ->assertRedirect(route('crm.messaging.message-templates.index', [
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'module' => 'webinars',
+                'group' => 'webinars:transactional:webinar:post_attended',
+                'preset' => $preset->getKey(),
+            ]));
+
+        $preset->refresh();
+
+        $this->assertSame('Replay ready {first_name}', $preset->payload['subject']);
+        $this->assertSame('Watch the replay and take the next step. {cta}', $preset->payload['body']);
+        $this->assertSame('Watch Replay', $preset->payload['ctas'][0]['label']);
+        $this->assertSame('{webinar_playback_url}', $preset->payload['ctas'][0]['url']);
+        $this->assertSame('Start Pre-Approval', $preset->payload['ctas'][1]['label']);
+        $this->assertSame('https://robthemortgagecoach.my1003app.com/322051/register', $preset->payload['ctas'][1]['url']);
+        $this->assertTrue($preset->is_customized);
+        $this->assertNotNull($preset->customized_at);
+        $this->assertEqualsCanonicalizing(['cta', 'first_name', 'webinar_playback_url'], $preset->tokens);
+    }
 }
 
 

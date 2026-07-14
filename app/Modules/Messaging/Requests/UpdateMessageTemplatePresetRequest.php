@@ -33,6 +33,10 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
             'payload.cta' => ['nullable', 'array'],
             'payload.cta.label' => ['nullable', 'string', 'max:255'],
             'payload.cta.url' => ['nullable', 'string', 'max:1000'],
+            'payload.ctas' => ['nullable', 'array'],
+            'payload.ctas.*' => ['nullable', 'array'],
+            'payload.ctas.*.label' => ['nullable', 'string', 'max:255'],
+            'payload.ctas.*.url' => ['nullable', 'string', 'max:1000'],
             'payload.secondary_link' => ['nullable', 'array'],
             'payload.secondary_link.label' => ['nullable', 'string', 'max:255'],
             'payload.secondary_link.url' => ['nullable', 'string', 'max:1000'],
@@ -153,6 +157,34 @@ class UpdateMessageTemplatePresetRequest extends FormRequest
                     'label' => $label !== '' ? $label : null,
                     'url' => $url !== '' ? $url : null,
                 ], static fn (mixed $value): bool => $value !== null);
+            }
+        }
+
+        $ctas = $payload['ctas'] ?? null;
+
+        if (is_array($ctas) && array_is_list($ctas)) {
+            $cleanCtas = [];
+
+            foreach ($ctas as $cta) {
+                if (! is_array($cta)) {
+                    continue;
+                }
+
+                $label = is_string($cta['label'] ?? null) ? trim($cta['label']) : '';
+                $url = is_string($cta['url'] ?? null) ? trim($cta['url']) : '';
+
+                if ($label === '' && $url === '') {
+                    continue;
+                }
+
+                $cleanCtas[] = array_filter([
+                    'label' => $label !== '' ? $label : null,
+                    'url' => $url !== '' ? $url : null,
+                ], static fn (mixed $value): bool => $value !== null);
+            }
+
+            if ($cleanCtas !== []) {
+                $clean['ctas'] = $cleanCtas;
             }
         }
 

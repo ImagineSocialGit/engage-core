@@ -293,6 +293,7 @@ class MessageTemplatePresetController extends Controller
                     'label' => Arr::get($payload, 'cta.label', ''),
                     'url' => Arr::get($payload, 'cta.url', ''),
                 ],
+                'ctas' => $this->editableCtas(Arr::get($payload, 'ctas', [])),
                 'secondary_link' => [
                     'label' => Arr::get($payload, 'secondary_link.label', ''),
                     'url' => Arr::get($payload, 'secondary_link.url', ''),
@@ -307,6 +308,31 @@ class MessageTemplatePresetController extends Controller
         }
 
         return $payload;
+    }
+
+    /**
+     * @param mixed $ctas
+     * @return array<int, array{label: string, url: string}>
+     */
+    private function editableCtas(mixed $ctas): array
+    {
+        if (! is_array($ctas) || ! array_is_list($ctas)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            static function (mixed $cta): ?array {
+                if (! is_array($cta)) {
+                    return null;
+                }
+
+                return [
+                    'label' => is_string($cta['label'] ?? null) ? $cta['label'] : '',
+                    'url' => is_string($cta['url'] ?? null) ? $cta['url'] : '',
+                ];
+            },
+            $ctas,
+        )));
     }
 
     private function channelLabel(string $channel): string

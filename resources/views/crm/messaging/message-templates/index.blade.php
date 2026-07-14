@@ -348,29 +348,72 @@
                                         @enderror
                                     </div>
 
-                                    <div class="grid gap-4 md:grid-cols-2">
+                                    @php
+                                        $editableCtas = old('payload.ctas', $editablePayload['ctas'] ?? []);
+
+                                        if (! is_array($editableCtas) || $editableCtas === []) {
+                                            $editableCtas = [
+                                                [
+                                                    'label' => data_get($editablePayload, 'cta.label', ''),
+                                                    'url' => data_get($editablePayload, 'cta.url', ''),
+                                                ],
+                                                [
+                                                    'label' => '',
+                                                    'url' => '',
+                                                ],
+                                            ];
+                                        }
+
+                                        $editableCtas = array_values(array_slice($editableCtas, 0, 4));
+
+                                        while (count($editableCtas) < 2) {
+                                            $editableCtas[] = ['label' => '', 'url' => ''];
+                                        }
+                                    @endphp
+
+                                    <div class="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                         <div>
-                                            <label for="cta_label" class="mb-2 block text-sm font-bold text-slate-900">
-                                                Button label
-                                            </label>
-                                            <input
-                                                id="cta_label"
-                                                name="payload[cta][label]"
-                                                value="{{ old('payload.cta.label', data_get($editablePayload, 'cta.label', '')) }}"
-                                                class="block w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            >
+                                            <h4 class="text-sm font-extrabold text-slate-950">
+                                                Buttons
+                                            </h4>
+                                            <p class="mt-1 text-xs leading-5 text-slate-500">
+                                                Use multiple buttons when the template needs more than one call to action. The email body can place them with <span class="font-mono">{cta}</span>.
+                                            </p>
                                         </div>
-                                        <div>
-                                            <label for="cta_url" class="mb-2 block text-sm font-bold text-slate-900">
-                                                Button link
-                                            </label>
-                                            <input
-                                                id="cta_url"
-                                                name="payload[cta][url]"
-                                                value="{{ old('payload.cta.url', data_get($editablePayload, 'cta.url', '')) }}"
-                                                class="block w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            >
-                                        </div>
+
+                                        @foreach($editableCtas as $ctaIndex => $cta)
+                                            <div class="grid gap-4 md:grid-cols-2">
+                                                <div>
+                                                    <label for="cta_label_{{ $ctaIndex }}" class="mb-2 block text-sm font-bold text-slate-900">
+                                                        Button {{ $ctaIndex + 1 }} label
+                                                    </label>
+                                                    <input
+                                                        id="cta_label_{{ $ctaIndex }}"
+                                                        name="payload[ctas][{{ $ctaIndex }}][label]"
+                                                        value="{{ data_get($cta, 'label', '') }}"
+                                                        class="block w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                    >
+                                                    @error("payload.ctas.{$ctaIndex}.label")
+                                                        <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
+                                                    @enderror
+                                                </div>
+
+                                                <div>
+                                                    <label for="cta_url_{{ $ctaIndex }}" class="mb-2 block text-sm font-bold text-slate-900">
+                                                        Button {{ $ctaIndex + 1 }} link
+                                                    </label>
+                                                    <input
+                                                        id="cta_url_{{ $ctaIndex }}"
+                                                        name="payload[ctas][{{ $ctaIndex }}][url]"
+                                                        value="{{ data_get($cta, 'url', '') }}"
+                                                        class="block w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                    >
+                                                    @error("payload.ctas.{$ctaIndex}.url")
+                                                        <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p>
+                                                    @enderror
+                                                </div>
+                                            </div>
+                                        @endforeach
                                     </div>
 
                                     <div>

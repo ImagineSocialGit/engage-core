@@ -908,10 +908,6 @@
 │   │       └── views
 │   │           └── emails
 │   │               └── webinars
-│   │                   ├── post-follow-up.blade.php
-│   │                   ├── registration-confirmation.blade.php
-│   │                   ├── reminder.blade.php
-│   │                   └── waitlist-scheduled.blade.php
 │   ├── slam-dunk-crm
 │   │   ├── client-project-tree.txt
 │   │   ├── config
@@ -1251,6 +1247,7 @@
 │   │   ├── TOKEN_REFERENCE.md
 │   │   ├── webinar-post-event-template.php
 │   │   └── webinar-schedule-profiles-template.php
+│   ├── engage-core-production-setup-checklist.md
 │   ├── module-boundaries.md
 │   ├── modules
 │   │   ├── broadcasts.md
@@ -1631,4 +1628,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-519 directories, 1113 files
+519 directories, 1110 files
