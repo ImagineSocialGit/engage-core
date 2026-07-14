@@ -9,7 +9,6 @@ use App\Modules\Campaigns\Data\CampaignStepVariantPresetDefinition;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Campaigns\Models\CampaignStepVariant;
-use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Throwable;
 use App\Support\Presets\Data\ResolvedPresetDomain;
@@ -47,12 +46,14 @@ class SyncCampaignPresetsAction
             try {
                 $definition = CampaignPresetDefinition::fromArray($definitionData);
             } catch (Throwable $exception) {
-                $result->campaignSkipped(
-                    $definitionData['key'] ?? 'unknown',
-                    $exception->getMessage(),
+                throw new InvalidArgumentException(
+                    sprintf(
+                        'Campaign preset definition [%s] is invalid: %s',
+                        $definitionData['key'] ?? 'unknown',
+                        $exception->getMessage(),
+                    ),
+                    previous: $exception,
                 );
-
-                continue;
             }
 
             $campaign = $this->syncCampaign($definition, $result);
@@ -66,18 +67,6 @@ class SyncCampaignPresetsAction
 
         return $result;
     }
-
-    /**
-     * @return array<int, CampaignPresetDefinition>
-     */
-
-    /**
-     * @return array<string, mixed>
-     */
-
-    /**
-     * @return array<int, string>
-     */
 
     private function syncCampaign(
         CampaignPresetDefinition $definition,

@@ -170,6 +170,7 @@ class CampaignStepVariantPresetDefinition
             'skipped',
             'failed',
             'terminal',
+            'unavailable',
         ];
 
         if ($states === []) {

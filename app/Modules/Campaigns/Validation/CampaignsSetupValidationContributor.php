@@ -38,6 +38,7 @@ class CampaignsSetupValidationContributor implements SetupValidationContributor
         'skipped',
         'failed',
         'terminal',
+        'unavailable',
     ];
 
     public function __construct(
