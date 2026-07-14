@@ -369,15 +369,21 @@ These are open code/runtime investigations surfaced by the first production Webi
   - Treat this as a persistence/runtime consistency issue; do not infer the Redis delay is wrong from the database timestamp alone.
 - [ ] Make queued send-time diagnostics timezone-explicit.
   - Current Horizon/debug `send_at` metadata that uses `toDateTimeString()` drops timezone information and can make a correct instant look ambiguous.
-- [ ] Normalize multi-CTA support across config validation and runtime unresolved-token validation.
+- [X] Normalize multi-CTA support across config validation and runtime unresolved-token validation.
   - Config validation accepted `ctas` with `{cta}` while runtime unresolved-token validation did not consistently accept the same shape.
 - [ ] Add a safer first-class operational recovery mechanism for exact skipped/failed `ScheduledMessage` rows.
   - Current recovery still depends on surgical Tinker commands for narrow incidents.
   - Preserve the current safety principle: identify exact rows, exact channel, exact status, and exact reason; never broaden recovery into indiscriminate retries or queue resets.
 - [ ] Improve first-class queued-job diagnostics.
   - Surface effective queue connection, queue name, Redis prefix, delayed/reserved key identity, Horizon metadata, and delayed-until information so operators do not need manual Redis spelunking.
-- [ ] Evaluate whether deployment tooling should enforce or automate the Supervisor-managed Horizon restart requirement after queued-job runtime PHP changes.
   - Deployment docs already require the restart; the remaining question is whether tooling should reduce the chance of human omission.
+
+### Setup validation
+
+- [ ] Verify the production preset/module false positive is resolved.
+  - A production setup using the selected `mortgage` preset incorrectly reported the required Mortgage module as unavailable.
+  - Reproduce with current preset composition and enabled-module configuration before changing code.
+  - If current `setup:validate` accepts the valid configuration, mark this resolved rather than creating a new fix.
 
 ### Webinar join-signal integrity
 
