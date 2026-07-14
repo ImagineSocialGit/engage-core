@@ -345,7 +345,7 @@ class CampaignStepVariantsTest extends TestCase
                 'contact_id' => $contact->id,
                 'channel' => MessageChannel::Email->value,
                 'purpose' => MessagePurpose::Marketing->value,
-                'scope' => 'webinar_nurture',
+                'scope' => 'webinar',
                 'consented_at' => now()->subMinute(),
                 'source' => 'test',
             ]);
@@ -356,7 +356,7 @@ class CampaignStepVariantsTest extends TestCase
                 'contact_id' => $contact->id,
                 'channel' => MessageChannel::Sms->value,
                 'purpose' => MessagePurpose::Marketing->value,
-                'scope' => 'webinar_nurture',
+                'scope' => 'webinar',
                 'consented_at' => now()->subMinute(),
                 'source' => 'test',
             ]);

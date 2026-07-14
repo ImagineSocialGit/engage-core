@@ -182,17 +182,17 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
             ->first();
 
         $this->assertNotNull($message);
-        $this->assertSame('A new webinar is available. Register here: {webinar_waitlist_registration_url}', $message->payload['body']);
-        $this->assertSame('{webinar_waitlist_registration_url}', $message->payload['cta']['url']);
-        $this->assertNotEmpty($message->payload['tokens']['webinar_waitlist_registration_url']);
+        $this->assertSame('A new webinar is available. Register here: {webinar_registration_url}', $message->payload['body']);
+        $this->assertSame('{webinar_registration_url}', $message->payload['cta']['url']);
+        $this->assertNotEmpty($message->payload['tokens']['webinar_registration_url']);
 
         $this->assertStringStartsWith(
             'https://webinar.engagecore.test/',
-            $message->payload['tokens']['webinar_waitlist_registration_url'],
+            $message->payload['tokens']['webinar_registration_url'],
         );
 
-        $this->assertStringContainsString(route('webinar.waitlist.register', ['seriesSlug' => $series->slug, 'signup' => $signup->id], false), $message->payload['tokens']['webinar_waitlist_registration_url']);
-        $this->assertStringContainsString('signature=', $message->payload['tokens']['webinar_waitlist_registration_url']);
+        $this->assertStringContainsString(route('webinar.waitlist.register', ['seriesSlug' => $series->slug, 'signup' => $signup->id], false), $message->payload['tokens']['webinar_registration_url']);
+        $this->assertStringContainsString('signature=', $message->payload['tokens']['webinar_registration_url']);
 
         $signup->refresh();
 
@@ -225,7 +225,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         $message = ScheduledMessage::query()->first();
 
         $this->assertNotNull($message);
-        $this->assertNotEmpty($message->payload['tokens']['webinar_waitlist_registration_url']);
+        $this->assertNotEmpty($message->payload['tokens']['webinar_registration_url']);
 
         $signup->refresh();
 
@@ -338,10 +338,10 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
                 'queue' => 'notifications',
                 'payload' => [
                     'subject' => 'New webinar scheduled: {webinar_title}',
-                    'body' => 'A new webinar is available. Register here: {webinar_waitlist_registration_url}',
+                    'body' => 'A new webinar is available. Register here: {webinar_registration_url}',
                     'cta' => [
                         'label' => 'Register Now',
-                        'url' => '{webinar_waitlist_registration_url}',
+                        'url' => '{webinar_registration_url}',
                     ],
                 ],
             ],
@@ -354,7 +354,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
                 'payload_class' => SmsPayload::class,
                 'queue' => 'notifications',
                 'payload' => [
-                    'message' => 'A new webinar is available. Register here: {webinar_waitlist_registration_url}',
+                    'message' => 'A new webinar is available. Register here: {webinar_registration_url}',
                 ],
             ],
         ]);
@@ -386,7 +386,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
                 'schedule' => null,
                 'conditions' => [
                     [
-                        'field' => 'webinar_waitlist_registration_url',
+                        'field' => 'webinar_registration_url',
                         'operator' => 'filled',
                     ],
                 ],
@@ -445,7 +445,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
                 'contact_id' => $contact->id,
                 'channel' => $channel,
                 'purpose' => MessagePurpose::Marketing->value,
-                'scope' => 'webinar_waitlist',
+                'scope' => 'webinar',
                 'consented_at' => now()->subMinute(),
                 'source' => 'test',
             ]);

@@ -68,7 +68,11 @@ class PresetCompositionSyncCutoverTest extends TestCase
             ->expectsOutputToContain('  - automated_messaging')
             ->expectsOutputToContain('Client preset config')
             ->expectsOutputToContain('Client: missing-client-config')
-            ->expectsOutputToContain('Expected path: '.$clientRoot.DIRECTORY_SEPARATOR.'presets.php')
+            ->expectsOutputToContain(
+                    'Expected path: '.str(
+                        $clientRoot.DIRECTORY_SEPARATOR.'presets.php'
+                    )->after(base_path().DIRECTORY_SEPARATOR)->toString()
+                )
             ->expectsOutputToContain('Exists: no')
             ->assertExitCode(1);
 
@@ -100,7 +104,11 @@ class PresetCompositionSyncCutoverTest extends TestCase
             ->expectsOutputToContain('  - messaging')
             ->expectsOutputToContain('Client preset config')
             ->expectsOutputToContain('Client: existing-client-config')
-            ->expectsOutputToContain('Expected path: '.$clientRoot.DIRECTORY_SEPARATOR.'presets.php')
+            ->expectsOutputToContain(
+                    'Expected path: '.str(
+                        $clientRoot.DIRECTORY_SEPARATOR.'presets.php'
+                    )->after(base_path().DIRECTORY_SEPARATOR)->toString()
+                )
             ->expectsOutputToContain('Exists: yes')
             ->assertExitCode(1);
 

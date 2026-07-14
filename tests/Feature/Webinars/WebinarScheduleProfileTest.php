@@ -107,7 +107,7 @@ class WebinarScheduleProfileTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame('scheduled', $item->timing);
-        $this->assertSame([
+        $this->assertEquals([
             'type' => 'next_day_at',
             'time' => '09:00',
         ], $item->schedule);

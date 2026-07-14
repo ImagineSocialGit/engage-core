@@ -2,8 +2,12 @@
 
 namespace App\Modules\Campaigns\Listeners;
 
+use App\Modules\Campaigns\Actions\ScheduleCampaignStepMessagesAction;
 use App\Modules\Campaigns\Actions\ScheduleNextCampaignStepAction;
+use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Campaigns\Models\CampaignStep;
+use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Models\ScheduledMessage;
@@ -11,6 +15,7 @@ use App\Modules\Messaging\Models\ScheduledMessage;
 class ScheduleNextCampaignStepAfterScheduledMessageSent
 {
     public function __construct(
+        private readonly ScheduleCampaignStepMessagesAction $scheduleCampaignStepMessagesAction,
         private readonly ScheduleNextCampaignStepAction $scheduleNextCampaignStepAction,
     ) {}
 
@@ -21,10 +26,6 @@ class ScheduleNextCampaignStepAfterScheduledMessageSent
         $campaignEnrollmentId = $scheduledMessage->meta['campaign_enrollment_id'] ?? null;
 
         if (! is_numeric($campaignEnrollmentId)) {
-            return;
-        }
-
-        if ($this->hasPendingSiblingVariantMessages($scheduledMessage, (int) $campaignEnrollmentId)) {
             return;
         }
 
@@ -43,9 +44,56 @@ class ScheduleNextCampaignStepAfterScheduledMessageSent
             return;
         }
 
+        $this->reevaluateCurrentDependencyAwareStep(
+            scheduledMessage: $scheduledMessage,
+            enrollment: $enrollment,
+            campaignStepId: $campaignStepId,
+        );
+
+        if ($this->hasPendingSiblingVariantMessages($scheduledMessage, (int) $campaignEnrollmentId)) {
+            return;
+        }
+
         $this->scheduleNextCampaignStepAction->handle(
             enrollment: $enrollment,
             dispatchKey: null,
+            context: $scheduledMessage->context,
+            payload: [],
+            meta: [
+                'previous_scheduled_message_id' => $scheduledMessage->id,
+            ],
+        );
+    }
+
+    private function reevaluateCurrentDependencyAwareStep(
+        ScheduledMessage $scheduledMessage,
+        CampaignEnrollment $enrollment,
+        mixed $campaignStepId,
+    ): void {
+        if (! is_numeric($campaignStepId)) {
+            return;
+        }
+
+        $step = CampaignStep::query()
+            ->with('variants')
+            ->find((int) $campaignStepId);
+
+        if (! $step || $step->variant_strategy !== 'dependency_aware') {
+            return;
+        }
+
+        $campaign = Campaign::query()->find($enrollment->campaign_id);
+        $contact = Contact::query()->find($enrollment->contact_id);
+
+        if (! $campaign || ! $contact) {
+            return;
+        }
+
+        $this->scheduleCampaignStepMessagesAction->handle(
+            enrollment: $enrollment,
+            campaign: $campaign,
+            step: $step,
+            contact: $contact,
             context: $scheduledMessage->context,
             payload: [],
             meta: [

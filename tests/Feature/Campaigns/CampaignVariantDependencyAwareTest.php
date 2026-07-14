@@ -205,6 +205,41 @@ class CampaignVariantDependencyAwareTest extends TestCase
         $this->assertSame('campaign_variant_dependency_unsatisfied', $smsAttempt['reason'] ?? null);
     }
 
+    public function test_dependency_aware_can_treat_required_sibling_channel_unavailable_as_an_explicit_state(): void
+    {
+        Queue::fake();
+        Carbon::setTestNow('2026-07-08 12:00:00');
+
+        $this->configureCampaignMessagingDefinitions();
+        $this->configureChannelAvailability();
+        Config::set('messaging.channel_availability.sms.surfaces.campaigns', false);
+
+        $campaign = $this->createCampaignWithDependencyAwareVariants(
+            emailSortOrder: 1,
+            smsSortOrder: 0,
+            smsDependencyRules: [],
+            emailDependencyRules: [
+                'requires_variant_states' => [
+                    'sms' => ['sent', 'unavailable'],
+                ],
+            ],
+        );
+
+        $contact = $this->contactWithConsent(email: true, sms: false);
+
+        app(EnrollContactInCampaignAction::class)->handle(
+            contact: $contact,
+            campaignKey: $campaign->key,
+        );
+
+        $this->assertDatabaseCount('scheduled_messages', 1);
+
+        $message = ScheduledMessage::query()->firstOrFail();
+
+        $this->assertSame('email', $message->channel);
+        $this->assertSame('email', data_get($message->meta, 'campaign_step_variant_key'));
+    }
+
     public function test_dependency_aware_supports_explicit_terminal_dependency_state(): void
     {
         Queue::fake();
@@ -252,6 +287,7 @@ class CampaignVariantDependencyAwareTest extends TestCase
         int $emailSortOrder,
         int $smsSortOrder,
         array $smsDependencyRules,
+        array $emailDependencyRules = [],
     ): Campaign {
         $campaign = Campaign::query()->create([
             'key' => 'webinar_attended_nurture',
@@ -277,7 +313,7 @@ class CampaignVariantDependencyAwareTest extends TestCase
             'scope' => 'webinar_nurture',
             'is_active' => true,
             'criteria' => [],
-            'dependency_rules' => [],
+            'dependency_rules' => $emailDependencyRules,
             'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
             'meta' => [],
         ]);
@@ -432,7 +468,7 @@ class CampaignVariantDependencyAwareTest extends TestCase
                 'contact_id' => $contact->id,
                 'channel' => 'email',
                 'purpose' => 'marketing',
-                'scope' => 'webinar_nurture',
+                'scope' => 'webinar',
                 'consented_at' => now()->subMinute(),
                 'source' => 'test',
             ]);
@@ -443,7 +479,7 @@ class CampaignVariantDependencyAwareTest extends TestCase
                 'contact_id' => $contact->id,
                 'channel' => 'sms',
                 'purpose' => 'marketing',
-                'scope' => 'webinar_nurture',
+                'scope' => 'webinar',
                 'consented_at' => now()->subMinute(),
                 'source' => 'test',
             ]);
@@ -459,5 +495,3 @@ class CampaignVariantDependencyAwareTest extends TestCase
         parent::tearDown();
     }
 }
-
-

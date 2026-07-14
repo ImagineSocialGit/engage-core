@@ -283,6 +283,7 @@ class WebinarMessageTemplateControllerTest extends TestCase
 
         $preset = $this->webinarTemplate([
             'message_type' => 'post_attended',
+            'dispatch_keys' => ['webinar_ended'],
             'usage_type' => 'webinar_post_attended',
             'group_label' => 'Post-Webinar Follow-Up',
             'item_label' => 'Attended Follow-Up Email',

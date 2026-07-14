@@ -18,19 +18,19 @@ return [
             'scope' => 'webinar_nurture',
             'status' => 'active',
             'is_active' => true,
-            'source_version' => 'core_generic_2026_07_2',
+            'source_version' => 3,
             'meta' => [
                 'domain' => 'webinar',
                 'strategy' => 'sms_preferred_email_fallback',
-                'notes' => 'Transactional replay delivery belongs to Webinars. This campaign provides one later marketing follow-up and prefers SMS when eligible, with email fallback.',
+                'notes' => 'Transactional replay delivery belongs to Webinars. This campaign provides one later marketing follow-up, prefers SMS when available, and sends email only after the same enrollment\'s SMS is sent or when SMS is unavailable for the client.',
             ],
             'steps' => [
                 [
                     'step_number' => 1,
                     'name' => 'Attended webinar follow-up',
-                    'variant_strategy' => 'first_available',
+                    'variant_strategy' => 'dependency_aware',
                     'is_active' => true,
-                    'source_version' => 'core_generic_2026_07_2',
+                    'source_version' => 3,
                     'criteria' => [
                         'timing' => [
                             'type' => 'delay',
@@ -61,6 +61,11 @@ return [
                             'scope' => 'webinar_nurture',
                             'dispatch_key' => 'campaign_step_due',
                             'is_active' => true,
+                            'dependency_rules' => [
+                                'requires_variant_states' => [
+                                    'sms' => ['sent', 'unavailable'],
+                                ],
+                            ],
                             'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
                         ],
                     ],
@@ -77,19 +82,19 @@ return [
             'scope' => 'webinar_nurture',
             'status' => 'active',
             'is_active' => true,
-            'source_version' => 'core_generic_2026_07_2',
+            'source_version' => 3,
             'meta' => [
                 'domain' => 'webinar',
                 'strategy' => 'sms_preferred_email_fallback',
-                'notes' => 'Transactional replay delivery belongs to Webinars. This campaign provides one later marketing follow-up and prefers SMS when eligible, with email fallback.',
+                'notes' => 'Transactional replay delivery belongs to Webinars. This campaign provides one later marketing follow-up, prefers SMS when available, and sends email only after the same enrollment\'s SMS is sent or when SMS is unavailable for the client.',
             ],
             'steps' => [
                 [
                     'step_number' => 1,
                     'name' => 'Missed webinar follow-up',
-                    'variant_strategy' => 'first_available',
+                    'variant_strategy' => 'dependency_aware',
                     'is_active' => true,
-                    'source_version' => 'core_generic_2026_07_2',
+                    'source_version' => 3,
                     'criteria' => [
                         'timing' => [
                             'type' => 'delay',
@@ -120,6 +125,11 @@ return [
                             'scope' => 'webinar_nurture',
                             'dispatch_key' => 'campaign_step_due',
                             'is_active' => true,
+                            'dependency_rules' => [
+                                'requires_variant_states' => [
+                                    'sms' => ['sent', 'unavailable'],
+                                ],
+                            ],
                             'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_missed_nurture.steps.1.variants.email',
                         ],
                     ],

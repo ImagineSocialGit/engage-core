@@ -59,6 +59,7 @@ class ScheduleCampaignStepMessagesAction
             if ($strategy === 'dependency_aware') {
                 $dependencyEvaluation = $this->evaluateDependencies(
                     enrollment: $enrollment,
+                    campaign: $campaign,
                     step: $step,
                     variant: $variant,
                     scheduledMessages: $scheduledMessages,
@@ -287,6 +288,7 @@ class ScheduleCampaignStepMessagesAction
      */
     private function evaluateDependencies(
         CampaignEnrollment $enrollment,
+        Campaign $campaign,
         CampaignStep $step,
         CampaignStepVariant $variant,
         array $scheduledMessages,
@@ -297,6 +299,7 @@ class ScheduleCampaignStepMessagesAction
         foreach ($requirements as $requiredVariantKey => $allowedStates) {
             if (! $this->dependencyRequirementSatisfied(
                 enrollment: $enrollment,
+                campaign: $campaign,
                 step: $step,
                 requiredVariantKey: $requiredVariantKey,
                 allowedStates: $allowedStates,
@@ -401,11 +404,23 @@ class ScheduleCampaignStepMessagesAction
      */
     private function dependencyRequirementSatisfied(
         CampaignEnrollment $enrollment,
+        Campaign $campaign,
         CampaignStep $step,
         string $requiredVariantKey,
         array $allowedStates,
         array $scheduledMessages,
     ): bool {
+        if (
+            in_array('unavailable', $allowedStates, true)
+            && $this->requiredVariantChannelIsUnavailable(
+                campaign: $campaign,
+                step: $step,
+                requiredVariantKey: $requiredVariantKey,
+            )
+        ) {
+            return true;
+        }
+
         $currentPassMessage = $scheduledMessages[$requiredVariantKey] ?? null;
 
         if ($currentPassMessage instanceof ScheduledMessage && $this->messageMatchesAnyDependencyState($currentPassMessage, $allowedStates)) {
@@ -418,6 +433,25 @@ class ScheduleCampaignStepMessagesAction
             ->where('meta->campaign_step_variant_key', $requiredVariantKey)
             ->get()
             ->contains(fn (ScheduledMessage $message): bool => $this->messageMatchesAnyDependencyState($message, $allowedStates));
+    }
+
+    private function requiredVariantChannelIsUnavailable(
+        Campaign $campaign,
+        CampaignStep $step,
+        string $requiredVariantKey,
+    ): bool {
+        $requiredVariant = $step->variants
+            ->first(fn (CampaignStepVariant $candidate): bool => $this->variantKey($candidate) === $requiredVariantKey);
+
+        if (! $requiredVariant instanceof CampaignStepVariant || ! $requiredVariant->is_active) {
+            return false;
+        }
+
+        return ! $this->campaignMessageDefinitionResolver->isVariantChannelAvailable(
+            campaign: $campaign,
+            step: $step,
+            variant: $requiredVariant,
+        );
     }
 
     /**
@@ -478,6 +512,7 @@ class ScheduleCampaignStepMessagesAction
             'skipped',
             'failed',
             'terminal',
+            'unavailable',
         ]));
 
         return $states !== [] ? $states : ['scheduled'];

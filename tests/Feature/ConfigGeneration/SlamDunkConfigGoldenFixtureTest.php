@@ -41,11 +41,11 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
     public function test_real_client_boot_produces_the_frozen_slam_dunk_effective_configuration(): void
     {
         $this->assertSame('slam-dunk-crm', config('client.key'));
-        $this->assertSame('webinar_funnel', config('client.preset'));
+        $this->assertSame('mortgage', config('client.preset'));
         $this->assertSame('Slam Dunk Home Loans', config('client.name'));
         $this->assertSame('America/New_York', config('client.timezone'));
 
-        $package = config('presets.packages.webinar_funnel');
+        $package = config('presets.packages.mortgage');
 
         $this->assertIsArray($package);
         $this->assertSame([
@@ -73,7 +73,7 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
             'dashboard',
             'core',
             ...$package['modules']['enabled'],
-        ], app(PresetPackageResolver::class)->effectiveModules('webinar_funnel'));
+        ], app(PresetPackageResolver::class)->effectiveModules('mortgage'));
 
         $attendedSteps = config(
             'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps'
@@ -108,7 +108,7 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
     public function test_slam_dunk_package_syncs_cleanly_into_a_fresh_database_and_resolves_all_selected_runtime_records(): void
     {
         $exitCode = Artisan::call('presets:sync', [
-            'preset' => 'webinar_funnel',
+            'preset' => 'mortgage',
         ]);
 
         $this->assertSame(0, $exitCode, Artisan::output());
@@ -188,8 +188,8 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
         $registry = app(ConfigContractRegistry::class);
 
         $this->assertSame([], $registry->get('app.preset_package')->schema()->validate(
-            config('presets.packages.webinar_funnel'),
-            'presets.packages.webinar_funnel',
+            config('presets.packages.mortgage'),
+            'presets.packages.mortgage',
         ));
 
         foreach (config('presets.modules.webinars.contact-statuses.definitions', []) as $key => $definition) {

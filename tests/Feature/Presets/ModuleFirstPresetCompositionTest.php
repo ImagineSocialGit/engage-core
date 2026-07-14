@@ -39,7 +39,7 @@ class ModuleFirstPresetCompositionTest extends TestCase
 
     public function test_webinar_package_resolves_cross_contributor_status_references(): void
     {
-        config()->set('presets.packages.webinar_funnel', [
+        config()->set('presets.packages.mortgage', [
             'groups' => [
                 'contact_statuses' => [
                     'webinar_default',
@@ -48,7 +48,7 @@ class ModuleFirstPresetCompositionTest extends TestCase
         ]);
 
         $resolved = app(PresetCompositionResolver::class)->resolve(
-            presetKey: 'webinar_funnel',
+            presetKey: 'mortgage',
             domain: PresetDomain::ContactStatuses,
         );
 

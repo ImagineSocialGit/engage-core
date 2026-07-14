@@ -18,7 +18,7 @@ class WebinarTokenSourceProvider implements TokenSourceProvider
         yield from $this->columns('webinar_registration', WebinarRegistration::class, ['id', 'contact_id', 'webinar_id', 'webinar_slug', 'status', 'source', 'registered_at', 'attended_at', 'cancelled_at', 'created_at', 'updated_at'], ['attended_at' => ['registration_attended_at']]);
         yield from $this->columns('webinar_waitlist_signup', WebinarWaitlistSignup::class, ['id', 'contact_id', 'webinar_series_id', 'source_page', 'notified_at', 'created_at', 'updated_at']);
 
-        foreach (['webinar_join_url', 'cancel_registration_url', 'webinar_playback_url', 'webinar_waitlist_registration_url', 'webinar_start_date', 'webinar_start_time', 'webinar_start_datetime', 'webinar_end_date', 'webinar_end_time', 'webinar_end_datetime'] as $token) {
+        foreach (['webinar_join_url', 'cancel_registration_url', 'webinar_playback_url', 'webinar_start_date', 'webinar_start_time', 'webinar_start_datetime', 'webinar_end_date', 'webinar_end_time', 'webinar_end_datetime'] as $token) {
             yield TokenSourceDefinition::computed($token, 'webinars', str($token)->headline()->toString(), 'Value explicitly produced by WebinarMessageData.', $token, WebinarMessageTokenValueProvider::class);
         }
     }

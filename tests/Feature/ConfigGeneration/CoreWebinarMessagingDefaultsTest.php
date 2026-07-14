@@ -60,10 +60,12 @@ class CoreWebinarMessagingDefaultsTest extends TestCase
             array_column($configs['sms_transactional']['reminders'], 'key'),
         );
 
-        $this->assertArrayNotHasKey(
-            'campaigns',
-            $configs['sms_nurture'],
-            'Core Webinar nurture should stay email-only; richer mixed-channel campaign strategy belongs to client config.',
+        $this->assertSame(
+            [
+                'webinar_attended_nurture',
+                'webinar_missed_nurture',
+            ],
+            array_keys($configs['sms_nurture']['campaigns']),
         );
 
         foreach ([
@@ -107,11 +109,24 @@ class CoreWebinarMessagingDefaultsTest extends TestCase
                 $step['criteria']['timing'],
             );
 
-            $this->assertCount(1, $step['variants']);
-            $this->assertSame('email', $step['variants'][0]['key']);
-            $this->assertSame('email', $step['variants'][0]['channel']);
-            $this->assertSame('marketing', $step['variants'][0]['purpose']);
-            $this->assertSame('webinar_nurture', $step['variants'][0]['scope']);
+            $this->assertCount(2, $step['variants']);
+
+            $this->assertSame(
+                ['sms', 'email'],
+                array_column($step['variants'], 'key'),
+            );
+
+            $this->assertSame(
+                ['sms', 'email'],
+                array_column($step['variants'], 'channel'),
+            );
+
+            foreach ($step['variants'] as $variant) {
+                $this->assertSame('marketing', $variant['purpose']);
+                $this->assertSame('webinar_nurture', $variant['scope']);
+            }
+
+            $this->assertSame('dependency_aware', $step['variant_strategy']);
 
             $this->assertIsArray(
                 data_get($emailTemplates, "campaigns.{$campaignKey}.steps.1.variants.email"),

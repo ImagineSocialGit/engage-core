@@ -29,8 +29,8 @@ class CampaignPresetDefinitionConfigContract implements ConfigContract
             'conditions' => ConfigField::optional(ConfigSchema::listOf($condition)),
         ], atMostOne: [['timing', 'schedule']]);
         $dependencyStates = ConfigSchema::oneOf([
-            ConfigSchema::string(allowedValues: ['scheduled', 'pending', 'sent', 'skipped', 'failed', 'terminal']),
-            ConfigSchema::listOf(ConfigSchema::string(allowedValues: ['scheduled', 'pending', 'sent', 'skipped', 'failed', 'terminal'])),
+            ConfigSchema::string(allowedValues: ['scheduled', 'pending', 'sent', 'skipped', 'failed', 'terminal', 'unavailable']),
+            ConfigSchema::listOf(ConfigSchema::string(allowedValues: ['scheduled', 'pending', 'sent', 'skipped', 'failed', 'terminal', 'unavailable'])),
         ]);
         $dependencies = ConfigSchema::object([
             'requires_scheduled_variant_keys' => ConfigField::optional(ConfigSchema::listOf(ConfigSchema::string())),

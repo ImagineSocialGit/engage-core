@@ -76,7 +76,6 @@ class WebinarTokenContextProvider implements TokenContextProvider
                 ...self::SERIES,
                 'webinar_waitlist_signup.id',
                 'webinar_waitlist_signup.source_page',
-                'webinar_waitlist_registration_url',
             ],
             ['email', 'sms'],
             ['marketing'],

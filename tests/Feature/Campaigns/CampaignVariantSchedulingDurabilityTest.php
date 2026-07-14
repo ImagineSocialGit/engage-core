@@ -245,7 +245,7 @@ class CampaignVariantSchedulingDurabilityTest extends TestCase
             'contact_id' => $contact->id,
             'channel' => MessageChannel::Email->value,
             'purpose' => MessagePurpose::Marketing->value,
-            'scope' => 'webinar_nurture',
+            'scope' => 'webinar',
             'consented_at' => now()->subMinute(),
             'source' => 'test',
         ]);

@@ -13,6 +13,7 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Services\ConsentDomainRegistry;
 use App\Modules\Webinars\Actions\DispatchWebinarRegistrationMessagesAction;
 use App\Modules\Webinars\Actions\DispatchWebinarWaitlistMessagesAction;
 use App\Modules\Webinars\Actions\PostEvent\DispatchPostWebinarFollowUpsAction;
@@ -57,7 +58,7 @@ class SlamDunkRuntimeGoldenFixtureTest extends TestCase
         $this->configureChannelAvailability();
 
         $this->assertSame(0, Artisan::call('presets:sync', [
-            'preset' => 'webinar_funnel',
+            'preset' => 'mortgage',
         ]), Artisan::output());
     }
 
@@ -305,12 +306,14 @@ class SlamDunkRuntimeGoldenFixtureTest extends TestCase
             'phone' => '+15555550123',
         ]);
 
+        $consentDomains = app(ConsentDomainRegistry::class);
+
         foreach ($consents as [$channel, $purpose, $scope]) {
             MessageConsent::query()->create([
                 'contact_id' => $contact->getKey(),
                 'channel' => $channel,
                 'purpose' => $purpose,
-                'scope' => $scope,
+                'scope' => $consentDomains->domainForScope($scope),
                 'consented_at' => now()->subMinute(),
                 'source' => 'runtime_golden_fixture',
             ]);

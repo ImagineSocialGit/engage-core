@@ -27,12 +27,10 @@ class CampaignMessageDefinitionResolver
 
         $reference = $this->reference($campaign, $step, $variant);
 
-        if (! $this->messageChannelAvailability->isVisibleForSurface(
-            channel: $reference['channel'],
-            surface: 'campaigns',
-            purpose: $reference['purpose'],
-            scope: $reference['scope'],
-            requireProvider: true,
+        if (! $this->isVariantChannelAvailable(
+            campaign: $campaign,
+            step: $step,
+            variant: $variant,
         )) {
             return $this->unavailableChannelDefinition(
                 campaign: $campaign,
@@ -94,6 +92,22 @@ class CampaignMessageDefinitionResolver
         }
 
         return $resolved;
+    }
+
+    public function isVariantChannelAvailable(
+        Campaign $campaign,
+        CampaignStep $step,
+        CampaignStepVariant $variant,
+    ): bool {
+        $reference = $this->reference($campaign, $step, $variant);
+
+        return $this->messageChannelAvailability->isVisibleForSurface(
+            channel: $reference['channel'],
+            surface: 'campaigns',
+            purpose: $reference['purpose'],
+            scope: $reference['scope'],
+            requireProvider: true,
+        );
     }
 
     /**

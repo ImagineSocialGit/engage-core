@@ -97,8 +97,9 @@ readonly class WebinarMessageData extends MessageData
             'webinar_timezone' => $timezone,
             'webinar_platform' => $this->webinar->platform,
             'webinar_join_url' => $this->webinarJoinUrl,
-            'webinar_registration_url' => $this->webinar->registration_url,
-            'webinar_waitlist_registration_url' => $this->waitlistRegistrationUrl(),
+            'webinar_registration_url' => $this->waitlistSignup instanceof WebinarWaitlistSignup
+                ? $this->waitlistRegistrationUrl()
+                : $this->webinar->registration_url,
             'cancel_registration_url' => $cancelRegistrationUrl,
             'webinar_playback_url' => $playbackUrl,
             'webinar_playback_passcode' => $this->webinar->playback_passcode,

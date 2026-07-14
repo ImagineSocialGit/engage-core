@@ -170,7 +170,7 @@ class SyncFlowRoutePresetsActionTest extends TestCase
 
     private function syncWebinarFlowRoutes(): void
     {
-        config()->set('presets.packages.webinar_funnel', [
+        config()->set('presets.packages.mortgage', [
             'groups' => [
                 'flow_routes' => [
                     'webinar_default',
@@ -182,7 +182,7 @@ class SyncFlowRoutePresetsActionTest extends TestCase
 
         app(SyncFlowRoutePresetsAction::class)->handle(
             app(PresetCompositionResolver::class)->resolve(
-                'webinar_funnel',
+                'mortgage',
                 PresetDomain::FlowRoutes,
             ),
         );
