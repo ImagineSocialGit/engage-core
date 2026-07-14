@@ -228,18 +228,31 @@ class SendScheduledMessageJob implements ShouldQueue
                 continue;
             }
 
-            if (! is_string($value['label'] ?? null) || trim($value['label']) === '') {
+            if ($this->isValidStructuredLink($value)) {
+                $tokens[] = '{'.$key.'}';
+
                 continue;
             }
 
-            if (! is_string($value['url'] ?? null) || trim($value['url']) === '') {
-                continue;
-            }
+            if ($key === 'ctas' && array_is_list($value)) {
+                $hasValidCta = collect($value)
+                    ->contains(fn (mixed $cta): bool => is_array($cta) && $this->isValidStructuredLink($cta));
 
-            $tokens[] = '{'.$key.'}';
+                if ($hasValidCta) {
+                    $tokens[] = '{cta}';
+                }
+            }
         }
 
-        return $tokens;
+        return array_values(array_unique($tokens));
+    }
+
+    private function isValidStructuredLink(array $value): bool
+    {
+        return is_string($value['label'] ?? null)
+            && trim($value['label']) !== ''
+            && is_string($value['url'] ?? null)
+            && trim($value['url']) !== '';
     }
 
     private function sendEmail(
