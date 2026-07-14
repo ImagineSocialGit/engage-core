@@ -29,6 +29,7 @@ class EmailPayload implements EmailMessage
         public readonly ?string $view = null,
         public readonly array $tokens = [],
         public readonly array $cta = [],
+        public readonly array $ctas = [],
         public readonly array $secondaryLink = [],
         public readonly ?string $footer = null,
         public readonly ?string $unsubscribeUrl = null,
@@ -75,6 +76,8 @@ class EmailPayload implements EmailMessage
             tokens: self::resolveTokens($payload),
 
             cta: self::arrayValue($payload['cta'] ?? null),
+
+            ctas: self::listArrayValue($payload['ctas'] ?? null),
 
             secondaryLink: self::arrayValue($payload['secondary_link'] ?? null),
 
@@ -152,6 +155,8 @@ class EmailPayload implements EmailMessage
                 'details' => $this->configArray('details'),
 
                 'cta' => $this->resolvedArray('cta', $this->cta),
+
+                'ctas' => $this->resolvedListArray('ctas', $this->ctas),
 
                 'secondary_link' => $this->resolvedArray('secondary_link', $this->secondaryLink),
 
@@ -247,6 +252,7 @@ class EmailPayload implements EmailMessage
             'text' => $this->text(),
             'view' => $this->view(),
             'cta' => $this->resolvedArray('cta', $this->cta),
+            'ctas' => $this->resolvedListArray('ctas', $this->ctas),
             'secondary_link' => $this->resolvedArray('secondary_link', $this->secondaryLink),
             'footer' => $this->footer ?? $this->configValue('footer'),
             'unsubscribe_url' => $this->marketingUnsubscribeUrl(),
@@ -353,6 +359,24 @@ class EmailPayload implements EmailMessage
         );
     }
 
+    private function resolvedListArray(string $key, array $value): array
+    {
+        $resolved = $value !== [] ? $value : $this->configArray($key);
+
+        if (! array_is_list($resolved)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_map(
+                fn (mixed $item): ?array => is_array($item)
+                    ? $this->interpolateRecursive($item)
+                    : null,
+                $resolved,
+            ),
+        ));
+    }
+
     private function marketingUnsubscribeUrl(): ?string
     {
         if ($this->unsubscribeUrl) {
@@ -397,6 +421,13 @@ class EmailPayload implements EmailMessage
     private static function arrayValue(mixed $value): array
     {
         return is_array($value) ? $value : [];
+    }
+
+    private static function listArrayValue(mixed $value): array
+    {
+        return is_array($value) && array_is_list($value)
+            ? $value
+            : [];
     }
 
     private static function nullableInt(mixed $value): ?int

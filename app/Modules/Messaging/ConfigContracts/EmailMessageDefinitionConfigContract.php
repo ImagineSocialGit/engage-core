@@ -31,6 +31,7 @@ class EmailMessageDefinitionConfigContract implements ConfigContract
             'body' => ConfigField::required(ConfigSchema::string()),
             'view' => ConfigField::optional(ConfigSchema::string(nullable: true)),
             'cta' => ConfigField::optional(MessageDefinitionSchema::link()),
+            'ctas' => ConfigField::optional(ConfigSchema::listOf(MessageDefinitionSchema::link())),
             'secondary_link' => ConfigField::optional(MessageDefinitionSchema::link()),
             'footer' => ConfigField::optional(ConfigSchema::string(nullable: true)),
         ]));

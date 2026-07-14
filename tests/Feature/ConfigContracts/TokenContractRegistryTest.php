@@ -27,7 +27,7 @@ class TokenContractRegistryTest extends TestCase
         }
     }
 
-    public function test_messaging_contexts_expose_only_registered_contact_columns_and_aliases(): void
+    public function test_messaging_contexts_expose_registered_contact_and_client_identity_tokens(): void
     {
         $registry = app(TokenContractRegistry::class);
 
@@ -42,9 +42,13 @@ class TokenContractRegistryTest extends TestCase
             'email',
             'contact.phone',
             'phone',
+            'client_name',
+            'client_signature',
         ], $registry->authorableTokens('imported_contact_permission_invitation'));
 
         $this->assertSame('messaging', $registry->context('consent_granted')->owner);
+        $this->assertContains('client_name', $registry->authorableTokens('consent_granted'));
+        $this->assertContains('client_signature', $registry->authorableTokens('consent_granted'));
         $this->assertNotContains('meta', $registry->authorableTokens('consent_granted'));
     }
 

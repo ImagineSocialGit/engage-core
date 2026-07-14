@@ -168,11 +168,41 @@ class MessageTemplateTokenValidator
      */
     private function isAllowedRenderSlot(string $token, array $payload): bool
     {
-        $value = $payload[$token] ?? null;
+        if ($token !== 'cta') {
+            $value = $payload[$token] ?? null;
 
-        return is_array($value)
-            && $this->filledString($value['label'] ?? null)
-            && $this->filledString($value['url'] ?? null);
+            return is_array($value)
+                && $this->filledString($value['label'] ?? null)
+                && $this->filledString($value['url'] ?? null);
+        }
+
+        $cta = $payload['cta'] ?? null;
+
+        if (
+            is_array($cta)
+            && $this->filledString($cta['label'] ?? null)
+            && $this->filledString($cta['url'] ?? null)
+        ) {
+            return true;
+        }
+
+        $ctas = $payload['ctas'] ?? null;
+
+        if (! is_array($ctas) || ! array_is_list($ctas) || $ctas === []) {
+            return false;
+        }
+
+        foreach ($ctas as $item) {
+            if (
+                ! is_array($item)
+                || ! $this->filledString($item['label'] ?? null)
+                || ! $this->filledString($item['url'] ?? null)
+            ) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function contextAllowsRoute(

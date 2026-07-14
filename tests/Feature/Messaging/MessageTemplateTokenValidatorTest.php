@@ -132,4 +132,31 @@ class MessageTemplateTokenValidatorTest extends TestCase
             'webinar_join_url',
         ], $tokens);
     }
+
+    public function test_it_accepts_multi_cta_collection_for_the_cta_render_slot(): void
+    {
+        $issues = app(MessageTemplateTokenValidator::class)->validatePayload(
+            payload: [
+                'subject' => 'Your webinar replay',
+                'body' => "Watch the replay below.\n{cta}",
+                'ctas' => [
+                    [
+                        'label' => 'Watch the Recording',
+                        'url' => '{webinar_playback_url}',
+                    ],
+                    [
+                        'label' => 'Get Pre-Approved',
+                        'url' => 'https://example.test/apply',
+                    ],
+                ],
+            ],
+            dispatchKeys: ['webinar_ended'],
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+            surface: 'webinar_registrations',
+        );
+
+        $this->assertSame([], $issues);
+    }
 }

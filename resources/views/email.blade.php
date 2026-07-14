@@ -46,6 +46,24 @@
                                     && filled($cta['label'] ?? null)
                                     && filled($cta['url'] ?? null);
 
+                                $resolvedCtas = [];
+
+                                if (! empty($ctas) && is_array($ctas)) {
+                                    foreach ($ctas as $item) {
+                                        if (
+                                            is_array($item)
+                                            && filled($item['label'] ?? null)
+                                            && filled($item['url'] ?? null)
+                                        ) {
+                                            $resolvedCtas[] = $item;
+                                        }
+                                    }
+                                }
+
+                                if ($resolvedCtas === [] && $hasCta) {
+                                    $resolvedCtas[] = $cta;
+                                }
+
                                 $hasInlineCta = false;
                             @endphp
 
@@ -53,15 +71,17 @@
                                 @if(trim($paragraph) === '{cta}')
                                     @php $hasInlineCta = true; @endphp
 
-                                    @if($hasCta)
+                                    @if($resolvedCtas !== [])
                                         <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0;">
-                                            <tr>
-                                                <td>
-                                                    <a href="{{ $cta['url'] }}" style="display:inline-block; background:#0f172a; color:#ffffff; text-decoration:none; font-size:15px; font-weight:700; padding:14px 22px; border-radius:999px;">
-                                                        {{ $cta['label'] }}
-                                                    </a>
-                                                </td>
-                                            </tr>
+                                            @foreach($resolvedCtas as $resolvedCta)
+                                                <tr>
+                                                    <td style="{{ ! $loop->first ? 'padding-top:12px;' : '' }}">
+                                                        <a href="{{ $resolvedCta['url'] }}" style="display:inline-block; background:#0f172a; color:#ffffff; text-decoration:none; font-size:15px; font-weight:700; padding:14px 22px; border-radius:999px;">
+                                                            {{ $resolvedCta['label'] }}
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
                                         </table>
                                     @endif
                                 @else
@@ -87,15 +107,17 @@
                                 </table>
                             @endif
 
-                            @if($hasCta && ! $hasInlineCta)
+                            @if($resolvedCtas !== [] && ! $hasInlineCta)
                                 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0;">
-                                    <tr>
-                                        <td>
-                                            <a href="{{ $cta['url'] }}" style="display:inline-block; background:#0f172a; color:#ffffff; text-decoration:none; font-size:15px; font-weight:700; padding:14px 22px; border-radius:999px;">
-                                                {{ $cta['label'] }}
-                                            </a>
-                                        </td>
-                                    </tr>
+                                    @foreach($resolvedCtas as $resolvedCta)
+                                        <tr>
+                                            <td style="{{ ! $loop->first ? 'padding-top:12px;' : '' }}">
+                                                <a href="{{ $resolvedCta['url'] }}" style="display:inline-block; background:#0f172a; color:#ffffff; text-decoration:none; font-size:15px; font-weight:700; padding:14px 22px; border-radius:999px;">
+                                                    {{ $resolvedCta['label'] }}
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    @endforeach
                                 </table>
                             @endif
 
