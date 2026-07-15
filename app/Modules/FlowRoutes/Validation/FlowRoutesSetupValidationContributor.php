@@ -2,17 +2,7 @@
 
 namespace App\Modules\FlowRoutes\Validation;
 
-use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Core\Models\ContactStatus;
-use App\Modules\FlowRoutes\Data\Points\BranchEvaluatePointDefinition;
-use App\Modules\FlowRoutes\Data\Points\CancelCampaignPointDefinition;
-use App\Modules\FlowRoutes\Data\Points\ChangeStatusPointDefinition;
-use App\Modules\FlowRoutes\Data\Points\ConditionPointDefinition;
-use App\Modules\FlowRoutes\Data\Points\CreateTaskPointDefinition;
-use App\Modules\FlowRoutes\Data\Points\EnrollCampaignPointDefinition;
-use App\Modules\FlowRoutes\Data\Points\EventWaitPointDefinition;
-use App\Modules\FlowRoutes\Data\Points\SendMessagePointDefinition;
-use App\Modules\FlowRoutes\Data\Points\WaitPointDefinition;
 use App\Modules\FlowRoutes\Data\Presets\FlowRoutePresetDefinition;
 use App\Modules\FlowRoutes\Models\ContactFlowRoutePlan;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
@@ -20,11 +10,10 @@ use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRouteCapability;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
-use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
-use App\Modules\Messaging\Services\MessageDefinitionResolver;
-use App\Modules\Tasks\Models\TaskTemplate;
 use App\Support\AutomationCapabilities\AutomationCapabilityRegistry;
+use App\Support\AutomationCapabilities\AutomationPointDefinitionRegistry;
+use App\Support\AutomationCapabilities\Data\AutomationPointValidationContext;
 use App\Support\AutomationCapabilities\Data\AutomationCapabilityDefinition;
 use App\Support\Modules\ModuleManager;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
@@ -42,9 +31,9 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
 
     public function __construct(
         private readonly AutomationCapabilityRegistry $capabilityRegistry,
+        private readonly AutomationPointDefinitionRegistry $pointDefinitionRegistry,
         private readonly PointHandlerRegistry $pointHandlerRegistry,
         private readonly ModuleManager $moduleManager,
-        private readonly MessageDefinitionResolver $messageDefinitionResolver,
         private readonly PresetCompositionResolver $compositionResolver,
         private readonly PresetPackageResolver $packageResolver,
     ) {}
@@ -61,7 +50,7 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
     /**
      * @return iterable<int, SetupValidationFinding>
      */
-private function validateSelectedPresetDefinitions(): iterable
+    private function validateSelectedPresetDefinitions(): iterable
     {
         $presetKey = $this->packageResolver->resolvePresetKey();
 
@@ -277,181 +266,35 @@ private function validateSelectedPresetDefinitions(): iterable
         string $path,
         array $context,
     ): iterable {
-        $parsed = match ($pointType) {
-            FlowRoutePointType::Wait->value => WaitPointDefinition::from($definition, $settings),
-            FlowRoutePointType::EventWait->value => EventWaitPointDefinition::from($definition, $settings),
-            FlowRoutePointType::Condition->value => ConditionPointDefinition::from($definition, $settings),
-            FlowRoutePointType::BranchEvaluate->value => BranchEvaluatePointDefinition::from($definition, $settings),
-            FlowRoutePointType::ChangeStatus->value => ChangeStatusPointDefinition::from($definition, $settings),
-            FlowRoutePointType::CreateTask->value => CreateTaskPointDefinition::from($definition, $settings),
-            FlowRoutePointType::SendMessage->value => SendMessagePointDefinition::from($definition, $settings),
-            FlowRoutePointType::EnrollCampaign->value => EnrollCampaignPointDefinition::from($definition, $settings),
-            FlowRoutePointType::CancelCampaign->value => CancelCampaignPointDefinition::from($definition, $settings),
-            default => null,
-        };
-
-        if ($parsed !== null && method_exists($parsed, 'isValid') && ! $parsed->isValid()) {
+        if (! $this->pointDefinitionRegistry->has($pointType)) {
             yield $this->error(
-                code: 'flow_routes.point_definition_invalid',
-                message: "FlowRoute [{$routeKey}] point [{$pointKey}] has invalid [{$pointType}] definition [{$parsed->invalidReason}].",
-                path: "{$path}.definition",
+                code: 'flow_routes.point_definition_contributor_missing',
+                message: "FlowRoute [{$routeKey}] point [{$pointKey}] uses point type [{$pointType}] with no registered point-definition contributor.",
+                path: "{$path}.type",
                 context: $context + [
                     'point_key' => $pointKey,
                     'point_type' => $pointType,
-                    'invalid_reason' => $parsed->invalidReason,
                 ],
             );
 
             return;
         }
 
-        if ($parsed instanceof CreateTaskPointDefinition
-            && $parsed->taskTemplateKey !== null
-            && ! $this->taskTemplateExists($parsed->taskTemplateKey)
-        ) {
-            yield $this->error(
-                code: 'flow_routes.task_template_missing',
-                message: "FlowRoute [{$routeKey}] point [{$pointKey}] references unavailable TaskTemplate [{$parsed->taskTemplateKey}].",
-                path: "{$path}.definition.task_template_key",
-                context: $context + [
-                    'point_key' => $pointKey,
-                    'task_template_key' => $parsed->taskTemplateKey,
-                ],
-            );
-        }
-
-        if ($parsed instanceof ChangeStatusPointDefinition && ! $this->contactStatusTargetExists($parsed)) {
-            yield $this->error(
-                code: 'flow_routes.contact_status_missing',
-                message: "FlowRoute [{$routeKey}] point [{$pointKey}] references an unavailable ContactStatus target.",
-                path: "{$path}.definition",
-                context: $context + [
-                    'point_key' => $pointKey,
-                    'contact_status_id' => $parsed->contactStatusId,
-                    'contact_status_key' => $parsed->contactStatusKey,
-                ],
-            );
-        }
-
-        if (($parsed instanceof EnrollCampaignPointDefinition || $parsed instanceof CancelCampaignPointDefinition)
-            && $parsed->campaignKey !== null
-            && ! $this->campaignExists($parsed->campaignKey)
-        ) {
-            yield $this->error(
-                code: 'flow_routes.campaign_missing',
-                message: "FlowRoute [{$routeKey}] point [{$pointKey}] references unavailable Campaign [{$parsed->campaignKey}].",
-                path: "{$path}.definition.campaign_key",
-                context: $context + [
-                    'point_key' => $pointKey,
-                    'campaign_key' => $parsed->campaignKey,
-                ],
-            );
-        }
-
-        if ($parsed instanceof SendMessagePointDefinition) {
-            yield from $this->validateSendMessageReference(
-                routeKey: $routeKey,
+        yield from $this->pointDefinitionRegistry->validate(
+            pointType: $pointType,
+            definition: $definition,
+            settings: $settings,
+            context: new AutomationPointValidationContext(
+                containerKey: $routeKey,
                 pointKey: $pointKey,
-                parsed: $parsed,
-                path: "{$path}.definition",
-                context: $context,
-            );
-        }
-
-        if ($parsed instanceof BranchEvaluatePointDefinition) {
-            foreach ($parsed->branches as $branchIndex => $branch) {
-                $target = $this->nullableString($branch['target_flow_route_point_key'] ?? null);
-
-                if ($target !== null && ! in_array($target, $routePointKeys, true)) {
-                    yield $this->error(
-                        code: 'flow_routes.branch_target_missing',
-                        message: "FlowRoute [{$routeKey}] point [{$pointKey}] branch references missing route point [{$target}].",
-                        path: "{$path}.definition.branches.{$branchIndex}.target_flow_route_point_key",
-                        context: $context + [
-                            'point_key' => $pointKey,
-                            'target_flow_route_point_key' => $target,
-                        ],
-                    );
-                }
-            }
-
-            if ($parsed->defaultTargetFlowRoutePointKey !== null
-                && ! in_array($parsed->defaultTargetFlowRoutePointKey, $routePointKeys, true)
-            ) {
-                yield $this->error(
-                    code: 'flow_routes.branch_default_target_missing',
-                    message: "FlowRoute [{$routeKey}] point [{$pointKey}] references missing default branch target [{$parsed->defaultTargetFlowRoutePointKey}].",
-                    path: "{$path}.definition.default_target_flow_route_point_key",
-                    context: $context + [
-                        'point_key' => $pointKey,
-                        'target_flow_route_point_key' => $parsed->defaultTargetFlowRoutePointKey,
-                    ],
-                );
-            }
-        }
-    }
-
-    /**
-     * @param array<string, mixed> $context
-     * @return iterable<int, SetupValidationFinding>
-     */
-    private function validateSendMessageReference(
-        string $routeKey,
-        string $pointKey,
-        SendMessagePointDefinition $parsed,
-        string $path,
-        array $context,
-    ): iterable {
-        try {
-            $definitions = $this->messageDefinitionResolver->resolve(
-                channel: $parsed->channel,
-                purpose: $parsed->purpose,
-                scope: $parsed->scope,
-            );
-        } catch (Throwable $exception) {
-            yield $this->error(
-                code: 'flow_routes.messaging_resolution_failed',
-                message: "FlowRoute [{$routeKey}] point [{$pointKey}] could not resolve Messaging definitions: {$exception->getMessage()}",
+                pointType: $pointType,
                 path: $path,
-                context: $context + ['point_key' => $pointKey],
-                meta: ['exception' => $exception::class],
-            );
-
-            return;
-        }
-
-        foreach ($parsed->dispatchKeys as $dispatchKey) {
-            $found = collect($definitions)->contains(function (mixed $definition) use ($dispatchKey): bool {
-                if (! is_array($definition)) {
-                    return false;
-                }
-
-                $keys = $definition['dispatch_keys']
-                    ?? $definition['dispatch_key']
-                    ?? [];
-
-                $keys = is_string($keys) ? [$keys] : $keys;
-
-                return is_array($keys) && in_array($dispatchKey, $keys, true);
-            });
-
-            if ($found) {
-                continue;
-            }
-
-            yield $this->error(
-                code: 'flow_routes.messaging_definition_missing',
-                message: "FlowRoute [{$routeKey}] point [{$pointKey}] cannot resolve Messaging dispatch key [{$dispatchKey}] for [{$parsed->channel}:{$parsed->purpose}:{$parsed->scope}].",
-                path: "{$path}.dispatch_keys",
-                context: $context + [
-                    'point_key' => $pointKey,
-                    'dispatch_key' => $dispatchKey,
-                    'channel' => $parsed->channel,
-                    'purpose' => $parsed->purpose,
-                    'scope' => $parsed->scope,
-                ],
-            );
-        }
+                siblingKeys: $routePointKeys,
+                context: $context,
+                source: self::SOURCE,
+                module: self::MODULE,
+            ),
+        );
     }
 
     /**
@@ -726,30 +569,6 @@ private function validateSelectedPresetDefinitions(): iterable
         return in_array($moduleKey, $this->moduleManager->enabledKeysWithDependencies(), true);
     }
 
-    private function taskTemplateExists(string $key): bool
-    {
-        if (! $this->moduleAvailable('tasks')) {
-            return false;
-        }
-
-        return TaskTemplate::query()
-            ->where('key', $key)
-            ->where('is_active', true)
-            ->exists();
-    }
-
-    private function campaignExists(string $key): bool
-    {
-        if (! $this->moduleAvailable('campaigns')) {
-            return false;
-        }
-
-        return Campaign::query()
-            ->where('key', $key)
-            ->active()
-            ->exists();
-    }
-
     private function contactStatusExists(?string $key): bool
     {
         if (! $this->filledString($key)) {
@@ -762,35 +581,11 @@ private function validateSelectedPresetDefinitions(): iterable
             ->exists();
     }
 
-    private function contactStatusTargetExists(ChangeStatusPointDefinition $definition): bool
-    {
-        $query = ContactStatus::query()->active();
-
-        if ($definition->contactStatusId !== null) {
-            return $query->whereKey($definition->contactStatusId)->exists();
-        }
-
-        if ($definition->contactStatusKey !== null) {
-            return $query->where('key', $definition->contactStatusKey)->exists();
-        }
-
-        return false;
-    }
-
     private function filledString(mixed $value): bool
     {
         return is_string($value) && trim($value) !== '';
     }
 
-    private function nullableString(mixed $value): ?string
-    {
-        return $this->filledString($value) ? trim($value) : null;
-    }
-
-    /**
-     * @param array<string, mixed> $context
-     * @param array<string, mixed> $meta
-     */
     private function error(
         string $code,
         string $message,

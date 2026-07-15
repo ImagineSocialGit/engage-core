@@ -9,6 +9,7 @@ use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
 use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Modules\FlowRoutes\Validation\FlowRoutesSetupValidationContributor;
+use App\Modules\Tasks\Models\TaskTemplate;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
@@ -183,6 +184,11 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
         Config::set('presets.packages.flow_routes_validation_test.groups.flow_routes', ['test_group']);
         Config::set('presets.modules.webinars.flow-routes.groups.test_group', ['create_task_route']);
 
+        $template = TaskTemplate::factory()->create([
+            'key' => 'route.follow_up',
+            'title' => 'Follow up with contact',
+        ]);
+
         Config::set('presets.modules.webinars.flow-routes.definitions.create_task_route', $this->routeDefinition(
             key: 'create_task_route',
             point: [
@@ -191,7 +197,7 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
                 'capability_key' => 'tasks.create_task',
                 'is_start' => true,
                 'definition' => [
-                    'title' => 'Follow up with contact',
+                    'task_template_key' => $template->key,
                 ],
             ],
         ));

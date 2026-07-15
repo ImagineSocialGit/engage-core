@@ -256,6 +256,35 @@ class ModuleDependencyBoundaryTest extends TestCase
         }
     }
 
+    public function test_flow_routes_point_extension_infrastructure_does_not_import_optional_action_modules(): void
+    {
+        $files = [
+            'app/Modules/FlowRoutes/ConfigContracts/FlowRoutePresetDefinitionConfigContract.php',
+            'app/Modules/FlowRoutes/Validation/FlowRoutesSetupValidationContributor.php',
+            'app/Modules/FlowRoutes/Providers/FlowRoutesModuleServiceProvider.php',
+            'app/Modules/FlowRoutes/PointHandlers/AutomationActionPointHandler.php',
+            'app/Modules/FlowRoutes/Services/PointHandlerRegistry.php',
+        ];
+
+        foreach ($files as $relativePath) {
+            $contents = file_get_contents(base_path($relativePath));
+
+            $this->assertIsString($contents);
+
+            foreach ([
+                'App\\Modules\\Tasks\\',
+                'App\\Modules\\Messaging\\',
+                'App\\Modules\\Campaigns\\',
+            ] as $forbiddenImport) {
+                $this->assertStringNotContainsString(
+                    $forbiddenImport,
+                    $contents,
+                    "FlowRoutes point extension infrastructure [{$relativePath}] must not import [{$forbiddenImport}].",
+                );
+            }
+        }
+    }
+
     public function test_tasks_module_does_not_import_optional_feature_modules(): void
     {
         $this->assertModuleDoesNotImport('Tasks', [

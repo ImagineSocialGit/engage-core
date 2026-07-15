@@ -4,6 +4,9 @@ namespace App\Providers;
 
 use App\Console\Commands\SyncPresetsCommand;
 use App\Console\Commands\ValidateSetupCommand;
+use App\Support\AutomationCapabilities\AutomationActionRegistry;
+use App\Support\AutomationCapabilities\AutomationCapabilityRegistry;
+use App\Support\AutomationCapabilities\AutomationPointDefinitionRegistry;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use App\Support\AutomationOpportunities\Actions\RecordAutomationEventCorrelationEvidenceAction;
 use App\Support\ConfigContracts\ConfigContractRegistry;
@@ -31,6 +34,24 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(ModuleManager::class);
+
+        $this->app->singleton(AutomationCapabilityRegistry::class, function ($app): AutomationCapabilityRegistry {
+            return new AutomationCapabilityRegistry(
+                contributors: $app->tagged('automation.capability_contributors'),
+            );
+        });
+
+        $this->app->singleton(AutomationPointDefinitionRegistry::class, function ($app): AutomationPointDefinitionRegistry {
+            return new AutomationPointDefinitionRegistry(
+                contributors: $app->tagged('automation.point_definition_contributors'),
+            );
+        });
+
+        $this->app->singleton(AutomationActionRegistry::class, function ($app): AutomationActionRegistry {
+            return new AutomationActionRegistry(
+                handlers: $app->tagged('automation.action_handlers'),
+            );
+        });
 
         $this->app->singleton(ConfigContractRegistry::class, function ($app): ConfigContractRegistry {
             return new ConfigContractRegistry(

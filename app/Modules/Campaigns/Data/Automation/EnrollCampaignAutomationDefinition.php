@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Modules\FlowRoutes\Data\Points;
+namespace App\Modules\Campaigns\Data\Automation;
 
-class EnrollCampaignPointDefinition
+class EnrollCampaignAutomationDefinition
 {
     public const ON_ALREADY_ENROLLED_SKIPPED = 'skipped';
     public const ON_ALREADY_ENROLLED_COMPLETED = 'completed';
@@ -32,46 +32,25 @@ class EnrollCampaignPointDefinition
         public readonly ?string $invalidReason = null,
     ) {}
 
-    /**
-     * @param array<string, mixed> $definition
-     * @param array<string, mixed> $settings
-     */
-    public static function from(array $definition, array $settings = []): self
+    /** @param array<string, mixed> $input */
+    public static function from(array $input): self
     {
-        $values = array_replace_recursive($definition, $settings);
-
-        $campaignKey = self::nullableString($values['campaign_key'] ?? null);
-
-        $onAlreadyEnrolled = self::nullableString($values['on_already_enrolled'] ?? null)
+        $campaignKey = self::nullableString($input['campaign_key'] ?? null);
+        $onAlreadyEnrolled = self::nullableString($input['on_already_enrolled'] ?? null)
             ?? self::ON_ALREADY_ENROLLED_SKIPPED;
-
-        $payload = is_array($values['payload'] ?? null)
-            ? $values['payload']
-            : [];
-
-        $meta = is_array($values['meta'] ?? null)
-            ? $values['meta']
-            : [];
-
-        $startContext = is_array($values['start_context'] ?? null)
-            ? $values['start_context']
-            : null;
-
-        $exitConditions = is_array($values['exit_conditions'] ?? null)
-            ? $values['exit_conditions']
-            : null;
 
         return new self(
             campaignKey: $campaignKey,
             onAlreadyEnrolled: $onAlreadyEnrolled,
-            payload: $payload,
-            meta: $meta,
-            startContext: $startContext,
-            exitConditions: $exitConditions,
-            invalidReason: self::invalidReason(
-                campaignKey: $campaignKey,
-                onAlreadyEnrolled: $onAlreadyEnrolled,
-            ),
+            payload: is_array($input['payload'] ?? null) ? $input['payload'] : [],
+            meta: is_array($input['meta'] ?? null) ? $input['meta'] : [],
+            startContext: is_array($input['start_context'] ?? null) ? $input['start_context'] : null,
+            exitConditions: is_array($input['exit_conditions'] ?? null) ? $input['exit_conditions'] : null,
+            invalidReason: match (true) {
+                $campaignKey === null => 'enroll_campaign_missing_campaign_key',
+                ! in_array($onAlreadyEnrolled, self::ON_ALREADY_ENROLLED_OPTIONS, true) => 'enroll_campaign_invalid_on_already_enrolled',
+                default => null,
+            },
         );
     }
 
@@ -80,9 +59,7 @@ class EnrollCampaignPointDefinition
         return $this->invalidReason === null;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function toMetaPayload(): array
     {
         return [
@@ -105,20 +82,5 @@ class EnrollCampaignPointDefinition
         $value = trim($value);
 
         return $value !== '' ? $value : null;
-    }
-
-    private static function invalidReason(
-        ?string $campaignKey,
-        string $onAlreadyEnrolled,
-    ): ?string {
-        if ($campaignKey === null) {
-            return 'enroll_campaign_missing_campaign_key';
-        }
-
-        if (! in_array($onAlreadyEnrolled, self::ON_ALREADY_ENROLLED_OPTIONS, true)) {
-            return 'enroll_campaign_invalid_on_already_enrolled';
-        }
-
-        return null;
     }
 }

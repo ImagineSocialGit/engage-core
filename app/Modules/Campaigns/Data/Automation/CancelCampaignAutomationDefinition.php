@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Modules\FlowRoutes\Data\Points;
+namespace App\Modules\Campaigns\Data\Automation;
 
-class CancelCampaignPointDefinition
+class CancelCampaignAutomationDefinition
 {
     public const ON_NOT_ENROLLED_SKIPPED = 'skipped';
     public const ON_NOT_ENROLLED_COMPLETED = 'completed';
@@ -16,9 +16,7 @@ class CancelCampaignPointDefinition
         self::ON_NOT_ENROLLED_FAILED,
     ];
 
-    /**
-     * @param array<string, mixed> $meta
-     */
+    /** @param array<string, mixed> $meta */
     public function __construct(
         public readonly ?string $campaignKey,
         public readonly string $reason = 'flow_route_cancelled_campaign',
@@ -28,38 +26,24 @@ class CancelCampaignPointDefinition
         public readonly ?string $invalidReason = null,
     ) {}
 
-    /**
-     * @param array<string, mixed> $definition
-     * @param array<string, mixed> $settings
-     */
-    public static function from(array $definition, array $settings = []): self
+    /** @param array<string, mixed> $input */
+    public static function from(array $input): self
     {
-        $values = array_replace_recursive($definition, $settings);
-
-        $campaignKey = self::nullableString($values['campaign_key'] ?? null);
-
-        $reason = self::nullableString($values['reason'] ?? null)
-            ?? 'flow_route_cancelled_campaign';
-
-        $onNotEnrolled = self::nullableString($values['on_not_enrolled'] ?? null)
+        $campaignKey = self::nullableString($input['campaign_key'] ?? null);
+        $onNotEnrolled = self::nullableString($input['on_not_enrolled'] ?? null)
             ?? self::ON_NOT_ENROLLED_SKIPPED;
-
-        $skipPendingMessages = (bool) ($values['skip_pending_messages'] ?? true);
-
-        $meta = is_array($values['meta'] ?? null)
-            ? $values['meta']
-            : [];
 
         return new self(
             campaignKey: $campaignKey,
-            reason: $reason,
+            reason: self::nullableString($input['reason'] ?? null) ?? 'flow_route_cancelled_campaign',
             onNotEnrolled: $onNotEnrolled,
-            skipPendingMessages: $skipPendingMessages,
-            meta: $meta,
-            invalidReason: self::invalidReason(
-                campaignKey: $campaignKey,
-                onNotEnrolled: $onNotEnrolled,
-            ),
+            skipPendingMessages: (bool) ($input['skip_pending_messages'] ?? true),
+            meta: is_array($input['meta'] ?? null) ? $input['meta'] : [],
+            invalidReason: match (true) {
+                $campaignKey === null => 'cancel_campaign_missing_campaign_key',
+                ! in_array($onNotEnrolled, self::ON_NOT_ENROLLED_OPTIONS, true) => 'cancel_campaign_invalid_on_not_enrolled',
+                default => null,
+            },
         );
     }
 
@@ -68,9 +52,7 @@ class CancelCampaignPointDefinition
         return $this->invalidReason === null;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function toMetaPayload(): array
     {
         return [
@@ -92,20 +74,5 @@ class CancelCampaignPointDefinition
         $value = trim($value);
 
         return $value !== '' ? $value : null;
-    }
-
-    private static function invalidReason(
-        ?string $campaignKey,
-        string $onNotEnrolled,
-    ): ?string {
-        if ($campaignKey === null) {
-            return 'cancel_campaign_missing_campaign_key';
-        }
-
-        if (! in_array($onNotEnrolled, self::ON_NOT_ENROLLED_OPTIONS, true)) {
-            return 'cancel_campaign_invalid_on_not_enrolled';
-        }
-
-        return null;
     }
 }

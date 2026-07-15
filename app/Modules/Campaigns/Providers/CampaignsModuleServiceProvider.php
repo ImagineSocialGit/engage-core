@@ -2,6 +2,9 @@
 
 namespace App\Modules\Campaigns\Providers;
 
+use App\Modules\Campaigns\Automation\CampaignsAutomationPointDefinitionContributor;
+use App\Modules\Campaigns\Automation\CancelCampaignAutomationActionHandler;
+use App\Modules\Campaigns\Automation\EnrollCampaignAutomationActionHandler;
 use App\Modules\Campaigns\Capabilities\CampaignsAutomationCapabilityContributor;
 use App\Modules\Campaigns\ConfigContracts\CampaignPresetConfigContractTargetProvider;
 use App\Modules\Campaigns\ConfigContracts\CampaignPresetDefinitionConfigContract;
@@ -28,6 +31,15 @@ class CampaignsModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             CampaignsAutomationCapabilityContributor::class,
         ], 'automation.capability_contributors');
+
+        $this->app->tag([
+            CampaignsAutomationPointDefinitionContributor::class,
+        ], 'automation.point_definition_contributors');
+
+        $this->app->tag([
+            EnrollCampaignAutomationActionHandler::class,
+            CancelCampaignAutomationActionHandler::class,
+        ], 'automation.action_handlers');
 
         $this->app->tag([
             CampaignsSetupValidationContributor::class,

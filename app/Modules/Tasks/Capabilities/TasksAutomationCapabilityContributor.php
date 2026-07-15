@@ -17,7 +17,7 @@ class TasksAutomationCapabilityContributor implements AutomationCapabilityContri
             handlerKey: 'create_task',
             actionKey: 'tasks.create_task',
             name: 'Create task',
-            description: 'Create a Task directly or from a DB-owned TaskTemplate.',
+            description: 'Create a Task automatically from a DB-owned TaskTemplate.',
             requiredModules: ['tasks'],
             sourceVersion: '2026_07_phase_6c_3',
         );

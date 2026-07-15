@@ -76,6 +76,10 @@
 │   │   │   │   ├── ScheduleCampaignStepMessagesAction.php
 │   │   │   │   ├── ScheduleNextCampaignStepAction.php
 │   │   │   │   └── SyncCampaignPresetsAction.php
+│   │   │   ├── Automation
+│   │   │   │   ├── CampaignsAutomationPointDefinitionContributor.php
+│   │   │   │   ├── CancelCampaignAutomationActionHandler.php
+│   │   │   │   └── EnrollCampaignAutomationActionHandler.php
 │   │   │   ├── Capabilities
 │   │   │   │   └── CampaignsAutomationCapabilityContributor.php
 │   │   │   ├── ConfigContracts
@@ -89,6 +93,9 @@
 │   │   │   │   └── CRM
 │   │   │   │       └── CampaignMessageTemplateController.php
 │   │   │   ├── Data
+│   │   │   │   ├── Automation
+│   │   │   │   │   ├── CancelCampaignAutomationDefinition.php
+│   │   │   │   │   └── EnrollCampaignAutomationDefinition.php
 │   │   │   │   ├── CampaignPresetDefinition.php
 │   │   │   │   ├── CampaignPresetSyncResult.php
 │   │   │   │   ├── CampaignStepPresetDefinition.php
@@ -252,15 +259,11 @@
 │   │   │   │   ├── FlowRouteConditionEvaluation.php
 │   │   │   │   ├── Points
 │   │   │   │   │   ├── BranchEvaluatePointDefinition.php
-│   │   │   │   │   ├── CancelCampaignPointDefinition.php
 │   │   │   │   │   ├── ChangeStatusPointDefinition.php
 │   │   │   │   │   ├── ConditionPointDefinition.php
-│   │   │   │   │   ├── CreateTaskPointDefinition.php
-│   │   │   │   │   ├── EnrollCampaignPointDefinition.php
 │   │   │   │   │   ├── EventWaitPointDefinition.php
 │   │   │   │   │   ├── PointExecutionContext.php
 │   │   │   │   │   ├── PointExecutionResult.php
-│   │   │   │   │   ├── SendMessagePointDefinition.php
 │   │   │   │   │   └── WaitPointDefinition.php
 │   │   │   │   └── Presets
 │   │   │   │       ├── FlowRoutePointPresetDefinition.php
@@ -283,16 +286,15 @@
 │   │   │   │   ├── FlowRoute.php
 │   │   │   │   ├── FlowRoutePoint.php
 │   │   │   │   └── FlowRouteTriggerBinding.php
+│   │   │   ├── PointDefinitions
+│   │   │   │   └── FlowRoutesAutomationPointDefinitionContributor.php
 │   │   │   ├── PointHandlers
+│   │   │   │   ├── AutomationActionPointHandler.php
 │   │   │   │   ├── BranchEvaluatePointHandler.php
-│   │   │   │   ├── CancelCampaignPointHandler.php
 │   │   │   │   ├── ChangeStatusPointHandler.php
 │   │   │   │   ├── ConditionPointHandler.php
-│   │   │   │   ├── CreateTaskPointHandler.php
-│   │   │   │   ├── EnrollCampaignPointHandler.php
 │   │   │   │   ├── EventWaitPointHandler.php
 │   │   │   │   ├── NoopPointHandler.php
-│   │   │   │   ├── SendMessagePointHandler.php
 │   │   │   │   └── WaitPointHandler.php
 │   │   │   ├── Providers
 │   │   │   │   └── FlowRoutesModuleServiceProvider.php
@@ -432,6 +434,9 @@
 │   │   │   │   ├── ScheduleMessageAction.php
 │   │   │   │   ├── SkipScheduledMessagesAction.php
 │   │   │   │   └── SyncMessageTemplatePresetsAction.php
+│   │   │   ├── Automation
+│   │   │   │   ├── MessagingAutomationPointDefinitionContributor.php
+│   │   │   │   └── SendMessageAutomationActionHandler.php
 │   │   │   ├── Capabilities
 │   │   │   │   └── MessagingAutomationCapabilityContributor.php
 │   │   │   ├── ConfigContracts
@@ -460,6 +465,8 @@
 │   │   │   │       ├── ConsentRevocationController.php
 │   │   │   │       └── ContactPermissionInvitationController.php
 │   │   │   ├── Data
+│   │   │   │   ├── Automation
+│   │   │   │   │   └── SendMessageAutomationDefinition.php
 │   │   │   │   ├── MessageData.php
 │   │   │   │   └── ResolvedMessageDispatch.php
 │   │   │   ├── Enums
@@ -605,6 +612,9 @@
 │   │   │   │   ├── RecordManualTaskCompletionAutomationBehaviorAction.php
 │   │   │   │   ├── SendTaskDigestNotificationsAction.php
 │   │   │   │   └── SyncTaskPresetsAction.php
+│   │   │   ├── Automation
+│   │   │   │   ├── CreateTaskAutomationActionHandler.php
+│   │   │   │   └── TasksAutomationPointDefinitionContributor.php
 │   │   │   ├── Capabilities
 │   │   │   │   └── TasksAutomationCapabilityContributor.php
 │   │   │   ├── ConfigContracts
@@ -619,6 +629,8 @@
 │   │   │   ├── Controllers
 │   │   │   │   └── TaskController.php
 │   │   │   ├── Data
+│   │   │   │   ├── Automation
+│   │   │   │   │   └── CreateTaskAutomationDefinition.php
 │   │   │   │   ├── TaskAssigneeOption.php
 │   │   │   │   ├── TaskDigest.php
 │   │   │   │   ├── TaskNotification.php
@@ -790,11 +802,19 @@
 │   │       └── IntegrationsModuleServiceProvider.php
 │   └── Support
 │       ├── AutomationCapabilities
+│       │   ├── AutomationActionRegistry.php
 │       │   ├── AutomationCapabilityRegistry.php
+│       │   ├── AutomationPointDefinitionRegistry.php
 │       │   ├── Contracts
-│       │   │   └── AutomationCapabilityContributor.php
+│       │   │   ├── AutomationActionHandler.php
+│       │   │   ├── AutomationCapabilityContributor.php
+│       │   │   └── AutomationPointDefinitionContributor.php
 │       │   └── Data
-│       │       └── AutomationCapabilityDefinition.php
+│       │       ├── AutomationActionContext.php
+│       │       ├── AutomationActionResult.php
+│       │       ├── AutomationCapabilityDefinition.php
+│       │       ├── AutomationPointDefinition.php
+│       │       └── AutomationPointValidationContext.php
 │       ├── AutomationEvents
 │       │   ├── Data
 │       │   │   └── AutomationEventData.php
@@ -1533,6 +1553,7 @@
 │   │   ├── Email
 │   │   │   └── HandleInboundEmailWebhookActionTest.php
 │   │   ├── FlowRoutes
+│   │   │   ├── AutomationPointExtensionRegistryTest.php
 │   │   │   ├── ContactStatusAutomationImpactResolverTest.php
 │   │   │   ├── FlowRouteBindingControllerTest.php
 │   │   │   ├── FlowRouteConditionBranchPointTest.php
@@ -1665,4 +1686,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-527 directories, 1139 files
+534 directories, 1153 files
