@@ -8,6 +8,9 @@ use App\Modules\InternalNotifications\Services\InternalNotificationChannelResolv
 use App\Modules\InternalNotifications\Services\InternalNotificationPreferences\TeamMemberInternalNotificationPreferenceResolver;
 use App\Modules\InternalNotifications\Services\Messaging\TeamMemberMessageRecipientGate;
 use App\Modules\InternalNotifications\Services\Messaging\TeamMemberMessageRecipientPayloadProvider;
+use App\Modules\InternalNotifications\Services\Tasks\InternalNotificationTaskScheduler;
+use App\Modules\InternalNotifications\Services\Tasks\OnlyActiveTeamMemberTaskAssignmentStrategyResolver;
+use App\Modules\InternalNotifications\Services\Tasks\TeamMemberTaskAssignedRecipientResolver;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -30,6 +33,8 @@ class InternalNotificationsModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             TeamMemberMessageRecipientPayloadProvider::class,
         ], 'messaging.message_recipient_payload_providers');
+
+        $this->registerTaskIntegrations();
     }
 
     public function boot(): void
@@ -42,5 +47,24 @@ class InternalNotificationsModuleServiceProvider extends ServiceProvider
             InboundMessageReceived::class,
             ScheduleInboundMessageInternalNotification::class,
         );
+    }
+
+    private function registerTaskIntegrations(): void
+    {
+        if (function_exists('module_enabled') && ! module_enabled('tasks')) {
+            return;
+        }
+
+        $this->app->tag([
+            OnlyActiveTeamMemberTaskAssignmentStrategyResolver::class,
+        ], 'tasks.assignment_strategy_resolvers');
+
+        $this->app->tag([
+            TeamMemberTaskAssignedRecipientResolver::class,
+        ], 'crm.tasks.assigned_recipient_resolvers');
+
+        $this->app->tag([
+            InternalNotificationTaskScheduler::class,
+        ], 'tasks.notification_schedulers');
     }
 }

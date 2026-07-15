@@ -31,7 +31,7 @@ use Illuminate\Support\ServiceProvider;
 
 class FlowRoutesModuleServiceProvider extends ServiceProvider
 {
-    private const CREATE_TASK_ACTION = 'App\\Modules\\Tasks\\Actions\\CreateTaskAction';
+    private const CREATE_TASK_FROM_TEMPLATE_ACTION = 'App\\Modules\\Tasks\\Actions\\CreateTaskFromTemplateAction';
 
     private const DISPATCH_MESSAGE_ACTION = 'App\\Modules\\Messaging\\Actions\\DispatchMessageAction';
 
@@ -139,7 +139,7 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
             return false;
         }
 
-        return class_exists(self::CREATE_TASK_ACTION);
+        return class_exists(self::CREATE_TASK_FROM_TEMPLATE_ACTION);
     }
 
     private function messagingAvailable(): bool

@@ -2,29 +2,25 @@
 
 namespace App\Modules\Tasks\Actions;
 
-use App\Modules\InternalNotifications\Actions\ScheduleInternalNotificationAction;
-use App\Modules\InternalNotifications\Models\TeamMemberNotificationPreference;
 use App\Modules\Tasks\Data\TaskDigest;
+use App\Modules\Tasks\Data\TaskNotification;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Services\TaskNotificationScheduler;
 use Illuminate\Support\Str;
 
 class SendTaskDigestNotificationsAction
 {
     public function __construct(
         private readonly BuildTaskDigestsAction $buildTaskDigests,
+        private readonly TaskNotificationScheduler $notificationScheduler,
     ) {}
 
     public function handle(string $frequency): int
     {
-        if (! $this->internalNotificationsEnabled()) {
-            return 0;
-        }
-
         $scheduled = 0;
-        $scheduleInternalNotification = app(ScheduleInternalNotificationAction::class);
 
         foreach ($this->buildTaskDigests->handle($frequency) as $digest) {
-            if ($this->scheduleDigest($digest, $scheduleInternalNotification)) {
+            if ($this->scheduleDigest($digest)) {
                 $scheduled++;
             }
         }
@@ -32,16 +28,15 @@ class SendTaskDigestNotificationsAction
         return $scheduled;
     }
 
-    private function scheduleDigest(
-        TaskDigest $digest,
-        ScheduleInternalNotificationAction $scheduleInternalNotification,
-    ): bool {
+    private function scheduleDigest(TaskDigest $digest): bool
+    {
         if (! $digest->hasTasks()) {
             return false;
         }
 
-        $scheduleInternalNotification->handle(
+        return $this->notificationScheduler->schedule(new TaskNotification(
             recipient: $digest->recipient,
+            notificationType: $digest->frequency,
             scope: 'crm_tasks',
             messageType: $digest->frequency,
             content: $this->content($digest),
@@ -52,9 +47,7 @@ class SendTaskDigestNotificationsAction
                 'task_count' => $digest->taskCount(),
                 'task_ids' => $digest->tasks->pluck('id')->values()->all(),
             ],
-        );
-
-        return true;
+        ));
     }
 
     /**
@@ -97,7 +90,9 @@ class SendTaskDigestNotificationsAction
             ->map(fn (Task $task): string => $this->taskLine($task))
             ->when(
                 $digest->taskCount() > 10,
-                fn ($lines) => $lines->push('And '.($digest->taskCount() - 10).' more.')
+                fn ($lines) => $lines->push(
+                    'And '.($digest->taskCount() - 10).' more.'
+                ),
             )
             ->values()
             ->all();
@@ -119,8 +114,8 @@ class SendTaskDigestNotificationsAction
     private function frequencyLabel(string $frequency): string
     {
         return match ($frequency) {
-            TeamMemberNotificationPreference::TYPE_DAILY_DIGEST => 'Daily Task Digest',
-            TeamMemberNotificationPreference::TYPE_WEEKLY_DIGEST => 'Weekly Task Digest',
+            BuildTaskDigestsAction::FREQUENCY_DAILY => 'Daily Task Digest',
+            BuildTaskDigestsAction::FREQUENCY_WEEKLY => 'Weekly Task Digest',
             default => Str::of($frequency)->replace('_', ' ')->title()->toString(),
         };
     }
@@ -128,18 +123,12 @@ class SendTaskDigestNotificationsAction
     private function dedupeKey(TaskDigest $digest): string
     {
         return implode(':', [
-            'internal_notification',
+            'task_notification',
             'task_digest',
             $digest->frequency,
             $digest->recipient->source->getMorphClass(),
             $digest->recipient->source->getKey(),
             now()->timezone(config('app.timezone'))->toDateString(),
         ]);
-    }
-
-    private function internalNotificationsEnabled(): bool
-    {
-        return ! function_exists('module_enabled')
-            || module_enabled('internal_notifications');
     }
 }

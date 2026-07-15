@@ -8,9 +8,11 @@ use App\Modules\FlowRoutes\Data\Points\CreateTaskPointDefinition;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionContext;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
-use App\Modules\Tasks\Actions\CreateTaskAction;
 use App\Modules\Tasks\Actions\CreateTaskFromTemplateAction;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Models\TaskLink;
+use App\Modules\Tasks\Models\TaskTemplate;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use InvalidArgumentException;
 use Throwable;
@@ -18,7 +20,6 @@ use Throwable;
 class CreateTaskPointHandler implements PointHandler
 {
     public function __construct(
-        private readonly CreateTaskAction $createTask,
         private readonly CreateTaskFromTemplateAction $createTaskFromTemplate,
     ) {}
 
@@ -29,11 +30,15 @@ class CreateTaskPointHandler implements PointHandler
 
     public function handle(PointExecutionContext $context): PointExecutionResult
     {
-        $definition = CreateTaskPointDefinition::from($context->definition, $context->settings);
+        $definition = CreateTaskPointDefinition::from(
+            $context->definition,
+            $context->settings,
+        );
 
         if (! $definition->isValid()) {
             return PointExecutionResult::failed(
-                reason: $definition->invalidReason ?? 'invalid_create_task_point_definition',
+                reason: $definition->invalidReason
+                    ?? 'invalid_create_task_point_definition',
                 meta: [
                     'create_task_definition' => $definition->toMetaPayload(),
                     'flow_routes' => $context->flowRouteProvenance(),
@@ -41,12 +46,21 @@ class CreateTaskPointHandler implements PointHandler
             );
         }
 
-        $data = $this->taskData($definition, $context);
+        if ($definition->taskTemplateKey === null) {
+            return PointExecutionResult::failed(
+                reason: 'create_task_requires_task_template',
+                meta: [
+                    'create_task_definition' => $definition->toMetaPayload(),
+                    'flow_routes' => $context->flowRouteProvenance(),
+                ],
+            );
+        }
 
         try {
-            $task = $definition->taskTemplateKey !== null
-                ? $this->createTaskFromTemplate->handle($definition->taskTemplateKey, $data)
-                : $this->createTask->handle($data);
+            $task = $this->createTaskFromTemplate->handle(
+                $definition->taskTemplateKey,
+                $this->taskData($definition, $context),
+            );
         } catch (ModelNotFoundException) {
             return PointExecutionResult::failed('task_template_not_found', [
                 'create_task_definition' => $definition->toMetaPayload(),
@@ -80,11 +94,19 @@ class CreateTaskPointHandler implements PointHandler
             ])->save();
         }
 
+        $task->loadMissing('links');
+
         return PointExecutionResult::completed('task_created', [
             'task' => [
                 'id' => $task->getKey(),
-                'related_type' => $task->related_type,
-                'related_id' => $task->related_id,
+                'links' => $task->links
+                    ->map(fn (TaskLink $link): array => [
+                        'role' => $link->role,
+                        'linkable_type' => $link->linkable_type,
+                        'linkable_id' => $link->linkable_id,
+                    ])
+                    ->values()
+                    ->all(),
                 'assigned_to_type' => $task->assigned_to_type,
                 'assigned_to_id' => $task->assigned_to_id,
                 'responsible_party' => $task->responsible_party,
@@ -101,38 +123,83 @@ class CreateTaskPointHandler implements PointHandler
         ]);
     }
 
-    /** @return array<string, mixed> */
-    private function taskData(CreateTaskPointDefinition $definition, PointExecutionContext $context): array
-    {
-        $relatedType = $context->progress->subject_type ?: Contact::class;
-        $relatedId = $context->progress->subject_id ?: $context->progress->contact_id;
-        $provenance = $context->flowRouteProvenance();
+    /**
+     * @return array<string, mixed>
+     */
+    private function taskData(
+        CreateTaskPointDefinition $definition,
+        PointExecutionContext $context,
+    ): array {
+        [$contact, $subject] = $this->taskContext($context);
 
         return array_filter([
-            'related_type' => $relatedType,
-            'related_id' => $relatedId,
+            'links' => $this->taskLinks($contact, $subject),
+            'link_context' => [
+                TaskTemplate::LINK_SOURCE_CURRENT_CONTACT => $contact,
+                TaskTemplate::LINK_SOURCE_CURRENT_SUBJECT => $subject,
+            ],
             'assigned_to_type' => $definition->assignedToType,
             'assigned_to_id' => $definition->assignedToId,
-            'assigned_to_strategy' => $definition->assignedToStrategy ?? $definition->assignedTo,
+            'assigned_to_strategy' => $definition->assignedToStrategy
+                ?? $definition->assignedTo,
             'responsible_party' => $definition->responsibleParty,
             'responsible_type' => $definition->responsibleType,
             'responsible_id' => $definition->responsibleId,
             'source' => Task::SOURCE_MODULE,
             'title' => $this->renderText($definition->title, $context),
-            'description' => $this->renderText($definition->description, $context),
+            'description' => $this->renderText(
+                $definition->description,
+                $context,
+            ),
             'due_at' => $this->dueAt($definition, $context),
             'due_offset_minutes' => $definition->dueOffsetMinutes,
             'priority' => $definition->priority,
-            ...$provenance,
-            'meta' => [
-                'flow_routes' => $provenance,
-                'definition' => $definition->meta,
-            ],
         ], fn (mixed $value): bool => $value !== null);
     }
 
-    private function renderText(?string $value, PointExecutionContext $context): ?string
+    /**
+     * @return array{0: Contact, 1: Model}
+     */
+    private function taskContext(PointExecutionContext $context): array
     {
+        $progress = $context->progress->loadMissing(['contact', 'subject']);
+        $contact = $progress->contact;
+        $subject = $progress->subject;
+
+        return [
+            $contact,
+            $subject instanceof Model ? $subject : $contact,
+        ];
+    }
+
+    /**
+     * @return array<int, array{linkable: Model, role: string}>
+     */
+    private function taskLinks(Contact $contact, Model $subject): array
+    {
+        if ($subject->is($contact)) {
+            return [[
+                'linkable' => $contact,
+                'role' => TaskLink::ROLE_SUBJECT,
+            ]];
+        }
+
+        return [
+            [
+                'linkable' => $subject,
+                'role' => TaskLink::ROLE_SUBJECT,
+            ],
+            [
+                'linkable' => $contact,
+                'role' => TaskLink::ROLE_CONTEXT,
+            ],
+        ];
+    }
+
+    private function renderText(
+        ?string $value,
+        PointExecutionContext $context,
+    ): ?string {
         if ($value === null) {
             return null;
         }
@@ -152,12 +219,16 @@ class CreateTaskPointHandler implements PointHandler
         ]);
     }
 
-    private function dueAt(CreateTaskPointDefinition $definition, PointExecutionContext $context): mixed
-    {
+    private function dueAt(
+        CreateTaskPointDefinition $definition,
+        PointExecutionContext $context,
+    ): mixed {
         if ($definition->dueAt === null) {
             return null;
         }
 
-        return is_string($definition->dueAt) ? $this->renderText($definition->dueAt, $context) : $definition->dueAt;
+        return is_string($definition->dueAt)
+            ? $this->renderText($definition->dueAt, $context)
+            : $definition->dueAt;
     }
 }

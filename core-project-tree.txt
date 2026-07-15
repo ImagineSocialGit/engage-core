@@ -397,9 +397,13 @@
 │   │   │   │   ├── InternalNotificationPreferences
 │   │   │   │   │   └── TeamMemberInternalNotificationPreferenceResolver.php
 │   │   │   │   ├── InternalNotificationRecipient.php
-│   │   │   │   └── Messaging
-│   │   │   │       ├── TeamMemberMessageRecipientGate.php
-│   │   │   │       └── TeamMemberMessageRecipientPayloadProvider.php
+│   │   │   │   ├── Messaging
+│   │   │   │   │   ├── TeamMemberMessageRecipientGate.php
+│   │   │   │   │   └── TeamMemberMessageRecipientPayloadProvider.php
+│   │   │   │   └── Tasks
+│   │   │   │       ├── InternalNotificationTaskScheduler.php
+│   │   │   │       ├── OnlyActiveTeamMemberTaskAssignmentStrategyResolver.php
+│   │   │   │       └── TeamMemberTaskAssignedRecipientResolver.php
 │   │   │   └── Support
 │   │   ├── Location
 │   │   │   ├── Actions
@@ -608,13 +612,16 @@
 │   │   │   ├── Contracts
 │   │   │   │   ├── TaskAssignedRecipientResolver.php
 │   │   │   │   ├── TaskAssignmentStrategyResolverContract.php
+│   │   │   │   ├── TaskNotificationSchedulerContract.php
 │   │   │   │   └── TaskRelatedSubjectResolverContract.php
 │   │   │   ├── Controllers
 │   │   │   │   └── TaskController.php
 │   │   │   ├── Data
 │   │   │   │   ├── TaskDigest.php
+│   │   │   │   ├── TaskNotification.php
 │   │   │   │   ├── TaskPresetDefinition.php
-│   │   │   │   └── TaskPresetSyncResult.php
+│   │   │   │   ├── TaskPresetSyncResult.php
+│   │   │   │   └── TaskRecipient.php
 │   │   │   ├── Events
 │   │   │   │   └── TaskCompleted.php
 │   │   │   ├── Listeners
@@ -630,8 +637,6 @@
 │   │   │   ├── Requests
 │   │   │   │   └── StoreTaskRequest.php
 │   │   │   ├── Services
-│   │   │   │   ├── AssignedRecipients
-│   │   │   │   │   └── TeamMemberTaskAssignedRecipientResolver.php
 │   │   │   │   ├── ContactShow
 │   │   │   │   │   ├── ContactTasksShowDataProvider.php
 │   │   │   │   │   └── ContactTaskVisibilityDataProvider.php
@@ -642,6 +647,7 @@
 │   │   │   │   ├── TaskAssignedRecipientsResolver.php
 │   │   │   │   ├── TaskAssignmentStrategyResolver.php
 │   │   │   │   ├── TaskContactLinkResolver.php
+│   │   │   │   ├── TaskNotificationScheduler.php
 │   │   │   │   └── TaskRelatedSubjectResolver.php
 │   │   │   ├── Support
 │   │   │   └── Validation
@@ -1648,4 +1654,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-525 directories, 1124 files
+525 directories, 1130 files

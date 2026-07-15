@@ -6,6 +6,7 @@ use App\Modules\Tasks\Data\TaskPresetDefinition;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Models\TaskLink;
 use App\Modules\Tasks\Models\TaskTemplate;
+use App\Modules\Tasks\Services\TaskAssignmentStrategyResolver;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 use App\Support\Presets\Enums\PresetDomain;
@@ -51,8 +52,10 @@ class TasksSetupValidationContributor implements SetupValidationContributor
     public function __construct(
         private readonly PresetCompositionResolver $compositionResolver,
         private readonly PresetPackageResolver $packageResolver,
+        private readonly TaskAssignmentStrategyResolver $assignmentStrategies,
     ) {}
-public function findings(): iterable
+
+    public function findings(): iterable
     {
         $presetKey = $this->packageResolver->resolvePresetKey();
 
@@ -248,7 +251,7 @@ public function findings(): iterable
             return;
         }
 
-        if (! is_string($resolved) || ! in_array(trim($resolved), TaskTemplate::ASSIGNED_TO_STRATEGIES, true)) {
+        if (! is_string($resolved) || trim($resolved) === '') {
             yield $this->error(
                 code: 'tasks.assignment_strategy_invalid',
                 message: "TaskTemplate preset definition [{$templateKey}] has an invalid assignment strategy.",
@@ -256,6 +259,23 @@ public function findings(): iterable
                     ? "{$path}.assigned_to_strategy"
                     : "{$path}.assigned_to",
                 context: $context,
+            );
+
+            return;
+        }
+
+        $resolved = trim($resolved);
+
+        if (! $this->assignmentStrategies->supports($resolved)) {
+            yield $this->error(
+                code: 'tasks.assignment_strategy_unavailable',
+                message: "TaskTemplate preset definition [{$templateKey}] requires unavailable assignment strategy [{$resolved}].",
+                path: $strategy !== null
+                    ? "{$path}.assigned_to_strategy"
+                    : "{$path}.assigned_to",
+                context: $context + [
+                    'assignment_strategy' => $resolved,
+                ],
             );
         }
     }

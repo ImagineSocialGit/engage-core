@@ -60,12 +60,6 @@ class TaskPresetDefinition
                 Task::RESPONSIBLE_PARTY_OPTIONS,
                 true,
             ) => 'invalid_responsible_party',
-            $assignedToStrategy !== null
-                && ! in_array(
-                    $assignedToStrategy,
-                    TaskTemplate::ASSIGNED_TO_STRATEGIES,
-                    true,
-                ) => 'invalid_assigned_to_strategy',
             default => null,
         };
 

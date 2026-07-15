@@ -2,8 +2,8 @@
 
 namespace App\Modules\Tasks\Services;
 
-use App\Modules\InternalNotifications\Services\InternalNotificationRecipient;
 use App\Modules\Tasks\Contracts\TaskAssignedRecipientResolver;
+use App\Modules\Tasks\Data\TaskRecipient;
 use App\Modules\Tasks\Models\Task;
 use Illuminate\Support\Collection;
 
@@ -17,14 +17,10 @@ class TaskAssignedRecipientsResolver
     ) {}
 
     /**
-     * @return Collection<int, InternalNotificationRecipient>
+     * @return Collection<int, TaskRecipient>
      */
     public function resolve(Task $task): Collection
     {
-        if (! $this->internalNotificationsEnabled()) {
-            return collect();
-        }
-
         $task->loadMissing('assignedTo');
 
         $assignedTo = $task->assignedTo;
@@ -40,11 +36,5 @@ class TaskAssignedRecipientsResolver
         }
 
         return collect();
-    }
-
-    private function internalNotificationsEnabled(): bool
-    {
-        return ! function_exists('module_enabled')
-            || module_enabled('internal_notifications');
     }
 }

@@ -241,12 +241,24 @@ class ResumeFlowRouteProgressFromEventAction
     {
         $correlation = $progress->waitingCorrelation();
 
-        if ($correlation !== []) {
-            return $this->matchesExplicitCorrelation($progress, $event, $correlation);
+        if ($this->isTaskCompletedEvent($event)) {
+            if (! $this->matchesRouteCreatedTaskArtifact($progress, $event)) {
+                return false;
+            }
+
+            if ($correlation !== []) {
+                return $this->matchesExplicitCorrelation(
+                    $progress,
+                    $event,
+                    $correlation,
+                );
+            }
+
+            return $this->hasSingleRouteCreatedTaskArtifact($progress);
         }
 
-        if ($this->isTaskCompletedEvent($event)) {
-            return $this->matchesSingleRouteCreatedTask($progress, $event);
+        if ($correlation !== []) {
+            return $this->matchesExplicitCorrelation($progress, $event, $correlation);
         }
 
         return $event->contactId !== null
@@ -276,7 +288,7 @@ class ResumeFlowRouteProgressFromEventAction
         return true;
     }
 
-    private function matchesSingleRouteCreatedTask(
+    private function matchesRouteCreatedTaskArtifact(
         ContactFlowRouteProgress $progress,
         FlowRouteExternalEvent $event,
     ): bool {
@@ -286,30 +298,34 @@ class ResumeFlowRouteProgressFromEventAction
             return false;
         }
 
-        $eventProgressId = $this->nullableInt($this->eventValue($event, 'task.flow_route_progress_id'));
-
-        if ($eventProgressId !== null && $eventProgressId !== (int) $progress->getKey()) {
-            return false;
-        }
-
-        $totalRouteCreatedTaskArtifacts = ContactFlowRouteProgressItem::query()
-            ->where('contact_flow_route_progress_id', $progress->getKey())
-            ->where('correlation_type', 'task')
-            ->count();
-
-        if ($totalRouteCreatedTaskArtifacts !== 1) {
-            return false;
-        }
-
         return ContactFlowRouteProgressItem::query()
             ->where('contact_flow_route_progress_id', $progress->getKey())
             ->where('correlation_type', 'task')
             ->where('created_subject_id', $taskId)
             ->when(
                 $event->subjectType !== null,
-                fn ($query) => $query->where('created_subject_type', $event->subjectType),
+                fn ($query) => $query->where(
+                    'created_subject_type',
+                    $event->subjectType,
+                ),
             )
             ->exists();
+    }
+
+    private function hasSingleRouteCreatedTaskArtifact(
+        ContactFlowRouteProgress $progress,
+    ): bool {
+        return ContactFlowRouteProgressItem::query()
+            ->where('contact_flow_route_progress_id', $progress->getKey())
+            ->where('correlation_type', 'task')
+            ->whereNotNull('created_subject_type')
+            ->whereNotNull('created_subject_id')
+            ->get(['created_subject_type', 'created_subject_id'])
+            ->unique(fn (ContactFlowRouteProgressItem $item): string => implode(':', [
+                $item->created_subject_type,
+                $item->created_subject_id,
+            ]))
+            ->count() === 1;
     }
 
     private function shouldApplyEventSubjectQueryFilter(FlowRouteExternalEvent $event): bool

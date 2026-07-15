@@ -57,13 +57,6 @@ class TaskTemplateFactory extends Factory
         ]);
     }
 
-    public function assignedToOnlyActiveTeamMember(): self
-    {
-        return $this->state([
-            'assigned_to_strategy' => TaskTemplate::ASSIGNED_TO_STRATEGY_ONLY_ACTIVE_TEAM_MEMBER,
-        ]);
-    }
-
     public function currentContactSubject(): self
     {
         return $this->state([

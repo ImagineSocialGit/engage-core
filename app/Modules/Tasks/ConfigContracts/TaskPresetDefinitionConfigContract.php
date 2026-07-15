@@ -61,18 +61,8 @@ class TaskPresetDefinitionConfigContract implements ConfigContract
             'responsible_id' => ConfigField::optional($nullableInteger),
             'assigned_to_type' => ConfigField::optional($nullableString),
             'assigned_to_id' => ConfigField::optional($nullableInteger),
-            'assigned_to_strategy' => ConfigField::optional(
-                ConfigSchema::string(
-                    nullable: true,
-                    allowedValues: TaskTemplate::ASSIGNED_TO_STRATEGIES,
-                ),
-            ),
-            'assigned_to' => ConfigField::optional(
-                ConfigSchema::string(
-                    nullable: true,
-                    allowedValues: TaskTemplate::ASSIGNED_TO_STRATEGIES,
-                ),
-            )->deprecated(),
+            'assigned_to_strategy' => ConfigField::optional($nullableString),
+            'assigned_to' => ConfigField::optional($nullableString)->deprecated(),
             'priority' => ConfigField::optional($nullableString),
             'due_offset_minutes' => ConfigField::optional($nullableInteger),
             'due_offset_days' => ConfigField::optional(

@@ -2,25 +2,25 @@
 
 namespace App\Modules\Tasks\Actions;
 
-use App\Modules\InternalNotifications\Actions\ScheduleInternalNotificationAction;
-use App\Modules\InternalNotifications\Services\InternalNotificationRecipient;
+use App\Modules\Tasks\Data\TaskNotification;
+use App\Modules\Tasks\Data\TaskRecipient;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Services\TaskAssignedRecipientsResolver;
+use App\Modules\Tasks\Services\TaskNotificationScheduler;
 use App\Modules\Tasks\Services\TaskRelatedSubjectResolver;
 
 class NotifyAssignedTaskRecipientsAction
 {
+    public const NOTIFICATION_TYPE = 'task_assigned';
+
     public function __construct(
         private readonly TaskAssignedRecipientsResolver $assignedRecipientsResolver,
         private readonly TaskRelatedSubjectResolver $relatedSubjectResolver,
+        private readonly TaskNotificationScheduler $notificationScheduler,
     ) {}
 
     public function handle(Task $task): void
     {
-        if (! $this->internalNotificationsEnabled()) {
-            return;
-        }
-
         $recipients = $this->assignedRecipientsResolver->resolve($task);
 
         if ($recipients->isEmpty()) {
@@ -28,17 +28,17 @@ class NotifyAssignedTaskRecipientsAction
         }
 
         $relatedSubject = $this->relatedSubjectResolver->resolve($task);
-        $scheduleInternalNotification = app(ScheduleInternalNotificationAction::class);
 
         foreach ($recipients as $recipient) {
-            $scheduleInternalNotification->handle(
+            $this->notificationScheduler->schedule(new TaskNotification(
                 recipient: $recipient,
+                notificationType: self::NOTIFICATION_TYPE,
                 scope: 'crm_tasks',
-                messageType: 'task_assigned',
+                messageType: self::NOTIFICATION_TYPE,
                 content: $this->content($task, $recipient, $relatedSubject),
                 context: $task,
                 dedupeKey: $this->dedupeKey($task, $recipient),
-            );
+            ));
         }
     }
 
@@ -55,7 +55,7 @@ class NotifyAssignedTaskRecipientsAction
      */
     private function content(
         Task $task,
-        InternalNotificationRecipient $recipient,
+        TaskRecipient $recipient,
         array $relatedSubject,
     ): array {
         return [
@@ -85,6 +85,16 @@ class NotifyAssignedTaskRecipientsAction
         ];
     }
 
+    /**
+     * @param array{
+     *     subject: object|null,
+     *     type: ?string,
+     *     label: string,
+     *     name: string,
+     *     url: ?string,
+     *     details: array<string, string>
+     * } $relatedSubject
+     */
     private function smsMessage(Task $task, array $relatedSubject): string
     {
         $message = 'New task assigned: '.$task->title;
@@ -111,21 +121,15 @@ class NotifyAssignedTaskRecipientsAction
             : '—';
     }
 
-    private function dedupeKey(Task $task, InternalNotificationRecipient $recipient): string
+    private function dedupeKey(Task $task, TaskRecipient $recipient): string
     {
         return implode(':', [
-            'internal_notification',
-            'task_assigned',
+            'task_notification',
+            self::NOTIFICATION_TYPE,
             $recipient->source->getMorphClass(),
             $recipient->source->getKey(),
             $task->getMorphClass(),
             $task->getKey(),
         ]);
-    }
-
-    private function internalNotificationsEnabled(): bool
-    {
-        return ! function_exists('module_enabled')
-            || module_enabled('internal_notifications');
     }
 }

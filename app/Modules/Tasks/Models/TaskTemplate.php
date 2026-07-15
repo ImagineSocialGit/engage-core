@@ -17,12 +17,6 @@ class TaskTemplate extends Model
     public const SOURCE_MODULE = 'module';
 
     public const ASSIGNED_TO_STRATEGY_UNASSIGNED = 'unassigned';
-    public const ASSIGNED_TO_STRATEGY_ONLY_ACTIVE_TEAM_MEMBER = 'only_active_team_member';
-
-    public const ASSIGNED_TO_STRATEGIES = [
-        self::ASSIGNED_TO_STRATEGY_UNASSIGNED,
-        self::ASSIGNED_TO_STRATEGY_ONLY_ACTIVE_TEAM_MEMBER,
-    ];
 
     public const LINK_SOURCE_CURRENT_CONTACT = 'current_contact';
     public const LINK_SOURCE_CURRENT_SUBJECT = 'current_subject';

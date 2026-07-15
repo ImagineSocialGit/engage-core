@@ -16,6 +16,27 @@ class TaskAssignmentStrategyResolver
         private readonly iterable $resolvers,
     ) {}
 
+    public function supports(string $strategy): bool
+    {
+        $strategy = trim($strategy);
+
+        if ($strategy === '') {
+            return false;
+        }
+
+        if ($strategy === TaskTemplate::ASSIGNED_TO_STRATEGY_UNASSIGNED) {
+            return true;
+        }
+
+        foreach ($this->resolvers as $resolver) {
+            if ($resolver->supports($strategy)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * @param array<string, mixed> $context
      */

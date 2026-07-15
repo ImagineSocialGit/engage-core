@@ -1,11 +1,10 @@
 <?php
 
-namespace App\Modules\Tasks\Services\AssignedRecipients;
+namespace App\Modules\InternalNotifications\Services\Tasks;
 
 use App\Modules\InternalNotifications\Models\TeamMember;
-use App\Modules\InternalNotifications\Models\TeamMemberNotificationPreference;
-use App\Modules\InternalNotifications\Services\InternalNotificationRecipient;
 use App\Modules\Tasks\Contracts\TaskAssignedRecipientResolver;
+use App\Modules\Tasks\Data\TaskRecipient;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
@@ -13,8 +12,7 @@ class TeamMemberTaskAssignedRecipientResolver implements TaskAssignedRecipientRe
 {
     public function supports(Model $assignedTo): bool
     {
-        return $this->internalNotificationsEnabled()
-            && $assignedTo instanceof TeamMember;
+        return $assignedTo instanceof TeamMember;
     }
 
     public function resolve(Model $assignedTo): Collection
@@ -24,12 +22,11 @@ class TeamMemberTaskAssignedRecipientResolver implements TaskAssignedRecipientRe
         }
 
         return collect([
-            new InternalNotificationRecipient(
+            new TaskRecipient(
                 source: $assignedTo,
                 name: $this->teamMemberName($assignedTo),
                 email: $assignedTo->email,
                 phone: $assignedTo->phone,
-                notificationType: TeamMemberNotificationPreference::TYPE_TASK_ASSIGNED,
                 preferenceOwner: $assignedTo,
             ),
         ]);
@@ -39,12 +36,8 @@ class TeamMemberTaskAssignedRecipientResolver implements TaskAssignedRecipientRe
     {
         $name = trim((string) $teamMember->name);
 
-        return $name !== '' ? $name : ($teamMember->email ?: 'Team Member #'.$teamMember->id);
-    }
-
-    private function internalNotificationsEnabled(): bool
-    {
-        return ! function_exists('module_enabled')
-            || module_enabled('internal_notifications');
+        return $name !== ''
+            ? $name
+            : ($teamMember->email ?: 'Team Member #'.$teamMember->id);
     }
 }

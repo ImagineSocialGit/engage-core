@@ -8,13 +8,13 @@ use App\Modules\Tasks\ConfigContracts\TaskPresetConfigContractTargetProvider;
 use App\Modules\Tasks\ConfigContracts\TaskPresetDefinitionConfigContract;
 use App\Modules\Tasks\Events\TaskCompleted;
 use App\Modules\Tasks\Listeners\EmitTaskCompletedAutomationEvent;
-use App\Modules\Tasks\Services\AssignedRecipients\TeamMemberTaskAssignedRecipientResolver;
 use App\Modules\Tasks\Services\ContactShow\ContactTasksShowDataProvider;
 use App\Modules\Tasks\Services\ContactShow\ContactTaskVisibilityDataProvider;
 use App\Modules\Tasks\Services\Dashboard\TodayTasksDashboardPanelProvider;
 use App\Modules\Tasks\Services\RelatedSubjects\ContactTaskRelatedSubjectResolver;
 use App\Modules\Tasks\Services\TaskAssignedRecipientsResolver;
 use App\Modules\Tasks\Services\TaskAssignmentStrategyResolver;
+use App\Modules\Tasks\Services\TaskNotificationScheduler;
 use App\Modules\Tasks\Services\TaskRelatedSubjectResolver;
 use App\Modules\Tasks\Validation\TasksSetupValidationContributor;
 use App\Support\Dashboard\DashboardPanelRegistry;
@@ -45,13 +45,13 @@ class TasksModuleServiceProvider extends ServiceProvider
             ->needs('$resolvers')
             ->giveTagged('tasks.assignment_strategy_resolvers');
 
-        $this->app->tag([
-            TeamMemberTaskAssignedRecipientResolver::class,
-        ], 'crm.tasks.assigned_recipient_resolvers');
-
         $this->app->when(TaskAssignedRecipientsResolver::class)
             ->needs('$resolvers')
             ->giveTagged('crm.tasks.assigned_recipient_resolvers');
+
+        $this->app->when(TaskNotificationScheduler::class)
+            ->needs('$schedulers')
+            ->giveTagged('tasks.notification_schedulers');
 
         $this->app->tag([
             ContactTaskRelatedSubjectResolver::class,

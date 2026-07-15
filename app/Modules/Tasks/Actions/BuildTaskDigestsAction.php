@@ -2,8 +2,8 @@
 
 namespace App\Modules\Tasks\Actions;
 
-use App\Modules\InternalNotifications\Services\InternalNotificationRecipient;
 use App\Modules\Tasks\Data\TaskDigest;
+use App\Modules\Tasks\Data\TaskRecipient;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Services\TaskAssignedRecipientsResolver;
 use Carbon\CarbonInterface;
@@ -30,14 +30,9 @@ class BuildTaskDigestsAction
     ): Collection {
         $this->validateFrequency($frequency);
 
-        if (! $this->internalNotificationsEnabled()) {
-            return collect();
-        }
-
         $now ??= now();
 
         $tasks = $this->tasksForFrequency($frequency, $now);
-
         $digests = [];
 
         foreach ($tasks as $task) {
@@ -72,7 +67,7 @@ class BuildTaskDigestsAction
         CarbonInterface $now,
     ): Collection {
         return Task::query()
-            ->with(['assignedTo', 'related'])
+            ->with('assignedTo')
             ->where('status', Task::STATUS_OPEN)
             ->unarchived()
             ->when(
@@ -103,7 +98,7 @@ class BuildTaskDigestsAction
         return $query->where('due_at', '<=', $now->copy()->addDays(7)->endOfDay());
     }
 
-    private function recipientKey(InternalNotificationRecipient $recipient): string
+    private function recipientKey(TaskRecipient $recipient): string
     {
         return $this->modelKey($recipient->source);
     }
@@ -119,13 +114,9 @@ class BuildTaskDigestsAction
             self::FREQUENCY_DAILY,
             self::FREQUENCY_WEEKLY,
         ], true)) {
-            throw new InvalidArgumentException("Unsupported task digest frequency [{$frequency}].");
+            throw new InvalidArgumentException(
+                "Unsupported task digest frequency [{$frequency}]."
+            );
         }
-    }
-
-    private function internalNotificationsEnabled(): bool
-    {
-        return ! function_exists('module_enabled')
-            || module_enabled('internal_notifications');
     }
 }

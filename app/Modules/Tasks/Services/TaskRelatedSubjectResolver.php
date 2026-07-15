@@ -4,6 +4,8 @@ namespace App\Modules\Tasks\Services;
 
 use App\Modules\Tasks\Contracts\TaskRelatedSubjectResolverContract;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Models\TaskLink;
+use Illuminate\Database\Eloquent\Model;
 
 class TaskRelatedSubjectResolver
 {
@@ -26,21 +28,40 @@ class TaskRelatedSubjectResolver
      */
     public function resolve(Task $task): array
     {
-        $task->loadMissing('related');
+        $task->loadMissing('links.linkable');
 
-        $related = $task->related;
+        $linkable = $this->primaryLinkable($task);
 
-        if (! $related) {
+        if (! $linkable) {
             return $this->fallback();
         }
 
         foreach ($this->resolvers as $resolver) {
-            if ($resolver->supports($related)) {
-                return $resolver->resolve($related);
+            if ($resolver->supports($linkable)) {
+                return $resolver->resolve($linkable);
             }
         }
 
         return $this->fallback();
+    }
+
+    private function primaryLinkable(Task $task): ?Model
+    {
+        foreach ([
+            TaskLink::ROLE_SUBJECT,
+            TaskLink::ROLE_CONTEXT,
+            TaskLink::ROLE_RESULT,
+        ] as $role) {
+            $linkable = $task->links
+                ->firstWhere('role', $role)
+                ?->linkable;
+
+            if ($linkable instanceof Model) {
+                return $linkable;
+            }
+        }
+
+        return null;
     }
 
     /**
