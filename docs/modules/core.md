@@ -104,6 +104,29 @@ Do not duplicate first-class values inside `meta`.
 
 Default status resolution should use the configured canonical contact status key rather than hard-coding `prospect` or another vertical/client-specific label.
 
+## Current generic Core ContactStatus contribution
+
+Core contributes one generic ContactStatus group:
+
+```text
+default
+    new       sort_order 10
+    active    sort_order 20
+    inactive  sort_order 90
+```
+
+Engaged and Requires Action are not part of the current generic Core lifecycle set. Requires Action is better modeled as an attention/work state than as a generic lifecycle status.
+
+Module-owned statuses belong to their owning module's preset contribution.
+
+Client-specific lifecycle statuses are optional and belong to the client contributor:
+
+client/{CLIENT_KEY}/config/presets/modules/client/contact-statuses.php
+
+A client-specific group may reference a definition owned by another contributor, such as Core-owned new, but must not redefine that same definition key.
+
+Clients that do not need additional or replacement lifecycle statuses may use Core's default group directly and do not need a client-specific ContactStatus contribution file.
+
 ## Core setup validation ownership
 
 Core contributes setup validation through `CoreSetupValidationContributor` for Core-owned ContactStatus definition semantics and canonical internal terminology.

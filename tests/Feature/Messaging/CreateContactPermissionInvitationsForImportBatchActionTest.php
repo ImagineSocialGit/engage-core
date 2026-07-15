@@ -13,6 +13,7 @@ use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class CreateContactPermissionInvitationsForImportBatchActionTest extends TestCase
@@ -22,6 +23,8 @@ class CreateContactPermissionInvitationsForImportBatchActionTest extends TestCas
     protected function setUp(): void
     {
         parent::setUp();
+
+        Queue::fake();
 
         config([
             'messaging.email.from.marketing.address' => 'marketing@example.test',

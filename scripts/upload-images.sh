@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
+
 set -euo pipefail
 
 CORE_ENV=".env"
 CLIENT_ROOT="client"
-LOCAL_DIR="public/images/processed/"
 DEST_PREFIX="images"
 
-if [ ! -f "$CORE_ENV" ]; then
+if [[ ! -f "$CORE_ENV" ]]; then
   echo "Core .env file not found."
   exit 1
 fi
@@ -15,14 +15,20 @@ set -a
 source "$CORE_ENV"
 set +a
 
-if [ -z "${CLIENT_KEY:-}" ]; then
+if [[ -z "${CLIENT_KEY:-}" ]]; then
   echo "CLIENT_KEY is not set in core .env."
   exit 1
 fi
 
-CLIENT_ENV="$CLIENT_ROOT/$CLIENT_KEY/.env"
+if [[ ! "$CLIENT_KEY" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+  echo "CLIENT_KEY contains invalid characters."
+  exit 1
+fi
 
-if [ ! -f "$CLIENT_ENV" ]; then
+CLIENT_ENV="$CLIENT_ROOT/$CLIENT_KEY/.env"
+LOCAL_DIR="public/images/processed/$CLIENT_KEY/"
+
+if [[ ! -f "$CLIENT_ENV" ]]; then
   echo "Client .env file not found: $CLIENT_ENV"
   exit 1
 fi
@@ -41,13 +47,13 @@ required_vars=(
 )
 
 for var in "${required_vars[@]}"; do
-  if [ -z "${!var:-}" ]; then
+  if [[ -z "${!var:-}" ]]; then
     echo "$var is not set in $CLIENT_ENV."
     exit 1
   fi
 done
 
-if [ ! -d "$LOCAL_DIR" ]; then
+if [[ ! -d "$LOCAL_DIR" ]]; then
   echo "Local processed images directory not found: $LOCAL_DIR"
   exit 1
 fi
@@ -59,15 +65,16 @@ DO_SPACES_HOST="${DO_SPACES_HOST#http://}"
 DO_SPACES_HOST="${DO_SPACES_HOST%/}"
 
 BUCKET_PATH="s3://$DO_SPACES_BUCKET/$CLIENT_PREFIX/$DEST_PREFIX/"
-PUBLIC_URL="$(echo "$CDN_BASE_URL" | sed 's#/*$##')/$CLIENT_PREFIX/$DEST_PREFIX/"
+PUBLIC_URL="$(echo "$CDN_BASE_URL" | sed 's#/*$##')/$DEST_PREFIX/"
 
-echo ""
+echo
 echo "Client:      $CLIENT_KEY"
 echo "Client env:  $CLIENT_ENV"
+echo "Local files: $LOCAL_DIR"
 echo "Bucket:      $BUCKET_PATH"
 echo "Public URL:  $PUBLIC_URL"
 echo "Endpoint:    $DO_SPACES_HOST"
-echo ""
+echo
 read -r -p "Upload processed images for this client? [y/N] " confirm
 
 case "$confirm" in
@@ -89,6 +96,6 @@ s3cmd --config=/dev/null sync \
   --exclude=".DS_Store" \
   "$LOCAL_DIR" "$BUCKET_PATH"
 
-echo ""
+echo
 echo "Uploaded images to:"
 echo "$PUBLIC_URL"

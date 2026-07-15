@@ -1,3 +1,4 @@
+
 # Engage Core — Deployment Safety & Troubleshooting
 
 ## Purpose
@@ -321,7 +322,7 @@ clean
 
 Do not assume every validation failure means client config is wrong. A validator itself can drift from runtime truth.
 
-A first-production-run example was a preset/module validation false positive involving a selected preset that required the Mortgage module. When setup validation contradicts the effective preset/module runtime state, inspect the validator against the project authority order rather than broadening config, inventing aliases, or disabling a required module merely to silence the finding.
+A first-production-run example exposed duplicated module authority: the selected preset required the Mortgage module, while runtime module bootstrapping still read a separate `ENABLED_MODULES` environment list that omitted it. The validator correctly reported the runtime contradiction. The architecture now makes `config('modules.enabled')` client-config-owned and keeps preset package module declarations as compatibility requirements, so setup validation compares one runtime module truth against package requirements.
 
 Use the project authority order:
 
@@ -671,5 +672,3 @@ Before launch or a live Webinar event:
 [ ] Post-event recording/playback dependency understood
 [ ] Already scheduled messages reviewed before copy/CTA changes
 ```
-
-

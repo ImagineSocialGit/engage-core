@@ -802,6 +802,7 @@
 │       ├── Caching
 │       │   └── CacheKey.php
 │       ├── Clients
+│       │   ├── ClientEnvironmentLoader.php
 │       │   └── ViewResolver.php
 │       ├── ConfigContracts
 │       │   ├── ConfigContractRegistry.php
@@ -883,10 +884,12 @@
 │   │   │   │       └── definitions
 │   │   │   │           └── transactional
 │   │   │   │               └── webinar.php
+│   │   │   ├── modules.php
 │   │   │   ├── presets
 │   │   │   │   └── modules
+│   │   │   │       ├── client
+│   │   │   │       │   └── contact-statuses.php
 │   │   │   │       └── core
-│   │   │   │           └── contact-statuses.php
 │   │   │   ├── presets.php
 │   │   │   ├── theme.php
 │   │   │   └── webinars
@@ -935,8 +938,12 @@
 │   │   │   │           │   └── webinar_waitlist.php
 │   │   │   │           └── transactional
 │   │   │   │               └── webinar.php
+│   │   │   ├── modules.php
 │   │   │   ├── presets
 │   │   │   │   └── modules
+│   │   │   │       ├── client
+│   │   │   │       │   └── contact-statuses.php
+│   │   │   │       ├── core
 │   │   │   │       └── webinars
 │   │   │   │           └── campaigns.php
 │   │   │   ├── presets.php
@@ -1475,7 +1482,8 @@
 │   │   │   ├── ScheduleNextCampaignStepAfterScheduledMessageSentTest.php
 │   │   │   └── WebinarNurtureFirstAvailableVariantTest.php
 │   │   ├── Clients
-│   │   │   └── ClientConfigFallbackTest.php
+│   │   │   ├── ClientConfigFallbackTest.php
+│   │   │   └── ClientEnvironmentLoaderTest.php
 │   │   ├── Commerce
 │   │   │   └── CommerceFoundationTest.php
 │   │   ├── ConfigContracts
@@ -1488,6 +1496,7 @@
 │   │   │   └── TokenContractRegistryTest.php
 │   │   ├── ConfigGeneration
 │   │   │   ├── CoreWebinarMessagingDefaultsTest.php
+│   │   │   ├── RobTheMortgageCoachClientSelectionTest.php
 │   │   │   ├── SlamDunkConfigGoldenFixtureTest.php
 │   │   │   └── SlamDunkRuntimeGoldenFixtureTest.php
 │   │   ├── Core
@@ -1635,4 +1644,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-522 directories, 1114 files
+525 directories, 1120 files

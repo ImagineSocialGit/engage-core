@@ -129,6 +129,8 @@ config/presets/modules/webinars/contact-statuses.php
 config/presets/modules/webinars/tasks.php
 config/presets/modules/webinars/campaigns.php
 config/presets/modules/webinars/flow-routes.php
+
+client/{client-key}/config/presets/modules/client/contact-statuses.php
 ```
 
 Future modules and verticals may contribute only the domains they actually own or extend. Do not create empty symmetry files.
@@ -140,7 +142,7 @@ PresetContributionRegistry
     discovers explicitly registered module contributors
 
 PresetPackageResolver
-    resolves package selection, selected groups, and effective modules
+    resolves package selection, selected groups, and package module composition/requirements
 
 PresetCompositionResolver
     resolves selected normalized definitions for one preset domain

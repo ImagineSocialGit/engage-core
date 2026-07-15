@@ -3,12 +3,41 @@
 return [
     /*
     |--------------------------------------------------------------------------
+    | Public permission invitation URL
+    |--------------------------------------------------------------------------
+    |
+    | This is the public base URL used when generating permission-invitation
+    | links.
+    |
+    | An explicit PERMISSION_INVITATION_PUBLIC_URL override wins when present.
+    | Otherwise the config falls back to APP_URL.
+    |
+    | Do not add a client-specific override merely for symmetry. Set an explicit
+    | permission-invitation URL only when these public links should use a different
+    | base URL from the application's normal APP_URL.
+    |
+    | This value provides only the public base URL. Messaging still generates the
+    | specific invitation URL for each claimed imported Contact at runtime.
+    |
+    */
+    'public' => [
+        'base_url' => rtrim(
+            (string) (
+                env('PERMISSION_INVITATION_PUBLIC_URL')
+                ?: env('APP_URL', 'http://localhost')
+            ),
+            '/',
+        ),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Imported-contact permission invitation email copy
     |--------------------------------------------------------------------------
     |
-    | This config does not hand-author the public preference URL. Messaging
-    | injects cta.url and secondary_link.url at runtime when the invitation is
-    | claimed for a specific imported Contact.
+    | This config does not hand-author the specific public preference URL.
+    | Messaging injects cta.url and secondary_link.url at runtime when the
+    | invitation is claimed for a specific imported Contact.
     |
     */
     'email' => [

@@ -271,6 +271,8 @@ return [
         'app',
         'bootstrap',
         'config/**/*.php',
+        'client/**/*.php',
+        'client/**/.env',
         'database/**/*.php',
         'public/**/*.php',
         'resources/**/*.php',

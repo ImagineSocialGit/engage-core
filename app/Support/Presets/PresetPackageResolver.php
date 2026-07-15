@@ -67,7 +67,10 @@ final class PresetPackageResolver
     }
 
     /**
-     * Effective package module defaults plus client add/remove overrides.
+     * Effective package modules plus client add/remove overrides.
+     *
+     * This describes preset-package composition. It is not the runtime module
+     * source of truth; runtime availability belongs to ModuleManager.
      *
      * @return array<int, string>
      */
@@ -75,9 +78,17 @@ final class PresetPackageResolver
     {
         $package = $this->package($presetKey);
 
-        $packageModules = $this->normalizeStringList(data_get($package, 'modules.enabled', []));
-        $addedModules = $this->normalizeStringList(config('client.modules.add', []));
-        $removedModules = $this->normalizeStringList(config('client.modules.remove', []));
+        $packageModules = $this->normalizeStringList(
+            data_get($package, 'modules.enabled', [])
+        );
+
+        $addedModules = $this->normalizeStringList(
+            config('client.modules.add', [])
+        );
+
+        $removedModules = $this->normalizeStringList(
+            config('client.modules.remove', [])
+        );
 
         $modules = array_values(array_unique([
             ...array_keys(array_filter(

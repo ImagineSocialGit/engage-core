@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-set -e
+
+set -euo pipefail
 
 CORE_ENV=".env"
 
-if [ ! -f "$CORE_ENV" ]; then
+if [[ ! -f "$CORE_ENV" ]]; then
   echo "Core .env file not found."
   exit 1
 fi
@@ -12,14 +13,25 @@ set -a
 source "$CORE_ENV"
 set +a
 
-if [ -z "${CLIENT_KEY:-}" ]; then
+if [[ -z "${CLIENT_KEY:-}" ]]; then
   echo "CLIENT_KEY is not set in core .env."
   exit 1
 fi
 
-RAW_DIR="resources/images/raw"
-OUT_DIR="public/images/processed"
-MANIFEST_PATH="client/${CLIENT_KEY}/resources/images/manifest.json"
+if [[ ! "$CLIENT_KEY" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+  echo "CLIENT_KEY contains invalid characters."
+  exit 1
+fi
+
+CLIENT_DIR="client/$CLIENT_KEY"
+RAW_DIR="$CLIENT_DIR/resources/images/raw"
+OUT_DIR="public/images/processed/$CLIENT_KEY"
+MANIFEST_PATH="$CLIENT_DIR/resources/images/manifest.json"
+
+if [[ ! -d "$RAW_DIR" ]]; then
+  echo "Client raw image directory not found: $RAW_DIR"
+  exit 1
+fi
 
 SIZES=(320 640 960 1280 1600)
 
@@ -31,7 +43,7 @@ find "$RAW_DIR" -type f -print0 | while IFS= read -r -d '' file; do
   relative_dir=$(dirname "$relative_path")
   output_dir="$OUT_DIR/$relative_dir/$name"
 
-  if [ "$relative_dir" = "." ]; then
+  if [[ "$relative_dir" = "." ]]; then
     manifest_path="$name"
     output_dir="$OUT_DIR/$name"
   else
@@ -58,11 +70,14 @@ find "$RAW_DIR" -type f -print0 | while IFS= read -r -d '' file; do
   processed_sizes=()
 
   for size in "${SIZES[@]}"; do
-    if [ "$size" -le "$max_width" ]; then
+    if [[ "$size" -le "$max_width" ]]; then
       processed_sizes+=("$size")
 
-      if [ "$file" -ot "$output_dir/$size.webp" ] && [ "$file" -ot "$output_dir/$size.avif" ]; then
-          continue
+      if [[ -f "$output_dir/$size.webp" ]] \
+        && [[ -f "$output_dir/$size.avif" ]] \
+        && [[ "$file" -ot "$output_dir/$size.webp" ]] \
+        && [[ "$file" -ot "$output_dir/$size.avif" ]]; then
+        continue
       fi
 
       sharp -i "$file" \
@@ -77,7 +92,7 @@ find "$RAW_DIR" -type f -print0 | while IFS= read -r -d '' file; do
     fi
   done
 
-  if [ ! -f "$output_dir/placeholder.webp" ] || [ "$file" -nt "$output_dir/placeholder.webp" ]; then
+  if [[ ! -f "$output_dir/placeholder.webp" ]] || [[ "$file" -nt "$output_dir/placeholder.webp" ]]; then
     sharp -i "$file" \
       -o "$output_dir/placeholder.webp" \
       -f webp \
@@ -93,7 +108,7 @@ find "$RAW_DIR" -type f -print0 | while IFS= read -r -d '' file; do
       printf "Manifest key: " > /dev/tty
       read -r manifest_key < /dev/tty
 
-      if [ -n "$manifest_key" ]; then
+      if [[ -n "$manifest_key" ]]; then
         sizes_csv=$(IFS=,; echo "${processed_sizes[*]}")
 
         mkdir -p "$(dirname "$MANIFEST_PATH")"
@@ -142,3 +157,8 @@ find "$RAW_DIR" -type f -print0 | while IFS= read -r -d '' file; do
       ;;
   esac
 done
+
+echo
+echo "Processed images for client: $CLIENT_KEY"
+echo "Output: $OUT_DIR"
+echo "Manifest: $MANIFEST_PATH"

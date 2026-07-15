@@ -2,7 +2,13 @@
 
 return [
     'public' => [
-        'base_url' => env('PERMISSION_INVITATION_PUBLIC_URL'),
+        'base_url' => rtrim(
+            (string) (
+                env('PERMISSION_INVITATION_PUBLIC_URL')
+                ?: env('APP_URL', 'http://localhost')
+            ),
+            '/',
+        ),
     ],
 
     'email' => [

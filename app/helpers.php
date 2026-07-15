@@ -5,7 +5,7 @@ declare(strict_types=1);
 if (! function_exists('cdn_image')) {
     function cdn_image(string $path, ?string $file = null): string
     {
-        $base = rtrim((string) config('filesystems.disks.spaces.url', env('CDN_BASE_URL')), '/');
+        $base = rtrim((string) config('filesystems.disks.spaces.url'), '/');
         $path = trim($path, '/');
 
         if ($file !== null) {
@@ -61,4 +61,3 @@ if (! function_exists('module_tone')) {
         return is_string($value) ? $value : '';
     }
 }
-

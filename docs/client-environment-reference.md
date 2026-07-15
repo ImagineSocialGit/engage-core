@@ -1,3 +1,4 @@
+
 # Engage Core — Client Environment Reference
 
 ## Purpose
@@ -73,20 +74,12 @@ APP_DEBUG=false
 
 ---
 
-# 2. Client identity, presets, modules, and timezone
+# 2. Client selection, client config, modules, and timezone
 
-Current Core reads:
+Root `.env` has one client-selection key:
 
 ```env
 CLIENT_KEY=
-CLIENT_PRESET=basic
-ENABLED_MODULES=
-```
-
-Optional override:
-
-```env
-# CLIENT_TIMEZONE=America/Chicago
 ```
 
 Meaning:
@@ -94,56 +87,52 @@ Meaning:
 ```text
 CLIENT_KEY
     selects client/{CLIENT_KEY}
-
-CLIENT_PRESET
-    selects the effective preset package
-
-ENABLED_MODULES
-    selects explicitly enabled runtime modules
-
-CLIENT_TIMEZONE
-    optional environment override for client timezone
 ```
 
-Prefer stable client timezone in `client/{CLIENT_KEY}/config/client.php` when the timezone is client identity/configuration rather than environment-specific infrastructure.
-
-### Current Core default enabled-module list
-
-The supplied `config/modules.php` defaults to:
+The selected client then contributes:
 
 ```text
-tasks
-workflow
-flow_routes
-messaging
-inbound_messaging
-internal_notifications
-campaigns
-broadcasts
-webinars
-integrations
-reporting
+client/{CLIENT_KEY}/.env
+    client deployment/runtime values
+
+client/{CLIENT_KEY}/config/client.php
+    client identity, selected preset, stable client timezone
+
+client/{CLIENT_KEY}/config/modules.php
+    explicitly enabled runtime product modules
+
+client/{CLIENT_KEY}/config/**
+    version-controlled product/business behavior and client overrides
 ```
 
-For staging/production, set `ENABLED_MODULES` explicitly instead of relying on a future-changing default.
+`CLIENT_PRESET`, `ENABLED_MODULES`, and `CLIENT_TIMEZONE` are not part of the canonical environment contract.
 
-### Current Core preset packages
-
-Core currently provides:
+The runtime module source of truth is:
 
 ```text
-basic
-messaging
-automated_messaging
+client/{CLIENT_KEY}/config/modules.php
+    -> config('modules.enabled')
+    -> ModuleManager
+    -> enabled module providers and runtime availability
 ```
 
-Rich vertical/client packages belong in client config.
+Preset packages may still declare `modules.enabled`, but that list is a package requirement contract: every declared module must be runtime-enabled for the selected package to be valid. It is not a second runtime module source of truth.
+
+Core keeps a generic default enabled-module list for the no-client/default application state and test fallback. A selected client's `config/modules.php` replaces that list.
+
+Client timezone is stable client config:
+
+```php
+client/{CLIENT_KEY}/config/client.php
+
+'timezone' => 'America/Denver',
+```
 
 ---
 
 # 3. URLs and host topology
 
-Core config directly reads:
+The selected client `.env` owns:
 
 ```env
 ROOT_DOMAIN=
@@ -152,13 +141,13 @@ WEBINAR_APP_URL=
 CRM_APP_URL=
 ```
 
-The deployment topology also currently uses:
+`bootstrap/app.php` derives the webhooks route host from `ROOT_DOMAIN`:
 
-```env
-WEBHOOKS_APP_URL=
+```text
+webhooks.<ROOT_DOMAIN>
 ```
 
-`WEBHOOKS_APP_URL` was not referenced by the supplied Core config files, but it is retained in the curated example because current deployment/routing topology includes a dedicated webhooks host. Verify route files and host binding if that topology changes.
+`WEBHOOKS_APP_URL` is not part of the active application environment contract.
 
 Typical production topology:
 
@@ -171,27 +160,31 @@ webhooks.<ROOT_DOMAIN>
 
 ---
 
-# 4. Application locale and timezone nuance
+# 4. Application locale and timezone
 
-Supplied Core config reads:
+Core reads:
 
 ```env
 APP_LOCALE=en
 APP_FALLBACK_LOCALE=en
 APP_FAKER_LOCALE=en_US
-APP_TIMEZONE=UTC
 ```
 
-Important nuance:
+Laravel application/runtime storage remains UTC:
 
 ```text
-config/app.php hardcodes the Laravel application timezone to UTC.
-config/client.php uses CLIENT_TIMEZONE, falling back to APP_TIMEZONE, then UTC.
+config/app.php
+    timezone = UTC
 ```
 
-Therefore `APP_TIMEZONE` currently acts as a client-timezone fallback, not as the authoritative Laravel application timezone.
+The selected client's presentation/business timezone comes from:
 
-Keep application/runtime storage in UTC unless the architecture is deliberately changed.
+```text
+client/{CLIENT_KEY}/config/client.php
+    -> config('client.timezone')
+```
+
+Do not duplicate the client timezone in root or client `.env`.
 
 ---
 
@@ -261,6 +254,8 @@ The Core logging config also supports Slack, Papertrail, stderr, syslog, and oth
 
 # 8. MySQL
 
+Root `.env` owns the connection type and machine/network location. The selected client `.env` owns database identity and credentials.
+
 Canonical current-stack variables:
 
 ```env
@@ -288,6 +283,8 @@ Do not populate them unless the actual deployment requires them.
 
 # 9. Cache
 
+Root `.env` owns cache backend and operational TTLs. The selected client `.env` owns `CACHE_PREFIX`.
+
 Current deployment path:
 
 ```env
@@ -313,6 +310,8 @@ The prefix must be unique when Redis/cache infrastructure is shared.
 ---
 
 # 10. Sessions
+
+Root `.env` owns session driver/security behavior. The selected client `.env` owns `SESSION_DOMAIN` when it varies by client domain.
 
 Canonical current stack:
 
@@ -414,6 +413,8 @@ The accompanying `.env.example` includes `campaigns` so the current executable c
 
 # 12. Redis
 
+Root `.env` owns the Redis client, host, port, password, and DB indexes. The selected client `.env` owns `REDIS_PREFIX`.
+
 Canonical current stack:
 
 ```env
@@ -450,6 +451,8 @@ Use prefixes and/or DB isolation deliberately. Never assume an unprefixed raw Re
 
 # 13. DigitalOcean Spaces
 
+These values are selected-client deployment values and belong in `client/{CLIENT_KEY}/.env`.
+
 Canonical variables:
 
 ```env
@@ -467,6 +470,8 @@ CDN_BASE_URL=
 ---
 
 # 14. Email and Resend
+
+Provider selection, credentials, webhook secrets, and sender identities are selected-client deployment values.
 
 Canonical provider path:
 
@@ -552,19 +557,19 @@ The updated example uses the current names only.
 
 # 15. Permission invitations
 
-Current Core reads:
+PERMISSION_INVITATION_PUBLIC_URL is an optional selected-client deployment override for the public base URL used by permission-invitation links.
 
-```env
-PERMISSION_INVITATION_PUBLIC_URL=
-```
+When absent, the config falls back to APP_URL.
 
-Set it when imported-contact permission invitations are part of the client workflow.
+Set it only when permission-invitation public links should use a different base URL from the application's normal APP_URL.
 
 This is a distinct Messaging-owned one-time permission flow. It is not a normal Broadcast consent bypass.
 
 ---
 
 # 16. Internal notifications and inbound replies
+
+These are selected-client deployment values.
 
 Optional current variables:
 
@@ -580,6 +585,8 @@ Only set them when the corresponding feature path is enabled and needs an overri
 ---
 
 # 17. SMS and Telnyx
+
+Provider enablement, selection, credentials, sender numbers, webhook keys, and profile IDs are selected-client deployment values. Rate limits and queue tuning remain root/process-owned.
 
 Current global SMS toggle/provider:
 
@@ -653,27 +660,26 @@ They are commented out in the curated env example because Telnyx is the current 
 
 # 19. Webinars and Zoom
 
-Current Core runtime flag/provider:
+Runtime Webinar module availability comes from the selected client's module config:
 
-```env
-WEBINARS_ENABLED=true
-WEBINAR_PROVIDER=zoom
+```text
+client/{CLIENT_KEY}/config/modules.php
+    -> config('modules.enabled')
+    -> ModuleManager
 ```
 
-`WEBINARS_ENABLED` is separate from `ENABLED_MODULES`.
-
-Use `ENABLED_MODULES` for explicit client module availability. Treat `WEBINARS_ENABLED` as a lower-level Webinars runtime/provider flag that should align with the intended module state.
-
-Zoom credentials:
+Webinar provider selection and Zoom credentials are client deployment values:
 
 ```env
+WEBINAR_PROVIDER=zoom
+
 ZOOM_ACCOUNT_ID=
 ZOOM_CLIENT_ID=
 ZOOM_CLIENT_SECRET=
 ZOOM_WEBHOOK_SECRET=
 ```
 
-Provider defaults/overrides:
+Provider operational defaults remain root-owned:
 
 ```env
 ZOOM_BASE_URL=https://api.zoom.us/v2
@@ -683,18 +689,13 @@ ZOOM_WEBHOOK_MAX_TIMESTAMP_DRIFT_SECONDS=300
 ZOOM_WEBHOOK_REPLAY_CACHE_TTL_SECONDS=600
 ```
 
-The supplied current config does not use:
-
-```text
-ZOOM_OAUTH_TOKEN_CACHE_KEY
-WEBINAR_MANAGED_BY
-```
-
-They are omitted from the new canonical env example.
+`WEBINARS_ENABLED` is not part of the current canonical runtime contract. Module availability is decided through client module config.
 
 ---
 
 # 20. Horizon
+
+`HORIZON_PREFIX` is selected-client-owned. Worker/process tuning remains root-owned.
 
 Current supported variables:
 
@@ -782,10 +783,11 @@ Before deleting an existing live environment variable, search the full repositor
 
 ```text
 [ ] No placeholder required values remain
-[ ] CLIENT_KEY correct
-[ ] CLIENT_PRESET exists
-[ ] ENABLED_MODULES explicit
-[ ] Client timezone correct
+[ ] Root CLIENT_KEY correct
+[ ] Selected client directory exists
+[ ] Selected client .env populated with deployment/runtime values
+[ ] Selected client config/client.php has correct preset and timezone
+[ ] Selected client config/modules.php has correct runtime modules
 [ ] APP_ENV correct
 [ ] APP_DEBUG false outside local
 [ ] APP_KEY set and preserved
@@ -799,9 +801,9 @@ Before deleting an existing live environment variable, search the full repositor
 [ ] Resend secret/API key set when enabled
 [ ] SMS_ENABLED deliberate
 [ ] Telnyx sender numbers/profile IDs correct when enabled
-[ ] Webinars/Zoom flags and credentials correct when enabled
+[ ] Webinars/Zoom provider and credentials correct when enabled
 [ ] setup user values handled securely
 [ ] staging credentials only used where intended
-[ ] php artisan optimize:clear run after env changes
+[ ] php artisan optimize:clear run after client/env changes
 [ ] php artisan setup:validate passes
 ```

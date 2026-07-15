@@ -24,7 +24,6 @@ class ClientConfigFallbackTest extends TestCase
 
         config([
             'client.config_path' => $root,
-            'client.env_path' => $root.'/.env',
             'client.preset' => null,
             'messaging.permission_invitations.content.heading' => 'Default heading',
             'messaging.permission_invitations.content.body' => 'Default body',
@@ -62,7 +61,6 @@ PHP);
 
         config([
             'client.config_path' => $root,
-            'client.env_path' => $root.'/.env',
             'client.preset' => null,
             'messaging.permission_invitations.content.heading' => 'Default heading',
             'messaging.permission_invitations.content.body' => 'Default body',
@@ -114,7 +112,6 @@ PHP);
 
         config([
             'client.config_path' => $root,
-            'client.env_path' => $root.'/.env',
             'client.preset' => null,
             'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps' => [
                 1 => [

@@ -43,7 +43,6 @@ class SlamDunkRuntimeGoldenFixtureTest extends TestCase
     public function createApplication(): Application
     {
         $this->setBootstrapEnvironment('CLIENT_KEY', 'slam-dunk-crm');
-        $this->setBootstrapEnvironment('CLIENT_PRESET', '');
 
         return parent::createApplication();
     }

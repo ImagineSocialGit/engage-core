@@ -1,3 +1,4 @@
+
 # Engage Core — Client Staging & Production Setup Checklist
 
 ## Purpose
@@ -40,7 +41,6 @@ Replace every placeholder before staging or production handoff.
 
 ```text
 <CLIENT_KEY>                 Example: example-client
-<CLIENT_PRESET>              Example: mortgage
 <ROOT_DOMAIN>                Example: example.com
 <STAGING_ROOT_DOMAIN>        Example: staging.example.com
 <APP_PATH>                   Example: /var/www/<ROOT_DOMAIN>/engage-core
@@ -69,10 +69,9 @@ Complete this before provisioning or changing a server.
 ## 1. Confirm client identity and package composition
 
 - [ ] `CLIENT_KEY` is final and matches the client directory/repository identity.
-- [ ] `CLIENT_PRESET` is final and exists in the effective merged `presets.packages` config.
-- [ ] `ENABLED_MODULES` is explicitly decided.
+- [ ] `client/{CLIENT_KEY}/config/client.php` selects the intended preset and stable client timezone.
+- [ ] `client/{CLIENT_KEY}/config/modules.php` explicitly selects runtime product modules.
 - [ ] Client-facing contact labels are correct.
-- [ ] Client timezone is correct in stable client config or via deliberate `CLIENT_TIMEZONE` override.
 - [ ] Required client config files exist.
 - [ ] No placeholder domains, sender addresses, phone numbers, provider IDs, or secrets remain in client configuration.
 
@@ -80,13 +79,13 @@ Keep these concepts separate:
 
 ```text
 CLIENT_KEY
-    selects the client config package
+    selects client/{CLIENT_KEY} and therefore the active client environment and configuration
 
-CLIENT_PRESET
-    selects preset composition
+client config/client.php
+    selects preset composition and stable client timezone
 
-ENABLED_MODULES
-    selects explicitly enabled runtime features
+client config/modules.php
+    selects explicitly enabled runtime product modules
 
 DB-owned selections/bindings
     decide which synced definitions actually run
@@ -147,7 +146,7 @@ Messaging templates own reusable copy and delivery-template metadata.
 Owning modules own lifecycle timing/conditions/enablement.
 Campaign presets own campaign timing and progression, not reusable message copy.
 Webinar schedule profiles own Webinar lifecycle timing.
-CLIENT_PRESET and ENABLED_MODULES are separate decisions.
+Preset composition and runtime module availability remain separate decisions.
 SMS availability is a Messaging channel-availability decision, not merely provider credentials.
 Normal Broadcasts remain consent-gated.
 Imported-contact permission invitations are a distinct Messaging-owned flow.
@@ -279,9 +278,9 @@ bootstrap/cache/
 
 Do not blindly copy `chown`/`chmod` commands between servers. Confirm the actual deployment and web users first.
 
-## 11. Create the staging `.env`
+## 11. Create the staging root and client environments
 
-Start from the updated `.env.example` in this batch.
+Start from the root `.env.example` and the selected client's `.env.example`.
 
 Required staging differences:
 
@@ -290,18 +289,33 @@ APP_ENV=staging
 APP_DEBUG=false
 ```
 
-Use staging-specific values for:
+Use the root `.env` for:
 
 ```text
+CLIENT_KEY
+APP_ENV
+APP_DEBUG
 APP_KEY
+DB connection host/port
+Redis host/port/database indexes
+queue/process tuning
+logging
+staging access
+initial-user bootstrap values
+```
+
+Use `client/{CLIENT_KEY}/.env` for:
+
+```text
 APP_URL and host URLs
 DB database/credentials
 CACHE_PREFIX
-REDIS_PREFIX and/or Redis DB isolation
+REDIS_PREFIX
 HORIZON_PREFIX
-provider webhook URLs
-provider credentials where environment-specific
-storage bucket/prefix where environment-specific
+provider credentials and webhook secrets
+sender identities and phone numbers
+storage credentials/bucket/CDN URL
+other selected-client deployment values
 ```
 
 Do not leave placeholder values such as `DOMAIN`, `CHANGE_ME`, empty required sender addresses, or blank provider secrets in an environment intended for handoff testing.
@@ -320,12 +334,17 @@ Do not regenerate a key after encrypted application data exists unless key rotat
 
 The current deployment path is MySQL 8.
 
-Verify:
+Verify root `.env`:
 
 ```env
 DB_CONNECTION=mysql
 DB_HOST=
 DB_PORT=3306
+```
+
+Verify selected client `.env`:
+
+```env
 DB_DATABASE=
 DB_USERNAME=
 DB_PASSWORD=
@@ -345,11 +364,16 @@ QUEUE_CONNECTION=redis
 
 Use an environment-specific namespace and/or Redis DB separation.
 
-Recommended explicit values:
+Recommended root `.env` values:
 
 ```env
 REDIS_DB=0
 REDIS_CACHE_DB=1
+```
+
+Recommended selected client `.env` values:
+
+```env
 REDIS_PREFIX=<CLIENT_KEY>_staging_
 CACHE_PREFIX=<CLIENT_KEY>_staging_cache_
 HORIZON_PREFIX=<CLIENT_KEY>_staging_horizon:
@@ -966,8 +990,8 @@ Import rules:
 [ ] Correct Core repository/commit deployed
 [ ] Correct client repository/config deployed
 [ ] CLIENT_KEY correct
-[ ] CLIENT_PRESET correct
-[ ] ENABLED_MODULES correct
+[ ] Selected client preset correct
+[ ] Selected client runtime modules correct
 [ ] Client timezone correct
 [ ] APP_ENV=production
 [ ] APP_DEBUG=false
@@ -1024,5 +1048,3 @@ Do not clear Redis indiscriminately during ordinary deployments.
 Do not regenerate `APP_KEY`.
 Do not destructively reset a production database containing real data.
 Do not assume preset changes rewrite already scheduled message payloads.
-
-

@@ -27,11 +27,15 @@ return [
     | Modules Template
     |--------------------------------------------------------------------------
     |
-    | File path:
+    | File paths:
     | config/modules.php
+    | client/{client-key}/config/modules.php
     |
     | This is product/onboarding configuration, not a client-facing feature
-    | toggle system. Core is always treated as enabled by ModuleManager.
+    | toggle system. Core owns installed module definitions. The selected client
+    | owns its explicit runtime-enabled module list in client config.
+    |
+    | Core is always treated as enabled by ModuleManager.
     |
     | enabled controls explicit feature visibility. Providers may load as
     | dependencies without making a module visible.
@@ -69,13 +73,19 @@ return [
     |
     */
 
-    'enabled' => array_filter(array_map(
-        'trim',
-        explode(',', env(
-            'ENABLED_MODULES',
-            'tasks,workflow,flow_routes,messaging,inbound_messaging,internal_notifications,campaigns,broadcasts,webinars,integrations,reporting'
-        ))
-    )),
+    'enabled' => [
+        'tasks',
+        'workflow',
+        'flow_routes',
+        'messaging',
+        'inbound_messaging',
+        'internal_notifications',
+        'campaigns',
+        'broadcasts',
+        'webinars',
+        'integrations',
+        'reporting',
+    ],
 
     'modules' => [
 

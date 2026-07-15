@@ -15,7 +15,7 @@ return [
     |
     */
 
-    'default_package' => env('CLIENT_PRESET', 'basic'),
+    'default_package' => 'basic',
 
     'packages' => [
 
@@ -40,7 +40,7 @@ return [
 
             'groups' => [
                 'contact_statuses' => [
-                    'general_default',
+                    'default',
                 ],
                 'tasks' => [
                     'general_default',
@@ -75,7 +75,7 @@ return [
 
             'groups' => [
                 'contact_statuses' => [
-                    'general_default',
+                    'default',
                 ],
                 'tasks' => [
                     'general_default',
@@ -111,7 +111,7 @@ return [
 
             'groups' => [
                 'contact_statuses' => [
-                    'general_default',
+                    'default',
                 ],
                 'tasks' => [
                     'general_default',

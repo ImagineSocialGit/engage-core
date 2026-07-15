@@ -727,6 +727,8 @@ config/presets/modules/webinars/contact-statuses.php
 config/presets/modules/webinars/tasks.php
 config/presets/modules/webinars/campaigns.php
 config/presets/modules/webinars/flow-routes.php
+
+client/{client-key}/config/presets/modules/client/contact-statuses.php
 ```
 
 Future modules and verticals should contribute only the domains they genuinely own or extend. Do not create empty symmetry files.
@@ -740,7 +742,7 @@ PresetContributionRegistry
 PresetPackageResolver
     package selection
     selected groups
-    effective modules
+    package module composition/requirements
 
 PresetCompositionResolver
     selected normalized definitions for one package/domain
@@ -1425,7 +1427,7 @@ Template reference:
 docs/config-templates/permission-invitations-template.php
 ```
 
-This config owns the permission invitation email subject/body/CTA labels, public preference-page copy, accepted consent scopes, and Tailwind-style class strings for the public page.
+This config owns the public permission-invitation base URL, invitation email subject/body/CTA labels, public preference-page copy, accepted consent scopes, and Tailwind-style class strings for the public page.
 
 
 Configured permission-invitation scopes are requested Messaging scopes. Consent creation still normalizes each through `ConsentDomainRegistry`; mapped related scopes may collapse to one domain, while unknown unmapped scopes remain narrow.
@@ -1434,6 +1436,11 @@ Expected top-level shape:
 
 ```php
 return [
+    
+    'public' => [
+        'base_url' => 'https://example.com',
+    ],
+
     'email' => [
         'subject' => 'Confirm how you want to hear from us',
         'body' => 'Hi {first_name}, please confirm your communication preferences so we know how you want to hear from us.',
@@ -1465,6 +1472,7 @@ return [
     ],
 ];
 ```
+The Core default resolves public.base_url from PERMISSION_INVITATION_PUBLIC_URL when explicitly set and otherwise falls back to APP_URL. Do not add a client-specific override merely for symmetry.
 
 The invitation email should include `{cta}` on its own line when the button should render in the body. The runtime injects `cta.url` and `secondary_link.url` using the invitation token.
 

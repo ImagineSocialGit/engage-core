@@ -2,13 +2,15 @@
 
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Http\Middleware\ForceStagingAccess;
+use App\Support\Clients\ClientEnvironmentLoader;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Routing\Exceptions\InvalidSignatureException;
+use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Route;
 
-return Application::configure(basePath: dirname(__DIR__))
+$app = Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',
@@ -71,3 +73,21 @@ return Application::configure(basePath: dirname(__DIR__))
         });
     })
     ->create();
+
+$app->afterLoadingEnvironment(function () use ($app): void {
+    /*
+     * Cached configuration already contains the fully resolved selected-client
+     * environment and merged config. Re-loading .env files at runtime would
+     * contradict Laravel's config-cache model.
+     */
+    if (
+        $app->configurationIsCached()
+        || Env::get('APP_ENV') === 'testing'
+    ) {
+        return;
+    }
+
+    (new ClientEnvironmentLoader())->load($app->basePath());
+});
+
+return $app;

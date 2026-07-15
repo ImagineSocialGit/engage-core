@@ -36,13 +36,19 @@ return [
     |
     */
 
-    'enabled' => array_filter(array_map(
-        'trim',
-        explode(',', env(
-            'ENABLED_MODULES',
-            'tasks,workflow,flow_routes,messaging,inbound_messaging,internal_notifications,campaigns,broadcasts,webinars,integrations,reporting'
-        ))
-    )),
+    'enabled' => [
+        'tasks',
+        'workflow',
+        'flow_routes',
+        'messaging',
+        'inbound_messaging',
+        'internal_notifications',
+        'campaigns',
+        'broadcasts',
+        'webinars',
+        'integrations',
+        'reporting',
+    ],
 
 
     /*

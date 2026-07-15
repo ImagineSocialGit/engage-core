@@ -65,7 +65,7 @@ return [
     |     -> all available contributed groups/definitions by domain
     |
     | PresetPackageResolver
-    |     -> selected package, selected groups, effective module defaults/overrides
+    |     -> selected package, selected groups, and package module composition/requirements
     |
     | PresetCompositionResolver
     |     -> ResolvedPresetDomain for one selected package/domain
@@ -90,7 +90,7 @@ return [
     |
     */
 
-    'default_package' => env('CLIENT_PRESET', 'basic'),
+    'default_package' => 'basic',
 
     /*
     |--------------------------------------------------------------------------
@@ -111,6 +111,19 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Package module requirements
+    |--------------------------------------------------------------------------
+    |
+    | packages.*.modules.enabled declares modules that must be runtime-enabled
+    | for that package to be valid. It is not the runtime module source of truth.
+    |
+    | Runtime module authority belongs to config('modules.enabled'), normally
+    | supplied by client/{client-key}/config/modules.php.
+    |
+    */
+
     'packages' => [
         'basic' => [
             'name' => 'Basic',
@@ -123,7 +136,7 @@ return [
             ],
             'groups' => [
                 'contact_statuses' => [
-                    'general_default',
+                    'default',
                 ],
                 'tasks' => [
                     'general_default',
@@ -148,7 +161,7 @@ return [
             ],
             'groups' => [
                 'contact_statuses' => [
-                    'general_default',
+                    'default',
                 ],
                 'tasks' => [
                     'general_default',
@@ -174,7 +187,7 @@ return [
             ],
             'groups' => [
                 'contact_statuses' => [
-                    'general_default',
+                    'default',
                 ],
                 'tasks' => [
                     'general_default',

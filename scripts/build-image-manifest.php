@@ -17,7 +17,7 @@ if ($clientKey === '') {
     exit(1);
 }
 
-if (! preg_match('/^[a-zA-Z0-9_-]+$/', $clientKey)) {
+if (! preg_match('/^[a-z0-9][a-z0-9_-]*$/', $clientKey)) {
     fwrite(STDERR, "CLIENT_KEY contains invalid characters.\n");
     exit(1);
 }

@@ -14,14 +14,6 @@ class ClientServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->loadClientEnvironment();
-
-        $preset = $this->selectedPreset();
-
-        if ($preset !== null) {
-            $this->mergePresetConfig($preset);
-        }
-
         $this->mergeClientConfig();
     }
 
@@ -33,49 +25,6 @@ class ClientServiceProvider extends ServiceProvider
             View::prependLocation($views);
             View::prependNamespace('client', $views);
         }
-    }
-
-    private function selectedPreset(): ?string
-    {
-        $explicit = config('client.preset');
-
-        if (is_string($explicit) && $explicit !== '') {
-            return $explicit;
-        }
-
-        $clientConfig = $this->loadClientConfigFile('client');
-
-        if (! is_array($clientConfig)) {
-            return null;
-        }
-
-        $preset = $clientConfig['preset'] ?? null;
-
-        return is_string($preset) && $preset !== ''
-            ? $preset
-            : null;
-    }
-
-    private function mergePresetConfig(string $preset): void
-    {
-        $defaults = config("presets.presets.{$preset}");
-
-        if (! is_array($defaults)) {
-            return;
-        }
-
-        foreach ($defaults as $key => $presetConfig) {
-            $current = config($key);
-
-            Config::set(
-                $key,
-                is_array($current) && is_array($presetConfig)
-                    ? $this->mergeConfigValues($current, $presetConfig)
-                    : $presetConfig,
-            );
-        }
-
-        Config::set('client.preset', $preset);
     }
 
     private function mergeClientConfig(): void
@@ -122,23 +71,6 @@ class ClientServiceProvider extends ServiceProvider
         }
     }
 
-    private function loadClientConfigFile(string $key): mixed
-    {
-        $root = config('client.config_path');
-
-        if (! is_string($root) || ! is_dir($root)) {
-            return null;
-        }
-
-        $path = $root.DIRECTORY_SEPARATOR.str_replace('.', DIRECTORY_SEPARATOR, $key).'.php';
-
-        if (! is_file($path)) {
-            return null;
-        }
-
-        return require $path;
-    }
-
     private function mergeConfigValues(array $defaults, array $overrides): array
     {
         foreach ($overrides as $key => $value) {
@@ -177,44 +109,5 @@ class ClientServiceProvider extends ServiceProvider
         }
 
         return false;
-    }
-
-    private function loadClientEnvironment(): void
-    {
-        $path = config('client.env_path');
-
-        if (! is_string($path) || ! file_exists($path)) {
-            config()->set('client.env', []);
-
-            return;
-        }
-
-        $values = [];
-
-        foreach (
-            file(
-                filename: $path,
-                flags: FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES
-            ) ?: [] as $line
-        ) {
-            $line = trim($line);
-
-            if (
-                $line === ''
-                || str_starts_with($line, '#')
-                || ! str_contains($line, '=')
-            ) {
-                continue;
-            }
-
-            [$key, $value] = explode('=', $line, 2);
-
-            $values[trim($key)] = trim(
-                $value,
-                " \t\n\r\0\x0B\"'"
-            );
-        }
-
-        config()->set('client.env', $values);
     }
 }

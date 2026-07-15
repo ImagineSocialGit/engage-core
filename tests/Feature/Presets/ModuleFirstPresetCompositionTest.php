@@ -22,7 +22,7 @@ class ModuleFirstPresetCompositionTest extends TestCase
         $registry = app(PresetContributionRegistry::class);
 
         $this->assertArrayHasKey(
-            'general_default',
+            'default',
             $registry->groups(PresetDomain::ContactStatuses),
         );
 
@@ -37,11 +37,12 @@ class ModuleFirstPresetCompositionTest extends TestCase
         );
     }
 
-    public function test_webinar_package_resolves_cross_contributor_status_references(): void
+    public function test_mortgage_package_resolves_cross_contributor_status_references(): void
     {
         config()->set('presets.packages.mortgage', [
             'groups' => [
                 'contact_statuses' => [
+                    'default',
                     'webinar_default',
                 ],
             ],
@@ -52,10 +53,14 @@ class ModuleFirstPresetCompositionTest extends TestCase
             domain: PresetDomain::ContactStatuses,
         );
 
-        $this->assertContains('new', $resolved->definitionKeys);
-        $this->assertContains('registered', $resolved->definitionKeys);
-        $this->assertContains('attended_webinar', $resolved->definitionKeys);
-        $this->assertContains('missed_webinar', $resolved->definitionKeys);
+        $this->assertSame([
+            'new',
+            'active',
+            'inactive',
+            'registered',
+            'attended_webinar',
+            'missed_webinar',
+        ], $resolved->definitionKeys);
 
         $this->assertSame(
             'core',

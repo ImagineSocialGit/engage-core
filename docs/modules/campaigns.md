@@ -173,6 +173,7 @@ sent
 skipped
 failed
 terminal
+unavailable
 ```
 
 `terminal` means the sibling variant has reached a final Messaging outcome such as sent, skipped, or failed when the runtime intentionally treats those as no-longer-pending for progression/dependency purposes.

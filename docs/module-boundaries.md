@@ -105,16 +105,15 @@ A table existing does not mean the feature is enabled.
 
 Feature availability is controlled through:
 
-- `config/modules.php`
-- module provider registration
-- route registration and route middleware
-- navigation visibility
-- controllers/actions
-- views/components
-- jobs/listeners
-- policies/gates
-- service bindings
-- module extension points
+Installed module definitions:
+config/modules.php
+
+Selected-client runtime module authority:
+client/{CLIENT_KEY}/config/modules.php
+-> config('modules.enabled')
+-> ModuleManager
+
+Provider loading may additionally include dependency modules without making those modules explicitly enabled or visible for the selected client.
 
 Do not put module-enabled conditionals inside normal shared migrations.
 
@@ -331,9 +330,7 @@ config/presets/modules/webinars/tasks.php
 config/presets/modules/webinars/campaigns.php
 config/presets/modules/webinars/flow-routes.php
 
-config/presets/modules/mortgage/tasks.php
-config/presets/modules/mortgage/campaigns.php
-config/presets/modules/mortgage/flow-routes.php
+client/{client-key}/config/presets/modules/client/contact-statuses.php
 ```
 
 The shared infrastructure is:
@@ -343,7 +340,7 @@ PresetContributionRegistry
     aggregates explicitly registered contributor groups/definitions by preset domain
 
 PresetPackageResolver
-    resolves selected package, selected groups, and effective module defaults/overrides
+    resolves selected package, selected groups, and package module composition/requirements
 
 PresetCompositionResolver
     produces ResolvedPresetDomain for one selected package/domain

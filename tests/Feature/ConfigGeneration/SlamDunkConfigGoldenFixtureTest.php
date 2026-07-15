@@ -33,7 +33,6 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
     public function createApplication(): Application
     {
         $this->setBootstrapEnvironment('CLIENT_KEY', 'slam-dunk-crm');
-        $this->setBootstrapEnvironment('CLIENT_PRESET', '');
 
         return parent::createApplication();
     }
@@ -45,11 +44,26 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
         $this->assertSame('Slam Dunk Home Loans', config('client.name'));
         $this->assertSame('America/New_York', config('client.timezone'));
 
+        $this->assertSame([
+            'tasks',
+            'workflow',
+            'flow_routes',
+            'messaging',
+            'inbound_messaging',
+            'internal_notifications',
+            'campaigns',
+            'broadcasts',
+            'webinars',
+            'integrations',
+            'reporting',
+            'mortgage',
+        ], config('modules.enabled'));
+
         $package = config('presets.packages.mortgage');
 
         $this->assertIsArray($package);
         $this->assertSame([
-            'contact_statuses' => ['webinar_default'],
+            'contact_statuses' => ['slam_dunk_crm_default', 'webinar_default'],
             'tasks' => ['general_default', 'webinar_default'],
             'flow_routes' => ['webinar_default'],
             'campaigns' => ['webinar_default'],
@@ -67,6 +81,7 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
             'webinars',
             'integrations',
             'reporting',
+            'mortgage',
         ], $package['modules']['enabled'] ?? null);
 
         $this->assertSame([
@@ -115,12 +130,13 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
 
         $this->assertSame([
             'attended_webinar',
-            'engaged',
-            'inactive',
+            'closed_funded',
+            'fallout_inactive',
+            'in_process',
             'missed_webinar',
             'new',
+            'prospect',
             'registered',
-            'requires_action',
         ], ContactStatus::query()->orderBy('key')->pluck('key')->all());
 
         $this->assertSame([
@@ -191,6 +207,16 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
             config('presets.packages.mortgage'),
             'presets.packages.mortgage',
         ));
+
+        foreach (config('presets.modules.client.contact-statuses.definitions', []) as $key => $definition) {
+            $this->assertSame(
+                [],
+                $registry->get('core.contact_status_definition')->schema()->validate(
+                    $definition,
+                    "presets.modules.client.contact-statuses.definitions.{$key}",
+                ),
+            );
+        }
 
         foreach (config('presets.modules.webinars.contact-statuses.definitions', []) as $key => $definition) {
             $this->assertSame(

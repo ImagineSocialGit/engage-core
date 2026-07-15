@@ -555,12 +555,25 @@ Remaining polish audit:
 - [ ] Add/update feature-specific docs when a feature crosses module boundaries.
   - Permission invitations already has a dedicated doc.
   - Similar docs may be useful for Broadcasts, Campaigns, FlowRoutes, Tasks, and Imports once each stabilizes.
+- [ ] Remove the hand-maintained full module-registry copy from `docs/config-templates/modules-template.php`.
+  - Keep `config/modules.php` as the one external registry of installed module existence.
+  - The template should document registry shape and selected-client runtime module configuration without requiring every module key, provider, and dependency to be copied manually.
+- [ ] Avoid parallel documentation inventories of executable module and preset registry facts.
+  - Keep examples that explain architecture and config shape.
+  - Do not create secondary authoritative lists that must be updated every time a module is added.
+  - Prefer deriving future generated reference documentation from executable registries/contracts where appropriate.
+- [ ] Reconcile the canonical executable queue inventory across client-environment-reference.md and client-staging-production-setup-checklist.md.
+  - Verify current runtime truth against config/horizon.php, config/reference/keys.php, and executable Messaging/Webinar definitions.
+  - Remove contradictory claims about emails, campaigns, and waitlist.
 
 ### Testing backlog
 
 - [x] Add test coverage for client config fallback behavior.
   - Missing optional content/style keys should not break public pages.
   - Client copy changes should not break tests that only need behavioral assertions.
+- [ ] Refactor the hard-coded installed-module inventory assertion in `tests/Feature/Modules/ModuleDependencyBoundaryTest.php`.
+  - Validate registered module definitions generically instead of enumerating every installed module key in a second hard-coded list.
+  - Adding a new module should not require updating another module-existence inventory outside `config/modules.php`.
 
 ## Captured UX polish backlog
 
