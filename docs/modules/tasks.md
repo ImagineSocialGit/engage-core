@@ -92,7 +92,7 @@ The three dimensions combine freely within those rules. For example, a template-
 
 ## Task relationship architecture
 
-The durable target is one generic relationship system owned by Tasks.
+The durable implementation uses one generic relationship system owned by Tasks.
 
 Do not preserve two competing relationship models such as:
 
@@ -102,9 +102,9 @@ plus
 task_links
 ```
 
-The target is to replace the single nullable `related` morph with zero-to-many polymorphic Task links.
+The single nullable `related` morph has been replaced by zero-to-many polymorphic Task links.
 
-Minimum target structure:
+Current structure:
 
 ```text
 task_links
@@ -298,7 +298,7 @@ Task template-backed live task creation resolves defaults in this order:
 
 Task relationship defaults should use one explicit TaskTemplate-owned contract rather than the old single `related_subject` shape.
 
-Durable target:
+Current contract:
 
 ```text
 TaskTemplate.link_defaults
@@ -419,63 +419,63 @@ Tasks validation should return shared structured findings and should not persist
 
 Do not make one Tasks validator import every linked module's private models/config internals. Validate cross-module link support through Tasks-owned registries/config contracts/public seams.
 
-## Standalone and multi-link Tasks phase
+## Standalone and multi-link Tasks completion
 
-The current implementation already proves some standalone behavior:
+Phase 12 is complete and the full test suite is green.
 
-```text
-tasks.related is nullable
-CreateTaskAction can create unrelated Tasks
-TaskFactory supports unrelated Tasks
-dashboard Task rendering can show unrelated Tasks
-task.completed can emit with nullable contact_id
-```
-
-The current implementation does not yet satisfy the full durable target because it still includes:
+Implemented architecture:
 
 ```text
-single related_type / related_id relationship
-TaskTemplate.related_subject as the old single-subject default contract
-Contact-only allowed related types
-Contact-only related-subject presenter registration
-no dedicated Task index/show routes
-Tasks-owned direct InternalNotifications/TeamMember coupling in core paths
-Tasks-owned FlowRoutes-specific provenance columns/model imports
+Task
+    one generic live work record
+
+TaskTemplate
+    optional for manual Tasks
+    required for automation-created Tasks
+
+TaskLink
+    zero-to-many polymorphic links
+    roles: subject, context, result
+
+TaskTemplate.link_defaults
+    generic creation-time link defaults
+    sources: current_contact, current_subject
 ```
 
-The implementation phase should close those gaps without rebuilding already-generic Task lifecycle behavior unnecessarily.
-
-Minimum implementation target:
+Completed behavior includes:
 
 ```text
-[ ] Replace single related morph with TaskLink zero-to-many relationships.
-[ ] Replace TaskTemplate.related_subject with TaskTemplate.link_defaults.
-[ ] Support initial generic roles: subject, context, result.
-[ ] Support initial generic link-default sources: current_contact and current_subject.
-[ ] Preserve unlinked Tasks.
-[ ] Preserve Contact-linked Tasks through TaskLinks.
-[ ] Prove one existing non-Contact linked model cleanly.
-[ ] Add Tasks-owned linked-record presentation registry/resolver behavior.
-[ ] Add dedicated Task index and Task show surfaces.
-[ ] Keep Task UI useful when links are absent.
-[ ] Make core Task creation/lifecycle/UI work with only Core enabled.
-[ ] Move optional TeamMember/InternalNotifications behavior behind optional seams.
-[ ] Remove Tasks structural dependency on FlowRoutes internals.
-[ ] Preserve automation-created Task correlation through FlowRoutes-owned state/public event seams.
-[ ] Protect template/no-template and manual/automation invariants with tests.
+unlinked Tasks
+Contact-linked Tasks through TaskLinks
+non-Contact-linked Tasks, including Appointment-linked coverage
+multi-link Tasks
+links that may be added later, including result links
+TaskLink de-duplication by task + linkable identity + role
+Tasks-owned linked-record presentation resolver/provider seams
+safe fallback presentation for unknown linked record types
+dedicated Task index and Task show surfaces
+Task show behavior for zero, one, or many links
+Core-only Task creation/lifecycle/templates/links/index/show/events
+optional TeamMember/InternalNotifications assignment and notification contributions
+FlowRoutes-owned Task correlation without Task-owned flow_route_* foreign keys
+template-backed automatic Task creation
+TaskLink-aware neutral task.completed events
+TaskLink-aware Automation Opportunity producers
 ```
 
-Do not add speculative module-specific roles, a giant universal subject registry, or a generic graph system.
+The current Task test coverage proves unlinked, Contact-linked, Appointment-linked, multi-link, template/manual/automation invariants, dedicated workspace surfaces, notifications/digests, setup validation, completion events, FlowRoutes correlation, and Automation Opportunity behavior.
+
+Do not reopen the old single-subject architecture, add module-specific TaskLink roles, or turn TaskLinks into a universal relationship graph.
 
 ## Dedicated Task index and show surfaces
 
-Dedicated Task index and show surfaces are part of this phase.
+Dedicated Task index and show surfaces are implemented.
 
-The first implementation may be information-dense and function-first. Final UI polish can happen later.
+The current implementation is intentionally information-dense and function-first. Final visual polish may happen later without reopening the Task relationship model.
 
 ### Task index
 
-The Task index should show all relevant live Tasks, including:
+The Task index supports relevant live Tasks including:
 
 ```text
 unlinked Tasks
@@ -508,9 +508,9 @@ Filters and visual refinement can be added later when real usage proves the need
 
 ### Task show
 
-A Task show page should work when the Task has zero, one, or many links.
+The Task show page works when the Task has zero, one, or many links.
 
-The page should make the following clear without requiring training:
+The page is organized to make the following clear without requiring training:
 
 ```text
 WHY am I seeing this Task?
@@ -581,7 +581,9 @@ Those behaviors belong to separate capabilities.
 
 ## FlowRoutes integration
 
-FlowRoutes may create template-backed Tasks through Tasks public services/actions.
+FlowRoutes may create template-backed Tasks through Tasks-owned neutral automation seams and public services/actions.
+
+`TasksAutomationPointDefinitionContributor` owns the `create_task` Point schema and Task-specific semantic/reference validation. `CreateTaskAutomationActionHandler` owns the neutral business action. FlowRoutes reaches that business action through its generic `AutomationActionPointHandler`, then records created Task identity and correlation in FlowRoutes-owned state.
 
 Durable direction:
 
@@ -646,7 +648,7 @@ A Task may still preserve durable `task_template_id` plus `task_template_key` id
 
 Broad Contact-only task completion matching remains unsafe. FlowRoutes should correlate against its own created-artifact/correlation state and the neutral event payload.
 
-The exact implementation shape should preserve the already-proven event-wait behavior without retaining a structural Tasks -> FlowRoutes dependency.
+The current implementation preserves event-wait behavior without retaining a structural Tasks -> FlowRoutes dependency.
 
 ## Task template UI
 
@@ -654,7 +656,7 @@ A client/operator task template UI is only needed if clients/operators need to m
 
 Before building a polished template builder, prove the schema, public action/service shape, TaskLink model, and dedicated Task workspace.
 
-The immediate phase needs Task index/show surfaces, not necessarily a polished TaskTemplate builder.
+The current implementation includes Task index/show surfaces. A polished TaskTemplate builder remains deferred until real operator demand justifies it.
 
 ### Task action interaction direction
 
@@ -723,7 +725,7 @@ Do not record automation-created Tasks as manual behavior occurrences.
 
 Do not put manual behavior recording inside generic `CreateTaskAction` merely because all Task creation passes through it. Record from an unambiguous manual application/UI seam.
 
-The current implementation is more Contact-oriented and should be generalized carefully during the code phase without breaking existing compound behaviors.
+The current implementation resolves Contact-specific compound behavior through TaskLinks/public linked-record context while preserving contactless and non-Contact Task behavior.
 
 ### Manual status change -> manual Task
 
@@ -884,3 +886,5 @@ linked context fields when provided by a registered linked-record context
 ```
 
 Do not expose arbitrary model columns, raw morph data, `meta`, or private module fields as implicit Task template token namespaces.
+
+

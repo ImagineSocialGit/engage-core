@@ -21,6 +21,23 @@ For Messaging copy, `MessageTemplateTokenValidator` is the shared context-aware 
 `TokenContractRegistry`. Config/setup validation, MessageTemplatePreset sync, and CRM template
 editing reuse it instead of maintaining separate token parsers or allowlists.
 
+## Shared automation capability extension infrastructure
+
+Neutral automation extension contracts live under `app/Support/AutomationCapabilities`.
+
+Current shared registries:
+
+```text
+AutomationCapabilityRegistry
+AutomationPointDefinitionRegistry
+AutomationActionRegistry
+AutomationPointAuthoringRegistry
+```
+
+Modules contribute their own capability metadata, Point schemas/semantic validation, neutral business-action handlers, and Point-specific authoring UX from module-owned directories and service providers. FlowRoutes owns orchestration, progression, native orchestration Points, created-artifact correlation, and the generic adapter from neutral action results into Route Point execution.
+
+A new module-owned Route action should not require central FlowRoutes imports or new switch branches across config schema, setup validation, editor catalog, request validation, Blade fields, presentation, and runtime handlers.
+
 This document is a quick orientation map for Engage Core. It classifies the project into Core, universal modules, vertical modules, and integrations/adapters.
 
 Use `module-boundaries.md` for detailed ownership and dependency rules. Use `TODO.md` for actionable implementation backlog.
@@ -194,7 +211,7 @@ When a module participates in FlowRoutes, follow one ownership-preserving proces
 1. The module owns its domain records and lifecycle.
 2. The module emits neutral AutomationEventRecorded events for automation-worthy outcomes.
 3. The module exposes public actions/services/contracts before FlowRoutes creates or mutates its records.
-4. The module may contribute FlowRoute capabilities, route presets, task templates, labels, and available-field metadata through public seams.
+4. The module may contribute capability metadata, Point-definition schema/validation, neutral action execution, Point-specific authoring UX, route presets, task templates, labels, and available-field metadata through public seams.
 5. FlowRoutes owns route progress, created-artifact references, correlation, and resume matching.
 6. Do not require the artifact-owning module to import FlowRoutes models or store FlowRoutes-specific foreign keys merely for provenance symmetry.
 ```
@@ -318,5 +335,7 @@ Avoid:
 ```text
 New Core columns for feature or vertical state
 ```
+
+
 
 

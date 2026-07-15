@@ -2,6 +2,7 @@
 
 namespace App\Modules\Campaigns\Providers;
 
+use App\Modules\Campaigns\Automation\CampaignsAutomationPointAuthoringContributor;
 use App\Modules\Campaigns\Automation\CampaignsAutomationPointDefinitionContributor;
 use App\Modules\Campaigns\Automation\CancelCampaignAutomationActionHandler;
 use App\Modules\Campaigns\Automation\EnrollCampaignAutomationActionHandler;
@@ -35,6 +36,10 @@ class CampaignsModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             CampaignsAutomationPointDefinitionContributor::class,
         ], 'automation.point_definition_contributors');
+
+        $this->app->tag([
+            CampaignsAutomationPointAuthoringContributor::class,
+        ], 'automation.point_authoring_contributors');
 
         $this->app->tag([
             EnrollCampaignAutomationActionHandler::class,

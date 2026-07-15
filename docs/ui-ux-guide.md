@@ -730,6 +730,51 @@ Stop Campaign
 
 Do not expose advanced internal Point types merely because runtime handlers exist.
 
+### Repeatable automatic-action guardrails
+
+Route actions happen when execution reaches their Point, potentially for many records over time. The UI must explain that repeated consequence before save.
+
+The standard is not merely "make valid actions possible." The UI should make conceptually dangerous or misleading actions difficult or impossible.
+
+For automatic Task creation, use the Tasks-owned authoring contract:
+
+```text
+Create a Task automatically
+
+Creates a new Task from the selected template every time a record reaches this Point.
+
+This does not create a one-time Task now.
+```
+
+Guardrails:
+
+```text
+Create Task
+    require an active Task Template
+    do not expose a freeform title-only automation path
+    explain repetition clearly
+
+Send Message
+    explain that the message may be sent every time the Point is reached
+    show the selected template/channel context
+    make skip/availability behavior understandable
+
+Start Campaign
+    explain repeated execution
+    make already-enrolled behavior explicit
+
+Stop Campaign
+    make not-enrolled/no-op behavior explicit
+
+Wait for Event
+    state the resume condition in plain language
+
+Change Status
+    show the target status and same-status behavior clearly
+```
+
+These fields, warnings, labels, and summaries should come from the owning module's `AutomationPointAuthoringContributor` through the shared authoring registry, not from a central FlowRoutes Blade switch that knows every optional module.
+
 ### Direct Route message-template eligibility
 
 The Route editor must not list every active Messaging template.

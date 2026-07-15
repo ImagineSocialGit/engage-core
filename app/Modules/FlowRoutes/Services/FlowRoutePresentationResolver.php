@@ -3,19 +3,22 @@
 namespace App\Modules\FlowRoutes\Services;
 
 use App\Modules\Core\Models\ContactStatus;
-use App\Modules\FlowRoutes\Data\Points\WaitPointDefinition;
 use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
-use Carbon\CarbonImmutable;
+use App\Support\AutomationCapabilities\AutomationPointAuthoringRegistry;
+use App\Support\AutomationCapabilities\Data\AutomationPointAuthoringContext;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use Throwable;
 
 class FlowRoutePresentationResolver
 {
     /** @var array<string, string>|null */
     private ?array $statusNamesByKey = null;
+
+    public function __construct(
+        private readonly AutomationPointAuthoringRegistry $authoring,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -101,6 +104,13 @@ class FlowRoutePresentationResolver
                     'label' => $this->meaningfulPointLabel($point),
                     'summary' => $this->pointEditorSummary($point, $route),
                     'condition_summaries' => array_slice($summaries, 1),
+                    'fields' => $this->authoring->has((string) $point->type)
+                        ? $this->authoring->fields(
+                            (string) $point->type,
+                            is_array($point->definition) ? $point->definition : [],
+                            $this->authoringContext($route, $point),
+                        )
+                        : [],
                 ];
             })
             ->all();
@@ -129,21 +139,19 @@ class FlowRoutePresentationResolver
     {
         $route ??= $point->flowRoute;
         $definition = is_array($point->definition) ? $point->definition : [];
-        $settings = is_array($point->settings) ? $point->settings : [];
-
-        $primary = match ($point->type) {
-            FlowRoutePointType::ChangeStatus->value => $this->changeStatusSummary($definition),
-            FlowRoutePointType::EnrollCampaign->value => 'Start Campaign: '.$this->humanConfigLabel((string) data_get($definition, 'campaign_key', 'selected')).'.',
-            FlowRoutePointType::CancelCampaign->value => 'Stop Campaign: '.$this->humanConfigLabel((string) data_get($definition, 'campaign_key', 'selected')).'.',
-            FlowRoutePointType::CreateTask->value => 'Create task: '.$this->taskLabel($point, $definition).'.',
-            FlowRoutePointType::SendMessage->value => 'Send a message.',
-            FlowRoutePointType::Wait->value => $this->waitSummary($definition, $settings),
-            FlowRoutePointType::EventWait->value => 'Wait until '.$this->humanAutomationEvent((string) data_get($definition, 'event_key', 'the next activity')).'.',
-            FlowRoutePointType::Condition->value => 'Check conditions before continuing.',
-            FlowRoutePointType::BranchEvaluate->value => 'Choose the next path based on conditions.',
-            FlowRoutePointType::Noop->value => 'No action.',
-            default => (string) ($point->description ?: $point->name),
-        };
+        $primary = $this->authoring->has((string) $point->type)
+            ? $this->authoring->summary(
+                (string) $point->type,
+                $definition,
+                $this->authoringContext($route, $point),
+            )
+            : match ($point->type) {
+                FlowRoutePointType::EventWait->value => 'Wait until '.$this->humanAutomationEvent((string) data_get($definition, 'event_key', 'the next activity')).'.',
+                FlowRoutePointType::Condition->value => 'Check conditions before continuing.',
+                FlowRoutePointType::BranchEvaluate->value => 'Choose the next path based on conditions.',
+                FlowRoutePointType::Noop->value => 'No action.',
+                default => (string) ($point->description ?: $point->name),
+            };
 
         return array_values(array_filter([
             $primary,
@@ -170,27 +178,22 @@ class FlowRoutePresentationResolver
         }
 
         $normalized = Str::lower($label);
+        $definition = $this->authoring->get((string) $point->type);
 
-        if (in_array($normalized, [
-            'wait',
-            'send message',
-            'create task',
-            'change contact status',
-            'start campaign',
-            'stop campaign',
-        ], true)) {
-            return null;
-        }
+        if ($definition !== null) {
+            $genericLabels = array_map(
+                fn (string $candidate): string => Str::lower(trim($candidate)),
+                $definition->genericLabels,
+            );
 
-        foreach ([
-            'create task:',
-            'create task from ',
-            'change status to ',
-            'start campaign:',
-            'stop campaign:',
-        ] as $generatedPrefix) {
-            if (str_starts_with($normalized, $generatedPrefix)) {
+            if (in_array($normalized, $genericLabels, true)) {
                 return null;
+            }
+
+            foreach ($definition->generatedPrefixes as $generatedPrefix) {
+                if (str_starts_with($normalized, Str::lower(trim($generatedPrefix)))) {
+                    return null;
+                }
             }
         }
 
@@ -199,31 +202,24 @@ class FlowRoutePresentationResolver
 
     private function pointTypeLabel(string $pointType): string
     {
-        return match ($pointType) {
-            FlowRoutePointType::Wait->value => 'Wait',
-            FlowRoutePointType::ChangeStatus->value => 'Status',
-            FlowRoutePointType::CreateTask->value => 'Task',
-            FlowRoutePointType::SendMessage->value => 'Message',
-            FlowRoutePointType::EnrollCampaign->value,
-            FlowRoutePointType::CancelCampaign->value => 'Campaign',
-            default => Str::headline($pointType),
-        };
+        $definition = $this->authoring->get($pointType);
+
+        return $definition?->typeLabel ?: Str::headline($pointType);
     }
 
     private function pointEditorSummary(FlowRoutePoint $point, FlowRoute $route): string
     {
         $definition = is_array($point->definition) ? $point->definition : [];
-        $settings = is_array($point->settings) ? $point->settings : [];
 
-        return match ($point->type) {
-            FlowRoutePointType::Wait->value => Str::of($this->waitSummary($definition, $settings))->rtrim('.')->toString(),
-            FlowRoutePointType::ChangeStatus->value => Str::of($this->changeStatusSummary($definition))->rtrim('.')->toString(),
-            FlowRoutePointType::CreateTask->value => $this->taskLabel($point, $definition),
-            FlowRoutePointType::SendMessage->value => $this->humanConfigLabel((string) data_get($definition, 'message_template_preset_key', 'Selected message')),
-            FlowRoutePointType::EnrollCampaign->value => 'Start '.$this->humanConfigLabel((string) data_get($definition, 'campaign_key', 'selected Campaign')),
-            FlowRoutePointType::CancelCampaign->value => 'Stop '.$this->humanConfigLabel((string) data_get($definition, 'campaign_key', 'selected Campaign')),
-            default => (string) ($point->description ?: $point->name),
-        };
+        if ($this->authoring->has((string) $point->type)) {
+            return $this->authoring->editorSummary(
+                (string) $point->type,
+                $definition,
+                $this->authoringContext($route, $point),
+            );
+        }
+
+        return (string) ($point->description ?: $point->name);
     }
 
     private function compactSummary(FlowRoute $route, array $summaryPoints): string
@@ -237,41 +233,6 @@ class FlowRoutePresentationResolver
         return (string) ($summaryPoints[0] ?? 'Review this Route to see what it does.');
     }
 
-    private function waitSummary(array $definition, array $settings): string
-    {
-        foreach (['weeks', 'days', 'hours', 'minutes', 'seconds'] as $unit) {
-            $value = $definition[$unit] ?? $settings[$unit] ?? null;
-
-            if (is_numeric($value)) {
-                return 'Wait '.$this->quantity((int) $value, rtrim($unit, 's')).'.';
-            }
-        }
-
-        $resumeAt = $definition['resume_at'] ?? $settings['resume_at'] ?? null;
-
-        if (is_string($resumeAt) && trim($resumeAt) !== '') {
-            try {
-                $date = CarbonImmutable::parse($resumeAt);
-
-                return 'Wait until '.$date->format('M j, Y \a\t g:i A').'.';
-            } catch (Throwable) {
-                return 'Wait until the scheduled time.';
-            }
-        }
-
-        $parsed = WaitPointDefinition::from($definition, $settings);
-        $seconds = $parsed->source['seconds'] ?? null;
-
-        if (is_numeric($seconds)) {
-            return 'Wait '.$this->durationFromSeconds((int) $seconds).'.';
-        }
-
-        return 'Wait before continuing.';
-    }
-
-    /**
-     * @return array<int, string>
-     */
     private function cancelConditionSummaries(FlowRoutePoint $point, FlowRoute $route): array
     {
         $conditions = is_array($point->cancel_conditions) ? $point->cancel_conditions : [];
@@ -292,28 +253,6 @@ class FlowRoutePresentationResolver
         }
 
         return array_values(array_unique($summaries));
-    }
-
-    private function changeStatusSummary(array $definition): string
-    {
-        $statusKey = (string) data_get($definition, 'contact_status_key', '');
-
-        if ($statusKey === '') {
-            return 'Update the status.';
-        }
-
-        return 'Move the '.config('contacts.labels.singular', 'contact').' to '.$this->statusName($statusKey).'.';
-    }
-
-    private function taskLabel(FlowRoutePoint $point, array $definition): string
-    {
-        $title = data_get($definition, 'title');
-
-        if (is_string($title) && trim($title) !== '') {
-            return trim($title);
-        }
-
-        return (string) $point->name;
     }
 
     private function statusName(string $statusKey): string
@@ -345,37 +284,20 @@ class FlowRoutePresentationResolver
         };
     }
 
-    private function humanConfigLabel(string $value): string
-    {
-        if ($value === '') {
-            return 'selected';
-        }
-
-        return Str::of($value)
-            ->replace(['_', '-'], ' ')
-            ->headline()
-            ->toString();
-    }
-
-    private function durationFromSeconds(int $seconds): string
-    {
-        foreach ([
-            'week' => 604800,
-            'day' => 86400,
-            'hour' => 3600,
-            'minute' => 60,
-        ] as $unit => $unitSeconds) {
-            if ($seconds >= $unitSeconds && $seconds % $unitSeconds === 0) {
-                return $this->quantity(intdiv($seconds, $unitSeconds), $unit);
-            }
-        }
-
-        return $this->quantity($seconds, 'second');
-    }
-
-    private function quantity(int $value, string $unit): string
-    {
-        return $value.' '.$unit.($value === 1 ? '' : 's');
+    private function authoringContext(
+        FlowRoute $route,
+        ?FlowRoutePoint $point = null,
+    ): AutomationPointAuthoringContext {
+        return new AutomationPointAuthoringContext(
+            existingPointTypes: $route->activeFlowRoutePoints()
+                ->orderBy('sort_order')
+                ->pluck('type')
+                ->map(fn (mixed $type): string => (string) $type)
+                ->all(),
+            container: $route,
+            point: $point,
+            capability: $point?->capability,
+        );
     }
 
     private function pointModuleKey(FlowRoutePoint $point): string
@@ -384,14 +306,7 @@ class FlowRoutePresentationResolver
             return (string) $point->capability->module_key;
         }
 
-        return match ($point->type) {
-            FlowRoutePointType::ChangeStatus->value => 'workflow',
-            FlowRoutePointType::CreateTask->value => 'tasks',
-            FlowRoutePointType::SendMessage->value => 'messaging',
-            FlowRoutePointType::EnrollCampaign->value,
-            FlowRoutePointType::CancelCampaign->value => 'campaigns',
-            default => 'flow_routes',
-        };
+        return $this->authoring->get((string) $point->type)?->moduleKey ?? 'flow_routes';
     }
 
     /**

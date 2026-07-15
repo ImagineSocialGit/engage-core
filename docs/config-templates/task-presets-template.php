@@ -110,8 +110,11 @@ return [
     | references that cannot create a safe live Task.
     |
     | FlowRoutes may reference Task templates by stable key. Tasks remains the
-    | authority for TaskTemplate definition semantics and DB/runtime availability,
-    | while FlowRoutes owns validation of its own create_task reference.
+    | authority for TaskTemplate definition semantics and DB/runtime availability.
+    | The Tasks-owned automation Point-definition contributor validates create_task
+    | definitions and referenced TaskTemplate availability; FlowRoutes owns the
+    | surrounding Route envelope, handler/capability availability, graph, and runtime
+    | consistency.
     |
     */
 
@@ -173,3 +176,5 @@ return [
     ],
 
 ];
+
+

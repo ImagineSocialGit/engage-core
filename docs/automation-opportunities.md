@@ -267,7 +267,7 @@ TaskController::store()
 
 Avoid placing manual-behavior recording in a generic domain action when that action is also used by FlowRoutes, system code, imports, provider sync, or other modules.
 
-Phase 12 target Tasks producer behavior:
+Current implemented Tasks producer behavior:
 
 ```text
 Manual no-template Task creation
@@ -798,3 +798,5 @@ Removing an event from the allowlist should stop future evidence capture; it doe
 The architecture should allow future retention rules such as pruning old, uninteresting occurrences after a defined period while preserving occurrences tied to suggested or converted opportunities.
 
 Add retention/pruning only when real volume or operational needs justify it. Avoid long-term auditing/history storage with little product payoff.
+
+

@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Modules\FlowRoutes\Services;
+namespace App\Modules\Messaging\Services;
 
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use Illuminate\Support\Collection;
 
-class FlowRouteMessageTemplateEligibilityResolver
+class RouteAuthoringMessageTemplateEligibilityResolver
 {
     /** @var Collection<int, MessageTemplatePreset>|null */
     private ?Collection $resolved = null;

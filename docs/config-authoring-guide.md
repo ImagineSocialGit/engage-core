@@ -1326,6 +1326,38 @@ This keeps webinar confirmations, webinar reminders, Campaign-step messages, per
 
 Do not infer direct Route eligibility from naming conventions, broad scope, or the mere existence of a Messaging template.
 
+### Module-contributed Point architecture
+
+Route Point definition, execution, and authoring ownership are contributor-driven.
+
+```text
+AutomationPointDefinitionRegistry
+    contributor-owned Point ConfigSchema
+    contributor-owned semantic/domain-reference validation
+
+AutomationActionRegistry
+    module-owned neutral business-action execution
+
+AutomationPointAuthoringRegistry
+    module-owned availability, labels, fields/options, request rules,
+    warnings/guidance, definition building, generated names, and summaries
+```
+
+FlowRoutes continues to own the Route envelope, trigger structure, graph, progression, placement policy, capability/handler availability, created-artifact references, correlation, and resume matching.
+
+Do not add a new module-owned action by teaching `FlowRouteEditorCatalog`, `FlowRoutePointAuthoringService`, request classes, a central Blade switch, or `FlowRoutePresentationResolver` about that module's private models and fields.
+
+For normal `create_task` authoring:
+
+```text
+TaskTemplate is required.
+The editor explains that a new Task is created every time a record reaches the Point.
+The editor explicitly states that this does not create a one-time Task now.
+Do not expose a title-only/freeform automatic Task alternative.
+```
+
+The config/runtime contract may retain deliberate optional overrides where supported, but the normal client/operator UI should remain more opinionated than the broadest technical runtime surface.
+
 ## FlowRoute config shape
 
 FlowRoutes should reference public actions/capabilities through point definitions.
@@ -1805,7 +1837,7 @@ template-backed Task
 
 FlowRoute presets own automation/control-flow route definitions and point definitions.
 
-Because FlowRoutes `create_task` is an automation creation path, every selected `create_task` point must reference a DB-owned TaskTemplate through a stable task template key. Inline arbitrary no-template automated Task creation is not part of the durable target.
+Because FlowRoutes `create_task` is an automation creation path, every selected `create_task` point must reference a DB-owned TaskTemplate through a stable task template key. Inline arbitrary no-template automated Task creation is not part of the durable contract.
 
 Task relationship defaults use `TaskTemplate.link_defaults`; do not preserve the old single `related_subject` contract beside it.
 
@@ -1861,20 +1893,32 @@ FlowRoute point capabilities should be DB-owned before production. Capability an
 
 Route instance plans are part of the durable FlowRoutes runtime model. Presets may assume that reusable templates seed contact/subject-specific plans with plan items and progress/execution items.
 
-Config/setup validation should check:
+Config/setup validation ownership is split deliberately:
 
 ```text
-Task preset shape.
-TaskTemplate.link_defaults role/source shape and resolvability contract.
-Task template references from FlowRoute presets.
-FlowRoute point types.
-Module capability references.
-Vertical references.
-Campaign references.
-Messaging template references.
-Unsupported point/module combinations.
-Route instance/snapshot assumptions when FlowRoute plans are introduced.
+Shared preset composition
+    package/group/definition structure
+
+FlowRoutes
+    Route envelope, triggers, capability/handler availability, graph,
+    progression, bindings, and runtime plan/progress consistency
+
+AutomationPointDefinitionRegistry contributors
+    Point-specific schema
+    Point semantic validation
+    owning-module domain-reference validation
 ```
+
+Current Point-specific examples:
+
+```text
+Tasks -> create_task + TaskTemplate availability/assignment strategy
+Messaging -> send_message + dispatch/template context
+Campaigns -> enroll_campaign/cancel_campaign + Campaign availability
+FlowRoutes -> native wait/event_wait/condition/branch/change_status semantics
+```
+
+Do not rebuild those checks as a central FlowRoutes `match` statement that imports every optional module.
 
 Validation should classify findings as hard errors or warnings.
 
@@ -2051,3 +2095,5 @@ business context label
 ```
 
 Do not persist schedule summary text unless a concrete reason appears. Prefer deriving it from the canonical schedule/profile/criteria definition.
+
+

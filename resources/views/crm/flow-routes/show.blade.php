@@ -168,9 +168,7 @@
                                 </div>
 
                                 @include('crm.flow-routes.partials.point-fields', [
-                                    'pointType' => $point->type,
-                                    'definition' => $point->definition ?? [],
-                                    'editorOptions' => $editorOptions,
+                                    'fields' => $presented['fields'] ?? [],
                                     'fieldSuffix' => 'edit-'.$point->id,
                                 ])
 
@@ -294,9 +292,7 @@
                                 </div>
 
                                 @include('crm.flow-routes.partials.point-fields', [
-                                    'pointType' => $capability['point_type'],
-                                    'definition' => [],
-                                    'editorOptions' => $editorOptions,
+                                    'fields' => $capability['fields'] ?? [],
                                     'fieldSuffix' => 'create-'.$capability['id'],
                                 ])
 

@@ -1,14 +1,14 @@
 <?php
 
-namespace Tests\Feature\FlowRoutes;
+namespace Tests\Feature\Messaging;
 
-use App\Modules\FlowRoutes\Services\FlowRouteMessageTemplateEligibilityResolver;
+use App\Modules\Messaging\Services\RouteAuthoringMessageTemplateEligibilityResolver;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class FlowRouteMessageTemplateEligibilityResolverTest extends TestCase
+class RouteAuthoringMessageTemplateEligibilityResolverTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -76,7 +76,7 @@ class FlowRouteMessageTemplateEligibilityResolverTest extends TestCase
             'is_active' => true,
         ]);
 
-        $eligible = app(FlowRouteMessageTemplateEligibilityResolver::class)->eligiblePresets();
+        $eligible = app(RouteAuthoringMessageTemplateEligibilityResolver::class)->eligiblePresets();
 
         $this->assertSame([$generic->getKey()], $eligible->pluck('id')->all());
     }
@@ -103,7 +103,7 @@ class FlowRouteMessageTemplateEligibilityResolverTest extends TestCase
             ],
         ]);
 
-        $eligible = app(FlowRouteMessageTemplateEligibilityResolver::class)->eligiblePresets();
+        $eligible = app(RouteAuthoringMessageTemplateEligibilityResolver::class)->eligiblePresets();
 
         $this->assertFalse($eligible->contains(fn (MessageTemplatePreset $candidate): bool => $candidate->is($preset)));
     }

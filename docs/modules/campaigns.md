@@ -316,7 +316,7 @@ Campaign presets do not own reusable subject/body/message payload copy
 active DB/runtime Campaign state remains safe and coherent
 ```
 
-FlowRoutes owns validation of its own external `campaign_key` references.
+Campaigns owns `enroll_campaign` and `cancel_campaign` Point-definition parsing and Campaign-reference validation through its `AutomationPointDefinitionContributor`. FlowRoutes owns the Route envelope, capability/handler availability, route graph, progression, and runtime consistency; it should not re-implement Campaign existence checks in a central FlowRoutes validator.
 
 A Campaign configuration that cannot execute safely is a hard error. A dormant but safe unused Campaign or variant may be a warning.
 
@@ -598,5 +598,7 @@ source event or route point, when available
 ```
 
 Do not persist summary text unless a concrete reporting/audit reason appears. Prefer deriving it from the canonical step/variant timing definition.
+
+
 
 

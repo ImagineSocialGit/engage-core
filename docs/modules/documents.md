@@ -1,4 +1,3 @@
-
 # Documents Module
 
 Documents is a current universal module.
@@ -868,25 +867,31 @@ Do not shape production code around stale tests. Shape tests around this future 
 
 ## FlowRoutes integration
 
-This module should integrate with FlowRoutes through the same uniform route capability and provenance pattern used by other modules.
+This module should integrate with FlowRoutes through the ownership-preserving automation extension pattern used across Engage Core.
 
-When this module has automation-worthy outcomes, it should record its own domain state first and then emit neutral `AutomationEventRecorded` events. FlowRoutes should listen to the generic automation event seam, not module-specific events.
+When this module has automation-worthy outcomes, it records its own domain state first and then emits neutral `AutomationEventRecorded` events. FlowRoutes listens to the generic automation-event seam, not module-specific events.
 
-When FlowRoutes creates or mutates this module's records, it should do so only through public actions/services/contracts exposed by this module. FlowRoutes should not write this module's private tables directly.
+When FlowRoutes creates or mutates this module's records, it does so only through public actions/services/contracts exposed by this module. FlowRoutes must not write this module's private tables directly.
 
-If FlowRoutes creates a module-owned artifact, that artifact should store the standard FlowRoutes provenance fields where applicable:
+When this module contributes a cross-module Route business action, the module owns the Point-definition schema, semantic/domain-reference validation, neutral automation action handler, and authoring contribution through the shared Support-layer automation registries. FlowRoutes owns the Route envelope, orchestration/progression, native orchestration Points, created-artifact references, correlation, and resume matching.
+
+Preferred boundary:
 
 ```text
-flow_route_progress_id
-flow_route_plan_id
-flow_route_plan_item_id
-flow_route_progress_item_id
-flow_route_id
-flow_route_point_id
-flow_route_capability_id
+Owning module
+    owns business records and lifecycle
+    owns contributed Point schema and semantic validation
+    owns neutral business-action execution
+    owns Point-specific authoring fields/rules/guidance when authorable
+
+FlowRoutes
+    owns route structure and progression
+    adapts neutral business-action results into Point execution results
+    records created-artifact identity in FlowRoutes-owned state
+    owns correlation and resume matching
 ```
 
-This keeps Scheduling, Documents, Forms, Portal, Commerce, Mortgage, PetServices, Music, and other future modules consistent instead of inventing bespoke route metadata per module.
+Do not add `flow_route_*` foreign keys to this module's artifacts merely for provenance symmetry. Add artifact-side provenance only when this module has an independently justified neutral provenance contract that is useful outside FlowRoutes.
 
 ## Deferred work
 
@@ -930,3 +935,5 @@ Include nullable request_token, but do not implement public token behavior yet.
 Include both status and nullable review_status on document_uploads for query/UX clarity.
 Include nullable assigned_to_type / assigned_to_id on document_requests as generic ownership metadata, but do not notify or create tasks from it yet.
 ```
+
+

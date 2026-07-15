@@ -1615,7 +1615,7 @@ Repeated similar manual no-template Tasks are the primary Task-created signal fo
 
 ### Generic Task relationships
 
-The durable target is one Tasks-owned zero-to-many polymorphic relationship system:
+The current durable implementation uses one Tasks-owned zero-to-many polymorphic relationship system:
 
 ```text
 task_links
@@ -1809,7 +1809,7 @@ When FlowRoutes creates a Task, it should preserve the Task identity in FlowRout
 
 Broad contact-only `task.completed` matching is unsafe.
 
-Detailed Tasks architecture, current implementation gaps, TaskLink roles, Task index/show requirements, optional integration behavior, and automation-opportunity direction live in `docs/modules/tasks.md`.
+Detailed Tasks architecture, completed TaskLink/index/show implementation, optional integration behavior, FlowRoutes boundary rules, and automation-opportunity direction live in `docs/modules/tasks.md`.
 
 ## Workflow Module
 
@@ -1983,10 +1983,46 @@ The old global `Point` model/table/template layer has been removed.
 
 `FlowRoutePoint` is now the concrete route-owned action/wait/condition definition and directly owns its type, name, description, definition, settings, cancel conditions, route ordering, and route-local durable key.
 
-`FlowRoutePointType` owns the shared type vocabulary.
+`FlowRoutePointType` owns the shared stable type vocabulary. A genuinely new Point type may still require one intentional enum edit; that is different from forcing every new capability to add branches across central config, validation, authoring, Blade, presentation, and runtime switchboards.
 
 Do not recreate shared mutable Point templates across Routes. A Route authoring surface may clone an existing `FlowRoutePoint` from another current Route, but the clone becomes an independent new `FlowRoutePoint`.
 
+### FlowRoutes Point extension ownership
+
+The shared automation extension layer separates four concerns:
+
+```text
+AutomationCapabilityRegistry
+    capability metadata and requirements
+
+AutomationPointDefinitionRegistry
+    Point-specific schema and semantic/domain-reference validation
+
+AutomationActionRegistry
+    module-owned neutral business-action execution
+
+AutomationPointAuthoringRegistry
+    module-owned authoring availability, fields, rules, guidance, definition building, and summaries
+```
+
+Ownership rule:
+
+```text
+FlowRoutes
+    owns Route structure/progression/correlation
+    owns native orchestration Points
+    owns Point placement policy
+    adapts neutral business-action results through one generic AutomationActionPointHandler
+
+Contributing module
+    owns its Point schema and semantic/domain-reference validation
+    owns the neutral business action that changes its own domain state
+    owns Point-specific authoring UX when the action is authorable
+```
+
+Current contributed business actions include Tasks `create_task`, Messaging `send_message`, and Campaigns `enroll_campaign` / `cancel_campaign`.
+
+Do not add a new module action by importing that module into central FlowRoutes editor/catalog/validator services and adding another series of `match`/`switch` branches.
 
 Preset config may create/update DB-owned FlowRoute definitions, but runtime execution should not depend directly on config definitions.
 
@@ -2036,9 +2072,11 @@ Direct `send_message` authoring uses an explicit Messaging-owned opt-in seam. A 
 
 This is a cross-module correctness boundary: FlowRoutes must not treat every active Messaging template as safe for generic direct Route use.
 
-FlowRoutes may create Tasks through public task-facing services/contracts.
+Cross-module business actions are module-owned neutral automation handlers. FlowRoutes resolves them through `AutomationActionRegistry` and its generic `AutomationActionPointHandler`; the module-owned handler may then call that module's public actions/services.
 
-FlowRoutes `create_task` points may create assigned or unassigned tasks.
+FlowRoutes may create Tasks through the Tasks-owned `CreateTaskAutomationActionHandler` and public Task services/actions.
+
+FlowRoutes `create_task` points may create assigned or unassigned tasks, but normal client/operator authoring currently requires an active Task Template and does not expose a title-only automatic Task path.
 
 FlowRoutes should pass task responsibility fields through `CreateTaskAction` rather than encoding responsibility only in FlowRoute metadata.
 
@@ -2138,7 +2176,7 @@ Owning module artifact
 
 Some artifact families may intentionally retain neutral or already-established provenance fields where their ownership contract supports it, but uniformity alone is not enough reason to create a hard module dependency.
 
-For Tasks specifically, the durable target is:
+For Tasks specifically, the current implementation is:
 
 ```text
 FlowRoutes create_task point
@@ -2172,7 +2210,7 @@ Every route-created artifact receives FlowRoutes foreign keys merely for schema 
 
 Task-completed resume should match a specific route progress/plan/progress item and task identity. Broad contact-only `task.completed` waits are unsafe when a contact may have multiple active tasks or multiple active subject-scoped route instances.
 
-Capability records do not replace point handlers or public actions. They describe and bind what is available for authoring, validation, labels, supported subjects, and runtime compatibility. Runtime execution still goes through registered handlers and public module actions/services.
+Capability records do not replace executable handlers or public module actions. They describe and bind what is available for authoring, validation, labels, supported subjects, and runtime compatibility. Native orchestration Points use FlowRoutes-owned handlers; cross-module business actions execute through the generic `AutomationActionPointHandler` -> `AutomationActionRegistry` -> module-owned neutral action handler path.
 
 ## Campaigns Module
 
@@ -3292,7 +3330,7 @@ ContactFlowRoutePlan
 ContactFlowRoutePlanItem
 ContactFlowRouteProgressItem
 Route definition/settings snapshots for active instance execution
-Structured FlowRoutes provenance on route-created artifacts
+FlowRoutes-owned created-artifact references and correlation
 ```
 
 The Phase 4A audit proved that route instance plan tables were required before production, and Phase 4B implemented the backend foundation before Phase 5 task-completed resume so runtime correlation does not become meta-heavy.
@@ -3347,7 +3385,7 @@ warning
 
 Do not persist validation findings by default. Add validation history/schema only when a concrete operator workflow needs retained runs, acknowledgements, audit history, or comparisons.
 
-Validation ownership follows module ownership. Tasks validates Task definitions. FlowRoutes validates route definitions/capabilities/references. Campaigns validates Campaign journey/variant definitions. Messaging validates message definitions/templates/fields/tokens. The app-level manager coordinates them without absorbing private module rules.
+Validation ownership follows module ownership. Tasks validates Task definitions and the Tasks-owned `create_task` Point contract. Campaigns validates Campaign journeys/variants and Campaign-owned Route action definitions. Messaging validates message definitions/templates/fields/tokens and its `send_message` Point contract. FlowRoutes validates the Route envelope, capabilities/handlers, graph, progression, bindings, and runtime state while delegating Point-specific schemas and semantic/domain-reference checks through `AutomationPointDefinitionRegistry`. The app-level manager coordinates contributors without absorbing private module rules.
 
 The same reusable validation seam should support:
 
@@ -3438,3 +3476,5 @@ A config/reference file is treated as an executable global allowlist.
 ```
 
 Treat available-field validation as setup/config-validation work. Future editor autocomplete should be a consumer of the existing registry/validator, not a second validation system.
+
+

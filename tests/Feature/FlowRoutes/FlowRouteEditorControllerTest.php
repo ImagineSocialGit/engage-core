@@ -4,11 +4,13 @@ namespace Tests\Feature\FlowRoutes;
 
 use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
+use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRouteCapability;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
+use App\Modules\Tasks\Models\TaskTemplate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -28,6 +30,13 @@ class FlowRouteEditorControllerTest extends TestCase
 
         $user = User::factory()->create();
         $route = $this->createRoute();
+
+        TaskTemplate::factory()->create([
+            'key' => 'general.follow_up',
+            'name' => 'Follow up',
+            'title' => 'Follow up',
+            'is_active' => true,
+        ]);
 
         $this->createCapability(
             key: 'flow_routes.wait',
@@ -69,6 +78,13 @@ class FlowRouteEditorControllerTest extends TestCase
 
         $user = User::factory()->create();
         $route = $this->createRoute();
+
+        Campaign::factory()->create([
+            'key' => 'welcome',
+            'name' => 'Welcome',
+            'status' => Campaign::STATUS_ACTIVE,
+            'is_active' => true,
+        ]);
 
         $this->createCapability(
             key: 'campaigns.enroll_contact',
@@ -369,12 +385,19 @@ class FlowRouteEditorControllerTest extends TestCase
             name: 'Create task',
         );
 
+        $template = TaskTemplate::factory()->create([
+            'key' => 'general.review_contact',
+            'name' => 'Review contact',
+            'title' => 'Review contact',
+            'is_active' => true,
+        ]);
+
         $this->withoutMiddleware(ForceStagingAccess::class);
 
         $this->actingAs($user)
             ->post('http://crm.'.config('app.root_domain').'/flow-routes/'.$route->getKey().'/points', [
                 'capability_id' => $capability->getKey(),
-                'title' => 'Review contact',
+                'task_template_key' => $template->key,
             ])
             ->assertRedirect(route('crm.flow-routes.index', ['edit_route' => $route->getKey()]));
 
@@ -425,6 +448,68 @@ class FlowRouteEditorControllerTest extends TestCase
             ->assertSee('data-point-movable="false"', false)
             ->assertSee(':disabled="!canRemove(', false)
             ->assertSee(':title="removalError(', false);
+    }
+
+    public function test_task_authoring_explains_repeated_automation_and_does_not_offer_one_time_task_input(): void
+    {
+        config()->set('modules.enabled', ['workflow', 'flow_routes', 'tasks']);
+
+        $user = User::factory()->create();
+        $route = $this->createRoute();
+        TaskTemplate::factory()->create([
+            'key' => 'general.follow_up',
+            'name' => 'Follow up',
+            'title' => 'Follow up',
+            'is_active' => true,
+        ]);
+
+        $this->createCapability(
+            key: 'tasks.create_task',
+            moduleKey: 'tasks',
+            pointType: FlowRoutePointType::CreateTask->value,
+            name: 'Create task',
+        );
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/flow-routes')
+            ->assertOk()
+            ->assertSee('Create a Task automatically')
+            ->assertSee('every time a record reaches this Point')
+            ->assertSee('This does not create a one-time Task now.')
+            ->assertSee('Task Template')
+            ->assertDontSee('Enter a task title or choose a Task Template.');
+    }
+
+    public function test_create_task_authoring_requires_an_active_task_template(): void
+    {
+        config()->set('modules.enabled', ['workflow', 'flow_routes', 'tasks']);
+
+        $user = User::factory()->create();
+        $route = $this->createRoute();
+        $capability = $this->createCapability(
+            key: 'tasks.create_task',
+            moduleKey: 'tasks',
+            pointType: FlowRoutePointType::CreateTask->value,
+            name: 'Create task',
+        );
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->from(route('crm.flow-routes.index', ['edit_route' => $route->getKey()]))
+            ->post('http://crm.'.config('app.root_domain').'/flow-routes/'.$route->getKey().'/points', [
+                'capability_id' => $capability->getKey(),
+                'title' => 'This stale inline input must not be accepted',
+            ])
+            ->assertRedirect(route('crm.flow-routes.index', ['edit_route' => $route->getKey()]))
+            ->assertSessionHasErrors('task_template_key');
+
+        $this->assertDatabaseMissing('flow_route_points', [
+            'flow_route_id' => $route->getKey(),
+            'type' => FlowRoutePointType::CreateTask->value,
+        ]);
     }
 
     private function createRoute(): FlowRoute

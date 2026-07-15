@@ -317,48 +317,37 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
     - Manual status-change consequence warning UX.
     - Contextual Automation Opportunity suggestion UX.
     - Simple future Point eligibility / Route continuation rules only if they remain linear and understandable.
-- [ ] Phase 12 — Standalone and multi-link Tasks.
+- [x] Phase 12 — Standalone and multi-link Tasks. Complete and full-suite green.
   - [x] Audit current Task schema, models, creation paths, UI assumptions, notifications/digests, automation events, FlowRoutes integration, tests, and docs.
-  - [x] Lock the Task mental model as independent dimensions rather than mutually exclusive Task categories.
-    - Template-backed vs no-template.
-    - Unlinked vs linked to zero/one/many module-owned records.
-    - Manual vs automation-created.
-  - [x] Lock invariant: no-template Tasks are manual only; automation-created Tasks must be template-backed.
-  - [x] Lock generic relationship target: replace the single `related` morph with zero-to-many `task_links`.
-  - [x] Lock initial TaskLink roles: `subject`, `context`, `result`.
-  - [x] Lock one canonical relationship system; do not retain both `related` and `task_links`.
-  - [x] Lock UX barometer: Task surfaces must quickly explain WHY the Task exists, WHAT to do, and HOW to complete/advance it.
-  - [x] Include dedicated Task index and Task show surfaces in the phase; first pass may be information-dense and function-first.
-  - [x] Lock Core-only operational contract: Tasks creation/lifecycle/templates/links/index/show/events must work with only Core enabled.
-  - [x] Lock module boundary: Tasks must not structurally depend on FlowRoutes internals; FlowRoutes owns route correlation/resume state.
-  - [ ] Replace `tasks.related_type / related_id` with `task_links` in branch schema/model/runtime code.
-  - [ ] Preserve unlinked Tasks.
-  - [ ] Preserve Contact-linked Tasks through TaskLinks.
-  - [ ] Prove one existing non-Contact linked model cleanly.
-  - [ ] Support Task links that grow over time, including `result` links added after work creates/selects a record.
-  - [ ] Add Tasks-owned linked-record presentation resolver/provider seams and safe fallback behavior.
-  - [ ] Ensure linked modules own presentation of their own records without Tasks importing those module models.
-  - [ ] Add dedicated Task index route/controller/view.
-  - [ ] Add dedicated Task show route/controller/view.
-  - [ ] Keep Task show valid with zero links and readable with multiple links.
-  - [ ] Generalize Contact show Task queries to the TaskLink model without including unrelated Tasks accidentally.
-  - [ ] Keep dashboard Task rendering valid for unlinked and multi-link Tasks.
-  - [ ] Move direct TeamMember/InternalNotifications coupling out of Tasks core creation/request/provider paths behind optional public seams.
-  - [ ] Keep notification copy/CTA behavior valid when a Task has no links.
-  - [ ] Keep digests independent of Contact or any specific linked module.
-  - [ ] Remove Tasks-owned FlowRoutes-specific foreign keys/model imports.
-  - [ ] Preserve FlowRoutes-created Task correlation through FlowRoutes-owned created-artifact/correlation state and neutral Task events.
-  - [ ] Update FlowRoutes `create_task` behavior so automation-created Tasks are template-backed.
-  - [ ] Update Task completion automation payload/context for TaskLinks while preserving valid contactless events.
-  - [ ] Update Automation Opportunity Task producer behavior so repeated similar manual no-template Tasks are the primary Task-created suggestion signal.
-  - [ ] Preserve useful existing Contact-specific compound opportunity behavior through TaskLinks/public linked-record context.
-  - [ ] Update Task setup validation/config contracts for TaskLink roles/defaults/supported link types without importing module internals.
-  - [ ] Add tests for unlinked, Contact-linked, non-Contact-linked, and multi-link Tasks.
-  - [ ] Add tests for template/no-template and manual/automation invariants.
-  - [ ] Add tests for dedicated index/show surfaces.
-  - [ ] Add tests proving Tasks core operation without InternalNotifications, Messaging, or FlowRoutes enabled.
-  - [ ] Run focused Tasks, Dashboard, Contact show, FlowRoutes, module-boundary, setup-validation, and automation-opportunity tests.
-  - [ ] Run final docs audit after code work and remove/update stale implementation-gap notes.
+  - [x] Lock Task mental model as independent dimensions: template/no-template, zero-to-many domain links, manual/automation origin.
+  - [x] Enforce no-template -> manual only; automation-created -> template-backed.
+  - [x] Replace the single `related` morph with zero-to-many `task_links`.
+  - [x] Implement generic TaskLink roles: `subject`, `context`, `result`.
+  - [x] Replace `TaskTemplate.related_subject` with `TaskTemplate.link_defaults` using generic `current_contact` / `current_subject` creation context.
+  - [x] Preserve unlinked Tasks and Contact-linked Tasks through TaskLinks.
+  - [x] Prove non-Contact Task linking with Appointment-linked coverage.
+  - [x] Support multi-link Tasks and links that may grow over time, including `result` links.
+  - [x] Add Tasks-owned linked-record presentation resolver/provider seams and safe fallback behavior.
+  - [x] Keep linked modules responsible for presenting their own records without Tasks importing optional module models.
+  - [x] Add dedicated Task index and Task show routes/controllers/views.
+  - [x] Keep Task workspace valid for zero, one, or many links.
+  - [x] Generalize Contact-show and dashboard Task rendering around TaskLinks without including unrelated Tasks.
+  - [x] Enforce Core-only Task operation for creation/lifecycle/templates/links/index/show/events.
+  - [x] Move TeamMember/InternalNotifications assignment, assignee options, recipient resolution, and notification scheduling behind optional contributed seams.
+  - [x] Keep notification copy/CTA behavior valid for unlinked Tasks and digests independent of any specific linked module.
+  - [x] Remove Task-owned FlowRoutes foreign keys/model imports.
+  - [x] Preserve FlowRoutes-created Task identity/correlation through FlowRoutes-owned progress state and neutral Task events.
+  - [x] Require `task_template_key` for automatic `create_task` Points.
+  - [x] Update Task completion event payload/context for TaskLinks while preserving valid contactless events.
+  - [x] Make repeated similar manual no-template Tasks the primary generic Task-created Automation Opportunity signal.
+  - [x] Preserve useful Contact-specific compound opportunity behavior through TaskLinks/public linked-record context.
+  - [x] Update Task setup validation/config contracts for link defaults, roles, sources, and assignment strategy resolution without optional-module imports.
+  - [x] Add focused tests for unlinked, Contact-linked, Appointment-linked, multi-link, template/manual/automation invariants, workspace surfaces, optional integrations, setup validation, events, and opportunities.
+  - [x] Complete expanded FlowRoutes modularity refactor: contributor-owned Point definition schema/validation, neutral business-action execution, generic FlowRoutes action adapter, and module-owned authoring UX.
+  - [x] Remove central Tasks/Messaging/Campaigns Point-definition/validation/authoring switchboards from FlowRoutes.
+  - [x] Make normal `create_task` Route authoring template-required and explicitly explain repeated automatic creation vs one-time Task creation.
+  - [x] Run focused and full automated test suites after 7A and 7B; green.
+  - [x] Run final docs/config audit and reconcile stale Phase 12/FlowRoutes architecture language.
 - [ ] Phase 13 — Dashboard / contact workspace polish audit.
   - Review orientation surfaces after core runtime pieces settle.
   - Add persisted preferences/acknowledgements only if proven necessary.
@@ -635,5 +624,7 @@ These notes are intentionally retained while the schema-discovery phases continu
 - [ ] Hide technical specs behind details/debug affordances.
 - [ ] Replace raw timing such as `Delay 10 minutes` with human-readable schedule summaries.
 - [ ] Clean up repeated dropdown labels such as `Step 1 Email — Webinar Attended Nurture — Step 1 Email`.
+
+
 
 

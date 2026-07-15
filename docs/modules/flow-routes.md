@@ -3,10 +3,10 @@
 ## Config contract
 
 FlowRoute preset definitions are closed by the registered `flow_routes.preset_definition`
-contract and the executable Point DTOs. The canonical authoring template no longer advertises
-route-level `status`, top-level Point `conditions`, or event-wait `timeout`, because those fields
-were not consumed. `enroll_campaign` points reference the public capability
-`campaigns.enroll_contact`.
+contract plus Point-specific schemas contributed through `AutomationPointDefinitionRegistry`.
+The canonical authoring template no longer advertises route-level `status`, top-level Point
+`conditions`, or event-wait `timeout`, because those fields are not consumed. `enroll_campaign`
+points reference the public capability `campaigns.enroll_contact`.
 
 Active runtime routes must resolve to exactly one executable start point. A zero-start validation
 finding usually indicates preserved customized database state rather than permission to weaken the
@@ -82,6 +82,94 @@ Enabling a module does not automatically activate every preset it contributes. I
 
 Preset groups are composition-only and are not persisted as durable route ownership.
 
+## Automation Point extension architecture
+
+FlowRoutes now uses shared Support-layer registries so modules can contribute Route behavior without adding branches to central FlowRoutes schema, validation, execution, editor, or presentation switchboards.
+
+Implemented registries:
+
+```text
+AutomationCapabilityRegistry
+    declares stable capability metadata and required modules
+
+AutomationPointDefinitionRegistry
+    point type -> contributor-owned ConfigSchema
+    contributor-owned semantic/domain-reference validation
+
+AutomationActionRegistry
+    stable action key -> module-owned neutral AutomationActionHandler
+
+AutomationPointAuthoringRegistry
+    point type -> module-owned authoring availability, fields, rules,
+    definition building, warnings/guidance, names, and summaries
+```
+
+Current ownership split:
+
+```text
+FlowRoutes owns native orchestration Points
+    noop
+    wait
+    event_wait
+    condition
+    branch_evaluate
+    change_status
+
+Tasks owns
+    create_task definition/validation
+    tasks.create_task neutral business action
+    create_task authoring UX
+
+Messaging owns
+    send_message definition/validation
+    messaging.dispatch_message neutral business action
+    send_message authoring UX and direct-Route template eligibility
+
+Campaigns owns
+    enroll_campaign definition/validation/action/authoring
+    cancel_campaign definition/validation/action/authoring
+```
+
+`FlowRoutePointType` remains the shared stable Point vocabulary. A genuinely new Point type may still require one intentional enum edit; the architecture goal is to avoid unrelated central schema/validator/editor/runtime switchboard edits for every contributed capability.
+
+`FlowRoutePointPlacementPolicy` remains FlowRoutes-owned because Wait-terminal and Change-Status-terminal rules are Route-structure semantics, not module business-action semantics.
+
+### Neutral business-action execution
+
+Cross-module business actions execute through module-owned `AutomationActionHandler` implementations registered in `AutomationActionRegistry`.
+
+FlowRoutes uses one generic `AutomationActionPointHandler` adapter to:
+
+```text
+resolve the module-owned business action
+supply current contact/current subject/source/behavior context
+execute the neutral action
+record created-artifact identity and correlation in FlowRoutes-owned state
+translate the neutral result into PointExecutionResult
+```
+
+Module-owned automation actions must not depend on FlowRoutes progress models, Point handlers, or execution DTOs merely to be reusable by a Route. The same business action may later be reused by another automation surface without duplicating domain behavior.
+
+### Module-owned authoring contributions
+
+Authoring is separate from Point schema/runtime validation. A module-owned `AutomationPointAuthoringContributor` may own:
+
+```text
+availability
+client-facing name and description
+tips and use cases
+warnings/callouts
+field definitions and resolved options
+request rules
+definition building
+generated Point name
+Route summary
+editor summary
+```
+
+The Route editor renders contributed field definitions generically rather than using one central Point-type Blade switch. Supported field shapes include notices, selects, checkboxes, textareas, numeric/date-time fields, and ordinary inputs.
+
+Server-side authoring checks contributor-owned availability and request rules even when a crafted request bypasses the UI.
 
 FlowRoutes depends on Workflow for status-triggered route behavior.
 
@@ -390,6 +478,20 @@ Send message
 Start Campaign
 Stop Campaign
 ```
+
+Automatic Route actions must explain repetition and consequences, not merely expose technically valid fields.
+
+For `create_task`, the Tasks-owned authoring contributor enforces:
+
+```text
+Create a Task automatically
+    requires an active Task Template
+    creates a new Task every time a record reaches the Point
+    does not create a one-time Task now
+    does not expose a title-only freeform automation path
+```
+
+The editor should apply the same consequence-first posture to other automatic actions: explain repeated execution, skipped/no-op behavior, availability constraints, and the condition that allows a wait to resume.
 
 Advanced internal Point types may exist in the runtime model, but the normal Route editor does not expose arbitrary branching, graph editing, joins, connectors, nested branch trees, or generic node-canvas behavior.
 
@@ -713,54 +815,73 @@ Capabilities do not give FlowRoutes permission to mutate another module's privat
 
 ## FlowRoutes setup validation ownership
 
-FlowRoutes contributes FlowRoutes-owned checks through `FlowRoutesSetupValidationContributor` to the shared app-level setup validation manager.
+`FlowRoutesSetupValidationContributor` owns Route-level orchestration and runtime consistency checks. Point-specific schemas and semantic/domain-reference checks are delegated through `AutomationPointDefinitionRegistry` to the module that owns that Point behavior.
 
 FlowRoutes validation uses these sources of truth:
 
 ```text
 FlowRoute preset definition DTOs
-FlowRoute point definition DTOs
+AutomationPointDefinitionRegistry for Point-specific schemas and validation contributors
 AutomationCapabilityRegistry for declared capabilities
-PointHandlerRegistry for actually registered executable point types
+PointHandlerRegistry for executable Point types in the current installation
 DB-owned FlowRouteCapability / FlowRouteCapabilityBinding records where runtime/client context matters
 DB-owned active/current route, trigger-binding, progress, and plan state
-actual owning-module runtime truth or public resolvers for referenced Task templates, Campaigns, Messaging templates, statuses, and future vertical capabilities
 ```
-
-Validation deliberately distinguishes declared capability metadata from actually registered executable handlers and from DB-owned capability/binding state. A DB capability row cannot make unavailable runtime behavior executable.
 
 Shared preset-composition validation owns package/group/definition structure, including missing selected groups and duplicate contributed group/definition keys.
 
-At minimum, FlowRoutes validates:
+FlowRoutes itself validates at least:
 
 ```text
 route definition keys match stable definition identity
 trigger type and trigger key shape are supported
-route point keys are unique within the route
-route point types have registered handlers for the current installation/context
-required capability references exist and are available
-create_task references resolve to available TaskTemplate definitions when configured
-change_status references resolve to available ContactStatus definitions
-campaign point references resolve to available Campaign definitions
-send_message references resolve through Messaging-owned template/context validation
-required modules for capabilities/handlers are available
-supported subject types match route/capability assumptions
+route point keys are unique within the Route
+point types have registered executable handlers for the current installation/context
+required capability references exist and match the Point type
+required capability modules are available
+supported subject types match Route/capability assumptions
 next-point references resolve safely
-route-instance plan/snapshot assumptions are supported by the durable runtime model
-available-field references are valid for the authoring/execution context
+route graph integrity
+route-instance plan/snapshot assumptions are supported
+runtime capability/catalog consistency
+active/current Route consistency
+runnable progress/plan consistency
+active trigger binding integrity
 ```
 
-A configured route point that cannot execute because its handler, required module, capability, or required referenced definition is unavailable is a hard error for that selected setup.
+Point-definition contributors own Point-specific checks. Current examples:
 
-A dormant unused capability that is safely unavailable may be a warning.
+```text
+FlowRoutes contributor
+    wait/event_wait/condition/branch/change_status parsing
+    ContactStatus target validation
+    branch target validation
 
-Do not make one global validator import every producer module's private models/config internals. FlowRoutes validates cross-module references through owning runtime truth/public seams while the shared manager only composes contributors. Future vertical modules should register their own contributors when they own real selected/executable reference contracts.
+Tasks contributor
+    create_task parsing
+    required TaskTemplate key and availability
+    assignment strategy availability
+
+Messaging contributor
+    send_message parsing
+    dispatch/template reference validation
+
+Campaigns contributor
+    enroll/cancel Campaign parsing
+    Campaign availability
+```
+
+A configured Route Point that cannot execute because its handler, required module, capability, Point-definition contributor, or required referenced definition is unavailable is a hard error for that selected setup.
+
+Do not restore a central FlowRoutes validator that imports every producer module's private models, DTOs, or resolution services.
 
 ## TaskTemplate requirement for create_task points
 
 Task templates are required for automation-created Tasks.
 
 FlowRoutes `create_task` points are automation creation paths and therefore must resolve a DB-owned `TaskTemplate` by stable key before creating a live Task.
+
+Tasks owns the Point-definition contract through `TasksAutomationPointDefinitionContributor`, the neutral business action through `CreateTaskAutomationActionHandler`, and the normal editor contribution through `TasksAutomationPointAuthoringContributor`. FlowRoutes owns only the surrounding Route orchestration and its generic neutral-action adapter/correlation responsibilities.
 
 Durable rule:
 
@@ -772,7 +893,7 @@ template-backed Task
     manual or automation-created
 ```
 
-Inline arbitrary no-template `create_task` definitions are not part of the durable target.
+Inline arbitrary no-template `create_task` definitions are not part of the durable contract.
 
 FlowRoutes should call Tasks-owned public actions/services. Tasks remains the owner of:
 
@@ -939,7 +1060,7 @@ Owning module artifact
     remains independent from FlowRoutes internals
 ```
 
-For Tasks specifically, the durable target is:
+For Tasks specifically, the current implementation is:
 
 ```text
 FlowRoute create_task point
@@ -1014,7 +1135,7 @@ FlowRoutes-owned created_subject_type / created_subject_id
 FlowRoutes-owned explicit correlation state
 ```
 
-Do not document `task.flow_route_*` fields as durable matching dimensions. Phase 12 removes that Tasks-owned structural dependency. Exact authoring syntax for any replacement correlation tokens should be finalized with the code implementation so documentation matches the executable contract.
+Do not document `task.flow_route_*` fields as durable matching dimensions. Phase 12 removed that Tasks-owned structural dependency. Explicit event-wait correlation may use neutral Task event fields such as `task.task_template_key` when they truthfully distinguish the intended Task; Route-instance identity and specific created-artifact matching remain FlowRoutes-owned.
 
 ## Relationship to Automation Opportunities
 
@@ -1143,3 +1264,5 @@ The Route index should not repeat assignment detail inside Route details. `Runs 
 One-step automatic behavior may be presented separately from multi-step Routes so a simple action is not forced into the same visual weight as a real Route.
 
 Route Management UX should explain available actions through `FlowRouteCapability` metadata and module-owned public seams rather than importing module internals.
+
+

@@ -501,4 +501,35 @@ class ModuleDependencyBoundaryTest extends TestCase
         return $files;
     }
 
+    public function test_flow_routes_authoring_infrastructure_does_not_import_optional_action_modules(): void
+    {
+        $files = [
+            app_path('Modules/FlowRoutes/Services/FlowRouteEditorCatalog.php'),
+            app_path('Modules/FlowRoutes/Services/FlowRoutePointAuthoringService.php'),
+            app_path('Modules/FlowRoutes/Services/FlowRoutePresentationResolver.php'),
+            app_path('Modules/FlowRoutes/Requests/StoreFlowRoutePointRequest.php'),
+            app_path('Modules/FlowRoutes/Requests/UpdateFlowRoutePointRequest.php'),
+        ];
+
+        foreach ($files as $file) {
+            $contents = file_get_contents($file);
+
+            $this->assertIsString($contents);
+            $this->assertStringNotContainsString('App\\Modules\\Tasks\\', $contents, $file);
+            $this->assertStringNotContainsString('App\\Modules\\Messaging\\', $contents, $file);
+            $this->assertStringNotContainsString('App\\Modules\\Campaigns\\', $contents, $file);
+        }
+
+        $pointFields = file_get_contents(
+            resource_path('views/crm/flow-routes/partials/point-fields.blade.php')
+        );
+
+        $this->assertIsString($pointFields);
+        $this->assertStringNotContainsString('@switch($pointType)', $pointFields);
+        $this->assertStringNotContainsString('FlowRoutePointType::CreateTask', $pointFields);
+        $this->assertStringNotContainsString('FlowRoutePointType::SendMessage', $pointFields);
+        $this->assertStringNotContainsString('FlowRoutePointType::EnrollCampaign', $pointFields);
+        $this->assertStringNotContainsString('FlowRoutePointType::CancelCampaign', $pointFields);
+    }
+
 }

@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Providers;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Automation\MessagingAutomationPointAuthoringContributor;
 use App\Modules\Messaging\Automation\MessagingAutomationPointDefinitionContributor;
 use App\Modules\Messaging\Automation\SendMessageAutomationActionHandler;
 use App\Modules\Messaging\Capabilities\MessagingAutomationCapabilityContributor;
@@ -59,6 +60,10 @@ class MessagingModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             MessagingAutomationPointDefinitionContributor::class,
         ], 'automation.point_definition_contributors');
+
+        $this->app->tag([
+            MessagingAutomationPointAuthoringContributor::class,
+        ], 'automation.point_authoring_contributors');
 
         $this->app->tag([
             SendMessageAutomationActionHandler::class,

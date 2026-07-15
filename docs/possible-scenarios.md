@@ -1,5 +1,3 @@
-
-
 # Possible Scenarios
 
 This document grounds Engage Core's abstract module architecture in concrete cross-industry workflows.
@@ -26,7 +24,7 @@ FlowRoutes calls other modules only through public actions/services/contracts.
 Tasks, Messaging, Campaigns, Documents, Scheduling, Portal, Commerce, and vertical modules own their own business state.
 ```
 
-FlowRoutes owns routing, route selection, route instance state, route plans, plan items, progress items, capability availability, and route-created artifact provenance.
+FlowRoutes owns routing, route selection, route instance state, route plans, plan items, progress items, capability availability, created-artifact references, correlation, and resume matching.
 
 Producer modules do not import FlowRoutes and do not construct FlowRouteExternalEvent directly.
 
@@ -59,7 +57,7 @@ Commerce owns purchase facts and external order IDs.
 Music owns artist-specific fan/customer meaning and product-interest categories.
 Campaigns owns the Campaign journey.
 Messaging owns message templates and delivery.
-FlowRoutes owns route selection, automation path, and route-created artifact provenance.
+FlowRoutes owns route selection, automation path, created-artifact references, correlation, and resume matching.
 ```
 
 Future release targeting could be driven by a later event such as:
@@ -303,7 +301,6 @@ Example explicit correlation:
 ```php
 'correlation' => [
     'task.task_template_key' => 'route.follow_up',
-    'task.flow_route_progress_id' => '{flow_route_progress.id}',
 ]
 ```
 
@@ -318,7 +315,7 @@ Universal modules own reusable operational primitives.
 FlowRoutes orchestrates but does not own other modules' business state.
 Automation events are neutral seams.
 Route progress can be contact-scoped or contact + subject-scoped.
-Route-created artifacts carry uniform provenance.
+FlowRoutes owns created-artifact identity/correlation; artifact-owning modules do not receive FlowRoutes foreign keys merely for symmetry.
 Client/operator UI can eventually present concrete consequences without exposing raw internals.
 ```
 
@@ -334,7 +331,9 @@ Show/event attendance model.
 Location-radius targeting model.
 Documents/Scheduling/Form/Portal scenario-specific route presets.
 Product-complete new Route creation and remaining focused Routes authoring/discovery UX.
-Config/setup validation for preset references, event keys, route point definitions, task-template refs, campaign refs, messaging refs, available fields, capability availability, and unsupported module combinations.
+Additional module-specific validation only when new executable contracts/capabilities are introduced.
 ```
 
-Phase 6 config/setup validation should use scenarios like these to ensure future presets fail clearly when they reference unavailable modules, missing templates, missing campaign keys, unsupported point types, invalid tokens/fields, unavailable capabilities, or unsafe route/event_wait correlation.
+The current contributor-based setup validation should keep using scenarios like these as regression cases so new presets fail clearly when they reference unavailable modules, missing templates, missing campaign keys, unsupported point types, invalid tokens/fields, unavailable capabilities, or unsafe Route/event-wait correlation. New module-owned Point types should contribute their own schema and semantic/domain-reference validation through the shared automation Point-definition registry.
+
+

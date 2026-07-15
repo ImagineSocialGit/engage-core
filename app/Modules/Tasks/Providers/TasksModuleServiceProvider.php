@@ -3,6 +3,7 @@
 namespace App\Modules\Tasks\Providers;
 
 use App\Modules\Tasks\Actions\RecordManualTaskCompletionAutomationBehaviorAction;
+use App\Modules\Tasks\Automation\TasksAutomationPointAuthoringContributor;
 use App\Modules\Tasks\Automation\CreateTaskAutomationActionHandler;
 use App\Modules\Tasks\Automation\TasksAutomationPointDefinitionContributor;
 use App\Modules\Tasks\Capabilities\TasksAutomationCapabilityContributor;
@@ -35,6 +36,10 @@ class TasksModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             TasksAutomationPointDefinitionContributor::class,
         ], 'automation.point_definition_contributors');
+
+        $this->app->tag([
+            TasksAutomationPointAuthoringContributor::class,
+        ], 'automation.point_authoring_contributors');
 
         $this->app->tag([
             CreateTaskAutomationActionHandler::class,

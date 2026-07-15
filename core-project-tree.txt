@@ -77,6 +77,7 @@
 │   │   │   │   ├── ScheduleNextCampaignStepAction.php
 │   │   │   │   └── SyncCampaignPresetsAction.php
 │   │   │   ├── Automation
+│   │   │   │   ├── CampaignsAutomationPointAuthoringContributor.php
 │   │   │   │   ├── CampaignsAutomationPointDefinitionContributor.php
 │   │   │   │   ├── CancelCampaignAutomationActionHandler.php
 │   │   │   │   └── EnrollCampaignAutomationActionHandler.php
@@ -234,6 +235,8 @@
 │   │   │   │   ├── StartFlowRoutesFromAutomationEventAction.php
 │   │   │   │   ├── SyncFlowRouteCapabilitiesAction.php
 │   │   │   │   └── SyncFlowRoutePresetsAction.php
+│   │   │   ├── Authoring
+│   │   │   │   └── FlowRoutesAutomationPointAuthoringContributor.php
 │   │   │   ├── Capabilities
 │   │   │   │   └── FlowRoutesAutomationCapabilityContributor.php
 │   │   │   ├── ConditionEvaluators
@@ -309,7 +312,6 @@
 │   │   │   │   ├── ContactStatusAutomationImpactResolver.php
 │   │   │   │   ├── FlowRouteConditionEvaluatorRegistry.php
 │   │   │   │   ├── FlowRouteEditorCatalog.php
-│   │   │   │   ├── FlowRouteMessageTemplateEligibilityResolver.php
 │   │   │   │   ├── FlowRoutePointAuthoringService.php
 │   │   │   │   ├── FlowRoutePointPlacementPolicy.php
 │   │   │   │   ├── FlowRoutePresentationResolver.php
@@ -435,6 +437,7 @@
 │   │   │   │   ├── SkipScheduledMessagesAction.php
 │   │   │   │   └── SyncMessageTemplatePresetsAction.php
 │   │   │   ├── Automation
+│   │   │   │   ├── MessagingAutomationPointAuthoringContributor.php
 │   │   │   │   ├── MessagingAutomationPointDefinitionContributor.php
 │   │   │   │   └── SendMessageAutomationActionHandler.php
 │   │   │   ├── Capabilities
@@ -537,6 +540,7 @@
 │   │   │   │   ├── MessageTemplateUsageResolver.php
 │   │   │   │   ├── PhoneNumberNormalizer.php
 │   │   │   │   ├── ResolvedMessageDispatchBuilder.php
+│   │   │   │   ├── RouteAuthoringMessageTemplateEligibilityResolver.php
 │   │   │   │   ├── ScheduledMessageGate.php
 │   │   │   │   └── Sms
 │   │   │   │       ├── SmsMessagingService.php
@@ -614,6 +618,7 @@
 │   │   │   │   └── SyncTaskPresetsAction.php
 │   │   │   ├── Automation
 │   │   │   │   ├── CreateTaskAutomationActionHandler.php
+│   │   │   │   ├── TasksAutomationPointAuthoringContributor.php
 │   │   │   │   └── TasksAutomationPointDefinitionContributor.php
 │   │   │   ├── Capabilities
 │   │   │   │   └── TasksAutomationCapabilityContributor.php
@@ -804,15 +809,19 @@
 │       ├── AutomationCapabilities
 │       │   ├── AutomationActionRegistry.php
 │       │   ├── AutomationCapabilityRegistry.php
+│       │   ├── AutomationPointAuthoringRegistry.php
 │       │   ├── AutomationPointDefinitionRegistry.php
 │       │   ├── Contracts
 │       │   │   ├── AutomationActionHandler.php
 │       │   │   ├── AutomationCapabilityContributor.php
+│       │   │   ├── AutomationPointAuthoringContributor.php
 │       │   │   └── AutomationPointDefinitionContributor.php
 │       │   └── Data
 │       │       ├── AutomationActionContext.php
 │       │       ├── AutomationActionResult.php
 │       │       ├── AutomationCapabilityDefinition.php
+│       │       ├── AutomationPointAuthoringContext.php
+│       │       ├── AutomationPointAuthoringDefinition.php
 │       │       ├── AutomationPointDefinition.php
 │       │       └── AutomationPointValidationContext.php
 │       ├── AutomationEvents
@@ -1553,6 +1562,7 @@
 │   │   ├── Email
 │   │   │   └── HandleInboundEmailWebhookActionTest.php
 │   │   ├── FlowRoutes
+│   │   │   ├── AutomationPointAuthoringRegistryTest.php
 │   │   │   ├── AutomationPointExtensionRegistryTest.php
 │   │   │   ├── ContactStatusAutomationImpactResolverTest.php
 │   │   │   ├── FlowRouteBindingControllerTest.php
@@ -1560,7 +1570,6 @@
 │   │   │   ├── FlowRouteControllerTest.php
 │   │   │   ├── FlowRouteEditorControllerTest.php
 │   │   │   ├── FlowRouteIndexAuthoringLinkTest.php
-│   │   │   ├── FlowRouteMessageTemplateEligibilityResolverTest.php
 │   │   │   ├── FlowRoutePointExecutionFoundationTest.php
 │   │   │   ├── FlowRoutePointPlacementPolicyTest.php
 │   │   │   ├── FlowRoutesModelSchemaTest.php
@@ -1612,6 +1621,7 @@
 │   │   │   ├── ResolvedMessageDispatchBuilderTest.php
 │   │   │   ├── ResolvedMessageDispatchIntegrationTest.php
 │   │   │   ├── ResolvedMessageDispatchSchemaTest.php
+│   │   │   ├── RouteAuthoringMessageTemplateEligibilityResolverTest.php
 │   │   │   ├── ScheduleInternalNotificationActionTest.php
 │   │   │   ├── SemanticCampaignVariantIdentityResolutionTest.php
 │   │   │   ├── SendScheduledMessageJobTest.php
@@ -1686,4 +1696,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-534 directories, 1153 files
+535 directories, 1162 files

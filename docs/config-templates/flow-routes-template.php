@@ -34,6 +34,18 @@ return [
     | settings, cancel conditions, route ordering, and route-local durable key.
     | There is no separate global Point model/table/template layer.
     |
+    | Point-specific extension ownership is contributor-driven:
+    | - FlowRoutes owns native orchestration Point definitions and Route structure.
+    | - Tasks owns create_task schema/semantic validation and automatic Task action.
+    | - Messaging owns send_message schema/semantic validation and message action.
+    | - Campaigns owns enroll_campaign/cancel_campaign schemas, validation, and actions.
+    | - Authorable modules own their Point-specific fields, request rules, warnings,
+    |   definition building, generated names, and summaries through the shared
+    |   automation authoring registry.
+    |
+    | `create_task` is an automatic repeated action and requires task_template_key.
+    | Do not author a title-only automatic Task Point.
+    |
     | Capability references should use stable keys when the authoring/runtime path
     | supports them.
     |
@@ -66,15 +78,18 @@ return [
     | including missing selected groups and duplicate contributed group/definition
     | keys.
     |
-    | FlowRoutes owns semantic and executable validation of selected route
-    | definitions: trigger shape, point type, registered point-handler availability,
-    | capability references, route graph, subject support, route-instance/snapshot
-    | assumptions, and point-specific references.
+    | FlowRoutes owns validation of the Route envelope and orchestration runtime:
+    | trigger shape, registered point-handler availability, capability matching,
+    | required module availability, route graph integrity, subject support,
+    | route-instance/snapshot assumptions, active trigger bindings, and runtime
+    | progress/plan consistency.
     |
-    | Cross-module references must be checked through public/runtime truths:
-    | - Tasks validates Task-template availability.
-    | - Campaigns validates Campaign availability.
-    | - Messaging validates message/template/field context.
+    | Point-specific definition schemas and semantic/domain-reference validation are
+    | contributor-owned through AutomationPointDefinitionRegistry:
+    | - FlowRoutes validates native orchestration Points such as wait/change_status.
+    | - Tasks validates create_task definitions and TaskTemplate availability.
+    | - Campaigns validates Campaign action definitions and Campaign availability.
+    | - Messaging validates send_message definition/template context.
     | - Module availability comes from the canonical module manager/provider state.
     |
     | A selected preset that contains a point whose required handler/module cannot
@@ -194,8 +209,9 @@ return [
         // resume from that specific route-created Task identity.
         //
         // If a route can create multiple Tasks before the event_wait, define explicit
-        // correlation such as task.task_template_key plus flow_route_progress_id,
-        // flow_route_plan_item_id, or flow_route_progress_item_id.
+        // correlation using neutral Task event fields that truthfully distinguish the
+        // intended Task, such as task.task_template_key. Route-instance identity stays
+        // in FlowRoutes-owned created-artifact/correlation state, not task.flow_route_*.
 
         'task_completed_resume_example' => [
             'key' => 'task_completed_resume_example',
@@ -227,7 +243,6 @@ return [
                         'event_key' => 'task.completed',
                         'correlation' => [
                             'task.task_template_key' => 'example.follow_up',
-                            'task.flow_route_progress_id' => '{flow_route_progress.id}',
                         ],
                     ],
                     'settings' => [],
@@ -243,4 +258,6 @@ return [
     ],
 
 ];
+
+
 

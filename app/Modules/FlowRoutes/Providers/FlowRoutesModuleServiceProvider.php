@@ -2,6 +2,7 @@
 
 namespace App\Modules\FlowRoutes\Providers;
 
+use App\Modules\FlowRoutes\Authoring\FlowRoutesAutomationPointAuthoringContributor;
 use App\Modules\FlowRoutes\Capabilities\FlowRoutesAutomationCapabilityContributor;
 use App\Modules\FlowRoutes\ConfigContracts\FlowRoutePresetConfigContractTargetProvider;
 use App\Modules\FlowRoutes\ConfigContracts\FlowRoutePresetDefinitionConfigContract;
@@ -22,6 +23,7 @@ use App\Modules\FlowRoutes\Services\FlowRouteConditionEvaluatorRegistry;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Modules\FlowRoutes\Validation\FlowRoutesSetupValidationContributor;
 use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
+use App\Support\AutomationCapabilities\AutomationPointAuthoringRegistry;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -47,6 +49,16 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             FlowRoutesAutomationPointDefinitionContributor::class,
         ], 'automation.point_definition_contributors');
+
+        $this->app->tag([
+            FlowRoutesAutomationPointAuthoringContributor::class,
+        ], 'automation.point_authoring_contributors');
+
+        $this->app->singleton(AutomationPointAuthoringRegistry::class, function ($app): AutomationPointAuthoringRegistry {
+            return new AutomationPointAuthoringRegistry(
+                contributors: $app->tagged('automation.point_authoring_contributors'),
+            );
+        });
 
         $this->app->tag([
             FlowRoutesSetupValidationContributor::class,
