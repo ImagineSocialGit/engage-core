@@ -31,9 +31,7 @@ class DashboardControllerTest extends TestCase
             'email' => 'tess@example.test',
         ]);
 
-        Task::query()->create([
-            'related_type' => $contact->getMorphClass(),
-            'related_id' => $contact->id,
+        Task::factory()->linkedTo($contact)->create([
             'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
             'source' => Task::SOURCE_MANUAL,
             'title' => 'Call Tess about her reply',
@@ -69,7 +67,7 @@ class DashboardControllerTest extends TestCase
         $response->assertSee('data-module-panel="inbound_messaging"', false);
         $response->assertSee('Today’s tasks');
         $response->assertSee('Print');
-        $response->assertSee('View');
+        $response->assertSee('Open task');
         $response->assertSee('Call Tess about her reply');
         $response->assertSee('Contacts needing attention');
         $response->assertSee('Review reply');
@@ -236,6 +234,25 @@ class DashboardControllerTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_standalone_dashboard_task_links_to_dedicated_task_show_surface(): void
+    {
+        $user = User::factory()->create();
+
+        $task = Task::factory()->create([
+            'title' => 'Standalone dashboard task',
+            'status' => Task::STATUS_OPEN,
+            'due_at' => now()->subHour(),
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.index'));
+
+        $response->assertOk();
+        $response->assertSee('Standalone dashboard task');
+        $response->assertSee(route('crm.tasks.show', $task), false);
+        $response->assertSee('Open task');
+    }
     public function test_it_renders_a_printable_task_list_without_future_dated_tasks(): void
     {
         $user = User::factory()->create();
@@ -317,9 +334,7 @@ class DashboardControllerTest extends TestCase
             'email' => 'clearable@example.test',
         ]);
 
-        $task = Task::query()->create([
-            'related_type' => $contact->getMorphClass(),
-            'related_id' => $contact->id,
+        $task = Task::factory()->linkedTo($contact)->create([
             'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
             'source' => Task::SOURCE_MANUAL,
             'title' => 'Still open after acknowledgement',
@@ -452,9 +467,7 @@ class DashboardControllerTest extends TestCase
         $user = User::factory()->create();
         $contact = Contact::factory()->create(['name' => 'Priority Lead']);
 
-        Task::query()->create([
-            'related_type' => $contact->getMorphClass(),
-            'related_id' => $contact->id,
+        Task::factory()->linkedTo($contact)->create([
             'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
             'source' => Task::SOURCE_MANUAL,
             'title' => 'Overdue but lower preset priority',

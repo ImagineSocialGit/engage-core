@@ -190,6 +190,9 @@ Route::middleware('auth')->group(function () {
         ->prefix('tasks')
         ->name('crm.tasks.')
         ->group(function () {
+            Route::get('/', [TaskController::class, 'index'])
+                ->name('index');
+
             Route::get('/today/print', [DashboardController::class, 'printTasks'])
                 ->name('today.print');
 
@@ -198,6 +201,9 @@ Route::middleware('auth')->group(function () {
 
             Route::post('/', [TaskController::class, 'store'])
                 ->name('store');
+
+            Route::get('/{task}', [TaskController::class, 'show'])
+                ->name('show');
 
             Route::patch('/{task}/complete', [TaskController::class, 'complete'])
                 ->name('complete');

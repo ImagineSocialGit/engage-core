@@ -28,11 +28,14 @@ use App\Modules\FlowRoutes\PointHandlers\NoopPointHandler;
 use App\Modules\FlowRoutes\PointHandlers\WaitPointHandler;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Modules\InternalNotifications\Models\TeamMember;
+use App\Modules\InternalNotifications\Services\Tasks\OnlyActiveTeamMemberTaskAssignmentStrategyResolver;
+use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Models\TaskLink;
 use App\Modules\Tasks\Models\TaskTemplate;
 use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
@@ -420,15 +423,20 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
         TeamMember::factory()->inactive()->create();
 
+        $template = TaskTemplate::factory()->create([
+            'key' => 'route.only_active_team_member',
+            'title' => 'The prospect task',
+            'assigned_to_strategy' => OnlyActiveTeamMemberTaskAssignmentStrategyResolver::STRATEGY,
+            'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+        ]);
+
         $setup = $this->createProgressWithPoints([
             FlowRoutePointType::CreateTask->value,
         ]);
 
         $setup['flow_route_points'][0]->forceFill([
             'definition' => [
-                'title' => 'The prospect task',
-                'assigned_to' => 'only_active_team_member',
-                'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+                'task_template_key' => $template->key,
             ],
         ])->save();
 
@@ -437,13 +445,13 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertSame(PointExecutionResult::STATUS_COMPLETED, $result->status);
         $this->assertSame('task_created', $result->reason);
 
-        $task = Task::query()->where('title', 'The prospect task')->firstOrFail();
+        $task = Task::query()->where('task_template_key', $template->key)->firstOrFail();
 
         $this->assertSame($teamMember->getMorphClass(), $task->assigned_to_type);
         $this->assertSame($teamMember->id, $task->assigned_to_id);
     }
 
-    public function test_inline_create_task_point_due_offset_minutes_sets_due_at(): void
+    public function test_create_task_point_requires_template_and_does_not_create_inline_automation_task(): void
     {
         $setup = $this->createProgressWithPoints([
             FlowRoutePointType::CreateTask->value,
@@ -451,7 +459,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
         $setup['flow_route_points'][0]->forceFill([
             'definition' => [
-                'title' => 'Due offset task',
+                'title' => 'Inline automation task should be rejected',
                 'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
                 'due_offset_minutes' => 45,
             ],
@@ -459,21 +467,14 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
         $result = app(ExecuteCurrentFlowRoutePointAction::class)->handle($setup['progress']);
 
-        $this->assertSame(PointExecutionResult::STATUS_COMPLETED, $result->status);
-        $this->assertSame('task_created', $result->reason);
-
-        $task = Task::query()->where('title', 'Due offset task')->firstOrFail();
-
-        $this->assertNotNull($task->due_at);
-        $this->assertTrue($task->due_at->between(
-            now()->addMinutes(44),
-            now()->addMinutes(46),
-        ));
+        $this->assertSame(PointExecutionResult::STATUS_FAILED, $result->status);
+        $this->assertSame('create_task_requires_task_template', $result->reason);
+        $this->assertSame(0, Task::query()->count());
     }
 
-    public function test_create_task_point_can_create_task_from_template_key(): void
+    public function test_create_task_point_uses_template_links_and_records_created_artifact_in_flow_routes_owned_state(): void
     {
-        TaskTemplate::factory()->create([
+        $template = TaskTemplate::factory()->currentContactSubject()->create([
             'key' => 'route.follow_up',
             'title' => 'Template route task',
             'task_description' => 'Created from template.',
@@ -488,7 +489,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
         $setup['flow_route_points'][0]->forceFill([
             'definition' => [
-                'task_template_key' => 'route.follow_up',
+                'task_template_key' => $template->key,
             ],
         ])->save();
 
@@ -497,18 +498,32 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertSame(PointExecutionResult::STATUS_COMPLETED, $result->status);
         $this->assertSame('task_created', $result->reason);
 
-        $task = Task::query()->where('title', 'Template route task')->firstOrFail();
+        $task = Task::query()->where('task_template_key', $template->key)->firstOrFail();
+        $contact = Contact::query()->findOrFail($setup['progress']->contact_id);
 
         $this->assertSame('Created from template.', $task->description);
         $this->assertSame('high', $task->priority);
-        $this->assertSame('route.follow_up', $task->meta['task_template']['key']);
+        $this->assertSame(Task::SOURCE_MODULE, $task->source);
+        $this->assertSame($template->getKey(), $task->task_template_id);
+        $this->assertSame($template->key, $task->task_template_key);
 
-        $this->assertSame($setup['progress']->getKey(), $task->flow_route_progress_id);
-        $this->assertSame($setup['flow_route']->getKey(), $task->flow_route_id);
-        $this->assertSame($setup['flow_route_points'][0]->getKey(), $task->flow_route_point_id);
-        $this->assertNotNull($task->flow_route_plan_id);
-        $this->assertNotNull($task->flow_route_plan_item_id);
-        $this->assertNotNull($task->flow_route_progress_item_id);
+        $this->assertDatabaseHas('task_links', [
+            'task_id' => $task->getKey(),
+            'linkable_type' => $contact->getMorphClass(),
+            'linkable_id' => $contact->getKey(),
+            'role' => TaskLink::ROLE_SUBJECT,
+        ]);
+
+        $progressItem = ContactFlowRouteProgressItem::query()
+            ->where('contact_flow_route_progress_id', $setup['progress']->getKey())
+            ->where('flow_route_point_id', $setup['flow_route_points'][0]->getKey())
+            ->firstOrFail();
+
+        $this->assertSame($task->getMorphClass(), $progressItem->created_subject_type);
+        $this->assertSame($task->getKey(), $progressItem->created_subject_id);
+        $this->assertSame('task', $progressItem->correlation_type);
+        $this->assertSame($task->getKey(), data_get($progressItem->correlation, 'task_id'));
+        $this->assertSame($template->key, data_get($progressItem->correlation, 'task_template_key'));
     }
 
     public function test_enroll_campaign_point_stores_route_provenance_on_enrollment_and_scheduled_message(): void
@@ -724,6 +739,11 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
     public function test_task_completed_event_resumes_waiting_route_for_the_specific_route_created_task(): void
     {
+        $template = TaskTemplate::factory()->currentContactSubject()->create([
+            'key' => 'route.complete_specific_task',
+            'title' => 'Complete this route-created task',
+        ]);
+
         $setup = $this->createProgressWithPoints([
             FlowRoutePointType::CreateTask->value,
             FlowRoutePointType::EventWait->value,
@@ -732,8 +752,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
         $setup['flow_route_points'][0]->forceFill([
             'definition' => [
-                'title' => 'Complete this route-created task',
-                'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+                'task_template_key' => $template->key,
             ],
         ])->save();
 
@@ -750,7 +769,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertSame('task_created', $createTaskResult->reason);
 
         $task = Task::query()
-            ->where('title', 'Complete this route-created task')
+            ->where('task_template_key', $template->key)
             ->firstOrFail();
 
         $waitResult = app(ExecuteCurrentFlowRoutePointAction::class)
@@ -766,7 +785,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $contact = Contact::query()->findOrFail($progress->contact_id);
 
         $unrelatedTask = Task::factory()
-            ->relatedTo($contact)
+            ->linkedTo($contact)
             ->completed()
             ->create([
                 'title' => 'Unrelated completed task',
@@ -796,23 +815,33 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertNull($progress->waiting_event_key);
     }
 
-    public function test_task_completed_event_can_resume_subject_scoped_route_created_task_without_contact_only_matching(): void
+    public function test_task_completed_event_can_resume_real_non_contact_subject_scoped_route_without_contact_only_matching(): void
     {
+        $template = TaskTemplate::factory()->currentSubject()->create([
+            'key' => 'route.appointment_subject_task',
+            'title' => 'Subject-scoped route-created task',
+        ]);
+
         $setup = $this->createProgressWithPoints([
             FlowRoutePointType::CreateTask->value,
             FlowRoutePointType::EventWait->value,
             FlowRoutePointType::Noop->value,
         ]);
 
+        $contact = Contact::query()->findOrFail($setup['progress']->contact_id);
+        $appointment = Appointment::factory()->create([
+            'contact_id' => $contact->getKey(),
+            'title' => 'Subject appointment',
+        ]);
+
         $setup['progress']->forceFill([
-            'subject_type' => 'dog',
-            'subject_id' => 123,
+            'subject_type' => $appointment->getMorphClass(),
+            'subject_id' => $appointment->getKey(),
         ])->save();
 
         $setup['flow_route_points'][0]->forceFill([
             'definition' => [
-                'title' => 'Subject-scoped route-created task',
-                'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+                'task_template_key' => $template->key,
             ],
         ])->save();
 
@@ -828,11 +857,21 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertSame(PointExecutionResult::STATUS_COMPLETED, $createTaskResult->status);
 
         $task = Task::query()
-            ->where('title', 'Subject-scoped route-created task')
+            ->where('task_template_key', $template->key)
             ->firstOrFail();
 
-        $this->assertSame('dog', $task->related_type);
-        $this->assertSame(123, $task->related_id);
+        $this->assertDatabaseHas('task_links', [
+            'task_id' => $task->getKey(),
+            'linkable_type' => $appointment->getMorphClass(),
+            'linkable_id' => $appointment->getKey(),
+            'role' => TaskLink::ROLE_SUBJECT,
+        ]);
+        $this->assertDatabaseHas('task_links', [
+            'task_id' => $task->getKey(),
+            'linkable_type' => $contact->getMorphClass(),
+            'linkable_id' => $contact->getKey(),
+            'role' => TaskLink::ROLE_CONTEXT,
+        ]);
 
         $waitResult = app(ExecuteCurrentFlowRoutePointAction::class)
             ->handle($setup['progress']->refresh());
@@ -856,6 +895,15 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
     public function test_task_completed_event_with_multiple_route_created_tasks_requires_explicit_correlation(): void
     {
+        $firstTemplate = TaskTemplate::factory()->create([
+            'key' => 'route.first_uncorrelated_task',
+            'title' => 'First route-created task',
+        ]);
+        $secondTemplate = TaskTemplate::factory()->create([
+            'key' => 'route.second_uncorrelated_task',
+            'title' => 'Second route-created task',
+        ]);
+
         $setup = $this->createProgressWithPoints([
             FlowRoutePointType::CreateTask->value,
             FlowRoutePointType::CreateTask->value,
@@ -865,15 +913,13 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
         $setup['flow_route_points'][0]->forceFill([
             'definition' => [
-                'title' => 'First route-created task',
-                'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+                'task_template_key' => $firstTemplate->key,
             ],
         ])->save();
 
         $setup['flow_route_points'][1]->forceFill([
             'definition' => [
-                'title' => 'Second route-created task',
-                'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+                'task_template_key' => $secondTemplate->key,
             ],
         ])->save();
 
@@ -892,7 +938,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertSame(PointExecutionResult::STATUS_WAITING, $waitResult->status);
 
         $task = Task::query()
-            ->where('title', 'First route-created task')
+            ->where('task_template_key', $firstTemplate->key)
             ->firstOrFail();
 
         $task->forceFill([
@@ -947,7 +993,6 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
                 'event_key' => 'task.completed',
                 'correlation' => [
                     'task.task_template_key' => 'route.second_task',
-                    'task.flow_route_progress_id' => '{flow_route_progress.id}',
                 ],
             ],
         ])->save();
@@ -998,6 +1043,11 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
     public function test_complete_task_action_resumes_waiting_event_wait_route_through_automation_event_listener_chain(): void
     {
+        $template = TaskTemplate::factory()->create([
+            'key' => 'route.listener_chain_task',
+            'title' => 'Complete through listener chain',
+        ]);
+
         $setup = $this->createProgressWithPoints([
             FlowRoutePointType::CreateTask->value,
             FlowRoutePointType::EventWait->value,
@@ -1006,8 +1056,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
         $setup['flow_route_points'][0]->forceFill([
             'definition' => [
-                'title' => 'Complete through listener chain',
-                'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
+                'task_template_key' => $template->key,
             ],
         ])->save();
 
@@ -1034,7 +1083,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertSame('task.completed', $progress->waiting_event_key);
 
         $task = Task::query()
-            ->where('title', 'Complete through listener chain')
+            ->where('task_template_key', $template->key)
             ->firstOrFail();
 
         app(\App\Modules\Tasks\Actions\CompleteTaskAction::class)
@@ -1057,6 +1106,9 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             'flow_route_point_id' => $setup['flow_route_points'][0]->getKey(),
             'point_type' => FlowRoutePointType::CreateTask->value,
             'status' => ContactFlowRouteProgressItem::STATUS_COMPLETED,
+            'created_subject_type' => $task->getMorphClass(),
+            'created_subject_id' => $task->getKey(),
+            'correlation_type' => 'task',
         ]);
 
         $this->assertDatabaseHas('contact_flow_route_progress_items', [
@@ -1076,6 +1128,8 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
     private function taskCompletedExternalEvent(Task $task, ?int $contactId): FlowRouteExternalEvent
     {
+        $task->loadMissing('links');
+
         return FlowRouteExternalEvent::make(
             name: 'task.completed',
             contactId: $contactId,
@@ -1092,34 +1146,26 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
                     'priority' => $task->priority,
                     'due_at' => $task->due_at?->toISOString(),
                     'completed_at' => $task->completed_at?->toISOString(),
-                    'related_type' => $task->related_type,
-                    'related_id' => $task->related_id,
                     'assigned_to_type' => $task->assigned_to_type,
                     'assigned_to_id' => $task->assigned_to_id,
                     'responsible_party' => $task->responsible_party,
                     'responsible_type' => $task->responsible_type,
                     'responsible_id' => $task->responsible_id,
-                    'flow_route_progress_id' => $task->flow_route_progress_id,
-                    'flow_route_plan_id' => $task->flow_route_plan_id,
-                    'flow_route_plan_item_id' => $task->flow_route_plan_item_id,
-                    'flow_route_progress_item_id' => $task->flow_route_progress_item_id,
-                    'flow_route_id' => $task->flow_route_id,
-                    'flow_route_point_id' => $task->flow_route_point_id,
-                    'flow_route_capability_id' => $task->flow_route_capability_id,
                     'task_template_id' => $task->task_template_id,
                     'task_template_key' => $task->task_template_key,
+                    'links' => $task->links
+                        ->map(fn (TaskLink $link): array => [
+                            'role' => $link->role,
+                            'linkable_type' => $link->linkable_type,
+                            'linkable_id' => $link->linkable_id,
+                        ])
+                        ->values()
+                        ->all(),
                     'meta' => $task->meta ?? [],
                 ],
                 'automation_event_meta' => [
                     'source_module' => 'tasks',
                     'task_id' => $task->getKey(),
-                    'flow_route_progress_id' => $task->flow_route_progress_id,
-                    'flow_route_plan_id' => $task->flow_route_plan_id,
-                    'flow_route_plan_item_id' => $task->flow_route_plan_item_id,
-                    'flow_route_progress_item_id' => $task->flow_route_progress_item_id,
-                    'flow_route_id' => $task->flow_route_id,
-                    'flow_route_point_id' => $task->flow_route_point_id,
-                    'flow_route_capability_id' => $task->flow_route_capability_id,
                 ],
             ],
         );
@@ -1246,5 +1292,3 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         ];
     }
 }
-
-

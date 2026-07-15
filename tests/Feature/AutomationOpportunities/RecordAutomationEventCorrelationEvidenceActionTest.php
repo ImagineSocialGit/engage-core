@@ -4,6 +4,7 @@ namespace Tests\Feature\AutomationOpportunities;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Models\TaskLink;
 use App\Support\AutomationEvents\Data\AutomationEventData;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use App\Support\AutomationOpportunities\Actions\RecordAutomationEventCorrelationEvidenceAction;
@@ -19,7 +20,10 @@ class RecordAutomationEventCorrelationEvidenceActionTest extends TestCase
     public function test_it_records_supported_contact_automation_event_as_evidence_only(): void
     {
         $contact = Contact::factory()->create();
-        $subject = Task::factory()->relatedTo($contact)->create();
+        Task::factory()->linkedTo(
+            $contact,
+            TaskLink::ROLE_SUBJECT,
+        )->create();
 
         $occurredAt = CarbonImmutable::parse('2026-07-10 14:00:00', 'UTC');
 

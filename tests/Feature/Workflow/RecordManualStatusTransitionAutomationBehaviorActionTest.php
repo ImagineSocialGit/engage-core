@@ -31,7 +31,10 @@ class RecordManualStatusTransitionAutomationBehaviorActionTest extends TestCase
         $completedAt = CarbonImmutable::parse('2026-07-10 14:00:00', 'UTC');
         $changedAt = $completedAt->addMinutes(5);
 
-        $task = Task::factory()->relatedTo($contact)->completed()->create([
+        Task::factory()->linkedTo(
+            $contact,
+            TaskLink::ROLE_SUBJECT,
+        )->completed()->create([
             'title' => 'Review application',
             'completed_at' => $completedAt,
         ]);

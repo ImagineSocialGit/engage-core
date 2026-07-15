@@ -22,7 +22,7 @@ class RecordManualTaskCompletionAutomationBehaviorActionTest extends TestCase
         $contact = Contact::factory()->create();
         $completedAt = CarbonImmutable::parse('2026-07-10 14:00:00', 'UTC');
 
-        $task = Task::factory()->relatedTo($contact)->completed()->create([
+        $task = Task::factory()->linkedTo($contact)->completed()->create([
             'title' => 'Review application',
             'task_template_key' => null,
             'completed_at' => $completedAt,
@@ -52,36 +52,18 @@ class RecordManualTaskCompletionAutomationBehaviorActionTest extends TestCase
         $this->assertSame($contact->getKey(), $occurrence->subject_id);
         $this->assertSame('review application', $occurrence->fingerprint_parts['normalized_title']);
         $this->assertSame('Review application', $occurrence->context['task_title']);
+        $this->assertSame($contact->getKey(), $occurrence->context['contact_id']);
         $this->assertTrue($occurrence->occurred_at->equalTo($completedAt));
 
         $this->assertDatabaseCount('automation_behavior_occurrences', 1);
         $this->assertDatabaseCount('automation_opportunities', 0);
     }
 
-    public function test_it_does_not_record_non_manual_completion(): void
-    {
-        $contact = Contact::factory()->create();
-
-        $task = Task::factory()->relatedTo($contact)->completed()->create();
-
-        $occurrence = app(RecordManualTaskCompletionAutomationBehaviorAction::class)->handle(
-            new TaskCompleted(
-                task: $task,
-                source: 'tasks',
-            ),
-        );
-
-        $this->assertNull($occurrence);
-        $this->assertDatabaseCount('automation_behavior_occurrences', 0);
-    }
-
-    public function test_it_does_not_record_completion_without_contact_subject(): void
+    public function test_it_records_standalone_manual_completion_evidence_using_task_as_subject(): void
     {
         $actor = User::factory()->create();
-
         $task = Task::factory()->completed()->create([
-            'related_type' => null,
-            'related_id' => null,
+            'title' => 'Review standalone checklist',
         ]);
 
         $occurrence = app(RecordManualTaskCompletionAutomationBehaviorAction::class)->handle(
@@ -93,6 +75,25 @@ class RecordManualTaskCompletionAutomationBehaviorActionTest extends TestCase
                 meta: [
                     'source' => 'task_controller.complete',
                 ],
+            ),
+        );
+
+        $this->assertInstanceOf(AutomationBehaviorOccurrence::class, $occurrence);
+        $this->assertSame($task->getMorphClass(), $occurrence->subject_type);
+        $this->assertSame($task->getKey(), $occurrence->subject_id);
+        $this->assertNull($occurrence->context['contact_id']);
+        $this->assertDatabaseCount('automation_opportunities', 0);
+    }
+
+    public function test_it_does_not_record_non_manual_completion(): void
+    {
+        $contact = Contact::factory()->create();
+        $task = Task::factory()->linkedTo($contact)->completed()->create();
+
+        $occurrence = app(RecordManualTaskCompletionAutomationBehaviorAction::class)->handle(
+            new TaskCompleted(
+                task: $task,
+                source: 'tasks',
             ),
         );
 

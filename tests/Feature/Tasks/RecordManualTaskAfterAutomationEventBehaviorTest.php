@@ -38,7 +38,7 @@ class RecordManualTaskAfterAutomationEventBehaviorTest extends TestCase
             ),
         ));
 
-        $task = Task::factory()->relatedTo($contact)->create([
+        $task = Task::factory()->linkedTo($contact)->create([
             'source' => Task::SOURCE_MANUAL,
             'title' => 'Call after webinar',
             'task_template_key' => null,
@@ -93,7 +93,7 @@ class RecordManualTaskAfterAutomationEventBehaviorTest extends TestCase
             ),
         ));
 
-        $task = Task::factory()->relatedTo($contact)->create([
+        $task = Task::factory()->linkedTo($contact)->create([
             'source' => Task::SOURCE_MANUAL,
             'title' => 'Call this contact',
             'created_at' => $taskCreatedAt,
@@ -131,7 +131,7 @@ class RecordManualTaskAfterAutomationEventBehaviorTest extends TestCase
 
             $taskCreatedAt = $eventAt->addMinutes(3);
 
-            $task = Task::factory()->relatedTo($contact)->create([
+            $task = Task::factory()->linkedTo($contact)->create([
                 'source' => Task::SOURCE_MANUAL,
                 'title' => 'Follow up with missed attendee',
                 'task_template_key' => null,

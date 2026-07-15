@@ -32,7 +32,7 @@
         x-data="{
             activityTab: new URLSearchParams(window.location.search).get('activity_tab') || @js($defaultActivityTab),
             messageTab: new URLSearchParams(window.location.search).get('messages_tab') || 'messages',
-            taskModalOpen: @js($errors->has('assigned_to_id') || $errors->has('title') || $errors->has('description') || $errors->has('due_at')),
+            taskModalOpen: @js($errors->has('assigned_to_id') || $errors->has('assigned_to_type') || $errors->has('links') || $errors->has('title') || $errors->has('description') || $errors->has('due_at')),
         }"
     >
         @if(session('success'))
@@ -446,10 +446,10 @@
 
             @if(module_enabled('tasks'))
                 <x-tasks.create-task-modal
-                    :related="$contact"
-                    related-label="{{ $leadSingular }}"
-                    :team-members="$teamMembers"
-                    :current-team-member="$currentTeamMember"
+                    :subject="$contact"
+                    subject-label="{{ $leadSingular }}"
+                    :assignee-options="$taskAssigneeOptions"
+                    :current-assignee-key="$currentTaskAssigneeKey"
                     :default-due-at="$defaultContactTaskDueAt"
                 />
             @endif
@@ -646,4 +646,3 @@
         @endif
     </div>
 </x-layouts.crm>
-

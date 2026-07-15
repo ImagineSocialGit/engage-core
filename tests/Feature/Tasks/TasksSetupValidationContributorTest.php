@@ -3,6 +3,7 @@
 namespace Tests\Feature\Tasks;
 
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Models\TaskLink;
 use App\Modules\Tasks\Models\TaskTemplate;
 use App\Modules\Tasks\Validation\TasksSetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
@@ -12,11 +13,9 @@ use Tests\TestCase;
 
 class TasksSetupValidationContributorTest extends TestCase
 {
-    public function test_it_accepts_valid_selected_task_presets(): void
+    public function test_it_accepts_valid_selected_task_presets_with_link_defaults(): void
     {
-        $this->setPresetPackage([
-            'default',
-        ]);
+        $this->setPresetPackage(['default']);
 
         Config::set('presets.modules.tasks.tasks.groups.default', [
             'general.follow_up',
@@ -39,15 +38,13 @@ class TasksSetupValidationContributorTest extends TestCase
                 'responsible_party' => Task::RESPONSIBLE_PARTY_CONTACT,
                 'assigned_to_strategy' => TaskTemplate::ASSIGNED_TO_STRATEGY_UNASSIGNED,
                 'due_offset_minutes' => 4320,
-                'related_subject' => [
-                    'default' => 'current_contact',
-                ],
-                'defaults' => [
-                    'due' => [
-                        'type' => 'delay',
-                        'minutes' => 4320,
+                'link_defaults' => [
+                    [
+                        'role' => TaskLink::ROLE_SUBJECT,
+                        'source' => TaskTemplate::LINK_SOURCE_CURRENT_CONTACT,
                     ],
                 ],
+                'defaults' => [],
                 'meta' => [],
             ],
         ]);
@@ -55,19 +52,16 @@ class TasksSetupValidationContributorTest extends TestCase
         $this->assertSame([], $this->findings());
     }
 
-
     public function test_it_reports_invalid_definition_contracts(): void
     {
-        $this->setPresetPackage([
-            'default',
-        ]);
+        $this->setPresetPackage(['default']);
 
         Config::set('presets.modules.tasks.tasks.groups.default', [
             '__test_missing_title__',
             '__test_bad_responsibility__',
             '__test_bad_assignment__',
+            '__test_unavailable_assignment__',
             '__test_bad_due__',
-            '__test_bad_related_subject__',
             '__test_bad_defaults__',
         ]);
 
@@ -81,17 +75,15 @@ class TasksSetupValidationContributorTest extends TestCase
             ],
             '__test_bad_assignment__' => [
                 'title' => 'Bad assignment',
+                'assigned_to_strategy' => [],
+            ],
+            '__test_unavailable_assignment__' => [
+                'title' => 'Unavailable assignment',
                 'assigned_to_strategy' => 'round_robin',
             ],
             '__test_bad_due__' => [
                 'title' => 'Bad due',
                 'due_offset_minutes' => 'tomorrow',
-            ],
-            '__test_bad_related_subject__' => [
-                'title' => 'Bad related subject',
-                'related_subject' => [
-                    'default' => 'current_lead',
-                ],
             ],
             '__test_bad_defaults__' => [
                 'title' => 'Bad defaults',
@@ -104,9 +96,76 @@ class TasksSetupValidationContributorTest extends TestCase
         $this->assertContains('tasks.definition_title_missing', $codes);
         $this->assertContains('tasks.responsible_party_invalid', $codes);
         $this->assertContains('tasks.assignment_strategy_invalid', $codes);
+        $this->assertContains('tasks.assignment_strategy_unavailable', $codes);
         $this->assertContains('tasks.due_offset_minutes_invalid', $codes);
-        $this->assertContains('tasks.related_subject_default_unsupported', $codes);
         $this->assertContains('tasks.defaults_invalid', $codes);
+    }
+
+    public function test_it_rejects_obsolete_or_invalid_relationship_default_shapes(): void
+    {
+        $this->setPresetPackage(['default']);
+
+        Config::set('presets.modules.tasks.tasks.groups.default', [
+            '__test_obsolete_related_subject__',
+            '__test_bad_role__',
+            '__test_bad_source__',
+            '__test_duplicate_link_default__',
+            '__test_nested_relationship_defaults__',
+        ]);
+
+        Config::set('presets.modules.tasks.tasks.definitions', [
+            '__test_obsolete_related_subject__' => [
+                'title' => 'Obsolete relationship contract',
+                'related_subject' => [
+                    'default' => 'current_contact',
+                ],
+            ],
+            '__test_bad_role__' => [
+                'title' => 'Bad link role',
+                'link_defaults' => [
+                    [
+                        'role' => 'owner',
+                        'source' => TaskTemplate::LINK_SOURCE_CURRENT_CONTACT,
+                    ],
+                ],
+            ],
+            '__test_bad_source__' => [
+                'title' => 'Bad link source',
+                'link_defaults' => [
+                    [
+                        'role' => TaskLink::ROLE_SUBJECT,
+                        'source' => 'current_pet',
+                    ],
+                ],
+            ],
+            '__test_duplicate_link_default__' => [
+                'title' => 'Duplicate link default',
+                'link_defaults' => [
+                    [
+                        'role' => TaskLink::ROLE_SUBJECT,
+                        'source' => TaskTemplate::LINK_SOURCE_CURRENT_CONTACT,
+                    ],
+                    [
+                        'role' => TaskLink::ROLE_SUBJECT,
+                        'source' => TaskTemplate::LINK_SOURCE_CURRENT_CONTACT,
+                    ],
+                ],
+            ],
+            '__test_nested_relationship_defaults__' => [
+                'title' => 'Nested relationship defaults',
+                'defaults' => [
+                    'links' => [],
+                ],
+            ],
+        ]);
+
+        $codes = array_column($this->findings(), 'code');
+
+        $this->assertContains('tasks.related_subject_obsolete', $codes);
+        $this->assertContains('tasks.link_default_role_invalid', $codes);
+        $this->assertContains('tasks.link_default_source_invalid', $codes);
+        $this->assertContains('tasks.link_default_duplicate', $codes);
+        $this->assertContains('tasks.relationship_defaults_not_first_class', $codes);
     }
 
     public function test_it_reports_key_mismatch_and_noncanonical_identity_while_allowing_cross_group_reuse(): void
@@ -144,9 +203,7 @@ class TasksSetupValidationContributorTest extends TestCase
 
     public function test_it_reports_assignment_conflicts_and_incomplete_morphs(): void
     {
-        $this->setPresetPackage([
-            'default',
-        ]);
+        $this->setPresetPackage(['default']);
 
         Config::set('presets.modules.tasks.tasks.groups.default', [
             '__test_assignment_conflict__',
@@ -158,7 +215,7 @@ class TasksSetupValidationContributorTest extends TestCase
             '__test_assignment_conflict__' => [
                 'title' => 'Assignment conflict',
                 'assigned_to_strategy' => TaskTemplate::ASSIGNED_TO_STRATEGY_UNASSIGNED,
-                'assigned_to' => TaskTemplate::ASSIGNED_TO_STRATEGY_ONLY_ACTIVE_TEAM_MEMBER,
+                'assigned_to' => 'another_strategy',
             ],
             '__test_assigned_morph__' => [
                 'title' => 'Assigned morph',
@@ -179,9 +236,7 @@ class TasksSetupValidationContributorTest extends TestCase
 
     public function test_it_warns_for_legacy_due_offset_and_first_class_defaults_duplication(): void
     {
-        $this->setPresetPackage([
-            'default',
-        ]);
+        $this->setPresetPackage(['default']);
 
         Config::set('presets.modules.tasks.tasks.groups.default', [
             '__test_legacy_task__',
@@ -207,7 +262,6 @@ class TasksSetupValidationContributorTest extends TestCase
             'tasks.first_class_field_duplicated_in_defaults',
         ], array_column($findings, 'code'));
     }
-
 
     public function test_manager_resolves_tagged_tasks_contributor(): void
     {

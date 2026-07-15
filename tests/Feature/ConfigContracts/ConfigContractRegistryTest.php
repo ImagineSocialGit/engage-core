@@ -158,6 +158,7 @@ class ConfigContractRegistryTest extends TestCase
             'responsible_party' => 'internal',
             'source' => 'preset',
             'is_active' => true,
+            'link_defaults' => [],
             'defaults' => [],
             'meta' => [],
         ], $normalized);

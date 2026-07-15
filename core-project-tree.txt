@@ -403,7 +403,8 @@
 │   │   │   │   └── Tasks
 │   │   │   │       ├── InternalNotificationTaskScheduler.php
 │   │   │   │       ├── OnlyActiveTeamMemberTaskAssignmentStrategyResolver.php
-│   │   │   │       └── TeamMemberTaskAssignedRecipientResolver.php
+│   │   │   │       ├── TeamMemberTaskAssignedRecipientResolver.php
+│   │   │   │       └── TeamMemberTaskAssigneeOptionProvider.php
 │   │   │   └── Support
 │   │   ├── Location
 │   │   │   ├── Actions
@@ -611,12 +612,14 @@
 │   │   │   │   └── TaskPresetDefinitionConfigContract.php
 │   │   │   ├── Contracts
 │   │   │   │   ├── TaskAssignedRecipientResolver.php
+│   │   │   │   ├── TaskAssigneeOptionProviderContract.php
 │   │   │   │   ├── TaskAssignmentStrategyResolverContract.php
-│   │   │   │   ├── TaskNotificationSchedulerContract.php
-│   │   │   │   └── TaskRelatedSubjectResolverContract.php
+│   │   │   │   ├── TaskLinkPresenterContract.php
+│   │   │   │   └── TaskNotificationSchedulerContract.php
 │   │   │   ├── Controllers
 │   │   │   │   └── TaskController.php
 │   │   │   ├── Data
+│   │   │   │   ├── TaskAssigneeOption.php
 │   │   │   │   ├── TaskDigest.php
 │   │   │   │   ├── TaskNotification.php
 │   │   │   │   ├── TaskPresetDefinition.php
@@ -642,13 +645,15 @@
 │   │   │   │   │   └── ContactTaskVisibilityDataProvider.php
 │   │   │   │   ├── Dashboard
 │   │   │   │   │   └── TodayTasksDashboardPanelProvider.php
+│   │   │   │   ├── LinkPresenters
+│   │   │   │   │   └── ContactTaskLinkPresenter.php
 │   │   │   │   ├── RelatedSubjects
-│   │   │   │   │   └── ContactTaskRelatedSubjectResolver.php
 │   │   │   │   ├── TaskAssignedRecipientsResolver.php
+│   │   │   │   ├── TaskAssigneeOptionsResolver.php
 │   │   │   │   ├── TaskAssignmentStrategyResolver.php
 │   │   │   │   ├── TaskContactLinkResolver.php
-│   │   │   │   ├── TaskNotificationScheduler.php
-│   │   │   │   └── TaskRelatedSubjectResolver.php
+│   │   │   │   ├── TaskLinkPresentationResolver.php
+│   │   │   │   └── TaskNotificationScheduler.php
 │   │   │   ├── Support
 │   │   │   └── Validation
 │   │   │       └── TasksSetupValidationContributor.php
@@ -1429,6 +1434,9 @@
 │       │   ├── messaging
 │       │   │   └── message-templates
 │       │   │       └── index.blade.php
+│       │   ├── tasks
+│       │   │   ├── index.blade.php
+│       │   │   └── show.blade.php
 │       │   └── webinars
 │       │       ├── index.blade.php
 │       │       └── message-templates
@@ -1617,10 +1625,13 @@
 │   │   │   ├── RecordManualTaskAfterAutomationEventBehaviorTest.php
 │   │   │   ├── RecordManualTaskAutomationBehaviorActionTest.php
 │   │   │   ├── RecordManualTaskCompletionAutomationBehaviorActionTest.php
-│   │   │   ├── RuntimeTaskBehaviorTest.php
+│   │   │   ├── TaskCompletionBehaviorTest.php
 │   │   │   ├── TaskCompletionProvenanceTest.php
+│   │   │   ├── TaskCreationBehaviorTest.php
+│   │   │   ├── TaskNotificationAndDigestBehaviorTest.php
 │   │   │   ├── TaskPresetSyncOwnershipTest.php
-│   │   │   └── TasksSetupValidationContributorTest.php
+│   │   │   ├── TasksSetupValidationContributorTest.php
+│   │   │   └── TaskWorkspaceTest.php
 │   │   ├── Webhooks
 │   │   │   ├── EmailWebhookControllerTest.php
 │   │   │   ├── SmsWebhookControllerTest.php
@@ -1654,4 +1665,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-525 directories, 1130 files
+527 directories, 1139 files

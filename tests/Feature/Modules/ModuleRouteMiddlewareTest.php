@@ -116,4 +116,30 @@ class ModuleRouteMiddlewareTest extends TestCase
 
         $response->assertNotFound();
     }
+    public function test_disabled_tasks_module_returns_404_for_crm_task_workspace(): void
+    {
+        config()->set('modules.enabled', []);
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->withoutMiddleware(ForceStagingAccess::class)
+            ->get('http://crm.'.config('app.root_domain').'/tasks')
+            ->assertNotFound();
+    }
+
+    public function test_enabled_tasks_module_allows_crm_task_workspace(): void
+    {
+        config()->set('modules.enabled', [
+            'tasks',
+        ]);
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->withoutMiddleware(ForceStagingAccess::class)
+            ->get('http://crm.'.config('app.root_domain').'/tasks')
+            ->assertOk();
+    }
+
 }

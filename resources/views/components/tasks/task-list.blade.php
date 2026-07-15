@@ -6,6 +6,7 @@
 
 @php
     $showingArchived = $taskView === 'archived';
+
     $visibleTasks = $showingArchived
         ? collect($archivedTasks)->values()
         : collect($tasks)
@@ -53,9 +54,12 @@
         <div class="rounded-xl border p-4 {{ module_tone('tasks', 'item') }}">
             <div class="flex items-start justify-between gap-4">
                 <div>
-                    <p class="font-semibold text-slate-900">
+                    <a
+                        href="{{ route('crm.tasks.show', $task) }}"
+                        class="font-semibold text-slate-900 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900"
+                    >
                         {{ $task->title }}
-                    </p>
+                    </a>
 
                     <div class="mt-2 grid gap-2 text-sm text-slate-500 sm:grid-cols-2">
                         <p>
@@ -74,7 +78,7 @@
                     </div>
                 </div>
 
-                <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $task->status === 'completed' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700' }}">
+                <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $task->status === 'completed' ? 'bg-green-50 text-green-700' : ($task->status === 'canceled' ? 'bg-slate-100 text-slate-700' : 'bg-blue-50 text-blue-700') }}">
                     {{ str($task->status)->replace('_', ' ')->title() }}
                 </span>
             </div>
@@ -93,6 +97,13 @@
             </p>
 
             <div class="mt-4 flex flex-wrap gap-2">
+                <x-ui.button
+                    href="{{ route('crm.tasks.show', $task) }}"
+                    variant="outline"
+                >
+                    Open Task
+                </x-ui.button>
+
                 @if ($task->archived_at)
                     <form method="POST" action="{{ route('crm.tasks.restore', $task) }}">
                         @csrf
@@ -157,4 +168,3 @@
         </div>
     @endforelse
 </div>
-

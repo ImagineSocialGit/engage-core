@@ -256,25 +256,26 @@ class ModuleDependencyBoundaryTest extends TestCase
         }
     }
 
-    public function test_tasks_do_not_import_flow_route_runtime_internals(): void
+    public function test_tasks_module_does_not_import_optional_feature_modules(): void
     {
-        foreach ($this->modulePhpFiles('Tasks') as $file) {
-            $contents = file_get_contents($file);
-
-            foreach ([
-                'App\\Modules\\FlowRoutes\\Data\\Events\\FlowRouteExternalEvent',
-                'App\\Modules\\FlowRoutes\\Actions\\ResumeFlowRouteProgressFromEventAction',
-                'App\\Modules\\FlowRoutes\\Actions\\StartFlowRoutesFromAutomationEventAction',
-                'App\\Modules\\FlowRoutes\\Actions\\HandleContactWorkflowStatusChangedAction',
-                'FlowRouteExternalEvent::make',
-            ] as $forbiddenReference) {
-                $this->assertStringNotContainsString(
-                    $forbiddenReference,
-                    $contents,
-                    "Tasks must emit neutral automation events, not call FlowRoutes runtime internals. Found [{$forbiddenReference}] in [{$file}].",
-                );
-            }
-        }
+        $this->assertModuleDoesNotImport('Tasks', [
+            'Broadcasts',
+            'Campaigns',
+            'Commerce',
+            'Documents',
+            'FlowRoutes',
+            'Forms',
+            'InboundMessaging',
+            'InternalNotifications',
+            'Location',
+            'Messaging',
+            'Mortgage',
+            'Portal',
+            'Reporting',
+            'Scheduling',
+            'Webinars',
+            'Workflow',
+        ]);
     }
 
     /**

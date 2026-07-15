@@ -4,10 +4,12 @@ namespace Tests\Feature\Tasks;
 
 use App\Models\User;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Tasks\Actions\CompleteTaskAction;
 use App\Modules\Tasks\Events\TaskCompleted;
 use App\Modules\Tasks\Listeners\EmitTaskCompletedAutomationEvent;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Models\TaskLink;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -74,11 +76,10 @@ class TaskCompletionProvenanceTest extends TestCase
 
         $actor = User::factory()->create();
         $contact = Contact::factory()->create();
-
         $completedAt = CarbonImmutable::parse('2026-07-10 14:30:00', 'UTC');
 
         $task = Task::factory()
-            ->relatedTo($contact)
+            ->linkedTo($contact)
             ->completed()
             ->create([
                 'completed_at' => $completedAt,
@@ -109,6 +110,104 @@ class TaskCompletionProvenanceTest extends TestCase
         );
     }
 
+    public function test_standalone_task_completed_automation_event_has_null_contact_id(): void
+    {
+        Event::fake([
+            AutomationEventRecorded::class,
+        ]);
+
+        $task = Task::factory()->completed()->create([
+            'title' => 'Standalone completed task',
+        ]);
+
+        app(EmitTaskCompletedAutomationEvent::class)->handle(
+            new TaskCompleted($task),
+        );
+
+        Event::assertDispatched(
+            AutomationEventRecorded::class,
+            fn (AutomationEventRecorded $event): bool => $event->event->contactId === null
+                && $event->event->subjectType === $task->getMorphClass()
+                && $event->event->subjectId === $task->getKey()
+                && data_get($event->event->payload, 'task.links') === [],
+        );
+    }
+
+    public function test_task_completed_event_includes_compact_non_contact_task_links(): void
+    {
+        Event::fake([
+            AutomationEventRecorded::class,
+        ]);
+
+        $appointment = Appointment::factory()->create();
+        $task = Task::factory()->linkedTo($appointment)->completed()->create();
+
+        app(EmitTaskCompletedAutomationEvent::class)->handle(
+            new TaskCompleted($task),
+        );
+
+        Event::assertDispatched(
+            AutomationEventRecorded::class,
+            fn (AutomationEventRecorded $event): bool => data_get(
+                $event->event->payload,
+                'task.links.0',
+            ) === [
+                'role' => TaskLink::ROLE_SUBJECT,
+                'linkable_type' => $appointment->getMorphClass(),
+                'linkable_id' => $appointment->getKey(),
+            ],
+        );
+    }
+
+    public function test_task_completed_contact_id_is_null_when_contact_link_attribution_is_ambiguous(): void
+    {
+        Event::fake([
+            AutomationEventRecorded::class,
+        ]);
+
+        $firstContact = Contact::factory()->create();
+        $secondContact = Contact::factory()->create();
+
+        $task = Task::factory()
+            ->linkedTo($firstContact, TaskLink::ROLE_SUBJECT)
+            ->linkedTo($secondContact, TaskLink::ROLE_SUBJECT)
+            ->completed()
+            ->create();
+
+        app(EmitTaskCompletedAutomationEvent::class)->handle(
+            new TaskCompleted($task),
+        );
+
+        Event::assertDispatched(
+            AutomationEventRecorded::class,
+            fn (AutomationEventRecorded $event): bool => $event->event->contactId === null,
+        );
+    }
+
+    public function test_task_completed_contact_id_can_fall_back_to_responsible_contact(): void
+    {
+        Event::fake([
+            AutomationEventRecorded::class,
+        ]);
+
+        $contact = Contact::factory()->create();
+
+        $task = Task::factory()->completed()->create([
+            'responsible_party' => Task::RESPONSIBLE_PARTY_CONTACT,
+            'responsible_type' => $contact->getMorphClass(),
+            'responsible_id' => $contact->getKey(),
+        ]);
+
+        app(EmitTaskCompletedAutomationEvent::class)->handle(
+            new TaskCompleted($task),
+        );
+
+        Event::assertDispatched(
+            AutomationEventRecorded::class,
+            fn (AutomationEventRecorded $event): bool => $event->event->contactId === $contact->getKey(),
+        );
+    }
+
     public function test_task_controller_marks_completion_as_manual_crm_provenance(): void
     {
         Event::fake([
@@ -116,7 +215,6 @@ class TaskCompletionProvenanceTest extends TestCase
         ]);
 
         $user = User::factory()->create();
-
         $task = Task::factory()->create([
             'status' => Task::STATUS_OPEN,
             'completed_at' => null,
