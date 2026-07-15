@@ -4,6 +4,8 @@ namespace App\Modules\Tasks\Requests;
 
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Models\TaskLink;
+use App\Modules\Tasks\Services\TaskAssigneeOptionsResolver;
+use App\Modules\Tasks\Services\TaskLinkPresentationResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Http\FormRequest;
@@ -90,6 +92,8 @@ class StoreTaskRequest extends FormRequest
             invalidIdField: 'assigned_to_id',
         );
 
+        $this->validateAvailableAssignee($validated);
+
         $this->normalizeExistingMorph(
             validated: $validated,
             typeKey: 'responsible_type',
@@ -128,6 +132,31 @@ class StoreTaskRequest extends FormRequest
     }
 
     /**
+     * @param array<string, mixed> $validated
+     */
+    private function validateAvailableAssignee(array $validated): void
+    {
+        if (! isset($validated['assigned_to_type'], $validated['assigned_to_id'])) {
+            return;
+        }
+
+        $assignee = $this->resolveModel(
+            type: $validated['assigned_to_type'],
+            id: $validated['assigned_to_id'],
+            invalidField: 'assigned_to_id',
+        );
+
+        if (! app(TaskAssigneeOptionsResolver::class)->isAvailable(
+            assignee: $assignee,
+            actor: $this->user(),
+        )) {
+            throw ValidationException::withMessages([
+                'assigned_to_id' => 'The selected assignee is not currently available for Tasks.',
+            ]);
+        }
+    }
+
+    /**
      * @param array<int, mixed> $links
      * @return array<int, array{
      *     role: string,
@@ -138,6 +167,7 @@ class StoreTaskRequest extends FormRequest
     private function normalizeLinks(array $links): array
     {
         $normalized = [];
+        $presentations = app(TaskLinkPresentationResolver::class);
 
         foreach ($links as $index => $link) {
             if (! is_array($link)) {
@@ -149,6 +179,12 @@ class StoreTaskRequest extends FormRequest
                 id: $link['linkable_id'] ?? null,
                 invalidField: "links.{$index}.linkable_id",
             );
+
+            if (! $presentations->hasPresenter($model)) {
+                throw ValidationException::withMessages([
+                    "links.{$index}.linkable_id" => 'That record type is not available for manual Task linking.',
+                ]);
+            }
 
             $role = $link['role'];
 

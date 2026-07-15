@@ -6,8 +6,8 @@ use App\Modules\Tasks\Data\TaskNotification;
 use App\Modules\Tasks\Data\TaskRecipient;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Services\TaskAssignedRecipientsResolver;
+use App\Modules\Tasks\Services\TaskLinkPresentationResolver;
 use App\Modules\Tasks\Services\TaskNotificationScheduler;
-use App\Modules\Tasks\Services\TaskRelatedSubjectResolver;
 
 class NotifyAssignedTaskRecipientsAction
 {
@@ -15,7 +15,7 @@ class NotifyAssignedTaskRecipientsAction
 
     public function __construct(
         private readonly TaskAssignedRecipientsResolver $assignedRecipientsResolver,
-        private readonly TaskRelatedSubjectResolver $relatedSubjectResolver,
+        private readonly TaskLinkPresentationResolver $linkPresentation,
         private readonly TaskNotificationScheduler $notificationScheduler,
     ) {}
 
@@ -27,7 +27,7 @@ class NotifyAssignedTaskRecipientsAction
             return;
         }
 
-        $relatedSubject = $this->relatedSubjectResolver->resolve($task);
+        $primaryLink = $this->linkPresentation->primary($task);
 
         foreach ($recipients as $recipient) {
             $this->notificationScheduler->schedule(new TaskNotification(
@@ -35,7 +35,7 @@ class NotifyAssignedTaskRecipientsAction
                 notificationType: self::NOTIFICATION_TYPE,
                 scope: 'crm_tasks',
                 messageType: self::NOTIFICATION_TYPE,
-                content: $this->content($task, $recipient, $relatedSubject),
+                content: $this->content($task, $recipient, $primaryLink),
                 context: $task,
                 dedupeKey: $this->dedupeKey($task, $recipient),
             ));
@@ -44,20 +44,38 @@ class NotifyAssignedTaskRecipientsAction
 
     /**
      * @param array{
-     *     subject: object|null,
+     *     link_id: int,
+     *     role: string,
+     *     role_label: string,
+     *     record: \Illuminate\Database\Eloquent\Model|null,
      *     type: ?string,
      *     label: string,
      *     name: string,
      *     url: ?string,
      *     details: array<string, string>
-     * } $relatedSubject
+     * }|null $primaryLink
      * @return array<string, mixed>
      */
     private function content(
         Task $task,
         TaskRecipient $recipient,
-        array $relatedSubject,
+        ?array $primaryLink,
     ): array {
+        $details = [
+            'Assigned To' => $recipient->name,
+            'Task' => $task->title,
+            'Description' => $task->description ?: '—',
+            'Due' => $this->dueAt($task),
+        ];
+
+        if ($primaryLink) {
+            $details[$primaryLink['label']] = $primaryLink['name'];
+            $details = [
+                ...$details,
+                ...$primaryLink['details'],
+            ];
+        }
+
         return [
             'subject' => 'New task assigned: '.$task->title,
             'headline' => 'New task assigned',
@@ -65,42 +83,39 @@ class NotifyAssignedTaskRecipientsAction
             'body' => [
                 'A new task has been assigned to you.',
             ],
-            'details' => [
-                'Assigned To' => $recipient->name,
-                'Task' => $task->title,
-                'Description' => $task->description ?: '—',
-                'Due' => $this->dueAt($task),
-                $relatedSubject['label'] => $relatedSubject['name'],
-                ...$relatedSubject['details'],
+            'details' => $details,
+            'cta' => [
+                'label' => 'Open task',
+                'url' => route('crm.tasks.show', $task),
             ],
-            'cta' => $relatedSubject['url'] ? [
-                'label' => 'View '.$relatedSubject['label'],
-                'url' => $relatedSubject['url'],
-            ] : [],
-            'sms_message' => $this->smsMessage($task, $relatedSubject),
+            'sms_message' => $this->smsMessage($task, $primaryLink),
             'meta' => [
-                'task_id' => $task->id,
-                'related_type' => $relatedSubject['type'],
+                'task_id' => $task->getKey(),
+                'primary_link_type' => $primaryLink['type'] ?? null,
+                'primary_link_role' => $primaryLink['role'] ?? null,
             ],
         ];
     }
 
     /**
      * @param array{
-     *     subject: object|null,
+     *     link_id: int,
+     *     role: string,
+     *     role_label: string,
+     *     record: \Illuminate\Database\Eloquent\Model|null,
      *     type: ?string,
      *     label: string,
      *     name: string,
      *     url: ?string,
      *     details: array<string, string>
-     * } $relatedSubject
+     * }|null $primaryLink
      */
-    private function smsMessage(Task $task, array $relatedSubject): string
+    private function smsMessage(Task $task, ?array $primaryLink): string
     {
         $message = 'New task assigned: '.$task->title;
 
-        if ($relatedSubject['name'] !== '—') {
-            $message .= ' for '.$relatedSubject['name'];
+        if ($primaryLink && $primaryLink['name'] !== '—') {
+            $message .= ' for '.$primaryLink['name'];
         }
 
         if ($task->due_at) {

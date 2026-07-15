@@ -4,24 +4,28 @@ namespace App\Modules\Tasks\Services\ContactShow;
 
 use App\Modules\Core\Contracts\Contacts\ContactShowDataProvider;
 use App\Modules\Core\Models\Contact;
-use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Services\TaskAssigneeOptionsResolver;
 use Illuminate\Database\Eloquent\Builder;
 
 class ContactTasksShowDataProvider implements ContactShowDataProvider
 {
+    public function __construct(
+        private readonly TaskAssigneeOptionsResolver $assigneeOptions,
+    ) {}
+
     /**
      * @return array<string, mixed>
      */
     public function dataFor(Contact $contact): array
     {
         $taskView = request('task_view') === 'archived' ? 'archived' : 'active';
+        $options = $this->assigneeOptions->options(auth()->user());
 
         return [
             'taskView' => $taskView,
 
-            'tasks' => $this->orderedActiveTaskQuery($contact)
-                ->get(),
+            'tasks' => $this->orderedActiveTaskQuery($contact)->get(),
 
             'archivedTasks' => $this->contactTaskQuery($contact)
                 ->archived()
@@ -29,13 +33,11 @@ class ContactTasksShowDataProvider implements ContactShowDataProvider
                 ->latest('id')
                 ->get(),
 
-            'teamMembers' => TeamMember::active()
-                ->orderBy('name')
-                ->get(['id', 'name', 'email']),
+            'taskAssigneeOptions' => $options,
 
-            'currentTeamMember' => TeamMember::query()
-                ->where('user_id', auth()->id())
-                ->first(),
+            'currentTaskAssigneeKey' => $options
+                ->first(fn ($option): bool => $option->isCurrent)
+                ?->key(),
         ];
     }
 
@@ -53,9 +55,16 @@ class ContactTasksShowDataProvider implements ContactShowDataProvider
     private function contactTaskQuery(Contact $contact): Builder
     {
         return Task::query()
-            ->with(['assignedTo', 'responsible'])
-            ->whereIn('related_type', $this->contactMorphTypes($contact))
-            ->where('related_id', $contact->id);
+            ->with([
+                'assignedTo',
+                'responsible',
+                'links.linkable',
+            ])
+            ->whereHas('links', function (Builder $query) use ($contact): void {
+                $query
+                    ->whereIn('linkable_type', $this->contactMorphTypes($contact))
+                    ->where('linkable_id', $contact->getKey());
+            });
     }
 
     /**

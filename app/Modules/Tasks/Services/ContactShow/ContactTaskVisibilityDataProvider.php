@@ -5,6 +5,7 @@ namespace App\Modules\Tasks\Services\ContactShow;
 use App\Modules\Core\Contracts\Contacts\ContactShowDataProvider;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Tasks\Models\Task;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
 class ContactTaskVisibilityDataProvider implements ContactShowDataProvider
@@ -14,25 +15,30 @@ class ContactTaskVisibilityDataProvider implements ContactShowDataProvider
      */
     public function dataFor(Contact $contact): array
     {
-        $contactType = $contact->getMorphClass();
+        $contactTypes = array_values(array_unique([
+            Contact::class,
+            $contact->getMorphClass(),
+        ]));
 
         $tasks = Task::query()
-            ->with(['assignedTo', 'responsible'])
-            ->where(function ($query) use ($contact, $contactType) {
+            ->with([
+                'assignedTo',
+                'responsible',
+                'links.linkable',
+            ])
+            ->whereHas('links', function (Builder $query) use ($contact, $contactTypes): void {
                 $query
-                    ->where(function ($query) use ($contact, $contactType) {
-                        $query->where('related_type', $contactType)
-                            ->where('related_id', $contact->id);
-                    })
-                    ->orWhere(function ($query) use ($contact, $contactType) {
-                        $query->where('responsible_type', $contactType)
-                            ->where('responsible_id', $contact->id);
-                    });
+                    ->whereIn('linkable_type', $contactTypes)
+                    ->where('linkable_id', $contact->getKey());
             })
             ->whereNull('archived_at')
-            ->orderByRaw("FIELD(status, 'open', 'completed', 'canceled')")
-            ->latest('due_at')
-            ->latest()
+            ->orderByRaw(
+                'CASE WHEN status = ? THEN 0 WHEN status = ? THEN 1 ELSE 2 END',
+                [Task::STATUS_OPEN, Task::STATUS_COMPLETED],
+            )
+            ->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('due_at')
+            ->latest('id')
             ->limit(8)
             ->get();
 
@@ -41,8 +47,8 @@ class ContactTaskVisibilityDataProvider implements ContactShowDataProvider
                 'tasks' => [
                     'title' => 'Tasks',
                     'module' => 'tasks',
-                    'description' => 'Open and recent manual actions/dependencies.',
-                    'empty' => 'No active tasks found.',
+                    'description' => 'Open and recent manual actions or dependencies linked to this '.config('contacts.labels.singular').'.',
+                    'empty' => 'No linked tasks found.',
                     'items' => $tasks->map(fn (Task $task): array => [
                         'title' => $task->title,
                         'subtitle' => $task->description,
@@ -88,6 +94,8 @@ class ContactTaskVisibilityDataProvider implements ContactShowDataProvider
 
     private function date(mixed $date): ?string
     {
-        return $date?->timezone(config('client.timezone', config('app.timezone', 'UTC')))->format('M j, Y g:i A');
+        return $date?->timezone(
+            config('client.timezone', config('app.timezone', 'UTC'))
+        )->format('M j, Y g:i A');
     }
 }

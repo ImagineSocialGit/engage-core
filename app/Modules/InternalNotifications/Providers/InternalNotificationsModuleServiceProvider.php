@@ -11,6 +11,7 @@ use App\Modules\InternalNotifications\Services\Messaging\TeamMemberMessageRecipi
 use App\Modules\InternalNotifications\Services\Tasks\InternalNotificationTaskScheduler;
 use App\Modules\InternalNotifications\Services\Tasks\OnlyActiveTeamMemberTaskAssignmentStrategyResolver;
 use App\Modules\InternalNotifications\Services\Tasks\TeamMemberTaskAssignedRecipientResolver;
+use App\Modules\InternalNotifications\Services\Tasks\TeamMemberTaskAssigneeOptionProvider;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -62,6 +63,10 @@ class InternalNotificationsModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             TeamMemberTaskAssignedRecipientResolver::class,
         ], 'crm.tasks.assigned_recipient_resolvers');
+
+        $this->app->tag([
+            TeamMemberTaskAssigneeOptionProvider::class,
+        ], 'tasks.assignee_option_providers');
 
         $this->app->tag([
             InternalNotificationTaskScheduler::class,

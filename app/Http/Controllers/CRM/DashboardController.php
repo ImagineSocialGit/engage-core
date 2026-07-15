@@ -4,13 +4,13 @@ namespace App\Http\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
 use App\Models\DashboardAcknowledgement;
-use App\Modules\Core\Models\Contact;
 use App\Modules\InternalNotifications\Actions\ScheduleInternalNotificationAction;
 use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\InternalNotifications\Services\InternalNotificationRecipient;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Services\Dashboard\TodayTasksDashboardPanelProvider;
+use App\Modules\Tasks\Services\TaskLinkPresentationResolver;
 use App\Support\Dashboard\DashboardPanelRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -42,8 +42,10 @@ class DashboardController extends Controller
         ]);
     }
 
-    public function printTasks(TodayTasksDashboardPanelProvider $tasksPanel): View
-    {
+    public function printTasks(
+        TodayTasksDashboardPanelProvider $tasksPanel,
+        TaskLinkPresentationResolver $linkPresentation,
+    ): View {
         $todayStart = $tasksPanel->todayStart();
         $todayEnd = $tasksPanel->todayEnd();
         $tasks = $tasksPanel->taskModels($todayEnd, 50);
@@ -52,15 +54,27 @@ class DashboardController extends Controller
             'title' => 'Today’s Task List',
             'printedAt' => now(config('client.timezone', config('app.timezone', 'UTC'))),
             'tasks' => $tasks,
-            'taskItems' => $tasks->map(fn (Task $task): array => $this->printableTaskItem($task, $todayStart, $todayEnd))->values(),
-            'overdueCount' => $tasks->filter(fn (Task $task): bool => $task->due_at?->lt($todayStart) ?? false)->count(),
-            'dueTodayCount' => $tasks->filter(fn (Task $task): bool => $task->due_at?->betweenIncluded($todayStart, $todayEnd) ?? false)->count(),
+            'taskItems' => $tasks
+                ->map(fn (Task $task): array => $this->printableTaskItem(
+                    $task,
+                    $todayStart,
+                    $todayEnd,
+                    $linkPresentation,
+                ))
+                ->values(),
+            'overdueCount' => $tasks
+                ->filter(fn (Task $task): bool => $task->due_at?->lt($todayStart) ?? false)
+                ->count(),
+            'dueTodayCount' => $tasks
+                ->filter(fn (Task $task): bool => $task->due_at?->betweenIncluded($todayStart, $todayEnd) ?? false)
+                ->count(),
         ]);
     }
 
     public function broadcastTasks(
         ScheduleInternalNotificationAction $scheduleInternalNotification,
         TodayTasksDashboardPanelProvider $tasksPanel,
+        TaskLinkPresentationResolver $linkPresentation,
     ): RedirectResponse {
         if (! $this->canBroadcastTaskList()) {
             return redirect()
@@ -109,7 +123,7 @@ class DashboardController extends Controller
                 recipient: $recipient,
                 scope: 'tasks',
                 messageType: self::TASK_BROADCAST_MESSAGE_TYPE,
-                content: $this->taskBroadcastContent($tasks, $teamMember),
+                content: $this->taskBroadcastContent($tasks, $teamMember, $linkPresentation),
                 context: null,
                 dedupeKey: $this->taskBroadcastDedupeKey($teamMember),
                 meta: [
@@ -177,7 +191,8 @@ class DashboardController extends Controller
             ->all();
 
         return [
-            'attention_count' => $panels->sum(fn (array $panel): int => (int) ($panel['attention_count'] ?? 0)),
+            'attention_count' => $panels
+                ->sum(fn (array $panel): int => (int) ($panel['attention_count'] ?? 0)),
             'panels' => $panelCounts,
         ];
     }
@@ -190,7 +205,10 @@ class DashboardController extends Controller
     {
         return $workPanels
             ->map(fn (array $panel): ?array => $panel['primary_action'] ?? null)
-            ->filter(fn (?array $action): bool => filled($action['href'] ?? null) || filled($action['summary'] ?? null))
+            ->filter(fn (?array $action): bool =>
+                filled($action['href'] ?? null)
+                || filled($action['summary'] ?? null)
+            )
             ->first() ?: [
                 'label' => 'View '.config('contacts.labels.plural'),
                 'href' => route('crm.contacts.index'),
@@ -203,15 +221,22 @@ class DashboardController extends Controller
      * @param Collection<int, array<string, mixed>> $contextPanels
      * @return array<int, array<string, mixed>>
      */
-    private function rightNowCards(Collection $workPanels, Collection $contextPanels): array
-    {
+    private function rightNowCards(
+        Collection $workPanels,
+        Collection $contextPanels,
+    ): array {
         $firstWorkPanel = $workPanels->first();
 
         $cards = [[
             'label' => 'need attention',
-            'count' => $workPanels->sum(fn (array $panel): int => (int) ($panel['attention_count'] ?? 0)),
-            'module' => is_array($firstWorkPanel) ? ($firstWorkPanel['module'] ?? 'core') : 'core',
-            'target_ref' => is_array($firstWorkPanel) ? ($firstWorkPanel['target_ref'] ?? null) : null,
+            'count' => $workPanels
+                ->sum(fn (array $panel): int => (int) ($panel['attention_count'] ?? 0)),
+            'module' => is_array($firstWorkPanel)
+                ? ($firstWorkPanel['module'] ?? 'core')
+                : 'core',
+            'target_ref' => is_array($firstWorkPanel)
+                ? ($firstWorkPanel['target_ref'] ?? null)
+                : null,
         ]];
 
         foreach ($workPanels->concat($contextPanels)->take(3) as $panel) {
@@ -229,9 +254,13 @@ class DashboardController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function printableTaskItem(Task $task, mixed $todayStart, mixed $todayEnd): array
-    {
-        $relatedContact = $task->related instanceof Contact ? $task->related : null;
+    private function printableTaskItem(
+        Task $task,
+        mixed $todayStart,
+        mixed $todayEnd,
+        TaskLinkPresentationResolver $linkPresentation,
+    ): array {
+        $primaryLink = $linkPresentation->primary($task);
         $dueAt = $task->due_at;
         $isOverdue = $dueAt && $dueAt->lt($todayStart);
         $isDueToday = $dueAt && $dueAt->betweenIncluded($todayStart, $todayEnd);
@@ -240,9 +269,11 @@ class DashboardController extends Controller
             'label' => $isOverdue ? 'Overdue' : ($isDueToday ? 'Today' : 'Open'),
             'title' => $task->title,
             'subtitle' => trim(implode(' · ', array_filter([
-                $relatedContact ? $this->contactName($relatedContact) : null,
+                $primaryLink['name'] ?? null,
                 $this->dueLabel($dueAt),
-                $task->assignedTo ? 'Owner: '.$this->modelName($task->assignedTo) : 'Unassigned',
+                $task->assignedTo
+                    ? 'Owner: '.$this->modelName($task->assignedTo)
+                    : 'Unassigned',
             ]))),
             'description' => $task->description,
         ];
@@ -252,15 +283,19 @@ class DashboardController extends Controller
      * @param Collection<int, Task> $tasks
      * @return array<string, mixed>
      */
-    private function taskBroadcastContent(Collection $tasks, TeamMember $teamMember): array
-    {
+    private function taskBroadcastContent(
+        Collection $tasks,
+        TeamMember $teamMember,
+        TaskLinkPresentationResolver $linkPresentation,
+    ): array {
         $count = $tasks->count();
         $lines = $tasks
             ->take(12)
-            ->map(fn (Task $task): string => $this->taskBroadcastLine($task))
+            ->map(fn (Task $task): string => $this->taskBroadcastLine($task, $linkPresentation))
             ->when(
                 $count > 12,
-                fn (Collection $lines): Collection => $lines->push('And '.($count - 12).' more.')
+                fn (Collection $lines): Collection =>
+                    $lines->push('And '.($count - 12).' more.')
             )
             ->values()
             ->all();
@@ -291,19 +326,20 @@ class DashboardController extends Controller
         ];
     }
 
-    private function taskBroadcastLine(Task $task): string
-    {
+    private function taskBroadcastLine(
+        Task $task,
+        TaskLinkPresentationResolver $linkPresentation,
+    ): string {
+        $primaryLink = $linkPresentation->primary($task);
         $segments = [$task->title];
 
-        if ($task->related instanceof Contact) {
-            $segments[] = $this->contactName($task->related);
+        if ($primaryLink) {
+            $segments[] = $primaryLink['name'];
         }
 
-        if ($task->due_at) {
-            $segments[] = $this->dueLabel($task->due_at);
-        } else {
-            $segments[] = 'No due date';
-        }
+        $segments[] = $task->due_at
+            ? $this->dueLabel($task->due_at)
+            : 'No due date';
 
         if ($task->assignedTo) {
             $segments[] = 'Owner: '.$this->modelName($task->assignedTo);
@@ -357,8 +393,13 @@ class DashboardController extends Controller
             return 'No due date';
         }
 
-        $localDate = $date->copy()->timezone(config('client.timezone', config('app.timezone', 'UTC')));
-        $today = now(config('client.timezone', config('app.timezone', 'UTC')));
+        $localDate = $date->copy()->timezone(
+            config('client.timezone', config('app.timezone', 'UTC'))
+        );
+
+        $today = now(
+            config('client.timezone', config('app.timezone', 'UTC'))
+        );
 
         if ($localDate->isBefore($today->copy()->startOfDay())) {
             return 'Due '.$localDate->format('M j, g:i A');
@@ -369,15 +410,6 @@ class DashboardController extends Controller
         }
 
         return 'Due '.$localDate->format('M j, g:i A');
-    }
-
-    private function contactName(Contact $contact): string
-    {
-        $name = trim((string) ($contact->name ?: trim(
-            trim((string) $contact->first_name).' '.trim((string) $contact->last_name)
-        )));
-
-        return $name !== '' ? $name : ($contact->email ?: Str::title(config('contacts.labels.singular')).' #'.$contact->id);
     }
 
     private function modelName(mixed $model): string
@@ -393,4 +425,3 @@ class DashboardController extends Controller
         return class_basename($model).' #'.$model->getKey();
     }
 }
-

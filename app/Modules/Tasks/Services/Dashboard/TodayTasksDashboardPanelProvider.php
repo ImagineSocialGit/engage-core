@@ -3,18 +3,21 @@
 namespace App\Modules\Tasks\Services\Dashboard;
 
 use App\Models\DashboardAcknowledgement;
-use App\Modules\Core\Models\Contact;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Services\TaskLinkPresentationResolver;
 use App\Support\Dashboard\Contracts\DashboardPanelProvider;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 
 class TodayTasksDashboardPanelProvider implements DashboardPanelProvider
 {
     public const UPCOMING_TASKS_ITEM_TYPE = 'upcoming_tasks_week';
+
+    public function __construct(
+        private readonly TaskLinkPresentationResolver $linkPresentation,
+    ) {}
 
     public function key(): string
     {
@@ -48,7 +51,13 @@ class TodayTasksDashboardPanelProvider implements DashboardPanelProvider
         $upcomingWeekCount = $this->upcomingTaskCount($todayEnd);
         $upcomingSummaryKey = $this->upcomingTaskSummaryKey();
 
-        if ($upcomingWeekCount > 0 && $this->isDashboardItemAcknowledged($request, self::UPCOMING_TASKS_ITEM_TYPE, $upcomingSummaryKey)) {
+        if ($upcomingWeekCount > 0
+            && $this->isDashboardItemAcknowledged(
+                $request,
+                self::UPCOMING_TASKS_ITEM_TYPE,
+                $upcomingSummaryKey,
+            )
+        ) {
             $upcomingWeekCount = 0;
         }
 
@@ -68,7 +77,9 @@ class TodayTasksDashboardPanelProvider implements DashboardPanelProvider
             'attention_count' => $overdueCount + $dueTodayCount,
             'overdue_count' => $overdueCount,
             'due_today_count' => $dueTodayCount,
-            'items' => $todayTasks->map(fn (Task $task): array => $this->taskItem($task, $todayStart, $todayEnd))->values(),
+            'items' => $todayTasks
+                ->map(fn (Task $task): array => $this->taskItem($task, $todayStart, $todayEnd))
+                ->values(),
             'upcoming_summary' => $upcomingWeekCount > 0 ? [
                 'type' => self::UPCOMING_TASKS_ITEM_TYPE,
                 'key' => $upcomingSummaryKey,
@@ -115,8 +126,11 @@ class TodayTasksDashboardPanelProvider implements DashboardPanelProvider
      * @param Collection<int, Task> $tasks
      * @return array<string, mixed>|null
      */
-    private function primaryAction(Collection $tasks, Carbon $todayStart, Carbon $todayEnd): ?array
-    {
+    private function primaryAction(
+        Collection $tasks,
+        Carbon $todayStart,
+        Carbon $todayEnd,
+    ): ?array {
         $task = $tasks->first(function (Task $task) use ($todayStart): bool {
             return $task->due_at?->lt($todayStart) ?? false;
         }) ?: $tasks->first(function (Task $task) use ($todayStart, $todayEnd): bool {
@@ -127,11 +141,11 @@ class TodayTasksDashboardPanelProvider implements DashboardPanelProvider
             return null;
         }
 
-        $relatedContact = $task->related instanceof Contact ? $task->related : null;
-
         return [
-            'label' => $task->due_at?->lt($todayStart) ? 'Open overdue task' : 'Open today’s task',
-            'href' => $relatedContact ? route('crm.contacts.show', $relatedContact).'?activity_tab=tasks' : null,
+            'label' => $task->due_at?->lt($todayStart)
+                ? 'Open overdue task'
+                : 'Open today’s task',
+            'href' => route('crm.tasks.show', $task),
             'summary' => $task->due_at?->lt($todayStart)
                 ? 'Start with the overdue task at the top of today’s list.'
                 : 'Start with the first task due today.',
@@ -150,7 +164,10 @@ class TodayTasksDashboardPanelProvider implements DashboardPanelProvider
     private function baseTaskQuery(): Builder
     {
         return Task::query()
-            ->with(['assignedTo', 'related'])
+            ->with([
+                'assignedTo',
+                'links.linkable',
+            ])
             ->open()
             ->unarchived();
     }
@@ -158,9 +175,12 @@ class TodayTasksDashboardPanelProvider implements DashboardPanelProvider
     /**
      * @return array<string, mixed>
      */
-    private function taskItem(Task $task, Carbon $todayStart, Carbon $todayEnd): array
-    {
-        $relatedContact = $task->related instanceof Contact ? $task->related : null;
+    private function taskItem(
+        Task $task,
+        Carbon $todayStart,
+        Carbon $todayEnd,
+    ): array {
+        $primaryLink = $this->linkPresentation->primary($task);
         $dueAt = $task->due_at;
         $isOverdue = $dueAt && $dueAt->lt($todayStart);
         $isDueToday = $dueAt && $dueAt->betweenIncluded($todayStart, $todayEnd);
@@ -174,13 +194,13 @@ class TodayTasksDashboardPanelProvider implements DashboardPanelProvider
             'tone' => $isOverdue ? 'amber' : 'slate',
             'title' => $task->title,
             'subtitle' => trim(implode(' · ', array_filter([
-                $relatedContact ? $this->contactName($relatedContact) : null,
+                $primaryLink['name'] ?? null,
                 $this->dueLabel($dueAt),
                 $task->assignedTo ? 'Owner: '.$this->modelName($task->assignedTo) : 'Unassigned',
             ]))),
             'description' => $task->description,
-            'href' => $relatedContact ? route('crm.contacts.show', $relatedContact) : null,
-            'action_label' => $relatedContact ? 'View' : null,
+            'href' => route('crm.tasks.show', $task),
+            'action_label' => 'Open task',
         ];
     }
 
@@ -191,8 +211,11 @@ class TodayTasksDashboardPanelProvider implements DashboardPanelProvider
             && module_enabled('internal_notifications');
     }
 
-    private function isDashboardItemAcknowledged(Request $request, string $itemType, string $itemKey): bool
-    {
+    private function isDashboardItemAcknowledged(
+        Request $request,
+        string $itemType,
+        string $itemKey,
+    ): bool {
         $userId = $request->user()?->id;
 
         if (! $userId) {
@@ -210,7 +233,9 @@ class TodayTasksDashboardPanelProvider implements DashboardPanelProvider
 
     private function upcomingTaskSummaryKey(): string
     {
-        return now(config('client.timezone', config('app.timezone', 'UTC')))->toDateString();
+        return now(
+            config('client.timezone', config('app.timezone', 'UTC'))
+        )->toDateString();
     }
 
     private function weekEnd(): Carbon
@@ -227,8 +252,13 @@ class TodayTasksDashboardPanelProvider implements DashboardPanelProvider
             return 'No due date';
         }
 
-        $localDate = $date->copy()->timezone(config('client.timezone', config('app.timezone', 'UTC')));
-        $today = now(config('client.timezone', config('app.timezone', 'UTC')));
+        $localDate = $date->copy()->timezone(
+            config('client.timezone', config('app.timezone', 'UTC'))
+        );
+
+        $today = now(
+            config('client.timezone', config('app.timezone', 'UTC'))
+        );
 
         if ($localDate->isBefore($today->copy()->startOfDay())) {
             return 'Due '.$localDate->format('M j, g:i A');
@@ -239,15 +269,6 @@ class TodayTasksDashboardPanelProvider implements DashboardPanelProvider
         }
 
         return 'Due '.$localDate->format('M j, g:i A');
-    }
-
-    private function contactName(Contact $contact): string
-    {
-        $name = trim((string) ($contact->name ?: trim(
-            trim((string) $contact->first_name).' '.trim((string) $contact->last_name)
-        )));
-
-        return $name !== '' ? $name : ($contact->email ?: Str::title(config('contacts.labels.singular')).' #'.$contact->id);
     }
 
     private function modelName(mixed $model): string

@@ -11,11 +11,12 @@ use App\Modules\Tasks\Listeners\EmitTaskCompletedAutomationEvent;
 use App\Modules\Tasks\Services\ContactShow\ContactTasksShowDataProvider;
 use App\Modules\Tasks\Services\ContactShow\ContactTaskVisibilityDataProvider;
 use App\Modules\Tasks\Services\Dashboard\TodayTasksDashboardPanelProvider;
-use App\Modules\Tasks\Services\RelatedSubjects\ContactTaskRelatedSubjectResolver;
+use App\Modules\Tasks\Services\LinkPresenters\ContactTaskLinkPresenter;
 use App\Modules\Tasks\Services\TaskAssignedRecipientsResolver;
+use App\Modules\Tasks\Services\TaskAssigneeOptionsResolver;
 use App\Modules\Tasks\Services\TaskAssignmentStrategyResolver;
+use App\Modules\Tasks\Services\TaskLinkPresentationResolver;
 use App\Modules\Tasks\Services\TaskNotificationScheduler;
-use App\Modules\Tasks\Services\TaskRelatedSubjectResolver;
 use App\Modules\Tasks\Validation\TasksSetupValidationContributor;
 use App\Support\Dashboard\DashboardPanelRegistry;
 use Illuminate\Support\Facades\Event;
@@ -49,17 +50,21 @@ class TasksModuleServiceProvider extends ServiceProvider
             ->needs('$resolvers')
             ->giveTagged('crm.tasks.assigned_recipient_resolvers');
 
+        $this->app->when(TaskAssigneeOptionsResolver::class)
+            ->needs('$providers')
+            ->giveTagged('tasks.assignee_option_providers');
+
         $this->app->when(TaskNotificationScheduler::class)
             ->needs('$schedulers')
             ->giveTagged('tasks.notification_schedulers');
 
         $this->app->tag([
-            ContactTaskRelatedSubjectResolver::class,
-        ], 'crm.task_related_subject_resolvers');
+            ContactTaskLinkPresenter::class,
+        ], 'tasks.link_presenters');
 
-        $this->app->when(TaskRelatedSubjectResolver::class)
-            ->needs('$resolvers')
-            ->giveTagged('crm.task_related_subject_resolvers');
+        $this->app->when(TaskLinkPresentationResolver::class)
+            ->needs('$presenters')
+            ->giveTagged('tasks.link_presenters');
 
         $this->app->tag([
             ContactTasksShowDataProvider::class,
