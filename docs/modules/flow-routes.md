@@ -779,6 +779,7 @@ FlowRoutes should call Tasks-owned public actions/services. Tasks remains the ow
 ```text
 Task creation
 TaskTemplate resolution rules
+TaskTemplate.link_defaults resolution
 assignment strategy
 responsibility fields
 TaskLink creation
@@ -787,6 +788,18 @@ due offsets
 Task lifecycle behavior
 ```
 
+When creating a Task, FlowRoutes may supply generic creation context such as:
+
+```text
+current_contact
+    the route's Contact when present
+
+current_subject
+    the route instance's current subject when present
+```
+
+Tasks resolves any `TaskTemplate.link_defaults` from that generic context and creates/de-duplicates TaskLinks. FlowRoutes should not create TaskLink rows directly or teach Tasks about FlowRoutes-specific subject types.
+
 FlowRoutes owns automation intent, route execution, created-artifact identity, correlation, and resume matching.
 
 The target creation path is:
@@ -794,9 +807,11 @@ The target creation path is:
 ```text
 FlowRoute create_task point
     -> resolve TaskTemplate by stable key
+    -> supply generic current_contact/current_subject creation context
     -> call Tasks public action
-    -> create live Task and TaskLinks
-    -> record created Task type/id in FlowRoutes-owned progress state
+    -> Tasks resolves link_defaults and explicit links
+    -> Tasks creates live Task and de-duplicated TaskLinks
+    -> FlowRoutes records created Task type/id in FlowRoutes-owned progress state
 ```
 
 `tasks.task_template_id` may remain a soft/current DB reference while `task_template_key` preserves durable historical TaskTemplate identity.
@@ -1128,6 +1143,3 @@ The Route index should not repeat assignment detail inside Route details. `Runs 
 One-step automatic behavior may be presented separately from multi-step Routes so a simple action is not forced into the same visual weight as a real Route.
 
 Route Management UX should explain available actions through `FlowRouteCapability` metadata and module-owned public seams rather than importing module internals.
-
-
-

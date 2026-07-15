@@ -19,7 +19,7 @@ class PresetCompositionResolverTest extends TestCase
     {
         Config::set('presets.packages.basic', [
             'groups' => [
-                'tasks' => ['general_default', 'extended_default'],
+                'tasks' => ['default', 'extended_default'],
             ],
         ]);
 
@@ -29,7 +29,7 @@ class PresetCompositionResolverTest extends TestCase
                     contributor: 'tasks',
                     domain: PresetDomain::Tasks,
                     groups: [
-                        'general_default' => ['general.follow_up'],
+                        'default' => ['general.follow_up'],
                         'extended_default' => ['general.follow_up', 'general.review'],
                     ],
                     definitions: [
@@ -52,7 +52,7 @@ class PresetCompositionResolverTest extends TestCase
         );
 
         $this->assertSame(
-            ['general_default', 'extended_default'],
+            ['default', 'extended_default'],
             $resolved->definitionGroups['general.follow_up'],
         );
     }
@@ -64,7 +64,7 @@ class PresetCompositionResolverTest extends TestCase
                 new PresetContribution(
                     contributor: 'tasks',
                     domain: PresetDomain::Tasks,
-                    groups: ['general_default' => ['general.follow_up']],
+                    groups: ['default' => ['general.follow_up']],
                     definitions: ['general.follow_up' => ['title' => 'Follow up']],
                     source: 'tasks',
                 ),
@@ -73,7 +73,7 @@ class PresetCompositionResolverTest extends TestCase
                 new PresetContribution(
                     contributor: 'webinars',
                     domain: PresetDomain::Tasks,
-                    groups: ['general_default' => ['webinar.review_reply']],
+                    groups: ['default' => ['webinar.review_reply']],
                     definitions: ['webinar.review_reply' => ['title' => 'Review reply']],
                     source: 'webinars',
                 ),
@@ -81,7 +81,7 @@ class PresetCompositionResolverTest extends TestCase
         ]);
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('group [general_default] is defined by multiple contributors');
+        $this->expectExceptionMessage('group [default] is defined by multiple contributors');
 
         $registry->groups(PresetDomain::Tasks);
     }
@@ -93,7 +93,7 @@ class PresetCompositionResolverTest extends TestCase
                 new PresetContribution(
                     contributor: 'tasks',
                     domain: PresetDomain::Tasks,
-                    groups: ['general_default' => ['general.follow_up']],
+                    groups: ['default' => ['general.follow_up']],
                     definitions: ['general.follow_up' => ['title' => 'Follow up']],
                     source: 'tasks',
                 ),

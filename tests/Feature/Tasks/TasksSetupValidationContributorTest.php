@@ -15,10 +15,10 @@ class TasksSetupValidationContributorTest extends TestCase
     public function test_it_accepts_valid_selected_task_presets(): void
     {
         $this->setPresetPackage([
-            'general_default',
+            'default',
         ]);
 
-        Config::set('presets.modules.tasks.tasks.groups.general_default', [
+        Config::set('presets.modules.tasks.tasks.groups.default', [
             'general.follow_up',
             'general.waiting_on_contact',
         ]);
@@ -59,10 +59,10 @@ class TasksSetupValidationContributorTest extends TestCase
     public function test_it_reports_invalid_definition_contracts(): void
     {
         $this->setPresetPackage([
-            'general_default',
+            'default',
         ]);
 
-        Config::set('presets.modules.tasks.tasks.groups.general_default', [
+        Config::set('presets.modules.tasks.tasks.groups.default', [
             '__test_missing_title__',
             '__test_bad_responsibility__',
             '__test_bad_assignment__',
@@ -145,10 +145,10 @@ class TasksSetupValidationContributorTest extends TestCase
     public function test_it_reports_assignment_conflicts_and_incomplete_morphs(): void
     {
         $this->setPresetPackage([
-            'general_default',
+            'default',
         ]);
 
-        Config::set('presets.modules.tasks.tasks.groups.general_default', [
+        Config::set('presets.modules.tasks.tasks.groups.default', [
             '__test_assignment_conflict__',
             '__test_assigned_morph__',
             '__test_responsible_morph__',
@@ -180,10 +180,10 @@ class TasksSetupValidationContributorTest extends TestCase
     public function test_it_warns_for_legacy_due_offset_and_first_class_defaults_duplication(): void
     {
         $this->setPresetPackage([
-            'general_default',
+            'default',
         ]);
 
-        Config::set('presets.modules.tasks.tasks.groups.general_default', [
+        Config::set('presets.modules.tasks.tasks.groups.default', [
             '__test_legacy_task__',
         ]);
 

@@ -61,8 +61,8 @@ class PresetPackageConfigContract implements ConfigContract
                 'enabled' => ['tasks', 'workflow'],
             ],
             'groups' => [
-                'contact_statuses' => ['general_default'],
-                'tasks' => ['general_default'],
+                'contact_statuses' => ['default'],
+                'tasks' => ['default'],
                 'campaigns' => [],
                 'flow_routes' => [],
             ],

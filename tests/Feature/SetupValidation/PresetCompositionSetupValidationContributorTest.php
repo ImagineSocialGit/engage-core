@@ -48,7 +48,7 @@ class PresetCompositionSetupValidationContributorTest extends TestCase
     {
         $this->package([
             'groups' => [
-                'tasks' => ['general_default'],
+                'tasks' => ['default'],
             ],
         ]);
 
@@ -57,7 +57,7 @@ class PresetCompositionSetupValidationContributorTest extends TestCase
                 contributor: 'tasks',
                 domain: PresetDomain::Tasks,
                 groups: [
-                    'general_default' => ['general.missing'],
+                    'default' => ['general.missing'],
                 ],
                 definitions: [],
             ),
@@ -102,7 +102,7 @@ class PresetCompositionSetupValidationContributorTest extends TestCase
             $this->contribution(
                 contributor: 'tasks',
                 domain: PresetDomain::Tasks,
-                groups: ['general_default' => ['general.follow_up']],
+                groups: ['default' => ['general.follow_up']],
                 definitions: ['general.follow_up' => ['title' => 'Follow up']],
             ),
             $this->contribution(

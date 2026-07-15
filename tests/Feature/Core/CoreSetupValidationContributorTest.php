@@ -12,10 +12,10 @@ class CoreSetupValidationContributorTest extends TestCase
     public function test_it_accepts_valid_selected_contact_status_presets(): void
     {
         $this->setPresetPackage([
-            'general_default',
+            'default',
         ]);
 
-        Config::set('presets.modules.core.contact-statuses.groups.general_default', [
+        Config::set('presets.modules.core.contact-statuses.groups.default', [
             'new',
             'engaged',
         ]);
@@ -47,10 +47,10 @@ class CoreSetupValidationContributorTest extends TestCase
     public function test_it_reports_required_fields_key_mismatch_and_invalid_meta(): void
     {
         $this->setPresetPackage([
-            'general_default',
+            'default',
         ]);
 
-        Config::set('presets.modules.core.contact-statuses.groups.general_default', [
+        Config::set('presets.modules.core.contact-statuses.groups.default', [
             '__test_missing_key__',
             '__test_mismatched__',
             '__test_missing_name__',
@@ -91,10 +91,10 @@ class CoreSetupValidationContributorTest extends TestCase
     public function test_it_rejects_client_facing_nouns_in_internal_status_identifiers(): void
     {
         $this->setPresetPackage([
-            'general_default',
+            'default',
         ]);
 
-        Config::set('presets.modules.core.contact-statuses.groups.general_default', [
+        Config::set('presets.modules.core.contact-statuses.groups.default', [
             'new_lead',
         ]);
 
@@ -126,10 +126,10 @@ class CoreSetupValidationContributorTest extends TestCase
     public function test_it_warns_when_first_class_fields_are_duplicated_inside_meta(): void
     {
         $this->setPresetPackage([
-            'general_default',
+            'default',
         ]);
 
-        Config::set('presets.modules.core.contact-statuses.groups.general_default', [
+        Config::set('presets.modules.core.contact-statuses.groups.default', [
             'engaged',
         ]);
 

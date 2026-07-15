@@ -131,6 +131,14 @@ result
 
 Keep this role vocabulary intentionally small. Do not add Task-owned roles such as `pet`, `borrower`, `appointment`, `loan`, `customer`, or other module-specific concepts.
 
+TaskLink identity should remain minimal and deterministic:
+
+```text
+task_id + linkable_type + linkable_id + role
+```
+
+The same record should not be duplicated more than once for the same Task and role. A record may appear under different generic roles only when that distinction is truthful and useful. Task-link creation should normalize and de-duplicate equivalent links rather than creating duplicate rows accidentally.
+
 The linked module owns the domain meaning of its records. Tasks owns only the generic connection and generic role.
 
 ### Relationship design rules
@@ -286,6 +294,53 @@ Task template-backed live task creation resolves defaults in this order:
 
 `TaskTemplate.defaults` is real generic fallback data. It is not a dumping ground for values that already have first-class TaskTemplate columns.
 
+### TaskTemplate link defaults
+
+Task relationship defaults should use one explicit TaskTemplate-owned contract rather than the old single `related_subject` shape.
+
+Durable target:
+
+```text
+TaskTemplate.link_defaults
+    zero or more generic link-default definitions
+```
+
+Canonical authoring shape:
+
+```php
+'link_defaults' => [
+    [
+        'role' => 'subject',
+        'source' => 'current_contact',
+    ],
+],
+```
+
+Initial Tasks-owned source vocabulary:
+
+```text
+current_contact
+    The Core Contact supplied in the Task creation context.
+
+current_subject
+    The generic model/record supplied as the current domain subject by the caller.
+```
+
+Do not add source keys such as `current_pet`, `current_appointment`, `current_loan`, or other module-specific aliases to Tasks. A contributing module supplies its record through the generic `current_subject` creation context or passes explicit live Task links through a Tasks-owned public seam.
+
+Template link defaults are creation contracts, not hidden metadata suggestions. If a selected template requires a link default whose source cannot be resolved from the supplied creation context, the creation path should fail clearly rather than silently creating a less-contextual Task.
+
+Live Task links resolve separately from scalar/default field precedence:
+
+```text
+1. Resolve explicit caller-provided live links, if any.
+2. Resolve TaskTemplate.link_defaults against the supplied creation context.
+3. Merge and de-duplicate links by linkable identity + role.
+4. If neither source provides links, create an unlinked Task.
+```
+
+`TaskTemplate.defaults` should not become a second relationship-definition system. Do not also store `defaults.links`, arbitrary relationship IDs in `meta`, or a parallel `related_subject` contract.
+
 Task template preset sync should create DB-owned default task templates only. It should not create live tasks.
 
 Normal sync should preserve customized templates unless an explicit force behavior is chosen.
@@ -346,8 +401,9 @@ due/default shapes
 assignment strategy shapes
 responsibility shapes
 TaskLink role vocabulary
-Task-link default shapes once the implementation contract is finalized
-supported linked model/type declarations
+TaskTemplate.link_defaults shape and source vocabulary
+link-default resolvability through supplied creation context
+supported linked-model presentation/provider declarations
 vertical-contributed TaskTemplate genericity
 DB/runtime TaskTemplate availability
 canonical internal terminology
@@ -379,6 +435,7 @@ The current implementation does not yet satisfy the full durable target because 
 
 ```text
 single related_type / related_id relationship
+TaskTemplate.related_subject as the old single-subject default contract
 Contact-only allowed related types
 Contact-only related-subject presenter registration
 no dedicated Task index/show routes
@@ -392,7 +449,9 @@ Minimum implementation target:
 
 ```text
 [ ] Replace single related morph with TaskLink zero-to-many relationships.
+[ ] Replace TaskTemplate.related_subject with TaskTemplate.link_defaults.
 [ ] Support initial generic roles: subject, context, result.
+[ ] Support initial generic link-default sources: current_contact and current_subject.
 [ ] Preserve unlinked Tasks.
 [ ] Preserve Contact-linked Tasks through TaskLinks.
 [ ] Prove one existing non-Contact linked model cleanly.

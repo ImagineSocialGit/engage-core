@@ -1,5 +1,3 @@
-
-
 # Automation Opportunities
 
 This document defines Engage Core's durable architecture and product direction for noticing repeated meaningful manual work and suggesting automation without acting autonomously.
@@ -269,33 +267,32 @@ TaskController::store()
 
 Avoid placing manual-behavior recording in a generic domain action when that action is also used by FlowRoutes, system code, imports, provider sync, or other modules.
 
-Current Tasks producer behavior:
+Phase 12 target Tasks producer behavior:
 
 ```text
-Manual Contact-associated Task creation
-    evaluated as task.created_manually
+Manual no-template Task creation
+    primary evaluated Task-created pattern for task.created_manually
 
-Manual Contact status change -> manual Contact-associated Task creation
+Manual Contact status change -> manual Task linked to that Contact
     evaluated as task.created_after_manual_status_change
 
 Manual Task completion
-    recorded as task.completed_manually evidence only
+    recorded as task.completed_manually evidence only when the completion has explicit CRM/manual provenance
 
 Manual Task completion -> manual Contact status change
-    evaluated as contact.status_changed_after_manual_task_completion
+    evaluated as contact.status_changed_after_manual_task_completion when Contact attribution is explicit
 
-Supported AutomationEventRecorded evidence -> manual Contact-associated Task creation
-    evaluated as task.created_after_automation_event
+Supported AutomationEventRecorded evidence -> later manual Task linked to the same Contact
+    evaluated as task.created_after_automation_event when correlation is truthful and unambiguous
 
-Manual standalone Task
-    not currently observed
+Template-backed manual Task creation
+    not the primary generic repeated-ad-hoc-work signal; may still participate in a specific compound pattern when that supports a truthful automation suggestion
 
-FlowRoute-created Task
-    not manual behavior
-
-Module/system-created Task
+Automation-created Task
     not manual behavior
 ```
+
+Task linkage must be resolved through TaskLinks rather than a single `related` morph. Contact-specific compound patterns should require an explicit linked Contact context and must not guess from an unrelated link, assignee, or arbitrary metadata.
 
 The current correlation window for implemented compound patterns is 10 minutes.
 
@@ -418,32 +415,46 @@ Do not let the shared infrastructure guess that two module-specific actions are 
 
 ### Tasks example
 
-Preferred fingerprint inputs for a manual Contact-associated Task:
+The primary generic Task-created signal should focus on repeated manual no-template Tasks.
+
+Preferred generic fingerprint inputs:
 
 ```text
-related subject type
-task_template_key when available
-normalized title when no template exists
-Contact status key when available
+normalized title
+stable generic linked-subject type context when one unambiguous subject link exists
+other compact Task-owned semantics only when they materially define equivalence
 ```
+
+Do not include linked record database IDs in the fingerprint merely because the Task is linked. Distinct subject counting and semantic equivalence are separate concerns.
 
 Example:
 
 ```text
 action_key = task.created_manually
-related_subject_type = contact
-contact_status_key = attempting_contact
-task_template_key = call_contact
+normalized_title = call this contact
+linked_subject_type = contact
 ```
 
-When no template exists:
+For an unlinked Task:
 
 ```text
 action_key = task.created_manually
-related_subject_type = contact
-contact_status_key = attempting_contact
+normalized_title = prepare quarterly marketing plan
+linked_subject_type = null
+```
+
+When one unambiguous `subject` TaskLink exists, that linked record may be used as the behavior occurrence subject for distinct-subject qualification. When no such link exists or several competing subject links make attribution ambiguous, prefer the Task itself or silence according to the producer's specific suggestion contract rather than guessing.
+
+Contact-specific compound patterns may add Contact status or event context when a Contact is explicitly linked and the causal rule requires it:
+
+```text
+action_key = task.created_after_manual_status_change
+from_status_key = new
+to_status_key = attempting_contact
 normalized_title = call this contact
 ```
+
+A template-backed Task may still participate in a specific compound automation suggestion by stable `task_template_key`, but repeated template-backed creation is not the primary generic "you keep creating this ad hoc task" signal because reusable template identity already exists.
 
 Do not include incidental values such as database IDs, exact timestamps, or due dates in a fingerprint unless the owning module deliberately defines them as part of equivalence.
 

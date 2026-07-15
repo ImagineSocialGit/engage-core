@@ -31,9 +31,9 @@ class CampaignsSetupValidationContributorTest extends TestCase
 
     public function test_it_accepts_valid_selected_campaign_preset(): void
     {
-        $this->setPresetPackage(['general_default']);
+        $this->setPresetPackage(['default']);
 
-        Config::set('presets.modules.webinars.campaigns.groups.general_default', [
+        Config::set('presets.modules.webinars.campaigns.groups.default', [
             'test_campaign',
         ]);
 
@@ -74,9 +74,9 @@ class CampaignsSetupValidationContributorTest extends TestCase
 
     public function test_it_warns_when_selected_campaign_has_orphaned_messaging_template_variant(): void
     {
-        $this->setPresetPackage(['general_default']);
+        $this->setPresetPackage(['default']);
 
-        Config::set('presets.modules.webinars.campaigns.groups.general_default', [
+        Config::set('presets.modules.webinars.campaigns.groups.default', [
             'test_campaign',
         ]);
 
@@ -150,9 +150,9 @@ class CampaignsSetupValidationContributorTest extends TestCase
 
     public function test_it_reports_invalid_strategy_duplicate_identity_and_reusable_copy(): void
     {
-        $this->setPresetPackage(['general_default']);
+        $this->setPresetPackage(['default']);
 
-        Config::set('presets.modules.webinars.campaigns.groups.general_default', [
+        Config::set('presets.modules.webinars.campaigns.groups.default', [
             'invalid_campaign',
         ]);
 
@@ -216,9 +216,9 @@ class CampaignsSetupValidationContributorTest extends TestCase
 
     public function test_it_reports_invalid_dependency_sibling_state_and_self_reference(): void
     {
-        $this->setPresetPackage(['general_default']);
+        $this->setPresetPackage(['default']);
 
-        Config::set('presets.modules.webinars.campaigns.groups.general_default', [
+        Config::set('presets.modules.webinars.campaigns.groups.default', [
             'dependency_campaign',
         ]);
 
@@ -267,9 +267,9 @@ class CampaignsSetupValidationContributorTest extends TestCase
 
     public function test_it_warns_when_dependency_rules_are_dormant_under_non_dependency_strategy(): void
     {
-        $this->setPresetPackage(['general_default']);
+        $this->setPresetPackage(['default']);
 
-        Config::set('presets.modules.webinars.campaigns.groups.general_default', [
+        Config::set('presets.modules.webinars.campaigns.groups.default', [
             'dormant_dependency_campaign',
         ]);
 

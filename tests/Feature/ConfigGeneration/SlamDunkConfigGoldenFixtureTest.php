@@ -64,7 +64,7 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
         $this->assertIsArray($package);
         $this->assertSame([
             'contact_statuses' => ['slam_dunk_crm_default', 'webinar_default'],
-            'tasks' => ['general_default', 'webinar_default'],
+            'tasks' => ['default', 'webinar_default'],
             'flow_routes' => ['webinar_default'],
             'campaigns' => ['webinar_default'],
         ], $package['groups'] ?? null);

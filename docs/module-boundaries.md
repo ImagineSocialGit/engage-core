@@ -1633,6 +1633,14 @@ context
 result
 ```
 
+TaskLink identity should remain minimal and deterministic:
+
+```text
+task_id + linkable_type + linkable_id + role
+```
+
+Equivalent Task links should be de-duplicated. The same record may appear under different generic roles only when that distinction is truthful and useful.
+
 Do not preserve both a single `tasks.related_type / related_id` morph and a separate multi-link system. Use one canonical relationship model.
 
 A Task may be:
@@ -1683,6 +1691,34 @@ TaskTemplates are optional reusable definitions/defaults for manual Tasks and re
 Task preset sync may create/update `task_templates`, but it must not create live `tasks`.
 
 Other modules should request Task/TaskLink creation through Tasks-owned public actions/services rather than directly creating rows when a public seam exists.
+
+### TaskTemplate relationship defaults
+
+The old single `related_subject` template concept should be replaced by one explicit Tasks-owned `link_defaults` contract.
+
+Canonical shape:
+
+```php
+'link_defaults' => [
+    [
+        'role' => 'subject',
+        'source' => 'current_contact',
+    ],
+],
+```
+
+Initial Tasks-owned sources:
+
+```text
+current_contact
+current_subject
+```
+
+`current_subject` is generic caller-supplied domain context. Tasks must not maintain source keys or inventories for every installed module.
+
+A selected template link default that cannot resolve from creation context should fail clearly rather than silently disappearing. Explicit caller links and resolved template defaults should merge and de-duplicate through Tasks-owned public behavior.
+
+Do not keep `TaskTemplate.related_subject`, `defaults.links`, Task relationship IDs in `meta`, and `link_defaults` as competing relationship-default systems.
 
 ### Core-only operational contract
 
@@ -3402,5 +3438,3 @@ A config/reference file is treated as an executable global allowlist.
 ```
 
 Treat available-field validation as setup/config-validation work. Future editor autocomplete should be a consumer of the existing registry/validator, not a second validation system.
-
-

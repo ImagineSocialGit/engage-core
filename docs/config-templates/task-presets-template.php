@@ -12,15 +12,15 @@ return [
     | config/presets/modules/{contributor-module}/tasks.php
     | client/{client-key}/config/presets/modules/{contributor-module}/tasks.php
     |
-    | Task presets create/update DB-owned task templates only.
-    | They must not create live tasks.
+    | Task presets create/update DB-owned TaskTemplate records only.
+    | They must not create live Tasks.
     |
-    | Runtime task creation should use CreateTaskAction or
+    | Runtime Task creation should use CreateTaskAction or
     | CreateTaskFromTemplateAction.
     |
-    | due_offset_minutes is the canonical delay field for task templates.
+    | due_offset_minutes is the canonical delay field for Task templates.
     | due_offset_days may be accepted by legacy/adapted config paths, but new
-    | presets should use due_offset_minutes so sub-day task defaults can be
+    | presets should use due_offset_minutes so sub-day Task defaults can be
     | represented without adding parallel timing semantics.
     */
 
@@ -29,7 +29,8 @@ return [
     | Runtime/default precedence
     |--------------------------------------------------------------------------
     |
-    | Template-backed live task creation resolves values in this order:
+    | Template-backed live Task creation resolves ordinary Task values in this
+    | order:
     |
     | 1. explicit caller value
     | 2. first-class TaskTemplate field
@@ -41,18 +42,57 @@ return [
     | defaults only for genuine generic fallback data.
     |
     | A live Task may store nullable task_template_id plus durable
-    | task_template_key identity. Historical tasks must survive template
+    | task_template_key identity. Historical Tasks must survive TaskTemplate
     | deletion/replacement safely.
     |
     | Durable origin rule:
     |
     | - no-template Tasks are manual only;
     | - template-backed Tasks may be manual or automation-created.
+    */
+
+    /*
+    |--------------------------------------------------------------------------
+    | TaskLink defaults
+    |--------------------------------------------------------------------------
     |
-    | Task relationships are moving to zero-to-many TaskLinks with the generic
-    | roles subject, context, and result. Do not add new related_subject examples
-    | here until the Tasks-owned TaskLink preset/default contract is implemented.
+    | Live Task relationships use zero-to-many TaskLinks. TaskTemplate presets may
+    | declare generic relationship defaults through first-class link_defaults.
     |
+    | Initial generic TaskLink roles:
+    |
+    | - subject
+    | - context
+    | - result
+    |
+    | Initial generic link-default sources:
+    |
+    | - current_contact
+    | - current_subject
+    |
+    | These sources describe generic creation context. They are not module or model
+    | inventories, and Tasks must not add sources such as current_pet,
+    | current_appointment, current_document, or other module-specific variants.
+    |
+    | Template-backed creation resolves links in this order:
+    |
+    | 1. explicit caller-provided live links;
+    | 2. TaskTemplate.link_defaults resolved from creation context;
+    | 3. merge and de-duplicate by linkable identity plus role.
+    |
+    | If neither explicit links nor resolvable defaults provide links, the Task may
+    | remain unlinked.
+    |
+    | If a selected link_default requires creation context that is unavailable,
+    | fail clearly rather than silently dropping intended relationship context.
+    |
+    | Do not create competing relationship-default systems through:
+    |
+    | - related_subject;
+    | - defaults.links;
+    | - arbitrary relationship IDs in meta.
+    |
+    | link_defaults is the canonical TaskTemplate relationship-default contract.
     */
 
     /*
@@ -64,19 +104,19 @@ return [
     | including missing selected groups and duplicate contributed group/definition
     | keys.
     |
-    | Tasks owns semantic validation of selected Task template definitions:
+    | Tasks owns semantic validation of selected TaskTemplate definitions:
     | malformed definitions, stable key identity, invalid responsibility or
-    | assignment strategies, due/default shapes, and references that cannot create
-    | a safe live Task.
+    | assignment strategies, due/default shapes, link-default roles/sources, and
+    | references that cannot create a safe live Task.
     |
     | FlowRoutes may reference Task templates by stable key. Tasks remains the
-    | authority for Task template definition semantics and DB/runtime availability,
+    | authority for TaskTemplate definition semantics and DB/runtime availability,
     | while FlowRoutes owns validation of its own create_task reference.
     |
     */
 
     'groups' => [
-        'crm_default' => [
+        'default' => [
             'call_contact',
             'review_contact_notes',
         ],
@@ -92,17 +132,18 @@ return [
             'responsible_party' => 'internal',
             'assigned_to_strategy' => 'unassigned',
             'source' => 'preset',
-            'source_version' => '2026_07_phase_3',
+            'source_version' => '2026_07_phase_12',
             'owner_group' => 'sales',
             'category' => 'follow_up',
             'is_active' => true,
             'due_offset_minutes' => 1440,
-            'defaults' => [
-                'due' => [
-                    'type' => 'delay',
-                    'minutes' => 1440,
+            'link_defaults' => [
+                [
+                    'role' => 'subject',
+                    'source' => 'current_contact',
                 ],
             ],
+            'defaults' => [],
             'meta' => [],
         ],
 
@@ -115,16 +156,20 @@ return [
             'responsible_party' => 'internal',
             'assigned_to_strategy' => 'unassigned',
             'source' => 'preset',
-            'source_version' => '2026_07_phase_3',
+            'source_version' => '2026_07_phase_12',
             'owner_group' => 'sales',
             'category' => 'review',
             'is_active' => true,
             'due_offset_minutes' => 2880,
+            'link_defaults' => [
+                [
+                    'role' => 'subject',
+                    'source' => 'current_contact',
+                ],
+            ],
             'defaults' => [],
             'meta' => [],
         ],
     ],
 
 ];
-
-

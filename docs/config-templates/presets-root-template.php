@@ -139,7 +139,7 @@ return [
                     'default',
                 ],
                 'tasks' => [
-                    'general_default',
+                    'default',
                 ],
                 'campaigns' => [],
                 'flow_routes' => [],
@@ -164,7 +164,7 @@ return [
                     'default',
                 ],
                 'tasks' => [
-                    'general_default',
+                    'default',
                 ],
                 'campaigns' => [],
                 'flow_routes' => [],
@@ -190,7 +190,7 @@ return [
                     'default',
                 ],
                 'tasks' => [
-                    'general_default',
+                    'default',
                 ],
                 'campaigns' => [],
                 'flow_routes' => [],

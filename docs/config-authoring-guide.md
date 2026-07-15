@@ -1807,7 +1807,53 @@ FlowRoute presets own automation/control-flow route definitions and point defini
 
 Because FlowRoutes `create_task` is an automation creation path, every selected `create_task` point must reference a DB-owned TaskTemplate through a stable task template key. Inline arbitrary no-template automated Task creation is not part of the durable target.
 
-Task relationship defaults are moving from the single `related_subject` concept to generic zero-to-many TaskLinks. Do not invent a replacement preset shape until the Tasks-owned TaskLink config/runtime contract is implemented and validated. The first TaskLink roles are `subject`, `context`, and `result`.
+Task relationship defaults use `TaskTemplate.link_defaults`; do not preserve the old single `related_subject` contract beside it.
+
+Canonical shape:
+
+```php
+'link_defaults' => [
+    [
+        'role' => 'subject',
+        'source' => 'current_contact',
+    ],
+],
+```
+
+Initial TaskLink roles:
+
+```text
+subject
+context
+result
+```
+
+Initial Tasks-owned link-default sources:
+
+```text
+current_contact
+current_subject
+```
+
+Rules:
+
+```text
+current_contact
+    resolves from Core Contact creation context
+
+current_subject
+    resolves from generic caller-provided domain subject context
+
+unknown source
+    validation error
+
+unresolvable selected link default
+    creation/runtime error; do not silently omit intended context
+```
+
+Do not invent module-specific Task link-default sources such as `current_pet`, `current_appointment`, or `current_loan`. Contributing modules pass their record through generic `current_subject` context or explicit live Task links using Tasks-owned public seams.
+
+Do not also define `defaults.links`, arbitrary relationship IDs in `meta`, or a parallel `related_subject` field. Explicit caller links and resolved template link defaults should merge and de-duplicate by linkable identity + generic role.
 
 FlowRoute presets should call other module capabilities through public actions/services/contracts, not private table internals.
 
@@ -1819,6 +1865,7 @@ Config/setup validation should check:
 
 ```text
 Task preset shape.
+TaskTemplate.link_defaults role/source shape and resolvability contract.
 Task template references from FlowRoute presets.
 FlowRoute point types.
 Module capability references.
@@ -2004,5 +2051,3 @@ business context label
 ```
 
 Do not persist schedule summary text unless a concrete reason appears. Prefer deriving it from the canonical schedule/profile/criteria definition.
-
-

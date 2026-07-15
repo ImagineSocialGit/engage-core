@@ -16,7 +16,7 @@ class TaskPresetSyncOwnershipTest extends TestCase
     public function test_same_definition_selected_by_multiple_groups_is_persisted_once(): void
     {
         $resolved = $this->resolved(
-            selectedGroups: ['general_default', 'extended_default'],
+            selectedGroups: ['default', 'extended_default'],
             selectedContributors: ['tasks'],
             definitions: [
                 'general.follow_up' => [
@@ -30,7 +30,7 @@ class TaskPresetSyncOwnershipTest extends TestCase
                 ],
             ],
             definitionGroups: [
-                'general.follow_up' => ['general_default', 'extended_default'],
+                'general.follow_up' => ['default', 'extended_default'],
             ],
         );
 
@@ -55,7 +55,7 @@ class TaskPresetSyncOwnershipTest extends TestCase
         $this->presetTemplate('webinar.review_reply', 'webinars');
 
         $resolved = $this->resolved(
-            selectedGroups: ['general_default'],
+            selectedGroups: ['default'],
             selectedContributors: ['tasks'],
             definitions: [
                 'general.follow_up' => [
@@ -69,7 +69,7 @@ class TaskPresetSyncOwnershipTest extends TestCase
                 ],
             ],
             definitionGroups: [
-                'general.follow_up' => ['general_default'],
+                'general.follow_up' => ['default'],
             ],
         );
 
@@ -89,7 +89,7 @@ class TaskPresetSyncOwnershipTest extends TestCase
         $template = $this->presetTemplate('general.old', 'tasks', customized: true);
 
         $resolved = $this->resolved(
-            selectedGroups: ['general_default'],
+            selectedGroups: ['default'],
             selectedContributors: ['tasks'],
             definitions: [],
             provenance: [],
@@ -111,7 +111,7 @@ class TaskPresetSyncOwnershipTest extends TestCase
         $template = $this->presetTemplate('general.old', 'tasks', customized: true);
 
         $resolved = $this->resolved(
-            selectedGroups: ['general_default'],
+            selectedGroups: ['default'],
             selectedContributors: ['tasks'],
             definitions: [],
             provenance: [],
