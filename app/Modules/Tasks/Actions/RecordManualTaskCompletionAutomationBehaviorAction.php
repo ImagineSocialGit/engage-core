@@ -2,9 +2,9 @@
 
 namespace App\Modules\Tasks\Actions;
 
-use App\Modules\Core\Models\Contact;
 use App\Modules\Tasks\Events\TaskCompleted;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Services\TaskContactLinkResolver;
 use App\Support\AutomationOpportunities\Actions\AutomationBehaviorAction;
 use App\Support\AutomationOpportunities\Data\AutomationBehaviorData;
 use App\Support\AutomationOpportunities\Models\AutomationBehaviorOccurrence;
@@ -15,15 +15,10 @@ class RecordManualTaskCompletionAutomationBehaviorAction extends AutomationBehav
 {
     public const ACTION_KEY = 'task.completed_manually';
 
-    public function handle(TaskCompleted $event): ?AutomationBehaviorOccurrence
-    {
+    public function handle(
+        TaskCompleted $event,
+    ): ?AutomationBehaviorOccurrence {
         if (! $this->isManualCrmCompletion($event)) {
-            return null;
-        }
-
-        $contact = $this->relatedContact($event->task);
-
-        if (! $contact) {
             return null;
         }
 
@@ -32,6 +27,10 @@ class RecordManualTaskCompletionAutomationBehaviorAction extends AutomationBehav
         if (! $actor) {
             return null;
         }
+
+        $contact = app(TaskContactLinkResolver::class)->resolve(
+            $event->task,
+        );
 
         $taskTemplateKey = $this->taskTemplateKey($event->task);
         $normalizedTitle = $taskTemplateKey === null
@@ -42,7 +41,7 @@ class RecordManualTaskCompletionAutomationBehaviorAction extends AutomationBehav
             AutomationBehaviorData::make(
                 actionKey: self::ACTION_KEY,
                 actor: $actor,
-                subject: $contact,
+                subject: $contact ?? $event->task,
                 fingerprintParts: [
                     'task_template_key' => $taskTemplateKey,
                     'normalized_title' => $normalizedTitle,
@@ -52,6 +51,7 @@ class RecordManualTaskCompletionAutomationBehaviorAction extends AutomationBehav
                     'task_title' => $event->task->title,
                     'task_template_key' => $taskTemplateKey,
                     'task_completed_at' => $event->occurredAt->toISOString(),
+                    'contact_id' => $contact?->getKey(),
                 ],
                 meta: [
                     'source' => $event->source,
@@ -70,21 +70,6 @@ class RecordManualTaskCompletionAutomationBehaviorAction extends AutomationBehav
             && is_string($event->actorType)
             && trim($event->actorType) !== ''
             && $event->actorId !== null;
-    }
-
-    private function relatedContact(Task $task): ?Contact
-    {
-        if (! $task->related_type || ! $task->related_id) {
-            return null;
-        }
-
-        $contactMorphClass = (new Contact())->getMorphClass();
-
-        if (! in_array($task->related_type, [Contact::class, $contactMorphClass], true)) {
-            return null;
-        }
-
-        return Contact::query()->find($task->related_id);
     }
 
     private function actor(TaskCompleted $event): ?Model

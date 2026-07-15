@@ -34,7 +34,7 @@ return new class extends Migration
             $table->string('priority')->nullable()->index();
             $table->integer('due_offset_minutes')->nullable();
 
-            $table->json('related_subject')->nullable();
+            $table->json('link_defaults')->nullable();
             $table->json('defaults')->nullable();
 
             $table->boolean('is_active')->default(true)->index();

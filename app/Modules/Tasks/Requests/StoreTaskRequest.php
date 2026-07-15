@@ -3,7 +3,9 @@
 namespace App\Modules\Tasks\Requests;
 
 use App\Modules\Tasks\Models\Task;
-use App\Modules\Tasks\Services\TaskRelatedTypeResolver;
+use App\Modules\Tasks\Models\TaskLink;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -17,26 +19,32 @@ class StoreTaskRequest extends FormRequest
 
     public function rules(): array
     {
-        $relatedTypeResolver = app(TaskRelatedTypeResolver::class);
-
         return [
-            'related_type' => [
-                'nullable',
+            'links' => ['nullable', 'array'],
+            'links.*.role' => [
+                'required',
                 'string',
-                'required_with:related_id',
-                Rule::in($relatedTypeResolver->allowedTypeKeys()),
+                Rule::in(TaskLink::ROLES),
+            ],
+            'links.*.linkable_type' => [
+                'required',
+                'string',
+            ],
+            'links.*.linkable_id' => [
+                'required',
+                'integer',
             ],
 
-            'related_id' => [
+            'assigned_to_type' => [
                 'nullable',
-                'integer',
-                'required_with:related_type',
+                'string',
+                'required_with:assigned_to_id',
             ],
 
             'assigned_to_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('team_members', 'id')->where('is_active', true),
+                'required_with:assigned_to_type',
             ],
 
             'responsible_party' => [
@@ -49,7 +57,6 @@ class StoreTaskRequest extends FormRequest
                 'nullable',
                 'string',
                 'required_with:responsible_id',
-                Rule::in($relatedTypeResolver->allowedTypeKeys()),
             ],
 
             'responsible_id' => [
@@ -76,14 +83,11 @@ class StoreTaskRequest extends FormRequest
 
         $validated['responsible_party'] ??= Task::RESPONSIBLE_PARTY_INTERNAL;
 
-        $relatedTypeResolver = app(TaskRelatedTypeResolver::class);
-
         $this->normalizeExistingMorph(
             validated: $validated,
-            typeKey: 'related_type',
-            idKey: 'related_id',
-            invalidIdField: 'related_id',
-            relatedTypeResolver: $relatedTypeResolver,
+            typeKey: 'assigned_to_type',
+            idKey: 'assigned_to_id',
+            invalidIdField: 'assigned_to_id',
         );
 
         $this->normalizeExistingMorph(
@@ -91,7 +95,10 @@ class StoreTaskRequest extends FormRequest
             typeKey: 'responsible_type',
             idKey: 'responsible_id',
             invalidIdField: 'responsible_id',
-            relatedTypeResolver: $relatedTypeResolver,
+        );
+
+        $validated['links'] = $this->normalizeLinks(
+            $validated['links'] ?? [],
         );
 
         return $validated;
@@ -105,23 +112,107 @@ class StoreTaskRequest extends FormRequest
         string $typeKey,
         string $idKey,
         string $invalidIdField,
-        TaskRelatedTypeResolver $relatedTypeResolver,
     ): void {
         if (! isset($validated[$typeKey], $validated[$idKey])) {
             return;
         }
 
-        $validated[$typeKey] = $relatedTypeResolver->normalize(
-            $validated[$typeKey],
-        );
-
-        if (! $relatedTypeResolver->exists(
+        $model = $this->resolveModel(
             type: $validated[$typeKey],
             id: $validated[$idKey],
-        )) {
+            invalidField: $invalidIdField,
+        );
+
+        $validated[$typeKey] = $model->getMorphClass();
+        $validated[$idKey] = (int) $model->getKey();
+    }
+
+    /**
+     * @param array<int, mixed> $links
+     * @return array<int, array{
+     *     role: string,
+     *     linkable_type: string,
+     *     linkable_id: int
+     * }>
+     */
+    private function normalizeLinks(array $links): array
+    {
+        $normalized = [];
+
+        foreach ($links as $index => $link) {
+            if (! is_array($link)) {
+                continue;
+            }
+
+            $model = $this->resolveModel(
+                type: $link['linkable_type'] ?? null,
+                id: $link['linkable_id'] ?? null,
+                invalidField: "links.{$index}.linkable_id",
+            );
+
+            $role = $link['role'];
+
+            $attributes = [
+                'role' => $role,
+                'linkable_type' => $model->getMorphClass(),
+                'linkable_id' => (int) $model->getKey(),
+            ];
+
+            $identity = implode(':', [
+                $attributes['linkable_type'],
+                $attributes['linkable_id'],
+                $attributes['role'],
+            ]);
+
+            $normalized[$identity] = $attributes;
+        }
+
+        return array_values($normalized);
+    }
+
+    private function resolveModel(
+        mixed $type,
+        mixed $id,
+        string $invalidField,
+    ): Model {
+        $modelClass = $this->modelClass($type);
+        $modelId = is_numeric($id) ? (int) $id : null;
+
+        if ($modelClass === null || $modelId === null) {
             throw ValidationException::withMessages([
-                $invalidIdField => 'The selected record is invalid.',
+                $invalidField => 'The selected record is invalid.',
             ]);
         }
+
+        $model = $modelClass::query()->find($modelId);
+
+        if (! $model instanceof Model) {
+            throw ValidationException::withMessages([
+                $invalidField => 'The selected record is invalid.',
+            ]);
+        }
+
+        return $model;
+    }
+
+    /**
+     * @return class-string<Model>|null
+     */
+    private function modelClass(mixed $type): ?string
+    {
+        if (! is_string($type) || trim($type) === '') {
+            return null;
+        }
+
+        $type = trim($type);
+        $modelClass = Relation::getMorphedModel($type) ?? $type;
+
+        if (! class_exists($modelClass)
+            || ! is_subclass_of($modelClass, Model::class)
+        ) {
+            return null;
+        }
+
+        return $modelClass;
     }
 }

@@ -2,111 +2,388 @@
 
 namespace App\Modules\Tasks\Actions;
 
-use App\Modules\Core\Models\Contact;
-use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Models\TaskLink;
 use App\Modules\Tasks\Models\TaskTemplate;
+use App\Modules\Tasks\Services\TaskAssignmentStrategyResolver;
+use App\Modules\Tasks\Services\TaskContactLinkResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class CreateTaskAction
 {
+    public function __construct(
+        private readonly TaskAssignmentStrategyResolver $assignmentStrategies,
+        private readonly TaskContactLinkResolver $contactLinks,
+    ) {}
+
     /** @param array<string, mixed> $data */
     public function handle(array $data): Task
     {
-        [$relatedType, $relatedId] = $this->optionalMorphPair($data['related_type'] ?? null, $data['related_id'] ?? null, 'related');
-        [$assignedToType, $assignedToId] = $this->assignedToMorphPair($data['assigned_to_type'] ?? null, $data['assigned_to_id'] ?? null, $data['assigned_to_strategy'] ?? $data['assigned_to'] ?? null);
-        $responsibleParty = $this->responsibleParty($data['responsible_party'] ?? null);
-        [$responsibleType, $responsibleId] = $this->responsibleMorphPair($responsibleParty, $data['responsible_type'] ?? null, $data['responsible_id'] ?? null, $relatedType, $relatedId);
+        $source = $this->source($data['source'] ?? Task::SOURCE_MANUAL);
+        [$taskTemplateId, $taskTemplateKey] = $this->taskTemplatePair(
+            $data['task_template_id'] ?? null,
+            $data['task_template_key'] ?? null,
+        );
 
-        return Task::query()->create([
-            'related_type' => $relatedType,
-            'related_id' => $relatedId,
-            'assigned_to_type' => $assignedToType,
-            'assigned_to_id' => $assignedToId,
-            'responsible_party' => $responsibleParty,
-            'responsible_type' => $responsibleType,
-            'responsible_id' => $responsibleId,
-            'flow_route_progress_id' => $this->nullableInt($data['flow_route_progress_id'] ?? null),
-            'flow_route_plan_id' => $this->nullableInt($data['flow_route_plan_id'] ?? null),
-            'flow_route_plan_item_id' => $this->nullableInt($data['flow_route_plan_item_id'] ?? null),
-            'flow_route_progress_item_id' => $this->nullableInt($data['flow_route_progress_item_id'] ?? null),
-            'flow_route_id' => $this->nullableInt($data['flow_route_id'] ?? null),
-            'flow_route_point_id' => $this->nullableInt($data['flow_route_point_id'] ?? null),
-            'flow_route_capability_id' => $this->nullableInt($data['flow_route_capability_id'] ?? null),
-            'task_template_id' => $this->nullableInt($data['task_template_id'] ?? null),
-            'task_template_key' => $this->nullableString($data['task_template_key'] ?? null),
-            'source' => $data['source'] ?? Task::SOURCE_SYSTEM,
-            'title' => $this->requiredString($data['title'] ?? null, 'title'),
-            'description' => $data['description'] ?? null,
-            'due_at' => $data['due_at'] ?? $this->dueAt($data['due_offset_minutes'] ?? null),
-            'status' => $data['status'] ?? Task::STATUS_OPEN,
-            'priority' => $data['priority'] ?? null,
-            'meta' => $data['meta'] ?? null,
-        ]);
+        if ($source !== Task::SOURCE_MANUAL && $taskTemplateId === null) {
+            throw new InvalidArgumentException(
+                'Automation-created Tasks must be template-backed.'
+            );
+        }
+
+        $links = $this->normalizeLinks($data['links'] ?? []);
+
+        [$assignedToType, $assignedToId] = $this->assignedToMorphPair(
+            assignedToType: $data['assigned_to_type'] ?? null,
+            assignedToId: $data['assigned_to_id'] ?? null,
+            assignedToStrategy: $data['assigned_to_strategy'] ?? $data['assigned_to'] ?? null,
+            context: is_array($data['assignment_context'] ?? null)
+                ? $data['assignment_context']
+                : [],
+        );
+
+        $responsibleParty = $this->responsibleParty(
+            $data['responsible_party'] ?? null,
+        );
+
+        [$responsibleType, $responsibleId] = $this->optionalMorphPair(
+            $data['responsible_type'] ?? null,
+            $data['responsible_id'] ?? null,
+            'responsible',
+        );
+
+        return DB::transaction(function () use (
+            $data,
+            $source,
+            $taskTemplateId,
+            $taskTemplateKey,
+            $links,
+            $assignedToType,
+            $assignedToId,
+            $responsibleParty,
+            $responsibleType,
+            $responsibleId,
+        ): Task {
+            $task = Task::query()->create([
+                'assigned_to_type' => $assignedToType,
+                'assigned_to_id' => $assignedToId,
+                'responsible_party' => $responsibleParty,
+                'responsible_type' => $responsibleType,
+                'responsible_id' => $responsibleId,
+                'task_template_id' => $taskTemplateId,
+                'task_template_key' => $taskTemplateKey,
+                'source' => $source,
+                'title' => $this->requiredString($data['title'] ?? null, 'title'),
+                'description' => $data['description'] ?? null,
+                'due_at' => $data['due_at'] ?? $this->dueAt($data['due_offset_minutes'] ?? null),
+                'status' => $data['status'] ?? Task::STATUS_OPEN,
+                'priority' => $data['priority'] ?? null,
+                'meta' => $data['meta'] ?? null,
+            ]);
+
+            foreach ($links as $link) {
+                $task->links()->firstOrCreate($link);
+            }
+
+            if ($responsibleParty === Task::RESPONSIBLE_PARTY_CONTACT
+                && $responsibleType === null
+                && $responsibleId === null
+            ) {
+                $contact = $this->contactLinks->resolve($task);
+
+                if ($contact) {
+                    $task->forceFill([
+                        'responsible_type' => $contact->getMorphClass(),
+                        'responsible_id' => $contact->getKey(),
+                    ])->save();
+                }
+            }
+
+            return $task->fresh(['links', 'taskTemplate']) ?? $task;
+        });
     }
 
-    private function assignedToMorphPair(mixed $assignedToType, mixed $assignedToId, mixed $assignedToStrategy = null): array
-    {
-        $id = $this->nullableInt($assignedToId);
-        if ($id !== null) return [$this->morphType($assignedToType) ?? $this->morphType(TeamMember::class), $id];
-        $strategy = is_string($assignedToStrategy) ? trim($assignedToStrategy) : null;
-        if ($strategy === null || $strategy === '' || $strategy === TaskTemplate::ASSIGNED_TO_STRATEGY_UNASSIGNED) return [null, null];
-        if ($strategy !== TaskTemplate::ASSIGNED_TO_STRATEGY_ONLY_ACTIVE_TEAM_MEMBER) throw new InvalidArgumentException("Invalid task assignment strategy [{$strategy}].");
-        $teamMembers = TeamMember::query()->active()->get();
-        if ($teamMembers->count() !== 1) throw new InvalidArgumentException('create_task_only_active_team_member_not_resolved');
-        $teamMember = $teamMembers->first();
-        return [$teamMember->getMorphClass(), $teamMember->getKey()];
-    }
+    /**
+     * @param array<string, mixed> $context
+     * @return array{0: ?string, 1: ?int}
+     */
+    private function assignedToMorphPair(
+        mixed $assignedToType,
+        mixed $assignedToId,
+        mixed $assignedToStrategy,
+        array $context,
+    ): array {
+        [$type, $id] = $this->optionalMorphPair(
+            $assignedToType,
+            $assignedToId,
+            'assigned_to',
+        );
 
-    private function responsibleMorphPair(string $responsibleParty, mixed $responsibleType, mixed $responsibleId, ?string $relatedType, ?int $relatedId): array
-    {
-        $type = $this->morphType($responsibleType); $id = $this->nullableInt($responsibleId);
-        if ($type !== null || $id !== null) {
-            if ($type === null || $id === null) throw new InvalidArgumentException('Incomplete task responsible morph.');
+        if ($type !== null && $id !== null) {
             return [$type, $id];
         }
-        if ($responsibleParty === Task::RESPONSIBLE_PARTY_CONTACT && $relatedId !== null && $this->isContactMorph($relatedType)) return [$this->morphType(Contact::class), $relatedId];
-        return [null, null];
+
+        $strategy = is_string($assignedToStrategy)
+            ? trim($assignedToStrategy)
+            : null;
+
+        $assignee = $this->assignmentStrategies->resolve($strategy, $context);
+
+        if (! $assignee) {
+            return [null, null];
+        }
+
+        return [
+            $assignee->getMorphClass(),
+            (int) $assignee->getKey(),
+        ];
     }
 
-    private function optionalMorphPair(mixed $type, mixed $id, string $field): array
-    {
-        $normalizedType = $this->morphType($type); $normalizedId = $this->nullableInt($id);
-        if ($normalizedType === null && $normalizedId === null) return [null, null];
-        if ($normalizedType === null || $normalizedId === null) throw new InvalidArgumentException("Incomplete task {$field} morph.");
+    /**
+     * @return array{0: ?string, 1: ?int}
+     */
+    private function optionalMorphPair(
+        mixed $type,
+        mixed $id,
+        string $field,
+    ): array {
+        $normalizedType = $this->morphType($type);
+        $normalizedId = $this->nullableInt($id);
+
+        if ($normalizedType === null && $normalizedId === null) {
+            return [null, null];
+        }
+
+        if ($normalizedType === null || $normalizedId === null) {
+            throw new InvalidArgumentException("Incomplete task {$field} morph.");
+        }
+
         return [$normalizedType, $normalizedId];
+    }
+
+    /**
+     * @return array{0: ?int, 1: ?string}
+     */
+    private function taskTemplatePair(
+        mixed $templateId,
+        mixed $templateKey,
+    ): array {
+        $id = $this->nullableInt($templateId);
+        $key = $this->nullableString($templateKey);
+
+        if ($id === null && $key === null) {
+            return [null, null];
+        }
+
+        if ($id === null || $key === null) {
+            throw new InvalidArgumentException(
+                'Incomplete task template identity.'
+            );
+        }
+
+        $exists = TaskTemplate::query()
+            ->whereKey($id)
+            ->where('key', $key)
+            ->exists();
+
+        if (! $exists) {
+            throw new InvalidArgumentException(
+                "Task template identity [{$id}:{$key}] is invalid."
+            );
+        }
+
+        return [$id, $key];
+    }
+
+    /**
+     * @return array<int, array{
+     *     linkable_type: string,
+     *     linkable_id: int,
+     *     role: string
+     * }>
+     */
+    private function normalizeLinks(mixed $links): array
+    {
+        if ($links === null) {
+            return [];
+        }
+
+        if (! is_array($links)) {
+            throw new InvalidArgumentException('Task links must be an array.');
+        }
+
+        $normalized = [];
+
+        foreach ($links as $index => $link) {
+            if (! is_array($link)) {
+                throw new InvalidArgumentException(
+                    "Task link [{$index}] must be an array."
+                );
+            }
+
+            $role = $this->requiredString(
+                $link['role'] ?? null,
+                "links.{$index}.role",
+            );
+
+            if (! in_array($role, TaskLink::ROLES, true)) {
+                throw new InvalidArgumentException(
+                    "Invalid TaskLink role [{$role}]."
+                );
+            }
+
+            $linkable = $link['linkable'] ?? null;
+
+            if ($linkable instanceof Model) {
+                $model = $linkable;
+            } else {
+                $model = $this->resolveModel(
+                    type: $link['linkable_type'] ?? null,
+                    id: $link['linkable_id'] ?? null,
+                    field: "links.{$index}.linkable",
+                );
+            }
+
+            $attributes = [
+                'linkable_type' => $model->getMorphClass(),
+                'linkable_id' => (int) $model->getKey(),
+                'role' => $role,
+            ];
+
+            $identity = implode(':', [
+                $attributes['linkable_type'],
+                $attributes['linkable_id'],
+                $attributes['role'],
+            ]);
+
+            $normalized[$identity] = $attributes;
+        }
+
+        return array_values($normalized);
+    }
+
+    private function resolveModel(
+        mixed $type,
+        mixed $id,
+        string $field,
+    ): Model {
+        $modelClass = $this->modelClass($type);
+        $modelId = $this->nullableInt($id);
+
+        if ($modelClass === null || $modelId === null) {
+            throw new InvalidArgumentException(
+                "Incomplete task {$field} morph."
+            );
+        }
+
+        $model = $modelClass::query()->find($modelId);
+
+        if (! $model instanceof Model) {
+            throw new InvalidArgumentException(
+                "Task {$field} record does not exist."
+            );
+        }
+
+        return $model;
+    }
+
+    /**
+     * @return class-string<Model>|null
+     */
+    private function modelClass(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $value = trim($value);
+        $mapped = Relation::getMorphedModel($value) ?? $value;
+
+        return $this->isModelClass($mapped) ? $mapped : null;
     }
 
     private function responsibleParty(mixed $value): string
     {
-        if (! is_string($value) || trim($value) === '') return Task::RESPONSIBLE_PARTY_INTERNAL;
+        if (! is_string($value) || trim($value) === '') {
+            return Task::RESPONSIBLE_PARTY_INTERNAL;
+        }
+
         $value = trim($value);
-        if (! in_array($value, Task::RESPONSIBLE_PARTY_OPTIONS, true)) throw new InvalidArgumentException("Invalid task responsible party [{$value}].");
+
+        if (! in_array($value, Task::RESPONSIBLE_PARTY_OPTIONS, true)) {
+            throw new InvalidArgumentException(
+                "Invalid task responsible party [{$value}]."
+            );
+        }
+
         return $value;
+    }
+
+    private function source(mixed $value): string
+    {
+        $source = $this->requiredString($value, 'source');
+
+        if (! in_array($source, Task::SOURCE_OPTIONS, true)) {
+            throw new InvalidArgumentException(
+                "Invalid task source [{$source}]."
+            );
+        }
+
+        return $source;
     }
 
     private function requiredString(mixed $value, string $field): string
     {
-        if (! is_string($value) || trim($value) === '') throw new InvalidArgumentException("Missing required task field [{$field}].");
+        if (! is_string($value) || trim($value) === '') {
+            throw new InvalidArgumentException(
+                "Missing required task field [{$field}]."
+            );
+        }
+
         return trim($value);
     }
 
-    private function nullableInt(mixed $value): ?int { return is_numeric($value) ? (int) $value : null; }
-    private function nullableString(mixed $value): ?string { return is_string($value) && trim($value) !== '' ? trim($value) : null; }
-    private function dueAt(mixed $dueOffsetMinutes): ?CarbonImmutable { $minutes = $this->nullableInt($dueOffsetMinutes); return $minutes === null ? null : CarbonImmutable::now('UTC')->addMinutes($minutes); }
+    private function nullableInt(mixed $value): ?int
+    {
+        return is_numeric($value) ? (int) $value : null;
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        return is_string($value) && trim($value) !== ''
+            ? trim($value)
+            : null;
+    }
+
+    private function dueAt(mixed $dueOffsetMinutes): ?CarbonImmutable
+    {
+        $minutes = $this->nullableInt($dueOffsetMinutes);
+
+        return $minutes === null
+            ? null
+            : CarbonImmutable::now('UTC')->addMinutes($minutes);
+    }
 
     private function morphType(mixed $value): ?string
     {
-        if (! is_string($value) || trim($value) === '') return null;
-        $value = trim($value); $mappedModel = Relation::getMorphedModel($value);
-        if (is_string($mappedModel) && $this->isModelClass($mappedModel)) return (new $mappedModel())->getMorphClass();
-        if ($this->isModelClass($value)) return (new $value())->getMorphClass();
-        return $value;
+        $modelClass = $this->modelClass($value);
+
+        if ($modelClass !== null) {
+            return (new $modelClass())->getMorphClass();
+        }
+
+        return is_string($value) && trim($value) !== ''
+            ? trim($value)
+            : null;
     }
 
-    private function isModelClass(string $class): bool { return class_exists($class) && is_subclass_of($class, Model::class); }
-    private function isContactMorph(?string $type): bool { return $type !== null && in_array($type, array_unique([Contact::class, (new Contact())->getMorphClass(), $this->morphType(Contact::class)]), true); }
+    private function isModelClass(string $class): bool
+    {
+        return class_exists($class)
+            && is_subclass_of($class, Model::class);
+    }
 }

@@ -4,6 +4,7 @@ namespace App\Modules\Tasks\Validation;
 
 use App\Modules\Tasks\Data\TaskPresetDefinition;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Models\TaskLink;
 use App\Modules\Tasks\Models\TaskTemplate;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
@@ -185,7 +186,7 @@ public function findings(): iterable
             context: $context,
         );
 
-        yield from $this->validateRelatedSubject(
+        yield from $this->validateLinkDefaults(
             templateKey: $templateKey,
             definition: $definition,
             path: $path,
@@ -373,6 +374,21 @@ public function findings(): iterable
             return;
         }
 
+        foreach (['links', 'link_defaults'] as $relationshipField) {
+            if (! array_key_exists($relationshipField, $defaults)) {
+                continue;
+            }
+
+            yield $this->error(
+                code: 'tasks.relationship_defaults_not_first_class',
+                message: "TaskTemplate preset definition [{$templateKey}] must use first-class [link_defaults], not [defaults.{$relationshipField}].",
+                path: "{$path}.defaults.{$relationshipField}",
+                context: $context + [
+                    'field' => $relationshipField,
+                ],
+            );
+        }
+
         foreach (self::FIRST_CLASS_DEFAULT_FIELDS as $field) {
             if (! array_key_exists($field, $defaults)) {
                 continue;
@@ -439,51 +455,110 @@ public function findings(): iterable
      * @param array<string, mixed> $context
      * @return iterable<int, SetupValidationFinding>
      */
-    private function validateRelatedSubject(
+    private function validateLinkDefaults(
         string $templateKey,
         array $definition,
         string $path,
         array $context,
     ): iterable {
-        if (! array_key_exists('related_subject', $definition)) {
-            return;
-        }
-
-        $relatedSubject = $definition['related_subject'];
-
-        if (! is_array($relatedSubject)) {
+        if (array_key_exists('related_subject', $definition)) {
             yield $this->error(
-                code: 'tasks.related_subject_invalid',
-                message: "TaskTemplate preset definition [{$templateKey}] [related_subject] must be an array.",
+                code: 'tasks.related_subject_obsolete',
+                message: "TaskTemplate preset definition [{$templateKey}] uses obsolete [related_subject]; use first-class [link_defaults].",
                 path: "{$path}.related_subject",
                 context: $context,
             );
+        }
 
+        if (! array_key_exists('link_defaults', $definition)) {
             return;
         }
 
-        $default = $relatedSubject['default'] ?? null;
+        $linkDefaults = $definition['link_defaults'];
 
-        if (! $this->filledString($default)) {
+        if (! is_array($linkDefaults) || ! array_is_list($linkDefaults)) {
             yield $this->error(
-                code: 'tasks.related_subject_default_missing',
-                message: "TaskTemplate preset definition [{$templateKey}] [related_subject] requires a non-empty [default].",
-                path: "{$path}.related_subject.default",
+                code: 'tasks.link_defaults_invalid',
+                message: "TaskTemplate preset definition [{$templateKey}] [link_defaults] must be a list.",
+                path: "{$path}.link_defaults",
                 context: $context,
             );
 
             return;
         }
 
-        if (trim($default) !== 'current_contact') {
-            yield $this->error(
-                code: 'tasks.related_subject_default_unsupported',
-                message: "TaskTemplate preset definition [{$templateKey}] uses unsupported related-subject default [".trim($default)."].",
-                path: "{$path}.related_subject.default",
-                context: $context + [
-                    'related_subject_default' => trim($default),
-                ],
-            );
+        $seen = [];
+
+        foreach ($linkDefaults as $index => $linkDefault) {
+            $itemPath = "{$path}.link_defaults.{$index}";
+
+            if (! is_array($linkDefault)) {
+                yield $this->error(
+                    code: 'tasks.link_default_invalid',
+                    message: "TaskTemplate preset definition [{$templateKey}] link default [{$index}] must be an array.",
+                    path: $itemPath,
+                    context: $context + [
+                        'link_default_index' => $index,
+                    ],
+                );
+
+                continue;
+            }
+
+            $role = $linkDefault['role'] ?? null;
+            $source = $linkDefault['source'] ?? null;
+
+            if (! is_string($role)
+                || ! in_array(trim($role), TaskLink::ROLES, true)
+            ) {
+                yield $this->error(
+                    code: 'tasks.link_default_role_invalid',
+                    message: "TaskTemplate preset definition [{$templateKey}] link default [{$index}] has an invalid [role].",
+                    path: "{$itemPath}.role",
+                    context: $context + [
+                        'link_default_index' => $index,
+                    ],
+                );
+            }
+
+            if (! is_string($source)
+                || ! in_array(trim($source), TaskTemplate::LINK_SOURCES, true)
+            ) {
+                yield $this->error(
+                    code: 'tasks.link_default_source_invalid',
+                    message: "TaskTemplate preset definition [{$templateKey}] link default [{$index}] has an invalid [source].",
+                    path: "{$itemPath}.source",
+                    context: $context + [
+                        'link_default_index' => $index,
+                    ],
+                );
+            }
+
+            if (! is_string($role)
+                || ! is_string($source)
+                || ! in_array(trim($role), TaskLink::ROLES, true)
+                || ! in_array(trim($source), TaskTemplate::LINK_SOURCES, true)
+            ) {
+                continue;
+            }
+
+            $identity = trim($role).':'.trim($source);
+
+            if (isset($seen[$identity])) {
+                yield $this->error(
+                    code: 'tasks.link_default_duplicate',
+                    message: "TaskTemplate preset definition [{$templateKey}] defines duplicate link default [{$identity}].",
+                    path: $itemPath,
+                    context: $context + [
+                        'link_default_index' => $index,
+                        'link_default_identity' => $identity,
+                    ],
+                );
+
+                continue;
+            }
+
+            $seen[$identity] = true;
         }
     }
 

@@ -5,6 +5,8 @@ namespace App\Modules\Tasks\Actions;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Models\TaskLink;
+use App\Modules\Tasks\Services\TaskContactLinkResolver;
 use App\Support\AutomationOpportunities\Actions\AutomationBehaviorAction;
 use App\Support\AutomationOpportunities\Actions\RecordAutomationEventCorrelationEvidenceAction;
 use App\Support\AutomationOpportunities\Data\AutomationBehaviorData;
@@ -28,46 +30,47 @@ class RecordManualTaskAutomationBehaviorAction extends AutomationBehaviorAction
         Task $task,
         ?Model $actor = null,
     ): ?AutomationBehaviorOccurrence {
-        if ($task->source !== Task::SOURCE_MANUAL) {
+        if (! $task->isManual()) {
             return null;
         }
 
-        $contact = $this->relatedContact($task);
-
-        if (! $contact) {
-            return null;
-        }
-
-        $contactStatus = $this->contactStatus($contact);
         $taskTemplateKey = $this->taskTemplateKey($task);
         $normalizedTitle = $taskTemplateKey === null
             ? $this->normalizeTitle($task->title)
             : null;
 
-        $occurrence = $this->record(
-            AutomationBehaviorData::make(
-                actionKey: self::ACTION_KEY,
-                actor: $actor,
-                subject: $contact,
-                capabilityKey: self::CAPABILITY_KEY,
-                fingerprintParts: [
-                    'related_subject_type' => 'contact',
-                    'contact_status_key' => $contactStatus?->key,
-                    'task_template_key' => $taskTemplateKey,
-                    'normalized_title' => $normalizedTitle,
-                ],
-                context: [
-                    'contact_status_key' => $contactStatus?->key,
-                    'contact_status_name' => $contactStatus?->name,
-                    'task_id' => $task->getKey(),
-                    'task_title' => $task->title,
-                    'task_template_key' => $taskTemplateKey,
-                ],
-                meta: [
-                    'source' => 'task_controller.store',
-                ],
-            ),
-        );
+        $primaryOccurrence = null;
+
+        if ($taskTemplateKey === null) {
+            $primaryOccurrence = $this->record(
+                AutomationBehaviorData::make(
+                    actionKey: self::ACTION_KEY,
+                    actor: $actor,
+                    subject: $task,
+                    capabilityKey: self::CAPABILITY_KEY,
+                    fingerprintParts: [
+                        'normalized_title' => $normalizedTitle,
+                        'subject_link_types' => $this->subjectLinkTypes($task),
+                    ],
+                    context: [
+                        'task_id' => $task->getKey(),
+                        'task_title' => $task->title,
+                        'task_template_key' => null,
+                        'link_count' => $task->links()->count(),
+                        'subject_link_types' => $this->subjectLinkTypes($task),
+                    ],
+                    meta: [
+                        'source' => 'task_controller.store',
+                    ],
+                ),
+            );
+        }
+
+        $contact = app(TaskContactLinkResolver::class)->resolve($task);
+
+        if (! $contact) {
+            return $primaryOccurrence;
+        }
 
         $this->recordRecentManualStatusChangePattern(
             task: $task,
@@ -85,7 +88,7 @@ class RecordManualTaskAutomationBehaviorAction extends AutomationBehaviorAction
             normalizedTitle: $normalizedTitle,
         );
 
-        return $occurrence;
+        return $primaryOccurrence;
     }
 
     private function recordRecentManualStatusChangePattern(
@@ -241,8 +244,12 @@ class RecordManualTaskAutomationBehaviorAction extends AutomationBehaviorAction
             return null;
         }
 
-        $fromStatusId = $this->nullableInt($transition['from_contact_status_id'] ?? null);
-        $toStatusId = $this->nullableInt($transition['to_contact_status_id'] ?? null);
+        $fromStatusId = $this->nullableInt(
+            $transition['from_contact_status_id'] ?? null,
+        );
+        $toStatusId = $this->nullableInt(
+            $transition['to_contact_status_id'] ?? null,
+        );
 
         if ($toStatusId === null || $fromStatusId === $toStatusId) {
             return null;
@@ -250,7 +257,9 @@ class RecordManualTaskAutomationBehaviorAction extends AutomationBehaviorAction
 
         $changedAtValue = $transition['changed_at'] ?? null;
 
-        if (! is_string($changedAtValue) || trim($changedAtValue) === '') {
+        if (! is_string($changedAtValue)
+            || trim($changedAtValue) === ''
+        ) {
             return null;
         }
 
@@ -259,7 +268,9 @@ class RecordManualTaskAutomationBehaviorAction extends AutomationBehaviorAction
 
         if ($changedAt->isAfter($taskCreatedAt)
             || $changedAt->isBefore(
-                $taskCreatedAt->subMinutes(self::RELATED_ACTION_WINDOW_MINUTES),
+                $taskCreatedAt->subMinutes(
+                    self::RELATED_ACTION_WINDOW_MINUTES,
+                ),
             )
         ) {
             return null;
@@ -293,11 +304,15 @@ class RecordManualTaskAutomationBehaviorAction extends AutomationBehaviorAction
         $taskCreatedAt = CarbonImmutable::instance($task->created_at);
 
         return AutomationBehaviorOccurrence::query()
-            ->forAction(RecordAutomationEventCorrelationEvidenceAction::ACTION_KEY)
+            ->forAction(
+                RecordAutomationEventCorrelationEvidenceAction::ACTION_KEY
+            )
             ->where('subject_type', $contact->getMorphClass())
             ->where('subject_id', $contact->getKey())
             ->whereBetween('occurred_at', [
-                $taskCreatedAt->subMinutes(self::RELATED_ACTION_WINDOW_MINUTES),
+                $taskCreatedAt->subMinutes(
+                    self::RELATED_ACTION_WINDOW_MINUTES,
+                ),
                 $taskCreatedAt,
             ])
             ->latest('occurred_at')
@@ -305,26 +320,20 @@ class RecordManualTaskAutomationBehaviorAction extends AutomationBehaviorAction
             ->first();
     }
 
-    private function relatedContact(Task $task): ?Contact
+
+    /**
+     * @return array<int, string>
+     */
+    private function subjectLinkTypes(Task $task): array
     {
-        if (! $task->related_type || ! $task->related_id) {
-            return null;
-        }
-
-        $contactMorphClass = (new Contact())->getMorphClass();
-
-        if (! in_array($task->related_type, [Contact::class, $contactMorphClass], true)) {
-            return null;
-        }
-
-        return Contact::query()->find($task->related_id);
-    }
-
-    private function contactStatus(Contact $contact): ?object
-    {
-        $profile = $contact->getRelationValue('workflowProfile');
-
-        return $profile?->contactStatus;
+        return $task->links()
+            ->where('role', TaskLink::ROLE_SUBJECT)
+            ->pluck('linkable_type')
+            ->filter(fn (mixed $type): bool => is_string($type) && $type !== '')
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
     }
 
     private function taskTemplateKey(Task $task): ?string

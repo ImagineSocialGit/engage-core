@@ -2,10 +2,11 @@
 
 namespace Database\Factories;
 
-use App\Modules\InternalNotifications\Models\TeamMember;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Models\TaskLink;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
+use InvalidArgumentException;
 
 /**
  * @extends Factory<Task>
@@ -17,20 +18,11 @@ class TaskFactory extends Factory
     public function definition(): array
     {
         return [
-            'related_type' => null,
-            'related_id' => null,
-            'assigned_to_type' => TeamMember::class,
-            'assigned_to_id' => TeamMember::factory(),
+            'assigned_to_type' => null,
+            'assigned_to_id' => null,
             'responsible_party' => Task::RESPONSIBLE_PARTY_INTERNAL,
             'responsible_type' => null,
             'responsible_id' => null,
-            'flow_route_progress_id' => null,
-            'flow_route_plan_id' => null,
-            'flow_route_plan_item_id' => null,
-            'flow_route_progress_item_id' => null,
-            'flow_route_id' => null,
-            'flow_route_point_id' => null,
-            'flow_route_capability_id' => null,
             'task_template_id' => null,
             'task_template_key' => null,
             'source' => Task::SOURCE_MANUAL,
@@ -55,17 +47,26 @@ class TaskFactory extends Factory
         ]);
     }
 
-    public function relatedTo(?Model $model): self
-    {
-        return $this->state([
-            'related_type' => $model?->getMorphClass(),
-            'related_id' => $model?->getKey(),
-        ]);
+    public function linkedTo(
+        Model $model,
+        string $role = TaskLink::ROLE_SUBJECT,
+    ): self {
+        if (! in_array($role, TaskLink::ROLES, true)) {
+            throw new InvalidArgumentException("Invalid TaskLink role [{$role}].");
+        }
+
+        return $this->afterCreating(function (Task $task) use ($model, $role): void {
+            $task->links()->firstOrCreate([
+                'linkable_type' => $model->getMorphClass(),
+                'linkable_id' => $model->getKey(),
+                'role' => $role,
+            ]);
+        });
     }
 
-    public function unrelated(): self
+    public function unlinked(): self
     {
-        return $this->relatedTo(null);
+        return $this;
     }
 
     public function completed(): self

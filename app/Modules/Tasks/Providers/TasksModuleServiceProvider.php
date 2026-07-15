@@ -14,6 +14,7 @@ use App\Modules\Tasks\Services\ContactShow\ContactTaskVisibilityDataProvider;
 use App\Modules\Tasks\Services\Dashboard\TodayTasksDashboardPanelProvider;
 use App\Modules\Tasks\Services\RelatedSubjects\ContactTaskRelatedSubjectResolver;
 use App\Modules\Tasks\Services\TaskAssignedRecipientsResolver;
+use App\Modules\Tasks\Services\TaskAssignmentStrategyResolver;
 use App\Modules\Tasks\Services\TaskRelatedSubjectResolver;
 use App\Modules\Tasks\Validation\TasksSetupValidationContributor;
 use App\Support\Dashboard\DashboardPanelRegistry;
@@ -39,6 +40,10 @@ class TasksModuleServiceProvider extends ServiceProvider
         $this->app->tag([
             TaskPresetConfigContractTargetProvider::class,
         ], 'config.contract_target_providers');
+
+        $this->app->when(TaskAssignmentStrategyResolver::class)
+            ->needs('$resolvers')
+            ->giveTagged('tasks.assignment_strategy_resolvers');
 
         $this->app->tag([
             TeamMemberTaskAssignedRecipientResolver::class,

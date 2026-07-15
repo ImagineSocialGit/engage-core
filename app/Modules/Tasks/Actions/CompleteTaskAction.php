@@ -5,12 +5,17 @@ namespace App\Modules\Tasks\Actions;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Tasks\Events\TaskCompleted;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Services\TaskContactLinkResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 class CompleteTaskAction
 {
+    public function __construct(
+        private readonly TaskContactLinkResolver $contactLinks,
+    ) {}
+
     /**
      * @param array<string, mixed> $meta
      */
@@ -36,7 +41,7 @@ class CompleteTaskAction
 
             $task->refresh();
 
-            $this->touchRelatedContact($task);
+            $this->touchLinkedContacts($task);
 
             return [$task, $wasCompleted];
         });
@@ -58,20 +63,16 @@ class CompleteTaskAction
         return $task->refresh();
     }
 
-    private function touchRelatedContact(Task $task): void
+    private function touchLinkedContacts(Task $task): void
     {
-        if (! $task->related_type || ! $task->related_id) {
-            return;
-        }
+        $contactIds = $this->contactLinks->contactIds($task);
 
-        $contactMorphClass = (new Contact())->getMorphClass();
-
-        if (! in_array($task->related_type, [Contact::class, $contactMorphClass], true)) {
+        if ($contactIds === []) {
             return;
         }
 
         Contact::query()
-            ->whereKey($task->related_id)
+            ->whereKey($contactIds)
             ->update([
                 'last_activity_at' => now(),
             ]);

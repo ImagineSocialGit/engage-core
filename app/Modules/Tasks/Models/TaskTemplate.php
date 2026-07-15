@@ -24,6 +24,14 @@ class TaskTemplate extends Model
         self::ASSIGNED_TO_STRATEGY_ONLY_ACTIVE_TEAM_MEMBER,
     ];
 
+    public const LINK_SOURCE_CURRENT_CONTACT = 'current_contact';
+    public const LINK_SOURCE_CURRENT_SUBJECT = 'current_subject';
+
+    public const LINK_SOURCES = [
+        self::LINK_SOURCE_CURRENT_CONTACT,
+        self::LINK_SOURCE_CURRENT_SUBJECT,
+    ];
+
     protected static function newFactory(): TaskTemplateFactory
     {
         return TaskTemplateFactory::new();
@@ -47,7 +55,7 @@ class TaskTemplate extends Model
         'responsible_id',
         'priority',
         'due_offset_minutes',
-        'related_subject',
+        'link_defaults',
         'defaults',
         'is_active',
         'is_customized',
@@ -59,7 +67,7 @@ class TaskTemplate extends Model
         'assigned_to_id' => 'integer',
         'responsible_id' => 'integer',
         'due_offset_minutes' => 'integer',
-        'related_subject' => 'array',
+        'link_defaults' => 'array',
         'defaults' => 'array',
         'is_active' => 'boolean',
         'is_customized' => 'boolean',

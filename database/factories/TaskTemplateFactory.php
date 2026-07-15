@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Models\TaskLink;
 use App\Modules\Tasks\Models\TaskTemplate;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -33,7 +34,7 @@ class TaskTemplateFactory extends Factory
             'responsible_id' => null,
             'priority' => null,
             'due_offset_minutes' => fake()->optional()->numberBetween(60, 20160),
-            'related_subject' => null,
+            'link_defaults' => null,
             'defaults' => null,
             'is_active' => true,
             'is_customized' => false,
@@ -60,6 +61,30 @@ class TaskTemplateFactory extends Factory
     {
         return $this->state([
             'assigned_to_strategy' => TaskTemplate::ASSIGNED_TO_STRATEGY_ONLY_ACTIVE_TEAM_MEMBER,
+        ]);
+    }
+
+    public function currentContactSubject(): self
+    {
+        return $this->state([
+            'link_defaults' => [
+                [
+                    'role' => TaskLink::ROLE_SUBJECT,
+                    'source' => TaskTemplate::LINK_SOURCE_CURRENT_CONTACT,
+                ],
+            ],
+        ]);
+    }
+
+    public function currentSubject(): self
+    {
+        return $this->state([
+            'link_defaults' => [
+                [
+                    'role' => TaskLink::ROLE_SUBJECT,
+                    'source' => TaskTemplate::LINK_SOURCE_CURRENT_SUBJECT,
+                ],
+            ],
         ]);
     }
 

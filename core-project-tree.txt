@@ -607,6 +607,7 @@
 │   │   │   │   └── TaskPresetDefinitionConfigContract.php
 │   │   │   ├── Contracts
 │   │   │   │   ├── TaskAssignedRecipientResolver.php
+│   │   │   │   ├── TaskAssignmentStrategyResolverContract.php
 │   │   │   │   └── TaskRelatedSubjectResolverContract.php
 │   │   │   ├── Controllers
 │   │   │   │   └── TaskController.php
@@ -619,6 +620,7 @@
 │   │   │   ├── Listeners
 │   │   │   │   └── EmitTaskCompletedAutomationEvent.php
 │   │   │   ├── Models
+│   │   │   │   ├── TaskLink.php
 │   │   │   │   ├── Task.php
 │   │   │   │   └── TaskTemplate.php
 │   │   │   ├── Presets
@@ -638,8 +640,9 @@
 │   │   │   │   ├── RelatedSubjects
 │   │   │   │   │   └── ContactTaskRelatedSubjectResolver.php
 │   │   │   │   ├── TaskAssignedRecipientsResolver.php
-│   │   │   │   ├── TaskRelatedSubjectResolver.php
-│   │   │   │   └── TaskRelatedTypeResolver.php
+│   │   │   │   ├── TaskAssignmentStrategyResolver.php
+│   │   │   │   ├── TaskContactLinkResolver.php
+│   │   │   │   └── TaskRelatedSubjectResolver.php
 │   │   │   ├── Support
 │   │   │   └── Validation
 │   │   │       └── TasksSetupValidationContributor.php
@@ -1077,7 +1080,6 @@
 │   ├── setup.php
 │   ├── sms.php
 │   ├── staging.php
-│   ├── tasks.php
 │   ├── theme
 │   ├── webinars
 │   │   ├── content.php
@@ -1146,6 +1148,7 @@
 │   │   ├── ScheduledMessageFactory.php
 │   │   ├── SchedulingAvailabilityWindowFactory.php
 │   │   ├── TaskFactory.php
+│   │   ├── TaskLinkFactory.php
 │   │   ├── TaskTemplateFactory.php
 │   │   ├── TeamMemberFactory.php
 │   │   ├── TeamMemberNotificationPreferenceFactory.php
@@ -1196,6 +1199,7 @@
 │   │   ├── 2026_04_15_203543_create_task_templates_table.php
 │   │   ├── 2026_04_15_203544_create_tasks_table.php
 │   │   ├── 2026_04_15_203545_create_automation_behavior_occurrences_table.php
+│   │   ├── 2026_04_15_203545_create_task_links_table.php
 │   │   ├── 2026_04_15_203546_create_automation_opportunities_table.php
 │   │   ├── 2026_04_15_203549_create_notes_table.php
 │   │   ├── 2026_05_15_215534_create_message_consents_table.php
@@ -1644,4 +1648,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-525 directories, 1120 files
+525 directories, 1124 files

@@ -8,7 +8,7 @@ use App\Modules\Tasks\Models\TaskTemplate;
 class TaskPresetDefinition
 {
     /**
-     * @param array<string, mixed>|null $relatedSubject
+     * @param array<int, array<string, mixed>>|null $linkDefaults
      * @param array<string, mixed>|null $defaults
      * @param array<string, mixed> $meta
      */
@@ -31,7 +31,7 @@ class TaskPresetDefinition
         public readonly ?string $ownerGroup,
         public readonly ?string $category,
         public readonly bool $isActive,
-        public readonly ?array $relatedSubject = null,
+        public readonly ?array $linkDefaults = null,
         public readonly ?array $defaults = null,
         public readonly array $meta = [],
         public readonly ?string $invalidReason = null,
@@ -55,8 +55,17 @@ class TaskPresetDefinition
         $invalidReason = match (true) {
             $key === null => 'missing_key',
             $title === null => 'missing_title',
-            ! in_array($responsibleParty, Task::RESPONSIBLE_PARTY_OPTIONS, true) => 'invalid_responsible_party',
-            $assignedToStrategy !== null && ! in_array($assignedToStrategy, TaskTemplate::ASSIGNED_TO_STRATEGIES, true) => 'invalid_assigned_to_strategy',
+            ! in_array(
+                $responsibleParty,
+                Task::RESPONSIBLE_PARTY_OPTIONS,
+                true,
+            ) => 'invalid_responsible_party',
+            $assignedToStrategy !== null
+                && ! in_array(
+                    $assignedToStrategy,
+                    TaskTemplate::ASSIGNED_TO_STRATEGIES,
+                    true,
+                ) => 'invalid_assigned_to_strategy',
             default => null,
         };
 
@@ -74,12 +83,14 @@ class TaskPresetDefinition
             assignedToStrategy: $assignedToStrategy,
             priority: self::string($data, 'priority'),
             dueOffsetMinutes: self::dueOffsetMinutes($data),
-            source: self::string($data, 'source') ?? TaskTemplate::SOURCE_PRESET,
-            sourceVersion: self::string($data, 'source_version') ?? self::string($data, 'version'),
+            source: self::string($data, 'source')
+                ?? TaskTemplate::SOURCE_PRESET,
+            sourceVersion: self::string($data, 'source_version')
+                ?? self::string($data, 'version'),
             ownerGroup: self::string($data, 'owner_group'),
             category: self::string($data, 'category'),
             isActive: self::bool($data, 'is_active', true),
-            relatedSubject: self::arrayOrNull($data, 'related_subject'),
+            linkDefaults: self::listOrNull($data, 'link_defaults'),
             defaults: self::arrayOrNull($data, 'defaults'),
             meta: self::meta($data),
             invalidReason: $invalidReason,
@@ -116,7 +127,7 @@ class TaskPresetDefinition
             'responsible_id' => $this->responsibleId,
             'priority' => $this->priority,
             'due_offset_minutes' => $this->dueOffsetMinutes,
-            'related_subject' => $this->relatedSubject,
+            'link_defaults' => $this->linkDefaults,
             'defaults' => $this->defaults,
             'is_active' => $this->isActive,
             'meta' => $this->meta,
@@ -156,11 +167,16 @@ class TaskPresetDefinition
     /**
      * @param array<string, mixed> $data
      */
-    private static function bool(array $data, string $key, bool $default): bool
-    {
+    private static function bool(
+        array $data,
+        string $key,
+        bool $default,
+    ): bool {
         $value = $data[$key] ?? $default;
 
-        return is_bool($value) ? $value : filter_var($value, FILTER_VALIDATE_BOOL);
+        return is_bool($value)
+            ? $value
+            : filter_var($value, FILTER_VALIDATE_BOOL);
     }
 
     /**
@@ -186,9 +202,15 @@ class TaskPresetDefinition
             return null;
         }
 
-        $minutes = is_numeric($due['minutes'] ?? null) ? (int) $due['minutes'] : 0;
-        $hours = is_numeric($due['hours'] ?? null) ? (int) $due['hours'] : 0;
-        $days = is_numeric($due['days'] ?? null) ? (int) $due['days'] : 0;
+        $minutes = is_numeric($due['minutes'] ?? null)
+            ? (int) $due['minutes']
+            : 0;
+        $hours = is_numeric($due['hours'] ?? null)
+            ? (int) $due['hours']
+            : 0;
+        $days = is_numeric($due['days'] ?? null)
+            ? (int) $due['days']
+            : 0;
 
         $total = $minutes + ($hours * 60) + ($days * 1440);
 
@@ -199,11 +221,28 @@ class TaskPresetDefinition
      * @param array<string, mixed> $data
      * @return array<string, mixed>|null
      */
-    private static function arrayOrNull(array $data, string $key): ?array
-    {
+    private static function arrayOrNull(
+        array $data,
+        string $key,
+    ): ?array {
         $value = $data[$key] ?? null;
 
         return is_array($value) ? $value : null;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<int, array<string, mixed>>|null
+     */
+    private static function listOrNull(
+        array $data,
+        string $key,
+    ): ?array {
+        $value = $data[$key] ?? null;
+
+        return is_array($value) && array_is_list($value)
+            ? $value
+            : null;
     }
 
     /**
