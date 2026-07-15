@@ -8,6 +8,7 @@ use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Tasks\Actions\RecordManualTaskCompletionAutomationBehaviorAction;
 use App\Modules\Tasks\Events\TaskCompleted;
 use App\Modules\Tasks\Models\Task;
+use App\Modules\Tasks\Models\TaskLink;
 use App\Modules\Workflow\Actions\RecordManualStatusTransitionAutomationBehaviorAction;
 use App\Modules\Workflow\Data\ContactWorkflowStatusTransition;
 use App\Support\AutomationOpportunities\Models\AutomationBehaviorOccurrence;
@@ -31,7 +32,7 @@ class RecordManualStatusTransitionAutomationBehaviorActionTest extends TestCase
         $completedAt = CarbonImmutable::parse('2026-07-10 14:00:00', 'UTC');
         $changedAt = $completedAt->addMinutes(5);
 
-        Task::factory()->linkedTo(
+        $task = Task::factory()->linkedTo(
             $contact,
             TaskLink::ROLE_SUBJECT,
         )->completed()->create([
@@ -234,7 +235,10 @@ class RecordManualStatusTransitionAutomationBehaviorActionTest extends TestCase
         Contact $contact,
         CarbonImmutable $completedAt,
     ): AutomationBehaviorOccurrence {
-        $task = Task::factory()->relatedTo($contact)->completed()->create([
+        $task = Task::factory()->linkedTo(
+            $contact,
+            TaskLink::ROLE_SUBJECT,
+        )->completed()->create([
             'title' => 'Review application',
             'completed_at' => $completedAt,
         ]);

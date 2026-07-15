@@ -75,7 +75,10 @@ class TaskNotificationAndDigestBehaviorTest extends TestCase
         $digests = $build->handle(BuildTaskDigestsAction::FREQUENCY_DAILY);
 
         $this->assertCount(1, $digests);
-        $this->assertTrue($digests->first()->tasks->contains($task));
+        $this->assertSame(
+            [$task->getKey()],
+            $digests->first()->tasks->pluck('id')->all(),
+        );
 
         $capture = $this->captureScheduler();
 

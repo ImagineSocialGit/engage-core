@@ -20,7 +20,7 @@ class RecordAutomationEventCorrelationEvidenceActionTest extends TestCase
     public function test_it_records_supported_contact_automation_event_as_evidence_only(): void
     {
         $contact = Contact::factory()->create();
-        Task::factory()->linkedTo(
+        $task = Task::factory()->linkedTo(
             $contact,
             TaskLink::ROLE_SUBJECT,
         )->create();
@@ -30,7 +30,7 @@ class RecordAutomationEventCorrelationEvidenceActionTest extends TestCase
         event(new AutomationEventRecorded(
             AutomationEventData::forSubject(
                 eventKey: 'task.completed',
-                subject: $subject,
+                subject: $task,
                 contactId: $contact->getKey(),
                 occurredAt: $occurredAt,
                 meta: [
@@ -48,8 +48,14 @@ class RecordAutomationEventCorrelationEvidenceActionTest extends TestCase
         $this->assertSame($contact->getKey(), $occurrence->subject_id);
         $this->assertSame('task.completed', $occurrence->fingerprint_parts['event_key']);
         $this->assertSame('task.completed', $occurrence->context['event_key']);
-        $this->assertSame($subject->getMorphClass(), $occurrence->context['automation_event_subject_type']);
-        $this->assertSame($subject->getKey(), $occurrence->context['automation_event_subject_id']);
+        $this->assertSame(
+            $task->getMorphClass(),
+            $occurrence->context['automation_event_subject_type'],
+        );
+        $this->assertSame(
+            $task->getKey(),
+            $occurrence->context['automation_event_subject_id'],
+        );
         $this->assertSame('tasks', $occurrence->context['source_module']);
         $this->assertSame('crm', $occurrence->context['source']);
         $this->assertSame(
