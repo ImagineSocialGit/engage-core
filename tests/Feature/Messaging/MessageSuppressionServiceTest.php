@@ -202,4 +202,23 @@ class MessageSuppressionServiceTest extends TestCase
 
         $this->assertNull($released);
     }
+
+    public function test_it_accepts_telnyx_as_a_suppression_provider(): void
+    {
+        $suppression = app(MessageSuppressionService::class)->suppress(
+            channel: MessageChannel::Sms,
+            destination: '+15555550123',
+            reason: MessageSuppression::REASON_PROVIDER,
+            provider: MessageSuppression::PROVIDER_TELNYX,
+            sourceEventId: 'telnyx-event-1',
+        );
+
+        $this->assertSame(MessageSuppression::PROVIDER_TELNYX, $suppression->provider);
+        $this->assertDatabaseHas('message_suppressions', [
+            'id' => $suppression->getKey(),
+            'provider' => MessageSuppression::PROVIDER_TELNYX,
+            'source_event_id' => 'telnyx-event-1',
+        ]);
+    }
 }
+

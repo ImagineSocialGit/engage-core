@@ -2,8 +2,10 @@
 
 namespace App\Modules\Messaging\Jobs;
 
+use App\Modules\Messaging\Actions\ClaimScheduledMessageForSendingAction;
 use App\Modules\Messaging\Contracts\Email\EmailMessage;
 use App\Modules\Messaging\Contracts\Sms\SmsMessage;
+use App\Modules\Messaging\Data\Delivery\MessageSendResult;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
@@ -17,11 +19,14 @@ use App\Modules\Messaging\Services\Sms\SmsMessagingService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use InvalidArgumentException;
+use RuntimeException;
 use Throwable;
 
 class SendScheduledMessageJob implements ShouldQueue
 {
     use Queueable;
+
+    public int $tries = 3;
 
     /**
      * @param array<string, mixed> $horizon
@@ -31,89 +36,148 @@ class SendScheduledMessageJob implements ShouldQueue
         public array $horizon = [],
     ) {}
 
+    /** @return array<int, int> */
+    public function backoff(): array
+    {
+        $backoff = config('messaging.delivery.retry_backoff_seconds', [60, 300]);
+
+        if (! is_array($backoff)) {
+            return [60, 300];
+        }
+
+        return array_values(array_filter(array_map(
+            static fn (mixed $seconds): ?int => is_numeric($seconds) && (int) $seconds >= 0
+                ? (int) $seconds
+                : null,
+            $backoff,
+        ), static fn (?int $seconds): bool => $seconds !== null)) ?: [60, 300];
+    }
+
     public function handle(
+        ClaimScheduledMessageForSendingAction $claimScheduledMessage,
         ScheduledMessageGate $scheduledMessageGate,
         EmailMessagingService $emailMessagingService,
         SmsMessagingService $smsMessagingService,
         ContactPermissionInvitationService $permissionInvitationService,
     ): void {
-        $scheduledMessage = ScheduledMessage::query()
-            ->with(['recipient', 'context'])
-            ->find($this->scheduledMessageId);
+        $scheduledMessage = $claimScheduledMessage->handle($this->scheduledMessageId);
 
-        if (! $scheduledMessage || $scheduledMessage->status !== ScheduledMessage::STATUS_PENDING) {
+        if (! $scheduledMessage instanceof ScheduledMessage) {
             return;
         }
 
-        if ($denialReason = $scheduledMessageGate->denialReason($scheduledMessage)) {
-            $this->markSkipped($scheduledMessage, $denialReason);
-
-            return;
-        }
-
-        $permissionInvitation = $this->claimPermissionInvitation(
-            scheduledMessage: $scheduledMessage,
-            permissionInvitationService: $permissionInvitationService,
-        );
-
-        if ($permissionInvitationService->isImportedContactPermissionInvitationMessage($scheduledMessage)
-            && ! $permissionInvitation
-        ) {
-            $this->markSkipped($scheduledMessage, 'Imported contact permission invitation was already used.');
-
-            return;
-        }
-
-        if ($permissionInvitation) {
-            $this->applyPermissionInvitationPayload(
-                scheduledMessage: $scheduledMessage,
-                permissionInvitation: $permissionInvitation,
-                permissionInvitationService: $permissionInvitationService,
-            );
-        }
+        $permissionInvitation = null;
 
         try {
-            $payload = $this->resolvePayload($scheduledMessage);
-
-            if ($reason = $this->unresolvedTokenReason($payload)) {
-                $this->markSkipped($scheduledMessage, $reason);
+            if ($denialReason = $scheduledMessageGate->denialReason($scheduledMessage)) {
+                $this->markSkipped($scheduledMessage, MessageSendResult::skipped(
+                    reasonCode: 'scheduled_message_gate_denied',
+                    reason: $denialReason,
+                ));
 
                 return;
             }
 
-            match ($scheduledMessage->channel) {
+            $permissionInvitation = $this->claimPermissionInvitation(
+                scheduledMessage: $scheduledMessage,
+                permissionInvitationService: $permissionInvitationService,
+            );
+
+            if ($permissionInvitationService->isImportedContactPermissionInvitationMessage($scheduledMessage)
+                && ! $permissionInvitation
+            ) {
+                $this->markSkipped($scheduledMessage, MessageSendResult::skipped(
+                    reasonCode: 'permission_invitation_already_used',
+                    reason: 'Imported contact permission invitation was already used.',
+                ));
+
+                return;
+            }
+
+            if ($permissionInvitation) {
+                $this->applyPermissionInvitationPayload(
+                    scheduledMessage: $scheduledMessage,
+                    permissionInvitation: $permissionInvitation,
+                    permissionInvitationService: $permissionInvitationService,
+                );
+            }
+
+            $payload = $this->resolvePayload($scheduledMessage);
+
+            if ($reason = $this->unresolvedTokenReason($payload)) {
+                $result = MessageSendResult::skipped(
+                    reasonCode: 'unresolved_message_tokens',
+                    reason: $reason,
+                );
+
+                $this->markSkipped($scheduledMessage, $result);
+                $this->markInvitationTerminalFailure(
+                    permissionInvitation: $permissionInvitation,
+                    scheduledMessage: $scheduledMessage,
+                    permissionInvitationService: $permissionInvitationService,
+                    reason: $reason,
+                );
+
+                return;
+            }
+
+            $result = match ($scheduledMessage->channel) {
                 MessageChannel::Email->value => $this->sendEmail($payload, $emailMessagingService),
                 MessageChannel::Sms->value => $this->sendSms($payload, $smsMessagingService),
                 default => throw new InvalidArgumentException("Unsupported message channel [{$scheduledMessage->channel}]."),
             };
 
-            $scheduledMessage->forceFill([
-                'status' => ScheduledMessage::STATUS_SENT,
-                'sent_at' => now(),
-                'failure_reason' => null,
-            ])->save();
+            if ($result->isSkipped()) {
+                $this->markSkipped($scheduledMessage, $result);
+                $this->markInvitationTerminalFailure(
+                    permissionInvitation: $permissionInvitation,
+                    scheduledMessage: $scheduledMessage,
+                    permissionInvitationService: $permissionInvitationService,
+                    reason: $result->reason ?? 'Message delivery was skipped.',
+                );
+
+                return;
+            }
+
+            if ($result->isFailed()) {
+                if ($result->retryable) {
+                    throw new RuntimeException($result->reason ?? 'Message provider reported a retryable failure.');
+                }
+
+                $this->markFailed(
+                    scheduledMessage: $scheduledMessage,
+                    exception: new RuntimeException($result->reason ?? 'Message provider reported a terminal failure.'),
+                    result: $result,
+                );
+                $this->markInvitationTerminalFailure(
+                    permissionInvitation: $permissionInvitation,
+                    scheduledMessage: $scheduledMessage,
+                    permissionInvitationService: $permissionInvitationService,
+                    reason: $result->reason ?? 'Message provider reported a terminal failure.',
+                );
+
+                return;
+            }
+
+            $this->markSent($scheduledMessage, $result);
 
             if ($permissionInvitation) {
                 $permissionInvitationService->markSent($permissionInvitation, $scheduledMessage);
             }
-
-            ScheduledMessageSent::dispatch($scheduledMessage);
         } catch (Throwable $exception) {
-            $scheduledMessage->forceFill([
-                'status' => ScheduledMessage::STATUS_FAILED,
-                'failed_at' => now(),
-                'failure_reason' => $exception->getMessage(),
-            ])->save();
+            if ($this->shouldRetry($scheduledMessage, $exception)) {
+                $this->releaseForRetry($scheduledMessage, $exception);
 
-            if ($permissionInvitation) {
-                $permissionInvitationService->markFailed(
-                    invitation: $permissionInvitation,
-                    scheduledMessage: $scheduledMessage,
-                    reason: $exception->getMessage(),
-                );
+                throw $exception;
             }
 
-            ScheduledMessageFailed::dispatch($scheduledMessage);
+            $this->markFailed($scheduledMessage, $exception);
+            $this->markInvitationTerminalFailure(
+                permissionInvitation: $permissionInvitation,
+                scheduledMessage: $scheduledMessage,
+                permissionInvitationService: $permissionInvitationService,
+                reason: $exception->getMessage(),
+            );
 
             throw $exception;
         }
@@ -258,35 +322,124 @@ class SendScheduledMessageJob implements ShouldQueue
     private function sendEmail(
         EmailMessage|SmsMessage $payload,
         EmailMessagingService $emailMessagingService,
-    ): void {
+    ): MessageSendResult {
         if (! $payload instanceof EmailMessage) {
             throw new InvalidArgumentException('Scheduled email message resolved to a non-email payload.');
         }
 
-        $emailMessagingService->send($payload);
+        return $emailMessagingService->send($payload);
     }
 
     private function sendSms(
         EmailMessage|SmsMessage $payload,
         SmsMessagingService $smsMessagingService,
-    ): void {
+    ): MessageSendResult {
         if (! $payload instanceof SmsMessage) {
             throw new InvalidArgumentException('Scheduled SMS message resolved to a non-SMS payload.');
         }
 
-        $smsMessagingService->send($payload);
+        return $smsMessagingService->send($payload);
     }
 
-    private function markSkipped(ScheduledMessage $scheduledMessage, string $reason): void
+    private function markSent(ScheduledMessage $scheduledMessage, MessageSendResult $result): void
+    {
+        $scheduledMessage->forceFill([
+            'status' => ScheduledMessage::STATUS_SENT,
+            'sending_at' => null,
+            'sent_at' => now(),
+            'skipped_at' => null,
+            'failed_at' => null,
+            'provider' => $result->provider,
+            'provider_message_id' => $result->providerMessageId,
+            'failure_reason' => null,
+            'skip_reason' => null,
+            'meta' => $this->deliveryMeta($scheduledMessage, $result),
+        ])->save();
+
+        ScheduledMessageSent::dispatch($scheduledMessage);
+    }
+
+    private function markSkipped(ScheduledMessage $scheduledMessage, MessageSendResult $result): void
     {
         $scheduledMessage->forceFill([
             'status' => ScheduledMessage::STATUS_SKIPPED,
+            'sending_at' => null,
             'skipped_at' => now(),
-            'skip_reason' => $reason,
+            'failed_at' => null,
+            'provider' => $result->provider,
+            'provider_message_id' => $result->providerMessageId,
+            'skip_reason' => $result->reason ?? 'Message delivery was skipped.',
             'failure_reason' => null,
+            'meta' => $this->deliveryMeta($scheduledMessage, $result),
         ])->save();
 
         ScheduledMessageSkipped::dispatch($scheduledMessage);
+    }
+
+    private function markFailed(
+        ScheduledMessage $scheduledMessage,
+        Throwable $exception,
+        ?MessageSendResult $result = null,
+    ): void {
+        $result ??= MessageSendResult::failed(
+            reasonCode: 'message_delivery_exception',
+            reason: $exception->getMessage(),
+            retryable: false,
+        );
+
+        $scheduledMessage->forceFill([
+            'status' => ScheduledMessage::STATUS_FAILED,
+            'sending_at' => null,
+            'failed_at' => now(),
+            'provider' => $result->provider,
+            'provider_message_id' => $result->providerMessageId,
+            'failure_reason' => $exception->getMessage(),
+            'skip_reason' => null,
+            'meta' => $this->deliveryMeta($scheduledMessage, $result),
+        ])->save();
+
+        ScheduledMessageFailed::dispatch($scheduledMessage);
+    }
+
+    private function releaseForRetry(ScheduledMessage $scheduledMessage, Throwable $exception): void
+    {
+        $result = MessageSendResult::failed(
+            reasonCode: 'message_delivery_retryable_exception',
+            reason: $exception->getMessage(),
+            retryable: true,
+        );
+
+        $scheduledMessage->forceFill([
+            'status' => ScheduledMessage::STATUS_PENDING,
+            'sending_at' => null,
+            'failed_at' => null,
+            'failure_reason' => $exception->getMessage(),
+            'meta' => $this->deliveryMeta($scheduledMessage, $result),
+        ])->save();
+    }
+
+    private function shouldRetry(ScheduledMessage $scheduledMessage, Throwable $exception): bool
+    {
+        if ($exception instanceof InvalidArgumentException) {
+            return false;
+        }
+
+        return (int) $scheduledMessage->send_attempts < $this->tries;
+    }
+
+    /** @return array<string, mixed> */
+    private function deliveryMeta(ScheduledMessage $scheduledMessage, MessageSendResult $result): array
+    {
+        return array_replace_recursive(
+            is_array($scheduledMessage->meta) ? $scheduledMessage->meta : [],
+            [
+                'delivery' => [
+                    ...$result->toMeta(),
+                    'attempt' => (int) $scheduledMessage->send_attempts,
+                    'attempted_at' => ($scheduledMessage->last_attempted_at ?? now())->toISOString(),
+                ],
+            ],
+        );
     }
 
     private function claimPermissionInvitation(
@@ -307,5 +460,22 @@ class SendScheduledMessageJob implements ShouldQueue
                 $permissionInvitationService->publicEmailPayload($permissionInvitation),
             ),
         ])->save();
+    }
+
+    private function markInvitationTerminalFailure(
+        ?ContactPermissionInvitation $permissionInvitation,
+        ScheduledMessage $scheduledMessage,
+        ContactPermissionInvitationService $permissionInvitationService,
+        string $reason,
+    ): void {
+        if (! $permissionInvitation instanceof ContactPermissionInvitation) {
+            return;
+        }
+
+        $permissionInvitationService->markFailed(
+            invitation: $permissionInvitation,
+            scheduledMessage: $scheduledMessage,
+            reason: $reason,
+        );
     }
 }

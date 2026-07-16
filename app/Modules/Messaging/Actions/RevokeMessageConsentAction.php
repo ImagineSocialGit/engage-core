@@ -52,12 +52,22 @@ class RevokeMessageConsentAction
                 ];
             }
 
-            $scopes = MessageConsent::query()
-                ->where('contact_id', $contact->getKey())
-                ->where('channel', $validated['channel'])
-                ->where('purpose', $validated['purpose'])
-                ->pluck('scope')
-                ->filter()
+            $scopes = collect(array_keys($this->consentDomainRegistry->definitions()))
+                ->merge(
+                    MessageConsent::query()
+                        ->where('contact_id', $contact->getKey())
+                        ->where('channel', $validated['channel'])
+                        ->where('purpose', $validated['purpose'])
+                        ->pluck('scope')
+                )
+                ->filter(
+                    fn (mixed $scope): bool => is_string($scope)
+                        && trim($scope) !== ''
+                )
+                ->map(
+                    fn (string $scope): string => $this->consentDomainRegistry
+                        ->domainForScope($scope)
+                )
                 ->unique()
                 ->values();
 

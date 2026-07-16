@@ -125,12 +125,12 @@ class HandleInboundEmailWebhookAction
             $this->revokeMessageConsentAction->handle($contact, [
                 'channel' => MessageChannel::Email->value,
                 'purpose' => MessagePurpose::Marketing->value,
-                'scope' => 'webinar',
                 'reason' => ConsentRevocation::REASON_PROVIDER_UNSUBSCRIBE,
                 'source' => "{$provider}_webhook",
                 'meta' => [
                     ...$this->meta($event, $provider),
                     'source_event_id' => $sourceEventId ?? $this->fallbackSourceEventId($event),
+                    'revocation_scope' => 'all_marketing_email_domains',
                 ],
             ]);
         }
@@ -219,3 +219,4 @@ class HandleInboundEmailWebhookAction
         return $value === '' ? null : $value;
     }
 }
+

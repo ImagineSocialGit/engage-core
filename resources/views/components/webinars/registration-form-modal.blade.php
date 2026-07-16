@@ -1,6 +1,7 @@
 @props([
     'page',
     'tokens',
+    'style' => [],
     'series',
     'webinarRegistrationChannels' => [],
     'registrationPrefill' => [],
@@ -22,6 +23,23 @@
     $transactionalSmsAvailable = in_array('sms', $transactionalChannels, true);
     $marketingEmailAvailable = in_array('email', $marketingChannels, true);
     $marketingSmsAvailable = in_array('sms', $marketingChannels, true);
+
+    $legalLinks = collect($page['legal_links']['links'] ?? [])
+        ->filter(function (mixed $link): bool {
+            if (! is_array($link)) {
+                return false;
+            }
+
+            $label = $link['label'] ?? null;
+            $url = $link['url'] ?? null;
+
+            return is_string($label)
+                && trim($label) !== ''
+                && is_string($url)
+                && trim($url) !== ''
+                && trim($url) !== '#';
+        })
+        ->values();
 @endphp
 
 <div
@@ -150,15 +168,24 @@
 
                     <div>
                         <x-ui.form.label for="phone">
-                            {{ $page['fields']['phone']['label'] ?? 'Phone Number' }}
+                            {{ $page['fields']['phone']['label'] ?? 'Mobile phone' }}
                         </x-ui.form.label>
-                        
+
                         <x-ui.form.input
                             id="phone"
                             name="phone"
+                            type="tel"
+                            inputmode="tel"
+                            autocomplete="tel"
+                            aria-describedby="phone_sms_helper"
+                            x-bind:required="transactionalSmsConsent || marketingSmsConsent"
                             :value="old('phone', $registrationPrefill['phone'] ?? null)"
                             :placeholder="$page['fields']['phone']['placeholder'] ?? 'Phone number'"
                         />
+
+                        <p id="phone_sms_helper" class="mt-1 text-xs leading-5 text-slate-500">
+                            {{ $page['fields']['phone']['helper'] ?? 'Required only when you choose an SMS option.' }}
+                        </p>
 
                         @error('phone')
                             <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
@@ -168,15 +195,17 @@
                     </div>
                 </div>
 
-                <div class="rounded-2xl bg-slate-50 p-4 space-y-2">
+                <div class="space-y-3 rounded-2xl bg-slate-50 p-4">
                     <div>
                         <h3 class="text-sm font-semibold text-slate-900">
-                            {{ $notificationSection['title'] ?? 'Notifications' }}
+                            {{ $notificationSection['title'] ?? 'Webinar Updates' }}
                         </h3>
 
-                        <p class="mt-1 text-sm text-slate-600">
-                            {{ $notificationSection['body'] ?? 'Please select at least one method below' }}
-                        </p>
+                        @if(filled($notificationSection['body'] ?? null))
+                            <p class="mt-1 text-sm text-slate-600">
+                                {{ $notificationSection['body'] }}
+                            </p>
+                        @endif
                     </div>
 
                     @if($transactionalEmailAvailable)
@@ -195,7 +224,7 @@
                                 >
 
                                 <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
-                                    {{ $page['fields']['consent_messages']['email']['label'] ?? 'Email webinar notifications' }}
+                                    {{ $page['fields']['consent_messages']['email']['label'] ?? 'Webinar email' }}
                                 </span>
                             </label>
 
@@ -218,14 +247,27 @@
                                     name="transactional_sms_consent"
                                     type="checkbox"
                                     value="1"
+                                    x-model="transactionalSmsConsent"
                                     @checked(old('transactional_sms_consent'))
+                                    @if(filled($page['fields']['consent_messages']['sms']['disclosure'] ?? null))
+                                        aria-describedby="transactional_sms_consent_disclosure"
+                                    @endif
                                     class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
                                 >
 
                                 <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
-                                    {{ $page['fields']['consent_messages']['sms']['label'] ?? 'SMS webinar notifications' }}
+                                    {{ $page['fields']['consent_messages']['sms']['label'] ?? 'Webinar SMS' }}
                                 </span>
                             </label>
+
+                            @if(filled($page['fields']['consent_messages']['sms']['disclosure'] ?? null))
+                                <p
+                                    id="transactional_sms_consent_disclosure"
+                                    class="mt-2 pl-7 text-xs leading-5 text-slate-500"
+                                >
+                                    {{ $page['fields']['consent_messages']['sms']['disclosure'] }}
+                                </p>
+                            @endif
 
                             @error('transactional_sms_consent')
                                 <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
@@ -242,11 +284,17 @@
                     @enderror
                 </div>
 
-                <div class="rounded-2xl border border-slate-200 p-4 space-y-2">
+                <div class="space-y-3 rounded-2xl border border-slate-200 p-4">
                     <div>
-                         <p class="text-sm text-slate-500">
-                            {{ $marketingSection['body'] ?? 'The following are not required for registration' }}
-                        </p>
+                        <h3 class="text-sm font-semibold text-slate-900">
+                            {{ $marketingSection['title'] ?? 'Keep Learning — Optional' }}
+                        </h3>
+
+                        @if(filled($marketingSection['body'] ?? null))
+                            <p class="mt-1 text-sm text-slate-500">
+                                {{ $marketingSection['body'] }}
+                            </p>
+                        @endif
                     </div>
 
                     @if($marketingEmailAvailable)
@@ -265,7 +313,7 @@
                                 >
 
                                 <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
-                                    {{ $page['fields']['marketing_consent_messages']['email']['label'] ?? '' }}
+                                    {{ $page['fields']['marketing_consent_messages']['email']['label'] ?? 'Marketing email' }}
                                 </span>
                             </label>
 
@@ -288,14 +336,27 @@
                                     name="marketing_sms_consent"
                                     type="checkbox"
                                     value="1"
+                                    x-model="marketingSmsConsent"
                                     @checked(old('marketing_sms_consent'))
+                                    @if(filled($page['fields']['marketing_consent_messages']['sms']['disclosure'] ?? null))
+                                        aria-describedby="marketing_sms_consent_disclosure"
+                                    @endif
                                     class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
                                 >
 
                                 <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }}">
-                                    {{ $page['fields']['marketing_consent_messages']['sms']['label'] ?? '' }}
+                                    {{ $page['fields']['marketing_consent_messages']['sms']['label'] ?? 'Marketing SMS' }}
                                 </span>
                             </label>
+
+                            @if(filled($page['fields']['marketing_consent_messages']['sms']['disclosure'] ?? null))
+                                <p
+                                    id="marketing_sms_consent_disclosure"
+                                    class="mt-2 pl-7 text-xs leading-5 text-slate-500"
+                                >
+                                    {{ $page['fields']['marketing_consent_messages']['sms']['disclosure'] }}
+                                </p>
+                            @endif
 
                             @error('marketing_sms_consent')
                                 <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
@@ -306,26 +367,20 @@
                     @endif
                 </div>
 
-                @if($page['legal_links']['enabled'] ?? false)
+                @if(($page['legal_links']['enabled'] ?? false) && $legalLinks->isNotEmpty())
                     <p class="{{ $style['legal_links']['wrapper'] ?? 'text-xs leading-5 text-slate-600' }}">
-                        By registering, you agree to our
-                        <a
-                            href="{{ $page['legal_links']['links'][0]['url'] }}"
-                            target="_blank"
-                            rel="noopener"
-                            class="{{ $style['legal_links']['link'] ?? 'font-semibold underline' }}"
-                        >
-                            {{ $page['legal_links']['links'][0]['label'] }}
-                        </a>
-                        and
-                        <a
-                            href="{{ $page['legal_links']['links'][1]['url'] }}"
-                            target="_blank"
-                            rel="noopener"
-                            class="{{ $style['legal_links']['link'] ?? 'font-semibold underline' }}"
-                        >
-                            {{ $page['legal_links']['links'][1]['label'] }}
-                        </a>.
+                        {{ $page['legal_links']['intro'] ?? 'By registering, you agree to our' }}
+                        @foreach($legalLinks as $link)
+                            @if(! $loop->first)
+                                {{ $loop->last ? ' and ' : ', ' }}
+                            @endif
+                            <a
+                                href="{{ trim($link['url']) }}"
+                                target="_blank"
+                                rel="noopener"
+                                class="{{ $style['legal_links']['link'] ?? 'font-semibold underline' }}"
+                            >{{ trim($link['label']) }}</a>@if($loop->last).@endif
+                        @endforeach
                     </p>
                 @endif
 

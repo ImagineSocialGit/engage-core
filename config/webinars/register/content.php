@@ -10,6 +10,18 @@ return [
 
     'image_caption' => null,
 
+    'sections' => [
+        'notifications' => [
+            'title' => 'Webinar Updates',
+            'body' => 'Choose at least one way to receive access details and reminders.',
+        ],
+
+        'marketing' => [
+            'title' => 'Keep Learning — Optional',
+            'body' => 'Get future tips, resources, and updates after the webinar.',
+        ],
+    ],
+
     'fields' => [
         'first_name' => [
             'label' => 'First name',
@@ -29,27 +41,34 @@ return [
         'phone' => [
             'label' => 'Mobile phone',
             'placeholder' => '(555) 555-5555',
-        ],
-
-        'sections' => [
-            'notifications' => [
-                'title' => 'Notifications',
-                'body' => 'Please select at least one method below',
-            ],
-
-            'marketing' => [
-                'body' => 'The following are not required for registration',
-            ],
+            'helper' => 'Required only when you choose an SMS option.',
         ],
 
         'consent_messages' => [
             'email' => [
-                'label' => 'I agree to receive emails related to my registration, including access details, reminders, replay access, and follow-up communications. I may unsubscribe at any time.',
+                'label' => 'Webinar email',
             ],
             'sms' => [
-                'label' => 'I agree to receive automated text messages related to my registration, including access details, reminders, replay access, and follow-up communications. Consent is not a condition of registration. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help.',
+                'label' => 'Webinar SMS',
+                'disclosure' => 'By selecting Webinar SMS, you agree to receive automated texts about this webinar, including access details, reminders, replay availability, and related follow-up. Consent is not a condition of registration. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help.',
             ],
         ],
+
+        'marketing_consent_messages' => [
+            'email' => [
+                'label' => 'Marketing email',
+            ],
+            'sms' => [
+                'label' => 'Marketing SMS',
+                'disclosure' => 'By selecting Marketing SMS, you agree to receive automated marketing texts. Consent is not a condition of registration. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help.',
+            ],
+        ],
+    ],
+
+    'legal_links' => [
+        'enabled' => false,
+        'intro' => 'By registering, you agree to our',
+        'links' => [],
     ],
 
 ];

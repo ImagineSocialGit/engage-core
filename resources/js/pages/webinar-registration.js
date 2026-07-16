@@ -2,6 +2,8 @@ export default function webinarRegistrationPage(config = {}) {
     return {
         formOpen: Boolean(config.formOpen),
         showStickyCta: false,
+        transactionalSmsConsent: Boolean(config.transactionalSmsConsent),
+        marketingSmsConsent: Boolean(config.marketingSmsConsent),
 
         countdownTarget: config.countdownTarget ?? null,
         remaining: 0,

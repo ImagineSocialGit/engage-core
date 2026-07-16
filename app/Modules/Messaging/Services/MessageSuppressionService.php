@@ -163,6 +163,7 @@ class MessageSuppressionService
 
         if (! in_array($provider, [
             MessageSuppression::PROVIDER_TWILIO,
+            MessageSuppression::PROVIDER_TELNYX,
             MessageSuppression::PROVIDER_RESEND,
         ], true)) {
             throw new InvalidArgumentException('Invalid message suppression provider.');
@@ -182,3 +183,4 @@ class MessageSuppressionService
         return $value === '' ? null : $value;
     }
 }
+

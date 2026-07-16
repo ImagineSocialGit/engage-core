@@ -57,8 +57,11 @@ class EmailMessagingServiceTest extends TestCase
             $provider
         );
 
-        app(EmailMessagingService::class)
+        $result = app(EmailMessagingService::class)
             ->send($message);
+
+        $this->assertTrue($result->isSent());
+        $this->assertSame('resend', $result->provider);
 
         Mail::assertSent(
             $message->mailable()::class

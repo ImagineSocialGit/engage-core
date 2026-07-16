@@ -2,22 +2,26 @@
 
 namespace App\Modules\Messaging\Services\Sms;
 
+use App\Modules\Messaging\Data\Delivery\SmsSendDecision;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 
 class SmsSendGuard
 {
-    public function allows(
+    public function decision(
         string $to,
         string $message,
         string $kind,
         ?string $sourceIp = null,
-    ): bool {
+    ): SmsSendDecision {
         if (Cache::has($this->duplicateKey($to, $message))) {
             Log::warning('Duplicate SMS suppressed.', compact('kind', 'to'));
 
-            return false;
+            return SmsSendDecision::denied(
+                reasonCode: 'sms_duplicate_suppressed',
+                reason: 'Duplicate SMS was suppressed during the configured cooldown window.',
+            );
         }
 
         if (RateLimiter::tooManyAttempts(
@@ -26,7 +30,10 @@ class SmsSendGuard
         )) {
             Log::warning('SMS per-phone daily limit exceeded.', compact('kind', 'to'));
 
-            return false;
+            return SmsSendDecision::denied(
+                reasonCode: 'sms_phone_rate_limit_exceeded',
+                reason: 'SMS per-phone daily limit was exceeded.',
+            );
         }
 
         if ($sourceIp && RateLimiter::tooManyAttempts(
@@ -38,11 +45,13 @@ class SmsSendGuard
                 'ip' => $sourceIp,
             ]);
 
-            return false;
+            return SmsSendDecision::denied(
+                reasonCode: 'sms_ip_rate_limit_exceeded',
+                reason: 'SMS per-IP hourly limit was exceeded.',
+            );
         }
 
         $dailyKey = $this->dailySendCountKey();
-
         $count = (int) Cache::get($dailyKey, 0);
 
         if ($count >= (int) config('sms.monitoring.daily_send_hard_limit', 2000)) {
@@ -51,10 +60,22 @@ class SmsSendGuard
                 'kind' => $kind,
             ]);
 
-            return false;
+            return SmsSendDecision::denied(
+                reasonCode: 'sms_daily_hard_limit_reached',
+                reason: 'SMS daily hard limit was reached.',
+            );
         }
 
-        return true;
+        return SmsSendDecision::allowed();
+    }
+
+    public function allows(
+        string $to,
+        string $message,
+        string $kind,
+        ?string $sourceIp = null,
+    ): bool {
+        return $this->decision($to, $message, $kind, $sourceIp)->allowed;
     }
 
     public function record(
@@ -79,7 +100,6 @@ class SmsSendGuard
         }
 
         $dailyKey = $this->dailySendCountKey();
-
         $count = Cache::increment($dailyKey);
 
         if ($count === 1) {

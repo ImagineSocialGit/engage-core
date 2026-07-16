@@ -76,35 +76,57 @@ class ContactPermissionInvitationService
 
         $contact = $scheduledMessage->recipient;
 
-        if (! $contact instanceof Contact) {
-            return null;
-        }
-
-        if (! $this->isImportedContact($contact)) {
+        if (! $contact instanceof Contact || ! $this->isImportedContact($contact)) {
             return null;
         }
 
         try {
-            return ContactPermissionInvitation::query()->create([
-                'contact_id' => $contact->getKey(),
-                'scheduled_message_id' => $scheduledMessage->getKey(),
-                'token' => $this->newToken(),
-                'context_type' => $scheduledMessage->context_type,
-                'context_id' => $scheduledMessage->context_id,
-                'channel' => ContactPermissionInvitation::CHANNEL_EMAIL,
-                'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
-                'status' => ContactPermissionInvitation::STATUS_CLAIMED,
-                'claimed_at' => now(),
-                'meta' => [
-                    'scheduled_message' => [
-                        'message_type' => $scheduledMessage->message_type,
-                        'purpose' => $scheduledMessage->purpose,
-                        'scope' => $scheduledMessage->scope,
+            return DB::transaction(function () use ($contact, $scheduledMessage): ?ContactPermissionInvitation {
+                $existing = ContactPermissionInvitation::query()
+                    ->where('contact_id', $contact->getKey())
+                    ->where('channel', ContactPermissionInvitation::CHANNEL_EMAIL)
+                    ->where('source', ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($existing instanceof ContactPermissionInvitation) {
+                    return (int) $existing->scheduled_message_id === (int) $scheduledMessage->getKey()
+                        && $existing->status === ContactPermissionInvitation::STATUS_CLAIMED
+                            ? $existing
+                            : null;
+                }
+
+                return ContactPermissionInvitation::query()->create([
+                    'contact_id' => $contact->getKey(),
+                    'scheduled_message_id' => $scheduledMessage->getKey(),
+                    'token' => $this->newToken(),
+                    'context_type' => $scheduledMessage->context_type,
+                    'context_id' => $scheduledMessage->context_id,
+                    'channel' => ContactPermissionInvitation::CHANNEL_EMAIL,
+                    'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
+                    'status' => ContactPermissionInvitation::STATUS_CLAIMED,
+                    'claimed_at' => now(),
+                    'meta' => [
+                        'scheduled_message' => [
+                            'message_type' => $scheduledMessage->message_type,
+                            'purpose' => $scheduledMessage->purpose,
+                            'scope' => $scheduledMessage->scope,
+                        ],
                     ],
-                ],
-            ]);
+                ]);
+            });
         } catch (QueryException) {
-            return null;
+            $existing = ContactPermissionInvitation::query()
+                ->where('contact_id', $contact->getKey())
+                ->where('channel', ContactPermissionInvitation::CHANNEL_EMAIL)
+                ->where('source', ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT)
+                ->first();
+
+            return $existing instanceof ContactPermissionInvitation
+                && (int) $existing->scheduled_message_id === (int) $scheduledMessage->getKey()
+                && $existing->status === ContactPermissionInvitation::STATUS_CLAIMED
+                    ? $existing
+                    : null;
         }
     }
 

@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\Services\Email;
 
 use App\Modules\Messaging\Contracts\Email\EmailMessage;
+use App\Modules\Messaging\Data\Delivery\MessageSendResult;
 use App\Modules\Messaging\Services\DevMessageSink;
 
 class EmailMessagingService
@@ -12,18 +13,23 @@ class EmailMessagingService
         private readonly EmailProviderManager $emailProviderManager,
     ) {}
 
-    public function send(EmailMessage $payload): void
+    public function send(EmailMessage $payload): MessageSendResult
     {
-        if (! $payload->to()) {
-            return;
+        $to = trim($payload->to());
+
+        if ($to === '') {
+            return MessageSendResult::skipped(
+                reasonCode: 'email_destination_missing',
+                reason: 'Email destination is missing.',
+            );
         }
 
         if (app()->environment('local')) {
             $this->devMessageSink->store('email', $payload->devPayload());
 
-            return;
+            return MessageSendResult::sent(provider: 'dev_sink');
         }
 
-        $this->emailProviderManager->provider()->send($payload);
+        return $this->emailProviderManager->provider()->send($payload);
     }
 }

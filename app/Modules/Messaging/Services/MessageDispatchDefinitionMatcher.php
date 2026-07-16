@@ -54,20 +54,51 @@ class MessageDispatchDefinitionMatcher
     {
         $normalized = [];
 
-        if (array_key_exists('campaign_key', $criteria)) {
-            if (! is_string($criteria['campaign_key']) || trim($criteria['campaign_key']) === '') {
-                throw new InvalidArgumentException('Dispatch criteria [campaign_key] must be a non-empty string.');
+        foreach ($criteria as $key => $value) {
+            $key = $this->normalizeCriteriaKey($key);
+
+            if (in_array($key, [
+                'campaign_key',
+                'message_type',
+                'definition_key',
+                'campaign_step_variant_key',
+            ], true)) {
+                if (! is_string($value) || trim($value) === '') {
+                    throw new InvalidArgumentException("Dispatch criteria [{$key}] must be a non-empty string.");
+                }
+
+                $normalized[$key] = $this->normalizeSegment($value);
+
+                continue;
             }
 
-            $normalized['campaign_key'] = $this->normalizeSegment($criteria['campaign_key']);
-        }
+            if ($key === 'step') {
+                if (! is_int($value) || $value < 1) {
+                    throw new InvalidArgumentException('Dispatch criteria [step] must be an integer greater than zero.');
+                }
 
-        if (array_key_exists('step', $criteria)) {
-            if (! is_int($criteria['step']) || $criteria['step'] < 1) {
-                throw new InvalidArgumentException('Dispatch criteria [step] must be an integer greater than zero.');
+                $normalized['step'] = $value;
+
+                continue;
             }
 
-            $normalized['step'] = $criteria['step'];
+            if ($key === 'source_config_path') {
+                if (! is_string($value) || trim($value) === '') {
+                    throw new InvalidArgumentException('Dispatch criteria [source_config_path] must be a non-empty string.');
+                }
+
+                $normalized['source_config_path'] = trim($value);
+
+                continue;
+            }
+
+            if (is_array($value) || is_object($value) || is_resource($value)) {
+                throw new InvalidArgumentException("Dispatch criteria [{$key}] must be a scalar value or null.");
+            }
+
+            $normalized[$key] = is_string($value)
+                ? trim($value)
+                : $value;
         }
 
         return $normalized;
@@ -85,6 +116,13 @@ class MessageDispatchDefinitionMatcher
             return false;
         }
 
+        $definitionDispatchKeys = array_values(array_unique(array_filter(array_map(
+            fn (mixed $dispatchKey): ?string => is_string($dispatchKey) && trim($dispatchKey) !== ''
+                ? $this->normalizeSegment($dispatchKey)
+                : null,
+            $definitionDispatchKeys,
+        ))));
+
         return array_intersect($dispatchKeys, $definitionDispatchKeys) !== [];
     }
 
@@ -95,13 +133,30 @@ class MessageDispatchDefinitionMatcher
     private function definitionMatchesCriteria(array $definition, array $criteria): bool
     {
         foreach ($criteria as $key => $expected) {
-            if (! array_key_exists($key, $definition)) {
-                return false;
+            $actual = $this->definitionCriteriaValue($definition, $key);
+
+            if ($key === 'step') {
+                if (! is_int($actual) || $actual !== $expected) {
+                    return false;
+                }
+
+                continue;
             }
 
-            $actual = $definition[$key];
+            if ($key === 'source_config_path') {
+                if (! is_string($actual) || trim($actual) !== $expected) {
+                    return false;
+                }
 
-            if ($key === 'campaign_key') {
+                continue;
+            }
+
+            if (in_array($key, [
+                'campaign_key',
+                'message_type',
+                'definition_key',
+                'campaign_step_variant_key',
+            ], true)) {
                 if (! is_string($actual) || $this->normalizeSegment($actual) !== $expected) {
                     return false;
                 }
@@ -109,8 +164,8 @@ class MessageDispatchDefinitionMatcher
                 continue;
             }
 
-            if ($key === 'step') {
-                if (! is_int($actual) || $actual !== $expected) {
+            if (is_string($actual) && is_string($expected)) {
+                if ($this->normalizeSegment($actual) !== $this->normalizeSegment($expected)) {
                     return false;
                 }
 
@@ -126,20 +181,62 @@ class MessageDispatchDefinitionMatcher
     }
 
     /**
+     * @param array<string, mixed> $definition
+     */
+    private function definitionCriteriaValue(array $definition, string $key): mixed
+    {
+        return match ($key) {
+            'campaign_key' => $definition['campaign_key']
+                ?? data_get($definition, 'meta.campaign_template.campaign_key')
+                ?? data_get($definition, 'meta.campaign.campaign_key'),
+            'step' => $definition['step']
+                ?? $definition['campaign_step']
+                ?? data_get($definition, 'meta.campaign_template.step_number')
+                ?? data_get($definition, 'meta.campaign.step'),
+            'message_type' => $definition['message_type'] ?? null,
+            'definition_key' => $definition['definition_key']
+                ?? $definition['key']
+                ?? data_get($definition, 'meta.message_template_assignment.definition_key')
+                ?? data_get($definition, 'meta.seed.definition_key'),
+            'campaign_step_variant_key' => $definition['campaign_step_variant_key']
+                ?? $definition['variant']
+                ?? data_get($definition, 'meta.campaign_template.campaign_step_variant_key')
+                ?? data_get($definition, 'meta.message_template_assignment.campaign_step_variant_key'),
+            'source_config_path' => $definition['campaign_step_variant_source_config_path']
+                ?? $definition['source_config_path']
+                ?? data_get($definition, 'meta.campaign_template.campaign_step_variant_source_config_path')
+                ?? $definition['config_path']
+                ?? data_get($definition, 'meta.message_template_assignment.source_config_path')
+                ?? data_get($definition, 'meta.message_template_preset.source_config_path')
+                ?? data_get($definition, 'meta.seed.config_path'),
+            default => data_get($definition, $key),
+        };
+    }
+
+    /**
      * @param array<int, array<string, mixed>> $definitions
      * @param array<string, mixed> $criteria
      */
     private function assertCriteriaMatchesSingleDefinition(array $definitions, array $criteria): void
     {
-        if ($criteria === []) {
-            return;
-        }
-
-        if (count($definitions) <= 1) {
+        if ($criteria === [] || count($definitions) <= 1) {
             return;
         }
 
         throw new InvalidArgumentException('Dispatch criteria matched multiple message definitions.');
+    }
+
+    private function normalizeCriteriaKey(mixed $key): string
+    {
+        if (! is_string($key) || trim($key) === '') {
+            throw new InvalidArgumentException('Dispatch criteria keys must be non-empty strings.');
+        }
+
+        return match ($this->normalizeSegment($key)) {
+            'campaign_step' => 'step',
+            'variant', 'variant_key' => 'campaign_step_variant_key',
+            default => $this->normalizeSegment($key),
+        };
     }
 
     private function normalizeSegment(string $value): string

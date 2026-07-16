@@ -3,6 +3,7 @@
 namespace App\Integrations\Messaging\Sms\Twilio;
 
 use App\Modules\Messaging\Contracts\Sms\SmsProvider;
+use App\Modules\Messaging\Data\Delivery\MessageSendResult;
 use RuntimeException;
 use Twilio\Rest\Client;
 
@@ -21,14 +22,21 @@ class TwilioSmsProvider implements SmsProvider
         string $to,
         string $message,
         array $meta = [],
-    ): void {
+    ): MessageSendResult {
         $purpose = $this->purposeFromMeta($meta);
         $from = $this->fromForPurpose($purpose);
-
-        $this->client->messages->create($to, [
+        $sent = $this->client->messages->create($to, [
             'from' => $from,
             'body' => $message,
         ]);
+        $providerMessageId = is_string($sent->sid ?? null)
+            ? trim((string) $sent->sid)
+            : null;
+
+        return MessageSendResult::sent(
+            provider: $this->provider(),
+            providerMessageId: $providerMessageId !== '' ? $providerMessageId : null,
+        );
     }
 
     private function purposeFromMeta(array $meta): string

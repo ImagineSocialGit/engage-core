@@ -2,7 +2,11 @@
 
 namespace App\Modules\Messaging\Contracts\Email;
 
+use App\Modules\Messaging\Data\Delivery\MessageSendResult;
+
 interface EmailProvider
 {
-    public function send(EmailMessage $message): void;
+    public function provider(): string;
+
+    public function send(EmailMessage $message): MessageSendResult;
 }

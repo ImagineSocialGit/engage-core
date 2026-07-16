@@ -29,6 +29,8 @@
         x-data="webinarRegistrationPage(@js([
             'countdownTarget' => $countdownTarget,
             'formOpen' => $errors->any(),
+            'transactionalSmsConsent' => (bool) old('transactional_sms_consent'),
+            'marketingSmsConsent' => (bool) old('marketing_sms_consent'),
         ]))"
         class="{{ $style['section'] ?? 'bg-white' }}"
         >
@@ -37,6 +39,7 @@
             :page="$page"
             :style="$style"
             :tokens="$tokens"
+            :style="$style"
             :series="$series"
             :event-details-items="$eventDetailsItems"
             :countdown-target="$countdownTarget"
@@ -396,6 +399,7 @@
         <x-webinars.registration-form-modal
             :page="$page"
             :tokens="$tokens"
+            :style="$style"
             :series="$series"
             :webinar-registration-channels="$webinarRegistrationChannels ?? []"
             :registration-prefill="$registrationPrefill ?? []"

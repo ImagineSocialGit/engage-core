@@ -4,6 +4,7 @@ namespace Tests\Feature\Messaging;
 
 use App\Modules\Messaging\Contracts\Sms\SmsMessage;
 use App\Modules\Messaging\Contracts\Sms\SmsProvider;
+use App\Modules\Messaging\Data\Delivery\MessageSendResult;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Services\DevMessageSink;
 use App\Modules\Messaging\Services\PhoneNumberNormalizer;
@@ -35,12 +36,14 @@ class SmsMessagingServiceTest extends TestCase
             smsSendGuard: app(SmsSendGuard::class),
         );
 
-        $service->send(new FakeSmsPayload(
+        $result = $service->send(new FakeSmsPayload(
             to: '(555) 555-0123',
             message: 'Test message',
             kind: 'test_message',
         ));
 
+        $this->assertTrue($result->isSent());
+        $this->assertSame('telnyx', $result->provider);
         $this->assertTrue($provider->sent);
         $this->assertSame('+15555550123', $provider->to);
         $this->assertSame('Test message', $provider->message);
@@ -70,7 +73,7 @@ class SmsMessagingServiceTest extends TestCase
             smsSendGuard: app(SmsSendGuard::class),
         );
 
-        $service->send(SmsPayload::fromArray([
+        $result = $service->send(SmsPayload::fromArray([
             'to' => '(555) 555-0123',
             'purpose' => 'transactional',
             'scope' => 'webinar',
@@ -82,6 +85,7 @@ class SmsMessagingServiceTest extends TestCase
             ],
         ]));
 
+        $this->assertTrue($result->isSent());
         $this->assertTrue($provider->sent);
         $this->assertSame('+15555550123', $provider->to);
         $this->assertSame('Hi Jeff, join here: https://example.test/join/abc123', $provider->message);
@@ -109,12 +113,14 @@ class SmsMessagingServiceTest extends TestCase
             smsSendGuard: app(SmsSendGuard::class),
         );
 
-        $service->send(new FakeSmsPayload(
+        $result = $service->send(new FakeSmsPayload(
             to: '+15555550123',
             message: 'Test message',
             kind: 'test_message',
         ));
 
+        $this->assertTrue($result->isSkipped());
+        $this->assertSame('sms_disabled', $result->reasonCode);
         $this->assertFalse($provider->sent);
     }
 }
@@ -138,12 +144,17 @@ class FakeSmsProvider implements SmsProvider
         return $this->provider;
     }
 
-    public function send(string $to, string $message, array $meta = []): void
+    public function send(string $to, string $message, array $meta = []): MessageSendResult
     {
         $this->sent = true;
         $this->to = $to;
         $this->message = $message;
         $this->meta = $meta;
+
+        return MessageSendResult::sent(
+            provider: $this->provider,
+            providerMessageId: 'provider-message-id',
+        );
     }
 }
 
@@ -204,3 +215,5 @@ class FakeSmsPayload implements SmsMessage
         return $this->sourceIp;
     }
 }
+
+

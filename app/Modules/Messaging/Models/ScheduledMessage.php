@@ -17,6 +17,7 @@ class ScheduledMessage extends Model
     }
 
     public const STATUS_PENDING = 'pending';
+    public const STATUS_SENDING = 'sending';
     public const STATUS_SENT = 'sent';
     public const STATUS_SKIPPED = 'skipped';
     public const STATUS_FAILED = 'failed';
@@ -39,6 +40,11 @@ class ScheduledMessage extends Model
         'payload',
         'send_at',
         'status',
+        'sending_at',
+        'last_attempted_at',
+        'send_attempts',
+        'provider',
+        'provider_message_id',
         'sent_at',
         'skipped_at',
         'failed_at',
@@ -57,6 +63,9 @@ class ScheduledMessage extends Model
             'dispatch_keys' => 'array',
             'payload' => 'array',
             'send_at' => 'datetime',
+            'sending_at' => 'datetime',
+            'last_attempted_at' => 'datetime',
+            'send_attempts' => 'integer',
             'sent_at' => 'datetime',
             'skipped_at' => 'datetime',
             'failed_at' => 'datetime',

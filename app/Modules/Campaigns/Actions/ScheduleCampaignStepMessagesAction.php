@@ -171,6 +171,19 @@ class ScheduleCampaignStepMessagesAction
             return null;
         }
 
+        $criteria = [
+            'campaign_key' => $campaign->key,
+            'step' => $step->step_number,
+            'variant' => $variant->key,
+        ];
+
+        if (
+            is_string($variant->source_config_path)
+            && trim($variant->source_config_path) !== ''
+        ) {
+            $criteria['source_config_path'] = trim($variant->source_config_path);
+        }
+
         $scheduledMessages = $this->dispatchMessageAction->handle(
             recipient: $contact,
             channel: $definition['channel'],
@@ -187,12 +200,7 @@ class ScheduleCampaignStepMessagesAction
                 strategy: $strategy,
                 meta: $meta,
             ),
-            criteria: [
-                'campaign_key' => $campaign->key,
-                'step' => $step->step_number,
-                'variant' => $variant->key,
-                'source_config_path' => $variant->source_config_path,
-            ],
+            criteria: $criteria,
             definitions: [$definition],
             occurrenceKey: implode(':', [
                 'campaign',

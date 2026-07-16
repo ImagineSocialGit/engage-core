@@ -35,6 +35,13 @@ return new class extends Migration
                 ->default('pending')
                 ->index();
 
+            $table->timestamp('sending_at')->nullable()->index();
+            $table->timestamp('last_attempted_at')->nullable()->index();
+            $table->unsignedInteger('send_attempts')->default(0);
+
+            $table->string('provider', 64)->nullable()->index();
+            $table->string('provider_message_id', 191)->nullable()->index();
+
             $table->timestamp('sent_at')->nullable()->index();
             $table->timestamp('skipped_at')->nullable()->index();
             $table->timestamp('failed_at')->nullable()->index();

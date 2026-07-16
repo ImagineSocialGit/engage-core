@@ -16,12 +16,10 @@ class MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped
     {
         $scheduledMessage = $event->scheduledMessage;
 
-        if (! $this->permissionInvitationService->isImportedContactPermissionInvitationMessage($scheduledMessage)) {
-            return;
-        }
-
         $invitation = ContactPermissionInvitation::query()
             ->where('scheduled_message_id', $scheduledMessage->getKey())
+            ->where('channel', ContactPermissionInvitation::CHANNEL_EMAIL)
+            ->where('source', ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT)
             ->where('status', ContactPermissionInvitation::STATUS_CLAIMED)
             ->first();
 
@@ -29,9 +27,10 @@ class MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped
             return;
         }
 
-        $reason = is_string($scheduledMessage->skip_reason) && trim($scheduledMessage->skip_reason) !== ''
-            ? trim($scheduledMessage->skip_reason)
-            : 'Scheduled permission invitation was skipped after claim.';
+        $reason = is_string($scheduledMessage->skip_reason)
+            && trim($scheduledMessage->skip_reason) !== ''
+                ? trim($scheduledMessage->skip_reason)
+                : 'Scheduled permission invitation was skipped after claim.';
 
         $this->permissionInvitationService->markFailed(
             invitation: $invitation,

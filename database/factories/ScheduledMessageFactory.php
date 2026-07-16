@@ -46,6 +46,12 @@ class ScheduledMessageFactory extends Factory
 
             'status' => ScheduledMessage::STATUS_PENDING,
 
+            'sending_at' => null,
+            'last_attempted_at' => null,
+            'send_attempts' => 0,
+            'provider' => null,
+            'provider_message_id' => null,
+
             'sent_at' => null,
             'failed_at' => null,
             'skipped_at' => null,
@@ -92,6 +98,17 @@ class ScheduledMessageFactory extends Factory
             'channel' => 'sms',
             'payload_class' => SmsPayload::class,
             'queue' => 'notifications',
+        ]);
+    }
+
+
+    public function sending(int $attempts = 1): static
+    {
+        return $this->state(fn () => [
+            'status' => ScheduledMessage::STATUS_SENDING,
+            'sending_at' => now(),
+            'last_attempted_at' => now(),
+            'send_attempts' => $attempts,
         ]);
     }
 

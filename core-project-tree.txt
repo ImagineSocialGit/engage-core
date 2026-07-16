@@ -429,6 +429,7 @@
 │   │   │   ├── Actions
 │   │   │   │   ├── AssignMessageTemplatePresetAction.php
 │   │   │   │   ├── BuildConsentOptInMessageIntentAction.php
+│   │   │   │   ├── ClaimScheduledMessageForSendingAction.php
 │   │   │   │   ├── CreateContactPermissionInvitationsForImportBatchAction.php
 │   │   │   │   ├── DispatchConsentOptInMessageAction.php
 │   │   │   │   ├── DispatchMessageAction.php
@@ -478,7 +479,9 @@
 │   │   │   │   ├── Consent
 │   │   │   │   │   └── MessageConsentGrantResult.php
 │   │   │   │   ├── Delivery
-│   │   │   │   │   └── MessageDeliveryIntent.php
+│   │   │   │   │   ├── MessageDeliveryIntent.php
+│   │   │   │   │   ├── MessageSendResult.php
+│   │   │   │   │   └── SmsSendDecision.php
 │   │   │   │   ├── MessageData.php
 │   │   │   │   └── ResolvedMessageDispatch.php
 │   │   │   ├── Enums
@@ -1560,7 +1563,8 @@
 │   │   │   ├── RobTheMortgageCoachClientSelectionTest.php
 │   │   │   ├── SlamDunkConfigGoldenFixtureTest.php
 │   │   │   ├── SlamDunkDeliveryConsolidationConfigTest.php
-│   │   │   └── SlamDunkRuntimeGoldenFixtureTest.php
+│   │   │   ├── SlamDunkRuntimeGoldenFixtureTest.php
+│   │   │   └── WebinarRegistrationConsentContentConfigTest.php
 │   │   ├── Core
 │   │   │   ├── ContactControllerTest.php
 │   │   │   ├── ContactFilterResolverTest.php
@@ -1595,6 +1599,7 @@
 │   │   ├── Forms
 │   │   │   └── FormsFoundationTest.php
 │   │   ├── InboundMessaging
+│   │   │   ├── HandleInboundEmailWebhookActionTest.php
 │   │   │   └── InboundNormalReplyAutomationEventTest.php
 │   │   ├── Integrations
 │   │   │   └── Messaging
@@ -1626,6 +1631,7 @@
 │   │   │   ├── MessageDefinitionConfigPathTest.php
 │   │   │   ├── MessageDefinitionResolverTest.php
 │   │   │   ├── MessageDeliveryConsolidatorTest.php
+│   │   │   ├── MessageDispatchDefinitionMatcherTest.php
 │   │   │   ├── MessageEligibilityGateTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
 │   │   │   ├── MessageTemplateBehaviorOwnershipValidationTest.php
@@ -1644,6 +1650,7 @@
 │   │   │   ├── ScheduleInternalNotificationActionTest.php
 │   │   │   ├── SemanticCampaignVariantIdentityResolutionTest.php
 │   │   │   ├── SendScheduledMessageJobTest.php
+│   │   │   ├── SkipScheduledMessagesActionTest.php
 │   │   │   ├── SmsMessagingServiceTest.php
 │   │   │   ├── SmsPayloadTest.php
 │   │   │   ├── SmsSendGuardTest.php
@@ -1700,6 +1707,7 @@
 │   │   │   │   └── ProcessPostWebinarEventJobTest.php
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
+│   │   │   ├── WebinarRegistrationConsentPresentationTest.php
 │   │   │   ├── WebinarRegistrationControllerTest.php
 │   │   │   ├── WebinarRegistrationMessageConsolidationTest.php
 │   │   │   ├── WebinarResolvedMessageDispatchOwnershipTest.php
@@ -1716,4 +1724,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-538 directories, 1179 files
+538 directories, 1187 files

@@ -3,6 +3,7 @@
 namespace App\Integrations\Messaging\Sms\Telnyx;
 
 use App\Modules\Messaging\Contracts\Sms\SmsProvider;
+use App\Modules\Messaging\Data\Delivery\MessageSendResult;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -13,7 +14,7 @@ class TelnyxSmsProvider implements SmsProvider
         return 'telnyx';
     }
 
-    public function send(string $to, string $message, array $meta = []): void
+    public function send(string $to, string $message, array $meta = []): MessageSendResult
     {
         $apiKey = config('services.telnyx.api_key');
         $purpose = $this->purposeFromMeta($meta);
@@ -46,6 +47,15 @@ class TelnyxSmsProvider implements SmsProvider
                 'Telnyx SMS send failed from ['.$from.'] to ['.$to.']: '.$response->body(),
             );
         }
+
+        $providerMessageId = $response->json('data.id');
+
+        return MessageSendResult::sent(
+            provider: $this->provider(),
+            providerMessageId: is_string($providerMessageId) && trim($providerMessageId) !== ''
+                ? trim($providerMessageId)
+                : null,
+        );
     }
 
     private function purposeFromMeta(array $meta): string

@@ -4,9 +4,13 @@ namespace Tests\Feature\Messaging;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
+use App\Modules\Messaging\Actions\ClaimScheduledMessageForSendingAction;
 use App\Modules\Messaging\Contracts\Email\EmailMessage;
 use App\Modules\Messaging\Contracts\Sms\SmsMessage;
+use App\Modules\Messaging\Data\Delivery\MessageSendResult;
+use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
+use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
 use App\Modules\Messaging\Models\ConsentRevocation;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
@@ -23,6 +27,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Event;
 use InvalidArgumentException;
 use Mockery;
+use RuntimeException;
 use Tests\TestCase;
 
 class SendScheduledMessageJobTest extends TestCase
@@ -60,7 +65,8 @@ class SendScheduledMessageJobTest extends TestCase
         $emailService
             ->shouldReceive('send')
             ->once()
-            ->with(Mockery::type(FakeJobEmailPayload::class));
+            ->with(Mockery::type(FakeJobEmailPayload::class))
+            ->andReturn(MessageSendResult::sent(provider: 'test_email'));
 
         app()->instance(EmailMessagingService::class, $emailService);
 
@@ -70,6 +76,9 @@ class SendScheduledMessageJobTest extends TestCase
 
         $this->assertSame('sent', $scheduledMessage->status);
         $this->assertNotNull($scheduledMessage->sent_at);
+        $this->assertSame(1, $scheduledMessage->send_attempts);
+        $this->assertSame('test_email', $scheduledMessage->provider);
+        $this->assertNull($scheduledMessage->sending_at);
 
         Event::assertDispatched(
             ScheduledMessageSent::class,
@@ -109,7 +118,8 @@ class SendScheduledMessageJobTest extends TestCase
         $smsService
             ->shouldReceive('send')
             ->once()
-            ->with(Mockery::type(FakeJobSmsPayload::class));
+            ->with(Mockery::type(FakeJobSmsPayload::class))
+            ->andReturn(MessageSendResult::sent(provider: 'test_sms'));
 
         app()->instance(SmsMessagingService::class, $smsService);
 
@@ -170,7 +180,8 @@ class SendScheduledMessageJobTest extends TestCase
 
                 return $payload instanceof SmsPayload
                     && $payload->message() === 'Hi Jeff, join here: https://example.test/join/abc123';
-            }));
+            }))
+            ->andReturn(MessageSendResult::sent(provider: 'test_sms'));
 
         app()->instance(SmsMessagingService::class, $smsService);
 
@@ -229,7 +240,8 @@ class SendScheduledMessageJobTest extends TestCase
                 return $payload->to() === '+15555550123'
                     && $payload->message() === 'This is an SMS broadcast.'
                     && $payload->purpose() === 'marketing';
-            }));
+            }))
+            ->andReturn(MessageSendResult::sent(provider: 'test_sms'));
 
         app()->instance(SmsMessagingService::class, $smsService);
 
@@ -282,7 +294,8 @@ class SendScheduledMessageJobTest extends TestCase
         $emailService
             ->shouldReceive('send')
             ->once()
-            ->with(Mockery::type(FakeJobEmailPayload::class));
+            ->with(Mockery::type(FakeJobEmailPayload::class))
+            ->andReturn(MessageSendResult::sent(provider: 'test_email'));
 
         app()->instance(EmailMessagingService::class, $emailService);
 
@@ -669,7 +682,8 @@ class SendScheduledMessageJobTest extends TestCase
                 $capturedPayload = $payload;
 
                 return true;
-            }));
+            }))
+            ->andReturn(MessageSendResult::sent(provider: 'test_email'));
 
         app()->instance(EmailMessagingService::class, $emailService);
 
@@ -753,7 +767,8 @@ Thanks.",
                 $capturedHtml = $payload->html();
 
                 return true;
-            }));
+            }))
+            ->andReturn(MessageSendResult::sent(provider: 'test_email'));
 
         app()->instance(EmailMessagingService::class, $emailService);
 
@@ -828,7 +843,8 @@ Thanks.",
                 $capturedPayload = $payload;
 
                 return true;
-            }));
+            }))
+            ->andReturn(MessageSendResult::sent(provider: 'test_email'));
 
         app()->instance(EmailMessagingService::class, $emailService);
 
@@ -1015,7 +1031,8 @@ Thanks.",
         $emailService
             ->shouldReceive('send')
             ->once()
-            ->with(Mockery::type(FakeJobEmailPayload::class));
+            ->with(Mockery::type(FakeJobEmailPayload::class))
+            ->andReturn(MessageSendResult::sent(provider: 'test_email'));
 
         app()->instance(EmailMessagingService::class, $emailService);
 
@@ -1118,11 +1135,164 @@ Thanks.",
         return $gate;
     }
 
+    public function test_atomic_claim_prevents_a_second_worker_from_claiming_the_same_message(): void
+    {
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'status' => ScheduledMessage::STATUS_PENDING,
+        ]);
+
+        $action = app(ClaimScheduledMessageForSendingAction::class);
+        $firstClaim = $action->handle($scheduledMessage);
+        $secondClaim = $action->handle($scheduledMessage);
+
+        $this->assertInstanceOf(ScheduledMessage::class, $firstClaim);
+        $this->assertSame(ScheduledMessage::STATUS_SENDING, $firstClaim->status);
+        $this->assertSame(1, $firstClaim->send_attempts);
+        $this->assertNull($secondClaim);
+        $this->assertSame(ScheduledMessage::STATUS_SENDING, $scheduledMessage->refresh()->status);
+    }
+
+    public function test_service_skip_result_marks_message_skipped_instead_of_sent(): void
+    {
+        Event::fake([
+            ScheduledMessageSent::class,
+            ScheduledMessageSkipped::class,
+        ]);
+
+        $contact = Contact::factory()->create([
+            'phone' => '+15555550123',
+        ]);
+        $this->grantConsent($contact, 'sms', 'transactional');
+
+        $scheduledMessage = ScheduledMessage::factory()->sms()->create([
+            'recipient_type' => Contact::class,
+            'recipient_id' => $contact->getKey(),
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => FakeJobSmsPayload::class,
+            'payload' => [
+                'to' => '+15555550123',
+                'message' => 'Hello',
+            ],
+            'meta' => ['conditions' => []],
+        ]);
+
+        $smsService = Mockery::mock(SmsMessagingService::class);
+        $smsService->shouldReceive('send')
+            ->once()
+            ->andReturn(MessageSendResult::skipped(
+                reasonCode: 'sms_disabled',
+                reason: 'SMS delivery is disabled.',
+            ));
+        app()->instance(SmsMessagingService::class, $smsService);
+
+        $this->handleScheduledMessage($scheduledMessage);
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $scheduledMessage->status);
+        $this->assertSame('SMS delivery is disabled.', $scheduledMessage->skip_reason);
+        $this->assertSame('sms_disabled', data_get($scheduledMessage->meta, 'delivery.reason_code'));
+        $this->assertNull($scheduledMessage->sent_at);
+        $this->assertNull($scheduledMessage->sending_at);
+        Event::assertNotDispatched(ScheduledMessageSent::class);
+        Event::assertDispatched(ScheduledMessageSkipped::class);
+    }
+
+    public function test_retryable_exception_returns_message_to_pending_for_another_attempt(): void
+    {
+        Event::fake([ScheduledMessageFailed::class]);
+
+        $contact = Contact::factory()->create([
+            'email' => 'retry@example.com',
+        ]);
+        $this->grantConsent($contact, 'email', 'transactional');
+
+        $scheduledMessage = ScheduledMessage::factory()->email()->create([
+            'recipient_type' => Contact::class,
+            'recipient_id' => $contact->getKey(),
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => FakeJobEmailPayload::class,
+            'payload' => ['to' => 'retry@example.com'],
+            'meta' => ['conditions' => []],
+        ]);
+
+        $emailService = Mockery::mock(EmailMessagingService::class);
+        $emailService->shouldReceive('send')
+            ->once()
+            ->andThrow(new RuntimeException('Temporary provider outage.'));
+        app()->instance(EmailMessagingService::class, $emailService);
+
+        try {
+            $this->handleScheduledMessage($scheduledMessage);
+            $this->fail('Expected retryable delivery exception.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Temporary provider outage.', $exception->getMessage());
+        }
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame(ScheduledMessage::STATUS_PENDING, $scheduledMessage->status);
+        $this->assertSame(1, $scheduledMessage->send_attempts);
+        $this->assertNull($scheduledMessage->sending_at);
+        $this->assertNull($scheduledMessage->failed_at);
+        $this->assertSame('Temporary provider outage.', $scheduledMessage->failure_reason);
+        $this->assertTrue((bool) data_get($scheduledMessage->meta, 'delivery.retryable'));
+        Event::assertNotDispatched(ScheduledMessageFailed::class);
+    }
+
+    public function test_retryable_exception_marks_message_failed_on_final_delivery_attempt(): void
+    {
+        Event::fake([ScheduledMessageFailed::class]);
+
+        $contact = Contact::factory()->create([
+            'email' => 'final-attempt@example.com',
+        ]);
+        $this->grantConsent($contact, 'email', 'transactional');
+
+        $scheduledMessage = ScheduledMessage::factory()->email()->create([
+            'recipient_type' => Contact::class,
+            'recipient_id' => $contact->getKey(),
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => FakeJobEmailPayload::class,
+            'payload' => ['to' => 'final-attempt@example.com'],
+            'send_attempts' => 2,
+            'meta' => ['conditions' => []],
+        ]);
+
+        $emailService = Mockery::mock(EmailMessagingService::class);
+        $emailService->shouldReceive('send')
+            ->once()
+            ->andThrow(new RuntimeException('Provider still unavailable.'));
+        app()->instance(EmailMessagingService::class, $emailService);
+
+        try {
+            $this->handleScheduledMessage($scheduledMessage);
+            $this->fail('Expected terminal delivery exception.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Provider still unavailable.', $exception->getMessage());
+        }
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame(ScheduledMessage::STATUS_FAILED, $scheduledMessage->status);
+        $this->assertSame(3, $scheduledMessage->send_attempts);
+        $this->assertNotNull($scheduledMessage->failed_at);
+        $this->assertNull($scheduledMessage->sending_at);
+        Event::assertDispatched(ScheduledMessageFailed::class);
+    }
+
     private function handleScheduledMessage(
         ScheduledMessage $scheduledMessage,
         ?ScheduledMessageGate $scheduledMessageGate = null,
     ): void {
         (new SendScheduledMessageJob($scheduledMessage->id))->handle(
+            claimScheduledMessage: app(ClaimScheduledMessageForSendingAction::class),
             scheduledMessageGate: $scheduledMessageGate ?? app(ScheduledMessageGate::class),
             emailMessagingService: app(EmailMessagingService::class),
             smsMessagingService: app(SmsMessagingService::class),
@@ -1263,3 +1433,5 @@ class FakeJobPermissionInvitationEmailPayload implements EmailMessage
         ];
     }
 }
+
+
