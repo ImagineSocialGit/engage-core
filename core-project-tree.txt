@@ -1707,8 +1707,10 @@
 │   │   │   │   └── ProcessPostWebinarEventJobTest.php
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
+│   │   │   ├── WebinarRegisterPageConfigTest.php
 │   │   │   ├── WebinarRegistrationConsentPresentationTest.php
 │   │   │   ├── WebinarRegistrationControllerTest.php
+│   │   │   ├── WebinarRegistrationFrontendContractTest.php
 │   │   │   ├── WebinarRegistrationMessageConsolidationTest.php
 │   │   │   ├── WebinarResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
@@ -1724,4 +1726,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-538 directories, 1187 files
+538 directories, 1189 files

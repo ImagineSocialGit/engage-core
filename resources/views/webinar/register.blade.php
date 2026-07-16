@@ -1,5 +1,17 @@
+
 @php
+    $landingPage = $page['landing'] ?? $page;
+    $registrationPage = $page['registration'] ?? [];
+
+    $landingStyle = $style['landing'] ?? $style;
+    $registrationStyle = $style['registration'] ?? [];
+
+    $page = $landingPage;
+    $style = $landingStyle;
+
     $tokens = $style['tokens'] ?? [];
+    $registrationTokens = $registrationStyle['tokens'] ?? $tokens;
+
     $countdownTarget = $webinar?->starts_at?->timezone('UTC')->toIso8601String();
 
     $eventDetailsItems = collect($page['event_details']['items'] ?? [])->map(function (array $item) use ($webinar) {
@@ -39,7 +51,6 @@
             :page="$page"
             :style="$style"
             :tokens="$tokens"
-            :style="$style"
             :series="$series"
             :event-details-items="$eventDetailsItems"
             :countdown-target="$countdownTarget"
@@ -397,9 +408,9 @@
         />
 
         <x-webinars.registration-form-modal
-            :page="$page"
-            :tokens="$tokens"
-            :style="$style"
+            :page="$registrationPage"
+            :tokens="$registrationTokens"
+            :style="$registrationStyle"
             :series="$series"
             :webinar-registration-channels="$webinarRegistrationChannels ?? []"
             :registration-prefill="$registrationPrefill ?? []"

@@ -1,3 +1,4 @@
+
 <?php
 
 // Registered style
@@ -48,12 +49,6 @@ return [
             px-4 py-4
             z-50
         ',
-    ],
-
-    'form_card' => [
-        'class' => 'rounded-3xl border border-black/10 bg-white p-4 text-ink shadow-2xl shadow-black/20 sm:p-8',
-        'title' => 'text-xl font-extrabold tracking-[-0.03em] text-ink sm:text-2xl',
-        'body' => 'mt-2 text-sm font-medium leading-6 text-slate-600',
     ],
 
     'countdown' => [
@@ -107,10 +102,16 @@ return [
         'credibility_item' => 'flex gap-3 text-base font-extrabold text-ink',
     ],
 
-    'form_card' => [
-        'class' => 'rounded-3xl border border-black/10 bg-white p-6 text-ink shadow-2xl shadow-black/20 sm:p-8',
-        'title' => 'text-2xl font-extrabold tracking-[-0.03em] text-ink',
-        'body' => 'mt-2 text-sm font-medium leading-6 text-slate-600',
+    'registration' => [
+        'form_card' => [
+            'class' => 'rounded-3xl border border-black/10 bg-white p-6 text-ink shadow-2xl shadow-black/20 sm:p-8',
+            'title' => 'text-2xl font-extrabold tracking-[-0.03em] text-ink',
+            'body' => 'mt-2 text-sm font-medium leading-6 text-slate-600',
+        ],
+        'legal_links' => [
+            'wrapper' => 'text-xs leading-5 text-slate-600',
+            'link' => 'font-extrabold text-primary underline underline-offset-4 hover:text-primary/80',
+        ],
     ],
 
     'secondary_cta' => [
@@ -170,11 +171,6 @@ return [
     'sticky_mobile' => [
         'wrapper' => 'fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-secondary/95 p-4 backdrop-blur md:hidden',
         'button' => 'w-full rounded-2xl bg-primary px-6 py-4 text-center text-sm font-extrabold uppercase tracking-[0.16em] text-white shadow-xl shadow-primary/25 animate-pulse motion-safe:animate-pulse cursor-pointer',
-    ],
-
-    'legal_links' => [
-        'wrapper' => 'text-xs leading-5 text-slate-600',
-        'link' => 'font-extrabold text-primary underline underline-offset-4 hover:text-primary/80',
     ],
 
     'compliance' => [

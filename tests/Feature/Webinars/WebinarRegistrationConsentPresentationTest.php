@@ -11,7 +11,7 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_registration_modal_renders_canonical_sections_labels_disclosures_and_legal_links(): void
+    public function test_registration_modal_renders_the_requested_stacked_consent_copy_and_legal_links(): void
     {
         $series = WebinarSeries::factory()->create([
             'slug' => 'consent-presentation',
@@ -31,40 +31,78 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
             'registrationPrefill' => [],
         ])->render();
 
-        $this->assertStringContainsString('Webinar Updates', $html);
-        $this->assertStringContainsString('Keep Learning — Optional', $html);
-        $this->assertStringContainsString('Webinar email', $html);
-        $this->assertStringContainsString('Webinar SMS', $html);
-        $this->assertStringContainsString('Marketing email', $html);
-        $this->assertStringContainsString('Marketing SMS', $html);
+        $this->assertStringContainsString('Webinar Registration (Required)', $html);
+        $this->assertStringContainsString('Stay Connected (Optional)', $html);
 
-        $this->assertStringNotContainsString('Section 1', $html);
-        $this->assertStringNotContainsString('Section 2', $html);
+        $this->assertStringContainsString(
+            'Email me my webinar confirmation, Zoom link, reminders, replay, and webinar-related updates.',
+            $html,
+        );
+        $this->assertStringContainsString('You may unsubscribe at any time.', $html);
+        $this->assertStringContainsString(
+            'Text me webinar reminders and access information. (Optional)',
+            $html,
+        );
+        $this->assertStringContainsString(
+            'By checking this box, you agree to receive automated text messages related to this webinar. Message frequency varies. Msg &amp; data rates may apply. Reply STOP to opt out.',
+            $html,
+        );
+        $this->assertStringContainsString(
+            'Send me marketing emails for future webinars, homebuying tips, loan program updates, and educational content from Slam Dunk Home Loans.',
+            $html,
+        );
+        $this->assertStringContainsString(
+            'Send me marketing texts for future webinars, mortgage updates, and educational content from Slam Dunk Home Loans.',
+            $html,
+        );
+        $this->assertStringContainsString(
+            'Message frequency varies. Msg &amp; data rates may apply. Reply STOP to opt out.',
+            $html,
+        );
 
+        $this->assertSame(2, substr_count($html, 'class="mt-3 space-y-4"'));
+        $this->assertStringNotContainsString('sm:col-span-2', $html);
+        $this->assertStringNotContainsString('Webinar Updates', $html);
+        $this->assertStringNotContainsString('Keep Learning — Optional', $html);
+
+        $this->assertStringContainsString('id="transactional_email_consent_helper"', $html);
         $this->assertStringContainsString('id="transactional_sms_consent_disclosure"', $html);
         $this->assertStringContainsString('id="marketing_sms_consent_disclosure"', $html);
-        $this->assertStringContainsString('Reply STOP to opt out or HELP for help.', $html);
 
         $this->assertLessThan(
+            strpos($html, 'id="transactional_email_consent_helper"'),
+            strpos($html, 'Email me my webinar confirmation'),
+        );
+        $this->assertLessThan(
             strpos($html, 'id="transactional_sms_consent_disclosure"'),
-            strpos($html, 'Webinar SMS'),
+            strpos($html, 'Text me webinar reminders'),
         );
         $this->assertLessThan(
             strpos($html, 'id="marketing_sms_consent_disclosure"'),
-            strpos($html, 'Marketing SMS'),
+            strpos($html, 'Send me marketing texts'),
         );
 
         $this->assertStringContainsString('x-model="transactionalSmsConsent"', $html);
         $this->assertStringContainsString('x-model="marketingSmsConsent"', $html);
-        $this->assertStringContainsString('x-bind:required="transactionalSmsConsent || marketingSmsConsent"', $html);
-        $this->assertStringContainsString('Required only when you choose an SMS option.', $html);
+        $this->assertStringContainsString(
+            'x-bind:required="transactionalSmsConsent || marketingSmsConsent"',
+            $html,
+        );
+        $this->assertStringContainsString('Required to receive SMS.', $html);
 
+        $this->assertStringContainsString('Terms of Service', $html);
+        $this->assertStringContainsString('Privacy Policy', $html);
         $this->assertStringContainsString('href="https://example.test/terms"', $html);
         $this->assertStringContainsString('href="https://example.test/privacy"', $html);
         $this->assertStringNotContainsString('href="#"', $html);
+
+        $this->assertStringContainsString('x-ref="registrationModal"', $html);
+        $this->assertStringContainsString('x-ref="registrationModalClose"', $html);
+        $this->assertStringContainsString('@keydown="trapRegistrationModalFocus($event)"', $html);
+        $this->assertStringNotContainsString('x-trap', $html);
     }
 
-    public function test_registration_modal_hides_sms_labels_and_disclosures_when_sms_is_unavailable(): void
+    public function test_registration_modal_hides_sms_controls_disclosures_and_phone_guidance_when_sms_is_unavailable(): void
     {
         $series = WebinarSeries::factory()->create([
             'slug' => 'email-only-consent-presentation',
@@ -84,12 +122,13 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
             'registrationPrefill' => [],
         ])->render();
 
-        $this->assertStringContainsString('Webinar email', $html);
-        $this->assertStringContainsString('Marketing email', $html);
+        $this->assertStringContainsString('Email me my webinar confirmation', $html);
+        $this->assertStringContainsString('Send me marketing emails', $html);
         $this->assertStringNotContainsString('name="transactional_sms_consent"', $html);
         $this->assertStringNotContainsString('name="marketing_sms_consent"', $html);
         $this->assertStringNotContainsString('transactional_sms_consent_disclosure', $html);
         $this->assertStringNotContainsString('marketing_sms_consent_disclosure', $html);
+        $this->assertStringNotContainsString('phone_sms_helper', $html);
     }
 
     /**
@@ -99,17 +138,15 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
     {
         return [
             'form_card' => [
-                'title' => 'Reserve Your Spot',
+                'title' => 'Save Your Seat',
                 'body' => 'Register below.',
             ],
             'sections' => [
                 'notifications' => [
-                    'title' => 'Webinar Updates',
-                    'body' => 'Choose at least one way to receive access details and reminders.',
+                    'title' => 'Webinar Registration (Required)',
                 ],
                 'marketing' => [
-                    'title' => 'Keep Learning — Optional',
-                    'body' => 'Get future tips, resources, and updates after the webinar.',
+                    'title' => 'Stay Connected (Optional)',
                 ],
             ],
             'fields' => [
@@ -118,20 +155,25 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
                 'email' => ['label' => 'Email Address'],
                 'phone' => [
                     'label' => 'Mobile Phone',
-                    'helper' => 'Required only when you choose an SMS option.',
+                    'helper' => 'Required to receive SMS.',
                 ],
                 'consent_messages' => [
-                    'email' => ['label' => 'Webinar email'],
+                    'email' => [
+                        'label' => 'Email me my webinar confirmation, Zoom link, reminders, replay, and webinar-related updates.',
+                        'helper' => 'You may unsubscribe at any time.',
+                    ],
                     'sms' => [
-                        'label' => 'Webinar SMS',
-                        'disclosure' => 'Webinar SMS disclosure. Reply STOP to opt out or HELP for help.',
+                        'label' => 'Text me webinar reminders and access information. (Optional)',
+                        'disclosure' => 'By checking this box, you agree to receive automated text messages related to this webinar. Message frequency varies. Msg & data rates may apply. Reply STOP to opt out.',
                     ],
                 ],
                 'marketing_consent_messages' => [
-                    'email' => ['label' => 'Marketing email'],
+                    'email' => [
+                        'label' => 'Send me marketing emails for future webinars, homebuying tips, loan program updates, and educational content from Slam Dunk Home Loans.',
+                    ],
                     'sms' => [
-                        'label' => 'Marketing SMS',
-                        'disclosure' => 'Marketing SMS disclosure. Reply STOP to opt out or HELP for help.',
+                        'label' => 'Send me marketing texts for future webinars, mortgage updates, and educational content from Slam Dunk Home Loans.',
+                        'disclosure' => 'Message frequency varies. Msg & data rates may apply. Reply STOP to opt out.',
                     ],
                 ],
             ],
@@ -139,7 +181,7 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
                 'enabled' => true,
                 'intro' => 'By registering, you agree to our',
                 'links' => [
-                    ['label' => 'Terms & Conditions', 'url' => 'https://example.test/terms'],
+                    ['label' => 'Terms of Service', 'url' => 'https://example.test/terms'],
                     ['label' => 'Ignored placeholder', 'url' => '#'],
                     ['label' => 'Privacy Policy', 'url' => 'https://example.test/privacy'],
                 ],
