@@ -316,7 +316,7 @@
                     @enderror
                 </fieldset>
 
-                <fieldset class="mx-2 rounded-2xl border border-slate-200 py-2 px-4">
+                {{-- <fieldset class="mx-2 rounded-2xl border border-slate-200 py-2 px-4">
                     <legend class="px-1 text-base font-semibold text-slate-900">
                         {{ $marketingSection['title'] ?? 'Stay Connected (Optional)' }}
                     </legend>
@@ -397,7 +397,7 @@
                             </div>
                         @endif
                     </div>
-                </fieldset>
+                </fieldset> --}}
 
                 @if(($page['legal_links']['enabled'] ?? false) && $legalLinks->isNotEmpty())
                     <p class="{{ $style['legal_links']['wrapper'] ?? 'text-xs leading-5 text-slate-600' }}">
