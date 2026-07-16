@@ -77,6 +77,60 @@ The imported-contact onboarding, Broadcast visibility, dashboard, contact worksp
 
 **Phase 12 — Standalone and multi-link Tasks is complete and green.** Tasks now uses zero-to-many TaskLinks, supports unlinked/Contact/non-Contact/multi-link work, has dedicated Task index/show surfaces, remains operational with only Core enabled, keeps optional assignment/notification behavior behind contributed seams, and no longer stores FlowRoutes-specific foreign keys. The same closeout expanded FlowRoutes into contributor-driven Point schema/validation, neutral business-action execution, and module-owned authoring UX.
 
+## Webinar registration presentation and delivery-consolidation closeout
+
+The Webinar registration presentation/test audit and fresh Slam Dunk runtime verification are complete.
+
+Completed presentation decisions:
+
+```text
+landing content/style
+    separate from registration-modal content/style
+
+registration content/style
+    owns consent_header, sections, fields, disclosures, legal links, and modal presentation
+
+client copy
+    may differ across clients
+```
+
+Tests now validate structural/runtime contracts rather than identical client prose or exact Tailwind utility counts. Enabled legal links must be valid absolute non-placeholder URLs.
+
+Fresh migration/sync runtime verification proved:
+
+```text
+accepted_channels
+    transactional email + SMS
+    marketing email + SMS
+
+message consent rows
+    four independent consent-history records
+    stored under the shared webinar consent domain
+
+delivery
+    marketing SMS acknowledgement sent standalone immediately
+    email confirmation consolidated transactional + marketing email acknowledgements
+    SMS confirmation consolidated transactional SMS acknowledgement
+    confirmation timing followed the Slam Dunk 10-minute schedule-profile delay
+```
+
+The consolidated scheduled messages retain covered intent keys and MessageConsent IDs in `meta.delivery_consolidation`. No revocations, suppressions, skips, or failures were present in the smoke registration.
+
+This closeout also exposed two separate follow-up tracks:
+
+```text
+deferred product work
+    Messaging-level Opt-In Messages management
+    consolidation-aware readiness presentation
+    multipart HTML + plain-text email
+    generated Webinar URL scheme verification
+
+immediate architecture audit
+    system-wide model-creation and persistence-bloat audit
+```
+
+The immediate audit is documented in [System-Wide Model Creation and Persistence Bloat Audit](model-persistence-bloat-audit.md). The runtime dump showed repeated Contact/Webinar/registration snapshots across payload, token, and context branches, so compact persistence must not be treated as fully verified yet.
+
 ## Messaging, consent, and Rob Webinar production-prep completion
 
 The current production-prep Messaging/Webinar slice is complete and green.
@@ -140,16 +194,17 @@ Delayed-message conditions
     rechecked by ScheduledMessageGate before provider delivery
 ```
 
-The immediate operational priority before importing Rob's 11 real production Webinar contacts is:
+The generic registration consent-domain and delivery-consolidation behavior has now been re-verified through a fresh Slam Dunk runtime smoke test.
+
+The remaining operational priority before importing Rob's 11 real production Webinar contacts is:
 
 ```text
-1. Re-verify final consent-domain and opt-in acknowledgement behavior.
-2. Confirm imported consent normalizes without MessageConsentGranted or opt-in sends.
-3. Confirm Rob presets:sync and setup:validate are clean.
-4. Review/finalize importer dry-run and --apply behavior.
-5. Dry-run the real 11-contact CSV.
-6. Apply only after exact output is verified.
-7. Verify consent rows, registrations, future reminders, no confirmations/opt-ins, and idempotent rerun.
+1. Confirm imported consent normalizes without MessageConsentGranted or opt-in sends.
+2. Confirm Rob presets:sync and setup:validate are clean.
+3. Review/finalize importer dry-run and --apply behavior.
+4. Dry-run the real 11-contact CSV.
+5. Apply only after exact output is verified.
+6. Verify consent rows, registrations, future reminders, no confirmations/opt-ins, and idempotent rerun.
 ```
 
 Phase 11 remains the broader product-roadmap phase, but this production migration checkpoint is the immediate client-operational priority.
@@ -195,6 +250,7 @@ Completed runway pieces:
 
 Remaining near-term candidates:
 
+- Immediate system-wide model-creation and persistence-bloat audit, beginning with `ScheduledMessage` and Webinar message-data producers.
 - Routes / FlowRoutes product completion: new Route creation, remaining authoring gaps, consequence previews, and contextual suggestions.
 - Dashboard / contact workspace polish audit after the main runtime and route-management work settles.
 - FOSS-informed module schema audit before production rollout.
@@ -226,8 +282,8 @@ Current schema-discovery sequence:
 
 | Phase | Item | Status | Primary discovery risk | Notes |
 | -: | --- | --- | --- | --- |
-| 1 | Webinar schedule profiles | Complete | DB/schema | DB-owned webinar schedule profiles/items exist. Series/webinars can select profiles with fallback. Webinars owns timing/slot identity. Messaging owns reusable copy/templates. Scheduled-message payloads stay compact; schedule/profile/template/debug identity belongs in meta. |
-| 2 | Campaign channel variants | Complete | DB/schema | DB-owned campaign step variants exist. Campaign enrollment is lifecycle, campaign step is the business moment, and campaign step variant is the channel-specific delivery option. Variant strategy and dependency-aware scheduling are hardened. Scheduled-message payloads stay compact; campaign/step/variant/template/debug identity belongs in meta. |
+| 1 | Webinar schedule profiles | Complete | DB/schema | DB-owned webinar schedule profiles/items exist. Series/webinars can select profiles with fallback. Webinars owns timing/slot identity. Messaging owns reusable copy/templates. Schedule/profile/template identity belongs in metadata; broader scheduled-payload duplication is now under immediate persistence audit. |
+| 2 | Campaign channel variants | Complete | DB/schema | DB-owned campaign step variants exist. Campaign enrollment is lifecycle, campaign step is the business moment, and campaign step variant is the channel-specific delivery option. Variant strategy and dependency-aware scheduling are hardened. Campaign payload/meta persistence remains subject to the system-wide persistence audit rather than assumed compact. |
 | 3 | Task templates / task defaults | Complete | DB/schema | DB-owned reusable `task_templates` exist. Phase 3 established due offsets, assignment strategy, responsibility, and the then-current single related-subject defaults. Phase 12 supersedes that relationship shape with zero-to-many TaskLinks and requires automation-created Tasks to be template-backed. |
 | 4A | FlowRoutes relationship, capability, and instance-plan audit | Complete | DB/schema + architecture | Audit confirmed that future subject-scoped route instance adjustment and durable capability discovery are guaranteed requirements before production. FlowRoutes should harden schema now instead of relying on meta-heavy execution/correlation. |
 | 4B | FlowRoutes schema hardening | Complete | DB/schema + architecture | Subject-scoped route progress, contact route plans, plan items, progress/execution items, capability catalog/bindings, created-artifact tracking/correlation, blocked/cancelled runtime handling, provenance/debug consistency, and boundary guardrails are in place. Phase 12 revises the Tasks-specific direct FlowRoutes provenance coupling. |
@@ -235,10 +291,11 @@ Current schema-discovery sequence:
 | 6 | Config validation / setup validation | Complete | Architecture + safety | 6A–6E are complete. Engage Core now has a shared `SetupValidationManager`, structured findings/results, module-owned contributors, app-level dependency and registry-drift contributors, the non-mutating `setup:validate` CLI, focused validation coverage, adjacent regression coverage, and broader client/default-preset fallback coverage. |
 | 7 | Permission invitation accepted automation event | Complete | Architecture | Accepted invitations emit neutral `permission_invitation.accepted` events after transactional acceptance, with row locking/idempotency and no Messaging dependency on consumers. |
 | 8 | Permission invitation cancellation / skip / failure bookkeeping | Complete | DB/schema + architecture | No schema change was needed. Pre-claim skips/cancellation create no invitation row; post-claim scheduled-message skips reconcile matching claimed invitations to failed; provider failures remain failed across Messaging and invitation state; failed invitations stay one-time-blocking. |
-| 9 | Webinar message readiness check | Complete | Architecture + operator safety | Computed Webinars-owned readiness now evaluates runtime Messaging resolution, channel availability, active schedule-profile effects, intentional disablement, registration/waitlist consent acknowledgement readiness, and post-event outcome-message enablement without persisting readiness state. |
+| 9 | Webinar message readiness check | Backend baseline complete; consolidation-aware presentation deferred | Architecture + operator safety | Computed Webinars-owned readiness evaluates runtime Messaging resolution, channel availability, active schedule-profile effects, intentional disablement, registration/waitlist consent acknowledgement contexts, and post-event outcome-message enablement without persisting readiness state. The surface still needs to distinguish consolidated/fallback-covered acknowledgement paths from truly missing standalone delivery. |
 | 10 | Manual status-change automation warning foundation | Complete | Operator safety + architecture | Backend-only consequence preview is implemented through a read-only FlowRoutes-owned impact resolver. It reports whether selected status-based FlowRoutes would run and which routes are selected without starting route progress. The actual operator warning UX is deferred to Phase 11. |
 | 11 | Automation opportunity foundation + Routes / FlowRoutes UX | In progress; backend, preset architecture, and first Route authoring baseline complete | DB/schema + architecture + UI/UX | Automation Opportunities, global Point collapse, module-first preset contributions, Manage Routes/Assignments IA, modal Route/Point editing, drag ordering, explicit Route message eligibility, linear product boundaries, and Point placement policy are complete. Remaining work is new Route creation and focused authoring/discovery UX gaps. |
 | 12 | Standalone and multi-link Tasks | Complete | DB/schema + architecture + UI foundation | Zero-to-many TaskLinks, unlinked/Contact/non-Contact/multi-link Tasks, template/manual/automation invariants, dedicated Task index/show, Core-only operation, optional assignment/notification seams, FlowRoutes-owned Task correlation, module-contributed Point definition/action/authoring architecture, and full-suite green verification are complete. |
+| Immediate | System-wide model creation and persistence-bloat audit | Planned next | Cross-module DB/payload audit | Inventory every create/update path, measure real row sizes, classify durable vs redundant data, and begin with ScheduledMessage/Webinar payload duplication. See `docs/model-persistence-bloat-audit.md`. |
 | 13 | Dashboard / contact workspace polish audit | Planned | UI/UX + possible schema | Review orientation surfaces after core runtime pieces settle. Add persisted preferences/acknowledgements only when needed. |
 | 14 | FOSS-informed module schema audit | Planned | DB/schema audit | Compare Engage Core modules against mature FOSS patterns to identify likely missing persisted concepts before production. Pull FlowRoutes-specific FOSS/OSS pattern review earlier into Phase 4 if helpful. |
 
@@ -559,10 +616,11 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | 6 | Config validation / setup validation | Complete | Shared contributor-based validation is implemented across Core, Tasks, Messaging, Webinars, Campaigns, FlowRoutes, module dependencies, and reference-registry drift. `setup:validate` fails on errors, succeeds on warnings-only/clean results, and does not mutate state. Focused and broader regression coverage are green. |
 | 7 | Permission invitation accepted automation event | Complete | Accepted invitations emit one neutral `permission_invitation.accepted` event after transactional acceptance. The invitation row is locked/rechecked for idempotency, submitted SMS phone updates occur inside the same transaction, and Messaging remains independent from consumers. |
 | 8 | Permission invitation cancellation behavior | Complete | Pre-claim skips/cancellations create no invitation row; post-claim skips reconcile claimed invitations to failed; provider failures remain failed; no new invitation statuses or schema changes were required. |
-| 9 | Webinar message readiness check | Complete | Computed readiness is available for registration confirmations, registration consent acknowledgement readiness, reminders, waitlist alerts, waitlist consent acknowledgement readiness, and post-event follow-ups. Readiness is derived from runtime resolution, channel availability, active schedule-profile effects, and post-event enablement; no readiness state is persisted. |
+| 9 | Webinar message readiness check | Backend baseline complete; presentation follow-up deferred | Computed readiness is available for registration confirmations, consent acknowledgement contexts, reminders, waitlist alerts, and post-event follow-ups. No readiness state is persisted. The current surface still needs delivery-consolidation-aware status language and fallback evaluation. |
 | 10 | Manual status-change automation warning foundation | Complete | FlowRoutes exposes a read-only `ContactStatusAutomationImpactResolver` and plural status-trigger route resolution. No schema, controller, or Blade changes were required. The actual warning interaction belongs to Phase 11 UX work. |
 | 11 | Automation opportunity foundation + Routes / FlowRoutes UX | In progress; first authoring baseline complete | Shared opportunity persistence/evaluation and the current Routes management/editor baseline are complete. Remaining focused Routes work continues after the schema-sensitive Task slice. |
 | 12 | Standalone and multi-link Tasks | Complete | Task is one generic live work record across template/no-template, zero-to-many domain links, and manual/automation origin. TaskLinks, dedicated index/show, Core-only operation, generic linked-record presentation, Tasks/FlowRoutes boundary correction, and contributor-driven FlowRoutes Point architecture are complete and green. |
+| Immediate | System-wide model creation and persistence-bloat audit | Multi-session, split by model/domain | Treat as the next architecture audit, not deferred backlog. Inventory/measure all write paths and start with ScheduledMessage/Webinar payload duplication. |
 | 13 | Dashboard / contact workspace polish audit | 1–2 sessions | Review shared orientation surfaces after runtime behavior settles. Add persisted state only for proven needs such as acknowledgements or preferences. |
 | 14 | FOSS-informed module schema audit | 2–6 sessions, split by module group | Compare Engage Core module tables against mature FOSS patterns to catch likely missing persisted concepts before production. |
 | Deferred | DB Snapshot / Export Safety Tool | 0.5–1.5 sessions near launch | Command-line SQL/JSONL snapshot tooling for production/launch hardening. Do not build during active pre-prod schema discovery unless real data preservation becomes necessary. |
@@ -659,8 +717,8 @@ Completed baseline:
 - Schedule profile items reference stable runtime dimensions such as channel, purpose, scope, surface, message type, dispatch key, and `message_template_key`. `source_config_path` is provenance/debug location only.
 - Multiple reminder slots may share `message_type = reminder`; the schedule profile item key owns the Webinar lifecycle slot, while `message_template_key` identifies the reusable Messaging template. `source_config_path` is provenance only.
 - Existing scheduled messages are not rewritten retroactively when a profile or template assignment changes.
-- Webinar dispatch payloads store compact token/context data. Schedule profile identity belongs in scheduled-message metadata, not as a hydrated profile/items object graph inside `scheduled_messages.payload`.
-- Tests include payload-shape checks so full Eloquent relationship graphs do not leak into scheduled-message payloads.
+- Webinar schedule-profile identity belongs in scheduled-message metadata, not as a hydrated profile/items object graph inside `scheduled_messages.payload`.
+- Existing payload-shape tests protect some profile-graph boundaries, but a fresh runtime dump still showed repeated Contact/Webinar/registration snapshots across payload, token, and context branches. Full compactness is therefore not considered verified until the system-wide persistence audit is complete.
 
 ### Webinars message/template setup and readiness
 
@@ -675,6 +733,7 @@ Completed functional baseline:
 - Readiness considers Messaging runtime definition resolution, channel visibility, active schedule profiles actually in use, explicit profile disablement, missing/inactive selected profile references, conflicting active defaults, and post-event outcome-message enablement.
 - Registration and waitlist consent acknowledgement readiness is included when the corresponding messaging surface has an available channel.
 - Consent acknowledgement contexts are Messaging-owned consent-domain messages resolved through `ConsentOptInDefinitionResolver`; they are not per-scope Webinar `opt_ins` templates and are not forced into Webinar schedule-profile items.
+- The current setup UI still needs a consolidation-aware presentation correction so zero standalone opt-in templates do not appear as a false `Needs attention` state when Messaging has a valid consolidated delivery path.
 - This is a functional setup/readiness UI, not the final UX-polished communication-plan experience.
 
 ### Campaign channel variants
@@ -696,7 +755,7 @@ Completed baseline:
 - Variants reference Messaging-owned templates/assignments through channel, purpose, scope, campaign key, step number, and optional variant context.
 - Variants do not own reusable subject/body/message copy.
 - Existing single-channel campaign step configs sync into a default variant for compatibility while the DB-owned variant model becomes the durable runtime shape.
-- Campaign-generated scheduled-message payloads remain compact; campaign/step/variant/template/debug identity belongs in `scheduled_messages.meta`.
+- Campaign/step/variant/template identity should remain compact and belongs in `scheduled_messages.meta`; Campaign-generated rows must be measured in the system-wide persistence audit rather than assumed compact.
 
 ### FlowRoute trigger bindings and CRM selection UI
 
@@ -960,7 +1019,7 @@ Completed behavior:
 - Campaigns supplies Campaign-owned step/variant timing and behavior.
 - Broadcasts supplies exact `sendAt` and uses the `Broadcast` as behavior-owner provenance rather than manufacturing a fake zero-delay Messaging schedule.
 - FlowRoute `send_message` behavior does not inherit hidden timing from reusable Messaging templates.
-- Imported-contact permission invitations and consent acknowledgements explicitly request immediate behavior and use stable logical occurrence identity.
+- Imported-contact permission invitations and standalone consent acknowledgements explicitly request immediate behavior and use stable logical occurrence identity. Acknowledgements consolidated into another lifecycle message inherit that primary message's resolved timing and behavior provenance.
 - Setup validation rejects reusable Messaging templates that carry competing lifecycle behavior.
 - Obsolete `timing`, `schedule`, and `conditions` columns are absent from `message_template_presets`.
 - Webinar dev tooling now resolves Webinar-owned behavior through the same schedule-profile seam and uses explicit caller-owned immediate behavior only when deliberately forcing a dev send.
@@ -1021,7 +1080,9 @@ AutomationActionPointHandler
 
 Normal `create_task` authoring is deliberately opinionated: it requires an active Task Template, explains that a new Task is created every time execution reaches the Point, and does not expose a title-only one-time-looking automation path.
 
-The next roadmap target is **Phase 13 — Dashboard / contact workspace polish audit**, unless a production-readiness issue or focused remaining Phase 11 Route product gap is intentionally pulled forward.
+The next roadmap target is the **system-wide model creation and persistence-bloat audit** documented in `docs/model-persistence-bloat-audit.md`.
+
+That audit is intentionally ahead of Phase 13 because the fresh registration runtime dump disproved the assumption that all scheduled-message payload paths are already compact. Phase 13 remains next after the persistence audit unless a production-readiness issue or focused remaining Phase 11 Route product gap is intentionally pulled forward.
 
 The locked Route boundary remains:
 
@@ -1102,7 +1163,3 @@ Routes
     Use Route Management / Routes in client-facing navigation.
     Use contextual hints to explain automatic actions in plain language.
 ```
-
-
-
-

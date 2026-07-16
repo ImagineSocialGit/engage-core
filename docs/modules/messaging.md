@@ -540,6 +540,57 @@ marketing:webinar_nurture opt_ins
 Normal consent granting may emit `MessageConsentGranted` and resolve an acknowledgement. Imported consent uses `ImportMessageConsentAction` specifically so imported state is normalized without emitting the grant event or sending an opt-in acknowledgement.
 
 
+#### Consent acknowledgement delivery consolidation
+
+Messaging may deliver a consent acknowledgement as a standalone message or consolidate it into a compatible lifecycle message under an explicit Messaging-owned delivery policy.
+
+Delivery consolidation must preserve separate intent identity even when several intents share one physical `ScheduledMessage`.
+
+A consolidation policy should define:
+
+```text
+primary lifecycle intent
+eligible acknowledgement intents
+channel compatibility
+composition/placement behavior
+standalone fallback behavior
+```
+
+Verified Webinar registration behavior currently follows this shape:
+
+```text
+Email registration confirmation
+    + transactional Webinar email acknowledgement
+    + marketing email acknowledgement
+
+SMS registration confirmation
+    + transactional Webinar SMS acknowledgement
+
+Marketing SMS acknowledgement
+    standalone when it is not compatible with the transactional confirmation
+```
+
+Only newly active consent grants should be considered for acknowledgement delivery. Repeated submissions that do not create a new active transition must not create duplicate acknowledgement messages.
+
+A consolidated scheduled message should retain compact audit provenance in:
+
+```text
+meta.delivery_consolidation.primary_intent_key
+meta.delivery_consolidation.intent_keys
+meta.delivery_consolidation.consent_ids
+meta.delivery_consolidation.policy
+meta.delivery_consolidation.group
+```
+
+The consolidated acknowledgement inherits the primary lifecycle message's resolved `send_at`, queue, conditions, and behavior-owner provenance. Consolidation does not imply immediate delivery. For example, an acknowledgement attached to a delayed Webinar confirmation sends with that confirmation.
+
+Any grant not covered by a successfully resolved consolidated message must follow the policy's explicit standalone fallback. A missing or unschedulable primary lifecycle message must never silently discard a required acknowledgement.
+
+Reserved `delivery_consolidation_*` composition placeholders are supplied only by the Messaging consolidation path. They are not universal authorable tokens and must not be treated as ordinary `TokenContractRegistry` fields.
+
+Readiness should evaluate whether each required acknowledgement has a valid delivery path. A zero count of standalone opt-in templates is not itself a readiness failure when the acknowledgement is covered by consolidation with a valid fallback.
+
+
 Good:
 
     DispatchMessageAction
@@ -619,6 +670,42 @@ Messaging may schedule messages for non-Contact recipients through recipient pay
 
 
 
+
+## ScheduledMessage persistence contract
+
+`ScheduledMessage` should persist enough immutable execution state to send, retry, deduplicate, explain, and audit a delivery without becoming a serialized copy of the surrounding application object graph.
+
+First-class columns should answer:
+
+```text
+who receives the message
+what domain record it is about
+which behavior owns the timing
+channel / purpose / scope / message type
+when it should send
+current delivery state and attempts
+provider outcome
+dedupe / occurrence identity
+skip or failure reason
+```
+
+`payload` should contain provider-ready content plus only the minimal late-bound values required for deterministic delivery.
+
+`meta` should contain compact operational provenance such as:
+
+```text
+resolved conditions
+intent keys
+consent IDs
+delivery-consolidation coverage
+template/assignment identity
+behavior-owner occurrence identity
+provider attempt diagnostics
+```
+
+Do not persist the same Contact, Webinar, registration, Campaign, Route, Task, or other model snapshot repeatedly under top-level payload fields, `tokens`, `context`, and metadata. Do not persist loaded relationship graphs merely because `toArray()` is convenient.
+
+Raw provider payloads belong only in columns explicitly designed as raw provider snapshots. A runtime producer that violates this contract should be treated as persistence debt to correct through the system-wide model creation and persistence audit, not as an accepted UX tradeoff.
 
 ## FlowRoutes-created scheduled message provenance
 

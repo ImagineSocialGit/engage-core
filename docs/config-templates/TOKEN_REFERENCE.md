@@ -96,6 +96,30 @@ belong to that consent acknowledgement resolver. They are not normal authorable 
 
 Do not substitute `{client_name}` or another brace token unless `TokenContractRegistry` explicitly registers it for the exact producer context.
 
+## Delivery-consolidation placeholders are reserved composition fields
+
+Placeholders named like:
+
+```text
+{delivery_consolidation_*}
+```
+
+are not universal Contact, Webinar, Campaign, or Messaging tokens.
+
+They are supplied only by a documented Messaging delivery-consolidation policy when it composes acknowledgement fragments into a compatible lifecycle message.
+
+Rules:
+
+```text
+do not expose them in generic available-field pickers
+do not add them to TokenContractRegistry merely to satisfy unrelated templates
+do not invent new placeholder names in client copy
+use them only in a consolidation-aware template context
+ensure the policy provides a standalone fallback for uncovered acknowledgements
+```
+
+System-resolved acknowledgement copy remains owned by Messaging even when the placeholder appears inside a Webinar or another module's lifecycle template.
+
 ## Token ownership model
 
 ### Universal Messaging / Contact tokens

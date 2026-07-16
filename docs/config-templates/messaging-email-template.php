@@ -71,6 +71,16 @@ return [
     | System markers such as :client_name and :consent_topic belong to the
     | consent acknowledgement resolver. They are not message-template tokens.
     |
+    | A Messaging-owned delivery-consolidation policy may compose compatible
+    | acknowledgement intents into a lifecycle email. The acknowledgement inherits
+    | the primary message's resolved send time, conditions, queue, and behavior
+    | provenance. Any uncovered required acknowledgement needs an explicit
+    | standalone fallback.
+    |
+    | Reserved {delivery_consolidation_*} placement fields are supplied only by
+    | the consolidation composer. They are not universal TokenContractRegistry
+    | fields and must not be invented in unrelated templates.
+    |
     | Normal Broadcasts usually provide ad hoc payloads inline from the
     | Broadcast record. Email Broadcast payloads use subject/body. Do not add
     | reusable Broadcast copy here unless a future workflow intentionally

@@ -15,6 +15,8 @@ Rules:
 - Token availability is executable context, not a free-form allowlist. Validate authorable message tokens through `TokenContractRegistry` and the shared `MessageTemplateTokenValidator`; do not treat `config/reference/tokens.php` or caller-supplied `allowedTokens` as runtime authority.
 - Message identity and consent identity are separate. A message uses `channel + purpose + scope`; consent uses `channel + purpose + consent domain`.
 - Do not add per-scope `opt_ins` groups to reusable Webinar Messaging definition files. Messaging resolves consent acknowledgements through `ConsentDomainRegistry` and `ConsentOptInDefinitionResolver`, using generic Messaging copy plus module/domain topic metadata and optional module/client overrides.
+- Messaging-owned delivery consolidation may combine compatible lifecycle and consent-acknowledgement intents into one physical message. Preserve covered intent keys/consent IDs and require an explicit standalone fallback for uncovered required acknowledgements.
+- Reserved `{delivery_consolidation_*}` placeholders are internal composition fields. Do not treat them as universal authorable tokens or invent new ones outside a documented consolidation-aware template context.
 - Webinar message scopes such as `webinar`, `webinar_waitlist`, and `webinar_nurture` may share the `webinar` consent domain. Unknown unmapped scopes must remain narrow rather than broadening accidentally.
 - Imported consent should use the dedicated import path so it normalizes to the consent domain without emitting `MessageConsentGranted` or sending an opt-in acknowledgement.
 - Messaging configs own reusable message copy and delivery templates.
@@ -34,6 +36,9 @@ Rules:
 - For delayed lifecycle messages, persist resolved conditions with the ScheduledMessage so `ScheduledMessageGate` can re-evaluate them immediately before provider send.
 - Schedule profile items may share generic Messaging message types such as `reminder`; use the schedule-profile item key for lifecycle-slot identity and stable `message_template_key` for reusable template identity. `source_config_path` is provenance/debug location only. Do not invent schedule-specific message types such as `reminder_30_minute`.
 - Persisted runtime payloads should be compact. Do not store full Eloquent model arrays or loaded relationship graphs in scheduled message payloads, automation events, route progress, task metadata, or broadcast/inbound metadata unless that column is explicitly a raw provider payload.
+- Do not duplicate the same domain snapshot under payload, tokens, context, and metadata branches merely because multiple consumers can read it.
+- Public Webinar registration copy may differ by client. Validate structure, accessibility, legal links, channel/consent behavior, and safe rendering rather than identical prose or exact Tailwind utility strings.
+- For SMS line breaks, use an actual multiline nowdoc or `\n` in a double-quoted PHP string. Single-quoted `'\n'` is literal text.
 - Default webinar configs should be vertical-neutral.
 - Core Webinar Messaging should remain deliberately small and generic. Rich client cadences and branded copy belong in client config.
 - Client associative config merges over defaults; list/numeric arrays replace the default list when present. A client reminder list therefore replaces the Core reminder list rather than appending duplicate reminder slots.

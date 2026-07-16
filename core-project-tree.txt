@@ -1323,6 +1323,7 @@
 │   │   ├── webinar-post-event-template.php
 │   │   └── webinar-schedule-profiles-template.php
 │   ├── deployment-safety-and-troubleshooting.md
+│   ├── model-persistence-bloat-audit.md
 │   ├── module-boundaries.md
 │   ├── modules
 │   │   ├── broadcasts.md
@@ -1708,6 +1709,7 @@
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
 │   │   │   ├── WebinarRegisterPageConfigTest.php
+│   │   │   ├── WebinarRegistrationConsentHeaderPresentationTest.php
 │   │   │   ├── WebinarRegistrationConsentPresentationTest.php
 │   │   │   ├── WebinarRegistrationControllerTest.php
 │   │   │   ├── WebinarRegistrationFrontendContractTest.php
@@ -1726,4 +1728,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-538 directories, 1189 files
+538 directories, 1191 files

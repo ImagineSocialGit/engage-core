@@ -23,6 +23,20 @@ Detailed sequencing and open decisions are in
 
 This file is intentionally disposable. Add work here when it is real but not yet ready for an implementation slice. Delete items as they are completed. Do not treat this as an architectural reference; long-lived decisions belong in `module-boundaries.md` or a feature-specific doc.
 
+## Immediate system-wide persistence audit
+
+- [ ] Execute [`model-persistence-bloat-audit.md`](model-persistence-bloat-audit.md) before treating compact persistence as verified.
+- [ ] Build a complete inventory of model/query-builder write paths, including actions, services, jobs, listeners, sync/import code, factories used by runtime helpers, provider ingestion, and bulk updates.
+- [ ] Begin with `ScheduledMessage` and Webinar message-data producers.
+  - Measure actual row size.
+  - Remove repeated Contact/Webinar/WebinarSeries/WebinarRegistration snapshots across top-level payload fields, `tokens`, `context`, and metadata.
+  - Preserve provider-ready content, retryability, dedupe/occurrence identity, consent IDs, consolidation intent keys, conditions, and useful delivery provenance.
+- [ ] Audit Campaign, Broadcast, FlowRoutes, Task, automation-event/opportunity, Forms, Documents, Commerce, inbound/provider, and reporting persistence using the same worksheet.
+- [ ] Add persistence-contract and size-budget tests only after measuring representative real rows.
+- [ ] Define retention/archive policy separately from payload-shape cleanup; do not prune compliance evidence or retry state merely to reduce size.
+
+This is the next architecture audit, not deferred UX backlog.
+
 ## Run through after completing an item or system update
 
 These are repeatable checklists. Run the relevant checklist after a production slice, config update, client setup change, or staging deployment. Do not leave one-off feature work here; put one-off work in the backlog sections below.
@@ -147,7 +161,7 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Series/webinars can select profiles with default fallback.
   - Webinars owns timing/slot identity.
   - Messaging owns reusable copy/templates.
-  - Scheduled-message payloads stay compact; schedule/profile/template/debug identity belongs in meta.
+  - Schedule/profile/template identity belongs in meta. A fresh registration runtime dump showed broader payload/token/context duplication, so compactness remains under the immediate persistence audit.
 - [x] Phase 2 — Campaign channel variants.
   - DB-owned campaign step variants exist.
   - Campaign enrollment is lifecycle.
@@ -159,7 +173,7 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Dependency checks consider same-pass scheduled siblings and persisted ScheduledMessage records.
   - Dependency checks are scoped to the same campaign enrollment, same campaign step, and required variant key.
   - Preset sync creates variants, removes stale non-customized variants, preserves customized stale variants, and protects customized campaigns.
-  - Campaign scheduled-message payloads stay compact; campaign/step/variant/template/debug identity belongs in meta.
+  - Campaign/step/variant/template identity belongs in meta. Campaign rows must be measured during the system-wide persistence audit rather than assumed compact.
 - [x] Phase 3 — Task templates / task defaults.
   - Audit `task_templates` table/model shape for generated/manual tasks.
   - Confirm FlowRoutes `create_task` points can reference `TaskTemplate` records.
@@ -448,6 +462,30 @@ These are open code/runtime investigations surfaced by the first production Webi
 
 ## One-off backlog
 
+### Messaging opt-in management and email format support
+
+- [ ] Add a dedicated `Messaging → Opt-In Messages` management surface separate from all ordinary module message-template pages.
+  - Treat acknowledgement definitions and delivery policy as Messaging-owned compliance primitives.
+  - Support `Automatic`, `Always standalone`, and `Prefer selected message type` behavior with an explicit fallback.
+  - Preview the final composed lifecycle message plus acknowledgement fragments.
+  - Show which consent intents and MessageConsent IDs the final delivery satisfies.
+  - Do not expose a generic disabled option where acknowledgement delivery is required.
+- [ ] Make module readiness presentation delivery-path aware.
+  - Distinguish standalone, consolidated, fallback-covered, and truly missing acknowledgement paths.
+  - Do not show `Needs attention` merely because zero standalone opt-in templates exist.
+  - Webinar Messages should link to the Messaging-owned Opt-In Messages surface rather than own acknowledgement copy.
+- [ ] Add Messaging-level plain-text email support for all email sources.
+  - Generate a readable plain-text version from formatted content.
+  - Allow an optional editable override.
+  - Send `multipart/alternative` with both `text/plain` and `text/html`.
+  - Preserve CTA, secondary-link, and unsubscribe URLs in readable text.
+  - Add validation and provider tests for both MIME alternatives.
+- [ ] Verify generated Webinar URL schemes.
+  - Audit `webinar_join_url`, `cancel_registration_url`, and related signed URL builders.
+  - Ensure persisted/rendered customer-facing URLs are absolute and include the correct HTTP/HTTPS scheme.
+  - Confirm email and SMS renderers do not rely on accidental normalization.
+
+
 ### Rob production Webinar contact migration
 
 Immediate production-prep checkpoint:
@@ -551,9 +589,6 @@ Remaining polish audit:
   - Keep examples that explain architecture and config shape.
   - Do not create secondary authoritative lists that must be updated every time a module is added.
   - Prefer deriving future generated reference documentation from executable registries/contracts where appropriate.
-- [ ] Reconcile the canonical executable queue inventory across client-environment-reference.md and client-staging-production-setup-checklist.md.
-  - Verify current runtime truth against config/horizon.php, config/reference/keys.php, and executable Messaging/Webinar definitions.
-  - Remove contradictory claims about emails, campaigns, and waitlist.
 
 ### Testing backlog
 
@@ -624,7 +659,3 @@ These notes are intentionally retained while the schema-discovery phases continu
 - [ ] Hide technical specs behind details/debug affordances.
 - [ ] Replace raw timing such as `Delay 10 minutes` with human-readable schedule summaries.
 - [ ] Clean up repeated dropdown labels such as `Step 1 Email — Webinar Attended Nurture — Step 1 Email`.
-
-
-
-

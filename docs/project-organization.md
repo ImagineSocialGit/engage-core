@@ -40,7 +40,7 @@ A new module-owned Route action should not require central FlowRoutes imports or
 
 This document is a quick orientation map for Engage Core. It classifies the project into Core, universal modules, vertical modules, and integrations/adapters.
 
-Use `module-boundaries.md` for detailed ownership and dependency rules. Use `TODO.md` for actionable implementation backlog.
+Use `module-boundaries.md` for detailed ownership and dependency rules. Use `TODO.md` for actionable implementation backlog. Use `model-persistence-bloat-audit.md` for the current system-wide audit of model creation, JSON payload shape, duplicated snapshots, and database-write boundaries.
 
 ## Layers
 
@@ -335,7 +335,3 @@ Avoid:
 ```text
 New Core columns for feature or vertical state
 ```
-
-
-
-

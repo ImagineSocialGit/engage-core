@@ -55,6 +55,49 @@ Webinars may depend on:
 
 Webinars may use Messaging to send registration confirmations, reminders, waitlist notices, and post-webinar transactional follow-ups. Webinar surfaces may collect consent, but consent-domain storage and consent acknowledgements are Messaging-owned.
 
+## Public registration presentation and config ownership
+
+The public Webinar registration experience is configuration-driven and may differ substantially between clients.
+
+`WebinarRegisterPageConfig` resolves two separate presentation buckets:
+
+```text
+landing
+registration
+```
+
+The public registration view passes the resolved registration content, style, and runtime tokens into the registration modal.
+
+Registration-owned presentation includes the modal's:
+
+```text
+consent header
+section headings and supporting copy
+field labels/placeholders/helpers
+transactional consent labels/disclosures
+marketing consent labels/disclosures
+legal links
+registration-specific style classes
+```
+
+`consent_header` belongs to the registration content/style contract. It should not be inferred from landing-page content or restored to an older title/items shape merely because a stale test expects it.
+
+Client copy is not a shared executable contract. Different clients may use different headings, labels, disclosures, and supporting language while still satisfying the same runtime and accessibility requirements.
+
+Tests should verify:
+
+```text
+required structural keys
+channel visibility and hidden-channel POST rejection
+required field behavior
+consent recording and accepted-channel state
+accessible labels/disclosures
+enabled legal links are valid absolute non-placeholder URLs
+runtime rendering safety
+```
+
+Tests should not require identical prose across clients, count exact Tailwind utility strings, or make one client's presentation the canonical copy for another client.
+
 ## Webinar message/template/schedule setup
 
 Webinars provides the owning setup surface for webinar-owned message contexts.
@@ -77,7 +120,9 @@ post-missed transactional follow-up
 
 For reusable Webinar lifecycle message contexts, the surface shows the current selected Messaging template, allows choosing a compatible `MessageTemplatePreset`, saves the selected `MessageTemplatePresetAssignment`, and links back to Message Templates for copy editing.
 
-Consent acknowledgement contexts are different: they resolve through Messaging's consent-domain and opt-in-definition services. Do not create or select scope-specific `opt_ins` templates merely to represent registration or waitlist consent acknowledgements. Schedule selection remains Webinars-owned and separate from copy editing.
+Consent acknowledgement contexts are different: they resolve through Messaging's consent-domain, opt-in-definition, and delivery-consolidation services. Do not create or select scope-specific `opt_ins` templates merely to represent registration or waitlist consent acknowledgements.
+
+A consent acknowledgement may be delivered standalone or consolidated into a compatible Webinar lifecycle message. Webinars may show whether the acknowledgement is covered, but it does not own the acknowledgement definition or delivery policy. Schedule selection remains Webinars-owned and separate from acknowledgement copy editing.
 
 ## Webinar message readiness
 
@@ -108,6 +153,7 @@ explicit schedule-profile disablement
 missing or inactive selected schedule-profile references
 conflicting active default schedule profiles
 post-event outcome-message enablement
+Messaging delivery-consolidation coverage and standalone fallback
 ```
 
 Current states:
@@ -118,13 +164,25 @@ Needs attention
 Optional / disabled
 ```
 
-Registration consent acknowledgement readiness is required when transactional webinar registration messaging has at least one available channel.
+Registration consent acknowledgement readiness is required when transactional Webinar registration messaging has at least one available channel.
 
-Waitlist consent acknowledgement readiness is required when webinar-waitlist marketing messaging has at least one available channel.
+Waitlist consent acknowledgement readiness is required when Webinar-waitlist marketing messaging has at least one available channel.
+
+An acknowledgement is ready when every required intent has a valid Messaging-owned delivery path:
+
+```text
+consolidated into a compatible resolved lifecycle message
+or
+resolved as a standalone acknowledgement with a valid fallback
+```
+
+A zero count of standalone opt-in templates is not itself a missing-template failure when consolidation covers the acknowledgement. The UI should distinguish `Managed through delivery consolidation` from a truly missing delivery path.
+
+The current readiness backend/surface baseline predates full delivery-consolidation presentation. Updating that presentation so it reports consolidated and fallback-covered paths accurately remains deferred product work.
 
 When the corresponding messaging surface is unavailable, the consent acknowledgement area is `Optional / disabled` rather than a false blocker.
 
-Consent-event acknowledgements dispatched by Messaging are Messaging-owned behavior, even when consent is collected on a Webinar surface. They resolve through the `webinar` consent domain and `ConsentOptInDefinitionResolver`, not through per-scope Webinar `opt_ins` template groups and not through Webinar schedule-profile items. Webinars owns the registration/waitlist surface, the human-readable consent topic, and the readiness context; Messaging owns consent-domain normalization, the consent-granted event, acknowledgement resolution, and delivery safety.
+Consent-event acknowledgements dispatched by Messaging are Messaging-owned behavior, even when consent is collected on a Webinar surface. They resolve through the `webinar` consent domain, `ConsentOptInDefinitionResolver`, and Messaging-owned delivery-consolidation policy rather than per-scope Webinar `opt_ins` template groups. Webinars owns the registration/waitlist surface, the human-readable consent topic, and the readiness context; Messaging owns consent-domain normalization, consent-grant intent identity, acknowledgement resolution, consolidation/fallback policy, and delivery safety.
 
 ## Selectable webinar schedule profiles
 
@@ -132,7 +190,9 @@ Webinars supports DB-owned selectable schedule profiles for webinar-owned messag
 
 Schedule profiles decide whether, when, and under what Webinar lifecycle conditions messages are sent. Messaging template presets decide what those messages say and provide reusable delivery-template metadata.
 
-Every Webinar lifecycle message dispatched through the Webinar lifecycle should get its behavior from a `WebinarScheduleProfileItem`, including immediate registration confirmations, waitlist alerts, and post-event follow-ups. Messaging-owned consent-domain acknowledgements are the explicit exception because the consent-granted lifecycle belongs to Messaging.
+Every Webinar lifecycle message dispatched through the Webinar lifecycle should get its behavior from a `WebinarScheduleProfileItem`, including immediate registration confirmations, waitlist alerts, and post-event follow-ups.
+
+Standalone Messaging-owned consent acknowledgements are not separate Webinar schedule-profile items because the consent-granted lifecycle belongs to Messaging. When an acknowledgement is consolidated into a Webinar lifecycle message, it inherits the primary message's resolved profile timing, conditions, queue, and behavior-owner provenance rather than receiving a second profile item.
 
 Profile items may cover categories such as:
 
@@ -202,6 +262,8 @@ Before handing a message to Messaging, Webinars resolves the active schedule pro
 Multiple reminder slots may share the same generic Messaging `message_type`, for example `message_type = reminder`. The schedule profile item key identifies the Webinar lifecycle slot, while `message_template_key` identifies the reusable Messaging template selected for that slot. `source_config_path` is provenance/debug location only and must not be used as durable matching identity. Messaging should not encode reminder timing into schedule-specific message types such as `reminder_30_minute`.
 
 Scheduled-message payloads created by Webinars must remain compact. They should include send-ready payload fields, compact token maps, and compact context arrays. They must not include full Eloquent model arrays, loaded relationships, webinar schedule profile objects, or profile item collections. Schedule profile/source identity belongs in scheduled-message metadata.
+
+Do not repeat the same Contact, Webinar, WebinarSeries, or WebinarRegistration snapshot under top-level payload fields, `tokens`, and `context`. Store only values required for deterministic rendering or deliberately late-bound delivery.
 
 
 For post-event follow-ups, Webinars should pass `webinar.ends_at` as the schedule anchor. This keeps `next_day_at` tied to the webinar's actual ending calendar day even when provider webhook processing is delayed past midnight.
@@ -400,5 +462,3 @@ Dev testing actions should still use public module seams:
 The dev UI should behave like an operator console. Actions inside testing modals should use AJAX/fetch where practical so the modal, selected registration, loaded message options, and activity log are not lost after each action.
 
 Sim Join should skip already-queued live reminders when the real definition has skip_when_join_clicked enabled. Manual dev sends are forced sends and may still send a selected reminder afterward so the exact payload can be tested.
-
-

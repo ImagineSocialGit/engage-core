@@ -1389,6 +1389,30 @@ Consent acknowledgements are not per-scope reusable Webinar `opt_ins` definition
 
 Imported consent uses `ImportMessageConsentAction` so imported state is normalized without emitting `MessageConsentGranted` or sending an opt-in acknowledgement.
 
+#### Messaging delivery consolidation
+
+Messaging owns any policy that combines several compatible delivery intents into one physical message.
+
+The owning feature module supplies the lifecycle message and its already-resolved behavior. Messaging decides whether compatible consent acknowledgement intents may be composed into that message and which uncovered intents require standalone delivery.
+
+A consolidated message must preserve:
+
+```text
+one primary lifecycle intent
+all covered acknowledgement intent keys
+the MessageConsent IDs represented
+the applied consolidation policy/group
+the primary behavior owner and occurrence identity
+```
+
+Consolidated acknowledgement copy inherits the primary message's exact schedule, conditions, queue, and behavior-owner provenance. Consolidation must not invent a competing send time.
+
+A required acknowledgement must have either a successfully resolved consolidated path or an explicit standalone fallback. Missing primary-message behavior must not silently suppress consent acknowledgement delivery.
+
+Reserved `delivery_consolidation_*` placeholders are internal composition fields supplied by Messaging. They are not universal authorable tokens.
+
+Module readiness pages may report that a module-owned lifecycle message includes Messaging-owned acknowledgements, but they must not treat a missing standalone module template as a failure when a valid consolidated path exists.
+
 Good:
 
     DispatchMessageAction
@@ -2711,6 +2735,8 @@ Webinars may depend on:
 
 Webinars may use Messaging to send registration confirmations, reminders, waitlist notices, and post-webinar transactional follow-ups. Webinar surfaces may collect consent, but consent-domain storage and acknowledgement resolution remain Messaging-owned.
 
+The public Webinar registration experience is configuration-driven. Registration-modal content/style is a distinct ownership bucket from landing-page content/style. Client wording may differ; executable tests should validate structure, accessibility, legal-link validity, channel/consent behavior, and runtime safety rather than identical prose or exact CSS utility counts.
+
 Webinar reminder, confirmation, and post-event timing is selectable through DB-owned schedule profiles and profile items.
 
 Webinars owns when webinar lifecycle messages are scheduled.
@@ -2760,11 +2786,11 @@ post-attended transactional follow-up
 post-missed transactional follow-up
 ```
 
-Readiness is derived from runtime Messaging resolution, channel availability, active Webinar schedule profiles and explicit disablement, selected-profile validity, active-default conflicts, and post-event outcome-message enablement.
+Readiness is derived from runtime Messaging resolution, channel availability, active Webinar schedule profiles and explicit disablement, selected-profile validity, active-default conflicts, post-event outcome-message enablement, and Messaging-owned acknowledgement consolidation/standalone fallback coverage.
 
 Readiness is not persisted.
 
-Consent-event acknowledgements are Messaging-owned consent-domain messages. They are not per-scope Webinar `opt_ins` templates and are not Webinar schedule-profile items.
+Consent-event acknowledgements are Messaging-owned consent-domain messages. They are not per-scope Webinar `opt_ins` templates and are not separate Webinar schedule-profile items. A standalone acknowledgement follows Messaging-owned behavior; an acknowledgement consolidated into a Webinar lifecycle message inherits that primary message's resolved Webinar schedule-profile behavior.
 
 Post-webinar transactional follow-ups are not campaign nurture.
 
@@ -3174,12 +3200,13 @@ Recommended direction:
 3. Add public seams only when a concrete consumer/workflow needs them.
 4. Add contact filters for Commerce or Location only when Broadcasts, Campaigns, Reporting, or another consuming surface needs them.
 5. Treat the dashboard and contact show page as shared orientation surfaces with module-contributed summaries, not module inventories.
-6. Webinars message/template setup and computed readiness are complete, including registration and waitlist consent acknowledgement readiness through Messaging consent domains.
+6. Webinars message/template setup and the computed readiness backend baseline are implemented. Delivery-consolidation-aware readiness presentation remains deferred so consolidated/fallback-covered acknowledgements are not shown as missing standalone templates.
 7. FlowRoutes has a read-only manual ContactStatus automation impact preview for the eventual manual-status consequence warning UX.
 8. The module-first preset contribution architecture is implemented and must remain separate from runtime module availability and trigger assignment.
 9. Routes now has a real Manage Routes / Assignments baseline, modal Route/Point editing, linear authoring boundaries, explicit direct-message eligibility, and server-authoritative Point placement rules.
-10. Continue focused Routes product completion before the later dashboard/contact workspace polish audit.
-11. Regenerate `core-project-tree.txt` from the repo after each structural batch.
+10. Run the system-wide model creation and persistence-bloat audit, starting with `ScheduledMessage`, before assuming current JSON/runtime payload shapes are production-ready.
+11. Continue focused Routes product completion or the dashboard/contact workspace polish audit after the persistence audit, according to the client-readiness roadmap.
+12. Regenerate `core-project-tree.txt` from the repo after each structural batch.
 
 Do not use this section as a backlog. Actionable items belong in `TODO.md`.
 
@@ -3476,5 +3503,3 @@ A config/reference file is treated as an executable global allowlist.
 ```
 
 Treat available-field validation as setup/config-validation work. Future editor autocomplete should be a consumer of the existing registry/validator, not a second validation system.
-
-

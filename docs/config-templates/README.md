@@ -192,6 +192,7 @@ Preset groups are composition-only. Durable preset ownership belongs to contribu
 ## Core authoring rules
 
 - Messaging configs own reusable message copy and delivery-template metadata only.
+- Messaging-owned delivery consolidation may compose compatible consent acknowledgements into a lifecycle message; it must preserve intent/consent provenance and standalone fallback behavior.
 - Every list-based Messaging definition must declare a stable explicit `key`. The synced `MessageTemplatePreset.key` derives from that explicit identity rather than list position. `source_config_path` remains provenance/debug location, not durable template identity.
 - Reusable Messaging templates must not own business timing, lifecycle conditions, sequencing, dependencies, enablement, or module-specific skip behavior.
 - Owning modules resolve their own behavior and use `ResolvedMessageDispatchBuilder` to produce a normalized `ResolvedMessageDispatch` with an exact `send_at`.
@@ -216,10 +217,12 @@ messaging.{channel}.definitions.{purpose}.{scope}.campaigns.{campaign_key}.steps
 - Runtime-only URLs must come from runtime payloads/services, not static config guesses.
 - Runtime artifact payloads must stay compact; source/debug/template identity belongs in metadata where appropriate.
 - SMS visibility belongs to Messaging channel availability for the relevant surface, not one-off provider checks.
+- For SMS line breaks, use a nowdoc or `\n` in a double-quoted PHP string; single-quoted `'\n'` remains literal and line breaks affect segmentation.
 - Imported-contact permission invitations are a distinct Messaging-owned one-time consent flow, not a normal Broadcast bypass.
 - Message scopes and consent domains are separate. Do not create a new consent identity merely because a new message scope exists.
 - Webinar consent acknowledgements come from consent-domain resolution, not scope-specific `opt_ins` groups in reusable message definition files.
 - Authorable message tokens are validated through `TokenContractRegistry` + `MessageTemplateTokenValidator`; do not use a global token allowlist.
+- Reserved `{delivery_consolidation_*}` fields are internal composition placeholders, not universal authorable tokens.
 - Webinar schedule profiles may use `delay`, `anchored`, or `next_day_at`. `next_day_at` uses client timezone and strict `HH:MM`.
 - Core Webinar Messaging should stay small, complete, generic, and vertical-neutral. Rich branded copy/cadence belongs in client config.
 - Rich vertical/client preset packages belong in `client/{client-key}/config/presets.php`; any selected package key must exist after effective merge.
@@ -328,6 +331,7 @@ Before accepting a config change, confirm:
 - Purpose/scope pairs are correct.
 - Consent domains are intentional and do not accidentally create one consent identity per message scope.
 - Webinar Messaging definition files do not reintroduce per-scope `opt_ins` groups.
+- Delivery-consolidation-aware templates use only documented reserved placement fields and preserve an explicit standalone fallback.
 - Webinar schedule items use supported schedule shapes and do not embed timezone on `next_day_at`.
 - Client list/numeric-array overrides intentionally replace, rather than append to, default lists.
 - SMS exposure is controlled by Messaging channel availability for the relevant surface.
@@ -368,10 +372,13 @@ Rules:
 - Validate authorable tokens against the exact producer context; do not use a global token allowlist.
 - Keep message scope separate from consent domain.
 - Do not add per-scope `opt_ins` groups to Webinar Messaging definitions; use consent-domain acknowledgement resolution.
+- Delivery consolidation is Messaging-owned; preserve covered intent/consent provenance and standalone fallback behavior.
+- Treat `{delivery_consolidation_*}` as reserved composition fields, not universal authorable tokens.
 - For Webinar schedule items, use only `delay(minutes)`, `anchored(minutes)`, or `next_day_at(time=HH:MM)`. `next_day_at` uses client timezone.
 - If the client request needs a missing token, recommend adding that token to the runtime payload or changing the copy.
 - Use `contact` for canonical internal keys and runtime concepts. Client-facing copy may use the configured industry noun such as Lead, Fan, Customer, Borrower, or Owner.
 - Keep SMS options config-toggleable in UI.
+- Use a nowdoc or double-quoted `\n` for SMS line breaks; single-quoted `'\n'` is literal text.
 - Keep imported-contact permission invitations separate from normal Broadcasts.
 
 Client request:

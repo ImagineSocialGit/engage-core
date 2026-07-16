@@ -67,6 +67,10 @@ See [Config Contracts and Token Contracts](config-contracts.md) and the
 30. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
 31. Module docs are the source of truth for module ownership and client-facing scope. Configs should not create a module feature that the owning module does not support.
 32. Commerce and Location configs should support admin convenience and integrations; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
+33. Messaging-owned delivery consolidation may combine compatible lifecycle and consent-acknowledgement intents into one physical message. Covered intent keys and consent IDs must remain auditable, and uncovered required acknowledgements need an explicit standalone fallback.
+34. Reserved `delivery_consolidation_*` placeholders are internal composition fields, not universal authorable tokens. Use them only in a documented consolidation-aware template context.
+35. Public Webinar registration presentation is client-configurable. Tests and config audits should validate structure, accessibility, legal-link validity, channel/consent behavior, and runtime safety rather than identical client copy or exact Tailwind class counts.
+36. Persisted runtime payloads must be send-ready and compact. Do not duplicate whole model arrays or the same domain snapshot under payload, token, context, and metadata branches.
 ## Universal internal terminology vs configured client nouns
 
 Engage Core has one universal internal person concept: `Contact`.
@@ -229,6 +233,37 @@ Do not expose raw scope keys to end users as consent copy. Use a human-readable 
 System markers such as `:client_name` and `:consent_topic` belong to the consent acknowledgement resolver. They are not normal authorable `{token}` values.
 
 Imported consent should use `ImportMessageConsentAction` so state is normalized to the consent domain without emitting `MessageConsentGranted` or sending an opt-in acknowledgement.
+
+
+### Consent acknowledgement delivery consolidation
+
+Consent acknowledgement definition, delivery policy, consolidation, and fallback are Messaging-owned.
+
+A feature module may supply a compatible lifecycle message, but it must not absorb acknowledgement ownership into its own reusable template area.
+
+A consolidation-aware path should preserve:
+
+```text
+primary lifecycle intent
+covered acknowledgement intent keys
+covered MessageConsent IDs
+policy/group identity
+standalone fallback for uncovered grants
+```
+
+The acknowledgement inherits the primary lifecycle message's resolved behavior. For example, a Webinar acknowledgement consolidated into a delayed registration confirmation sends with that confirmation rather than immediately.
+
+Do not create duplicate standalone acknowledgements for intents already covered by a successfully scheduled consolidated message.
+
+Reserved placeholders named like:
+
+```text
+{delivery_consolidation_*}
+```
+
+are composition fields supplied by the Messaging consolidation path. They are not universal Contact/Webinar tokens and should not be added to `TokenContractRegistry` merely to silence ordinary token validation.
+
+A module readiness page should evaluate the final delivery path. `No standalone opt-in template` is not equivalent to `no acknowledgement delivery` when a valid consolidated path and fallback exist.
 
 ## Key selection process
 
@@ -637,6 +672,10 @@ post_missed
 ```
 
 Do not add per-scope `opt_ins` groups. Consent acknowledgements resolve through Messaging consent domains.
+
+When a reusable lifecycle template participates in a documented Messaging delivery-consolidation policy, it may include reserved placement fields supplied by that composer. Those fields do not transfer acknowledgement ownership to the lifecycle module and do not become general authorable tokens.
+
+The final consolidated message keeps the primary template's resolved behavior. Do not add a second schedule merely for the acknowledgement fragment.
 
 Do not encode reminder timing into schedule-specific `message_type` values. Multiple reminder slots may share `message_type = reminder`; Webinar schedule profile items identify the specific lifecycle slots.
 
@@ -1372,6 +1411,44 @@ task.completed -> resume event_wait point, when configured
 
 Do not make producer modules import FlowRoutes.
 
+## Webinar registration presentation config
+
+Public Webinar landing content and registration-modal content are separate configuration concerns.
+
+`WebinarRegisterPageConfig` resolves:
+
+```text
+landing
+registration
+```
+
+Registration-modal content/style should own keys such as:
+
+```text
+consent_header
+sections
+fields
+legal_links
+registration-specific style classes
+```
+
+Client registration wording may differ freely when the executable contract remains valid.
+
+Config and presentation tests should verify:
+
+```text
+required structural keys
+visible/accepted channel consistency
+hidden SMS POST rejection
+required field behavior
+consent storage and accepted_channels
+accessible labels and disclosures
+absolute non-placeholder legal links when enabled
+safe rendering of missing optional copy
+```
+
+Do not require one client's headings, labels, disclosures, or Tailwind utility strings to match another client's values.
+
 ## Webinar schedule profiles
 
 Webinars has DB-owned selectable `WebinarScheduleProfile` and `WebinarScheduleProfileItem` records.
@@ -1581,6 +1658,40 @@ Examples that should remain singular:
 - `imported_contact_permission_invitation`
 - `webinar_registration` payload/context keys
 - `webinar_waitlist_signup` payload/context keys
+
+## SMS line breaks
+
+SMS message bodies may contain normal line feeds.
+
+For short config strings, use a double-quoted PHP string with `\n`:
+
+```php
+'message' => "Hi {first_name},\n\nYour webinar starts soon.\n\nJoin: {webinar_join_url}",
+```
+
+For longer copy, prefer a nowdoc so the intended formatting is visible:
+
+```php
+'message' => <<<'SMS'
+Hi {first_name},
+
+Your webinar starts soon.
+
+Join: {webinar_join_url}
+SMS,
+```
+
+Do not place `\n` inside a single-quoted PHP string expecting it to become a newline:
+
+```php
+'message' => 'First line\nSecond line',
+```
+
+That stores literal backslash characters.
+
+Use `\r\n` only when a specific integration requires CRLF. Ordinary SMS composition should use line feeds.
+
+Line breaks count toward the encoded SMS length and may increase message segmentation. Keep the final rendered SMS concise and test the provider-visible result.
 
 ## Review checklist before committing configs
 
@@ -2095,5 +2206,3 @@ business context label
 ```
 
 Do not persist schedule summary text unless a concrete reason appears. Prefer deriving it from the canonical schedule/profile/criteria definition.
-
-

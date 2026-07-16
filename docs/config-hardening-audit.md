@@ -215,6 +215,14 @@ Consent domains
     Scope-specific Webinar opt_ins definitions were removed in favor of
     ConsentOptInDefinitionResolver and generic/module/client acknowledgement copy.
 
+Consent acknowledgement delivery consolidation
+    Messaging may consolidate newly activated acknowledgement intents into a compatible
+    lifecycle message while preserving intent keys and consent-record provenance.
+    Consolidated acknowledgements inherit the primary message schedule, queue, conditions,
+    and behavior owner. Any acknowledgement that cannot be consolidated requires an explicit
+    standalone delivery path rather than being silently dropped. Reserved
+    delivery_consolidation_* placeholders are composition fields, not globally authorable tokens.
+
 Webinar schedule contract expansion
     delay(minutes)
     anchored(minutes)

@@ -48,6 +48,18 @@ return [
     | Messaging copy, a human-readable consent topic, and optional module/client
     | overrides.
     |
+    | A Messaging-owned delivery-consolidation policy may compose a compatible
+    | acknowledgement into a lifecycle SMS. The acknowledgement inherits the
+    | primary message's resolved behavior. Uncovered required acknowledgements
+    | must use an explicit standalone fallback.
+    |
+    | Reserved {delivery_consolidation_*} placement fields are internal composer
+    | inputs, not universal authorable tokens.
+    |
+    | For line breaks, use an actual multiline nowdoc or \n in a double-quoted
+    | PHP string. A single-quoted '\n' is sent literally. Line breaks count toward
+    | SMS segmentation, so test the final rendered message length.
+    |
     | Campaign SMS templates use the same structure as email campaign templates:
     |
     | campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}

@@ -1,4 +1,5 @@
 
+
 # Engage Core — Client Environment Reference
 
 ## Purpose
@@ -363,7 +364,7 @@ WEBINAR_FOLLOWUP_QUEUE=notifications
 
 ## Current executable queue inventory
 
-From supplied Core configs and queue registry:
+Current runtime/configuration paths use:
 
 ```text
 default
@@ -373,41 +374,40 @@ opt_in_messages
 reminders
 post_event
 marketing
-campaigns
-waitlist
+emails
 sms
 webinars
 webhooks
 ```
 
-### Known drift discovered during this audit
+Current queue notes:
 
-1. `config/horizon.php` currently defaults to:
+```text
+emails
+    active generic email/Broadcast queue path
+
+notifications
+    current Webinar waitlist delivery queue; no separate canonical waitlist queue is required
+
+marketing
+    current Campaign/Webinar nurture queue; do not preserve the obsolete campaigns queue assumption
+```
+
+### Horizon default coverage
+
+`config/horizon.php` currently defaults to:
 
 ```text
 default,notifications,confirmation_messages,reminders,opt_in_messages,post_event,marketing
 ```
 
-That does not cover every current executable queue path.
+That built-in default does not cover every executable queue path above. Until the Core Horizon defaults are reconciled, set `HORIZON_SUPERVISOR_1_QUEUES` explicitly for deployments:
 
-2. Core SMS Webinar nurture templates currently use:
-
-```text
-queue = campaigns
+```env
+HORIZON_SUPERVISOR_1_QUEUES=default,notifications,confirmation_messages,opt_in_messages,reminders,post_event,marketing,emails,sms,webinars,webhooks
 ```
 
-but `campaigns` is not currently listed in `config/reference/keys.php` under queues.
-
-Recommended code/config cleanup:
-
-```text
-Either register `campaigns` as an intentional queue and include it in Horizon defaults,
-or normalize those SMS nurture templates to the intended existing marketing queue.
-```
-
-The accompanying `.env.example` includes `campaigns` so the current executable config is not silently starved while that drift is unresolved.
-
-3. Older env/checklist material mentioned an `emails` queue. The supplied current Core configs do not dispatch to `emails`, so it is not included in the new canonical queue list.
+Verify the effective queue list after configuration changes. Do not copy historical `campaigns` or `waitlist` queue names into a deployment unless current executable code reintroduces them deliberately.
 
 ---
 
