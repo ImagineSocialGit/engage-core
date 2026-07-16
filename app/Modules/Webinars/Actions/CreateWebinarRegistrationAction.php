@@ -6,6 +6,7 @@ use App\Modules\Core\Actions\Contacts\CreateOrUpdateContactAction;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\DispatchConsentOptInMessageAction;
 use App\Modules\Messaging\Actions\GrantMessageConsentsAction;
+use App\Modules\Messaging\Data\Consent\MessageConsentGrantResult;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
@@ -56,7 +57,18 @@ class CreateWebinarRegistrationAction
                 ->first();
 
             if ($registration) {
-                $this->storeMessageConsents($validated, $request, $contact, $registration);
+                $consentGrants = $this->storeMessageConsents(
+                    validated: $validated,
+                    request: $request,
+                    contact: $contact,
+                    registration: $registration,
+                );
+
+                $this->dispatchStandaloneConsentAcknowledgements(
+                    contact: $contact,
+                    registration: $registration,
+                    consentGrants: $consentGrants,
+                );
 
                 return $registration;
             }
@@ -89,13 +101,19 @@ class CreateWebinarRegistrationAction
                 ],
             ]);
 
-            $this->storeMessageConsents($validated, $request, $contact, $registration, $now);
+            $consentGrants = $this->storeMessageConsents(
+                validated: $validated,
+                request: $request,
+                contact: $contact,
+                registration: $registration,
+                now: $now,
+            );
 
             $registration->load(['contact', 'webinar', 'webinar.webinarSeries']);
 
             $this->syncRegistrationToWebinarPlatform($registration, $webinar);
 
-            DB::afterCommit(function () use ($registration, $now) {
+            DB::afterCommit(function () use ($registration, $now, $consentGrants): void {
                 $registration = $registration->fresh([
                     'contact',
                     'webinar',
@@ -112,20 +130,27 @@ class CreateWebinarRegistrationAction
                     occurredAt: $registration->registered_at ?? $now,
                 );
 
-                $this->dispatchWebinarRegistrationMessagesAction->handle($registration);
+                $this->dispatchWebinarRegistrationMessagesAction->handle(
+                    $registration,
+                    null,
+                    $consentGrants,
+                );
             });
 
             return $registration;
         });
     }
 
+    /**
+     * @return array<int, MessageConsentGrantResult>
+     */
     private function storeMessageConsents(
         array $validated,
         Request $request,
         Contact $contact,
         WebinarRegistration $registration,
         mixed $now = null
-    ): void {
+    ): array {
         $now ??= now();
         $grants = [];
 
@@ -159,20 +184,32 @@ class CreateWebinarRegistrationAction
             ];
         }
 
-        $results = $this->grantMessageConsentsAction->handle(
+        return $this->grantMessageConsentsAction->handle(
             contact: $contact,
             grants: $grants,
             context: $registration,
         );
+    }
 
-        foreach ($results as $result) {
-            if (! $result->becameActive) {
+    /**
+     * Existing registrations have no new registration-confirmation intent to
+     * absorb a newly granted consent acknowledgement, so they remain separate.
+     *
+     * @param array<int, MessageConsentGrantResult> $consentGrants
+     */
+    private function dispatchStandaloneConsentAcknowledgements(
+        Contact $contact,
+        WebinarRegistration $registration,
+        array $consentGrants,
+    ): void {
+        foreach ($consentGrants as $grant) {
+            if (! $grant->becameActive) {
                 continue;
             }
 
             $this->dispatchConsentOptInMessageAction->handle(
                 contact: $contact,
-                grant: $result,
+                grant: $grant,
                 payload: [
                     'webinar_registration_id' => $registration->id,
                     'webinar_id' => $registration->webinar_id,
@@ -263,7 +300,6 @@ class CreateWebinarRegistrationAction
         );
 
         $meta = $registration->meta ?? [];
-
         $meta['provider'] = $providerRegistration->toMeta();
 
         $registration->update([

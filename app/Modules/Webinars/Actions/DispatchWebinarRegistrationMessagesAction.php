@@ -2,7 +2,10 @@
 
 namespace App\Modules\Webinars\Actions;
 
-use App\Modules\Messaging\Actions\DispatchMessageAction;
+use App\Modules\Messaging\Actions\BuildConsentOptInMessageIntentAction;
+use App\Modules\Messaging\Actions\DispatchMessageIntentsAction;
+use App\Modules\Messaging\Data\Consent\MessageConsentGrantResult;
+use App\Modules\Messaging\Data\Delivery\MessageDeliveryIntent;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ScheduledMessage;
@@ -19,7 +22,8 @@ class DispatchWebinarRegistrationMessagesAction
     private const SCOPE = 'webinar';
 
     public function __construct(
-        private readonly DispatchMessageAction $dispatchMessageAction,
+        private readonly DispatchMessageIntentsAction $dispatchMessageIntents,
+        private readonly BuildConsentOptInMessageIntentAction $buildConsentOptInIntent,
         private readonly MessageEligibilityGate $messageEligibilityGate,
         private readonly MessageChannelAvailability $messageChannelAvailability,
         private readonly MessageDefinitionResolver $messageDefinitionResolver,
@@ -28,11 +32,13 @@ class DispatchWebinarRegistrationMessagesAction
 
     /**
      * @param array<int, string>|null $contextKeys
+     * @param array<int, MessageConsentGrantResult> $consentGrants
      * @return array<int, ScheduledMessage>
      */
     public function handle(
         WebinarRegistration $registration,
         ?array $contextKeys = null,
+        array $consentGrants = [],
     ): array {
         $registration->loadMissing([
             'contact',
@@ -46,7 +52,8 @@ class DispatchWebinarRegistrationMessagesAction
 
         $contextKeys = $this->normalizeContextKeys($contextKeys);
         $messageData = WebinarMessageData::fromRegistration($registration)->toArray();
-        $scheduledMessages = [];
+        $payload = $this->messagePayload($messageData);
+        $intents = [];
 
         foreach ($this->availableTransactionalChannels($registration) as $channel) {
             if (! $this->messageEligibilityGate->allows(
@@ -69,45 +76,75 @@ class DispatchWebinarRegistrationMessagesAction
                 surface: 'webinar_registrations',
             );
 
-            $definitions = $this->filterByContextKeys($definitions, $contextKeys);
+            foreach ($this->filterByContextKeys($definitions, $contextKeys) as $definition) {
+                $definitionKey = $this->definitionKey($definition);
 
-            if ($definitions === []) {
-                continue;
-            }
-
-            $scheduledMessages = [
-                ...$scheduledMessages,
-                ...$this->dispatchMessageAction->handle(
+                $intents[] = MessageDeliveryIntent::fromDefinition(
+                    key: 'webinar.registration.'.$definitionKey,
                     recipient: $registration->contact,
-                    channel: $channel,
-                    purpose: MessagePurpose::Transactional,
-                    scope: self::SCOPE,
-                    dispatchKeys: 'registration_created',
-                    payload: [
-                        'tokens' => $messageData,
-                        'context' => [
-                            'contact' => $messageData['contact'] ?? [],
-                            'webinar_registration' => $messageData['webinar_registration'] ?? [],
-                            'webinar' => $messageData['webinar'] ?? [],
-                            'webinar_series' => $messageData['webinar_series'] ?? [],
-                        ],
-                    ],
+                    definition: $definition,
+                    payload: $payload,
                     context: $registration,
                     triggeredAt: $registration->registered_at ?? now(),
                     anchor: $registration->webinar?->starts_at,
+                    occurrenceKey: 'webinar_registration:'.$registration->getKey(),
                     meta: [
+                        'delivery_intent' => [
+                            'key' => 'webinar.registration.'.$definitionKey,
+                            'consent_ids' => [],
+                        ],
                         'webinar_schedule_profile_applied' => true,
                         'webinar_registration_id' => $registration->getKey(),
                         'webinar_id' => $registration->webinar_id,
                         'webinar_slug' => $registration->webinar_slug,
                     ],
-                    definitions: $definitions,
-                    occurrenceKey: 'webinar_registration:'.$registration->getKey(),
-                ),
-            ];
+                );
+            }
         }
 
-        return $scheduledMessages;
+        if ($this->includesInitialRegistrationContext($contextKeys)) {
+            foreach ($consentGrants as $grant) {
+                if (! $grant instanceof MessageConsentGrantResult || ! $grant->becameActive) {
+                    continue;
+                }
+
+                $intent = $this->buildConsentOptInIntent->handle(
+                    contact: $registration->contact,
+                    grant: $grant,
+                    payload: $payload,
+                    context: $registration,
+                    resolverContext: [
+                        'webinar_slug' => $registration->webinar_slug,
+                    ],
+                );
+
+                if ($intent instanceof MessageDeliveryIntent) {
+                    $intents[] = $intent;
+                }
+            }
+        }
+
+        return $this->dispatchMessageIntents->handle(
+            intents: $intents,
+            policyKey: 'webinar_registration',
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $messageData
+     * @return array<string, mixed>
+     */
+    private function messagePayload(array $messageData): array
+    {
+        return [
+            'tokens' => $messageData,
+            'context' => [
+                'contact' => $messageData['contact'] ?? [],
+                'webinar_registration' => $messageData['webinar_registration'] ?? [],
+                'webinar' => $messageData['webinar'] ?? [],
+                'webinar_series' => $messageData['webinar_series'] ?? [],
+            ],
+        ];
     }
 
     /**
@@ -165,6 +202,38 @@ class DispatchWebinarRegistrationMessagesAction
                 );
             },
         ));
+    }
+
+    /**
+     * @param array<int, string>|null $contextKeys
+     */
+    private function includesInitialRegistrationContext(?array $contextKeys): bool
+    {
+        if ($contextKeys === null) {
+            return true;
+        }
+
+        return in_array('confirmation', $contextKeys, true)
+            || in_array('confirmations', $contextKeys, true);
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     */
+    private function definitionKey(array $definition): string
+    {
+        foreach ([
+            $definition['definition_key'] ?? null,
+            $definition['key'] ?? null,
+            data_get($definition, 'meta.message_template_assignment.definition_key'),
+            $definition['message_type'] ?? null,
+        ] as $candidate) {
+            if (is_string($candidate) && trim($candidate) !== '') {
+                return $this->normalizeSegment($candidate);
+            }
+        }
+
+        return 'message';
     }
 
     /**

@@ -428,9 +428,11 @@
 │   │   ├── Messaging
 │   │   │   ├── Actions
 │   │   │   │   ├── AssignMessageTemplatePresetAction.php
+│   │   │   │   ├── BuildConsentOptInMessageIntentAction.php
 │   │   │   │   ├── CreateContactPermissionInvitationsForImportBatchAction.php
 │   │   │   │   ├── DispatchConsentOptInMessageAction.php
 │   │   │   │   ├── DispatchMessageAction.php
+│   │   │   │   ├── DispatchMessageIntentsAction.php
 │   │   │   │   ├── GrantMessageConsentAction.php
 │   │   │   │   ├── GrantMessageConsentsAction.php
 │   │   │   │   ├── ImportMessageConsentAction.php
@@ -475,6 +477,8 @@
 │   │   │   │   │   └── SendMessageAutomationDefinition.php
 │   │   │   │   ├── Consent
 │   │   │   │   │   └── MessageConsentGrantResult.php
+│   │   │   │   ├── Delivery
+│   │   │   │   │   └── MessageDeliveryIntent.php
 │   │   │   │   ├── MessageData.php
 │   │   │   │   └── ResolvedMessageDispatch.php
 │   │   │   ├── Enums
@@ -532,6 +536,7 @@
 │   │   │   │   ├── MessageConfigValidator.php
 │   │   │   │   ├── MessageDedupeKeyBuilder.php
 │   │   │   │   ├── MessageDefinitionResolver.php
+│   │   │   │   ├── MessageDeliveryConsolidator.php
 │   │   │   │   ├── MessageDispatchDefinitionMatcher.php
 │   │   │   │   ├── MessageDispatchDefinitionNormalizer.php
 │   │   │   │   ├── MessageEligibilityGate.php
@@ -973,6 +978,7 @@
 │   │   │   ├── generated
 │   │   │   │   └── images.php
 │   │   │   ├── messaging
+│   │   │   │   ├── delivery_consolidation.php
 │   │   │   │   ├── email
 │   │   │   │   │   └── definitions
 │   │   │   │   │       ├── marketing
@@ -1085,6 +1091,7 @@
 │   ├── logging.php
 │   ├── mail.php
 │   ├── messaging
+│   │   ├── delivery_consolidation.php
 │   │   ├── email
 │   │   │   └── definitions
 │   │   │       ├── marketing
@@ -1552,6 +1559,7 @@
 │   │   │   ├── CoreWebinarMessagingDefaultsTest.php
 │   │   │   ├── RobTheMortgageCoachClientSelectionTest.php
 │   │   │   ├── SlamDunkConfigGoldenFixtureTest.php
+│   │   │   ├── SlamDunkDeliveryConsolidationConfigTest.php
 │   │   │   └── SlamDunkRuntimeGoldenFixtureTest.php
 │   │   ├── Core
 │   │   │   ├── ContactControllerTest.php
@@ -1617,6 +1625,7 @@
 │   │   │   ├── MessageConfigValidatorTest.php
 │   │   │   ├── MessageDefinitionConfigPathTest.php
 │   │   │   ├── MessageDefinitionResolverTest.php
+│   │   │   ├── MessageDeliveryConsolidatorTest.php
 │   │   │   ├── MessageEligibilityGateTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
 │   │   │   ├── MessageTemplateBehaviorOwnershipValidationTest.php
@@ -1691,6 +1700,7 @@
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
 │   │   │   ├── WebinarRegistrationControllerTest.php
+│   │   │   ├── WebinarRegistrationMessageConsolidationTest.php
 │   │   │   ├── WebinarResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
@@ -1705,4 +1715,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-537 directories, 1169 files
+538 directories, 1178 files
