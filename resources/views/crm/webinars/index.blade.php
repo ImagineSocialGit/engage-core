@@ -148,8 +148,10 @@
                     <tbody class="divide-y divide-slate-200">
                         @forelse($webinars as $webinar)
                             @php
-                                $registrationUrl = $webinar->webinarSeries?->slug
-                                    ? rtrim(config('app.webinar_url') ?: config('app.url'), '/') . route('webinar.show', $webinar->webinarSeries->slug, false)
+                                $registrationUrl = filled($webinar->webinarSeries?->slug)
+                                    ? route('webinar.show', [
+                                        'seriesSlug' => $webinar->webinarSeries->slug,
+                                    ])
                                     : null;
 
                                 $modalName = 'webinar-dev-testing-'.$webinar->id;

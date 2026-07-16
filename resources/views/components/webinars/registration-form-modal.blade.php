@@ -1,4 +1,3 @@
-
 @props([
     'page',
     'tokens',
@@ -206,21 +205,17 @@
                     </div>
                 </div>
 
-                {{-- CONSENT HEADER --}}
-                <div class="">
-                    Almost Done!
-                    
-                    We'll send you:
+                @if($page['consent_header']['enabled'] ?? true)
+                    <div class="{{ $style['consent_header']['wrapper'] ?? 'rounded-2xl border border-primary/20 bg-primary/5 p-4' }}">
+                        @if(filled($page['consent_header']['body'] ?? null))
+                            <p class="{{ $style['consent_header']['body'] ?? 'mt-1 text-sm font-medium text-slate-600' }}">
+                                {{ $page['consent_header']['body'] }}
+                            </p>
+                        @endif
+                    </div>
+                @endif
 
-                    ✅ Your Zoom link
-
-                    ✅ Webinar reminders
-
-                    ✅ Replay access if you can't attend live
-                </div>
-                {{-- END CONSENT HEADER --}}
-
-                <fieldset class="rounded-2xl bg-slate-50 pt-2 pb-4 px-4 border border-slate-300">
+                <fieldset class="mx-2 rounded-2xl bg-slate-50 pt-2 pb-4 px-4 border border-slate-300">
                     <legend class="text-base font-semibold text-slate-900">
                         {{ $notificationSection['title'] ?? 'Webinar Registration (Required)' }}
                     </legend>
@@ -321,7 +316,7 @@
                     @enderror
                 </fieldset>
 
-                <fieldset class="rounded-2xl border border-slate-200 py-2 px-4">
+                <fieldset class="mx-2 rounded-2xl border border-slate-200 py-2 px-4">
                     <legend class="px-1 text-base font-semibold text-slate-900">
                         {{ $marketingSection['title'] ?? 'Stay Connected (Optional)' }}
                     </legend>

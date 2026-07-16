@@ -11,6 +11,16 @@ return [
     'image_caption' => null,
 
     'registration' => [
+        'consent_header' => [
+            'enabled' => true,
+            'title' => 'Almost Done!',
+            'body' => "We'll send you:",
+            'items' => [
+                'Your Zoom link',
+                'Webinar reminders',
+                "Replay access if you can't attend live",
+            ],
+        ],
         'sections' => [
             'notifications' => [
                 'title' => 'Webinar Registration (Required)',

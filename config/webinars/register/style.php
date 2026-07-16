@@ -1,4 +1,3 @@
-
 <?php
 
 // Registered style
@@ -103,6 +102,14 @@ return [
     ],
 
     'registration' => [
+        'consent_header' => [
+            'wrapper' => 'rounded-2xl border border-primary/20 bg-primary/5 p-4',
+            'title' => 'text-lg font-extrabold tracking-tight text-slate-900',
+            'body' => 'mt-1 text-sm font-medium text-slate-600',
+            'list' => 'mt-3 grid gap-2 sm:grid-cols-3',
+            'item' => 'flex items-start gap-2 text-sm font-semibold leading-5 text-slate-700',
+            'icon' => 'mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[0.7rem] font-extrabold text-white',
+        ],
         'form_card' => [
             'class' => 'rounded-3xl border border-black/10 bg-white p-6 text-ink shadow-2xl shadow-black/20 sm:p-8',
             'title' => 'text-2xl font-extrabold tracking-[-0.03em] text-ink',
