@@ -282,9 +282,9 @@ class SlamDunkRuntimeGoldenFixtureTest extends TestCase
         $this->assertTrue($messages->every(
             fn (ScheduledMessage $message): bool => $message->scope === 'webinar_nurture'
                 && data_get($message->meta, 'campaign_key') === $campaignKey
-                && $message->flow_route_progress_id !== null
-                && $message->flow_route_id !== null
-                && $message->flow_route_point_id !== null
+                && data_get($message->meta, 'flow_route.flow_route_progress_id') !== null
+                && data_get($message->meta, 'flow_route.flow_route_id') !== null
+                && data_get($message->meta, 'flow_route.flow_route_point_id') !== null
                 && $message->send_at->equalTo(now()->addMinutes($expectedDelayMinutes))
         ));
 

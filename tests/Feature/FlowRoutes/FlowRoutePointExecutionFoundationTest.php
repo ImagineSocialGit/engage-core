@@ -413,6 +413,19 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
                 $after->copy()->endOfSecond(),
             ),
         );
+
+        $progressItem = ContactFlowRouteProgressItem::query()
+            ->where('contact_flow_route_progress_id', $setup['progress']->getKey())
+            ->where('flow_route_point_id', $flowRoutePoint->getKey())
+            ->firstOrFail();
+
+        $this->assertSame($message->getMorphClass(), $progressItem->created_subject_type);
+        $this->assertSame($message->getKey(), $progressItem->created_subject_id);
+        $this->assertSame('scheduled_message', $progressItem->correlation_type);
+        $this->assertSame(
+            [$message->getKey()],
+            data_get($progressItem->correlation, 'scheduled_message_ids'),
+        );
     }
 
     public function test_create_task_point_assigns_to_only_active_team_member(): void
@@ -526,7 +539,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertSame($template->key, data_get($progressItem->correlation, 'task_template_key'));
     }
 
-    public function test_enroll_campaign_point_stores_route_provenance_on_enrollment_and_scheduled_message(): void
+    public function test_enroll_campaign_point_keeps_provenance_on_enrollment_and_message_metadata(): void
     {
         Queue::fake();
 
@@ -635,12 +648,30 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertNotNull($enrollment->flow_route_plan_item_id);
         $this->assertNotNull($enrollment->flow_route_progress_item_id);
 
-        $this->assertSame($enrollment->flow_route_progress_id, $scheduledMessage->flow_route_progress_id);
-        $this->assertSame($enrollment->flow_route_plan_id, $scheduledMessage->flow_route_plan_id);
-        $this->assertSame($enrollment->flow_route_plan_item_id, $scheduledMessage->flow_route_plan_item_id);
-        $this->assertSame($enrollment->flow_route_progress_item_id, $scheduledMessage->flow_route_progress_item_id);
-        $this->assertSame($enrollment->flow_route_id, $scheduledMessage->flow_route_id);
-        $this->assertSame($enrollment->flow_route_point_id, $scheduledMessage->flow_route_point_id);
+        $this->assertSame(
+            $enrollment->flow_route_progress_id,
+            data_get($scheduledMessage->meta, 'flow_route.flow_route_progress_id'),
+        );
+        $this->assertSame(
+            $enrollment->flow_route_plan_id,
+            data_get($scheduledMessage->meta, 'flow_route.flow_route_plan_id'),
+        );
+        $this->assertSame(
+            $enrollment->flow_route_plan_item_id,
+            data_get($scheduledMessage->meta, 'flow_route.flow_route_plan_item_id'),
+        );
+        $this->assertSame(
+            $enrollment->flow_route_progress_item_id,
+            data_get($scheduledMessage->meta, 'flow_route.flow_route_progress_item_id'),
+        );
+        $this->assertSame(
+            $enrollment->flow_route_id,
+            data_get($scheduledMessage->meta, 'flow_route.flow_route_id'),
+        );
+        $this->assertSame(
+            $enrollment->flow_route_point_id,
+            data_get($scheduledMessage->meta, 'flow_route.flow_route_point_id'),
+        );
     }
 
     public function test_automation_event_route_can_change_contact_workflow_status(): void

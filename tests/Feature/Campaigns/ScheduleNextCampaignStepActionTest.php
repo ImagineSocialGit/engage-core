@@ -248,7 +248,7 @@ class ScheduleNextCampaignStepActionTest extends TestCase
         $this->assertSame('campaign_channel_unavailable', data_get($enrollment->meta, 'last_message_schedule_attempt.reason'));
     }
 
-    public function test_it_preserves_flow_route_provenance_from_enrollment_on_next_scheduled_message(): void
+    public function test_it_preserves_flow_route_provenance_from_enrollment_in_next_message_metadata(): void
     {
         Queue::fake();
         Carbon::setTestNow('2026-06-12 12:00:00');
@@ -280,14 +280,6 @@ class ScheduleNextCampaignStepActionTest extends TestCase
         $scheduledMessage = app(ScheduleNextCampaignStepAction::class)->handle($enrollment);
 
         $this->assertInstanceOf(ScheduledMessage::class, $scheduledMessage);
-
-        $this->assertSame($flowRoute['progress']->getKey(), $scheduledMessage->flow_route_progress_id);
-        $this->assertSame($flowRoute['plan']->getKey(), $scheduledMessage->flow_route_plan_id);
-        $this->assertSame($flowRoute['plan_item']->getKey(), $scheduledMessage->flow_route_plan_item_id);
-        $this->assertSame($flowRoute['progress_item']->getKey(), $scheduledMessage->flow_route_progress_item_id);
-        $this->assertSame($flowRoute['flow_route']->getKey(), $scheduledMessage->flow_route_id);
-        $this->assertSame($flowRoute['flow_route_point']->getKey(), $scheduledMessage->flow_route_point_id);
-        $this->assertSame($flowRoute['capability']->getKey(), $scheduledMessage->flow_route_capability_id);
 
         $this->assertSame($flowRoute['progress']->getKey(), data_get($scheduledMessage->meta, 'flow_route.flow_route_progress_id'));
         $this->assertSame($flowRoute['plan']->getKey(), data_get($scheduledMessage->meta, 'flow_route.flow_route_plan_id'));
@@ -548,4 +540,3 @@ class ScheduleNextCampaignStepActionTest extends TestCase
         parent::tearDown();
     }
 }
-

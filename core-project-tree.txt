@@ -1640,6 +1640,7 @@
 │   │   │   ├── ResolvedMessageDispatchIntegrationTest.php
 │   │   │   ├── ResolvedMessageDispatchSchemaTest.php
 │   │   │   ├── RouteAuthoringMessageTemplateEligibilityResolverTest.php
+│   │   │   ├── ScheduledMessageFlowRoutesBoundaryTest.php
 │   │   │   ├── ScheduleInternalNotificationActionTest.php
 │   │   │   ├── SemanticCampaignVariantIdentityResolutionTest.php
 │   │   │   ├── SendScheduledMessageJobTest.php
@@ -1715,4 +1716,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-538 directories, 1178 files
+538 directories, 1179 files
