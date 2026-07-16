@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Messaging;
 
+use App\Modules\Messaging\Actions\AssignMessageTemplatePresetAction;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Payloads\EmailPayload;
@@ -486,7 +487,112 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
         ], collect($definitions)->pluck('payload.subject')->all());
     }
 
+    public function test_exact_manual_reminder_assignment_preserves_sibling_reminder_definitions(): void
+    {
+        Config::set('messaging.email.definitions.transactional.webinar', [
+            'reminders' => [
+                [
+                    'key' => 'reminder_10_day',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'reminders',
+                    'payload' => [
+                        'subject' => 'Config ten day',
+                        'body' => 'Config ten day body.',
+                    ],
+                ],
+                [
+                    'key' => 'reminder_1_day',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'reminders',
+                    'payload' => [
+                        'subject' => 'Config one day',
+                        'body' => 'Config one day body.',
+                    ],
+                ],
+            ],
+        ]);
+
+        $seedPresets = [];
+
+        foreach ([
+            ['index' => 0, 'key' => 'reminder_10_day', 'subject' => 'Seed ten day'],
+            ['index' => 1, 'key' => 'reminder_1_day', 'subject' => 'Seed one day'],
+        ] as $definition) {
+            $sourceConfigPath = 'messaging.email.definitions.transactional.webinar.reminders.'.$definition['index'];
+            $preset = MessageTemplatePreset::factory()->create([
+                'key' => 'email.transactional.webinar.'.$definition['key'],
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+                'message_type' => 'reminder',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'reminders',
+                'dispatch_keys' => ['registration_created'],
+                'payload' => [
+                    'subject' => $definition['subject'],
+                    'body' => $definition['subject'].' body.',
+                ],
+                'source_config_path' => $sourceConfigPath,
+                'meta' => [
+                    'seed' => [
+                        'definition_key' => $definition['key'],
+                    ],
+                ],
+            ]);
+
+            MessageTemplatePresetAssignment::factory()
+                ->forPreset($preset)
+                ->create([
+                    'surface' => 'webinar_registrations',
+                    'definition_key' => $definition['key'],
+                    'source_config_path' => $sourceConfigPath,
+                ]);
+
+            $seedPresets[$definition['key']] = $preset;
+        }
+
+        $customPreset = MessageTemplatePreset::factory()->create([
+            'key' => 'email.transactional.webinar.reminder_10_day.custom',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'reminder',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'reminders',
+            'dispatch_keys' => ['registration_created'],
+            'payload' => [
+                'subject' => 'Custom ten day',
+                'body' => 'Custom ten day body.',
+            ],
+        ]);
+
+        app(AssignMessageTemplatePresetAction::class)->handle(
+            preset: $customPreset,
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+            surface: 'webinar_registrations',
+            messageType: 'reminder',
+            sourceConfigPath: 'messaging.email.definitions.transactional.webinar.reminders.0',
+            definitionKey: 'reminder_10_day',
+        );
+
+        $definitions = app(MessageDefinitionResolver::class)->resolve(
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+        );
+
+        $this->assertDatabaseCount('message_template_preset_assignments', 2);
+        $this->assertCount(2, $definitions);
+        $this->assertSame([
+            'reminder_10_day' => 'Custom ten day',
+            'reminder_1_day' => 'Seed one day',
+        ], collect($definitions)->mapWithKeys(
+            fn (array $definition): array => [$definition['key'] => $definition['payload']['subject']],
+        )->sortKeys()->all());
+    }
+
 }
-
-
-

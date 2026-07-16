@@ -119,6 +119,144 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
         Queue::assertPushed(SendScheduledMessageJob::class, 2);
     }
 
+
+    public function test_exact_assigned_reminder_does_not_remove_sibling_reminder_from_registration_dispatch(): void
+    {
+        Queue::fake();
+
+        $this->configureWebinarRegistrationChannelAvailability();
+        Config::set('messaging.email.definitions.transactional.webinar', [
+            'confirmation' => [
+                'key' => 'confirmation',
+                'dispatch_key' => 'registration_created',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'confirmation_messages',
+                'payload' => [
+                    'subject' => 'Config confirmation',
+                    'body' => 'Config confirmation body.',
+                ],
+            ],
+            'reminders' => [
+                [
+                    'key' => 'reminder_1_day',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'reminders',
+                    'payload' => [
+                        'subject' => 'Config one day',
+                        'body' => 'Config one day body.',
+                    ],
+                ],
+                [
+                    'key' => 'reminder_30_minute',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'reminders',
+                    'payload' => [
+                        'subject' => 'Config thirty minute',
+                        'body' => 'Config thirty minute body.',
+                    ],
+                ],
+            ],
+        ]);
+
+        $preset = MessageTemplatePreset::factory()->create([
+            'key' => 'email.transactional.webinar.reminder_1_day.custom',
+            'name' => 'Custom One Day Reminder',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'reminder',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'reminders',
+            'dispatch_keys' => ['registration_created'],
+            'payload' => [
+                'subject' => 'Assigned one day',
+                'body' => 'Assigned one day body.',
+            ],
+            'meta' => [
+                'seed' => [
+                    'definition_key' => 'reminder_1_day',
+                ],
+            ],
+        ]);
+
+        MessageTemplatePresetAssignment::factory()
+            ->forPreset($preset)
+            ->create([
+                'surface' => 'webinar_registrations',
+                'definition_key' => 'reminder_1_day',
+                'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.0',
+            ]);
+
+        $profile = WebinarScheduleProfile::factory()->create([
+            'key' => 'multiple_reminder_assignment_profile',
+            'name' => 'Multiple reminder assignment profile',
+            'status' => WebinarScheduleProfile::STATUS_ACTIVE,
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+
+        foreach ([
+            [
+                'key' => 'email_confirmation',
+                'context_key' => 'confirmation',
+                'message_type' => 'confirmation',
+                'message_template_key' => 'confirmation',
+                'timing' => 'immediate',
+                'schedule' => null,
+            ],
+            [
+                'key' => 'email_reminder_1_day',
+                'context_key' => 'reminders',
+                'message_type' => 'reminder',
+                'message_template_key' => 'reminder_1_day',
+                'timing' => 'scheduled',
+                'schedule' => ['type' => 'anchored', 'minutes' => -1440],
+            ],
+            [
+                'key' => 'email_reminder_30_minute',
+                'context_key' => 'reminders',
+                'message_type' => 'reminder',
+                'message_template_key' => 'reminder_30_minute',
+                'timing' => 'scheduled',
+                'schedule' => ['type' => 'anchored', 'minutes' => -30],
+            ],
+        ] as $item) {
+            WebinarScheduleProfileItem::factory()->create([
+                'webinar_schedule_profile_id' => $profile->getKey(),
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+                'surface' => 'webinar_registrations',
+                'dispatch_key' => 'registration_created',
+                'conditions' => [],
+                'is_enabled' => true,
+                'is_active' => true,
+                ...$item,
+            ]);
+        }
+
+        $registration = $this->registrationForContact($this->contactWithTransactionalEmailConsent());
+
+        $registration->webinar()->update([
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        app(DispatchWebinarRegistrationMessagesAction::class)->handle($registration);
+
+        $this->assertSame(3, ScheduledMessage::query()->count());
+        $this->assertEqualsCanonicalizing([
+            'Assigned one day',
+            'Config thirty minute',
+        ], ScheduledMessage::query()
+            ->where('message_type', 'reminder')
+            ->get()
+            ->pluck('payload.subject')
+            ->all());
+        Queue::assertPushed(SendScheduledMessageJob::class, 3);
+    }
+
     private function configureRegistrationMessages(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
@@ -268,5 +406,3 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
         ]);
     }
 }
-
-

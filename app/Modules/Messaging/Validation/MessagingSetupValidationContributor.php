@@ -12,6 +12,7 @@ use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class MessagingSetupValidationContributor implements SetupValidationContributor
 {
@@ -28,6 +29,7 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
         yield from $this->validateConfigRoutes();
         yield from $this->validateCustomizedPresets();
         yield from $this->validateActiveAssignments();
+        yield from $this->validateAmbiguousStandardAssignments();
         yield from $this->validateExactAssignmentAmbiguity();
     }
 
@@ -357,6 +359,157 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
         }
     }
 
+
+    /**
+     * @return iterable<int, SetupValidationFinding>
+     */
+    private function validateAmbiguousStandardAssignments(): iterable
+    {
+        /** @var Collection<int, MessageTemplatePresetAssignment> $assignments */
+        $assignments = MessageTemplatePresetAssignment::query()
+            ->active()
+            ->whereNull('campaign_key')
+            ->whereNull('campaign_step')
+            ->with('messageTemplatePreset')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (MessageTemplatePresetAssignment $assignment): bool => (bool) $assignment->messageTemplatePreset?->isActive());
+
+        foreach ($assignments as $assignment) {
+            $configuredKeys = $this->configuredDefinitionKeysForMessageType(
+                channel: (string) $assignment->channel,
+                purpose: (string) $assignment->purpose,
+                scope: (string) $assignment->scope,
+                messageType: (string) $assignment->message_type,
+            );
+
+            if ($this->resolvedAssignmentDefinitionKey($assignment, $configuredKeys) !== null) {
+                continue;
+            }
+
+            if (count($configuredKeys) < 2) {
+                continue;
+            }
+
+            yield $this->error(
+                code: 'messaging.assignment_definition_key_ambiguous',
+                message: "Active MessageTemplatePresetAssignment [{$assignment->getKey()}] targets message type [{$assignment->message_type}], which has multiple definitions, but the assignment has no exact definition_key.",
+                source: 'message_template_preset_assignments',
+                path: "message_template_preset_assignments.{$assignment->getKey()}.definition_key",
+                context: [
+                    'message_template_preset_assignment_id' => $assignment->getKey(),
+                    'message_template_preset_id' => $assignment->message_template_preset_id,
+                    'channel' => $assignment->channel,
+                    'purpose' => $assignment->purpose,
+                    'scope' => $assignment->scope,
+                    'message_type' => $assignment->message_type,
+                    'available_definition_keys' => $configuredKeys,
+                ],
+            );
+        }
+    }
+
+    /**
+     * @param array<int, string> $configuredKeys
+     */
+    private function resolvedAssignmentDefinitionKey(
+        MessageTemplatePresetAssignment $assignment,
+        array $configuredKeys,
+    ): ?string {
+        $definitionKey = $this->assignmentDefinitionKey($assignment);
+
+        if ($definitionKey !== null) {
+            return $definitionKey;
+        }
+
+        if (count($configuredKeys) === 1) {
+            return $configuredKeys[0];
+        }
+
+        return null;
+    }
+
+    private function assignmentDefinitionKey(MessageTemplatePresetAssignment $assignment): ?string
+    {
+        $definitionKey = $this->normalizedNullableString($assignment->definition_key)
+            ?: $this->normalizedNullableString(data_get($assignment->meta, 'definition_key'));
+
+        if ($definitionKey !== '') {
+            return $definitionKey;
+        }
+
+        $sourceConfigPath = $this->nullableString($assignment->source_config_path);
+
+        if ($sourceConfigPath !== null) {
+            $definition = config($sourceConfigPath);
+            $configuredKey = is_array($definition)
+                ? $this->normalizedNullableString($definition['key'] ?? null)
+                : '';
+
+            if ($configuredKey !== '') {
+                return $configuredKey;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function configuredDefinitionKeysForMessageType(
+        string $channel,
+        string $purpose,
+        string $scope,
+        string $messageType,
+    ): array {
+        $definitions = config(MessageDefinitionConfigPath::scope(
+            $this->normalizedNullableString($channel),
+            $this->normalizedNullableString($purpose),
+            $this->normalizedNullableString($scope),
+        ));
+
+        if (! is_array($definitions)) {
+            return [];
+        }
+
+        $messageType = $this->normalizedNullableString($messageType);
+        $keys = [];
+
+        foreach ($definitions as $sourceMessageType => $definition) {
+            if ($sourceMessageType === 'campaigns' || ! is_string($sourceMessageType) || ! is_array($definition)) {
+                continue;
+            }
+
+            $runtimeMessageType = Str::singular($this->normalizedNullableString($sourceMessageType));
+
+            if ($runtimeMessageType !== $messageType) {
+                continue;
+            }
+
+            $isList = array_is_list($definition);
+            $definitionList = $isList ? $definition : [$definition];
+
+            foreach ($definitionList as $index => $nestedDefinition) {
+                if (! is_array($nestedDefinition) || ! ($nestedDefinition['enabled'] ?? true)) {
+                    continue;
+                }
+
+                $key = $this->normalizedNullableString($nestedDefinition['key'] ?? null);
+
+                if ($key === '') {
+                    $key = $isList
+                        ? $runtimeMessageType.'_'.((int) $index + 1)
+                        : $runtimeMessageType;
+                }
+
+                $keys[] = $key;
+            }
+        }
+
+        return array_values(array_unique($keys));
+    }
+
     /**
      * @return iterable<int, SetupValidationFinding>
      */
@@ -395,6 +548,7 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
                     'purpose' => $first->purpose,
                     'scope' => $first->scope,
                     'message_type' => $first->message_type,
+                    'definition_key' => $this->assignmentDefinitionKey($first),
                     'campaign_key' => $first->campaign_key,
                     'campaign_step' => $first->campaign_step,
                     'campaign_step_variant_key' => $first->campaign_step_variant_key,
@@ -408,12 +562,18 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
 
     private function assignmentIdentityKey(MessageTemplatePresetAssignment $assignment): string
     {
+        $definitionKey = $this->assignmentDefinitionKey($assignment);
+        $sourceConfigPath = $definitionKey === null
+            ? $this->assignmentSourceConfigPath($assignment)
+            : null;
+
         return implode('|', [
             $this->normalizedNullableString($assignment->channel),
             $this->normalizedNullableString($assignment->purpose),
             $this->normalizedNullableString($assignment->scope),
             $this->normalizedNullableString($assignment->message_type),
-            $this->assignmentSourceConfigPath($assignment) ?? '',
+            $definitionKey ?? '',
+            $sourceConfigPath ?? '',
             $this->normalizedNullableString($assignment->campaign_key),
             (string) ($assignment->campaign_step ?? ''),
             $this->normalizedNullableString($assignment->campaign_step_variant_key),

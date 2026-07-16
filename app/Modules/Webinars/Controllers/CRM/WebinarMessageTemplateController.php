@@ -98,6 +98,8 @@ class WebinarMessageTemplateController extends Controller
         AssignMessageTemplatePresetAction $assignTemplatePreset,
     ): RedirectResponse {
         $preset = $request->messageTemplatePreset();
+        $catalogEntry = $request->messageTemplateCatalogEntry();
+        $definitionKey = $this->definitionKeyForEntry($catalogEntry);
 
         $assignTemplatePreset->handle(
             preset: $preset,
@@ -106,11 +108,14 @@ class WebinarMessageTemplateController extends Controller
             scope: $request->validated('scope'),
             surface: $request->validated('surface'),
             messageType: $request->validated('message_type'),
+            definitionKey: $definitionKey,
+            sourceConfigPath: $catalogEntry->source_config_path,
             meta: [
                 'source' => 'crm_webinar_message_template_assignment',
                 'webinars' => [
                     'context_key' => $request->validated('context_key'),
-                    'catalog_entry_id' => $request->integer('catalog_entry_id') ?: null,
+                    'catalog_entry_id' => $catalogEntry->getKey(),
+                    'definition_key' => $definitionKey,
                 ],
             ],
         );
@@ -194,6 +199,7 @@ class WebinarMessageTemplateController extends Controller
                 scope: $assignment->scope,
                 surface: $assignment->surface,
                 messageType: $assignment->message_type,
+                definitionKey: $this->assignmentDefinitionKey($assignment),
             ))
             ->keyBy(fn (MessageTemplatePresetAssignment $assignment): string => $this->assignmentKey(
                 channel: $assignment->channel,
@@ -201,6 +207,7 @@ class WebinarMessageTemplateController extends Controller
                 scope: $assignment->scope,
                 surface: $assignment->surface,
                 messageType: $assignment->message_type,
+                definitionKey: $this->assignmentDefinitionKey($assignment),
             ));
     }
 
@@ -245,6 +252,7 @@ class WebinarMessageTemplateController extends Controller
             ): array {
                 $entries = $catalogEntries
                     ->filter(fn (MessageTemplateCatalogEntry $entry): bool => in_array($entry->usage_type, $context['usage_types'], true))
+                    ->unique(fn (MessageTemplateCatalogEntry $entry): string => $this->entryContextKey($entry))
                     ->map(function (MessageTemplateCatalogEntry $entry) use (
                         $contextKey,
                         $currentAssignments,
@@ -255,12 +263,14 @@ class WebinarMessageTemplateController extends Controller
                         $preset = $entry->messageTemplatePreset;
                         $surface = $entry->surface ?: $this->surfaceForEntry($entry);
                         $messageType = $preset?->message_type ?? data_get($entry->meta, 'message_type') ?? '';
+                        $definitionKey = $this->definitionKeyForEntry($entry);
                         $assignmentKey = $this->assignmentKey(
                             channel: $entry->channel,
                             purpose: $entry->purpose,
                             scope: $entry->scope,
                             surface: $surface,
                             messageType: $messageType,
+                            definitionKey: $definitionKey,
                         );
                         $assignment = $currentAssignments->get($assignmentKey);
                         $selectedPreset = $assignment?->messageTemplatePreset ?? $preset;
@@ -276,6 +286,7 @@ class WebinarMessageTemplateController extends Controller
                             'assignment_key' => $assignmentKey,
                             'surface' => $surface,
                             'message_type' => $messageType,
+                            'definition_key' => $definitionKey,
                             'schedule_label' => $this->effectiveScheduleLabel(
                                 preset: $preset,
                                 entry: $entry,
@@ -319,6 +330,7 @@ class WebinarMessageTemplateController extends Controller
             scope: $entry->scope,
             surface: $entry->surface ?: $this->surfaceForEntry($entry),
             messageType: (string) $messageType,
+            definitionKey: $this->definitionKeyForEntry($entry),
         );
     }
 
@@ -328,6 +340,7 @@ class WebinarMessageTemplateController extends Controller
         string $scope,
         ?string $surface,
         string $messageType,
+        ?string $definitionKey,
     ): string {
         return implode(':', [
             $this->normalizeSegment($channel),
@@ -335,7 +348,121 @@ class WebinarMessageTemplateController extends Controller
             $this->normalizeSegment($scope),
             $surface !== null ? $this->normalizeSegment($surface) : '',
             $this->normalizeSegment($messageType),
+            $this->normalizeSegment((string) $definitionKey),
         ]);
+    }
+
+    private function assignmentDefinitionKey(MessageTemplatePresetAssignment $assignment): ?string
+    {
+        $definitionKey = $this->normalizeNullableSegment($assignment->definition_key)
+            ?? $this->normalizeNullableSegment(data_get($assignment->meta, 'definition_key'));
+
+        if ($definitionKey !== null) {
+            return $definitionKey;
+        }
+
+        $sourceConfigPath = is_string($assignment->source_config_path)
+            ? trim($assignment->source_config_path)
+            : '';
+
+        if ($sourceConfigPath !== '') {
+            $definition = config($sourceConfigPath);
+
+            if (is_array($definition)) {
+                $definitionKey = $this->normalizeNullableSegment($definition['key'] ?? null);
+
+                if ($definitionKey !== null) {
+                    return $definitionKey;
+                }
+            }
+        }
+
+        $configuredKeys = $this->configuredDefinitionKeysForMessageType(
+            channel: (string) $assignment->channel,
+            purpose: (string) $assignment->purpose,
+            scope: (string) $assignment->scope,
+            messageType: (string) $assignment->message_type,
+        );
+
+        return count($configuredKeys) === 1 ? $configuredKeys[0] : null;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function configuredDefinitionKeysForMessageType(
+        string $channel,
+        string $purpose,
+        string $scope,
+        string $messageType,
+    ): array {
+        $definitions = config(implode('.', [
+            'messaging',
+            $this->normalizeSegment($channel),
+            'definitions',
+            $this->normalizeSegment($purpose),
+            $this->normalizeSegment($scope),
+        ]));
+
+        if (! is_array($definitions)) {
+            return [];
+        }
+
+        $messageType = $this->normalizeSegment($messageType);
+        $keys = [];
+
+        foreach ($definitions as $sourceMessageType => $definition) {
+            if ($sourceMessageType === 'campaigns' || ! is_string($sourceMessageType) || ! is_array($definition)) {
+                continue;
+            }
+
+            $runtimeMessageType = Str::singular($this->normalizeSegment($sourceMessageType));
+
+            if ($runtimeMessageType !== $messageType) {
+                continue;
+            }
+
+            $isList = array_is_list($definition);
+            $definitionList = $isList ? $definition : [$definition];
+
+            foreach ($definitionList as $index => $nestedDefinition) {
+                if (! is_array($nestedDefinition) || ! ($nestedDefinition['enabled'] ?? true)) {
+                    continue;
+                }
+
+                $keys[] = $this->normalizeNullableSegment($nestedDefinition['key'] ?? null)
+                    ?? ($isList ? $runtimeMessageType.'_'.((int) $index + 1) : $runtimeMessageType);
+            }
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    private function definitionKeyForEntry(MessageTemplateCatalogEntry $entry): ?string
+    {
+        $definitionKey = $this->normalizeNullableSegment(data_get($entry->meta, 'definition_key'))
+            ?? $this->normalizeNullableSegment(data_get($entry->messageTemplatePreset?->meta, 'seed.definition_key'));
+
+        if ($definitionKey !== null) {
+            return $definitionKey;
+        }
+
+        foreach ([$entry->source_config_path, $entry->messageTemplatePreset?->source_config_path] as $sourceConfigPath) {
+            if (! is_string($sourceConfigPath) || trim($sourceConfigPath) === '') {
+                continue;
+            }
+
+            $definition = config(trim($sourceConfigPath));
+            $definitionKey = is_array($definition)
+                ? $this->normalizeNullableSegment($definition['key'] ?? null)
+                : null;
+
+            if ($definitionKey !== null) {
+                return $definitionKey;
+            }
+        }
+
+        return null;
     }
 
     private function surfaceForEntry(MessageTemplateCatalogEntry $entry): string
@@ -472,6 +599,15 @@ class WebinarMessageTemplateController extends Controller
         }
 
         return $minutes.' '.Str::plural('minute', $minutes);
+    }
+
+    private function normalizeNullableSegment(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return $this->normalizeSegment($value);
     }
 
     private function normalizeSegment(string $value): string

@@ -429,9 +429,12 @@
 │   │   │   ├── Actions
 │   │   │   │   ├── AssignMessageTemplatePresetAction.php
 │   │   │   │   ├── CreateContactPermissionInvitationsForImportBatchAction.php
+│   │   │   │   ├── DispatchConsentOptInMessageAction.php
 │   │   │   │   ├── DispatchMessageAction.php
 │   │   │   │   ├── GrantMessageConsentAction.php
+│   │   │   │   ├── GrantMessageConsentsAction.php
 │   │   │   │   ├── ImportMessageConsentAction.php
+│   │   │   │   ├── RecordMessageConsentAction.php
 │   │   │   │   ├── RevokeMessageConsentAction.php
 │   │   │   │   ├── ScheduleMessageAction.php
 │   │   │   │   ├── SkipScheduledMessagesAction.php
@@ -470,6 +473,8 @@
 │   │   │   ├── Data
 │   │   │   │   ├── Automation
 │   │   │   │   │   └── SendMessageAutomationDefinition.php
+│   │   │   │   ├── Consent
+│   │   │   │   │   └── MessageConsentGrantResult.php
 │   │   │   │   ├── MessageData.php
 │   │   │   │   └── ResolvedMessageDispatch.php
 │   │   │   ├── Enums
@@ -510,6 +515,8 @@
 │   │   │   │   └── MessageConsentRules.php
 │   │   │   ├── Services
 │   │   │   │   ├── ConditionChecker.php
+│   │   │   │   ├── Consent
+│   │   │   │   │   └── MessageConsentStateResolver.php
 │   │   │   │   ├── ConsentDomainRegistry.php
 │   │   │   │   ├── ConsentOptInDefinitionResolver.php
 │   │   │   │   ├── ContactPermissionInvitationEligibility.php
@@ -1597,10 +1604,12 @@
 │   │   │   ├── ConsentRevocationControllerTest.php
 │   │   │   ├── ContactPermissionInvitationControllerTest.php
 │   │   │   ├── CreateContactPermissionInvitationsForImportBatchActionTest.php
+│   │   │   ├── DispatchConsentOptInMessageActionTest.php
 │   │   │   ├── DispatchMessageActionTest.php
 │   │   │   ├── EmailMessagingServiceTest.php
 │   │   │   ├── EmailPayloadTest.php
 │   │   │   ├── GrantMessageConsentActionTest.php
+│   │   │   ├── ImportMessageConsentActionTest.php
 │   │   │   ├── InternalNotificationChannelResolverTest.php
 │   │   │   ├── InternalNotificationGateTest.php
 │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest.php
@@ -1696,4 +1705,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-535 directories, 1162 files
+537 directories, 1169 files

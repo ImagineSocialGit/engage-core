@@ -25,6 +25,7 @@ class AssignMessageTemplatePresetAction
         ?string $sourceConfigPath = null,
         ?Model $context = null,
         array $meta = [],
+        ?string $definitionKey = null,
     ): MessageTemplatePresetAssignment {
         $attributes = [
             'channel' => $this->normalizeSegment($channel),
@@ -32,6 +33,7 @@ class AssignMessageTemplatePresetAction
             'scope' => $this->normalizeSegment($scope),
             'surface' => $surface !== null ? $this->normalizeSegment($surface) : null,
             'message_type' => $messageType !== null ? $this->normalizeSegment($messageType) : $preset->message_type,
+            'definition_key' => $this->normalizeNullableSegment($definitionKey),
             'campaign_key' => $campaignKey !== null ? $this->normalizeSegment($campaignKey) : null,
             'campaign_step' => $campaignStep,
             'campaign_step_variant_key' => $campaignStepVariantKey !== null ? $this->normalizeSegment($campaignStepVariantKey) : null,
@@ -70,6 +72,7 @@ class AssignMessageTemplatePresetAction
         foreach ([
             'surface',
             'message_type',
+            'definition_key',
             'campaign_key',
             'campaign_step',
             'campaign_step_variant_key',
@@ -111,10 +114,20 @@ class AssignMessageTemplatePresetAction
         return array_replace_recursive([
             'source' => 'crm_assignment',
             'source_config_path' => $attributes['source_config_path'] ?? $preset->source_config_path,
+            'definition_key' => $attributes['definition_key'],
             'campaign_step_variant_key' => $attributes['campaign_step_variant_key'] ?? null,
             'assigned_at' => now()->toISOString(),
             'catalog' => $catalogMeta,
         ], $meta);
+    }
+
+    private function normalizeNullableSegment(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return $this->normalizeSegment($value);
     }
 
     private function normalizeSegment(string $value): string

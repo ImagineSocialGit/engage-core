@@ -24,6 +24,7 @@ return new class extends Migration
             $table->string('scope', 96)->index();
             $table->string('surface', 96)->nullable()->index();
             $table->string('message_type', 128)->nullable()->index();
+            $table->string('definition_key', 128)->nullable()->index('mtpa_definition_key_idx');
 
             $table->string('campaign_key', 128)->nullable()->index();
             $table->unsignedInteger('campaign_step')->nullable()->index();
@@ -51,6 +52,7 @@ return new class extends Migration
                 'purpose',
                 'scope',
                 'message_type',
+                'definition_key',
             ], 'mtpa_msg_ctx_idx');
 
             $table->index([

@@ -58,7 +58,8 @@ class MessageDefinitionResolver
                 continue;
             }
 
-            $definitionList = array_is_list($definition) ? $definition : [$definition];
+            $isList = array_is_list($definition);
+            $definitionList = $isList ? $definition : [$definition];
 
             foreach ($definitionList as $index => $nestedDefinition) {
                 if (! is_array($nestedDefinition)) {
@@ -69,44 +70,38 @@ class MessageDefinitionResolver
                     continue;
                 }
 
-                $resolved[] = $this->validateDefinition($this->hydrateDefinitionFromPath(
+                $definitionKey = $this->standardDefinitionKey(
                     definition: $nestedDefinition,
+                    messageType: trim($messageType),
+                    listIndex: $isList ? (int) $index : null,
+                );
+
+                $resolved[] = $this->validateDefinition($this->hydrateDefinitionFromPath(
+                    definition: array_replace($nestedDefinition, [
+                        'key' => $definitionKey,
+                        'definition_key' => $definitionKey,
+                    ]),
                     channel: $channel,
                     purpose: $purpose,
                     scope: $scope,
                     messageType: trim($messageType),
-                    configPath: "{$scopeConfigPath}.{$messageType}".(array_is_list($definition) ? ".{$index}" : ''),
+                    configPath: "{$scopeConfigPath}.{$messageType}".($isList ? ".{$index}" : ''),
                 ));
             }
         }
 
         if ($assignedDefinitions !== []) {
-            $assignedSourceConfigPaths = array_values(array_unique(array_filter(array_map(
-                fn (array $definition): ?string => $this->definitionSourceConfigPath($definition),
-                $assignedDefinitions,
-            ))));
-
-            $assignedMessageTypes = array_values(array_unique(array_filter(array_map(
-                fn (array $definition): ?string => is_string($definition['message_type'] ?? null)
-                    ? $this->normalizeSegment($definition['message_type'])
-                    : null,
+            $assignedDefinitionKeys = array_values(array_unique(array_filter(array_map(
+                fn (array $definition): ?string => $this->definitionKey($definition),
                 $assignedDefinitions,
             ))));
 
             $resolved = collect($resolved)
-                ->reject(function (array $definition) use ($assignedSourceConfigPaths, $assignedMessageTypes): bool {
-                    $sourceConfigPath = $this->definitionSourceConfigPath($definition);
-
-                    if ($sourceConfigPath !== null && in_array($sourceConfigPath, $assignedSourceConfigPaths, true)) {
-                        return true;
-                    }
-
-                    return in_array(
-                        $this->normalizeSegment((string) ($definition['message_type'] ?? '')),
-                        $assignedMessageTypes,
-                        true,
-                    );
-                })
+                ->reject(fn (array $definition): bool => in_array(
+                    $this->definitionKey($definition),
+                    $assignedDefinitionKeys,
+                    true,
+                ))
                 ->merge($assignedDefinitions)
                 ->values()
                 ->all();
@@ -371,6 +366,41 @@ class MessageDefinitionResolver
                 : null,
             $dispatchKeys,
         ))));
+    }
+
+
+    /**
+     * @param array<string, mixed> $definition
+     */
+    private function standardDefinitionKey(
+        array $definition,
+        string $messageType,
+        ?int $listIndex,
+    ): string {
+        $explicitKey = $this->normalizeNullableSegment($definition['key'] ?? null);
+
+        if ($explicitKey !== null) {
+            return $explicitKey;
+        }
+
+        $messageType = Str::singular($this->normalizeSegment($messageType));
+
+        return $listIndex === null
+            ? $messageType
+            : $messageType.'_'.($listIndex + 1);
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     */
+    private function definitionKey(array $definition): ?string
+    {
+        return $this->normalizeNullableSegment(
+            $definition['definition_key']
+                ?? $definition['key']
+                ?? data_get($definition, 'meta.message_template_assignment.definition_key')
+                ?? data_get($definition, 'meta.seed.definition_key'),
+        );
     }
 
     /**

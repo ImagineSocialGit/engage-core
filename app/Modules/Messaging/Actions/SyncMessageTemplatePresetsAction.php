@@ -71,6 +71,20 @@ class SyncMessageTemplatePresetsAction
                     ]))->save();
 
                     $result['assignments_updated']++;
+                } elseif (
+                    $assignment->definition_key === null
+                    && is_string($assignmentAttributes['definition_key'] ?? null)
+                    && trim($assignmentAttributes['definition_key']) !== ''
+                ) {
+                    $assignment->forceFill([
+                        'definition_key' => $assignmentAttributes['definition_key'],
+                        'meta' => array_replace_recursive(
+                            is_array($assignment->meta) ? $assignment->meta : [],
+                            ['definition_key' => $assignmentAttributes['definition_key']],
+                        ),
+                    ])->save();
+
+                    $result['assignments_updated']++;
                 } else {
                     $result['assignments_preserved']++;
                 }
@@ -125,6 +139,32 @@ class SyncMessageTemplatePresetsAction
      */
     private function matchingGlobalAssignment(array $assignment): ?MessageTemplatePresetAssignment
     {
+        $assignmentMatch = $this->globalAssignmentQuery($assignment, includeDefinitionKey: true)
+            ->orderByDesc('is_active')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($assignmentMatch instanceof MessageTemplatePresetAssignment) {
+            return $assignmentMatch;
+        }
+
+        if (! is_string($assignment['definition_key'] ?? null) || trim($assignment['definition_key']) === '') {
+            return null;
+        }
+
+        return $this->globalAssignmentQuery($assignment, includeDefinitionKey: false)
+            ->whereNull('definition_key')
+            ->orderByDesc('is_active')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    /**
+     * @param array<string, mixed> $assignment
+     * @return \Illuminate\Database\Eloquent\Builder<MessageTemplatePresetAssignment>
+     */
+    private function globalAssignmentQuery(array $assignment, bool $includeDefinitionKey): \Illuminate\Database\Eloquent\Builder
+    {
         $query = MessageTemplatePresetAssignment::query()
             ->where('channel', $assignment['channel'])
             ->where('purpose', $assignment['purpose'])
@@ -132,14 +172,20 @@ class SyncMessageTemplatePresetsAction
             ->whereNull('context_type')
             ->whereNull('context_id');
 
-        foreach ([
+        $columns = [
             'surface',
             'message_type',
             'campaign_key',
             'campaign_step',
             'campaign_step_variant_key',
             'source_config_path',
-        ] as $column) {
+        ];
+
+        if ($includeDefinitionKey) {
+            $columns[] = 'definition_key';
+        }
+
+        foreach ($columns as $column) {
             if (($assignment[$column] ?? null) === null) {
                 $query->whereNull($column);
             } else {
@@ -147,7 +193,7 @@ class SyncMessageTemplatePresetsAction
             }
         }
 
-        return $query->orderByDesc('is_active')->orderByDesc('id')->first();
+        return $query;
     }
 
     /**
@@ -225,6 +271,7 @@ class SyncMessageTemplatePresetsAction
                     definition: $nestedDefinition,
                     configPath: $configPath,
                     required: $isList,
+                    fallback: $runtimeMessageType,
                 );
 
                 yield $this->definitionPayload(
@@ -383,6 +430,7 @@ class SyncMessageTemplatePresetsAction
             campaignTemplate: $campaignTemplate,
             listIndex: $listIndex,
             presetKey: $key,
+            definitionKey: $campaignTemplate ? null : $definitionKey,
         );
 
         $this->assertValidPayloadTokens(
@@ -403,6 +451,7 @@ class SyncMessageTemplatePresetsAction
                     'campaign_key' => $campaignKey,
                     'campaign_step' => $campaignStep,
                     'campaign_step_variant_key' => $campaignStepVariantKey,
+                    'definition_key' => $campaignTemplate ? null : $definitionKey,
                 ],
                 'catalog' => [
                     'group_key' => $catalog['group_key'],
@@ -448,6 +497,7 @@ class SyncMessageTemplatePresetsAction
                 'scope' => $scope,
                 'surface' => $surface,
                 'message_type' => $messageType,
+                'definition_key' => $campaignTemplate ? null : $definitionKey,
                 'campaign_key' => $campaignKey,
                 'campaign_step' => $campaignStep,
                 'campaign_step_variant_key' => $campaignStepVariantKey,
@@ -460,6 +510,7 @@ class SyncMessageTemplatePresetsAction
                 'meta' => [
                     'source' => 'config_sync',
                     'source_config_path' => $configPath,
+                    'definition_key' => $campaignTemplate ? null : $definitionKey,
                     'campaign_step_variant_key' => $campaignStepVariantKey,
                     'catalog' => [
                         'group_key' => $catalog['group_key'],
@@ -492,6 +543,7 @@ class SyncMessageTemplatePresetsAction
         bool $campaignTemplate,
         ?int $listIndex,
         string $presetKey,
+        ?string $definitionKey,
     ): array {
         if ($campaignTemplate && $campaignKey !== null && $campaignStep !== null && $campaignStepVariantKey !== null) {
             $moduleKey = 'campaigns';
@@ -550,6 +602,7 @@ class SyncMessageTemplatePresetsAction
                 'meta' => [
                     'message_type' => $messageType,
                     'source_message_type' => $sourceMessageType,
+                    'definition_key' => $definitionKey,
                     'campaign_key' => $campaignKey,
                     'campaign_step' => $campaignStep,
                     'campaign_step_variant_key' => $campaignStepVariantKey,
@@ -708,8 +761,12 @@ class SyncMessageTemplatePresetsAction
     /**
      * @param array<string, mixed> $definition
      */
-    private function definitionKey(array $definition, string $configPath, bool $required): ?string
-    {
+    private function definitionKey(
+        array $definition,
+        string $configPath,
+        bool $required,
+        string $fallback,
+    ): string {
         $key = $definition['key'] ?? null;
 
         if (! is_string($key) || trim($key) === '') {
@@ -719,7 +776,7 @@ class SyncMessageTemplatePresetsAction
                 );
             }
 
-            return null;
+            return $this->normalizeSegment($fallback);
         }
 
         return $this->normalizeSegment($key);

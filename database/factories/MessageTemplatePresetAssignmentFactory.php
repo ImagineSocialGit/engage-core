@@ -19,6 +19,7 @@ class MessageTemplatePresetAssignmentFactory extends Factory
             'scope' => 'webinar',
             'surface' => null,
             'message_type' => 'confirmation',
+            'definition_key' => null,
             'campaign_key' => null,
             'campaign_step' => null,
             'campaign_step_variant_key' => null,
@@ -40,6 +41,7 @@ class MessageTemplatePresetAssignmentFactory extends Factory
             'purpose' => $preset->purpose,
             'scope' => $preset->scope,
             'message_type' => $preset->message_type,
+            'definition_key' => data_get($preset->meta, 'seed.definition_key'),
         ]);
     }
 

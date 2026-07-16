@@ -194,10 +194,12 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         $this->assertDatabaseHas('message_template_preset_assignments', [
             'message_template_preset_id' => $presets[0]->getKey(),
             'message_type' => 'reminder',
+            'definition_key' => 'webinar_reminder_1_day',
         ]);
         $this->assertDatabaseHas('message_template_preset_assignments', [
             'message_template_preset_id' => $presets[1]->getKey(),
             'message_type' => 'reminder',
+            'definition_key' => 'webinar_reminder_30_minute',
         ]);
     }
 
@@ -468,6 +470,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         $this->assertDatabaseHas('message_template_preset_assignments', [
             'message_template_preset_id' => $preset->getKey(),
             'message_type' => 'confirmation',
+            'definition_key' => 'confirmation',
             'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmation',
             'is_active' => true,
         ]);
@@ -481,6 +484,46 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         $this->assertCount(1, $definitions);
         $this->assertSame('Customized synced subject', $definitions[0]['payload']['subject']);
         $this->assertSame($preset->getKey(), data_get($definitions[0], 'meta.message_template_preset.id'));
+    }
+
+    public function test_normal_sync_backfills_definition_key_on_legacy_source_specific_assignment(): void
+    {
+        Config::set('messaging.sms', []);
+        Config::set('messaging.email.definitions', [
+            'transactional' => [
+                'webinar' => [
+                    'confirmation' => [
+                        'key' => 'confirmation',
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'confirmation_messages',
+                        'payload' => [
+                            'subject' => 'Config subject',
+                            'body' => 'Config body.',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        app(SyncMessageTemplatePresetsAction::class)->handle();
+
+        $preset = MessageTemplatePreset::query()
+            ->where('key', 'email.transactional.webinar.confirmation')
+            ->firstOrFail();
+        $assignment = $preset->assignments()->firstOrFail();
+        $assignment->forceFill([
+            'definition_key' => null,
+            'meta' => array_replace($assignment->meta ?? [], [
+                'definition_key' => null,
+            ]),
+        ])->save();
+
+        $result = app(SyncMessageTemplatePresetsAction::class)->handle();
+
+        $this->assertSame(1, $result['assignments_updated']);
+        $this->assertSame('confirmation', $assignment->refresh()->definition_key);
+        $this->assertDatabaseCount('message_template_preset_assignments', 1);
     }
 
 }

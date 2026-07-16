@@ -55,6 +55,15 @@ class UpdateWebinarMessageTemplateRequest extends FormRequest
         return MessageTemplatePreset::query()->findOrFail((int) $this->validated('message_template_preset_id'));
     }
 
+    public function messageTemplateCatalogEntry(): MessageTemplateCatalogEntry
+    {
+        return MessageTemplateCatalogEntry::query()
+            ->active()
+            ->with('messageTemplatePreset')
+            ->where('module_key', 'webinars')
+            ->findOrFail((int) $this->validated('catalog_entry_id'));
+    }
+
     private function isCompatible(MessageTemplatePreset $preset): bool
     {
         if (! $preset->isActive()) {
@@ -63,6 +72,7 @@ class UpdateWebinarMessageTemplateRequest extends FormRequest
 
         $catalogEntry = MessageTemplateCatalogEntry::query()
             ->active()
+            ->with('messageTemplatePreset')
             ->whereKey((int) $this->input('catalog_entry_id'))
             ->where('module_key', 'webinars')
             ->first();
@@ -87,15 +97,59 @@ class UpdateWebinarMessageTemplateRequest extends FormRequest
             return false;
         }
 
+        $targetDefinitionKey = $this->definitionKeyForCatalogEntry($catalogEntry);
+
+        if ($targetDefinitionKey === null) {
+            return false;
+        }
+
         return MessageTemplateCatalogEntry::query()
             ->active()
+            ->with('messageTemplatePreset')
             ->where('message_template_preset_id', $preset->getKey())
             ->where('module_key', 'webinars')
             ->where('usage_type', $catalogEntry->usage_type)
             ->where('channel', $this->normalizeSegment((string) $this->input('channel')))
             ->where('purpose', $this->normalizeSegment((string) $this->input('purpose')))
             ->where('scope', $this->normalizeSegment((string) $this->input('scope')))
-            ->exists();
+            ->get()
+            ->contains(fn (MessageTemplateCatalogEntry $candidate): bool => $this->definitionKeyForCatalogEntry($candidate) === $targetDefinitionKey);
+    }
+
+    private function definitionKeyForCatalogEntry(MessageTemplateCatalogEntry $entry): ?string
+    {
+        $definitionKey = $this->normalizeNullableSegment(data_get($entry->meta, 'definition_key'))
+            ?? $this->normalizeNullableSegment(data_get($entry->messageTemplatePreset?->meta, 'seed.definition_key'));
+
+        if ($definitionKey !== null) {
+            return $definitionKey;
+        }
+
+        foreach ([$entry->source_config_path, $entry->messageTemplatePreset?->source_config_path] as $sourceConfigPath) {
+            if (! is_string($sourceConfigPath) || trim($sourceConfigPath) === '') {
+                continue;
+            }
+
+            $definition = config(trim($sourceConfigPath));
+            $definitionKey = is_array($definition)
+                ? $this->normalizeNullableSegment($definition['key'] ?? null)
+                : null;
+
+            if ($definitionKey !== null) {
+                return $definitionKey;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeNullableSegment(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return $this->normalizeSegment($value);
     }
 
     private function normalizeSegment(?string $value): string

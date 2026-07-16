@@ -218,6 +218,54 @@ class MessagingSetupValidationContributorTest extends TestCase
         );
     }
 
+
+    public function test_it_reports_ambiguous_standard_assignment_without_definition_key_for_multi_definition_message_type(): void
+    {
+        Config::set('messaging.email.definitions.transactional.webinar', [
+            'reminders' => [
+                [
+                    'key' => 'reminder_1_day',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'reminders',
+                    'payload' => [
+                        'subject' => 'Tomorrow',
+                        'body' => 'Tomorrow.',
+                    ],
+                ],
+                [
+                    'key' => 'reminder_30_minute',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'reminders',
+                    'payload' => [
+                        'subject' => 'Soon',
+                        'body' => 'Soon.',
+                    ],
+                ],
+            ],
+        ]);
+
+        $preset = $this->preset([
+            'key' => 'reminder.custom',
+            'message_type' => 'reminder',
+        ]);
+
+        MessageTemplatePresetAssignment::query()->create(
+            $this->assignmentAttributes($preset, [
+                'surface' => 'webinar_registrations',
+                'message_type' => 'reminder',
+                'definition_key' => null,
+                'source_config_path' => null,
+            ])
+        );
+
+        $this->assertContains(
+            'messaging.assignment_definition_key_ambiguous',
+            array_column($this->findings(), 'code'),
+        );
+    }
+
     public function test_manager_resolves_tagged_messaging_contributor(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
@@ -286,6 +334,7 @@ class MessagingSetupValidationContributorTest extends TestCase
             'scope' => $preset->scope,
             'surface' => null,
             'message_type' => $preset->message_type,
+            'definition_key' => null,
             'campaign_key' => null,
             'campaign_step' => null,
             'campaign_step_variant_key' => null,
