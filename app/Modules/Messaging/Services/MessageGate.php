@@ -6,7 +6,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ConsentRevocation;
-use App\Modules\Messaging\Models\MessageConsent;
+use App\Modules\Messaging\Services\Consent\MessageConsentStateResolver;
 
 class MessageGate
 {
@@ -14,6 +14,7 @@ class MessageGate
         private readonly MessageSuppressionService $messageSuppressionService,
         private readonly ContactPermissionInvitationService $permissionInvitationService,
         private readonly ConsentDomainRegistry $consentDomainRegistry,
+        private readonly MessageConsentStateResolver $consentStateResolver,
     ) {}
 
     /**
@@ -38,7 +39,7 @@ class MessageGate
             return false;
         }
 
-        if (! $this->messageIsEnabled($channel, $messageKey, $definitionConfigPath)) {
+        if (! $this->messageIsEnabled($definitionConfigPath)) {
             return false;
         }
 
@@ -51,7 +52,7 @@ class MessageGate
         $consentDomain = $this->consentDomainRegistry->domainForScope($scope);
 
         if (
-            ! $this->hasActiveConsent($contact, $channel, $purpose, $consentDomain)
+            ! $this->consentStateResolver->isActive($contact, $channel, $purpose, $consentDomain)
             && ! $this->allowsImportedContactInvitationPass($contact, $channel, $messageKey, $context)
         ) {
             return false;
@@ -69,54 +70,19 @@ class MessageGate
         return $this->allows($contact, $channel, $purpose, $scope);
     }
 
-    private function messageIsEnabled(
-        string $channel,
-        ?string $messageKey,
-        ?string $definitionConfigPath,
-    ): bool {
+    private function messageIsEnabled(?string $definitionConfigPath): bool
+    {
         if (! is_string($definitionConfigPath) || trim($definitionConfigPath) === '') {
             return true;
         }
 
-        return $this->configEnabled($definitionConfigPath);
-    }
-
-    private function configEnabled(string $configPath): bool
-    {
-        $config = config($configPath);
+        $config = config($definitionConfigPath);
 
         if (! is_array($config)) {
             return false;
         }
 
         return (bool) ($config['enabled'] ?? true);
-    }
-
-    private function hasActiveConsent(
-        Contact $contact,
-        string $channel,
-        string $purpose,
-        string $scope,
-    ): bool {
-        $latestConsent = MessageConsent::query()
-            ->where('contact_id', $contact->getKey())
-            ->where('channel', $channel)
-            ->where('purpose', $purpose)
-            ->where('scope', $scope)
-            ->latest('consented_at')
-            ->first();
-
-        if (! $latestConsent) {
-            return false;
-        }
-
-        return ! ConsentRevocation::query()
-            ->where('contact_id', $contact->getKey())
-            ->where('channel', $channel)
-            ->where('purpose', $purpose)
-            ->where('scope', $scope)
-            ->where('revoked_at', '>=', $latestConsent->consented_at)
-            ->exists();
     }
 
     /**

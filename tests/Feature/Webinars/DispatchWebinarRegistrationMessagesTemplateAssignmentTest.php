@@ -50,7 +50,7 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
             'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmation',
         ]);
 
-        $this->configureRegistrationScheduleProfile($preset->key);
+        $this->configureRegistrationScheduleProfile('confirmation');
 
         MessageTemplateCatalogEntry::factory()
             ->forPreset($preset)

@@ -9,10 +9,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('message_consents', function (Blueprint $table) {
+        Schema::create('message_consents', function (Blueprint $table): void {
             $table->id();
 
-            $table->foreignIdFor(Contact::class)->constrained()->cascadeOnDelete();
+            $table->foreignIdFor(Contact::class)
+                ->constrained()
+                ->cascadeOnDelete();
 
             $table->string('channel');
             $table->string('purpose');
@@ -27,15 +29,20 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique([
+            $table->index([
                 'contact_id',
                 'channel',
                 'purpose',
                 'scope',
-            ], 'message_consents_contact_channel_purpose_scope_unique');
+                'consented_at',
+            ], 'message_consents_history_lookup_index');
 
-            $table->index(['contact_id', 'channel', 'purpose', 'scope'], 'message_consents_lookup_index');
-            $table->index(['channel', 'purpose', 'scope'], 'message_consents_channel_purpose_scope_index');
+            $table->index([
+                'channel',
+                'purpose',
+                'scope',
+            ], 'message_consents_channel_purpose_scope_index');
+
             $table->index('consented_at');
         });
     }

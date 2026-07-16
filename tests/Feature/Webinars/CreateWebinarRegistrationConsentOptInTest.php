@@ -3,11 +3,11 @@
 namespace Tests\Feature\Webinars;
 
 use App\Modules\Core\Models\Contact;
-use App\Modules\Messaging\Actions\GrantMessageConsentAction;
-use App\Modules\Messaging\Enums\MessageChannel;
-use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Actions\DispatchConsentOptInMessageAction;
+use App\Modules\Messaging\Data\Consent\MessageConsentGrantResult;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Webinars\Actions\CreateWebinarRegistrationAction;
+use App\Modules\Webinars\Actions\DispatchWebinarRegistrationMessagesAction;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarSeries;
@@ -29,105 +29,119 @@ class CreateWebinarRegistrationConsentOptInTest extends TestCase
         $this->configureWebinarRegistrationChannelAvailability();
     }
 
-    public function test_transactional_email_registration_consent_dispatches_opt_in_message(): void
+    public function test_all_selected_registration_consents_are_recorded_then_explicitly_forwarded_for_acknowledgement(): void
     {
         $webinar = $this->createWebinar();
+        $seen = [];
 
-        $this->mockConsentGrant(
-            expectedChannel: MessageChannel::Email,
-            expectedPurpose: MessagePurpose::Transactional,
-            expectedScope: 'webinar',
-            expectedDispatchOptInMessage: true,
-        );
-
-        app(CreateWebinarRegistrationAction::class)->handle(
-            validated: [
-                'first_name' => 'Jeff',
-                'last_name' => 'Yarnall',
-                'email' => 'jeff@example.com',
-                'phone' => null,
-                'transactional_email_consent' => true,
-                'transactional_sms_consent' => false,
-                'marketing_email_consent' => false,
-                'marketing_sms_consent' => false,
-            ],
-            request: Request::create('/register', 'POST'),
-            webinarSlug: $webinar->slug,
-        );
-
-        $registration = WebinarRegistration::query()->first();
-
-        $this->assertNotNull($registration);
-        $this->assertSame(['email'], $registration->meta['accepted_channels']['transactional']);
-    }
-
-    public function test_transactional_sms_registration_consent_dispatches_opt_in_message(): void
-    {
-        $webinar = $this->createWebinar();
-
-        $this->mockConsentGrant(
-            expectedChannel: MessageChannel::Sms,
-            expectedPurpose: MessagePurpose::Transactional,
-            expectedScope: 'webinar',
-            expectedDispatchOptInMessage: true,
-        );
-
-        app(CreateWebinarRegistrationAction::class)->handle(
-            validated: [
-                'first_name' => 'Jeff',
-                'last_name' => 'Yarnall',
-                'email' => 'jeff@example.com',
-                'phone' => '(555) 555-0123',
-                'transactional_email_consent' => false,
-                'transactional_sms_consent' => true,
-                'marketing_email_consent' => false,
-                'marketing_sms_consent' => false,
-            ],
-            request: Request::create('/register', 'POST'),
-            webinarSlug: $webinar->slug,
-        );
-
-        $contact = Contact::query()->where('email', 'jeff@example.com')->first();
-        $registration = WebinarRegistration::query()->first();
-
-        $this->assertNotNull($contact);
-        $this->assertNotNull($registration);
-        $this->assertSame('+15555550123', $contact->phone);
-        $this->assertSame(['sms'], $registration->meta['accepted_channels']['transactional']);
-    }
-
-    private function mockConsentGrant(
-        MessageChannel $expectedChannel,
-        MessagePurpose $expectedPurpose,
-        string $expectedScope,
-        bool $expectedDispatchOptInMessage,
-    ): void {
-        $mock = Mockery::mock(GrantMessageConsentAction::class);
-
-        $mock->shouldReceive('handle')
-            ->once()
+        $dispatch = Mockery::mock(DispatchConsentOptInMessageAction::class);
+        $dispatch->shouldReceive('handle')
+            ->times(4)
             ->withArgs(function (
                 Contact $contact,
-                array $data,
-                array $optInPayload,
+                MessageConsentGrantResult $grant,
+                array $payload,
                 ?Model $context,
                 array $resolverContext,
-                bool $dispatchOptInMessage,
-            ) use ($expectedChannel, $expectedPurpose, $expectedScope, $expectedDispatchOptInMessage): bool {
-                return $contact->email === 'jeff@example.com'
-                    && $data['channel'] === $expectedChannel->value
-                    && $data['purpose'] === $expectedPurpose->value
-                    && $data['scope'] === $expectedScope
-                    && $data['source'] === 'webinar_registration'
-                    && array_key_exists('webinar_registration_id', $data['meta'])
-                    && array_key_exists('webinar_id', $optInPayload)
-                    && $context instanceof WebinarRegistration
-                    && $resolverContext['webinar_slug'] === $context->webinar_slug
-                    && $dispatchOptInMessage === $expectedDispatchOptInMessage;
-            })
-            ->andReturn(new MessageConsent());
+            ) use (&$seen): bool {
+                $seen[] = implode(':', [
+                    $grant->channel,
+                    $grant->purpose,
+                    $grant->requestedScope,
+                ]);
 
-        $this->app->instance(GrantMessageConsentAction::class, $mock);
+                return $contact->email === 'jeff@example.com'
+                    && $grant->becameActive
+                    && $grant->created
+                    && $grant->consent->exists
+                    && array_key_exists('webinar_id', $payload)
+                    && $context instanceof WebinarRegistration
+                    && ($resolverContext['webinar_slug'] ?? null) === $context->webinar_slug;
+            })
+            ->andReturn([]);
+
+        $this->app->instance(DispatchConsentOptInMessageAction::class, $dispatch);
+        $this->mockRegistrationLifecycleDispatch();
+
+        $registration = app(CreateWebinarRegistrationAction::class)->handle(
+            validated: $this->allConsentInput(),
+            request: Request::create('/register', 'POST'),
+            webinarSlug: $webinar->slug,
+        );
+
+        sort($seen);
+
+        $this->assertSame([
+            'email:marketing:webinar_nurture',
+            'email:transactional:webinar',
+            'sms:marketing:webinar_nurture',
+            'sms:transactional:webinar',
+        ], $seen);
+        $this->assertSame(['email', 'sms'], $registration->meta['accepted_channels']['transactional']);
+        $this->assertSame(['email', 'sms'], $registration->meta['accepted_channels']['marketing']);
+        $this->assertDatabaseCount('message_consents', 4);
+    }
+
+    public function test_repeated_registration_does_not_request_duplicate_acknowledgements_for_active_consents(): void
+    {
+        $webinar = $this->createWebinar();
+
+        $dispatch = Mockery::mock(DispatchConsentOptInMessageAction::class);
+        $dispatch->shouldReceive('handle')
+            ->times(4)
+            ->withArgs(fn (
+                Contact $contact,
+                MessageConsentGrantResult $grant,
+            ): bool => $contact->email === 'jeff@example.com'
+                && $grant->becameActive
+                && $grant->created)
+            ->andReturn([]);
+
+        $this->app->instance(DispatchConsentOptInMessageAction::class, $dispatch);
+        $this->mockRegistrationLifecycleDispatch();
+
+        $action = app(CreateWebinarRegistrationAction::class);
+
+        $action->handle(
+            validated: $this->allConsentInput(),
+            request: Request::create('/register', 'POST'),
+            webinarSlug: $webinar->slug,
+        );
+
+        $action->handle(
+            validated: $this->allConsentInput(),
+            request: Request::create('/register', 'POST'),
+            webinarSlug: $webinar->slug,
+        );
+
+        $this->assertDatabaseCount('contacts', 1);
+        $this->assertDatabaseCount('webinar_registrations', 1);
+        $this->assertDatabaseCount('message_consents', 4);
+    }
+
+    /** @return array<string, mixed> */
+    private function allConsentInput(): array
+    {
+        return [
+            'first_name' => 'Jeff',
+            'last_name' => 'Yarnall',
+            'email' => 'jeff@example.com',
+            'phone' => '(555) 555-0123',
+            'transactional_email_consent' => true,
+            'transactional_sms_consent' => true,
+            'marketing_email_consent' => true,
+            'marketing_sms_consent' => true,
+        ];
+    }
+
+    private function mockRegistrationLifecycleDispatch(): void
+    {
+        $mock = Mockery::mock(DispatchWebinarRegistrationMessagesAction::class);
+        $mock->shouldReceive('handle')
+            ->once()
+            ->andReturn([]);
+
+        $this->app->instance(DispatchWebinarRegistrationMessagesAction::class, $mock);
     }
 
     private function createWebinar(): Webinar

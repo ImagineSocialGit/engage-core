@@ -4,7 +4,8 @@ namespace App\Modules\Webinars\Actions;
 
 use App\Modules\Core\Actions\Contacts\CreateOrUpdateContactAction;
 use App\Modules\Core\Models\Contact;
-use App\Modules\Messaging\Actions\GrantMessageConsentAction;
+use App\Modules\Messaging\Actions\DispatchConsentOptInMessageAction;
+use App\Modules\Messaging\Actions\GrantMessageConsentsAction;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
@@ -21,7 +22,8 @@ class CreateWebinarRegistrationAction
         private readonly PhoneNumberNormalizer $phoneNumberNormalizer,
         private readonly AddRegistrantToWebinarProviderAction $addRegistrantToWebinarProviderAction,
         private readonly DispatchWebinarRegistrationMessagesAction $dispatchWebinarRegistrationMessagesAction,
-        private readonly GrantMessageConsentAction $grantMessageConsentAction,
+        private readonly GrantMessageConsentsAction $grantMessageConsentsAction,
+        private readonly DispatchConsentOptInMessageAction $dispatchConsentOptInMessageAction,
         private readonly CreateOrUpdateContactAction $createOrUpdateContact,
         private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
     ) {}
@@ -125,89 +127,92 @@ class CreateWebinarRegistrationAction
         mixed $now = null
     ): void {
         $now ??= now();
+        $grants = [];
 
-        $consents = [
-            'transactional_email_consent' => [
-                [
-                    'channel' => MessageChannel::Email,
-                    'purpose' => MessagePurpose::Transactional,
-                    'scope' => 'webinar',
-                    'dispatch_opt_in_message' => true,
-                ],
-            ],
-
-            'transactional_sms_consent' => [
-                [
-                    'channel' => MessageChannel::Sms,
-                    'purpose' => MessagePurpose::Transactional,
-                    'scope' => 'webinar',
-                    'dispatch_opt_in_message' => true,
-                ],
-            ],
-
-            'marketing_email_consent' => [
-                [
-                    'channel' => MessageChannel::Email,
-                    'purpose' => MessagePurpose::Marketing,
-                    'scope' => 'webinar_nurture',
-                    'dispatch_opt_in_message' => true,
-                ],
-            ],
-
-            'marketing_sms_consent' => [
-                [
-                    'channel' => MessageChannel::Sms,
-                    'purpose' => MessagePurpose::Marketing,
-                    'scope' => 'webinar_nurture',
-                    'dispatch_opt_in_message' => true,
-                ],
-            ],
-        ];
-
-        foreach ($consents as $field => $consentDefinitions) {
+        foreach ($this->consentDefinitions() as $field => $definition) {
             if (! ($validated[$field] ?? false)) {
                 continue;
             }
 
-            foreach ($consentDefinitions as $consent) {
-                if (! $this->messageChannelAvailability->isVisibleForSurface(
-                    channel: $consent['channel'],
-                    surface: 'webinar_registrations',
-                    purpose: $consent['purpose']->value,
-                    scope: $consent['scope'],
-                )) {
-                    continue;
-                }
-
-                $this->grantMessageConsentAction->handle(
-                    contact: $contact,
-                    data: [
-                        'channel' => $consent['channel']->value,
-                        'purpose' => $consent['purpose']->value,
-                        'scope' => $consent['scope'],
-                        'consented_at' => $now,
-                        'ip_address' => $request->ip(),
-                        'user_agent' => $request->userAgent(),
-                        'source' => 'webinar_registration',
-                        'meta' => [
-                            'webinar_registration_id' => $registration->id,
-                            'webinar_id' => $registration->webinar_id,
-                            'webinar_slug' => $registration->webinar_slug,
-                        ],
-                    ],
-                    optInPayload: [
-                        'webinar_registration_id' => $registration->id,
-                        'webinar_id' => $registration->webinar_id,
-                        'webinar_slug' => $registration->webinar_slug,
-                    ],
-                    context: $registration,
-                    resolverContext: [
-                        'webinar_slug' => $registration->webinar_slug,
-                    ],
-                    dispatchOptInMessage: (bool) $consent['dispatch_opt_in_message'],
-                );
+            if (! $this->messageChannelAvailability->isVisibleForSurface(
+                channel: $definition['channel'],
+                surface: 'webinar_registrations',
+                purpose: $definition['purpose']->value,
+                scope: $definition['scope'],
+            )) {
+                continue;
             }
+
+            $grants[] = [
+                'channel' => $definition['channel']->value,
+                'purpose' => $definition['purpose']->value,
+                'scope' => $definition['scope'],
+                'consented_at' => $now,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'source' => 'webinar_registration',
+                'meta' => [
+                    'webinar_registration_id' => $registration->id,
+                    'webinar_id' => $registration->webinar_id,
+                    'webinar_slug' => $registration->webinar_slug,
+                ],
+            ];
         }
+
+        $results = $this->grantMessageConsentsAction->handle(
+            contact: $contact,
+            grants: $grants,
+            context: $registration,
+        );
+
+        foreach ($results as $result) {
+            if (! $result->becameActive) {
+                continue;
+            }
+
+            $this->dispatchConsentOptInMessageAction->handle(
+                contact: $contact,
+                grant: $result,
+                payload: [
+                    'webinar_registration_id' => $registration->id,
+                    'webinar_id' => $registration->webinar_id,
+                    'webinar_slug' => $registration->webinar_slug,
+                ],
+                context: $registration,
+                resolverContext: [
+                    'webinar_slug' => $registration->webinar_slug,
+                ],
+            );
+        }
+    }
+
+    /**
+     * @return array<string, array{channel: MessageChannel, purpose: MessagePurpose, scope: string}>
+     */
+    private function consentDefinitions(): array
+    {
+        return [
+            'transactional_email_consent' => [
+                'channel' => MessageChannel::Email,
+                'purpose' => MessagePurpose::Transactional,
+                'scope' => 'webinar',
+            ],
+            'transactional_sms_consent' => [
+                'channel' => MessageChannel::Sms,
+                'purpose' => MessagePurpose::Transactional,
+                'scope' => 'webinar',
+            ],
+            'marketing_email_consent' => [
+                'channel' => MessageChannel::Email,
+                'purpose' => MessagePurpose::Marketing,
+                'scope' => 'webinar_nurture',
+            ],
+            'marketing_sms_consent' => [
+                'channel' => MessageChannel::Sms,
+                'purpose' => MessagePurpose::Marketing,
+                'scope' => 'webinar_nurture',
+            ],
+        ];
     }
 
     /**

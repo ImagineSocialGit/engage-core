@@ -5,6 +5,7 @@ namespace Tests\Feature\Messaging;
 use App\Modules\Messaging\Actions\SyncMessageTemplatePresetsAction;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Messaging\Services\MessageDefinitionResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;
@@ -428,6 +429,58 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             'usage_type' => 'webinar_reminder',
             'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.1',
         ]);
+    }
+
+    public function test_synced_standard_assignment_is_used_by_runtime_after_preset_copy_is_customized(): void
+    {
+        Config::set('messaging.sms', []);
+        Config::set('messaging.email.definitions', [
+            'transactional' => [
+                'webinar' => [
+                    'confirmation' => [
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'confirmation_messages',
+                        'payload' => [
+                            'subject' => 'Config subject',
+                            'body' => 'Config body.',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        app(SyncMessageTemplatePresetsAction::class)->handle();
+
+        $preset = MessageTemplatePreset::query()
+            ->where('key', 'email.transactional.webinar.confirmation')
+            ->firstOrFail();
+
+        $preset->forceFill([
+            'payload' => [
+                'subject' => 'Customized synced subject',
+                'body' => 'Customized synced body.',
+            ],
+            'is_customized' => true,
+            'customized_at' => now(),
+        ])->save();
+
+        $this->assertDatabaseHas('message_template_preset_assignments', [
+            'message_template_preset_id' => $preset->getKey(),
+            'message_type' => 'confirmation',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmation',
+            'is_active' => true,
+        ]);
+
+        $definitions = app(MessageDefinitionResolver::class)->resolve(
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+        );
+
+        $this->assertCount(1, $definitions);
+        $this->assertSame('Customized synced subject', $definitions[0]['payload']['subject']);
+        $this->assertSame($preset->getKey(), data_get($definitions[0], 'meta.message_template_preset.id'));
     }
 
 }

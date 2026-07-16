@@ -3,197 +3,57 @@
 namespace App\Modules\Messaging\Actions;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Data\Consent\MessageConsentGrantResult;
 use App\Modules\Messaging\Events\MessageConsentGranted;
-use App\Modules\Messaging\Models\ConsentRevocation;
-use App\Modules\Messaging\Models\MessageConsent;
-use App\Modules\Messaging\Rules\MessageConsentRules;
-use App\Modules\Messaging\Services\ConsentDomainRegistry;
-use App\Modules\Messaging\Services\ConsentOptInDefinitionResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class GrantMessageConsentAction
 {
     public function __construct(
-        private readonly DispatchMessageAction $dispatchMessageAction,
-        private readonly ConsentDomainRegistry $consentDomainRegistry,
-        private readonly ConsentOptInDefinitionResolver $consentOptInDefinitionResolver,
+        private readonly RecordMessageConsentAction $recordMessageConsent,
     ) {}
 
     /**
+     * Grant consent and emit the domain event when consent becomes active.
+     *
+     * Message acknowledgement delivery is intentionally caller-owned.
+     *
      * @param array<string, mixed> $data
-     * @param array<string, mixed> $optInPayload
-     * @param array<string, mixed> $resolverContext
      *
      * @throws ValidationException
      */
     public function handle(
         Contact $contact,
         array $data,
-        array $optInPayload = [],
         ?Model $context = null,
-        array $resolverContext = [],
-        bool $dispatchOptInMessage = true,
-    ): MessageConsent {
-        $validated = Validator::make($data, MessageConsentRules::rules())->validate();
+    ): MessageConsentGrantResult {
+        $result = $this->recordMessageConsent->handle($contact, $data);
 
-        $validated['channel'] = $this->normalizeSegment($validated['channel']);
-        $validated['purpose'] = $this->normalizeSegment($validated['purpose']);
-        $requestedScope = $this->normalizeSegment($validated['scope']);
-        $validated['scope'] = $this->consentDomainRegistry->domainForScope($requestedScope);
-
-        return DB::transaction(function () use ($contact, $validated, $requestedScope, $optInPayload, $context, $resolverContext, $dispatchOptInMessage): MessageConsent {
-            $channel = $validated['channel'];
-            $purpose = $validated['purpose'];
-            $scope = $validated['scope'];
-            $consentedAt = $validated['consented_at'] ?? now();
-
-            $wasActivelyConsented = $this->wasActivelyConsented(
-                contact: $contact,
-                channel: $channel,
-                purpose: $purpose,
-                scope: $scope,
-            );
-
-            $willBeActivelyConsented = $this->willBeActivelyConsented(
-                contact: $contact,
-                channel: $channel,
-                purpose: $purpose,
-                scope: $scope,
-                consentedAt: $consentedAt,
-            );
-
-            $consent = MessageConsent::query()->updateOrCreate(
-                [
-                    'contact_id' => $contact->getKey(),
-                    'channel' => $channel,
-                    'purpose' => $purpose,
-                    'scope' => $scope,
-                ],
-                [
-                    'consented_at' => $consentedAt,
-                    'ip_address' => $validated['ip_address'] ?? null,
-                    'user_agent' => $validated['user_agent'] ?? null,
-                    'source' => $validated['source'] ?? null,
-                    'meta' => array_replace_recursive(
-                        is_array($validated['meta'] ?? null) ? $validated['meta'] : [],
-                        [
-                            'consent' => [
-                                'requested_scope' => $requestedScope,
-                                'domain' => $scope,
-                            ],
-                        ],
-                    ),
-                ],
-            );
-
-            if (! $wasActivelyConsented && $willBeActivelyConsented) {
-                DB::afterCommit(function () use ($contact, $consent, $channel, $purpose, $scope, $requestedScope, $optInPayload, $context, $resolverContext, $validated, $dispatchOptInMessage): void {
-                    MessageConsentGranted::dispatch(
-                        contact: $contact,
-                        messageConsent: $consent,
-                        channel: $channel,
-                        purpose: $purpose,
-                        scope: $scope,
-                        context: $context,
-                        data: [
-                            'source' => $validated['source'] ?? null,
-                            'ip_address' => $validated['ip_address'] ?? null,
-                            'user_agent' => $validated['user_agent'] ?? null,
-                            'meta' => $validated['meta'] ?? null,
-                        ],
-                    );
-
-                    if (! $dispatchOptInMessage) {
-                        return;
-                    }
-
-                    $this->dispatchMessageAction->handle(
-                        recipient: $contact,
-                        channel: $channel,
-                        purpose: $purpose,
-                        scope: $scope,
-                        dispatchKeys: 'consent_granted',
-                        behavior: [
-                            'timing' => 'immediate',
-                        ],
-                        occurrenceKey: implode(':', [
-                            'consent_granted',
-                            $consent->getKey(),
-                            $channel,
-                            $purpose,
-                            $scope,
-                        ]),
-                        payload: $optInPayload,
-                        context: $context,
-                        meta: [
-                            'resolver_context' => $resolverContext,
-                            'consent' => [
-                                'requested_scope' => $requestedScope,
-                                'domain' => $scope,
-                            ],
-                        ],
-                        definitions: [
-                            $this->consentOptInDefinitionResolver->resolve(
-                                channel: $channel,
-                                purpose: $purpose,
-                                messageScope: $requestedScope,
-                            ),
-                        ],
-                    );
-                });
-            }
-
-            return $consent;
-        });
-    }
-
-    private function wasActivelyConsented(
-        Contact $contact,
-        string $channel,
-        string $purpose,
-        string $scope,
-    ): bool {
-        $consent = MessageConsent::query()
-            ->where('contact_id', $contact->getKey())
-            ->where('channel', $this->normalizeSegment($channel))
-            ->where('purpose', $this->normalizeSegment($purpose))
-            ->where('scope', $this->normalizeSegment($scope))
-            ->first();
-
-        if (! $consent) {
-            return false;
+        if (! $result->becameActive) {
+            return $result;
         }
 
-        return ! ConsentRevocation::query()
-            ->where('contact_id', $contact->getKey())
-            ->where('channel', $this->normalizeSegment($channel))
-            ->where('purpose', $this->normalizeSegment($purpose))
-            ->where('scope', $this->normalizeSegment($scope))
-            ->where('revoked_at', '>=', $consent->consented_at)
-            ->exists();
-    }
+        DB::afterCommit(function () use ($contact, $result, $context): void {
+            MessageConsentGranted::dispatch(
+                contact: $contact,
+                messageConsent: $result->consent,
+                channel: $result->channel,
+                purpose: $result->purpose,
+                scope: $result->domain,
+                context: $context,
+                data: [
+                    'source' => $result->consent->source,
+                    'ip_address' => $result->consent->ip_address,
+                    'user_agent' => $result->consent->user_agent,
+                    'meta' => $result->consent->meta,
+                    'requested_scope' => $result->requestedScope,
+                    'domain' => $result->domain,
+                ],
+            );
+        });
 
-    private function willBeActivelyConsented(
-        Contact $contact,
-        string $channel,
-        string $purpose,
-        string $scope,
-        mixed $consentedAt,
-    ): bool {
-        return ! ConsentRevocation::query()
-            ->where('contact_id', $contact->getKey())
-            ->where('channel', $this->normalizeSegment($channel))
-            ->where('purpose', $this->normalizeSegment($purpose))
-            ->where('scope', $this->normalizeSegment($scope))
-            ->where('revoked_at', '>=', $consentedAt)
-            ->exists();
-    }
-
-    private function normalizeSegment(string $value): string
-    {
-        return str_replace('-', '_', strtolower(trim($value)));
+        return $result;
     }
 }

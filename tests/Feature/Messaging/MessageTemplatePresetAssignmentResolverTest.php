@@ -258,5 +258,235 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
         $this->assertSame('messaging.email.definitions.transactional.webinar.confirmation', $definitions[0]['config_path']);
     }
 
+    public function test_standard_resolution_uses_source_specific_synced_assignment_before_config(): void
+    {
+        $sourceConfigPath = 'messaging.email.definitions.transactional.webinar.confirmation';
+
+        Config::set($sourceConfigPath, [
+            'key' => 'confirmation',
+            'dispatch_key' => 'registration_created',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'confirmation_messages',
+            'payload' => [
+                'subject' => 'Config subject',
+                'body' => 'Config body.',
+            ],
+        ]);
+
+        $preset = MessageTemplatePreset::factory()->create([
+            'key' => 'email.transactional.webinar.confirmation',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'confirmation_messages',
+            'dispatch_keys' => ['registration_created'],
+            'payload' => [
+                'subject' => 'Customized synced subject',
+                'body' => 'Customized synced body.',
+            ],
+            'source_config_path' => $sourceConfigPath,
+            'is_customized' => true,
+            'customized_at' => now(),
+        ]);
+
+        MessageTemplatePresetAssignment::factory()
+            ->forPreset($preset)
+            ->create([
+                'surface' => 'webinar_registrations',
+                'message_type' => 'confirmation',
+                'source_config_path' => $sourceConfigPath,
+                'meta' => [
+                    'source' => 'config_sync',
+                    'source_config_path' => $sourceConfigPath,
+                ],
+            ]);
+
+        $definitions = app(MessageDefinitionResolver::class)->resolve(
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+        );
+
+        $confirmationDefinitions = collect($definitions)
+            ->where('key', 'confirmation')
+            ->values();
+
+        $this->assertCount(1, $confirmationDefinitions);
+        $this->assertSame('Customized synced subject', $confirmationDefinitions[0]['payload']['subject']);
+        $this->assertSame($sourceConfigPath, $confirmationDefinitions[0]['source_config_path']);
+        $this->assertSame($preset->getKey(), data_get($confirmationDefinitions[0], 'meta.message_template_preset.id'));
+    }
+
+    public function test_manual_standard_assignment_overrides_source_specific_seed_assignment_for_same_message_type(): void
+    {
+        $sourceConfigPath = 'messaging.email.definitions.transactional.webinar.confirmation';
+
+        Config::set($sourceConfigPath, [
+            'key' => 'confirmation',
+            'dispatch_key' => 'registration_created',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'confirmation_messages',
+            'payload' => [
+                'subject' => 'Config subject',
+                'body' => 'Config body.',
+            ],
+        ]);
+
+        $seedPreset = MessageTemplatePreset::factory()->create([
+            'key' => 'email.transactional.webinar.confirmation',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'confirmation_messages',
+            'dispatch_keys' => ['registration_created'],
+            'payload' => [
+                'subject' => 'Seed subject',
+                'body' => 'Seed body.',
+            ],
+            'source_config_path' => $sourceConfigPath,
+        ]);
+
+        MessageTemplatePresetAssignment::factory()
+            ->forPreset($seedPreset)
+            ->create([
+                'surface' => 'webinar_registrations',
+                'message_type' => 'confirmation',
+                'source_config_path' => $sourceConfigPath,
+            ]);
+
+        $manualPreset = MessageTemplatePreset::factory()->create([
+            'key' => 'email.transactional.webinar.confirmation_manual',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'confirmation_messages',
+            'dispatch_keys' => ['registration_created'],
+            'payload' => [
+                'subject' => 'Manual subject',
+                'body' => 'Manual body.',
+            ],
+            'source_config_path' => $sourceConfigPath,
+        ]);
+
+        MessageTemplatePresetAssignment::factory()
+            ->forPreset($manualPreset)
+            ->create([
+                'surface' => 'webinar_registrations',
+                'message_type' => 'confirmation',
+                'source_config_path' => null,
+                'meta' => [
+                    'source' => 'crm_assignment',
+                ],
+            ]);
+
+        $definitions = app(MessageDefinitionResolver::class)->resolve(
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+        );
+
+        $confirmationDefinitions = collect($definitions)
+            ->where('key', 'confirmation')
+            ->values();
+
+        $this->assertCount(1, $confirmationDefinitions);
+        $this->assertSame('Manual subject', $confirmationDefinitions[0]['payload']['subject']);
+        $this->assertSame($manualPreset->getKey(), data_get($confirmationDefinitions[0], 'meta.message_template_preset.id'));
+        $this->assertFalse(collect($definitions)->contains(
+            fn (array $definition): bool => data_get($definition, 'payload.subject') === 'Seed subject',
+        ));
+    }
+
+    public function test_source_specific_standard_assignments_preserve_multiple_list_definitions_and_semantic_keys(): void
+    {
+        Config::set('messaging.email.definitions.transactional.webinar', [
+            'reminders' => [
+                [
+                    'key' => 'reminder_10_day',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'reminders',
+                    'payload' => [
+                        'subject' => 'Config first reminder',
+                        'body' => 'Config first body.',
+                    ],
+                ],
+                [
+                    'key' => 'reminder_1_day',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'reminders',
+                    'payload' => [
+                        'subject' => 'Config second reminder',
+                        'body' => 'Config second body.',
+                    ],
+                ],
+            ],
+        ]);
+
+        foreach ([
+            [
+                'index' => 0,
+                'key' => 'reminder_10_day',
+                'subject' => 'DB first reminder',
+            ],
+            [
+                'index' => 1,
+                'key' => 'reminder_1_day',
+                'subject' => 'DB second reminder',
+            ],
+        ] as $definition) {
+            $sourceConfigPath = 'messaging.email.definitions.transactional.webinar.reminders.'.$definition['index'];
+
+            $preset = MessageTemplatePreset::factory()->create([
+                'key' => 'email.transactional.webinar.'.$definition['key'],
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+                'message_type' => 'reminder',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'reminders',
+                'dispatch_keys' => ['registration_created'],
+                'payload' => [
+                    'subject' => $definition['subject'],
+                    'body' => $definition['subject'].' body.',
+                ],
+                'source_config_path' => $sourceConfigPath,
+            ]);
+
+            MessageTemplatePresetAssignment::factory()
+                ->forPreset($preset)
+                ->create([
+                    'surface' => 'webinar_registrations',
+                    'message_type' => 'reminder',
+                    'source_config_path' => $sourceConfigPath,
+                ]);
+        }
+
+        $definitions = app(MessageDefinitionResolver::class)->resolve(
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+        );
+
+        $this->assertCount(2, $definitions);
+        $this->assertEqualsCanonicalizing([
+            'reminder_10_day',
+            'reminder_1_day',
+        ], collect($definitions)->pluck('key')->all());
+        $this->assertEqualsCanonicalizing([
+            'DB first reminder',
+            'DB second reminder',
+        ], collect($definitions)->pluck('payload.subject')->all());
+    }
+
 }
+
+
 

@@ -23,7 +23,6 @@ class MessageTemplatePresetAssignmentResolver
             ->whereNull('campaign_key')
             ->whereNull('campaign_step')
             ->whereNull('campaign_step_variant_key')
-            ->whereNull('source_config_path')
             ->whereNull('context_type')
             ->whereNull('context_id')
             ->with('messageTemplatePreset')
@@ -31,11 +30,43 @@ class MessageTemplatePresetAssignmentResolver
             ->orderByDesc('id')
             ->get()
             ->filter(fn (MessageTemplatePresetAssignment $assignment): bool => (bool) $assignment->messageTemplatePreset?->isActive())
+            ->values();
+
+        $broadAssignments = $assignments
+            ->filter(fn (MessageTemplatePresetAssignment $assignment): bool => $this->nullableString($assignment->source_config_path) === null)
+            ->unique(fn (MessageTemplatePresetAssignment $assignment): string => $this->normalizeSegment((string) $assignment->message_type))
+            ->values();
+
+        $broadMessageTypes = $broadAssignments
+            ->map(fn (MessageTemplatePresetAssignment $assignment): string => $this->normalizeSegment((string) $assignment->message_type))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $sourceSpecificAssignments = $assignments
+            ->filter(fn (MessageTemplatePresetAssignment $assignment): bool => $this->nullableString($assignment->source_config_path) !== null)
+            ->reject(fn (MessageTemplatePresetAssignment $assignment): bool => in_array(
+                $this->normalizeSegment((string) $assignment->message_type),
+                $broadMessageTypes,
+                true,
+            ))
             ->unique(fn (MessageTemplatePresetAssignment $assignment): string => $this->assignmentDefinitionKey($assignment))
             ->values();
 
+        $selectedAssignmentIds = $broadAssignments
+            ->merge($sourceSpecificAssignments)
+            ->map(fn (MessageTemplatePresetAssignment $assignment): mixed => $assignment->getKey())
+            ->all();
+
         return $assignments
+            ->filter(fn (MessageTemplatePresetAssignment $assignment): bool => in_array(
+                $assignment->getKey(),
+                $selectedAssignmentIds,
+                true,
+            ))
             ->map(fn (MessageTemplatePresetAssignment $assignment): array => $this->definitionForAssignment($assignment))
+            ->values()
             ->all();
     }
 
@@ -148,6 +179,7 @@ class MessageTemplatePresetAssignmentResolver
             ?? $this->normalizeNullableSegment(data_get($assignment->meta, 'campaign_step_variant_key'));
 
         return array_replace_recursive($definition, [
+            'key' => $this->standardDefinitionKey($assignment, $sourceConfigPath),
             'campaign_step_variant_key' => $variantKey,
             'source_config_path' => $sourceConfigPath,
             'meta' => [
@@ -158,6 +190,39 @@ class MessageTemplatePresetAssignmentResolver
                 ], fn (mixed $value): bool => $value !== null),
             ],
         ]);
+    }
+
+    private function standardDefinitionKey(
+        MessageTemplatePresetAssignment $assignment,
+        ?string $sourceConfigPath,
+    ): string {
+        if ($sourceConfigPath !== null) {
+            $configuredDefinition = config($sourceConfigPath);
+            $configuredKey = is_array($configuredDefinition)
+                ? $this->normalizeNullableSegment($configuredDefinition['key'] ?? null)
+                : null;
+
+            if ($configuredKey !== null) {
+                return $configuredKey;
+            }
+        }
+
+        $presetKey = $this->nullableString($assignment->messageTemplatePreset?->key);
+
+        if ($presetKey !== null) {
+            $lastSeparatorPosition = strrpos($presetKey, '.');
+            $semanticKey = $lastSeparatorPosition === false
+                ? $presetKey
+                : substr($presetKey, $lastSeparatorPosition + 1);
+
+            $semanticKey = $this->normalizeNullableSegment($semanticKey);
+
+            if ($semanticKey !== null) {
+                return $semanticKey;
+            }
+        }
+
+        return $this->normalizeSegment((string) $assignment->message_type);
     }
 
     private function assignmentDefinitionKey(MessageTemplatePresetAssignment $assignment): string
@@ -207,5 +272,7 @@ class MessageTemplatePresetAssignmentResolver
         return $value !== '' ? $value : null;
     }
 }
+
+
 
 

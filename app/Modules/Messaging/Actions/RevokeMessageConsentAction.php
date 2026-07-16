@@ -2,11 +2,12 @@
 
 namespace App\Modules\Messaging\Actions;
 
+use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Events\MessageConsentRevoked;
 use App\Modules\Messaging\Models\ConsentRevocation;
-use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Rules\ConsentRevocationRules;
+use App\Modules\Messaging\Services\Consent\MessageConsentStateResolver;
 use App\Modules\Messaging\Services\ConsentDomainRegistry;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,7 @@ class RevokeMessageConsentAction
 {
     public function __construct(
         private readonly ConsentDomainRegistry $consentDomainRegistry,
+        private readonly MessageConsentStateResolver $stateResolver,
     ) {}
 
     /**
@@ -62,21 +64,18 @@ class RevokeMessageConsentAction
             $revocations = new Collection();
             $created = false;
 
-            foreach ($scopes as $scope) {
-                $result = $this->revokeScope($contact, $validated, $scope);
+            foreach ($scopes as $resolvedScope) {
+                $result = $this->revokeScope($contact, $validated, $resolvedScope);
 
                 $revocations->push($result['revocation']);
-
-                if ($result['created']) {
-                    $created = true;
-                }
+                $created = $created || $result['created'];
 
                 $this->dispatchRevokedEventAfterCommit(
                     contact: $contact,
                     revocation: $result['revocation'],
                     created: $result['created'],
                     validated: $validated,
-                    scope: $scope,
+                    scope: $resolvedScope,
                 );
             }
 
@@ -93,26 +92,26 @@ class RevokeMessageConsentAction
      */
     private function revokeScope(Contact $contact, array $validated, string $scope): array
     {
-        $now = now();
-        $revokedAt = $validated['revoked_at'] ?? $now;
+        $revokedAt = $validated['revoked_at'] ?? now();
 
-        $latestConsent = MessageConsent::query()
-            ->where('contact_id', $contact->getKey())
-            ->where('channel', $validated['channel'])
-            ->where('purpose', $validated['purpose'])
-            ->where('scope', $scope)
-            ->latest('consented_at')
-            ->first();
+        $latestConsent = $this->stateResolver->latestConsent(
+            contact: $contact,
+            channel: $validated['channel'],
+            purpose: $validated['purpose'],
+            scope: $scope,
+        );
 
         $existingRevocation = ConsentRevocation::query()
             ->where('contact_id', $contact->getKey())
             ->where('channel', $validated['channel'])
             ->where('purpose', $validated['purpose'])
             ->where('scope', $scope)
-            ->when($latestConsent, function ($query) use ($latestConsent) {
-                $query->where('revoked_at', '>=', $latestConsent->consented_at);
-            })
-            ->latest('revoked_at')
+            ->when(
+                $latestConsent,
+                fn ($query) => $query->where('revoked_at', '>=', $latestConsent->consented_at),
+            )
+            ->orderByDesc('revoked_at')
+            ->orderByDesc('id')
             ->first();
 
         if ($existingRevocation) {

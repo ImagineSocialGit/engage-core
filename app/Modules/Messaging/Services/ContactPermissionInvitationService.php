@@ -6,7 +6,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
-use App\Modules\Messaging\Models\MessageConsent;
+use App\Modules\Messaging\Actions\RecordMessageConsentAction;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Support\AutomationEvents\Data\AutomationEventData;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
@@ -22,6 +22,7 @@ class ContactPermissionInvitationService
 
     public function __construct(
         private readonly MessageChannelAvailability $channelAvailability,
+        private readonly RecordMessageConsentAction $recordMessageConsent,
     ) {}
 
     /**
@@ -186,25 +187,20 @@ class ContactPermissionInvitationService
 
             foreach ($channels as $channel) {
                 foreach ($scopes as $scope) {
-                    MessageConsent::query()->updateOrCreate(
-                        [
-                            'contact_id' => $contact->getKey(),
-                            'channel' => $channel,
-                            'purpose' => MessagePurpose::Marketing->value,
-                            'scope' => $scope,
+                    $this->recordMessageConsent->handle($contact, [
+                        'channel' => $channel,
+                        'purpose' => MessagePurpose::Marketing->value,
+                        'scope' => $scope,
+                        'consented_at' => $acceptedAt,
+                        'source' => 'imported_contact_permission_invitation',
+                        'ip_address' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                        'meta' => [
+                            'permission_invitation_id' => $lockedInvitation->getKey(),
+                            'permission_invitation_source' => $lockedInvitation->source,
+                            'accepted_from' => 'public_form',
                         ],
-                        [
-                            'consented_at' => $acceptedAt,
-                            'source' => 'imported_contact_permission_invitation',
-                            'ip_address' => $request->ip(),
-                            'user_agent' => $request->userAgent(),
-                            'meta' => [
-                                'permission_invitation_id' => $lockedInvitation->getKey(),
-                                'permission_invitation_source' => $lockedInvitation->source,
-                                'accepted_from' => 'public_form',
-                            ],
-                        ],
-                    );
+                    ]);
                 }
             }
 
