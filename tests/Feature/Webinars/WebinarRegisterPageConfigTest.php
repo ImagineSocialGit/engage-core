@@ -25,6 +25,10 @@ class WebinarRegisterPageConfigTest extends TestCase
                 ],
             ],
             'registration' => [
+                'consent_header' => [
+                    'enabled' => true,
+                    'body' => 'Base consent header.',
+                ],
                 'sections' => [
                     'notifications' => [
                         'title' => 'Base webinar updates',
@@ -66,6 +70,9 @@ class WebinarRegisterPageConfigTest extends TestCase
                 ],
             ],
             'registration' => [
+                'consent_header' => [
+                    'body' => 'Series consent header.',
+                ],
                 'sections' => [
                     'notifications' => [
                         'title' => 'Series webinar choices',
@@ -107,6 +114,10 @@ class WebinarRegisterPageConfigTest extends TestCase
         $this->assertSame('Series problem', data_get($content, 'landing.problem.heading'));
 
         $this->assertSame(
+            'Series consent header.',
+            data_get($content, 'registration.consent_header.body'),
+        );
+        $this->assertSame(
             'Series webinar choices',
             data_get($content, 'registration.sections.notifications.title'),
         );
@@ -139,6 +150,9 @@ class WebinarRegisterPageConfigTest extends TestCase
             'hero' => [
                 'title' => 'Flat base hero',
             ],
+            'consent_header' => [
+                'body' => 'Flat base consent header.',
+            ],
             'fields' => [
                 'phone' => [
                     'helper' => 'Flat base helper.',
@@ -149,6 +163,9 @@ class WebinarRegisterPageConfigTest extends TestCase
         Config::set('webinars.register.legacy-series.content', [
             'hero' => [
                 'title' => 'Flat series hero',
+            ],
+            'consent_header' => [
+                'body' => 'Flat series consent header.',
             ],
             'fields' => [
                 'phone' => [
@@ -163,7 +180,12 @@ class WebinarRegisterPageConfigTest extends TestCase
         );
 
         $this->assertSame('Flat series hero', data_get($content, 'landing.hero.title'));
+        $this->assertSame(
+            'Flat series consent header.',
+            data_get($content, 'registration.consent_header.body'),
+        );
         $this->assertSame('Flat series helper.', data_get($content, 'registration.fields.phone.helper'));
+        $this->assertArrayNotHasKey('consent_header', $content['landing']);
         $this->assertArrayNotHasKey('fields', $content['landing']);
         $this->assertArrayNotHasKey('hero', $content['registration']);
     }
@@ -190,12 +212,18 @@ class WebinarRegisterPageConfigTest extends TestCase
                 'form_card' => [
                     'class' => 'base-form-card',
                 ],
+                'consent_header' => [
+                    'body' => 'base-consent-header-body',
+                ],
             ],
         ]);
 
         Config::set('webinars.register.custom-series.style', [
             'hero' => [
                 'section' => 'series-hero',
+            ],
+            'consent_header' => [
+                'body' => 'series-consent-header-body',
             ],
             'legal_links' => [
                 'link' => 'series-legal-link',
@@ -211,9 +239,14 @@ class WebinarRegisterPageConfigTest extends TestCase
         $this->assertSame('base-hero-title', data_get($style, 'landing.tokens.hero_title'));
 
         $this->assertSame('base-form-card', data_get($style, 'registration.form_card.class'));
+        $this->assertSame(
+            'series-consent-header-body',
+            data_get($style, 'registration.consent_header.body'),
+        );
         $this->assertSame('series-legal-link', data_get($style, 'registration.legal_links.link'));
         $this->assertSame('base-error', data_get($style, 'registration.tokens.field_error'));
         $this->assertSame('base-checkbox', data_get($style, 'registration.components.checkbox.input'));
+        $this->assertArrayNotHasKey('consent_header', $style['landing']);
         $this->assertArrayNotHasKey('hero', $style['registration']);
     }
 

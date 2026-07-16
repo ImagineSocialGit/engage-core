@@ -14,6 +14,7 @@ class WebinarRegisterPageConfig
      */
     private const REGISTRATION_CONTENT_KEYS = [
         'form_card',
+        'consent_header',
         'sections',
         'fields',
         'submit',
@@ -27,6 +28,7 @@ class WebinarRegisterPageConfig
      */
     private const REGISTRATION_STYLE_KEYS = [
         'form_card',
+        'consent_header',
         'legal_links',
     ];
 

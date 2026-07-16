@@ -10,28 +10,163 @@ class WebinarRegistrationConsentContentConfigTest extends TestCase
 {
     public function test_base_registration_defaults_resolve_to_a_renderable_registration_contract(): void
     {
+        Config::set('webinars.content', []);
         Config::set(
             'webinars.register.content',
             require base_path('config/webinars/register/content.php'),
         );
+        Config::set('webinars.register.readiness-audit.content', []);
 
         $content = app(WebinarRegisterPageConfig::class)->content(
             page: 'register',
-            seriesSlug: 'default-series',
+            seriesSlug: 'readiness-audit',
         );
 
-        $registration = $content['registration'];
+        $this->assertRenderableRegistrationContract(
+            $content['registration'],
+            'core registration defaults',
+        );
+    }
+
+    public function test_every_client_registration_config_resolves_without_requiring_shared_language(): void
+    {
+        $baseContent = require base_path('config/webinars/register/content.php');
+        $clientPaths = glob(base_path('client/*/config/webinars/register/content.php')) ?: [];
+
+        $this->assertNotEmpty(
+            $clientPaths,
+            'No client webinar registration content configs were found.',
+        );
+
+        foreach ($clientPaths as $clientPath) {
+            $clientContent = require $clientPath;
+
+            $this->assertIsArray($clientContent, $clientPath);
+
+            Config::set('webinars.content', []);
+            Config::set(
+                'webinars.register.content',
+                array_replace_recursive($baseContent, $clientContent),
+            );
+            Config::set('webinars.register.readiness-audit.content', []);
+
+            $resolved = app(WebinarRegisterPageConfig::class)->content(
+                page: 'register',
+                seriesSlug: 'readiness-audit',
+            );
+
+            $this->assertRenderableRegistrationContract(
+                $resolved['registration'],
+                $this->relativePath($clientPath),
+            );
+        }
+    }
+
+    public function test_every_series_registration_override_resolves_on_top_of_its_client_contract(): void
+    {
+        $baseContent = require base_path('config/webinars/register/content.php');
+        $seriesPaths = glob(base_path('client/*/config/webinars/register/*/content.php')) ?: [];
+
+        foreach ($seriesPaths as $seriesPath) {
+            $registerDirectory = dirname(dirname($seriesPath));
+            $clientContentPath = $registerDirectory.'/content.php';
+
+            $this->assertFileExists($clientContentPath);
+
+            $clientContent = require $clientContentPath;
+            $seriesContent = require $seriesPath;
+
+            $this->assertIsArray($clientContent, $clientContentPath);
+            $this->assertIsArray($seriesContent, $seriesPath);
+
+            Config::set('webinars.content', []);
+            Config::set(
+                'webinars.register.content',
+                array_replace_recursive($baseContent, $clientContent),
+            );
+            Config::set('webinars.register.readiness-audit.content', $seriesContent);
+
+            $resolved = app(WebinarRegisterPageConfig::class)->content(
+                page: 'register',
+                seriesSlug: 'readiness-audit',
+            );
+
+            $this->assertRenderableRegistrationContract(
+                $resolved['registration'],
+                $this->relativePath($seriesPath),
+            );
+        }
+    }
+
+    public function test_client_overrides_can_customize_copy_without_copying_the_base_shape(): void
+    {
+        Config::set('webinars.content', []);
+        Config::set('webinars.register.content', [
+            'registration' => [
+                'sections' => [
+                    'notifications' => [
+                        'title' => 'Base delivery title',
+                    ],
+                    'marketing' => [
+                        'title' => 'Base marketing title',
+                    ],
+                ],
+                'fields' => [
+                    'phone' => [
+                        'helper' => 'Base phone helper.',
+                    ],
+                    'consent_messages' => [
+                        'email' => [
+                            'label' => 'Base webinar email label.',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        Config::set('webinars.register.client-series.content', [
+            'registration' => [
+                'sections' => [
+                    'notifications' => [
+                        'title' => 'Client-specific delivery title',
+                    ],
+                ],
+            ],
+        ]);
+
+        $content = app(WebinarRegisterPageConfig::class)->content(
+            page: 'register',
+            seriesSlug: 'client-series',
+        );
 
         $this->assertSame(
-            'Webinar Registration (Required)',
-            data_get($registration, 'sections.notifications.title'),
+            'Client-specific delivery title',
+            data_get($content, 'registration.sections.notifications.title'),
         );
         $this->assertSame(
-            'Stay Connected (Optional)',
-            data_get($registration, 'sections.marketing.title'),
+            'Base marketing title',
+            data_get($content, 'registration.sections.marketing.title'),
         );
+        $this->assertSame(
+            'Base webinar email label.',
+            data_get($content, 'registration.fields.consent_messages.email.label'),
+        );
+        $this->assertSame(
+            'Base phone helper.',
+            data_get($content, 'registration.fields.phone.helper'),
+        );
+    }
 
+    /**
+     * @param array<string, mixed> $registration
+     */
+    private function assertRenderableRegistrationContract(
+        array $registration,
+        string $source,
+    ): void {
         foreach ([
+            'sections.notifications.title',
+            'sections.marketing.title',
             'fields.first_name.label',
             'fields.last_name.label',
             'fields.email.label',
@@ -44,145 +179,106 @@ class WebinarRegistrationConsentContentConfigTest extends TestCase
             'fields.marketing_consent_messages.sms.label',
             'fields.marketing_consent_messages.sms.disclosure',
         ] as $path) {
-            $this->assertNotSame('', trim((string) data_get($registration, $path)), $path);
+            $value = data_get($registration, $path);
+
+            $this->assertIsString(
+                $value,
+                "{$source}: [{$path}] must resolve to a string.",
+            );
+            $this->assertNotSame(
+                '',
+                trim($value),
+                "{$source}: [{$path}] must not be blank.",
+            );
+        }
+
+        $consentHeader = data_get($registration, 'consent_header', []);
+
+        $this->assertIsArray(
+            $consentHeader,
+            "{$source}: [consent_header] must resolve to an array.",
+        );
+
+        if (($consentHeader['enabled'] ?? true) === true) {
+            $body = $consentHeader['body'] ?? null;
+
+            $this->assertIsString(
+                $body,
+                "{$source}: enabled consent headers must provide [body].",
+            );
+            $this->assertNotSame(
+                '',
+                trim($body),
+                "{$source}: enabled consent-header [body] must not be blank.",
+            );
+        }
+
+        $this->assertSafeLegalLinks(
+            data_get($registration, 'legal_links', []),
+            $source,
+        );
+    }
+
+    /**
+     * @param mixed $legalLinks
+     */
+    private function assertSafeLegalLinks(mixed $legalLinks, string $source): void
+    {
+        $this->assertIsArray(
+            $legalLinks,
+            "{$source}: [legal_links] must resolve to an array.",
+        );
+
+        $links = $legalLinks['links'] ?? [];
+
+        $this->assertIsArray(
+            $links,
+            "{$source}: [legal_links.links] must resolve to an array.",
+        );
+
+        if (($legalLinks['enabled'] ?? false) === true) {
+            $this->assertNotEmpty(
+                $links,
+                "{$source}: enabled legal links must include at least one link.",
+            );
+        }
+
+        foreach ($links as $index => $link) {
+            $this->assertIsArray(
+                $link,
+                "{$source}: legal link [{$index}] must be an array.",
+            );
+
+            $label = $link['label'] ?? null;
+            $url = $link['url'] ?? null;
+
+            $this->assertIsString(
+                $label,
+                "{$source}: legal link [{$index}.label] must be a string.",
+            );
+            $this->assertNotSame(
+                '',
+                trim($label),
+                "{$source}: legal link [{$index}.label] must not be blank.",
+            );
+            $this->assertIsString(
+                $url,
+                "{$source}: legal link [{$index}.url] must be a string.",
+            );
+            $this->assertNotSame(
+                '#',
+                trim($url),
+                "{$source}: legal link [{$index}.url] must not be a placeholder.",
+            );
+            $this->assertNotFalse(
+                filter_var(trim($url), FILTER_VALIDATE_URL),
+                "{$source}: legal link [{$index}.url] must be an absolute URL.",
+            );
         }
     }
 
-    public function test_client_registration_configs_publish_the_requested_consent_copy(): void
+    private function relativePath(string $path): string
     {
-        foreach ([
-            'slam-dunk-crm' => [
-                'config_path' => 'client/slam-dunk-crm/config/webinars/register/content.php',
-                'sender_name' => 'Slam Dunk Home Loans',
-            ],
-            'rob-the-mortgage-coach' => [
-                'config_path' => 'client/rob-the-mortgage-coach/config/webinars/register/content.php',
-                'sender_name' => 'Rob The Mortgage Coach',
-            ],
-        ] as $label => $expected) {
-            $content = require base_path($expected['config_path']);
-            $registration = $content['registration'];
-            $senderName = $expected['sender_name'];
-
-            $this->assertSame(
-                'Webinar Registration (Required)',
-                data_get($registration, 'sections.notifications.title'),
-                $label,
-            );
-            $this->assertSame(
-                'Stay Connected (Optional)',
-                data_get($registration, 'sections.marketing.title'),
-                $label,
-            );
-            $this->assertSame(
-                'Email me my webinar confirmation, Zoom link, reminders, replay, and webinar-related updates.',
-                data_get($registration, 'fields.consent_messages.email.label'),
-                $label,
-            );
-            $this->assertSame(
-                'You may unsubscribe at any time.',
-                data_get($registration, 'fields.consent_messages.email.helper'),
-                $label,
-            );
-            $this->assertSame(
-                'Text me webinar reminders and access information. (Optional)',
-                data_get($registration, 'fields.consent_messages.sms.label'),
-                $label,
-            );
-            $this->assertSame(
-                'By checking this box, you agree to receive automated text messages related to this webinar. Message frequency varies. Msg & data rates may apply. Reply STOP to opt out.',
-                data_get($registration, 'fields.consent_messages.sms.disclosure'),
-                $label,
-            );
-            $this->assertSame(
-                "Send me marketing emails for future webinars, homebuying tips, loan program updates, and educational content from {$senderName}.",
-                data_get($registration, 'fields.marketing_consent_messages.email.label'),
-                $label,
-            );
-            $this->assertSame(
-                "Send me marketing texts for future webinars, mortgage updates, and educational content from {$senderName}.",
-                data_get($registration, 'fields.marketing_consent_messages.sms.label'),
-                $label,
-            );
-            $this->assertSame(
-                'Message frequency varies. Msg & data rates may apply. Reply STOP to opt out.',
-                data_get($registration, 'fields.marketing_consent_messages.sms.disclosure'),
-                $label,
-            );
-        }
+        return ltrim(str_replace(base_path(), '', $path), DIRECTORY_SEPARATOR);
     }
-
-    public function test_client_registration_configs_are_not_required_to_duplicate_the_base_shape(): void
-    {
-        Config::set('webinars.register.content', [
-            'registration' => [
-                'sections' => [
-                    'notifications' => [
-                        'title' => 'Base webinar delivery',
-                    ],
-                ],
-                'fields' => [
-                    'phone' => [
-                        'helper' => 'Base phone helper.',
-                    ],
-                    'consent_messages' => [
-                        'email' => [
-                            'label' => 'Base webinar email',
-                        ],
-                    ],
-                ],
-            ],
-        ]);
-
-        Config::set('webinars.register.client-series.content', [
-            'registration' => [
-                'sections' => [
-                    'notifications' => [
-                        'title' => 'Client delivery choices',
-                    ],
-                ],
-            ],
-        ]);
-
-        $content = app(WebinarRegisterPageConfig::class)->content(
-            page: 'register',
-            seriesSlug: 'client-series',
-        );
-
-        $this->assertSame(
-            'Client delivery choices',
-            data_get($content, 'registration.sections.notifications.title'),
-        );
-        $this->assertSame(
-            'Base webinar email',
-            data_get($content, 'registration.fields.consent_messages.email.label'),
-        );
-        $this->assertSame(
-            'Base phone helper.',
-            data_get($content, 'registration.fields.phone.helper'),
-        );
-    }
-
-    public function test_slam_dunk_uses_terms_of_service_label(): void
-    {
-        $content = require base_path('client/slam-dunk-crm/config/webinars/register/content.php');
-
-        $this->assertSame(
-            'Terms of Service',
-            data_get($content, 'registration.legal_links.links.0.label'),
-        );
-        $this->assertSame(
-            'Privacy Policy',
-            data_get($content, 'registration.legal_links.links.1.label'),
-        );
-    }
-
-    public function test_rob_registration_config_does_not_publish_placeholder_legal_links(): void
-    {
-        $content = require base_path('client/rob-the-mortgage-coach/config/webinars/register/content.php');
-
-        $this->assertFalse(data_get($content, 'registration.legal_links.enabled'));
-        $this->assertSame([], data_get($content, 'registration.legal_links.links'));
-    }
-
 }

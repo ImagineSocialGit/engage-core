@@ -11,7 +11,7 @@ class WebinarRegistrationConsentHeaderPresentationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_consent_header_content_and_styles_are_configuration_driven(): void
+    public function test_current_consent_header_body_and_styles_are_configuration_driven(): void
     {
         $series = WebinarSeries::factory()->create([
             'slug' => 'consent-header-presentation',
@@ -20,57 +20,15 @@ class WebinarRegistrationConsentHeaderPresentationTest extends TestCase
         view()->share('errors', new ViewErrorBag());
 
         $html = view('components.webinars.registration-form-modal', [
-            'page' => [
-                'form_card' => [
-                    'title' => 'Save Your Seat',
-                    'body' => 'Register below.',
-                ],
-                'consent_header' => [
-                    'enabled' => true,
-                    'title' => 'Configured header title',
-                    'body' => 'Configured header body',
-                    'items' => [
-                        'Configured item one',
-                        'Configured item two',
-                    ],
-                ],
-                'sections' => [
-                    'notifications' => [
-                        'title' => 'Webinar Registration',
-                    ],
-                    'marketing' => [
-                        'title' => 'Stay Connected',
-                    ],
-                ],
-                'fields' => [
-                    'first_name' => ['label' => 'First Name'],
-                    'last_name' => ['label' => 'Last Name'],
-                    'email' => ['label' => 'Email Address'],
-                    'phone' => ['label' => 'Mobile Phone'],
-                    'consent_messages' => [
-                        'email' => ['label' => 'Webinar email'],
-                    ],
-                    'marketing_consent_messages' => [
-                        'email' => ['label' => 'Marketing email'],
-                    ],
-                ],
-                'legal_links' => [
-                    'enabled' => false,
-                    'links' => [],
-                ],
-                'submit' => [
-                    'label' => 'Reserve My Spot',
-                ],
-            ],
+            'page' => $this->page([
+                'enabled' => true,
+                'body' => 'Configured consent-header body.',
+            ]),
             'tokens' => [],
             'style' => [
                 'consent_header' => [
-                    'wrapper' => 'consent-header-wrapper',
-                    'title' => 'consent-header-title',
-                    'body' => 'consent-header-body',
-                    'list' => 'consent-header-list',
-                    'item' => 'consent-header-item',
-                    'icon' => 'consent-header-icon',
+                    'wrapper' => 'configured-consent-header-wrapper',
+                    'body' => 'configured-consent-header-body',
                 ],
             ],
             'series' => $series,
@@ -81,21 +39,9 @@ class WebinarRegistrationConsentHeaderPresentationTest extends TestCase
             'registrationPrefill' => [],
         ])->render();
 
-        $this->assertStringContainsString('Configured header title', $html);
-        $this->assertStringContainsString('Configured header body', $html);
-        $this->assertStringContainsString('Configured item one', $html);
-        $this->assertStringContainsString('Configured item two', $html);
-
-        foreach ([
-            'consent-header-wrapper',
-            'consent-header-title',
-            'consent-header-body',
-            'consent-header-list',
-            'consent-header-item',
-            'consent-header-icon',
-        ] as $class) {
-            $this->assertStringContainsString($class, $html);
-        }
+        $this->assertStringContainsString('Configured consent-header body.', $html);
+        $this->assertStringContainsString('configured-consent-header-wrapper', $html);
+        $this->assertStringContainsString('configured-consent-header-body', $html);
     }
 
     public function test_consent_header_can_be_disabled(): void
@@ -106,41 +52,11 @@ class WebinarRegistrationConsentHeaderPresentationTest extends TestCase
 
         view()->share('errors', new ViewErrorBag());
 
-        $page = [
-            'form_card' => [
-                'title' => 'Save Your Seat',
-            ],
-            'consent_header' => [
-                'enabled' => false,
-                'title' => 'This must not render',
-            ],
-            'sections' => [
-                'notifications' => ['title' => 'Webinar Registration'],
-                'marketing' => ['title' => 'Stay Connected'],
-            ],
-            'fields' => [
-                'first_name' => ['label' => 'First Name'],
-                'last_name' => ['label' => 'Last Name'],
-                'email' => ['label' => 'Email Address'],
-                'phone' => ['label' => 'Mobile Phone'],
-                'consent_messages' => [
-                    'email' => ['label' => 'Webinar email'],
-                ],
-                'marketing_consent_messages' => [
-                    'email' => ['label' => 'Marketing email'],
-                ],
-            ],
-            'legal_links' => [
-                'enabled' => false,
-                'links' => [],
-            ],
-            'submit' => [
-                'label' => 'Reserve My Spot',
-            ],
-        ];
-
         $html = view('components.webinars.registration-form-modal', [
-            'page' => $page,
+            'page' => $this->page([
+                'enabled' => false,
+                'body' => 'Disabled consent-header marker.',
+            ]),
             'tokens' => [],
             'style' => [],
             'series' => $series,
@@ -151,6 +67,48 @@ class WebinarRegistrationConsentHeaderPresentationTest extends TestCase
             'registrationPrefill' => [],
         ])->render();
 
-        $this->assertStringNotContainsString('This must not render', $html);
+        $this->assertStringNotContainsString('Disabled consent-header marker.', $html);
+    }
+
+    /**
+     * @param array<string, mixed> $consentHeader
+     * @return array<string, mixed>
+     */
+    private function page(array $consentHeader): array
+    {
+        return [
+            'form_card' => [
+                'title' => 'Modal title',
+                'body' => 'Modal body.',
+            ],
+            'consent_header' => $consentHeader,
+            'sections' => [
+                'notifications' => [
+                    'title' => 'Transactional section',
+                ],
+                'marketing' => [
+                    'title' => 'Marketing section',
+                ],
+            ],
+            'fields' => [
+                'first_name' => ['label' => 'First Name'],
+                'last_name' => ['label' => 'Last Name'],
+                'email' => ['label' => 'Email Address'],
+                'phone' => ['label' => 'Mobile Phone'],
+                'consent_messages' => [
+                    'email' => ['label' => 'Transactional email label.'],
+                ],
+                'marketing_consent_messages' => [
+                    'email' => ['label' => 'Marketing email label.'],
+                ],
+            ],
+            'legal_links' => [
+                'enabled' => false,
+                'links' => [],
+            ],
+            'submit' => [
+                'label' => 'Submit registration',
+            ],
+        ];
     }
 }
