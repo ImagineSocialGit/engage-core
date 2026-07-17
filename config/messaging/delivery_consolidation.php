@@ -50,7 +50,7 @@ return [
                     'placement' => [
                         'payload_key' => 'message',
                         'position' => 'append',
-                        'separator' => ' ',
+                        'separator' => '\n\n',
                     ],
 
                     'fragments' => [
