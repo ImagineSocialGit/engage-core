@@ -698,6 +698,7 @@
 │   │   │   │   ├── DispatchWebinarRegistrationMessagesAction.php
 │   │   │   │   ├── DispatchWebinarWaitlistMessagesAction.php
 │   │   │   │   ├── EmitWebinarAutomationEventAction.php
+│   │   │   │   ├── FinalizeWebinarRegistrationAction.php
 │   │   │   │   ├── FlushWebinarCachesAction.php
 │   │   │   │   ├── GetActiveWebinarSeriesAction.php
 │   │   │   │   ├── GetNextUpcomingWebinarAction.php
@@ -708,8 +709,10 @@
 │   │   │   │   │   ├── RecordWebinarAttendanceAction.php
 │   │   │   │   │   ├── RecordWebinarProviderAttendanceAction.php
 │   │   │   │   │   └── ResolveWebinarPlaybackAction.php
+│   │   │   │   ├── ResolveRegisterableWebinarAction.php
 │   │   │   │   ├── ResolveWebinarJoinUrlAction.php
 │   │   │   │   ├── ResolveWebinarPlaybackUrlAction.php
+│   │   │   │   ├── SyncWebinarRegistrationToProviderAction.php
 │   │   │   │   ├── SyncWebinarScheduleProfilesAction.php
 │   │   │   │   └── SyncWebinarSeriesFromProviderAction.php
 │   │   │   ├── ConfigContracts
@@ -742,15 +745,19 @@
 │   │   │   │   ├── ProviderWebinarData.php
 │   │   │   │   ├── WebinarAttendanceRecord.php
 │   │   │   │   ├── WebinarMessageData.php
+│   │   │   │   ├── WebinarProviderSyncResult.php
+│   │   │   │   ├── WebinarRegistrationConsentTransition.php
 │   │   │   │   ├── WebinarRegistrationImportResult.php
-│   │   │   │   └── WebinarRegistrationImportRow.php
+│   │   │   │   ├── WebinarRegistrationImportRow.php
+│   │   │   │   └── WebinarRegistrationResult.php
 │   │   │   ├── Enums
 │   │   │   │   └── WebinarTag.php
 │   │   │   ├── Jobs
 │   │   │   │   ├── NotifyWebinarWaitlistJob.php
-│   │   │   │   └── PostEvent
-│   │   │   │       ├── ProcessPostWebinarEventJob.php
-│   │   │   │       └── ProcessWebinarProviderEventJob.php
+│   │   │   │   ├── PostEvent
+│   │   │   │   │   ├── ProcessPostWebinarEventJob.php
+│   │   │   │   │   └── ProcessWebinarProviderEventJob.php
+│   │   │   │   └── SyncWebinarRegistrationToProviderJob.php
 │   │   │   ├── Models
 │   │   │   │   ├── Webinar.php
 │   │   │   │   ├── WebinarRegistration.php
@@ -1554,14 +1561,17 @@
 │   │   │   ├── ImportWebinarRegistrationsCommandTest.php
 │   │   │   ├── PostEvent
 │   │   │   │   └── ProcessPostWebinarEventJobTest.php
+│   │   │   ├── ResolveRegisterableWebinarActionTest.php
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
 │   │   │   ├── WebinarRegisterPageConfigTest.php
+│   │   │   ├── WebinarRegistrationBoundaryContractTest.php
 │   │   │   ├── WebinarRegistrationConsentHeaderPresentationTest.php
 │   │   │   ├── WebinarRegistrationConsentPresentationTest.php
 │   │   │   ├── WebinarRegistrationControllerTest.php
 │   │   │   ├── WebinarRegistrationFrontendContractTest.php
 │   │   │   ├── WebinarRegistrationMessageConsolidationTest.php
+│   │   │   ├── WebinarRegistrationProviderSyncTest.php
 │   │   │   ├── WebinarResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
@@ -1576,4 +1586,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-472 directories, 1105 files
+472 directories, 1115 files

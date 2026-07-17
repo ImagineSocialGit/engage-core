@@ -66,11 +66,13 @@ class CreateWebinarRegistrationConsentOptInTest extends TestCase
         $standalone->shouldReceive('handle')->never();
         $this->app->instance(DispatchConsentOptInMessageAction::class, $standalone);
 
-        $registration = app(CreateWebinarRegistrationAction::class)->handle(
+        $result = app(CreateWebinarRegistrationAction::class)->handle(
             validated: $this->allConsentInput(),
             request: Request::create('/register', 'POST'),
             webinarSlug: $webinar->slug,
         );
+
+        $registration = $result->registration;
 
         $this->assertSame([
             'email:marketing:webinar_nurture',

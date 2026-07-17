@@ -60,7 +60,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
         $provider->shouldReceive('handle')->never();
         app()->instance(AddRegistrantToWebinarProviderAction::class, $provider);
 
-        $registration = app(CreateWebinarRegistrationAction::class)->handle(
+        $result = app(CreateWebinarRegistrationAction::class)->handle(
             validated: [
                 'first_name' => 'Jeff',
                 'last_name' => 'Yarnall',
@@ -70,9 +70,11 @@ class CreateWebinarRegistrationActionTest extends TestCase
                 'marketing_email_consent' => true,
             ],
             request: $this->registrationRequest(),
-            webinarSlug: $webinar->slug,
+            webinarSlug: $webinar,
         );
 
+        $this->assertTrue($result->wasCreated());
+        $registration = $result->registration;
         $registration->refresh();
 
         $this->assertInstanceOf(WebinarRegistration::class, $registration);
@@ -146,7 +148,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
         $provider->shouldReceive('handle')->never();
         app()->instance(AddRegistrantToWebinarProviderAction::class, $provider);
 
-        $registration = app(CreateWebinarRegistrationAction::class)->handle(
+        $result = app(CreateWebinarRegistrationAction::class)->handle(
             validated: [
                 'first_name' => 'Jeff',
                 'last_name' => 'Yarnall',
@@ -158,8 +160,11 @@ class CreateWebinarRegistrationActionTest extends TestCase
                 'marketing_sms_consent' => true,
             ],
             request: $this->registrationRequest(),
-            webinarSlug: $webinar->slug,
+            webinarSlug: $webinar,
         );
+
+        $this->assertTrue($result->wasCreated());
+        $registration = $result->registration;
 
         $contact = Contact::query()->where('email', 'jeff@example.com')->firstOrFail();
 
@@ -220,10 +225,11 @@ class CreateWebinarRegistrationActionTest extends TestCase
                 'transactional_email_consent' => true,
             ],
             request: Request::create('/register', 'POST'),
-            webinarSlug: $webinar->slug,
+            webinarSlug: $webinar,
         );
 
-        $this->assertTrue($returned->is($existing));
+        $this->assertTrue($returned->wasExisting());
+        $this->assertTrue($returned->registration->is($existing));
         $this->assertDatabaseCount('webinar_registrations', 1);
         $this->assertDatabaseCount('message_consents', 1);
     }

@@ -4,40 +4,50 @@ namespace App\Modules\Webinars\Actions;
 
 use App\Modules\Core\Actions\Contacts\CreateOrUpdateContactAction;
 use App\Modules\Core\Models\Contact;
-use App\Modules\Messaging\Actions\DispatchConsentOptInMessageAction;
 use App\Modules\Messaging\Actions\GrantMessageConsentsAction;
 use App\Modules\Messaging\Data\Consent\MessageConsentGrantResult;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\PhoneNumberNormalizer;
+use App\Modules\Webinars\Data\WebinarRegistrationResult;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class CreateWebinarRegistrationAction
 {
     public function __construct(
         private readonly MessageChannelAvailability $messageChannelAvailability,
         private readonly PhoneNumberNormalizer $phoneNumberNormalizer,
-        private readonly AddRegistrantToWebinarProviderAction $addRegistrantToWebinarProviderAction,
-        private readonly DispatchWebinarRegistrationMessagesAction $dispatchWebinarRegistrationMessagesAction,
         private readonly GrantMessageConsentsAction $grantMessageConsentsAction,
-        private readonly DispatchConsentOptInMessageAction $dispatchConsentOptInMessageAction,
         private readonly CreateOrUpdateContactAction $createOrUpdateContact,
-        private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
+        private readonly FinalizeWebinarRegistrationAction $finalizeRegistration,
     ) {}
 
-    public function handle(array $validated, Request $request, string $webinarSlug = 'default'): WebinarRegistration
-    {
-        return DB::transaction(function () use ($validated, $request, $webinarSlug) {
-            $webinar = Webinar::query()
-                ->where('slug', $webinarSlug)
-                ->firstOrFail();
+    /**
+     * The Webinar model is the authoritative occurrence selected by the public
+     * request resolver. String support remains temporarily for non-HTTP callers
+     * that already pass an exact webinar slug.
+     */
+    public function handle(
+        array $validated,
+        Request $request,
+        Webinar|string $webinarSlug = 'default',
+    ): WebinarRegistrationResult {
+        $webinar = $webinarSlug instanceof Webinar
+            ? $webinarSlug
+            : Webinar::query()->where('slug', $webinarSlug)->firstOrFail();
 
+        $result = DB::transaction(function () use (
+            $validated,
+            $request,
+            $webinar,
+        ): WebinarRegistrationResult {
             $normalizedPhone = $this->phoneNumberNormalizer->normalize(
-                $validated['phone'] ?? null
+                $validated['phone'] ?? null,
             );
 
             $contact = $this->createOrUpdateContact->handle(
@@ -52,38 +62,35 @@ class CreateWebinarRegistrationAction
             );
 
             $registration = WebinarRegistration::query()
-                ->where('contact_id', $contact->id)
-                ->where('webinar_id', $webinar->id)
+                ->where('contact_id', $contact->getKey())
+                ->where('webinar_id', $webinar->getKey())
                 ->first();
 
-            if ($registration) {
-                $consentGrants = $this->storeMessageConsents(
-                    validated: $validated,
-                    request: $request,
-                    contact: $contact,
+            if ($registration instanceof WebinarRegistration) {
+                return WebinarRegistrationResult::existing(
                     registration: $registration,
+                    consentGrants: $this->storeMessageConsents(
+                        validated: $validated,
+                        request: $request,
+                        contact: $contact,
+                        registration: $registration,
+                    ),
                 );
-
-                $this->dispatchStandaloneConsentAcknowledgements(
-                    contact: $contact,
-                    registration: $registration,
-                    consentGrants: $consentGrants,
-                );
-
-                return $registration;
             }
 
             $now = now();
 
             $registration = WebinarRegistration::query()->create([
-                'contact_id' => $contact->id,
-                'webinar_id' => $webinar->id,
+                'contact_id' => $contact->getKey(),
+                'webinar_id' => $webinar->getKey(),
                 'webinar_slug' => $webinar->slug,
                 'status' => 'pending',
                 'source' => 'webinar_subdomain',
                 'registered_at' => $now,
                 'attended_at' => null,
                 'meta' => [
+                    // Consent/business provenance. Reporting must not reuse this
+                    // as anonymous visitor identity.
                     'request_ip' => $request->ip(),
                     'user_agent' => $request->userAgent(),
                     'accepted_channels' => [
@@ -109,36 +116,27 @@ class CreateWebinarRegistrationAction
                 now: $now,
             );
 
-            $registration->load(['contact', 'webinar', 'webinar.webinarSeries']);
-
-            $this->syncRegistrationToWebinarPlatform($registration, $webinar);
-
-            DB::afterCommit(function () use ($registration, $now, $consentGrants): void {
-                $registration = $registration->fresh([
+            return WebinarRegistrationResult::created(
+                registration: $registration->load([
                     'contact',
                     'webinar',
                     'webinar.webinarSeries',
-                ]);
-
-                if (! $registration) {
-                    return;
-                }
-
-                $this->emitWebinarAutomationEvent->forRegistration(
-                    eventKey: 'webinar.registered',
-                    registration: $registration,
-                    occurredAt: $registration->registered_at ?? $now,
-                );
-
-                $this->dispatchWebinarRegistrationMessagesAction->handle(
-                    $registration,
-                    null,
-                    $consentGrants,
-                );
-            });
-
-            return $registration;
+                ]),
+                consentGrants: $consentGrants,
+            );
         });
+
+        // This runs only after the local registration/consent transaction has
+        // committed. Provider or delivery failures cannot roll it back.
+        try {
+            $this->finalizeRegistration->handle($result);
+        } catch (Throwable $exception) {
+            // The local registration is already committed. Downstream failures
+            // are operational failures, not registration failures.
+            report($exception);
+        }
+
+        return $result;
     }
 
     /**
@@ -149,7 +147,7 @@ class CreateWebinarRegistrationAction
         Request $request,
         Contact $contact,
         WebinarRegistration $registration,
-        mixed $now = null
+        mixed $now = null,
     ): array {
         $now ??= now();
         $grants = [];
@@ -177,7 +175,7 @@ class CreateWebinarRegistrationAction
                 'user_agent' => $request->userAgent(),
                 'source' => 'webinar_registration',
                 'meta' => [
-                    'webinar_registration_id' => $registration->id,
+                    'webinar_registration_id' => $registration->getKey(),
                     'webinar_id' => $registration->webinar_id,
                     'webinar_slug' => $registration->webinar_slug,
                 ],
@@ -189,38 +187,6 @@ class CreateWebinarRegistrationAction
             grants: $grants,
             context: $registration,
         );
-    }
-
-    /**
-     * Existing registrations have no new registration-confirmation intent to
-     * absorb a newly granted consent acknowledgement, so they remain separate.
-     *
-     * @param array<int, MessageConsentGrantResult> $consentGrants
-     */
-    private function dispatchStandaloneConsentAcknowledgements(
-        Contact $contact,
-        WebinarRegistration $registration,
-        array $consentGrants,
-    ): void {
-        foreach ($consentGrants as $grant) {
-            if (! $grant->becameActive) {
-                continue;
-            }
-
-            $this->dispatchConsentOptInMessageAction->handle(
-                contact: $contact,
-                grant: $grant,
-                payload: [
-                    'webinar_registration_id' => $registration->id,
-                    'webinar_id' => $registration->webinar_id,
-                    'webinar_slug' => $registration->webinar_slug,
-                ],
-                context: $registration,
-                resolverContext: [
-                    'webinar_slug' => $registration->webinar_slug,
-                ],
-            );
-        }
     }
 
     /**
@@ -252,9 +218,7 @@ class CreateWebinarRegistrationAction
         ];
     }
 
-    /**
-     * @return array<int, string>
-     */
+    /** @return array<int, string> */
     private function acceptedChannels(
         array $validated,
         MessagePurpose $purpose,
@@ -280,30 +244,5 @@ class CreateWebinarRegistrationAction
         }
 
         return $channels;
-    }
-
-    private function syncRegistrationToWebinarPlatform(
-        WebinarRegistration $registration,
-        Webinar $webinar
-    ): void {
-        if (blank($webinar->providerKey())) {
-            return;
-        }
-
-        if (blank($webinar->external_id)) {
-            return;
-        }
-
-        $providerRegistration = $this->addRegistrantToWebinarProviderAction->handle(
-            $webinar,
-            $registration
-        );
-
-        $meta = $registration->meta ?? [];
-        $meta['provider'] = $providerRegistration->toMeta();
-
-        $registration->update([
-            'meta' => $meta,
-        ]);
     }
 }

@@ -377,7 +377,7 @@ class WebinarSyncTest extends TestCase
         Queue::assertNotPushed(NotifyWebinarWaitlistJob::class);
     }
 
-    public function test_sync_flushes_webinar_show_page_cache(): void
+    public function test_sync_flushes_webinar_public_data_caches(): void
     {
         Cache::flush();
 
@@ -386,18 +386,37 @@ class WebinarSyncTest extends TestCase
             'slug' => 'home-buyer-game-plan',
         ]);
 
-        Cache::put(
-            CacheKey::webinarLandingPage($series->slug),
-            'stale cached page',
-            now()->addMinutes(10)
+        $globalUpcomingKey = CacheKey::nextUpcomingWebinar();
+        $seriesUpcomingKey = CacheKey::nextUpcomingWebinar($series->slug);
+        $activeSeriesKey = CacheKey::activeWebinarSeries();
+        $pageConfigKey = CacheKey::publicPageConfig(
+            'webinar-registration',
+            $series->slug,
+        );
+        $unrelatedKey = 'unrelated-cache-key';
+
+        Cache::put($globalUpcomingKey, 100, now()->addMinutes(10));
+        Cache::put($seriesUpcomingKey, 100, now()->addMinutes(10));
+        Cache::put($activeSeriesKey, [$series->getKey()], now()->addMinutes(10));
+        Cache::put($pageConfigKey, ['stale' => true], now()->addMinutes(10));
+        Cache::put($unrelatedKey, 'preserve me', now()->addMinutes(10));
+
+        $this->assertTrue(Cache::has($globalUpcomingKey));
+        $this->assertTrue(Cache::has($seriesUpcomingKey));
+        $this->assertTrue(Cache::has($activeSeriesKey));
+        $this->assertTrue(Cache::has($pageConfigKey));
+        $this->assertTrue(Cache::has($unrelatedKey));
+
+        app(FlushWebinarCachesAction::class)->handle(
+            seriesSlug: $series->slug,
         );
 
-        $this->assertTrue(Cache::has(CacheKey::webinarLandingPage($series->slug)));
+        $this->assertFalse(Cache::has($globalUpcomingKey));
+        $this->assertFalse(Cache::has($seriesUpcomingKey));
+        $this->assertFalse(Cache::has($activeSeriesKey));
+        $this->assertFalse(Cache::has($pageConfigKey));
 
-        app(FlushWebinarCachesAction::class)
-            ->handle(seriesSlug: $series->slug);
-
-        $this->assertFalse(Cache::has(CacheKey::webinarLandingPage($series->slug)));
+        $this->assertTrue(Cache::has($unrelatedKey));
     }
 
     private function providerWebinar(

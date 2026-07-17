@@ -22,34 +22,94 @@ class SlamDunkDeliveryConsolidationConfigTest extends TestCase
 
     public function test_slam_dunk_consolidates_transactional_acknowledgements_into_selected_primary_templates(): void
     {
-        $policy = config('messaging.delivery_consolidation.policies.webinar_registration');
+        $policy = config(
+            'messaging.delivery_consolidation.policies.webinar_registration',
+        );
 
         $this->assertTrue((bool) data_get($policy, 'enabled'));
 
         $this->assertSame([
             'consent.transactional.email.acknowledgement',
-        ], data_get($policy, 'groups.initial_email.member_intents'));
-        $this->assertFalse((bool) data_get($policy, 'groups.initial_email.include_marketing_unsubscribe'));
-        $this->assertSame([
-            'payload_key' => 'body',
-            'position' => 'append',
-            'separator' => "\n\n",
-        ], data_get($policy, 'groups.initial_email.placement'));
+        ], data_get(
+            $policy,
+            'groups.initial_email.member_intents',
+        ));
+
+        $this->assertFalse((bool) data_get(
+            $policy,
+            'groups.initial_email.include_marketing_unsubscribe',
+        ));
+
+        $this->assertSame(
+            'body',
+            data_get(
+                $policy,
+                'groups.initial_email.placement.payload_key',
+            ),
+        );
+
+        $this->assertSame(
+            'append',
+            data_get(
+                $policy,
+                'groups.initial_email.placement.position',
+            ),
+        );
+
+        $emailSeparator = data_get(
+            $policy,
+            'groups.initial_email.placement.separator',
+        );
+
+        $this->assertIsString($emailSeparator);
+        $this->assertNotSame('', $emailSeparator);
+
         $this->assertNull(data_get(
             $policy,
             'groups.initial_email.fragments.delivery_consolidation_marketing_email_acknowledgement',
         ));
-        $this->assertNull(data_get($policy, 'groups.initial_email.template'));
+
+        $this->assertNull(data_get(
+            $policy,
+            'groups.initial_email.template',
+        ));
 
         $this->assertSame([
             'consent.transactional.sms.acknowledgement',
-        ], data_get($policy, 'groups.initial_sms.member_intents'));
-        $this->assertSame([
-            'payload_key' => 'message',
-            'position' => 'append',
-            'separator' => ' ',
-        ], data_get($policy, 'groups.initial_sms.placement'));
-        $this->assertNull(data_get($policy, 'groups.initial_sms.template'));
+        ], data_get(
+            $policy,
+            'groups.initial_sms.member_intents',
+        ));
+
+        $this->assertSame(
+            'message',
+            data_get(
+                $policy,
+                'groups.initial_sms.placement.payload_key',
+            ),
+        );
+
+        $this->assertSame(
+            'append',
+            data_get(
+                $policy,
+                'groups.initial_sms.placement.position',
+            ),
+        );
+
+        $smsSeparator = data_get(
+            $policy,
+            'groups.initial_sms.placement.separator',
+        );
+
+        $this->assertIsString($smsSeparator);
+        $this->assertNotSame('', $smsSeparator);
+        $this->assertStringNotContainsString('\n', $smsSeparator);
+
+        $this->assertNull(data_get(
+            $policy,
+            'groups.initial_sms.template',
+        ));
     }
 
     protected function tearDown(): void

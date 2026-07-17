@@ -3,6 +3,8 @@
 namespace App\Modules\Webinars\Requests;
 
 use App\Modules\Messaging\Services\MessageChannelAvailability;
+use App\Modules\Webinars\Actions\GetActiveWebinarSeriesAction;
+use App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarSeries;
@@ -47,6 +49,10 @@ class StoreWebinarRegistrationRequest extends FormRequest
 
     /** @var array<string, mixed>|null */
     private ?array $registrationConsentConfiguration = null;
+
+    private bool $registerableWebinarResolved = false;
+
+    private ?Webinar $resolvedRegisterableWebinar = null;
 
     public function authorize(): bool
     {
@@ -212,6 +218,32 @@ class StoreWebinarRegistrationRequest extends FormRequest
         );
     }
 
+    public function registerableWebinar(): ?Webinar
+    {
+        if ($this->registerableWebinarResolved) {
+            return $this->resolvedRegisterableWebinar;
+        }
+
+        $this->registerableWebinarResolved = true;
+        $seriesSlug = trim((string) $this->route('seriesSlug'));
+
+        if ($seriesSlug === '') {
+            return null;
+        }
+
+        $series = app(GetActiveWebinarSeriesAction::class)->findBySlug(
+            $seriesSlug,
+        );
+
+        if (! $series) {
+            return null;
+        }
+
+        return $this->resolvedRegisterableWebinar = app(
+            GetNextUpcomingWebinarAction::class,
+        )->getForSeries($series);
+    }
+
     private function duplicateRegistrationExists(): bool
     {
         $email = strtolower(trim((string) $this->input('email')));
@@ -220,36 +252,18 @@ class StoreWebinarRegistrationRequest extends FormRequest
             return false;
         }
 
-        $seriesSlug = (string) $this->route('seriesSlug');
-
-        if ($seriesSlug === '') {
-            return false;
-        }
-
-        $series = WebinarSeries::query()
-            ->where('slug', $seriesSlug)
-            ->where('status', 'active')
-            ->first();
-
-        if (! $series) {
-            return false;
-        }
-
-        $webinar = Webinar::query()
-            ->where('webinar_series_id', $series->id)
-            ->where('starts_at', '>=', now())
-            ->orderBy('starts_at')
-            ->first();
+        $webinar = $this->registerableWebinar();
 
         if (! $webinar) {
             return false;
         }
 
         return WebinarRegistration::query()
-            ->where('webinar_id', $webinar->id)
+            ->where('webinar_id', $webinar->getKey())
             ->whereHas('contact', function ($query) use ($email): void {
                 $query->whereRaw('LOWER(email) = ?', [$email]);
             })
             ->exists();
     }
+
 }

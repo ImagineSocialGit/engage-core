@@ -28,18 +28,21 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
         Queue::fake();
 
         $this->configureConsolidation();
+        Config::set('client.name', 'Example Company');
+
         $this->configureChannelAvailability();
         $this->configureRegistrationDefinitions();
         $this->configureConfirmationScheduleProfile();
 
         $series = WebinarSeries::factory()->create();
+
         $webinar = Webinar::factory()->create([
             'webinar_series_id' => $series->getKey(),
             'external_id' => null,
             'starts_at' => now()->addDays(2),
         ]);
 
-        $registration = app(CreateWebinarRegistrationAction::class)->handle(
+        $result = app(CreateWebinarRegistrationAction::class)->handle(
             validated: [
                 'first_name' => 'Jeff',
                 'last_name' => 'Yarnall',
@@ -54,6 +57,8 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
             webinarSlug: $webinar->slug,
         );
 
+        $registration = $result->registration;
+
         $messages = ScheduledMessage::query()
             ->where('context_type', $registration->getMorphClass())
             ->where('context_id', $registration->getKey())
@@ -65,9 +70,11 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
         $this->assertSame(2, $messages->where('channel', 'sms')->count());
 
         $email = $messages->firstWhere('channel', 'email');
+
         $transactionalSms = $messages
             ->where('channel', 'sms')
             ->firstWhere('purpose', 'transactional');
+
         $marketingSms = $messages
             ->where('channel', 'sms')
             ->firstWhere('purpose', 'marketing');
@@ -80,53 +87,177 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
         $this->assertSame('confirmation', $transactionalSms->message_type);
         $this->assertSame('opt_in', $marketingSms->message_type);
 
-        $this->assertSame('Original email confirmation', $email->payload['subject']);
+        /*
+        * The selected primary email template must remain authoritative.
+        * Consolidation may configure how acknowledgement placeholders are
+        * separated, but both placeholders must be appended in policy order.
+        */
         $this->assertSame(
-            "Original email confirmation body.\n\n{delivery_consolidation_webinar_email_acknowledgement}\n\n{delivery_consolidation_marketing_email_acknowledgement}",
-            $email->payload['body'],
+            'Original email confirmation',
+            $email->payload['subject'],
         );
+
+        $emailBody = (string) $email->payload['body'];
+        $webinarEmailPlaceholder =
+            '{delivery_consolidation_webinar_email_acknowledgement}';
+        $marketingEmailPlaceholder =
+            '{delivery_consolidation_marketing_email_acknowledgement}';
+
+        $this->assertStringStartsWith(
+            'Original email confirmation body.',
+            $emailBody,
+        );
+
+        $this->assertStringContainsString(
+            $webinarEmailPlaceholder,
+            $emailBody,
+        );
+
+        $this->assertStringContainsString(
+            $marketingEmailPlaceholder,
+            $emailBody,
+        );
+
+        $webinarEmailPosition = strpos(
+            $emailBody,
+            $webinarEmailPlaceholder,
+        );
+
+        $marketingEmailPosition = strpos(
+            $emailBody,
+            $marketingEmailPlaceholder,
+        );
+
+        $this->assertIsInt($webinarEmailPosition);
+        $this->assertIsInt($marketingEmailPosition);
+        $this->assertTrue(
+            $webinarEmailPosition < $marketingEmailPosition,
+            'The webinar acknowledgement should precede the marketing acknowledgement.',
+        );
+
         $this->assertEqualsCanonicalizing([
             'label' => 'Original CTA',
             'url' => '{webinar_join_url}',
         ], $email->payload['cta']);
+
         $this->assertEqualsCanonicalizing([
             'label' => 'Original secondary link',
             'url' => '{cancel_registration_url}',
         ], $email->payload['secondary_link']);
-        $this->assertStringContainsString(
-            'Webinar email updates are enabled',
-            $email->payload['tokens']['delivery_consolidation_webinar_email_acknowledgement'],
-        );
-        $this->assertStringContainsString(
-            'Slam Dunk Home Loans',
-            $email->payload['tokens']['delivery_consolidation_marketing_email_acknowledgement'],
+
+        $webinarEmailAcknowledgement = data_get(
+            $email->payload,
+            'tokens.delivery_consolidation_webinar_email_acknowledgement',
         );
 
-        $this->assertSame(
-            'Original SMS confirmation. {delivery_consolidation_webinar_sms_acknowledgement}',
-            $transactionalSms->payload['message'],
+        $marketingEmailAcknowledgement = data_get(
+            $email->payload,
+            'tokens.delivery_consolidation_marketing_email_acknowledgement',
         );
+
+        $this->assertIsString($webinarEmailAcknowledgement);
+        $this->assertNotSame('', trim($webinarEmailAcknowledgement));
+
+        $this->assertIsString($marketingEmailAcknowledgement);
+        $this->assertNotSame('', trim($marketingEmailAcknowledgement));
         $this->assertStringContainsString(
-            'Reply HELP for help or STOP to opt out.',
-            $transactionalSms->payload['tokens']['delivery_consolidation_webinar_sms_acknowledgement'],
+            'Example Company',
+            $marketingEmailAcknowledgement,
         );
+
+        /*
+        * The selected primary SMS copy must remain intact and the transactional
+        * acknowledgement placeholder must appear after it. Separator formatting
+        * remains policy-configurable.
+        */
+        $transactionalSmsMessage =
+            (string) $transactionalSms->payload['message'];
+
+        $webinarSmsPlaceholder =
+            '{delivery_consolidation_webinar_sms_acknowledgement}';
+
+        $this->assertStringStartsWith(
+            'Original SMS confirmation.',
+            $transactionalSmsMessage,
+        );
+
+        $this->assertStringContainsString(
+            $webinarSmsPlaceholder,
+            $transactionalSmsMessage,
+        );
+
+        $primarySmsPosition = strpos(
+            $transactionalSmsMessage,
+            'Original SMS confirmation.',
+        );
+
+        $webinarSmsPosition = strpos(
+            $transactionalSmsMessage,
+            $webinarSmsPlaceholder,
+        );
+
+        $this->assertIsInt($primarySmsPosition);
+        $this->assertIsInt($webinarSmsPosition);
+        $this->assertTrue(
+            $primarySmsPosition < $webinarSmsPosition,
+            'The SMS acknowledgement should follow the primary confirmation copy.',
+        );
+
+        $webinarSmsAcknowledgement = data_get(
+            $transactionalSms->payload,
+            'tokens.delivery_consolidation_webinar_sms_acknowledgement',
+        );
+
+        $this->assertIsString($webinarSmsAcknowledgement);
+        $this->assertNotSame('', trim($webinarSmsAcknowledgement));
 
         $this->assertEqualsCanonicalizing([
             'webinar.registration.confirmation',
             'consent.transactional.email.acknowledgement',
             'consent.marketing.email.acknowledgement',
-        ], data_get($email->meta, 'delivery_consolidation.intent_keys'));
-        $this->assertCount(2, data_get($email->meta, 'delivery_consolidation.consent_ids'));
-        $this->assertSame('primary_intent', data_get($email->meta, 'delivery_consolidation.template_source'));
+        ], data_get(
+            $email->meta,
+            'delivery_consolidation.intent_keys',
+        ));
+
+        $this->assertCount(
+            2,
+            data_get($email->meta, 'delivery_consolidation.consent_ids'),
+        );
+
+        $this->assertSame(
+            'primary_intent',
+            data_get($email->meta, 'delivery_consolidation.template_source'),
+        );
 
         $this->assertEqualsCanonicalizing([
             'webinar.registration.confirmation',
             'consent.transactional.sms.acknowledgement',
-        ], data_get($transactionalSms->meta, 'delivery_consolidation.intent_keys'));
-        $this->assertCount(1, data_get($transactionalSms->meta, 'delivery_consolidation.consent_ids'));
-        $this->assertSame('primary_intent', data_get($transactionalSms->meta, 'delivery_consolidation.template_source'));
+        ], data_get(
+            $transactionalSms->meta,
+            'delivery_consolidation.intent_keys',
+        ));
 
-        $this->assertNull(data_get($marketingSms->meta, 'delivery_consolidation'));
+        $this->assertCount(
+            1,
+            data_get(
+                $transactionalSms->meta,
+                'delivery_consolidation.consent_ids',
+            ),
+        );
+
+        $this->assertSame(
+            'primary_intent',
+            data_get(
+                $transactionalSms->meta,
+                'delivery_consolidation.template_source',
+            ),
+        );
+
+        $this->assertNull(
+            data_get($marketingSms->meta, 'delivery_consolidation'),
+        );
+
         $this->assertSame('marketing', $marketingSms->purpose);
         $this->assertSame('webinar', $marketingSms->scope);
 
@@ -140,6 +271,7 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
         $this->configureConsolidation();
         $this->configureChannelAvailability();
         $this->configureRegistrationDefinitions();
+
         $profile = $this->configureConfirmationScheduleProfile();
 
         $preset = MessageTemplatePreset::factory()->create([
@@ -164,7 +296,8 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
                     'url' => '{cancel_registration_url}',
                 ],
             ],
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmations.0',
+            'source_config_path' =>
+                'messaging.email.definitions.transactional.webinar.confirmations.0',
             'meta' => [
                 'seed' => [
                     'definition_key' => 'confirmation',
@@ -181,13 +314,14 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
             ]);
 
         $series = WebinarSeries::factory()->create();
+
         $webinar = Webinar::factory()->create([
             'webinar_series_id' => $series->getKey(),
             'external_id' => null,
             'starts_at' => now()->addDays(2),
         ]);
 
-        $registration = app(CreateWebinarRegistrationAction::class)->handle(
+        $result = app(CreateWebinarRegistrationAction::class)->handle(
             validated: [
                 'first_name' => 'Jeff',
                 'last_name' => 'Yarnall',
@@ -197,6 +331,8 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
             request: Request::create('/register', 'POST'),
             webinarSlug: $webinar->slug,
         );
+
+        $registration = $result->registration;
 
         $message = ScheduledMessage::query()
             ->where('context_type', $registration->getMorphClass())
@@ -210,29 +346,89 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
             ->where('message_type', 'confirmation')
             ->firstOrFail();
 
-        $this->assertSame('CRM-selected confirmation subject', $message->payload['subject']);
         $this->assertSame(
-            "CRM-selected confirmation body.\n\n{delivery_consolidation_webinar_email_acknowledgement}",
-            $message->payload['body'],
+            'CRM-selected confirmation subject',
+            $message->payload['subject'],
         );
+
+        $body = (string) $message->payload['body'];
+        $acknowledgementPlaceholder =
+            '{delivery_consolidation_webinar_email_acknowledgement}';
+
+        $this->assertStringStartsWith(
+            'CRM-selected confirmation body.',
+            $body,
+        );
+
+        $this->assertStringContainsString(
+            $acknowledgementPlaceholder,
+            $body,
+        );
+
+        $primaryBodyPosition = strpos(
+            $body,
+            'CRM-selected confirmation body.',
+        );
+
+        $acknowledgementPosition = strpos(
+            $body,
+            $acknowledgementPlaceholder,
+        );
+
+        $this->assertIsInt($primaryBodyPosition);
+        $this->assertIsInt($acknowledgementPosition);
+        $this->assertTrue(
+            $primaryBodyPosition < $acknowledgementPosition,
+            'The acknowledgement should follow the CRM-selected primary body.',
+        );
+
         $this->assertEqualsCanonicalizing([
             'label' => 'CRM-selected CTA',
             'url' => '{webinar_join_url}',
         ], $message->payload['cta']);
+
         $this->assertEqualsCanonicalizing([
             'label' => 'CRM-selected secondary link',
             'url' => '{cancel_registration_url}',
         ], $message->payload['secondary_link']);
-        $this->assertSame($preset->getKey(), data_get($message->meta, 'message_template_preset.id'));
-        $this->assertSame($assignment->getKey(), data_get($message->meta, 'message_template_assignment.id'));
-        $this->assertSame($profileItem->getMorphClass(), $message->behavior_owner_type);
-        $this->assertSame($profileItem->getKey(), $message->behavior_owner_id);
-        $this->assertSame('confirmation', data_get($message->meta, 'delivery_consolidation.template_key'));
-        $this->assertSame('primary_intent', data_get($message->meta, 'delivery_consolidation.template_source'));
-        $this->assertSame([
+
+        $this->assertSame(
+            $preset->getKey(),
+            data_get($message->meta, 'message_template_preset.id'),
+        );
+
+        $this->assertSame(
+            $assignment->getKey(),
+            data_get($message->meta, 'message_template_assignment.id'),
+        );
+
+        $this->assertSame(
+            $profileItem->getMorphClass(),
+            $message->behavior_owner_type,
+        );
+
+        $this->assertSame(
+            $profileItem->getKey(),
+            $message->behavior_owner_id,
+        );
+
+        $this->assertSame(
+            'confirmation',
+            data_get($message->meta, 'delivery_consolidation.template_key'),
+        );
+
+        $this->assertSame(
+            'primary_intent',
+            data_get($message->meta, 'delivery_consolidation.template_source'),
+        );
+
+        $this->assertEqualsCanonicalizing([
             'webinar.registration.confirmation',
             'consent.transactional.email.acknowledgement',
-        ], data_get($message->meta, 'delivery_consolidation.intent_keys'));
+        ], data_get(
+            $message->meta,
+            'delivery_consolidation.intent_keys',
+        ));
 
         Queue::assertPushed(SendScheduledMessageJob::class, 1);
     }

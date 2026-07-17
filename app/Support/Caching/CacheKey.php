@@ -39,16 +39,6 @@ class CacheKey
         ]);
     }
 
-    public static function webinarLandingPage(string $seriesSlug): string
-    {
-        return implode(':', [
-            'webinar',
-            self::client(),
-            'landing-page',
-            $seriesSlug,
-        ]);
-    }
-
     public static function zoomOAuthToken(string $accountKey = 'default'): string
     {
         return 'integrations:zoom:oauth-token:' . $accountKey;

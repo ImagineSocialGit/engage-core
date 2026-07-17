@@ -33,7 +33,7 @@ Route::middleware('module:webinars')->group(function () {
         ->name('webinar.show');
 
     Route::post('/{seriesSlug}/waitlist', WebinarWaitlistSignupController::class)
-        ->middleware('throttle:webinar-registration')
+        ->middleware('throttle:webinar-waitlist')
         ->name('webinar.waitlist.store');
 
     Route::post('/{seriesSlug}', [WebinarRegistrationController::class, 'store'])

@@ -16,6 +16,5 @@ class FlushWebinarCachesAction
         Cache::forget(CacheKey::nextUpcomingWebinar($seriesSlug));
         Cache::forget(CacheKey::activeWebinarSeries());
         Cache::forget(CacheKey::publicPageConfig('webinar-registration', $seriesSlug));
-        Cache::forget(CacheKey::webinarLandingPage($seriesSlug));
     }
 }

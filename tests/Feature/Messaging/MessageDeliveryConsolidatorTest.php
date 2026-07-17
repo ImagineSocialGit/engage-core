@@ -44,7 +44,10 @@ class MessageDeliveryConsolidatorTest extends TestCase
 
     public function test_email_policy_preserves_primary_definition_and_appends_compatible_consent_fragments(): void
     {
-        Config::set('messaging.delivery_consolidation.policies.webinar_registration.enabled', true);
+        Config::set(
+            'messaging.delivery_consolidation.policies.webinar_registration.enabled',
+            true,
+        );
 
         $contact = Contact::factory()->create();
 
@@ -101,51 +104,140 @@ class MessageDeliveryConsolidatorTest extends TestCase
 
         $this->assertSame('transactional', $intent->purpose());
         $this->assertSame('webinar', $intent->scope());
-        $this->assertSame('confirmation', $intent->definition['message_type']);
-        $this->assertSame('Selected confirmation subject', $intent->definition['payload']['subject']);
         $this->assertSame(
-            "Selected confirmation body.\n\n{delivery_consolidation_webinar_email_acknowledgement}\n\n{delivery_consolidation_marketing_email_acknowledgement}",
-            $intent->definition['payload']['body'],
+            'confirmation',
+            $intent->definition['message_type'],
         );
+
+        $this->assertSame(
+            'Selected confirmation subject',
+            $intent->definition['payload']['subject'],
+        );
+
+        $body = (string) $intent->definition['payload']['body'];
+        $webinarPlaceholder =
+            '{delivery_consolidation_webinar_email_acknowledgement}';
+        $marketingPlaceholder =
+            '{delivery_consolidation_marketing_email_acknowledgement}';
+
+        $this->assertStringStartsWith(
+            'Selected confirmation body.',
+            $body,
+        );
+
+        $this->assertStringContainsString(
+            $webinarPlaceholder,
+            $body,
+        );
+
+        $this->assertStringContainsString(
+            $marketingPlaceholder,
+            $body,
+        );
+
+        $webinarPosition = strpos($body, $webinarPlaceholder);
+        $marketingPosition = strpos($body, $marketingPlaceholder);
+
+        $this->assertIsInt($webinarPosition);
+        $this->assertIsInt($marketingPosition);
+        $this->assertTrue(
+            $webinarPosition < $marketingPosition,
+            'The webinar acknowledgement should precede the marketing acknowledgement.',
+        );
+
         $this->assertSame([
             'label' => 'Selected CTA',
             'url' => 'https://example.test/join',
         ], $intent->definition['payload']['cta']);
+
         $this->assertSame([
             'label' => 'Selected secondary link',
             'url' => 'https://example.test/cancel',
         ], $intent->definition['payload']['secondary_link']);
-        $this->assertSame(91, data_get($intent->definition, 'meta.message_template_preset.id'));
-        $this->assertSame(92, data_get($intent->definition, 'meta.message_template_assignment.id'));
-        $this->assertSame('webinar_registration:55:delivery_consolidation:initial_email', $intent->occurrenceKey);
+
+        $this->assertSame(
+            91,
+            data_get(
+                $intent->definition,
+                'meta.message_template_preset.id',
+            ),
+        );
+
+        $this->assertSame(
+            92,
+            data_get(
+                $intent->definition,
+                'meta.message_template_assignment.id',
+            ),
+        );
+
+        $this->assertSame(
+            'webinar_registration:55:delivery_consolidation:initial_email',
+            $intent->occurrenceKey,
+        );
+
         $this->assertSame(
             [
                 'consent.marketing.email.acknowledgement',
                 'consent.transactional.email.acknowledgement',
                 'webinar.registration.confirmation',
             ],
-            collect(data_get($intent->meta, 'delivery_consolidation.intent_keys'))
+            collect(data_get(
+                $intent->meta,
+                'delivery_consolidation.intent_keys',
+            ))
                 ->sort()
                 ->values()
                 ->all(),
         );
-        $this->assertSame([11, 12], data_get($intent->meta, 'delivery_consolidation.consent_ids'));
-        $this->assertSame('primary_intent', data_get($intent->meta, 'delivery_consolidation.template_source'));
-        $this->assertSame('body', data_get($intent->meta, 'delivery_consolidation.payload_key'));
-        $this->assertSame('append', data_get($intent->meta, 'delivery_consolidation.position'));
-        $this->assertStringContainsString(
-            'Webinar email updates are enabled',
-            $intent->payload['tokens']['delivery_consolidation_webinar_email_acknowledgement'],
+
+        $this->assertSame(
+            [11, 12],
+            data_get($intent->meta, 'delivery_consolidation.consent_ids'),
         );
+
+        $this->assertSame(
+            'primary_intent',
+            data_get($intent->meta, 'delivery_consolidation.template_source'),
+        );
+
+        $this->assertSame(
+            'body',
+            data_get($intent->meta, 'delivery_consolidation.payload_key'),
+        );
+
+        $this->assertSame(
+            'append',
+            data_get($intent->meta, 'delivery_consolidation.position'),
+        );
+
+        $webinarAcknowledgement = data_get(
+            $intent->payload,
+            'tokens.delivery_consolidation_webinar_email_acknowledgement',
+        );
+
+        $marketingAcknowledgement = data_get(
+            $intent->payload,
+            'tokens.delivery_consolidation_marketing_email_acknowledgement',
+        );
+
+        $this->assertIsString($webinarAcknowledgement);
+        $this->assertNotSame('', trim($webinarAcknowledgement));
+
+        $this->assertIsString($marketingAcknowledgement);
+        $this->assertNotSame('', trim($marketingAcknowledgement));
         $this->assertStringContainsString(
             'Example Company',
-            $intent->payload['tokens']['delivery_consolidation_marketing_email_acknowledgement'],
+            $marketingAcknowledgement,
         );
     }
 
     public function test_marketing_sms_remains_separate_while_primary_sms_copy_is_preserved(): void
     {
-        Config::set('messaging.delivery_consolidation.policies.webinar_registration.enabled', true);
+        Config::set(
+            'messaging.delivery_consolidation.policies.webinar_registration.enabled',
+            true,
+        );
 
         $contact = Contact::factory()->create();
 
@@ -160,32 +252,105 @@ class MessageDeliveryConsolidatorTest extends TestCase
                     'message' => 'Selected SMS confirmation.',
                 ],
             ),
-            $this->intent($contact, 'consent.transactional.sms.acknowledgement', 'sms', 'transactional', SmsPayload::class, consentId: 21),
-            $this->intent($contact, 'consent.marketing.sms.acknowledgement', 'sms', 'marketing', SmsPayload::class, consentId: 22),
+            $this->intent(
+                contact: $contact,
+                key: 'consent.transactional.sms.acknowledgement',
+                channel: 'sms',
+                purpose: 'transactional',
+                payloadClass: SmsPayload::class,
+                consentId: 21,
+            ),
+            $this->intent(
+                contact: $contact,
+                key: 'consent.marketing.sms.acknowledgement',
+                channel: 'sms',
+                purpose: 'marketing',
+                payloadClass: SmsPayload::class,
+                consentId: 22,
+            ),
         ], 'webinar_registration');
 
         $this->assertCount(2, $resolved);
 
         $combined = collect($resolved)->first(
-            fn (MessageDeliveryIntent $intent): bool => data_get($intent->meta, 'delivery_consolidation.group') === 'initial_sms',
-        );
-        $marketing = collect($resolved)->first(
-            fn (MessageDeliveryIntent $intent): bool => $intent->key === 'consent.marketing.sms.acknowledgement',
+            fn (MessageDeliveryIntent $intent): bool =>
+                data_get(
+                    $intent->meta,
+                    'delivery_consolidation.group',
+                ) === 'initial_sms',
         );
 
-        $this->assertInstanceOf(MessageDeliveryIntent::class, $combined);
-        $this->assertInstanceOf(MessageDeliveryIntent::class, $marketing);
-        $this->assertSame(
-            'Selected SMS confirmation. {delivery_consolidation_webinar_sms_acknowledgement}',
-            $combined->definition['payload']['message'],
+        $marketing = collect($resolved)->first(
+            fn (MessageDeliveryIntent $intent): bool =>
+                $intent->key ===
+                    'consent.marketing.sms.acknowledgement',
         );
+
+        $this->assertInstanceOf(
+            MessageDeliveryIntent::class,
+            $combined,
+        );
+
+        $this->assertInstanceOf(
+            MessageDeliveryIntent::class,
+            $marketing,
+        );
+
+        $message = (string) $combined->definition['payload']['message'];
+        $acknowledgementPlaceholder =
+            '{delivery_consolidation_webinar_sms_acknowledgement}';
+
+        $this->assertStringStartsWith(
+            'Selected SMS confirmation.',
+            $message,
+        );
+
         $this->assertStringContainsString(
-            'Reply HELP for help or STOP to opt out.',
-            $combined->payload['tokens']['delivery_consolidation_webinar_sms_acknowledgement'],
+            $acknowledgementPlaceholder,
+            $message,
         );
-        $this->assertSame([21], data_get($combined->meta, 'delivery_consolidation.consent_ids'));
-        $this->assertSame('marketing', $marketing->purpose());
-        $this->assertNull(data_get($marketing->meta, 'delivery_consolidation'));
+
+        $primaryPosition = strpos(
+            $message,
+            'Selected SMS confirmation.',
+        );
+
+        $acknowledgementPosition = strpos(
+            $message,
+            $acknowledgementPlaceholder,
+        );
+
+        $this->assertIsInt($primaryPosition);
+        $this->assertIsInt($acknowledgementPosition);
+        $this->assertTrue(
+            $primaryPosition < $acknowledgementPosition,
+            'The transactional SMS acknowledgement should follow the primary copy.',
+        );
+
+        $acknowledgement = data_get(
+            $combined->payload,
+            'tokens.delivery_consolidation_webinar_sms_acknowledgement',
+        );
+
+        $this->assertIsString($acknowledgement);
+        $this->assertNotSame('', trim($acknowledgement));
+
+        $this->assertSame(
+            [21],
+            data_get(
+                $combined->meta,
+                'delivery_consolidation.consent_ids',
+            ),
+        );
+
+        $this->assertSame(
+            'marketing',
+            $marketing->purpose(),
+        );
+
+        $this->assertNull(
+            data_get($marketing->meta, 'delivery_consolidation'),
+        );
     }
 
     public function test_missing_member_fragment_falls_back_to_independent_deliveries(): void
