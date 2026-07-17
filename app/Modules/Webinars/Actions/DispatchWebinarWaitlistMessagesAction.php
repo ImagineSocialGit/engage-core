@@ -7,6 +7,7 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\MessageDefinitionResolver;
+use App\Modules\Webinars\Services\WebinarMessageAreaRegistry;
 use App\Modules\Webinars\Services\WebinarScheduleProfileDefinitionResolver;
 use App\Modules\Webinars\Data\WebinarMessageData;
 use App\Modules\Webinars\Models\Webinar;
@@ -23,10 +24,15 @@ class DispatchWebinarWaitlistMessagesAction
         private readonly MessageChannelAvailability $messageChannelAvailability,
         private readonly MessageDefinitionResolver $messageDefinitionResolver,
         private readonly WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
+        private readonly WebinarMessageAreaRegistry $messageAreaRegistry,
     ) {}
 
     public function handle(Webinar $webinar): void
     {
+        if (! $this->messageAreaRegistry->isEnabled('waitlist')) {
+            return;
+        }
+
         $webinar->loadMissing('webinarSeries');
 
         $signups = WebinarWaitlistSignup::query()
@@ -71,6 +77,12 @@ class DispatchWebinarWaitlistMessagesAction
                     scope: self::SCOPE,
                 ),
                 dispatchKeys: 'webinar_added',
+                surface: self::SURFACE,
+            );
+
+            $definitions = $this->messageAreaRegistry->filterDefinitions(
+                definitions: $definitions,
+                areaKeys: ['waitlist'],
                 surface: self::SURFACE,
             );
 

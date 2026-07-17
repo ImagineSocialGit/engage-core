@@ -10,6 +10,7 @@ use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
 use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Services\WebinarMessageAreaRegistry;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 use Illuminate\Support\Collection;
@@ -18,15 +19,33 @@ use Throwable;
 class WebinarsSetupValidationContributor implements SetupValidationContributor
 {
     private const SOURCE = 'webinars.schedule_profiles';
+    private const MESSAGE_AREA_SOURCE = 'webinars.message_areas';
     private const MODULE = 'webinars';
 
     public function __construct(
         private readonly MessageDefinitionResolver $messageDefinitionResolver,
         private readonly MessageChannelAvailability $messageChannelAvailability,
+        private readonly WebinarMessageAreaRegistry $messageAreaRegistry,
     ) {}
 
     public function findings(): iterable
     {
+        try {
+            $this->messageAreaRegistry->all();
+        } catch (Throwable $exception) {
+            yield $this->error(
+                code: 'webinars.message_areas.config_invalid',
+                message: $exception->getMessage(),
+                path: self::MESSAGE_AREA_SOURCE,
+                meta: [
+                    'exception' => $exception::class,
+                ],
+                source: self::MESSAGE_AREA_SOURCE,
+            );
+
+            return;
+        }
+
         yield from $this->validateConfigProfiles();
         yield from $this->validateRuntimeProfiles();
         yield from $this->validateSelectedProfiles();
@@ -232,6 +251,7 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
                 'channel',
                 'purpose',
                 'scope',
+                'surface',
                 'message_type',
                 'dispatch_key',
                 'message_template_key',
@@ -284,6 +304,26 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
                 schedule: $item['schedule'] ?? null,
                 path: $path,
             );
+
+            if ($this->scheduleItemIdentityComplete($item)
+                && ! $this->messageAreaRegistry->areaForScheduleItem($item)
+            ) {
+                yield $this->error(
+                    code: 'webinars.schedule_profiles.message_area_unmapped',
+                    message: "Webinar schedule profile item [{$profileKey}:{$normalizedItemKey}] does not map to a configured Webinar message area.",
+                    path: $path,
+                    context: [
+                        'profile_key' => $profileKey,
+                        'item_key' => $normalizedItemKey,
+                        'context_key' => $item['context_key'],
+                        'purpose' => $item['purpose'],
+                        'scope' => $item['scope'],
+                        'surface' => $item['surface'],
+                        'message_type' => $item['message_type'],
+                        'dispatch_key' => $item['dispatch_key'],
+                    ],
+                );
+            }
         }
     }
 
@@ -444,7 +484,31 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
             context: $context,
         );
 
-        if (! $this->filledString($item->surface)) {
+        if (! $this->runtimeScheduleItemIdentityComplete($item)) {
+            return;
+        }
+
+        $messageArea = $this->messageAreaRegistry->areaForScheduleItem($item);
+
+        if (! $messageArea) {
+            yield $this->error(
+                code: 'webinars.schedule_profiles.message_area_unmapped',
+                message: "Webinar schedule profile item [{$profile->key}:{$item->key}] does not map to a configured Webinar message area.",
+                path: $path,
+                context: $context + [
+                    'context_key' => $item->context_key,
+                    'purpose' => $item->purpose,
+                    'scope' => $item->scope,
+                    'surface' => $item->surface,
+                    'message_type' => $item->message_type,
+                    'dispatch_key' => $item->dispatch_key,
+                ],
+            );
+
+            return;
+        }
+
+        if (! $messageArea->enabled) {
             return;
         }
 
@@ -716,6 +780,39 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
         }
     }
 
+    /**
+     * @param array<string, mixed> $item
+     */
+    private function scheduleItemIdentityComplete(array $item): bool
+    {
+        foreach ([
+            'context_key',
+            'purpose',
+            'scope',
+            'surface',
+            'message_type',
+            'dispatch_key',
+        ] as $field) {
+            if (! $this->filledString($item[$field] ?? null)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function runtimeScheduleItemIdentityComplete(WebinarScheduleProfileItem $item): bool
+    {
+        return $this->scheduleItemIdentityComplete([
+            'context_key' => $item->context_key,
+            'purpose' => $item->purpose,
+            'scope' => $item->scope,
+            'surface' => $item->surface,
+            'message_type' => $item->message_type,
+            'dispatch_key' => $item->dispatch_key,
+        ]);
+    }
+
     private function filledString(mixed $value): bool
     {
         return is_string($value) && trim($value) !== '';
@@ -747,12 +844,13 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
         string $path,
         array $context = [],
         array $meta = [],
+        ?string $source = null,
     ): SetupValidationFinding {
         return new SetupValidationFinding(
             severity: SetupValidationFinding::SEVERITY_ERROR,
             code: $code,
             message: $message,
-            source: self::SOURCE,
+            source: $source ?? self::SOURCE,
             path: $path,
             module: self::MODULE,
             context: $context,

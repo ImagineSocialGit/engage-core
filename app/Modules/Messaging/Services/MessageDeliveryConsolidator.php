@@ -13,6 +13,76 @@ class MessageDeliveryConsolidator
         private readonly EmailConsentRevocationLinkGenerator $emailConsentRevocationLinkGenerator,
     ) {}
 
+    public function coversIntent(
+        string $policyKey,
+        string $primaryIntentKey,
+        string $memberIntentKey,
+        string $channel,
+    ): bool {
+        $policy = config(
+            'messaging.delivery_consolidation.policies.'.$this->normalizeSegment($policyKey),
+            [],
+        );
+
+        if (! is_array($policy) || ! ($policy['enabled'] ?? false)) {
+            return false;
+        }
+
+        $groups = is_array($policy['groups'] ?? null) ? $policy['groups'] : [];
+
+        foreach ($groups as $group) {
+            if (! is_array($group)) {
+                continue;
+            }
+
+            if ($this->nullableSegment($group['channel'] ?? null) !== $this->normalizeSegment($channel)) {
+                continue;
+            }
+
+            if ($this->nullableSegment($group['primary_intent'] ?? null) !== $this->normalizeSegment($primaryIntentKey)) {
+                continue;
+            }
+
+            $memberIntents = array_values(array_filter(array_map(
+                fn (mixed $intent): ?string => $this->nullableSegment($intent),
+                is_array($group['member_intents'] ?? null) ? $group['member_intents'] : [],
+            )));
+
+            if (! in_array($this->normalizeSegment($memberIntentKey), $memberIntents, true)) {
+                continue;
+            }
+
+            $fragments = is_array($group['fragments'] ?? null) ? $group['fragments'] : [];
+            $fragmentCoversIntent = false;
+
+            foreach ($fragments as $fragment) {
+                if (
+                    is_array($fragment)
+                    && $this->nullableSegment($fragment['intent_key'] ?? null) === $this->normalizeSegment($memberIntentKey)
+                ) {
+                    $fragmentCoversIntent = true;
+                    break;
+                }
+            }
+
+            if (! $fragmentCoversIntent) {
+                continue;
+            }
+
+            $placement = is_array($group['placement'] ?? null) ? $group['placement'] : [];
+            $payloadKey = $this->nullableString($placement['payload_key'] ?? null);
+            $position = $this->nullableSegment($placement['position'] ?? null) ?? 'append';
+
+            if ($payloadKey === null || ! in_array($position, ['append', 'prepend'], true)) {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
     /**
      * @param array<int, MessageDeliveryIntent> $intents
      * @return array<int, MessageDeliveryIntent>

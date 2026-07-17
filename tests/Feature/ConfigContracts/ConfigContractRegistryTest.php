@@ -22,6 +22,7 @@ class ConfigContractRegistryTest extends TestCase
             'messaging.permission_invitation',
             'messaging.sms_definition',
             'tasks.preset_definition',
+            'webinars.message_area',
             'webinars.post_event',
             'webinars.schedule_profile',
         ], array_keys($registry->all()));

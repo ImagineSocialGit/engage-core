@@ -4,7 +4,6 @@ namespace App\Modules\Webinars\Actions\PostEvent;
 
 use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Enums\MessageChannel;
-use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Services\ConditionChecker;
 use App\Modules\Messaging\Services\MessageDefinitionResolver;
 use App\Modules\Webinars\Actions\EmitWebinarAutomationEventAction;
@@ -12,16 +11,23 @@ use App\Modules\Webinars\Contracts\WebinarProvider;
 use App\Modules\Webinars\Data\WebinarMessageData;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Services\WebinarMessageAreaRegistry;
 use App\Modules\Webinars\Services\WebinarScheduleProfileDefinitionResolver;
 
 class DispatchPostWebinarFollowUpsAction
 {
+    private const OUTCOME_AREA_KEYS = [
+        'post_attended',
+        'post_missed',
+    ];
+
     public function __construct(
         private readonly ConditionChecker $conditionChecker,
         private readonly DispatchMessageAction $dispatchMessageAction,
         private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
         private readonly MessageDefinitionResolver $messageDefinitionResolver,
         private readonly WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
+        private readonly WebinarMessageAreaRegistry $messageAreaRegistry,
     ) {}
 
     public function execute(
@@ -29,31 +35,29 @@ class DispatchPostWebinarFollowUpsAction
         Webinar $webinar,
         string $event,
     ): bool {
-        if (! config('webinars.post_event.outcome_messages.enabled', true)) {
-            return true;
-        }
-
-        $conditions = config('webinars.post_event.outcome_messages.conditions', []);
-
-        if (
-            is_array($conditions)
-            && ! $this->conditionChecker->passes($conditions, $this->conditionContext($webinar, $event))
-        ) {
-            return false;
-        }
-
         $webinar = $webinar->fresh() ?? $webinar;
 
-        if (! data_get($webinar->meta, 'normalized.post_event.follow_ups_dispatched_at')) {
-            $this->dispatchTransactionalFollowUps($webinar);
+        if ($this->hasEnabledOutcomeMessages()) {
+            $conditions = config('webinars.post_event.outcome_messages.conditions', []);
 
-            $webinar = $this->markMeta($webinar, [
-                'normalized' => [
-                    'post_event' => [
-                        'follow_ups_dispatched_at' => now()->toIso8601String(),
+            if (
+                is_array($conditions)
+                && ! $this->conditionChecker->passes($conditions, $this->conditionContext($webinar, $event))
+            ) {
+                return false;
+            }
+
+            if (! data_get($webinar->meta, 'normalized.post_event.follow_ups_dispatched_at')) {
+                $this->dispatchTransactionalFollowUps($webinar);
+
+                $webinar = $this->markMeta($webinar, [
+                    'normalized' => [
+                        'post_event' => [
+                            'follow_ups_dispatched_at' => now()->toIso8601String(),
+                        ],
                     ],
-                ],
-            ]);
+                ]);
+            }
         }
 
         if (! data_get($webinar->meta, 'automation_events.webinar_ended_recorded_at')) {
@@ -95,9 +99,14 @@ class DispatchPostWebinarFollowUpsAction
                 continue;
             }
 
-            $dispatchKeys = config('webinars.post_event.outcome_messages.dispatch_key', 'webinar_ended');
-            $purpose = $this->normalizedPurpose();
-            $scope = $this->normalizedScope();
+            $areaKey = filled($registration->attended_at)
+                ? 'post_attended'
+                : 'post_missed';
+            $messageArea = $this->messageAreaRegistry->get($areaKey);
+
+            if (! $messageArea?->enabled || ! $messageArea->isTemplate()) {
+                continue;
+            }
 
             $messageData = array_replace_recursive(
                 WebinarMessageData::fromRegistration($registration)->toArray(),
@@ -131,6 +140,7 @@ class DispatchPostWebinarFollowUpsAction
                     'webinar_id' => $webinar->getKey(),
                     'webinar_registration_id' => $registration->getKey(),
                     'webinar_slug' => $registration->webinar_slug,
+                    'webinar_message_area' => $messageArea->key,
                     'post_event' => [
                         'type' => 'transactional_follow_up',
                         'attended' => filled($registration->attended_at),
@@ -141,11 +151,17 @@ class DispatchPostWebinarFollowUpsAction
                     webinar: $webinar,
                     definitions: $this->messageDefinitionResolver->resolve(
                         channel: $channel,
-                        purpose: $purpose,
-                        scope: $scope,
+                        purpose: $messageArea->purpose,
+                        scope: $messageArea->scope,
                     ),
-                    dispatchKeys: $dispatchKeys,
-                    surface: 'webinar_registrations',
+                    dispatchKeys: $messageArea->dispatchKey,
+                    surface: $messageArea->surface,
+                );
+
+                $definitions = $this->messageAreaRegistry->filterDefinitions(
+                    definitions: $definitions,
+                    areaKeys: [$messageArea->key],
+                    surface: $messageArea->surface,
                 );
 
                 if ($definitions === []) {
@@ -155,9 +171,9 @@ class DispatchPostWebinarFollowUpsAction
                 $this->dispatchMessageAction->handle(
                     recipient: $registration->contact,
                     channel: $channel,
-                    purpose: $purpose,
-                    scope: $scope,
-                    dispatchKeys: $dispatchKeys,
+                    purpose: $messageArea->purpose,
+                    scope: $messageArea->scope,
+                    dispatchKeys: $messageArea->dispatchKey,
                     payload: $payload,
                     context: $registration,
                     triggeredAt: now(),
@@ -172,6 +188,17 @@ class DispatchPostWebinarFollowUpsAction
                 );
             }
         }
+    }
+
+    private function hasEnabledOutcomeMessages(): bool
+    {
+        foreach (self::OUTCOME_AREA_KEYS as $areaKey) {
+            if ($this->messageAreaRegistry->isEnabled($areaKey)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -198,24 +225,6 @@ class DispatchPostWebinarFollowUpsAction
                 : null,
             $channels,
         )))) ?: [MessageChannel::Email->value];
-    }
-
-    private function normalizedPurpose(): string
-    {
-        $purpose = config('webinars.post_event.outcome_messages.purpose', MessagePurpose::Transactional->value);
-
-        return is_string($purpose) && trim($purpose) !== ''
-            ? str_replace('-', '_', strtolower(trim($purpose)))
-            : MessagePurpose::Transactional->value;
-    }
-
-    private function normalizedScope(): string
-    {
-        $scope = config('webinars.post_event.outcome_messages.scope', 'webinar');
-
-        return is_string($scope) && trim($scope) !== ''
-            ? str_replace('-', '_', strtolower(trim($scope)))
-            : 'webinar';
     }
 
     /**

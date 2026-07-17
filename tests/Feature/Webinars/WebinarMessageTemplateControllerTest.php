@@ -18,6 +18,16 @@ class WebinarMessageTemplateControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config()->set(
+            'webinars.message_areas',
+            require base_path('config/webinars/message_areas.php'),
+        );
+    }
+
     public function test_index_renders_webinar_message_contexts_without_copy_editing(): void
     {
         config()->set('modules.enabled', [
@@ -72,6 +82,61 @@ class WebinarMessageTemplateControllerTest extends TestCase
             ->assertDontSee('Subject')
             ->assertDontSee('Body')
             ->assertDontSee('Template title');
+    }
+
+    public function test_opt_in_section_explains_messaging_owned_delivery_without_requesting_a_webinar_template(): void
+    {
+        config()->set('modules.enabled', [
+            'webinars',
+            'messaging',
+        ]);
+        config()->set('messaging.channel_availability.email', [
+            'runtime_supported' => true,
+            'provider_enabled' => true,
+            'requires_explicit_opt_in' => false,
+            'surfaces' => [
+                'webinar_registrations' => true,
+                'webinar_waitlists' => false,
+            ],
+            'purpose_scopes' => [
+                'transactional:webinar' => true,
+            ],
+        ]);
+        config()->set('messaging.channel_availability.sms.runtime_supported', false);
+        config()->set(
+            'messaging.delivery_consolidation',
+            require base_path('config/messaging/delivery_consolidation.php'),
+        );
+        config()->set('messaging.delivery_consolidation.policies.webinar_registration.enabled', true);
+
+        $user = User::factory()->create();
+        $preset = $this->webinarTemplate([
+            'message_type' => 'confirmation',
+            'usage_type' => 'webinar_confirmation',
+            'group_label' => 'Webinar Confirmations',
+            'item_label' => 'Confirmation Email',
+        ]);
+
+        MessageTemplatePresetAssignment::factory()
+            ->forPreset($preset)
+            ->create([
+                'surface' => 'webinar_registrations',
+                'message_type' => 'confirmation',
+                'definition_key' => 'confirmation',
+                'source_config_path' => $preset->source_config_path,
+            ]);
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/webinars/message-templates?section=registration_opt_in')
+            ->assertOk()
+            ->assertSee('Messaging-managed')
+            ->assertSee('Messaging owns this opt-in acknowledgement')
+            ->assertSee('No Webinar template selection is required here')
+            ->assertSee('Included with confirmation')
+            ->assertDontSee('No synced Messaging template is available for this webinar message area yet.')
+            ->assertDontSee('Template for this message');
     }
 
     public function test_it_updates_the_selected_template_for_a_webinar_message_context(): void
@@ -456,6 +521,60 @@ class WebinarMessageTemplateControllerTest extends TestCase
             ->get('http://crm.'.config('app.root_domain').'/webinars/message-templates?section=post_attended')
             ->assertOk()
             ->assertSee('Next day at 09:00');
+    }
+
+
+    public function test_index_omits_an_intentionally_disabled_message_area(): void
+    {
+        config()->set('modules.enabled', [
+            'webinars',
+            'messaging',
+        ]);
+        config()->set('webinars.message_areas.post_missed.enabled', false);
+
+        $user = User::factory()->create();
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/webinars/message-templates')
+            ->assertOk()
+            ->assertDontSee('Missed replay follow-up')
+            ->assertSee('Attended replay follow-up');
+    }
+
+    public function test_update_rejects_a_template_assignment_for_a_disabled_message_area(): void
+    {
+        config()->set('modules.enabled', [
+            'webinars',
+            'messaging',
+        ]);
+        config()->set('webinars.message_areas.confirmation.enabled', false);
+
+        $user = User::factory()->create();
+        $preset = $this->webinarTemplate([
+            'message_type' => 'confirmation',
+            'usage_type' => 'webinar_confirmation',
+            'group_label' => 'Webinar Confirmations',
+            'item_label' => 'Confirmation Email',
+        ]);
+        $catalogEntry = $preset->catalogEntries()->firstOrFail();
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->from('http://crm.'.config('app.root_domain').'/webinars/message-templates')
+            ->patch('http://crm.'.config('app.root_domain').'/webinars/message-templates', [
+                'context_key' => 'confirmation',
+                'catalog_entry_id' => $catalogEntry->getKey(),
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+                'surface' => 'webinar_registrations',
+                'message_type' => 'confirmation',
+                'message_template_preset_id' => $preset->getKey(),
+            ])
+            ->assertSessionHasErrors(['context_key']);
     }
 
     /**

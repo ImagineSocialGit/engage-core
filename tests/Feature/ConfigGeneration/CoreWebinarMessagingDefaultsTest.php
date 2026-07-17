@@ -137,8 +137,8 @@ class CoreWebinarMessagingDefaultsTest extends TestCase
 
     public function test_core_webinar_schedule_profile_matches_the_simplified_definition_keys(): void
     {
-        $webinars = require base_path('config/webinars.php');
-        $profile = $webinars['schedule_profiles']['full_10_day'] ?? null;
+        $profiles = require base_path('config/webinars/schedule_profiles.php');
+        $profile = $profiles['full_10_day'] ?? null;
 
         $this->assertIsArray($profile);
         $this->assertTrue($profile['is_default']);

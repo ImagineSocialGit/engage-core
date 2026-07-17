@@ -26,7 +26,38 @@ class WebinarsSetupValidationContributorTest extends TestCase
         Config::set('messaging.email', []);
         Config::set('messaging.sms', []);
 
+        $this->configureMessageAreas();
         $this->configureEmailAvailability();
+    }
+
+
+    public function test_it_reports_invalid_message_area_configuration_as_a_setup_finding(): void
+    {
+        Config::set('webinars.message_areas.registration_opt_in', [
+            'enabled' => false,
+            'disableable' => false,
+            'kind' => 'consent_acknowledgement',
+            'label' => 'Registration opt-in confirmations',
+            'description' => 'Consent acknowledgement.',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'surface' => 'webinar_registrations',
+            'message_type' => 'opt_in',
+            'dispatch_key' => 'consent_granted',
+            'required' => 'registration_messaging_available',
+            'usage_types' => [],
+            'profile_context_keys' => [],
+            'managed_by_messaging' => true,
+            'sort_order' => 20,
+        ]);
+
+        $findings = $this->findings();
+
+        $this->assertCount(1, $findings);
+        $this->assertSame('webinars.message_areas.config_invalid', $findings[0]['code']);
+        $this->assertSame('webinars.message_areas', $findings[0]['source']);
+        $this->assertSame('webinars.message_areas', $findings[0]['path']);
+        $this->assertStringContainsString('cannot be disabled directly', $findings[0]['message']);
     }
 
     public function test_it_accepts_valid_config_and_runtime_profile_state(): void
@@ -225,6 +256,82 @@ class WebinarsSetupValidationContributorTest extends TestCase
         );
     }
 
+
+    public function test_it_ignores_runtime_definition_and_availability_checks_for_disabled_message_area(): void
+    {
+        Config::set('webinars.message_areas.confirmation.enabled', false);
+        Config::set(
+            'messaging.channel_availability.email.surfaces.webinar_registrations',
+            false,
+        );
+
+        Config::set('webinars.schedule_profiles', [
+            'disabled_area_profile' => [
+                'name' => 'Disabled area profile',
+                'items' => [
+                    $this->validConfigItem(),
+                ],
+            ],
+        ]);
+
+        $profile = $this->profile();
+        $this->item($profile);
+
+        $codes = array_column($this->findings(), 'code');
+
+        $this->assertNotContains(
+            'webinars.schedule_profiles.messaging_definition_missing',
+            $codes,
+        );
+        $this->assertNotContains(
+            'webinars.schedule_profiles.channel_unavailable_for_surface',
+            $codes,
+        );
+        $this->assertNotContains(
+            'webinars.schedule_profiles.message_area_unmapped',
+            $codes,
+        );
+    }
+
+    public function test_it_reports_config_and_runtime_items_that_do_not_map_to_a_message_area(): void
+    {
+        $unmapped = $this->validConfigItem([
+            'key' => 'legacy_follow_up',
+            'context_key' => 'legacy_follow_up',
+            'message_type' => 'legacy_follow_up',
+            'dispatch_key' => 'legacy_event',
+            'message_template_key' => 'legacy_follow_up',
+        ]);
+
+        Config::set('webinars.schedule_profiles', [
+            'unmapped_profile' => [
+                'name' => 'Unmapped profile',
+                'items' => [$unmapped],
+            ],
+        ]);
+
+        $profile = $this->profile();
+        $this->item($profile, [
+            'key' => 'legacy_follow_up',
+            'context_key' => 'legacy_follow_up',
+            'message_type' => 'legacy_follow_up',
+            'dispatch_key' => 'legacy_event',
+            'message_template_key' => 'legacy_follow_up',
+        ]);
+
+        $unmappedFindings = array_values(array_filter(
+            $this->findings(),
+            fn (array $finding): bool => $finding['code']
+                === 'webinars.schedule_profiles.message_area_unmapped',
+        ));
+
+        $this->assertCount(2, $unmappedFindings);
+        $this->assertEqualsCanonicalizing([
+            'webinars.schedule_profiles.unmapped_profile.items.0',
+            'webinar_schedule_profile_items.'.$profile->items()->firstOrFail()->getKey(),
+        ], array_column($unmappedFindings, 'path'));
+    }
+
     public function test_it_reports_selected_inactive_profile_and_missing_default_fallback(): void
     {
         $inactive = $this->profile([
@@ -290,6 +397,28 @@ class WebinarsSetupValidationContributorTest extends TestCase
                 $result->findings(),
             ),
         );
+    }
+
+    private function configureMessageAreas(): void
+    {
+        Config::set('webinars.message_areas', [
+            'confirmation' => [
+                'enabled' => true,
+                'disableable' => true,
+                'kind' => 'template',
+                'label' => 'Registration confirmations',
+                'description' => 'Sent after someone registers.',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+                'surface' => 'webinar_registrations',
+                'message_type' => 'confirmation',
+                'dispatch_key' => 'registration_created',
+                'required' => true,
+                'usage_types' => ['webinar_confirmation'],
+                'profile_context_keys' => ['confirmation', 'confirmations'],
+                'sort_order' => 10,
+            ],
+        ]);
     }
 
     private function configureValidMessagingDefinition(): void
@@ -411,5 +540,6 @@ class WebinarsSetupValidationContributorTest extends TestCase
         );
     }
 }
+
 
 

@@ -14,7 +14,7 @@ use App\Modules\Messaging\Services\MessageEligibilityGate;
 use App\Modules\Messaging\Services\MessageDefinitionResolver;
 use App\Modules\Webinars\Data\WebinarMessageData;
 use App\Modules\Webinars\Models\WebinarRegistration;
-use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
+use App\Modules\Webinars\Services\WebinarMessageAreaRegistry;
 use App\Modules\Webinars\Services\WebinarScheduleProfileDefinitionResolver;
 
 class DispatchWebinarRegistrationMessagesAction
@@ -28,6 +28,7 @@ class DispatchWebinarRegistrationMessagesAction
         private readonly MessageChannelAvailability $messageChannelAvailability,
         private readonly MessageDefinitionResolver $messageDefinitionResolver,
         private readonly WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
+        private readonly WebinarMessageAreaRegistry $messageAreaRegistry,
     ) {}
 
     /**
@@ -76,7 +77,13 @@ class DispatchWebinarRegistrationMessagesAction
                 surface: 'webinar_registrations',
             );
 
-            foreach ($this->filterByContextKeys($definitions, $contextKeys) as $definition) {
+            $definitions = $this->messageAreaRegistry->filterDefinitions(
+                definitions: $definitions,
+                areaKeys: $contextKeys,
+                surface: 'webinar_registrations',
+            );
+
+            foreach ($definitions as $definition) {
                 $definitionKey = $this->definitionKey($definition);
 
                 $intents[] = MessageDeliveryIntent::fromDefinition(
@@ -172,49 +179,19 @@ class DispatchWebinarRegistrationMessagesAction
     }
 
     /**
-     * @param array<int, array<string, mixed>> $definitions
-     * @param array<int, string>|null $contextKeys
-     * @return array<int, array<string, mixed>>
-     */
-    private function filterByContextKeys(array $definitions, ?array $contextKeys): array
-    {
-        if ($contextKeys === null) {
-            return $definitions;
-        }
-
-        if ($contextKeys === []) {
-            return [];
-        }
-
-        return array_values(array_filter(
-            $definitions,
-            function (array $definition) use ($contextKeys): bool {
-                $owner = $definition['behavior_owner'] ?? null;
-
-                if (! $owner instanceof WebinarScheduleProfileItem) {
-                    return false;
-                }
-
-                return in_array(
-                    $this->normalizeSegment($owner->context_key),
-                    $contextKeys,
-                    true,
-                );
-            },
-        ));
-    }
-
-    /**
      * @param array<int, string>|null $contextKeys
      */
     private function includesInitialRegistrationContext(?array $contextKeys): bool
     {
+        if (! $this->messageAreaRegistry->isEnabled('registration_opt_in')) {
+            return false;
+        }
+
         if ($contextKeys === null) {
             return true;
         }
 
-        return in_array('confirmation', $contextKeys, true)
-            || in_array('confirmations', $contextKeys, true);
+        return in_array('confirmation', $contextKeys, true);
     }
 
     /**
@@ -242,16 +219,7 @@ class DispatchWebinarRegistrationMessagesAction
      */
     private function normalizeContextKeys(?array $contextKeys): ?array
     {
-        if ($contextKeys === null) {
-            return null;
-        }
-
-        return array_values(array_unique(array_filter(array_map(
-            fn (mixed $contextKey): ?string => is_string($contextKey) && trim($contextKey) !== ''
-                ? $this->normalizeSegment($contextKey)
-                : null,
-            $contextKeys,
-        ))));
+        return $this->messageAreaRegistry->normalizeEnabledAreaKeys($contextKeys);
     }
 
     private function normalizeSegment(string $value): string

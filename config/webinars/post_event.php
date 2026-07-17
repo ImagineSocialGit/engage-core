@@ -1,4 +1,3 @@
-
 <?php
 
 use App\Modules\Webinars\Actions\PostEvent\DispatchPostWebinarFollowUpsAction;
@@ -29,10 +28,6 @@ return [
     ],
 
     'outcome_messages' => [
-        'enabled' => true,
-        'dispatch_key' => 'webinar_ended',
-        'purpose' => 'transactional',
-        'scope' => 'webinar',
         'channels' => [
             'email',
             'sms',

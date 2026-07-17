@@ -14,7 +14,8 @@
 │   │   │       └── DashboardController.php
 │   │   └── Middleware
 │   │       ├── EnsureModuleEnabled.php
-│   │       └── ForceStagingAccess.php
+│   │       ├── ForceStagingAccess.php
+│   │       └── RequestCorrelation.php
 │   ├── Integrations
 │   │   ├── Messaging
 │   │   │   ├── Email
@@ -716,6 +717,7 @@
 │   │   │   │   ├── SyncWebinarScheduleProfilesAction.php
 │   │   │   │   └── SyncWebinarSeriesFromProviderAction.php
 │   │   │   ├── ConfigContracts
+│   │   │   │   ├── WebinarMessageAreaConfigContract.php
 │   │   │   │   ├── WebinarPostEventConfigContract.php
 │   │   │   │   ├── WebinarScheduleProfileConfigContract.php
 │   │   │   │   └── WebinarsConfigContractTargetProvider.php
@@ -744,6 +746,7 @@
 │   │   │   │   ├── ProviderWebhookEvent.php
 │   │   │   │   ├── ProviderWebinarData.php
 │   │   │   │   ├── WebinarAttendanceRecord.php
+│   │   │   │   ├── WebinarMessageAreaDefinition.php
 │   │   │   │   ├── WebinarMessageData.php
 │   │   │   │   ├── WebinarProviderSyncResult.php
 │   │   │   │   ├── WebinarRegistrationConsentTransition.php
@@ -781,6 +784,7 @@
 │   │   │   │   │   └── WebinarContactPanelProvider.php
 │   │   │   │   ├── Dashboard
 │   │   │   │   │   └── WebinarActivityDashboardPanelProvider.php
+│   │   │   │   ├── WebinarMessageAreaRegistry.php
 │   │   │   │   ├── WebinarMessageReadinessService.php
 │   │   │   │   ├── WebinarProviderManager.php
 │   │   │   │   ├── WebinarRegistrationCsvReader.php
@@ -998,6 +1002,7 @@
 │   │   ├── index
 │   │   │   ├── content.php
 │   │   │   └── style.php
+│   │   ├── message_areas.php
 │   │   ├── notify-me
 │   │   │   ├── content.php
 │   │   │   └── style.php
@@ -1005,6 +1010,7 @@
 │   │   ├── register
 │   │   │   ├── content.php
 │   │   │   └── style.php
+│   │   ├── schedule_profiles.php
 │   │   ├── style.php
 │   │   └── thank-you
 │   │       ├── content.php
@@ -1202,12 +1208,25 @@
 │   │   ├── tasks.md
 │   │   ├── webinars.md
 │   │   └── workflow.md
+│   ├── operations
+│   │   └── observability
+│   │       └── README.md
 │   ├── permission-invitations.md
 │   ├── possible-scenarios.md
 │   ├── product-principles.md
 │   ├── project-organization.md
 │   ├── TODO.md
 │   └── ui-ux-guide.md
+├── ops
+│   └── observability
+│       ├── logrotate
+│       │   ├── engage-core-client.template
+│       │   └── engage-core-php-fpm-slow.template
+│       ├── nginx
+│       │   ├── engage-core-observability-http.conf
+│       │   └── engage-core-request-id-fastcgi.conf
+│       └── php-fpm
+│           └── slowlog-settings.conf
 ├── package.json
 ├── package-lock.json
 ├── phpunit.xml
@@ -1369,8 +1388,17 @@
 │   ├── webinar.php
 │   └── web.php
 ├── scripts
+│   ├── add-client-modules.sh
 │   ├── build-image-manifest.php
 │   ├── create-client.sh
+│   ├── operations
+│   │   ├── configure-client-logging.sh
+│   │   ├── install-observability.sh
+│   │   ├── lib
+│   │   │   ├── patch_nginx_site.py
+│   │   │   └── patch_php_fpm_pool.py
+│   │   ├── rollback-observability.sh
+│   │   └── verify-observability.sh
 │   ├── process-images.sh
 │   └── upload-images.sh
 ├── tests
@@ -1551,6 +1579,7 @@
 │   │   │   ├── TelnyxInboundSmsWebhookTest.php
 │   │   │   └── ZoomWebhookTest.php
 │   │   ├── Webinars
+│   │   │   ├── CoreWebinarScheduleProfileExtractionTest.php
 │   │   │   ├── CreateWebinarRegistrationActionTest.php
 │   │   │   ├── CreateWebinarRegistrationConsentOptInTest.php
 │   │   │   ├── DispatchWebinarRegistrationMessagesActionTest.php
@@ -1560,8 +1589,11 @@
 │   │   │   ├── ImportWebinarRegistrationReminderDispatchTest.php
 │   │   │   ├── ImportWebinarRegistrationsCommandTest.php
 │   │   │   ├── PostEvent
+│   │   │   │   ├── DispatchPostWebinarFollowUpsMessageAreaTest.php
 │   │   │   │   └── ProcessPostWebinarEventJobTest.php
 │   │   │   ├── ResolveRegisterableWebinarActionTest.php
+│   │   │   ├── SyncWebinarScheduleProfilesMessageAreaTest.php
+│   │   │   ├── WebinarMessageAreaRegistryTest.php
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
 │   │   │   ├── WebinarRegisterPageConfigTest.php
@@ -1573,6 +1605,7 @@
 │   │   │   ├── WebinarRegistrationMessageConsolidationTest.php
 │   │   │   ├── WebinarRegistrationProviderSyncTest.php
 │   │   │   ├── WebinarResolvedMessageDispatchOwnershipTest.php
+│   │   │   ├── WebinarScheduleProfileDefinitionResolverMessageAreaTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
 │   │   │   └── WebinarWaitlistSignupControllerTest.php
@@ -1586,4 +1619,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-472 directories, 1115 files
+481 directories, 1139 files

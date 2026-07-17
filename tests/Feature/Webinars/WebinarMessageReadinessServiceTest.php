@@ -20,7 +20,12 @@ class WebinarMessageReadinessServiceTest extends TestCase
 
         Config::set('messaging.email', []);
         Config::set('messaging.sms', []);
-        Config::set('webinars.post_event.outcome_messages.enabled', false);
+        Config::set(
+            'webinars.message_areas',
+            require base_path('config/webinars/message_areas.php'),
+        );
+        Config::set('webinars.message_areas.post_attended.enabled', false);
+        Config::set('webinars.message_areas.post_missed.enabled', false);
 
         Config::set('messaging.channel_availability.email', [
             'runtime_supported' => true,
@@ -60,16 +65,23 @@ class WebinarMessageReadinessServiceTest extends TestCase
         $this->assertSame(WebinarMessageReadinessService::STATUS_READY, $readiness['status']);
         $this->assertSame(WebinarMessageReadinessService::STATUS_READY, $readiness['contexts']['confirmation']['status']);
         $this->assertSame(WebinarMessageReadinessService::STATUS_READY, $readiness['contexts']['registration_opt_in']['status']);
+        $this->assertSame('Sent separately', $readiness['contexts']['registration_opt_in']['status_label']);
+        $this->assertSame(
+            'sent_separately',
+            $readiness['contexts']['registration_opt_in']['channels'][0]['delivery_mode'],
+        );
         $this->assertSame(WebinarMessageReadinessService::STATUS_READY, $readiness['contexts']['reminders']['status']);
         $this->assertSame(WebinarMessageReadinessService::STATUS_OPTIONAL, $readiness['contexts']['waitlist']['status']);
         $this->assertSame(WebinarMessageReadinessService::STATUS_OPTIONAL, $readiness['contexts']['waitlist_opt_in']['status']);
-        $this->assertSame(WebinarMessageReadinessService::STATUS_OPTIONAL, $readiness['contexts']['post_attended']['status']);
-        $this->assertSame(WebinarMessageReadinessService::STATUS_OPTIONAL, $readiness['contexts']['post_missed']['status']);
+        $this->assertArrayNotHasKey('post_attended', $readiness['contexts']);
+        $this->assertArrayNotHasKey('post_missed', $readiness['contexts']);
         $this->assertSame(['Config fallback'], $readiness['contexts']['confirmation']['channels'][0]['source_labels']);
     }
 
-    public function test_it_needs_attention_when_a_required_message_context_does_not_resolve(): void
+
+    public function test_intentionally_disabled_message_area_is_omitted_instead_of_reported_missing(): void
     {
+        Config::set('webinars.message_areas.reminders.enabled', false);
         Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => $this->definition(
                 dispatchKey: 'registration_created',
@@ -83,34 +95,55 @@ class WebinarMessageReadinessServiceTest extends TestCase
 
         $readiness = app(WebinarMessageReadinessService::class)->resolve();
 
-        $this->assertSame(WebinarMessageReadinessService::STATUS_NEEDS_ATTENTION, $readiness['status']);
-        $this->assertSame(WebinarMessageReadinessService::STATUS_NEEDS_ATTENTION, $readiness['contexts']['reminders']['status']);
-        $this->assertSame(1, $readiness['counts']['needs_attention']);
+        $this->assertSame(WebinarMessageReadinessService::STATUS_READY, $readiness['status']);
+        $this->assertArrayNotHasKey('reminders', $readiness['contexts']);
+        $this->assertSame(0, $readiness['counts']['needs_attention']);
     }
 
-    public function test_it_needs_attention_when_registration_opt_in_is_missing_from_available_registration_messaging(): void
+    public function test_it_needs_attention_when_a_required_message_context_does_not_resolve(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
             'confirmation' => $this->definition(
                 dispatchKey: 'registration_created',
                 subject: 'Registered',
             ),
-            'reminder' => $this->definition(
-                dispatchKey: 'registration_created',
-                subject: 'Reminder',
-            ),
         ]);
 
         $readiness = app(WebinarMessageReadinessService::class)->resolve();
 
         $this->assertSame(WebinarMessageReadinessService::STATUS_NEEDS_ATTENTION, $readiness['status']);
+        $this->assertSame(WebinarMessageReadinessService::STATUS_NEEDS_ATTENTION, $readiness['contexts']['reminders']['status']);
+        $this->assertSame(1, $readiness['counts']['needs_attention']);
+    }
+
+    public function test_registration_opt_in_is_ready_when_delivery_consolidation_includes_it_with_confirmation(): void
+    {
+        $this->configureRequiredRegistrationDefinitions();
+
+        Config::set(
+            'messaging.delivery_consolidation',
+            require base_path('config/messaging/delivery_consolidation.php'),
+        );
+        Config::set('messaging.delivery_consolidation.policies.webinar_registration.enabled', true);
+
+        $readiness = app(WebinarMessageReadinessService::class)->resolve();
+
+        $this->assertSame(WebinarMessageReadinessService::STATUS_READY, $readiness['status']);
         $this->assertSame(
-            WebinarMessageReadinessService::STATUS_NEEDS_ATTENTION,
+            WebinarMessageReadinessService::STATUS_READY,
             $readiness['contexts']['registration_opt_in']['status'],
+        );
+        $this->assertSame(
+            'Included with confirmation',
+            $readiness['contexts']['registration_opt_in']['status_label'],
+        );
+        $this->assertSame(
+            'included_with_confirmation',
+            $readiness['contexts']['registration_opt_in']['channels'][0]['delivery_mode'],
         );
     }
 
-    public function test_waitlist_opt_in_becomes_required_when_waitlist_messaging_is_available(): void
+    public function test_waitlist_opt_in_uses_the_messaging_owned_standalone_definition(): void
     {
         $this->configureRequiredRegistrationDefinitions();
 
@@ -125,10 +158,15 @@ class WebinarMessageReadinessServiceTest extends TestCase
 
         $readiness = app(WebinarMessageReadinessService::class)->resolve();
 
-        $this->assertSame(WebinarMessageReadinessService::STATUS_NEEDS_ATTENTION, $readiness['status']);
+        $this->assertSame(WebinarMessageReadinessService::STATUS_READY, $readiness['status']);
         $this->assertSame(
-            WebinarMessageReadinessService::STATUS_NEEDS_ATTENTION,
+            WebinarMessageReadinessService::STATUS_READY,
             $readiness['contexts']['waitlist_opt_in']['status'],
+        );
+        $this->assertSame('Sent separately', $readiness['contexts']['waitlist_opt_in']['status_label']);
+        $this->assertSame(
+            'sent_separately',
+            $readiness['contexts']['waitlist_opt_in']['channels'][0]['delivery_mode'],
         );
     }
 
@@ -205,5 +243,3 @@ class WebinarMessageReadinessServiceTest extends TestCase
         ];
     }
 }
-
-

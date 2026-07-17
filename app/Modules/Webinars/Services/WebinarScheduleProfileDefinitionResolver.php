@@ -10,6 +10,7 @@ class WebinarScheduleProfileDefinitionResolver
 {
     public function __construct(
         private readonly WebinarScheduleProfileResolver $profileResolver,
+        private readonly WebinarMessageAreaRegistry $messageAreaRegistry,
     ) {}
 
     /**
@@ -94,6 +95,12 @@ class WebinarScheduleProfileDefinitionResolver
                 continue;
             }
 
+            $messageArea = $this->messageAreaRegistry->areaForScheduleItem($item);
+
+            if (! $messageArea?->enabled) {
+                continue;
+            }
+
             $schedule = is_array($item->schedule) ? $item->schedule : null;
             $conditions = is_array($item->conditions) ? $item->conditions : [];
 
@@ -117,6 +124,10 @@ class WebinarScheduleProfileDefinitionResolver
                         'item_id' => $item->getKey(),
                         'item_key' => $item->key,
                         'item_label' => $item->label,
+                    ],
+                    'webinar_message_area' => [
+                        'key' => $messageArea->key,
+                        'label' => $messageArea->label,
                     ],
                 ],
             );
@@ -167,9 +178,6 @@ class WebinarScheduleProfileDefinitionResolver
     }
 
 
-    /**
-     * @param array<string, mixed> $definition
-     */
     /** @param array<string, mixed> $definition */
     private function definitionTemplateKey(array $definition): ?string
     {

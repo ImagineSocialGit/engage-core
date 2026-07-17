@@ -11,6 +11,7 @@ final class WebinarsConfigContractTargetProvider implements ConfigContractTarget
     public function contractKeys(): array
     {
         return [
+            'webinars.message_area',
             'webinars.post_event',
             'webinars.schedule_profile',
         ];
@@ -18,6 +19,21 @@ final class WebinarsConfigContractTargetProvider implements ConfigContractTarget
 
     public function targets(ConfigContractTargetContext $context): iterable
     {
+        $messageAreas = $context->config('webinars.message_areas', []);
+
+        if (is_array($messageAreas)) {
+            foreach ($messageAreas as $areaKey => $area) {
+                yield new ConfigContractTarget(
+                    contractKey: 'webinars.message_area',
+                    path: 'webinars.message_areas.'.(string) $areaKey,
+                    value: $area,
+                    context: [
+                        'area_key' => $areaKey,
+                    ],
+                );
+            }
+        }
+
         $profiles = $context->config('webinars.schedule_profiles', []);
 
         if (is_array($profiles)) {

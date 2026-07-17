@@ -100,13 +100,22 @@
             @endif
         </section>
 
-        @if($sections->every(fn ($section) => $section['entries']->isEmpty() && ! ($section['managed_by_messaging'] ?? false)))
+        @if($sections->isEmpty())
+            <section class="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+                <h2 class="text-xl font-extrabold tracking-tight text-slate-950">
+                    No webinar message areas are enabled.
+                </h2>
+                <p class="mt-2 text-sm leading-6 text-slate-600">
+                    Enable the message areas this client uses in the Webinar configuration. Intentionally disabled areas do not count as setup problems.
+                </p>
+            </section>
+        @elseif($sections->every(fn ($section) => $section['entries']->isEmpty() && ! ($section['managed_by_messaging'] ?? false)))
             <section class="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
                 <h2 class="text-xl font-extrabold tracking-tight text-slate-950">
                     No webinar message templates are available yet.
                 </h2>
                 <p class="mt-2 text-sm leading-6 text-slate-600">
-                    Run the Messaging template preset sync after confirming the webinar message config exists.
+                    Run the Messaging template preset sync after confirming the enabled Webinar message areas have matching message definitions.
                 </p>
             </section>
         @else

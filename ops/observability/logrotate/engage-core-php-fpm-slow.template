@@ -1,0 +1,10 @@
+/var/log/php/php__PHP_VERSION__-fpm-slow.log {
+    daily
+    rotate 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    create 0640 www-data adm
+}

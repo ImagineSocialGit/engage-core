@@ -3,6 +3,7 @@
 namespace App\Modules\Webinars\Providers;
 
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
+use App\Modules\Webinars\ConfigContracts\WebinarMessageAreaConfigContract;
 use App\Modules\Webinars\ConfigContracts\WebinarPostEventConfigContract;
 use App\Modules\Webinars\ConfigContracts\WebinarScheduleProfileConfigContract;
 use App\Modules\Webinars\ConfigContracts\WebinarsConfigContractTargetProvider;
@@ -24,6 +25,7 @@ class WebinarsModuleServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->tag([
+            WebinarMessageAreaConfigContract::class,
             WebinarPostEventConfigContract::class,
             WebinarScheduleProfileConfigContract::class,
         ], 'config.contracts');
@@ -56,85 +58,106 @@ class WebinarsModuleServiceProvider extends ServiceProvider
         $this->app->make(ContactPanelRegistry::class)
             ->register(WebinarContactPanelProvider::class, 'webinars');
 
-        RateLimiter::for('webinar-registration', fn (Request $request): array =>
-            $this->publicFormLimits($request, 'registration')
-        );
-
-        RateLimiter::for('webinar-waitlist', fn (Request $request): array =>
-            $this->publicFormLimits($request, 'waitlist')
-        );
-
+        $this->registerPublicLimiter('webinar-registration', 'registration');
+        $this->registerPublicLimiter('webinar-waitlist', 'waitlist');
     }
-    /** @return array<int, Limit> */
-    private function publicFormLimits(Request $request, string $flow): array
+
+    private function registerPublicLimiter(string $limiterName, string $flow): void
     {
-        $seriesSlug = strtolower(trim((string) $request->route('seriesSlug')));
-        $seriesKey = $seriesSlug !== '' ? $seriesSlug : 'unknown';
-        $limits = [];
+        RateLimiter::for($limiterName, function (Request $request) use ($flow) {
+            $perIpPerMinute = max(
+                1,
+                (int) config('webinars.registration.rate_limits.per_ip_per_minute', 5)
+            );
 
-        if ($request->ip()) {
-            $limits[] = Limit::perMinute((int) config(
-                'webinars.registration.rate_limits.per_ip_per_minute',
-                20,
-            ))
-                ->by('webinar-public:ip:'.$this->rateLimitHash($request->ip()))
-                ->response(fn (Request $request, array $headers) =>
-                    back()->withInput()->withErrors([
-                        'rate_limit' => 'Too many webinar requests were submitted. Please wait a moment and try again.',
-                    ])->withHeaders($headers)
-                );
-        }
+            $perEmailPerHour = max(
+                1,
+                (int) config('webinars.registration.rate_limits.per_email_per_hour', 3)
+            );
 
-        $email = strtolower(trim((string) $request->input('email')));
+            $perPhonePerHour = max(
+                1,
+                (int) config('webinars.registration.rate_limits.per_phone_per_hour', $perEmailPerHour)
+            );
 
-        if ($email !== '') {
-            $limits[] = Limit::perHour((int) config(
-                'webinars.registration.rate_limits.per_email_per_hour',
-                3,
-            ))
-                ->by(sprintf(
-                    'webinar:%s:%s:email:%s',
-                    $flow,
-                    $seriesKey,
-                    $this->rateLimitHash($email),
-                ))
-                ->response(fn (Request $request, array $headers) =>
-                    back()->withInput()->withErrors([
-                        'email' => 'Too many attempts were submitted for this email. Please wait and try again.',
-                    ])->withHeaders($headers)
-                );
-        }
+            $seriesSlug = $this->seriesSlug($request);
+            $limits = [
+                Limit::perMinute($perIpPerMinute)
+                    ->by('webinar-public:ip:'.$this->hashedRateLimitIdentity(
+                        'webinar-public:ip:'.(string) $request->ip(),
+                    ))
+                    ->response($this->webinarRegistrationThrottleResponse(
+                        'email',
+                        'Too many attempts. Please wait a moment and try again.'
+                    )),
+            ];
 
-        $phone = preg_replace('/\D+/', '', (string) $request->input('phone'));
+            $email = strtolower(trim((string) $request->input('email')));
 
-        if (filled($phone)) {
-            $limits[] = Limit::perHour((int) config(
-                'webinars.registration.rate_limits.per_phone_per_hour',
-                3,
-            ))
-                ->by(sprintf(
-                    'webinar:%s:%s:phone:%s',
-                    $flow,
-                    $seriesKey,
-                    $this->rateLimitHash($phone),
-                ))
-                ->response(fn (Request $request, array $headers) =>
-                    back()->withInput()->withErrors([
-                        'phone' => 'Too many attempts were submitted for this phone number. Please wait and try again.',
-                    ])->withHeaders($headers)
-                );
-        }
+            if ($email !== '') {
+                $limits[] = Limit::perHour($perEmailPerHour)
+                    ->by('webinar-public:email:'.$this->hashedRateLimitIdentity(sprintf(
+                        'webinar:%s:%s:email:%s',
+                        $flow,
+                        $seriesSlug,
+                        $email,
+                    )))
+                    ->response($this->webinarRegistrationThrottleResponse(
+                        'email',
+                        'Too many attempts for this email. Please wait a moment and try again.'
+                    ));
+            }
 
-        return $limits;
+            $phone = preg_replace('/\D+/', '', (string) $request->input('phone'));
+
+            if (is_string($phone) && $phone !== '') {
+                $limits[] = Limit::perHour($perPhonePerHour)
+                    ->by('webinar-public:phone:'.$this->hashedRateLimitIdentity(sprintf(
+                        'webinar:%s:%s:phone:%s',
+                        $flow,
+                        $seriesSlug,
+                        $phone,
+                    )))
+                    ->response($this->webinarRegistrationThrottleResponse(
+                        'phone',
+                        'Too many attempts for this phone number. Please wait a moment and try again.'
+                    ));
+            }
+
+            return $limits;
+        });
     }
 
-    private function rateLimitHash(string $value): string
+    private function seriesSlug(Request $request): string
     {
-        return hash_hmac(
-            'sha256',
-            trim($value),
-            (string) config('app.key'),
-        );
+        $seriesSlug = $request->route('seriesSlug');
+
+        return is_string($seriesSlug) && trim($seriesSlug) !== ''
+            ? strtolower(trim($seriesSlug))
+            : 'unknown';
     }
 
+    private function hashedRateLimitIdentity(string $material): string
+    {
+        $key = config('app.key');
+
+        if (! is_string($key) || trim($key) === '') {
+            $key = 'engage-core-webinar-rate-limiter';
+        }
+
+        return hash_hmac('sha256', $material, $key);
+    }
+
+    private function webinarRegistrationThrottleResponse(string $field, string $message): callable
+    {
+        return function (Request $request, array $headers) use ($field, $message) {
+            return redirect()
+                ->back()
+                ->withInput($request->except('_token'))
+                ->withErrors([
+                    $field => $message,
+                ])
+                ->withHeaders($headers);
+        };
+    }
 }

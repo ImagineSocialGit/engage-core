@@ -4,11 +4,16 @@ namespace App\Modules\Webinars\Actions;
 
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
+use App\Modules\Webinars\Services\WebinarMessageAreaRegistry;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class SyncWebinarScheduleProfilesAction
 {
+    public function __construct(
+        private readonly WebinarMessageAreaRegistry $messageAreaRegistry,
+    ) {}
+
     /**
      * @return array{
      *     profiles_created: int,
@@ -152,6 +157,12 @@ class SyncWebinarScheduleProfilesAction
                     );
                 }
 
+                if (! $this->messageAreaRegistry->areaForScheduleItem($itemConfig)) {
+                    throw new InvalidArgumentException(
+                        "Webinar schedule profile [{$normalizedKey}] item [{$itemKey}] does not map to a configured Webinar message area."
+                    );
+                }
+
                 $seenItemKeys[$itemKey] = true;
             }
 
@@ -239,6 +250,14 @@ class SyncWebinarScheduleProfilesAction
         );
 
         $normalizedKey = $this->normalizeSegment($key);
+        $messageArea = $this->messageAreaRegistry->areaForScheduleItem($config);
+
+        if (! $messageArea) {
+            throw new InvalidArgumentException(
+                "Webinar schedule profile item [{$profile->key}:{$normalizedKey}] does not map to a configured Webinar message area."
+            );
+        }
+
         $timing = $this->normalizeSegment((string) ($config['timing'] ?? 'immediate'));
         $schedule = is_array($config['schedule'] ?? null) ? $config['schedule'] : null;
 
@@ -293,7 +312,7 @@ class SyncWebinarScheduleProfilesAction
                 "webinars.schedule_profiles.{$profile->key}.items.{$index}.message_template_key",
             )),
             'source_config_path' => $this->nullableString($config['source_config_path'] ?? null),
-            'is_enabled' => (bool) ($config['is_enabled'] ?? true),
+            'is_enabled' => (bool) ($config['is_enabled'] ?? true) && $messageArea->enabled,
             'is_active' => (bool) ($config['is_active'] ?? true),
             'sort_order' => is_numeric($config['sort_order'] ?? null) ? (int) $config['sort_order'] : $index,
             'timing' => $timing,
@@ -304,6 +323,11 @@ class SyncWebinarScheduleProfilesAction
                 [
                     'source' => 'config',
                     'source_config_path' => "webinars.schedule_profiles.{$profile->key}.items.{$index}",
+                    'webinar_message_area' => [
+                        'key' => $messageArea->key,
+                        'label' => $messageArea->label,
+                        'enabled' => $messageArea->enabled,
+                    ],
                 ],
             ),
         ];

@@ -2,8 +2,10 @@
 
 namespace App\Modules\Webinars\Services;
 
+use App\Modules\Messaging\Services\ConsentOptInDefinitionResolver;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\MessageDefinitionResolver;
+use App\Modules\Messaging\Services\MessageDeliveryConsolidator;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Models\WebinarSeries;
@@ -16,87 +18,13 @@ class WebinarMessageReadinessService
     public const STATUS_NEEDS_ATTENTION = 'needs_attention';
     public const STATUS_OPTIONAL = 'optional';
 
-    /**
-     * @var array<string, array{
-     *     label: string,
-     *     purpose: string,
-     *     scope: string,
-     *     surface: string,
-     *     message_type: string,
-     *     dispatch_key: string,
-     *     required: bool|string
-     * }>
-     */
-    private const CONTEXTS = [
-        'confirmation' => [
-            'label' => 'Registration confirmations',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-            'surface' => 'webinar_registrations',
-            'message_type' => 'confirmation',
-            'dispatch_key' => 'registration_created',
-            'required' => true,
-        ],
-        'registration_opt_in' => [
-            'label' => 'Registration opt-in confirmations',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-            'surface' => 'webinar_registrations',
-            'message_type' => 'opt_in',
-            'dispatch_key' => 'consent_granted',
-            'required' => 'registration_messaging_available',
-        ],
-        'reminders' => [
-            'label' => 'Reminder messages',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-            'surface' => 'webinar_registrations',
-            'message_type' => 'reminder',
-            'dispatch_key' => 'registration_created',
-            'required' => true,
-        ],
-        'waitlist' => [
-            'label' => 'Waitlist availability messages',
-            'purpose' => 'marketing',
-            'scope' => 'webinar_waitlist',
-            'surface' => 'webinar_waitlists',
-            'message_type' => 'alert',
-            'dispatch_key' => 'webinar_added',
-            'required' => false,
-        ],
-        'waitlist_opt_in' => [
-            'label' => 'Waitlist opt-in confirmations',
-            'purpose' => 'marketing',
-            'scope' => 'webinar_waitlist',
-            'surface' => 'webinar_waitlists',
-            'message_type' => 'opt_in',
-            'dispatch_key' => 'consent_granted',
-            'required' => 'waitlist_messaging_available',
-        ],
-        'post_attended' => [
-            'label' => 'Attended replay follow-up',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-            'surface' => 'webinar_registrations',
-            'message_type' => 'post_attended',
-            'dispatch_key' => 'webinar_ended',
-            'required' => 'post_event_outcome_messages',
-        ],
-        'post_missed' => [
-            'label' => 'Missed replay follow-up',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-            'surface' => 'webinar_registrations',
-            'message_type' => 'post_missed',
-            'dispatch_key' => 'webinar_ended',
-            'required' => 'post_event_outcome_messages',
-        ],
-    ];
-
     public function __construct(
         private readonly MessageDefinitionResolver $messageDefinitionResolver,
         private readonly MessageChannelAvailability $messageChannelAvailability,
+        private readonly MessageDeliveryConsolidator $messageDeliveryConsolidator,
+        private readonly ConsentOptInDefinitionResolver $consentOptInDefinitionResolver,
         private readonly WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
+        private readonly WebinarMessageAreaRegistry $messageAreaRegistry,
     ) {}
 
     /**
@@ -118,10 +46,10 @@ class WebinarMessageReadinessService
 
         $contexts = [];
 
-        foreach (self::CONTEXTS as $contextKey => $definition) {
+        foreach ($this->messageAreaRegistry->enabled() as $contextKey => $messageArea) {
             $contexts[$contextKey] = $this->resolveContext(
                 contextKey: $contextKey,
-                definition: $definition,
+                definition: $messageArea->toArray(),
                 profiles: $profiles,
             );
         }
@@ -202,11 +130,16 @@ class WebinarMessageReadinessService
         $channelStates = [];
 
         foreach ($channels as $channel) {
-            $channelStates[] = $this->resolveChannelState(
-                channel: $channel,
-                definition: $definition,
-                profiles: $profiles,
-            );
+            $channelStates[] = ($definition['kind'] ?? 'message') === 'consent_acknowledgement'
+                ? $this->resolveConsentChannelState(
+                    channel: $channel,
+                    definition: $definition,
+                )
+                : $this->resolveChannelState(
+                    channel: $channel,
+                    definition: $definition,
+                    profiles: $profiles,
+                );
         }
 
         $blockingStates = array_values(array_filter(
@@ -234,9 +167,14 @@ class WebinarMessageReadinessService
             'key' => $contextKey,
             'label' => $definition['label'],
             'status' => $status,
-            'status_label' => $this->statusLabel($status),
+            'status_label' => $this->contextStatusLabel(
+                status: $status,
+                definition: $definition,
+                readyStates: $readyStates,
+            ),
             'summary' => $this->contextSummary(
                 required: $required,
+                definition: $definition,
                 readyStates: $readyStates,
                 blockingStates: $blockingStates,
                 optionalStates: $optionalStates,
@@ -244,6 +182,109 @@ class WebinarMessageReadinessService
             'required' => $required,
             'channels' => $channelStates,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     * @return array<string, mixed>
+     */
+    private function resolveConsentChannelState(string $channel, array $definition): array
+    {
+        $intentKey = implode('.', [
+            'consent',
+            $this->normalizeSegment((string) $definition['purpose']),
+            $this->normalizeSegment($channel),
+            'acknowledgement',
+        ]);
+
+        $consolidationPolicy = $definition['consolidation_policy'] ?? null;
+        $consolidationPrimary = is_array($definition['consolidation_primary'] ?? null)
+            ? $definition['consolidation_primary']
+            : null;
+
+        if (
+            is_string($consolidationPolicy)
+            && $consolidationPrimary !== null
+            && is_string($consolidationPrimary['intent_key'] ?? null)
+            && $this->messageDeliveryConsolidator->coversIntent(
+                policyKey: $consolidationPolicy,
+                primaryIntentKey: $consolidationPrimary['intent_key'],
+                memberIntentKey: $intentKey,
+                channel: $channel,
+            )
+            && $this->primaryDefinitionResolves(
+                channel: $channel,
+                primary: $consolidationPrimary,
+            )
+        ) {
+            return [
+                'channel' => $channel,
+                'status' => self::STATUS_READY,
+                'status_label' => 'Included with confirmation',
+                'summary' => 'Messaging includes this opt-in acknowledgement with the registration confirmation.',
+                'delivery_mode' => 'included_with_confirmation',
+                'source_labels' => ['Delivery consolidation'],
+                'profiles_disabled' => [],
+                'error' => null,
+            ];
+        }
+
+        try {
+            $this->consentOptInDefinitionResolver->resolve(
+                channel: $channel,
+                purpose: (string) $definition['purpose'],
+                messageScope: (string) $definition['scope'],
+            );
+        } catch (Throwable $exception) {
+            return [
+                'channel' => $channel,
+                'status' => self::STATUS_NEEDS_ATTENTION,
+                'status_label' => 'Needs attention',
+                'summary' => 'Messaging cannot resolve a standalone opt-in acknowledgement for this channel.',
+                'delivery_mode' => 'unavailable',
+                'source_labels' => [],
+                'profiles_disabled' => [],
+                'error' => $exception->getMessage(),
+            ];
+        }
+
+        return [
+            'channel' => $channel,
+            'status' => self::STATUS_READY,
+            'status_label' => 'Sent separately',
+            'summary' => 'Messaging sends this opt-in acknowledgement as a separate message.',
+            'delivery_mode' => 'sent_separately',
+            'source_labels' => ['Messaging opt-in definition'],
+            'profiles_disabled' => [],
+            'error' => null,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $primary
+     */
+    private function primaryDefinitionResolves(string $channel, array $primary): bool
+    {
+        $primaryAreaKey = $primary['area_key'] ?? null;
+
+        if (is_string($primaryAreaKey) && ! $this->messageAreaRegistry->isEnabled($primaryAreaKey)) {
+            return false;
+        }
+
+        try {
+            $definitions = $this->messageDefinitionResolver->resolve(
+                channel: $channel,
+                purpose: (string) ($primary['purpose'] ?? ''),
+                scope: (string) ($primary['scope'] ?? ''),
+            );
+        } catch (Throwable) {
+            return false;
+        }
+
+        return $this->matchingDefinitions($definitions, [
+            'message_type' => (string) ($primary['message_type'] ?? ''),
+            'dispatch_key' => (string) ($primary['dispatch_key'] ?? ''),
+        ]) !== [];
     }
 
     /**
@@ -492,7 +533,6 @@ class WebinarMessageReadinessService
                 purpose: $definition['purpose'],
                 scope: $definition['scope'],
             ) !== [],
-            'post_event_outcome_messages' => (bool) config('webinars.post_event.outcome_messages.enabled', true),
             default => false,
         };
     }
@@ -504,17 +544,30 @@ class WebinarMessageReadinessService
      */
     private function contextSummary(
         bool $required,
+        array $definition,
         array $readyStates,
         array $blockingStates,
         array $optionalStates,
     ): string {
+        $isConsentAcknowledgement = ($definition['kind'] ?? 'message') === 'consent_acknowledgement';
+
         if ($blockingStates !== []) {
+            if ($isConsentAcknowledgement) {
+                return $required
+                    ? 'At least one currently available channel has no valid opt-in acknowledgement delivery path.'
+                    : 'This optional opt-in acknowledgement is not fully configured for every currently available channel.';
+            }
+
             return $required
                 ? 'At least one currently available channel does not resolve to a compatible runtime message definition.'
                 : 'This optional message area is not fully configured for every currently available channel.';
         }
 
         if ($readyStates !== []) {
+            if ($isConsentAcknowledgement) {
+                return 'Messaging has a valid opt-in acknowledgement delivery path on every currently available channel.';
+            }
+
             if ($optionalStates !== []) {
                 return 'Ready on available channels, with one or more channels intentionally disabled by the active schedule profile.';
             }
@@ -522,7 +575,34 @@ class WebinarMessageReadinessService
             return 'All currently available channels resolve to compatible runtime message definitions.';
         }
 
-        return 'This message area is currently optional or intentionally disabled.';
+        return $isConsentAcknowledgement
+            ? 'This opt-in acknowledgement is currently optional or unavailable.'
+            : 'This message area is currently optional or intentionally disabled.';
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     * @param array<int, array<string, mixed>> $readyStates
+     */
+    private function contextStatusLabel(string $status, array $definition, array $readyStates): string
+    {
+        if (
+            $status === self::STATUS_READY
+            && ($definition['kind'] ?? 'message') === 'consent_acknowledgement'
+        ) {
+            $labels = array_values(array_unique(array_filter(array_map(
+                fn (array $state): ?string => is_string($state['status_label'] ?? null)
+                    ? $state['status_label']
+                    : null,
+                $readyStates,
+            ))));
+
+            if (count($labels) === 1) {
+                return $labels[0];
+            }
+        }
+
+        return $this->statusLabel($status);
     }
 
     /**
@@ -531,6 +611,10 @@ class WebinarMessageReadinessService
      */
     private function overallSummary(string $status, array $counts, array $issues): string
     {
+        if (array_sum($counts) === 0 && $issues === []) {
+            return 'No Webinar message areas are currently enabled.';
+        }
+
         if ($status === self::STATUS_READY) {
             return $counts['optional'] > 0
                 ? 'Required webinar message areas are ready. Optional or intentionally disabled areas are called out separately.'

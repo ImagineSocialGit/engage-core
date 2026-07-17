@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Http\Middleware\ForceStagingAccess;
+use App\Http\Middleware\RequestCorrelation;
 use App\Support\Clients\ClientEnvironmentLoader;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -57,9 +58,14 @@ $app = Application::configure(basePath: dirname(__DIR__))
             'email/resend',
         ]);
 
-        $middleware->web(append: [
-            ForceStagingAccess::class,
-        ]);
+        $middleware->web(
+            prepend: [
+                RequestCorrelation::class,
+            ],
+            append: [
+                ForceStagingAccess::class,
+            ],
+        );
     })
     ->withExceptions(function ($exceptions): void {
         $exceptions->render(function (

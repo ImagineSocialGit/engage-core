@@ -9,6 +9,7 @@ use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Requests\UpdateWebinarMessageTemplateRequest;
+use App\Modules\Webinars\Services\WebinarMessageAreaRegistry;
 use App\Modules\Webinars\Services\WebinarMessageReadinessService;
 use App\Modules\Webinars\Services\WebinarScheduleProfileDefinitionResolver;
 use Illuminate\Contracts\View\View;
@@ -16,59 +17,26 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class WebinarMessageTemplateController extends Controller
 {
-    private const CONTEXTS = [
-        'confirmation' => [
-            'label' => 'Registration confirmations',
-            'description' => 'Sent after someone registers, using the registration message timing already owned by Webinars.',
-            'usage_types' => ['webinar_confirmation'],
-        ],
-        'registration_opt_in' => [
-            'label' => 'Registration opt-in confirmations',
-            'description' => 'Sent when someone grants webinar transactional messaging consent.',
-            'usage_types' => ['webinar_opt_in'],
-        ],
-        'reminders' => [
-            'label' => 'Reminder messages',
-            'description' => 'Scheduled around the webinar start time. Changing the selected template affects future registrations only.',
-            'usage_types' => ['webinar_reminder'],
-        ],
-        'waitlist' => [
-            'label' => 'Waitlist availability messages',
-            'description' => 'Sent when a new webinar becomes available for people waiting on a series.',
-            'usage_types' => ['webinar_waitlist_alert'],
-        ],
-        'waitlist_opt_in' => [
-            'label' => 'Waitlist opt-in confirmations',
-            'description' => 'Sent when someone grants marketing messaging consent while joining a webinar waitlist.',
-            'usage_types' => ['webinar_waitlist_opt_in'],
-        ],
-        'post_attended' => [
-            'label' => 'Attended replay follow-up',
-            'description' => 'Transactional replay follow-up for registrants marked as attended.',
-            'usage_types' => ['webinar_post_attended'],
-        ],
-        'post_missed' => [
-            'label' => 'Missed replay follow-up',
-            'description' => 'Transactional replay follow-up for registrants marked as missed.',
-            'usage_types' => ['webinar_post_missed'],
-        ],
-    ];
-
     public function index(
         Request $request,
         WebinarMessageReadinessService $messageReadiness,
         WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
+        WebinarMessageAreaRegistry $messageAreaRegistry,
     ): View {
-        $catalogEntries = $this->webinarCatalogEntries();
+        $contexts = $messageAreaRegistry->enabled()
+            ->map(fn ($messageArea): array => $messageArea->toArray());
+        $catalogEntries = $this->webinarCatalogEntries($contexts);
         $currentAssignments = $this->currentAssignments($catalogEntries);
         $templateOptions = $this->templateOptions($catalogEntries);
         $readiness = $messageReadiness->resolve();
         $profiles = $messageReadiness->profilesInUse()['profiles'];
 
         $sections = $this->sections(
+            contexts: $contexts,
             catalogEntries: $catalogEntries,
             currentAssignments: $currentAssignments,
             templateOptions: $templateOptions,
@@ -96,9 +64,22 @@ class WebinarMessageTemplateController extends Controller
     public function update(
         UpdateWebinarMessageTemplateRequest $request,
         AssignMessageTemplatePresetAction $assignTemplatePreset,
+        WebinarMessageAreaRegistry $messageAreaRegistry,
     ): RedirectResponse {
         $preset = $request->messageTemplatePreset();
         $catalogEntry = $request->messageTemplateCatalogEntry();
+        $area = $messageAreaRegistry->get((string) $request->validated('context_key'));
+
+        if (
+            ! $area?->enabled
+            || ! $area->isTemplate()
+            || ! in_array($catalogEntry->usage_type, $area->usageTypes, true)
+        ) {
+            throw ValidationException::withMessages([
+                'context_key' => 'This Webinar message area is disabled or does not own the selected template.',
+            ]);
+        }
+
         $definitionKey = $this->definitionKeyForEntry($catalogEntry);
 
         $assignTemplatePreset->handle(
@@ -131,13 +112,17 @@ class WebinarMessageTemplateController extends Controller
     /**
      * @return Collection<int, MessageTemplateCatalogEntry>
      */
-    private function webinarCatalogEntries(): Collection
+    private function webinarCatalogEntries(Collection $contexts): Collection
     {
-        $usageTypes = collect(self::CONTEXTS)
+        $usageTypes = $contexts
             ->flatMap(fn (array $context): array => $context['usage_types'])
             ->unique()
             ->values()
             ->all();
+
+        if ($usageTypes === []) {
+            return collect();
+        }
 
         return MessageTemplateCatalogEntry::query()
             ->active()
@@ -236,13 +221,14 @@ class WebinarMessageTemplateController extends Controller
      * @return Collection<string, array{key: string, label: string, description: string, entries: Collection<int, array<string, mixed>>}>
      */
     private function sections(
+        Collection $contexts,
         Collection $catalogEntries,
         Collection $currentAssignments,
         Collection $templateOptions,
         Collection $profiles,
         WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
     ): Collection {
-        return collect(self::CONTEXTS)
+        return $contexts
             ->map(function (array $context, string $contextKey) use (
                 $catalogEntries,
                 $currentAssignments,
@@ -301,6 +287,7 @@ class WebinarMessageTemplateController extends Controller
                     'key' => $contextKey,
                     'label' => $context['label'],
                     'description' => $context['description'],
+                    'managed_by_messaging' => (bool) ($context['managed_by_messaging'] ?? false),
                     'entries' => $entries,
                 ];
             });

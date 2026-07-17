@@ -4,10 +4,14 @@ set -euo pipefail
 
 CLIENT_KEY="${1:-}"
 CLIENT_TIMEZONE="${2:-}"
+WEB_GROUP="${ENGAGE_CORE_WEB_GROUP:-www-data}"
 
 if [[ -z "$CLIENT_KEY" || -z "$CLIENT_TIMEZONE" ]]; then
   echo "Usage: ./scripts/create-client.sh client-key timezone"
   echo "Example: ./scripts/create-client.sh example-client America/Chicago"
+  echo
+  echo "Optional:"
+  echo "  ENGAGE_CORE_WEB_GROUP=www-data"
   exit 1
 fi
 
@@ -18,6 +22,12 @@ fi
 
 if ! command -v php >/dev/null 2>&1; then
   echo "PHP is required to validate the client timezone and generated configuration files."
+  exit 1
+fi
+
+if ! getent group "$WEB_GROUP" >/dev/null 2>&1; then
+  echo "Web server group does not exist: $WEB_GROUP"
+  echo "Set ENGAGE_CORE_WEB_GROUP when the PHP-FPM group is not www-data."
   exit 1
 fi
 
@@ -262,10 +272,12 @@ This scaffold intentionally starts with the \`basic\` preset and the Tasks and W
 
 ## Local setup
 
-1. Copy the client environment example:
+1. Create the client environment with PHP-FPM-readable permissions:
 
    \`\`\`bash
-   cp client/$CLIENT_KEY/.env.example client/$CLIENT_KEY/.env
+   sudo install -o "\$(id -un)" -g "$WEB_GROUP" -m 640 \\
+     client/$CLIENT_KEY/.env.example \\
+     client/$CLIENT_KEY/.env
    \`\`\`
 
 2. Populate \`client/$CLIENT_KEY/.env\` with client deployment values and secrets.
@@ -282,6 +294,18 @@ This scaffold intentionally starts with the \`basic\` preset and the Tasks and W
    php artisan presets:sync
    php artisan setup:validate
    \`\`\`
+
+## File permissions
+
+The client scaffold uses:
+
+\`\`\`text
+directories: 2750
+files:       0640
+group:       $WEB_GROUP
+\`\`\`
+
+The setgid directory bit keeps newly created files in the PHP-FPM group. When creating or replacing the client \`.env\`, preserve mode \`0640\` so PHP-FPM can read it without making secrets world-readable.
 
 ## Configuration ownership
 
@@ -303,9 +327,27 @@ $json = file_get_contents($argv[1]);
 json_decode($json, true, 512, JSON_THROW_ON_ERROR);
 ' "$TEMP_CLIENT_DIR/resources/images/manifest.json"
 
+# mktemp creates the temporary client directory as 0700. Before publishing the
+# client, make it traversable/readable by the PHP-FPM group while keeping it
+# closed to all other users. The setgid bit preserves the web group on new files.
+if ! chgrp -R "$WEB_GROUP" "$TEMP_CLIENT_DIR" 2>/dev/null; then
+  if ! command -v sudo >/dev/null 2>&1; then
+    echo "Unable to assign the client directory to group '$WEB_GROUP'."
+    echo "Install sudo, run as root, or add the current user to that group."
+    exit 1
+  fi
+
+  sudo chgrp -R "$WEB_GROUP" "$TEMP_CLIENT_DIR"
+fi
+
+find "$TEMP_CLIENT_DIR" -type d -exec chmod 2750 {} +
+find "$TEMP_CLIENT_DIR" -type f -exec chmod 0640 {} +
+
 mv "$TEMP_CLIENT_DIR" "$CLIENT_DIR"
 TEMP_CLIENT_DIR=""
 trap - EXIT
+
+CURRENT_USER="$(id -un)"
 
 cat <<EOF
 Created client: $CLIENT_DIR
@@ -313,9 +355,12 @@ Name: $CLIENT_NAME
 Timezone: $CLIENT_TIMEZONE
 Preset: basic
 Modules: tasks, workflow
+Permissions: directories 2750; files 0640; group $WEB_GROUP
 
 Next:
-  cp client/$CLIENT_KEY/.env.example client/$CLIENT_KEY/.env
+  sudo install -o "$CURRENT_USER" -g "$WEB_GROUP" -m 640 \\
+    client/$CLIENT_KEY/.env.example \\
+    client/$CLIENT_KEY/.env
   # Populate client/$CLIENT_KEY/.env
   # Set CLIENT_KEY=$CLIENT_KEY in the root .env
   php artisan optimize:clear
