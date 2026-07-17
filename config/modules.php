@@ -437,6 +437,11 @@ return [
             'ui' => [
                 'tone' => 'emerald',
             ],
+            'nav' => [
+                'label' => 'Tasks',
+                'route' => 'crm.tasks.index',
+                'priority' => 25,
+            ],
             'depends_on' => ['core'],
             'preset_contributors' => [
                 TasksPresetContributor::class,

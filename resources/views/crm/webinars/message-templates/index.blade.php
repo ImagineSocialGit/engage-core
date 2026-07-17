@@ -100,7 +100,7 @@
             @endif
         </section>
 
-        @if($sections->every(fn ($section) => $section['entries']->isEmpty()))
+        @if($sections->every(fn ($section) => $section['entries']->isEmpty() && ! ($section['managed_by_messaging'] ?? false)))
             <section class="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
                 <h2 class="text-xl font-extrabold tracking-tight text-slate-950">
                     No webinar message templates are available yet.
@@ -150,7 +150,11 @@
                                     {{ $section['description'] }}
                                 </div>
                                 <div class="mt-3 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
-                                    {{ $section['entries']->count() }} {{ Str::plural('message', $section['entries']->count()) }}
+                                    @if($section['managed_by_messaging'] ?? false)
+                                        Messaging-managed
+                                    @else
+                                        {{ $section['entries']->count() }} {{ Str::plural('message', $section['entries']->count()) }}
+                                    @endif
                                 </div>
                             </a>
                         @endforeach
@@ -192,9 +196,48 @@
 
                         @if($selectedSection['entries']->isEmpty())
                             <div class="p-6">
-                                <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-                                    No synced Messaging template is available for this webinar message area yet.
-                                </div>
+                                @if($selectedSection['managed_by_messaging'] ?? false)
+                                    <div class="rounded-2xl border border-sky-200 bg-sky-50/70 p-5 text-sm leading-6 text-slate-700">
+                                        <p class="font-extrabold text-slate-950">
+                                            Messaging owns this opt-in acknowledgement.
+                                        </p>
+                                        <p class="mt-1">
+                                            No Webinar template selection is required here. Messaging either includes the acknowledgement with the related lifecycle message or sends it separately using its consent-message definition.
+                                        </p>
+
+                                        @if(!empty($selectedSection['readiness']['channels']))
+                                            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                                                @foreach($selectedSection['readiness']['channels'] as $channelState)
+                                                    @php
+                                                        $channelStateClass = match ($channelState['status'] ?? null) {
+                                                            'ready' => 'border-emerald-200 bg-white text-emerald-900',
+                                                            'needs_attention' => 'border-amber-200 bg-amber-50 text-amber-950',
+                                                            default => 'border-slate-200 bg-white text-slate-700',
+                                                        };
+                                                    @endphp
+
+                                                    <div class="rounded-2xl border p-4 {{ $channelStateClass }}">
+                                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                                            <span class="font-extrabold uppercase tracking-wide">
+                                                                {{ ($channelState['channel'] ?? null) === 'sms' ? 'SMS' : Str::headline($channelState['channel'] ?? '') }}
+                                                            </span>
+                                                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-extrabold text-slate-700">
+                                                                {{ $channelState['status_label'] ?? 'Unavailable' }}
+                                                            </span>
+                                                        </div>
+                                                        <p class="mt-2 text-sm leading-5">
+                                                            {{ $channelState['summary'] ?? '' }}
+                                                        </p>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
+                                @else
+                                    <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                                        No synced Messaging template is available for this webinar message area yet.
+                                    </div>
+                                @endif
                             </div>
                         @else
                             <div class="divide-y divide-slate-100">
@@ -341,5 +384,3 @@
         @endif
     </div>
 </x-layouts.crm>
-
-
