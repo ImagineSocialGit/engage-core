@@ -1,3 +1,4 @@
+
 # Engage Core TODO
 
 ## Config generation lock-in
@@ -459,6 +460,36 @@ These are open code/runtime investigations surfaced by the first production Webi
 - [ ] Make post-event sequencing and recovery intent easier to inspect.
   - `webinar.ended` handles attendance while recording completion resolves playback and dispatches follow-ups.
   - Runtime behavior is valid, but current operational sequencing is easy to misread during recovery; improve first-class status/introspection before considering orchestration changes.
+
+## Reporting foundation documentation and audit
+
+This is the next focused documentation branch. Do not begin Reporting implementation until the durable module contract and first phased plan are written.
+
+- [ ] Audit current first-party observability inputs before proposing schema.
+  - Existing Nginx/access logs and server-side request facts.
+  - Current Webinar landing, registration, waitlist, join, attendance, replay, and message outcomes.
+  - Current module events, public read seams, and any existing Reporting module files/tests.
+- [ ] Use mature FOSS analytics/reporting systems as feature-shape references, not implementation sources.
+- [ ] Expand `docs/modules/reporting.md` into a durable optional-module contract.
+  - Reporting owns collection/normalization/aggregation/read models and report surfaces that are genuinely Reporting-specific.
+  - Producer modules own their domain state and emit public events/read data; Reporting must not mutate producer state or absorb producer business logic.
+  - The module must remain independently enableable and malleable across mortgage, music, pet services, and other clients.
+- [ ] Lock privacy-first identity and retention rules.
+  - No covert personal-data collection or sale.
+  - No cross-domain identity stitching by default.
+  - Prefer anonymous/session-level first-party measurement until a deliberate consented Contact correlation exists.
+  - Define IP/user-agent handling, bot classification, raw-event retention, aggregation retention, deletion, and access boundaries.
+- [ ] Define the initial event and attribution contract.
+  - Page/request observations.
+  - Webinar view, CTA, registration-start, registration-complete, waitlist, join, attendance, replay, and downstream conversion milestones.
+  - Source/referrer/UTM/campaign/content identifiers.
+  - Anonymous session, request, page-view, webinar, registration, Contact, message, and campaign correlation rules.
+  - Human-vs-bot classification and confidence/reason provenance without pretending uncertain traffic is definitively human.
+- [ ] Define the first report and phased implementation plan.
+  - First report: Webinar traffic and conversion funnel, including likely-human views, registration conversion, source attribution, join/attendance/replay outcomes, and explicit denominator rules.
+  - Phase collection and ingestion separately from normalized events, rollups, query/read services, dashboards, and external-site tracking client work.
+  - Include testing, data-volume, dedupe/idempotency, retry, privacy, and persistence-size requirements.
+- [ ] Capture unresolved product/schema decisions explicitly instead of guessing.
 
 ## One-off backlog
 

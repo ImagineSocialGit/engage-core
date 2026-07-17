@@ -1,14 +1,14 @@
 <?php
 
-use App\Modules\Messaging\Payloads\EmailPayload;
-use App\Modules\Messaging\Payloads\SmsPayload;
-
 return [
     'policies' => [
         'webinar_registration' => [
             /*
              * Core defaults to separate deliveries. A client may enable this
              * policy without changing consent persistence or provider behavior.
+             *
+             * Consolidation decorates the selected primary message definition.
+             * It must never replace client-authored or CRM-selected templates.
              */
             'enabled' => false,
 
@@ -22,43 +22,10 @@ return [
                     ],
                     'include_marketing_unsubscribe' => true,
 
-                    'template' => [
-                        'key' => 'webinar_registration_initial',
-                        'definition_key' => 'webinar_registration_initial',
-                        'dispatch_keys' => ['registration_created'],
-                        'message_type' => 'confirmation',
-                        'channel' => 'email',
-                        'purpose' => 'transactional',
-                        'scope' => 'webinar',
-                        'payload_class' => EmailPayload::class,
-                        'queue' => 'confirmation_messages',
-                        'payload' => [
-                            'subject' => 'You’re registered for {webinar_title}',
-                            'body' => <<<'TEXT'
-Hi {first_name},
-
-You’re registered for {webinar_title}.
-
-Date: {webinar_start_date}
-Time: {webinar_start_time}
-
-{cta}
-
-{delivery_consolidation_webinar_email_acknowledgement}
-
-{delivery_consolidation_marketing_email_acknowledgement}
-
-We look forward to seeing you there.
-TEXT,
-                            'cta' => [
-                                'label' => 'Join Webinar',
-                                'url' => '{webinar_join_url}',
-                            ],
-                            'secondary_link' => [
-                                'label' => 'Need to cancel your registration?',
-                                'url' => '{cancel_registration_url}',
-                            ],
-                        ],
+                    'placement' => [
+                        'payload_key' => 'body',
+                        'position' => 'append',
+                        'separator' => "\n\n",
                     ],
 
                     'fragments' => [
@@ -80,19 +47,10 @@ TEXT,
                         'consent.transactional.sms.acknowledgement',
                     ],
 
-                    'template' => [
-                        'key' => 'webinar_registration_initial',
-                        'definition_key' => 'webinar_registration_initial',
-                        'dispatch_keys' => ['registration_created'],
-                        'message_type' => 'confirmation',
-                        'channel' => 'sms',
-                        'purpose' => 'transactional',
-                        'scope' => 'webinar',
-                        'payload_class' => SmsPayload::class,
-                        'queue' => 'confirmation_messages',
-                        'payload' => [
-                            'message' => 'You’re registered for {webinar_title} on {webinar_start_date} at {webinar_start_time}. Join: {webinar_join_url} {delivery_consolidation_webinar_sms_acknowledgement}',
-                        ],
+                    'placement' => [
+                        'payload_key' => 'message',
+                        'position' => 'append',
+                        'separator' => ' ',
                     ],
 
                     'fragments' => [

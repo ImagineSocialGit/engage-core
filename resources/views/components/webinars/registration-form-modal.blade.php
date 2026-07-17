@@ -22,11 +22,29 @@
     $transactionalChannels = $webinarRegistrationChannels['transactional'] ?? ['email'];
     $marketingChannels = $webinarRegistrationChannels['marketing'] ?? ['email'];
 
-    $transactionalEmailAvailable = in_array('email', $transactionalChannels, true);
-    $transactionalSmsAvailable = in_array('sms', $transactionalChannels, true);
-    $marketingEmailAvailable = in_array('email', $marketingChannels, true);
-    $marketingSmsAvailable = in_array('sms', $marketingChannels, true);
+    $transactionalEmailConfigured = data_get($page, 'consents.transactional.email', true) === true;
+    $transactionalSmsConfigured = data_get($page, 'consents.transactional.sms', true) === true;
+    $marketingEmailConfigured = data_get($page, 'consents.marketing.email', true) === true;
+    $marketingSmsConfigured = data_get($page, 'consents.marketing.sms', true) === true;
+
+    $transactionalEmailAvailable = $transactionalEmailConfigured
+        && in_array('email', $transactionalChannels, true);
+    $transactionalSmsAvailable = $transactionalSmsConfigured
+        && in_array('sms', $transactionalChannels, true);
+    $marketingEmailAvailable = $marketingEmailConfigured
+        && in_array('email', $marketingChannels, true);
+    $marketingSmsAvailable = $marketingSmsConfigured
+        && in_array('sms', $marketingChannels, true);
+
+    $transactionalConsentAvailable = $transactionalEmailAvailable || $transactionalSmsAvailable;
+    $marketingConsentAvailable = $marketingEmailAvailable || $marketingSmsAvailable;
     $smsAvailable = $transactionalSmsAvailable || $marketingSmsAvailable;
+
+    $smsConsentModels = array_values(array_filter([
+        $transactionalSmsAvailable ? 'transactionalSmsConsent' : null,
+        $marketingSmsAvailable ? 'marketingSmsConsent' : null,
+    ]));
+    $smsConsentRequirement = implode(' || ', $smsConsentModels);
 
     $legalLinks = collect($page['legal_links']['links'] ?? [])
         ->filter(function (mixed $link): bool {
@@ -178,18 +196,30 @@
                             {{ $page['fields']['phone']['label'] ?? 'Mobile phone' }}
                         </x-ui.form.label>
 
-                        <x-ui.form.input
-                            id="phone"
-                            name="phone"
-                            type="tel"
-                            inputmode="tel"
-                            autocomplete="tel"
-                            :aria-describedby="$smsAvailable ? 'phone_sms_helper' : null"
-                            x-bind:required="transactionalSmsConsent || marketingSmsConsent"
-                            x-bind:aria-required="transactionalSmsConsent || marketingSmsConsent ? 'true' : 'false'"
-                            :value="old('phone', $registrationPrefill['phone'] ?? null)"
-                            :placeholder="$page['fields']['phone']['placeholder'] ?? 'Phone number'"
-                        />
+                        @if($smsAvailable)
+                            <x-ui.form.input
+                                id="phone"
+                                name="phone"
+                                type="tel"
+                                inputmode="tel"
+                                autocomplete="tel"
+                                aria-describedby="phone_sms_helper"
+                                x-bind:required="{{ $smsConsentRequirement }}"
+                                x-bind:aria-required="({{ $smsConsentRequirement }}) ? 'true' : 'false'"
+                                :value="old('phone', $registrationPrefill['phone'] ?? null)"
+                                :placeholder="$page['fields']['phone']['placeholder'] ?? 'Phone number'"
+                            />
+                        @else
+                            <x-ui.form.input
+                                id="phone"
+                                name="phone"
+                                type="tel"
+                                inputmode="tel"
+                                autocomplete="tel"
+                                :value="old('phone', $registrationPrefill['phone'] ?? null)"
+                                :placeholder="$page['fields']['phone']['placeholder'] ?? 'Phone number'"
+                            />
+                        @endif
 
                         @if($smsAvailable)
                             <p id="phone_sms_helper" class="mt-1 text-xs font-medium leading-5 text-slate-500">
@@ -215,7 +245,8 @@
                     </div>
                 @endif
 
-                <fieldset class="mx-2 rounded-2xl bg-slate-50 pt-2 pb-4 px-4 border border-slate-300">
+                @if($transactionalConsentAvailable)
+                    <fieldset class="mx-2 rounded-2xl bg-slate-50 pt-2 pb-4 px-4 border border-slate-300">
                     <legend class="text-base font-semibold text-slate-900">
                         {{ $notificationSection['title'] ?? 'Webinar Registration (Required)' }}
                     </legend>
@@ -314,9 +345,11 @@
                             {{ $message }}
                         </p>
                     @enderror
-                </fieldset>
+                    </fieldset>
+                @endif
 
-                {{-- <fieldset class="mx-2 rounded-2xl border border-slate-200 py-2 px-4">
+                @if($marketingConsentAvailable)
+                    <fieldset class="mx-2 rounded-2xl border border-slate-200 py-2 px-4">
                     <legend class="px-1 text-base font-semibold text-slate-900">
                         {{ $marketingSection['title'] ?? 'Stay Connected (Optional)' }}
                     </legend>
@@ -397,7 +430,8 @@
                             </div>
                         @endif
                     </div>
-                </fieldset> --}}
+                    </fieldset>
+                @endif
 
                 @if(($page['legal_links']['enabled'] ?? false) && $legalLinks->isNotEmpty())
                     <p class="{{ $style['legal_links']['wrapper'] ?? 'text-xs leading-5 text-slate-600' }}">

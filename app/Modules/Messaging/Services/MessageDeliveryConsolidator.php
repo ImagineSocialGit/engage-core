@@ -161,6 +161,10 @@ class MessageDeliveryConsolidator
                 continue;
             }
 
+            if ($intent->channel() !== $primary->channel()) {
+                continue;
+            }
+
             if (! $this->sameModel($primary->recipient, $intent->recipient)) {
                 continue;
             }
@@ -186,50 +190,52 @@ class MessageDeliveryConsolidator
         MessageDeliveryIntent $primary,
         array $members,
     ): ?MessageDeliveryIntent {
-        $template = $group['template'] ?? null;
+        $definition = $primary->definition;
+        $dispatchKeys = $definition['dispatch_keys'] ?? null;
 
-        if (! is_array($template)) {
-            return null;
-        }
-
-        $template = $this->replaceSystemMarkersRecursive($template);
-        $dispatchKeys = $template['dispatch_keys'] ?? null;
-
-        if ($dispatchKeys === null && is_string($template['dispatch_key'] ?? null)) {
-            $dispatchKeys = [$template['dispatch_key']];
+        if ($dispatchKeys === null && is_string($definition['dispatch_key'] ?? null)) {
+            $dispatchKeys = [$definition['dispatch_key']];
         }
 
         if (! is_array($dispatchKeys) || $dispatchKeys === []) {
             return null;
         }
 
-        $template['dispatch_keys'] = $dispatchKeys;
-        unset($template['dispatch_key']);
+        $definition['dispatch_keys'] = $dispatchKeys;
+        unset($definition['dispatch_key']);
 
         $included = [$primary, ...$members];
         $includedIntentKeys = array_values(array_unique(array_map(
             fn (MessageDeliveryIntent $intent): string => $this->normalizeSegment($intent->key),
             $included,
         )));
-        $consentIds = $this->consentIds($included);
+        $memberIntentKeys = array_values(array_unique(array_map(
+            fn (MessageDeliveryIntent $intent): string => $this->normalizeSegment($intent->key),
+            $members,
+        )));
 
+        $resolvedFragments = $this->resolvedFragments($group, $memberIntentKeys);
+
+        if ($resolvedFragments === null) {
+            return null;
+        }
+
+        $placement = $this->applyFragmentPlacement(
+            definition: $definition,
+            group: $group,
+            fragmentTokens: array_keys($resolvedFragments),
+        );
+
+        if ($placement === null) {
+            return null;
+        }
+
+        $definition = $placement['definition'];
         $payload = $primary->payload;
         $tokens = is_array($payload['tokens'] ?? null) ? $payload['tokens'] : [];
-        $fragments = is_array($group['fragments'] ?? null) ? $group['fragments'] : [];
 
-        foreach ($fragments as $token => $fragment) {
-            if (! is_string($token) || trim($token) === '' || ! is_array($fragment)) {
-                continue;
-            }
-
-            $intentKey = $this->nullableSegment($fragment['intent_key'] ?? null);
-            $text = $this->nullableString($fragment['text'] ?? null);
-
-            $tokens[$token] = $intentKey !== null
-                && in_array($intentKey, $includedIntentKeys, true)
-                && $text !== null
-                    ? $this->replaceSystemMarkers($text)
-                    : '';
+        foreach ($resolvedFragments as $token => $text) {
+            $tokens[$token] = $text;
         }
 
         $payload['tokens'] = $tokens;
@@ -243,6 +249,9 @@ class MessageDeliveryConsolidator
                 ->marketingUnsubscribeUrl($primary->recipient);
         }
 
+        $consentIds = $this->consentIds($included);
+        $definitionKey = $this->definitionKey($definition);
+
         $meta = array_replace_recursive(
             $primary->meta,
             [
@@ -252,18 +261,11 @@ class MessageDeliveryConsolidator
                     'intent_keys' => $includedIntentKeys,
                     'consent_ids' => $consentIds,
                     'primary_intent_key' => $this->normalizeSegment($primary->key),
-                    'template_key' => $template['key'] ?? null,
-                ],
-            ],
-        );
-
-        $template['meta'] = array_replace_recursive(
-            is_array($template['meta'] ?? null) ? $template['meta'] : [],
-            [
-                'delivery_consolidation_template' => [
-                    'policy' => $policyKey,
-                    'group' => $groupKey,
-                    'intent_keys' => $includedIntentKeys,
+                    'template_key' => $definitionKey,
+                    'template_source' => 'primary_intent',
+                    'payload_key' => $placement['payload_key'],
+                    'position' => $placement['position'],
+                    'fragment_tokens' => array_keys($resolvedFragments),
                 ],
             ],
         );
@@ -271,7 +273,7 @@ class MessageDeliveryConsolidator
         return new MessageDeliveryIntent(
             key: "delivery_consolidation.{$policyKey}.{$groupKey}",
             recipient: $primary->recipient,
-            definition: $template,
+            definition: $definition,
             payload: $payload,
             context: $primary->context,
             triggeredAt: $primary->triggeredAt,
@@ -286,6 +288,105 @@ class MessageDeliveryConsolidator
             ], fn (mixed $value): bool => is_string($value) && trim($value) !== '')),
             meta: $meta,
         );
+    }
+
+    /**
+     * @param array<string, mixed> $group
+     * @param array<int, string> $memberIntentKeys
+     * @return array<string, string>|null
+     */
+    private function resolvedFragments(array $group, array $memberIntentKeys): ?array
+    {
+        $fragments = is_array($group['fragments'] ?? null) ? $group['fragments'] : [];
+
+        if ($fragments === [] || $memberIntentKeys === []) {
+            return null;
+        }
+
+        $resolved = [];
+        $coveredIntentKeys = [];
+
+        foreach ($fragments as $token => $fragment) {
+            if (! is_string($token) || trim($token) === '' || ! is_array($fragment)) {
+                continue;
+            }
+
+            $intentKey = $this->nullableSegment($fragment['intent_key'] ?? null);
+            $text = $this->nullableString($fragment['text'] ?? null);
+
+            if (
+                $intentKey === null
+                || $text === null
+                || ! in_array($intentKey, $memberIntentKeys, true)
+            ) {
+                continue;
+            }
+
+            $resolved[trim($token)] = $this->replaceSystemMarkers($text);
+            $coveredIntentKeys[] = $intentKey;
+        }
+
+        $coveredIntentKeys = array_values(array_unique($coveredIntentKeys));
+
+        if (array_diff($memberIntentKeys, $coveredIntentKeys) !== []) {
+            return null;
+        }
+
+        return $resolved !== [] ? $resolved : null;
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     * @param array<string, mixed> $group
+     * @param array<int, string> $fragmentTokens
+     * @return array{definition: array<string, mixed>, payload_key: string, position: string}|null
+     */
+    private function applyFragmentPlacement(
+        array $definition,
+        array $group,
+        array $fragmentTokens,
+    ): ?array {
+        $placement = is_array($group['placement'] ?? null) ? $group['placement'] : [];
+        $payloadKey = $this->nullableString($placement['payload_key'] ?? null);
+        $position = $this->nullableSegment($placement['position'] ?? null) ?? 'append';
+        $separator = is_string($placement['separator'] ?? null)
+            ? $placement['separator']
+            : "\n\n";
+
+        if ($payloadKey === null || ! in_array($position, ['append', 'prepend'], true)) {
+            return null;
+        }
+
+        $payloadPath = 'payload.'.$payloadKey;
+        $currentValue = data_get($definition, $payloadPath);
+
+        if (! is_string($currentValue) || trim($currentValue) === '') {
+            return null;
+        }
+
+        $placeholders = array_map(
+            fn (string $token): string => '{'.$token.'}',
+            $fragmentTokens,
+        );
+        $fragmentBlock = implode($separator, $placeholders);
+
+        if ($fragmentBlock === '') {
+            return null;
+        }
+
+        data_set(
+            $definition,
+            $payloadPath,
+            $position === 'prepend'
+                ? $fragmentBlock.$separator.$currentValue
+                : $currentValue.$separator.$fragmentBlock,
+        );
+
+        return [
+            'definition' => $definition,
+            'payload_key' => $payloadKey,
+            'position' => $position,
+        ];
     }
 
     /**
@@ -319,6 +420,25 @@ class MessageDeliveryConsolidator
         return array_values(array_unique($ids));
     }
 
+    /**
+     * @param array<string, mixed> $definition
+     */
+    private function definitionKey(array $definition): ?string
+    {
+        foreach ([
+            $definition['definition_key'] ?? null,
+            $definition['key'] ?? null,
+            data_get($definition, 'meta.message_template_assignment.definition_key'),
+            data_get($definition, 'meta.seed.definition_key'),
+        ] as $candidate) {
+            if (is_string($candidate) && trim($candidate) !== '') {
+                return trim($candidate);
+            }
+        }
+
+        return null;
+    }
+
     private function sameModel(Model $left, Model $right): bool
     {
         return $left->getMorphClass() === $right->getMorphClass()
@@ -332,21 +452,6 @@ class MessageDeliveryConsolidator
         }
 
         return $this->sameModel($left, $right);
-    }
-
-    /**
-     * @param array<string, mixed> $values
-     * @return array<string, mixed>
-     */
-    private function replaceSystemMarkersRecursive(array $values): array
-    {
-        array_walk_recursive($values, function (&$value): void {
-            if (is_string($value)) {
-                $value = $this->replaceSystemMarkers($value);
-            }
-        });
-
-        return $values;
     }
 
     private function replaceSystemMarkers(string $value): string

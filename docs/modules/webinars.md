@@ -1,3 +1,4 @@
+
 # Webinars Module
 
 ## Config and token contracts
@@ -83,6 +84,82 @@ registration-specific style classes
 `consent_header` belongs to the registration content/style contract. It should not be inferred from landing-page content or restored to an older title/items shape merely because a stale test expects it.
 
 Client copy is not a shared executable contract. Different clients may use different headings, labels, disclosures, and supporting language while still satisfying the same runtime and accessibility requirements.
+
+### Registration consent-field contract
+
+Registration field availability is an explicit boolean contract under the resolved registration content:
+
+```php
+'registration' => [
+    'consents' => [
+        'transactional' => [
+            'email' => true,
+            'sms' => true,
+        ],
+        'marketing' => [
+            'email' => false,
+            'sms' => false,
+        ],
+    ],
+],
+```
+
+The four boolean leaves are required configuration decisions. Do not infer field availability from whether copy happens to exist, and do not represent availability as an empty numeric list that may merge ambiguously.
+
+Effective presentation and acceptance are the intersection of:
+
+```text
+configured consent boolean = true
+AND
+Messaging channel availability exposes that channel for webinar_registrations
+```
+
+The registration modal and `StoreWebinarRegistrationRequest` must resolve the same effective client/series configuration. A consent field that is disabled by config or unavailable operationally must not render and must be rejected when manually posted. At least one effective transactional channel must remain available and selected. The phone field becomes required only when an effective SMS consent field is selected.
+
+Current intended defaults:
+
+```text
+Core
+    transactional email = true
+    transactional SMS = true
+    marketing email = true
+    marketing SMS = true
+
+Slam Dunk CRM
+    transactional email = true
+    transactional SMS = true
+    marketing email = false
+    marketing SMS = false
+
+Rob the Mortgage Coach
+    transactional email = true
+    transactional SMS = true
+    marketing email = false
+    marketing SMS = false
+```
+
+These are current client decisions, not a rule that every client must share one consent layout.
+
+### Shared registration foundation and series overrides
+
+Registration-page configuration follows this hierarchy:
+
+```text
+config/webinars/register/content.php
+    generic Core registration defaults
+
+client/{client-key}/config/webinars/register/content.php
+    shared client registration-page foundation
+
+client/{client-key}/config/webinars/register/{series-slug}/content.php
+    webinar/topic-specific overrides
+```
+
+The shared client file should own reusable page and form defaults such as registration fields, consent presentation, legal links, shared instructor identity/credentials, reviews, generic event-detail structure, common CTA defaults, and shared compliance language. A series file should contain only the positioning, proof, problem framing, urgency, topic-specific instructor framing, CTA copy, and compliance exceptions that genuinely differ for that webinar.
+
+Topic-specific style files should normally return an empty array and inherit the shared registration style. Add a topic style override only when that series has a real visual exception.
+
+Slam Dunk is the current reference structure for this separation. Rob keeps Rob-specific shared reviews, identity, form copy, and presentation in the shared file while Homebuyer Game Plan and VA Homebuyer Game Plan keep their topic-specific content in their own series directories. Do not collapse those topic overrides back into the shared client file.
 
 Tests should verify:
 

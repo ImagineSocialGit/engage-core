@@ -20,17 +20,36 @@ class SlamDunkDeliveryConsolidationConfigTest extends TestCase
         return parent::createApplication();
     }
 
-    public function test_slam_dunk_enables_webinar_registration_delivery_consolidation(): void
+    public function test_slam_dunk_consolidates_transactional_acknowledgements_into_selected_primary_templates(): void
     {
-        $this->assertTrue(
-            (bool) config('messaging.delivery_consolidation.policies.webinar_registration.enabled'),
-        );
-        $this->assertIsArray(
-            config('messaging.delivery_consolidation.policies.webinar_registration.groups.initial_email.template'),
-        );
-        $this->assertIsArray(
-            config('messaging.delivery_consolidation.policies.webinar_registration.groups.initial_sms.template'),
-        );
+        $policy = config('messaging.delivery_consolidation.policies.webinar_registration');
+
+        $this->assertTrue((bool) data_get($policy, 'enabled'));
+
+        $this->assertSame([
+            'consent.transactional.email.acknowledgement',
+        ], data_get($policy, 'groups.initial_email.member_intents'));
+        $this->assertFalse((bool) data_get($policy, 'groups.initial_email.include_marketing_unsubscribe'));
+        $this->assertSame([
+            'payload_key' => 'body',
+            'position' => 'append',
+            'separator' => "\n\n",
+        ], data_get($policy, 'groups.initial_email.placement'));
+        $this->assertNull(data_get(
+            $policy,
+            'groups.initial_email.fragments.delivery_consolidation_marketing_email_acknowledgement',
+        ));
+        $this->assertNull(data_get($policy, 'groups.initial_email.template'));
+
+        $this->assertSame([
+            'consent.transactional.sms.acknowledgement',
+        ], data_get($policy, 'groups.initial_sms.member_intents'));
+        $this->assertSame([
+            'payload_key' => 'message',
+            'position' => 'append',
+            'separator' => ' ',
+        ], data_get($policy, 'groups.initial_sms.placement'));
+        $this->assertNull(data_get($policy, 'groups.initial_sms.template'));
     }
 
     protected function tearDown(): void

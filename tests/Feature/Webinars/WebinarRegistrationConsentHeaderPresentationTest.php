@@ -82,6 +82,10 @@ class WebinarRegistrationConsentHeaderPresentationTest extends TestCase
                 'body' => 'Modal body.',
             ],
             'consent_header' => $consentHeader,
+            'consents' => [
+                'transactional' => ['email' => true, 'sms' => false],
+                'marketing' => ['email' => false, 'sms' => false],
+            ],
             'sections' => [
                 'notifications' => [
                     'title' => 'Transactional section',

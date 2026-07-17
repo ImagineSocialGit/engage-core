@@ -11,25 +11,18 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_registration_modal_renders_configured_consent_fields_and_safe_legal_links(): void
+    public function test_registration_modal_renders_every_configured_and_available_consent_field(): void
     {
-        $series = WebinarSeries::factory()->create([
-            'slug' => 'consent-presentation',
-        ]);
-
-        view()->share('errors', new ViewErrorBag());
-
-        $html = view('components.webinars.registration-form-modal', [
-            'page' => $this->page(),
-            'tokens' => [],
-            'style' => [],
-            'series' => $series,
-            'webinarRegistrationChannels' => [
+        $html = $this->renderModal(
+            consents: [
+                'transactional' => ['email' => true, 'sms' => true],
+                'marketing' => ['email' => true, 'sms' => true],
+            ],
+            channels: [
                 'transactional' => ['email', 'sms'],
                 'marketing' => ['email', 'sms'],
             ],
-            'registrationPrefill' => [],
-        ])->render();
+        );
 
         foreach ([
             'Configured transactional section',
@@ -81,25 +74,45 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
         $this->assertStringNotContainsString('x-trap', $html);
     }
 
-    public function test_registration_modal_hides_sms_controls_and_guidance_when_sms_is_unavailable(): void
+    public function test_registration_modal_hides_fields_disabled_by_the_page_contract_even_when_channels_are_available(): void
     {
-        $series = WebinarSeries::factory()->create([
-            'slug' => 'email-only-consent-presentation',
-        ]);
+        $html = $this->renderModal(
+            consents: [
+                'transactional' => ['email' => true, 'sms' => true],
+                'marketing' => ['email' => false, 'sms' => false],
+            ],
+            channels: [
+                'transactional' => ['email', 'sms'],
+                'marketing' => ['email', 'sms'],
+            ],
+        );
 
-        view()->share('errors', new ViewErrorBag());
+        $this->assertStringContainsString('Configured transactional section', $html);
+        $this->assertStringContainsString('name="transactional_email_consent"', $html);
+        $this->assertStringContainsString('name="transactional_sms_consent"', $html);
+        $this->assertStringContainsString('x-model="transactionalSmsConsent"', $html);
+        $this->assertStringContainsString('x-bind:required="transactionalSmsConsent"', $html);
 
-        $html = view('components.webinars.registration-form-modal', [
-            'page' => $this->page(),
-            'tokens' => [],
-            'style' => [],
-            'series' => $series,
-            'webinarRegistrationChannels' => [
+        $this->assertStringNotContainsString('Configured optional marketing section', $html);
+        $this->assertStringNotContainsString('Configured marketing email label.', $html);
+        $this->assertStringNotContainsString('Configured marketing SMS label.', $html);
+        $this->assertStringNotContainsString('name="marketing_email_consent"', $html);
+        $this->assertStringNotContainsString('name="marketing_sms_consent"', $html);
+        $this->assertStringNotContainsString('x-model="marketingSmsConsent"', $html);
+    }
+
+    public function test_registration_modal_intersects_configured_fields_with_channel_availability(): void
+    {
+        $html = $this->renderModal(
+            consents: [
+                'transactional' => ['email' => true, 'sms' => true],
+                'marketing' => ['email' => true, 'sms' => true],
+            ],
+            channels: [
                 'transactional' => ['email'],
                 'marketing' => ['email'],
             ],
-            'registrationPrefill' => [],
-        ])->render();
+        );
 
         $this->assertStringContainsString('Configured transactional email label.', $html);
         $this->assertStringContainsString('Configured marketing email label.', $html);
@@ -108,18 +121,43 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
         $this->assertStringNotContainsString('transactional_sms_consent_disclosure', $html);
         $this->assertStringNotContainsString('marketing_sms_consent_disclosure', $html);
         $this->assertStringNotContainsString('phone_sms_helper', $html);
+        $this->assertStringNotContainsString('x-bind:required=', $html);
     }
 
     /**
+     * @param array<string, array<string, bool>> $consents
+     * @param array<string, array<int, string>> $channels
+     */
+    private function renderModal(array $consents, array $channels): string
+    {
+        $series = WebinarSeries::factory()->create([
+            'slug' => 'consent-presentation-'.bin2hex(random_bytes(4)),
+        ]);
+
+        view()->share('errors', new ViewErrorBag());
+
+        return view('components.webinars.registration-form-modal', [
+            'page' => $this->page($consents),
+            'tokens' => [],
+            'style' => [],
+            'series' => $series,
+            'webinarRegistrationChannels' => $channels,
+            'registrationPrefill' => [],
+        ])->render();
+    }
+
+    /**
+     * @param array<string, array<string, bool>> $consents
      * @return array<string, mixed>
      */
-    private function page(): array
+    private function page(array $consents): array
     {
         return [
             'form_card' => [
                 'title' => 'Configured modal title',
                 'body' => 'Configured modal body.',
             ],
+            'consents' => $consents,
             'consent_header' => [
                 'enabled' => true,
                 'body' => 'Configured consent-header body.',

@@ -24,6 +24,10 @@ class WebinarRegistrationControllerTest extends TestCase
         Cache::flush();
 
         $this->configureWebinarRegistrationChannelAvailability();
+        $this->configureRegistrationConsentContract([
+            'transactional' => ['email' => true, 'sms' => true],
+            'marketing' => ['email' => true, 'sms' => true],
+        ]);
     }
 
     public function test_show_displays_notify_me_page_when_no_upcoming_webinar_exists(): void
@@ -68,8 +72,13 @@ class WebinarRegistrationControllerTest extends TestCase
         $response->assertSee(route('webinar.registration.store', $series->slug), false);
     }
 
-    public function test_show_hides_sms_consent_options_when_sms_is_not_available_for_registration(): void
+    public function test_show_intersects_configured_consent_fields_with_channel_availability(): void
     {
+        $this->configureRegistrationConsentContract([
+            'transactional' => ['email' => true, 'sms' => true],
+            'marketing' => ['email' => true, 'sms' => true],
+        ]);
+
         $series = WebinarSeries::factory()->create([
             'status' => 'active',
             'slug' => 'hidden-sms',
@@ -84,21 +93,24 @@ class WebinarRegistrationControllerTest extends TestCase
         $response = $this->get(route('webinar.show', $series->slug));
 
         $response->assertOk();
-
         $response->assertSee('name="transactional_email_consent"', false);
         $response->assertSee('name="marketing_email_consent"', false);
         $response->assertDontSee('name="transactional_sms_consent"', false);
         $response->assertDontSee('name="marketing_sms_consent"', false);
     }
 
-    public function test_show_displays_sms_consent_options_when_sms_is_available_for_registration(): void
+    public function test_show_renders_only_fields_enabled_by_the_registration_consent_contract(): void
     {
         $this->enableWebinarRegistrationSms();
+        $this->configureRegistrationConsentContract([
+            'transactional' => ['email' => true, 'sms' => true],
+            'marketing' => ['email' => false, 'sms' => false],
+        ]);
 
         $series = WebinarSeries::factory()->create([
             'status' => 'active',
-            'slug' => 'visible-sms',
-            'title' => 'Visible SMS',
+            'slug' => 'transactional-only',
+            'title' => 'Transactional Only',
         ]);
 
         Webinar::factory()->create([
@@ -109,9 +121,10 @@ class WebinarRegistrationControllerTest extends TestCase
         $response = $this->get(route('webinar.show', $series->slug));
 
         $response->assertOk();
-
+        $response->assertSee('name="transactional_email_consent"', false);
         $response->assertSee('name="transactional_sms_consent"', false);
-        $response->assertSee('name="marketing_sms_consent"', false);
+        $response->assertDontSee('name="marketing_email_consent"', false);
+        $response->assertDontSee('name="marketing_sms_consent"', false);
     }
 
     public function test_index_displays_only_active_series(): void
@@ -197,6 +210,40 @@ class WebinarRegistrationControllerTest extends TestCase
             ->assertOk()
             ->assertSee(route('webinar.registration.store', $series->slug), false)
             ->assertDontSee(route('webinar.waitlist.store', $series->slug), false);
+    }
+
+    public function test_store_rejects_a_selected_consent_field_disabled_by_the_registration_contract(): void
+    {
+        $this->enableWebinarRegistrationSms();
+        $this->configureRegistrationConsentContract([
+            'transactional' => ['email' => true, 'sms' => true],
+            'marketing' => ['email' => false, 'sms' => false],
+        ]);
+
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'disabled-marketing-consent',
+        ]);
+
+        Webinar::factory()->create([
+            'webinar_series_id' => $series->id,
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $response = $this->from(route('webinar.show', $series->slug))
+            ->post(route('webinar.registration.store', $series->slug), [
+                'first_name' => 'Jeff',
+                'last_name' => 'Yarnall',
+                'email' => 'jeff@example.com',
+                'phone' => '6155551212',
+                'transactional_email_consent' => true,
+                'transactional_sms_consent' => false,
+                'marketing_email_consent' => true,
+                'marketing_sms_consent' => false,
+            ]);
+
+        $response->assertRedirect(route('webinar.show', $series->slug));
+        $response->assertSessionHasErrors('marketing_email_consent');
     }
 
     public function test_store_rejects_sms_consent_when_sms_is_not_available_for_registration(): void
@@ -406,6 +453,7 @@ class WebinarRegistrationControllerTest extends TestCase
         $this->assertStringContainsString('value="Tess"', $html);
         $this->assertStringContainsString('value="Tester"', $html);
         $this->assertStringContainsString('value="tess@example.com"', $html);
+
         $this->assertStringContainsString('value="+15555550123"', $html);
         $this->assertStringContainsString('name="transactional_email_consent"', $html);
         $this->assertStringNotContainsString('name="transactional_email_consent" type="checkbox" value="1" checked', $html);
@@ -438,6 +486,14 @@ class WebinarRegistrationControllerTest extends TestCase
                 'marketing:webinar_nurture' => true,
             ],
         ]);
+    }
+
+    /**
+     * @param array<string, array<string, bool>> $consents
+     */
+    private function configureRegistrationConsentContract(array $consents): void
+    {
+        Config::set('webinars.register.content.registration.consents', $consents);
     }
 
     private function enableWebinarRegistrationSms(): void

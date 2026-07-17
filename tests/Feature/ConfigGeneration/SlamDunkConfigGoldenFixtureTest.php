@@ -13,12 +13,14 @@ use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Tasks\Models\TaskTemplate;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
+use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
 use App\Support\ConfigContracts\ConfigContractRegistry;
 use App\Support\Presets\PresetPackageResolver;
 use App\Support\SetupValidation\SetupValidationManager;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\ViewErrorBag;
 use Tests\TestCase;
 
 class SlamDunkConfigGoldenFixtureTest extends TestCase
@@ -118,6 +120,38 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
             'Stacey',
             (string) config('messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email.payload.body'),
         );
+    }
+
+    public function test_slam_dunk_registration_contract_renders_only_transactional_consent_fields(): void
+    {
+        $content = app(WebinarRegisterPageConfig::class)->content(
+            page: 'register',
+            seriesSlug: 'consent-contract-audit',
+        );
+
+        $this->assertSame([
+            'transactional' => ['email' => true, 'sms' => true],
+            'marketing' => ['email' => false, 'sms' => false],
+        ], data_get($content, 'registration.consents'));
+
+        view()->share('errors', new ViewErrorBag());
+
+        $html = view('components.webinars.registration-form-modal', [
+            'page' => $content['registration'],
+            'tokens' => [],
+            'style' => [],
+            'series' => (object) ['slug' => 'consent-contract-audit'],
+            'webinarRegistrationChannels' => [
+                'transactional' => ['email', 'sms'],
+                'marketing' => ['email', 'sms'],
+            ],
+            'registrationPrefill' => [],
+        ])->render();
+
+        $this->assertStringContainsString('name="transactional_email_consent"', $html);
+        $this->assertStringContainsString('name="transactional_sms_consent"', $html);
+        $this->assertStringNotContainsString('name="marketing_email_consent"', $html);
+        $this->assertStringNotContainsString('name="marketing_sms_consent"', $html);
     }
 
     public function test_slam_dunk_package_syncs_cleanly_into_a_fresh_database_and_resolves_all_selected_runtime_records(): void

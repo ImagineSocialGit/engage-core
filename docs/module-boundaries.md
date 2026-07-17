@@ -1,3 +1,4 @@
+
 # Engage Core Module Boundaries
 
 ## Executable config and token contract ownership
@@ -2736,6 +2737,10 @@ Webinars may depend on:
 Webinars may use Messaging to send registration confirmations, reminders, waitlist notices, and post-webinar transactional follow-ups. Webinar surfaces may collect consent, but consent-domain storage and acknowledgement resolution remain Messaging-owned.
 
 The public Webinar registration experience is configuration-driven. Registration-modal content/style is a distinct ownership bucket from landing-page content/style. Client wording may differ; executable tests should validate structure, accessibility, legal-link validity, channel/consent behavior, and runtime safety rather than identical prose or exact CSS utility counts.
+
+Registration consent fields use explicit booleans under `registration.consents` for transactional/marketing email/SMS. Effective fields are those enabled by the resolved Core/client/series config and exposed by Messaging channel availability for `webinar_registrations`. Disabled or unavailable fields must not render and must be rejected when posted manually.
+
+Core supplies vertical-neutral shared defaults. A client shared register config owns reusable form, consent, legal, review, instructor, event-detail, and common CTA defaults. Series-specific register configs own topic positioning, proof, urgency, problem framing, CTA copy, and genuine compliance exceptions. Topic-specific style files should normally inherit the shared registration style.
 
 Webinar reminder, confirmation, and post-event timing is selectable through DB-owned schedule profiles and profile items.
 

@@ -1,3 +1,4 @@
+
 # Client Request Intake Template
 
 Use this prompt when asking a new thread to convert a client request into Engage Core config files.
@@ -38,6 +39,11 @@ Rules:
 - Persisted runtime payloads should be compact. Do not store full Eloquent model arrays or loaded relationship graphs in scheduled message payloads, automation events, route progress, task metadata, or broadcast/inbound metadata unless that column is explicitly a raw provider payload.
 - Do not duplicate the same domain snapshot under payload, tokens, context, and metadata branches merely because multiple consumers can read it.
 - Public Webinar registration copy may differ by client. Validate structure, accessibility, legal links, channel/consent behavior, and safe rendering rather than identical prose or exact Tailwind utility strings.
+- Webinar registration consent availability must use explicit booleans at `registration.consents.transactional.email`, `registration.consents.transactional.sms`, `registration.consents.marketing.email`, and `registration.consents.marketing.sms`.
+- Effective Webinar registration fields are configured booleans intersected with Messaging channel availability for `webinar_registrations`; disabled or unavailable fields must not render and must be rejected when posted manually.
+- Keep shared client registration defaults in `client/{client-key}/config/webinars/register/content.php` and topic-specific positioning/copy in `client/{client-key}/config/webinars/register/{series-slug}/content.php`.
+- Shared registration config may own reusable reviews, instructor identity/credentials, form/consent/legal copy, event-detail structure, and common CTA defaults. Series overrides should contain only genuine topic-specific content.
+- Topic-specific registration style files should normally return an empty array and inherit shared styling unless a real visual exception is required.
 - For SMS line breaks, use an actual multiline nowdoc or `\n` in a double-quoted PHP string. Single-quoted `'\n'` is literal text.
 - Default webinar configs should be vertical-neutral.
 - Core Webinar Messaging should remain deliberately small and generic. Rich client cadences and branded copy belong in client config.

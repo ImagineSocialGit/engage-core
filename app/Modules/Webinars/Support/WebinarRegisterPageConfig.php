@@ -14,6 +14,7 @@ class WebinarRegisterPageConfig
      */
     private const REGISTRATION_CONTENT_KEYS = [
         'form_card',
+        'consents',
         'consent_header',
         'sections',
         'fields',

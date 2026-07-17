@@ -3,6 +3,8 @@
 namespace Tests\Feature\Webinars;
 
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
+use App\Modules\Messaging\Models\MessageTemplatePreset;
+use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
@@ -21,7 +23,7 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_all_four_selected_consents_schedule_one_email_and_two_sms_messages(): void
+    public function test_all_four_selected_consents_preserve_primary_templates_while_scheduling_one_email_and_two_sms_messages(): void
     {
         Queue::fake();
 
@@ -78,24 +80,161 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
         $this->assertSame('confirmation', $transactionalSms->message_type);
         $this->assertSame('opt_in', $marketingSms->message_type);
 
+        $this->assertSame('Original email confirmation', $email->payload['subject']);
+        $this->assertSame(
+            "Original email confirmation body.\n\n{delivery_consolidation_webinar_email_acknowledgement}\n\n{delivery_consolidation_marketing_email_acknowledgement}",
+            $email->payload['body'],
+        );
+        $this->assertEqualsCanonicalizing([
+            'label' => 'Original CTA',
+            'url' => '{webinar_join_url}',
+        ], $email->payload['cta']);
+        $this->assertEqualsCanonicalizing([
+            'label' => 'Original secondary link',
+            'url' => '{cancel_registration_url}',
+        ], $email->payload['secondary_link']);
+        $this->assertStringContainsString(
+            'Webinar email updates are enabled',
+            $email->payload['tokens']['delivery_consolidation_webinar_email_acknowledgement'],
+        );
+        $this->assertStringContainsString(
+            'Slam Dunk Home Loans',
+            $email->payload['tokens']['delivery_consolidation_marketing_email_acknowledgement'],
+        );
+
+        $this->assertSame(
+            'Original SMS confirmation. {delivery_consolidation_webinar_sms_acknowledgement}',
+            $transactionalSms->payload['message'],
+        );
+        $this->assertStringContainsString(
+            'Reply HELP for help or STOP to opt out.',
+            $transactionalSms->payload['tokens']['delivery_consolidation_webinar_sms_acknowledgement'],
+        );
+
         $this->assertEqualsCanonicalizing([
             'webinar.registration.confirmation',
             'consent.transactional.email.acknowledgement',
             'consent.marketing.email.acknowledgement',
         ], data_get($email->meta, 'delivery_consolidation.intent_keys'));
         $this->assertCount(2, data_get($email->meta, 'delivery_consolidation.consent_ids'));
+        $this->assertSame('primary_intent', data_get($email->meta, 'delivery_consolidation.template_source'));
 
         $this->assertEqualsCanonicalizing([
             'webinar.registration.confirmation',
             'consent.transactional.sms.acknowledgement',
         ], data_get($transactionalSms->meta, 'delivery_consolidation.intent_keys'));
         $this->assertCount(1, data_get($transactionalSms->meta, 'delivery_consolidation.consent_ids'));
+        $this->assertSame('primary_intent', data_get($transactionalSms->meta, 'delivery_consolidation.template_source'));
 
         $this->assertNull(data_get($marketingSms->meta, 'delivery_consolidation'));
         $this->assertSame('marketing', $marketingSms->purpose);
         $this->assertSame('webinar', $marketingSms->scope);
 
         Queue::assertPushed(SendScheduledMessageJob::class, 3);
+    }
+
+    public function test_consolidation_preserves_db_assigned_confirmation_template_and_profile_behavior(): void
+    {
+        Queue::fake();
+
+        $this->configureConsolidation();
+        $this->configureChannelAvailability();
+        $this->configureRegistrationDefinitions();
+        $profile = $this->configureConfirmationScheduleProfile();
+
+        $preset = MessageTemplatePreset::factory()->create([
+            'key' => 'email.transactional.webinar.confirmation.custom',
+            'name' => 'Custom Webinar Confirmation',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => EmailPayload::class,
+            'queue' => 'confirmation_messages',
+            'dispatch_keys' => ['registration_created'],
+            'payload' => [
+                'subject' => 'CRM-selected confirmation subject',
+                'body' => 'CRM-selected confirmation body.',
+                'cta' => [
+                    'label' => 'CRM-selected CTA',
+                    'url' => '{webinar_join_url}',
+                ],
+                'secondary_link' => [
+                    'label' => 'CRM-selected secondary link',
+                    'url' => '{cancel_registration_url}',
+                ],
+            ],
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmations.0',
+            'meta' => [
+                'seed' => [
+                    'definition_key' => 'confirmation',
+                ],
+            ],
+        ]);
+
+        $assignment = MessageTemplatePresetAssignment::factory()
+            ->forPreset($preset)
+            ->create([
+                'surface' => 'webinar_registrations',
+                'message_type' => 'confirmation',
+                'definition_key' => 'confirmation',
+            ]);
+
+        $series = WebinarSeries::factory()->create();
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+            'external_id' => null,
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        $registration = app(CreateWebinarRegistrationAction::class)->handle(
+            validated: [
+                'first_name' => 'Jeff',
+                'last_name' => 'Yarnall',
+                'email' => 'jeff@example.com',
+                'transactional_email_consent' => true,
+            ],
+            request: Request::create('/register', 'POST'),
+            webinarSlug: $webinar->slug,
+        );
+
+        $message = ScheduledMessage::query()
+            ->where('context_type', $registration->getMorphClass())
+            ->where('context_id', $registration->getKey())
+            ->where('channel', 'email')
+            ->where('message_type', 'confirmation')
+            ->firstOrFail();
+
+        $profileItem = $profile->items()
+            ->where('channel', 'email')
+            ->where('message_type', 'confirmation')
+            ->firstOrFail();
+
+        $this->assertSame('CRM-selected confirmation subject', $message->payload['subject']);
+        $this->assertSame(
+            "CRM-selected confirmation body.\n\n{delivery_consolidation_webinar_email_acknowledgement}",
+            $message->payload['body'],
+        );
+        $this->assertEqualsCanonicalizing([
+            'label' => 'CRM-selected CTA',
+            'url' => '{webinar_join_url}',
+        ], $message->payload['cta']);
+        $this->assertEqualsCanonicalizing([
+            'label' => 'CRM-selected secondary link',
+            'url' => '{cancel_registration_url}',
+        ], $message->payload['secondary_link']);
+        $this->assertSame($preset->getKey(), data_get($message->meta, 'message_template_preset.id'));
+        $this->assertSame($assignment->getKey(), data_get($message->meta, 'message_template_assignment.id'));
+        $this->assertSame($profileItem->getMorphClass(), $message->behavior_owner_type);
+        $this->assertSame($profileItem->getKey(), $message->behavior_owner_id);
+        $this->assertSame('confirmation', data_get($message->meta, 'delivery_consolidation.template_key'));
+        $this->assertSame('primary_intent', data_get($message->meta, 'delivery_consolidation.template_source'));
+        $this->assertSame([
+            'webinar.registration.confirmation',
+            'consent.transactional.email.acknowledgement',
+        ], data_get($message->meta, 'delivery_consolidation.intent_keys'));
+
+        Queue::assertPushed(SendScheduledMessageJob::class, 1);
     }
 
     private function configureConsolidation(): void
@@ -141,6 +280,14 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
                 'payload' => [
                     'subject' => 'Original email confirmation',
                     'body' => 'Original email confirmation body.',
+                    'cta' => [
+                        'label' => 'Original CTA',
+                        'url' => '{webinar_join_url}',
+                    ],
+                    'secondary_link' => [
+                        'label' => 'Original secondary link',
+                        'url' => '{cancel_registration_url}',
+                    ],
                 ],
             ]],
         ]);
@@ -162,7 +309,7 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
         ]);
     }
 
-    private function configureConfirmationScheduleProfile(): void
+    private function configureConfirmationScheduleProfile(): WebinarScheduleProfile
     {
         $profile = WebinarScheduleProfile::factory()->create([
             'key' => 'consolidation_test',
@@ -191,5 +338,7 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
                 'conditions' => [],
             ]);
         }
+
+        return $profile;
     }
 }

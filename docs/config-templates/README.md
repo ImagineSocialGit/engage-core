@@ -1,3 +1,4 @@
+
 # Engage Core Config Templates
 
 This directory contains safe starting templates for Engage Core default configs and client-specific overrides.
@@ -93,6 +94,35 @@ Generic acknowledgement copy is Messaging-owned and may receive system markers s
 Those markers are resolved by the consent acknowledgement path. They are not normal message-template tokens and must not be replaced with `{client_name}` or another authorable token unless `TokenContractRegistry` explicitly registers it.
 
 Imported consent uses the dedicated import action so state can be normalized without emitting `MessageConsentGranted` or sending an opt-in acknowledgement.
+
+## Webinar registration-page configuration
+
+Webinar registration uses separate landing and registration buckets. Registration consent availability is an explicit four-leaf boolean contract:
+
+```php
+'registration' => [
+    'consents' => [
+        'transactional' => ['email' => true, 'sms' => true],
+        'marketing' => ['email' => false, 'sms' => false],
+    ],
+],
+```
+
+Effective fields are the configured booleans intersected with Messaging channel availability for the `webinar_registrations` surface. Disabled or unavailable fields must not render and must be rejected if forged in a request.
+
+Use shared client registration config for reusable form, consent, legal, review, instructor, and page defaults:
+
+```text
+client/{client-key}/config/webinars/register/content.php
+```
+
+Keep topic-specific positioning and copy in:
+
+```text
+client/{client-key}/config/webinars/register/{series-slug}/content.php
+```
+
+Topic style files should normally inherit the shared registration style with an empty array unless a real visual exception exists. Do not make one client's copy or consent layout a universal test contract.
 
 ## Webinar schedule types and client timezone
 

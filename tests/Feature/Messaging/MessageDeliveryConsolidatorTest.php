@@ -42,7 +42,7 @@ class MessageDeliveryConsolidatorTest extends TestCase
         $this->assertSame($intents, $resolved);
     }
 
-    public function test_email_policy_combines_registration_and_compatible_consent_intents(): void
+    public function test_email_policy_preserves_primary_definition_and_appends_compatible_consent_fragments(): void
     {
         Config::set('messaging.delivery_consolidation.policies.webinar_registration.enabled', true);
 
@@ -56,6 +56,26 @@ class MessageDeliveryConsolidatorTest extends TestCase
                 purpose: 'transactional',
                 payloadClass: EmailPayload::class,
                 occurrenceKey: 'webinar_registration:55',
+                definitionPayload: [
+                    'subject' => 'Selected confirmation subject',
+                    'body' => 'Selected confirmation body.',
+                    'cta' => [
+                        'label' => 'Selected CTA',
+                        'url' => 'https://example.test/join',
+                    ],
+                    'secondary_link' => [
+                        'label' => 'Selected secondary link',
+                        'url' => 'https://example.test/cancel',
+                    ],
+                ],
+                definitionMeta: [
+                    'message_template_preset' => [
+                        'id' => 91,
+                    ],
+                    'message_template_assignment' => [
+                        'id' => 92,
+                    ],
+                ],
             ),
             $this->intent(
                 contact: $contact,
@@ -82,6 +102,21 @@ class MessageDeliveryConsolidatorTest extends TestCase
         $this->assertSame('transactional', $intent->purpose());
         $this->assertSame('webinar', $intent->scope());
         $this->assertSame('confirmation', $intent->definition['message_type']);
+        $this->assertSame('Selected confirmation subject', $intent->definition['payload']['subject']);
+        $this->assertSame(
+            "Selected confirmation body.\n\n{delivery_consolidation_webinar_email_acknowledgement}\n\n{delivery_consolidation_marketing_email_acknowledgement}",
+            $intent->definition['payload']['body'],
+        );
+        $this->assertSame([
+            'label' => 'Selected CTA',
+            'url' => 'https://example.test/join',
+        ], $intent->definition['payload']['cta']);
+        $this->assertSame([
+            'label' => 'Selected secondary link',
+            'url' => 'https://example.test/cancel',
+        ], $intent->definition['payload']['secondary_link']);
+        $this->assertSame(91, data_get($intent->definition, 'meta.message_template_preset.id'));
+        $this->assertSame(92, data_get($intent->definition, 'meta.message_template_assignment.id'));
         $this->assertSame('webinar_registration:55:delivery_consolidation:initial_email', $intent->occurrenceKey);
         $this->assertSame(
             [
@@ -95,6 +130,9 @@ class MessageDeliveryConsolidatorTest extends TestCase
                 ->all(),
         );
         $this->assertSame([11, 12], data_get($intent->meta, 'delivery_consolidation.consent_ids'));
+        $this->assertSame('primary_intent', data_get($intent->meta, 'delivery_consolidation.template_source'));
+        $this->assertSame('body', data_get($intent->meta, 'delivery_consolidation.payload_key'));
+        $this->assertSame('append', data_get($intent->meta, 'delivery_consolidation.position'));
         $this->assertStringContainsString(
             'Webinar email updates are enabled',
             $intent->payload['tokens']['delivery_consolidation_webinar_email_acknowledgement'],
@@ -105,14 +143,23 @@ class MessageDeliveryConsolidatorTest extends TestCase
         );
     }
 
-    public function test_marketing_sms_remains_separate_from_combined_webinar_sms(): void
+    public function test_marketing_sms_remains_separate_while_primary_sms_copy_is_preserved(): void
     {
         Config::set('messaging.delivery_consolidation.policies.webinar_registration.enabled', true);
 
         $contact = Contact::factory()->create();
 
         $resolved = app(MessageDeliveryConsolidator::class)->consolidate([
-            $this->intent($contact, 'webinar.registration.confirmation', 'sms', 'transactional', SmsPayload::class),
+            $this->intent(
+                contact: $contact,
+                key: 'webinar.registration.confirmation',
+                channel: 'sms',
+                purpose: 'transactional',
+                payloadClass: SmsPayload::class,
+                definitionPayload: [
+                    'message' => 'Selected SMS confirmation.',
+                ],
+            ),
             $this->intent($contact, 'consent.transactional.sms.acknowledgement', 'sms', 'transactional', SmsPayload::class, consentId: 21),
             $this->intent($contact, 'consent.marketing.sms.acknowledgement', 'sms', 'marketing', SmsPayload::class, consentId: 22),
         ], 'webinar_registration');
@@ -128,11 +175,52 @@ class MessageDeliveryConsolidatorTest extends TestCase
 
         $this->assertInstanceOf(MessageDeliveryIntent::class, $combined);
         $this->assertInstanceOf(MessageDeliveryIntent::class, $marketing);
+        $this->assertSame(
+            'Selected SMS confirmation. {delivery_consolidation_webinar_sms_acknowledgement}',
+            $combined->definition['payload']['message'],
+        );
+        $this->assertStringContainsString(
+            'Reply HELP for help or STOP to opt out.',
+            $combined->payload['tokens']['delivery_consolidation_webinar_sms_acknowledgement'],
+        );
         $this->assertSame([21], data_get($combined->meta, 'delivery_consolidation.consent_ids'));
         $this->assertSame('marketing', $marketing->purpose());
         $this->assertNull(data_get($marketing->meta, 'delivery_consolidation'));
     }
 
+    public function test_missing_member_fragment_falls_back_to_independent_deliveries(): void
+    {
+        Config::set('messaging.delivery_consolidation.policies.webinar_registration.enabled', true);
+        Config::set(
+            'messaging.delivery_consolidation.policies.webinar_registration.groups.initial_email.fragments.delivery_consolidation_webinar_email_acknowledgement',
+            null,
+        );
+
+        $contact = Contact::factory()->create();
+        $intents = [
+            $this->intent($contact, 'webinar.registration.confirmation', 'email', 'transactional', EmailPayload::class),
+            $this->intent(
+                $contact,
+                'consent.transactional.email.acknowledgement',
+                'email',
+                'transactional',
+                EmailPayload::class,
+                consentId: 31,
+            ),
+        ];
+
+        $resolved = app(MessageDeliveryConsolidator::class)->consolidate(
+            $intents,
+            'webinar_registration',
+        );
+
+        $this->assertSame($intents, $resolved);
+    }
+
+    /**
+     * @param array<string, mixed>|null $definitionPayload
+     * @param array<string, mixed> $definitionMeta
+     */
     private function intent(
         Contact $contact,
         string $key,
@@ -141,8 +229,10 @@ class MessageDeliveryConsolidatorTest extends TestCase
         string $payloadClass,
         ?string $occurrenceKey = null,
         ?int $consentId = null,
+        ?array $definitionPayload = null,
+        array $definitionMeta = [],
     ): MessageDeliveryIntent {
-        $payload = $channel === 'email'
+        $definitionPayload ??= $channel === 'email'
             ? ['subject' => 'Subject', 'body' => 'Body']
             : ['message' => 'Message'];
 
@@ -164,7 +254,8 @@ class MessageDeliveryConsolidatorTest extends TestCase
                 'scope' => 'webinar',
                 'payload_class' => $payloadClass,
                 'queue' => 'messages',
-                'payload' => $payload,
+                'payload' => $definitionPayload,
+                'meta' => $definitionMeta,
             ],
             payload: [
                 'tokens' => [

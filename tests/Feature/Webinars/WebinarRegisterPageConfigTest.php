@@ -25,6 +25,10 @@ class WebinarRegisterPageConfigTest extends TestCase
                 ],
             ],
             'registration' => [
+                'consents' => [
+                    'transactional' => ['email' => true, 'sms' => true],
+                    'marketing' => ['email' => true, 'sms' => true],
+                ],
                 'consent_header' => [
                     'enabled' => true,
                     'body' => 'Base consent header.',
@@ -70,6 +74,9 @@ class WebinarRegisterPageConfigTest extends TestCase
                 ],
             ],
             'registration' => [
+                'consents' => [
+                    'marketing' => ['email' => false, 'sms' => false],
+                ],
                 'consent_header' => [
                     'body' => 'Series consent header.',
                 ],
@@ -113,6 +120,10 @@ class WebinarRegisterPageConfigTest extends TestCase
         $this->assertSame('Database hero body.', data_get($content, 'landing.hero.body'));
         $this->assertSame('Series problem', data_get($content, 'landing.problem.heading'));
 
+        $this->assertSame([
+            'transactional' => ['email' => true, 'sms' => true],
+            'marketing' => ['email' => false, 'sms' => false],
+        ], data_get($content, 'registration.consents'));
         $this->assertSame(
             'Series consent header.',
             data_get($content, 'registration.consent_header.body'),
@@ -150,6 +161,10 @@ class WebinarRegisterPageConfigTest extends TestCase
             'hero' => [
                 'title' => 'Flat base hero',
             ],
+            'consents' => [
+                'transactional' => ['email' => true, 'sms' => true],
+                'marketing' => ['email' => true, 'sms' => true],
+            ],
             'consent_header' => [
                 'body' => 'Flat base consent header.',
             ],
@@ -163,6 +178,9 @@ class WebinarRegisterPageConfigTest extends TestCase
         Config::set('webinars.register.legacy-series.content', [
             'hero' => [
                 'title' => 'Flat series hero',
+            ],
+            'consents' => [
+                'marketing' => ['email' => false, 'sms' => false],
             ],
             'consent_header' => [
                 'body' => 'Flat series consent header.',
@@ -180,11 +198,16 @@ class WebinarRegisterPageConfigTest extends TestCase
         );
 
         $this->assertSame('Flat series hero', data_get($content, 'landing.hero.title'));
+        $this->assertSame([
+            'transactional' => ['email' => true, 'sms' => true],
+            'marketing' => ['email' => false, 'sms' => false],
+        ], data_get($content, 'registration.consents'));
         $this->assertSame(
             'Flat series consent header.',
             data_get($content, 'registration.consent_header.body'),
         );
         $this->assertSame('Flat series helper.', data_get($content, 'registration.fields.phone.helper'));
+        $this->assertArrayNotHasKey('consents', $content['landing']);
         $this->assertArrayNotHasKey('consent_header', $content['landing']);
         $this->assertArrayNotHasKey('fields', $content['landing']);
         $this->assertArrayNotHasKey('hero', $content['registration']);

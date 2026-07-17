@@ -147,6 +147,44 @@ PHP);
         );
     }
 
+    public function test_client_boolean_consent_overrides_can_disable_inherited_fields(): void
+    {
+        $root = $this->makeTempDirectory();
+
+        mkdir($root.'/webinars/register', 0777, true);
+
+        file_put_contents($root.'/webinars/register/content.php', <<<'PHP'
+<?php
+
+return [
+    'registration' => [
+        'consents' => [
+            'marketing' => [
+                'email' => false,
+                'sms' => false,
+            ],
+        ],
+    ],
+];
+PHP);
+
+        config([
+            'client.config_path' => $root,
+            'client.preset' => null,
+            'webinars.register.content.registration.consents' => [
+                'transactional' => ['email' => true, 'sms' => true],
+                'marketing' => ['email' => true, 'sms' => true],
+            ],
+        ]);
+
+        (new ClientServiceProvider($this->app))->register();
+
+        $this->assertSame([
+            'transactional' => ['email' => true, 'sms' => true],
+            'marketing' => ['email' => false, 'sms' => false],
+        ], config('webinars.register.content.registration.consents'));
+    }
+
     private function makeTempDirectory(): string
     {
         $directory = sys_get_temp_dir().'/engage-core-client-config-'.bin2hex(random_bytes(8));

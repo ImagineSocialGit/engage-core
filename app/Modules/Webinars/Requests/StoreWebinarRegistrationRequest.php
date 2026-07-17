@@ -6,6 +6,7 @@ use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -13,6 +14,39 @@ use Illuminate\Validation\Validator;
 class StoreWebinarRegistrationRequest extends FormRequest
 {
     private const SURFACE = 'webinar_registrations';
+
+    /**
+     * @var array<string, array{channel: string, purpose: string, scope: string, config_path: string}>
+     */
+    private const CONSENT_FIELDS = [
+        'transactional_email_consent' => [
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'config_path' => 'transactional.email',
+        ],
+        'transactional_sms_consent' => [
+            'channel' => 'sms',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'config_path' => 'transactional.sms',
+        ],
+        'marketing_email_consent' => [
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar_nurture',
+            'config_path' => 'marketing.email',
+        ],
+        'marketing_sms_consent' => [
+            'channel' => 'sms',
+            'purpose' => 'marketing',
+            'scope' => 'webinar_nurture',
+            'config_path' => 'marketing.sms',
+        ],
+    ];
+
+    /** @var array<string, mixed>|null */
+    private ?array $registrationConsentConfiguration = null;
 
     public function authorize(): bool
     {
@@ -45,11 +79,10 @@ class StoreWebinarRegistrationRequest extends FormRequest
                 'max:30',
             ],
 
-            'transactional_email_consent' => ['required', 'boolean'],
-            'transactional_sms_consent' => ['required', 'boolean'],
-
-            'marketing_email_consent' => ['nullable', 'boolean'],
-            'marketing_sms_consent' => ['nullable', 'boolean'],
+            'transactional_email_consent' => ['boolean'],
+            'transactional_sms_consent' => ['boolean'],
+            'marketing_email_consent' => ['boolean'],
+            'marketing_sms_consent' => ['boolean'],
         ];
     }
 
@@ -85,19 +118,19 @@ class StoreWebinarRegistrationRequest extends FormRequest
 
     private function requiresPhoneNumber(): bool
     {
-        return (
-            $this->boolean('transactional_sms_consent')
-            && $this->channelAvailable('sms', 'transactional', 'webinar')
-        ) || (
-            $this->boolean('marketing_sms_consent')
-            && $this->channelAvailable('sms', 'marketing', 'webinar_nurture')
-        );
+        foreach (['transactional_sms_consent', 'marketing_sms_consent'] as $field) {
+            if ($this->boolean($field) && $this->consentFieldSelectable($field)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function hasSelectedAvailableTransactionalChannel(): bool
     {
-        foreach ($this->availableTransactionalChannels() as $channel) {
-            if ($this->boolean("transactional_{$channel}_consent")) {
+        foreach (['transactional_email_consent', 'transactional_sms_consent'] as $field) {
+            if ($this->consentFieldSelectable($field) && $this->boolean($field)) {
                 return true;
             }
         }
@@ -107,34 +140,66 @@ class StoreWebinarRegistrationRequest extends FormRequest
 
     private function rejectUnavailableSelectedChannels(Validator $validator): void
     {
-        foreach ([
-            'transactional_email_consent' => ['email', 'transactional', 'webinar'],
-            'transactional_sms_consent' => ['sms', 'transactional', 'webinar'],
-            'marketing_email_consent' => ['email', 'marketing', 'webinar_nurture'],
-            'marketing_sms_consent' => ['sms', 'marketing', 'webinar_nurture'],
-        ] as $field => [$channel, $purpose, $scope]) {
-            if (
-                $this->boolean($field)
-                && ! $this->channelAvailable($channel, $purpose, $scope)
-            ) {
+        foreach (array_keys(self::CONSENT_FIELDS) as $field) {
+            if ($this->boolean($field) && ! $this->consentFieldSelectable($field)) {
                 $validator->errors()->add(
                     $field,
-                    'This communication channel is not available for this registration form.'
+                    'This communication option is not available for this registration form.'
                 );
             }
         }
     }
 
-    /**
-     * @return array<int, string>
-     */
-    private function availableTransactionalChannels(): array
+    private function consentFieldSelectable(string $field): bool
     {
-        return app(MessageChannelAvailability::class)->visibleChannelsForSurface(
-            surface: self::SURFACE,
-            purpose: 'transactional',
-            scope: 'webinar',
+        $definition = self::CONSENT_FIELDS[$field] ?? null;
+
+        if (! is_array($definition)) {
+            return false;
+        }
+
+        return $this->consentFieldConfigured($definition['config_path'])
+            && $this->channelAvailable(
+                $definition['channel'],
+                $definition['purpose'],
+                $definition['scope'],
+            );
+    }
+
+    private function consentFieldConfigured(string $path): bool
+    {
+        return data_get($this->registrationConsentConfiguration(), $path, true) === true;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function registrationConsentConfiguration(): array
+    {
+        if ($this->registrationConsentConfiguration !== null) {
+            return $this->registrationConsentConfiguration;
+        }
+
+        $seriesSlug = (string) $this->route('seriesSlug');
+
+        $series = $seriesSlug !== ''
+            ? WebinarSeries::query()
+                ->where('slug', $seriesSlug)
+                ->where('status', 'active')
+                ->first()
+            : null;
+
+        $content = app(WebinarRegisterPageConfig::class)->content(
+            page: 'register',
+            seriesSlug: $seriesSlug,
+            seriesMeta: is_array($series?->meta) ? $series->meta : [],
         );
+
+        $consents = data_get($content, 'registration.consents', []);
+
+        return $this->registrationConsentConfiguration = is_array($consents)
+            ? $consents
+            : [];
     }
 
     private function channelAvailable(string $channel, string $purpose, string $scope): bool

@@ -1,3 +1,4 @@
+
 # Engage Core Client-Readiness Roadmap
 
 ## Config generation lock-in checkpoint
@@ -77,46 +78,84 @@ The imported-contact onboarding, Broadcast visibility, dashboard, contact worksp
 
 **Phase 12 — Standalone and multi-link Tasks is complete and green.** Tasks now uses zero-to-many TaskLinks, supports unlinked/Contact/non-Contact/multi-link work, has dedicated Task index/show surfaces, remains operational with only Core enabled, keeps optional assignment/notification behavior behind contributed seams, and no longer stores FlowRoutes-specific foreign keys. The same closeout expanded FlowRoutes into contributor-driven Point schema/validation, neutral business-action execution, and module-owned authoring UX.
 
-## Webinar registration presentation and delivery-consolidation closeout
+## Webinar registration presentation, consent contract, and config-structure closeout
 
-The Webinar registration presentation/test audit and fresh Slam Dunk runtime verification are complete.
+The Webinar registration presentation, consent-contract, client-config restructuring, and regression work are complete and the full test suite is green.
 
-Completed presentation decisions:
+Durable presentation/config decisions:
 
 ```text
 landing content/style
     separate from registration-modal content/style
 
 registration content/style
-    owns consent_header, sections, fields, disclosures, legal links, and modal presentation
+    owns consents, consent_header, sections, fields, disclosures, legal links, and modal presentation
 
-client copy
-    may differ across clients
+shared client registration config
+    owns reusable form/consent/legal defaults, reviews, instructor identity/credentials, event-detail structure, common CTA defaults, and shared presentation
+
+series-specific registration config
+    owns topic positioning, proof, urgency, problem framing, topic-specific instructor framing, CTA copy, and compliance exceptions
+
+client copy and consent layout
+    may differ across clients and series
 ```
 
-Tests now validate structural/runtime contracts rather than identical client prose or exact Tailwind utility counts. Enabled legal links must be valid absolute non-placeholder URLs.
-
-Fresh migration/sync runtime verification proved:
+Registration consent availability is an explicit boolean contract:
 
 ```text
-accepted_channels
+transactional.email
+transactional.sms
+marketing.email
+marketing.sms
+```
+
+Effective presentation and request acceptance are the resolved config booleans intersected with Messaging channel availability for the `webinar_registrations` surface. Disabled or unavailable fields do not render and forged submissions are rejected. The phone field is required only when an effective SMS consent is selected.
+
+Current intended client matrix:
+
+```text
+Core
     transactional email + SMS
     marketing email + SMS
 
-message consent rows
-    four independent consent-history records
-    stored under the shared webinar consent domain
+Slam Dunk CRM
+    transactional email + SMS only
 
-delivery
-    marketing SMS acknowledgement sent standalone immediately
-    email confirmation consolidated transactional + marketing email acknowledgements
-    SMS confirmation consolidated transactional SMS acknowledgement
-    confirmation timing followed the Slam Dunk 10-minute schedule-profile delay
+Rob the Mortgage Coach
+    transactional email + SMS only
 ```
 
-The consolidated scheduled messages retain covered intent keys and MessageConsent IDs in `meta.delivery_consolidation`. No revocations, suppressions, skips, or failures were present in the smoke registration.
+Slam Dunk is the reference structure for separating shared registration content from series-specific content. Rob now follows the same split while retaining Rob-specific content and presentation:
 
-This closeout also exposed two separate follow-up tracks:
+```text
+client/rob-the-mortgage-coach/config/webinars/register/content.php
+    shared Rob registration foundation
+
+client/rob-the-mortgage-coach/config/webinars/register/homebuyer-game-plan/content.php
+    Rob Homebuyer Game Plan topic overrides
+
+client/rob-the-mortgage-coach/config/webinars/register/va-homebuyer-game-plan/content.php
+    Rob VA Homebuyer Game Plan topic overrides
+```
+
+The topic style files inherit Rob's shared registration style unless a genuine visual exception is introduced. The restructuring batch intentionally did not modify Slam Dunk configs.
+
+Tests now validate structural/runtime contracts rather than identical client prose or exact Tailwind utility counts. Coverage includes all-four, transactional-only, and channel-restricted layouts; client-key config resolution; series overrides; disabled-field POST rejection; waitlist prefill; accessibility; and enabled legal-link validity.
+
+A historical fresh Slam Dunk smoke run, performed before the final two-field Slam Dunk presentation decision, proved the underlying all-four capability and delivery-consolidation behavior:
+
+```text
+four independent MessageConsent records
+marketing SMS acknowledgement standalone
+email confirmation consolidated transactional + marketing email acknowledgements
+SMS confirmation consolidated transactional SMS acknowledgement
+covered intent keys and MessageConsent IDs retained in delivery_consolidation metadata
+```
+
+That smoke result proves the Core/all-four capability; it should not be read as the current Slam Dunk public registration layout.
+
+Remaining separate follow-up tracks:
 
 ```text
 deferred product work
@@ -125,11 +164,11 @@ deferred product work
     multipart HTML + plain-text email
     generated Webinar URL scheme verification
 
-immediate architecture audit
+architecture safety work
     system-wide model-creation and persistence-bloat audit
 ```
 
-The immediate audit is documented in [System-Wide Model Creation and Persistence Bloat Audit](model-persistence-bloat-audit.md). The runtime dump showed repeated Contact/Webinar/registration snapshots across payload, token, and context branches, so compact persistence must not be treated as fully verified yet.
+The persistence audit remains documented in [System-Wide Model Creation and Persistence Bloat Audit](model-persistence-bloat-audit.md). Compact persistence is not considered fully verified.
 
 ## Messaging, consent, and Rob Webinar production-prep completion
 
@@ -295,6 +334,7 @@ Current schema-discovery sequence:
 | 10 | Manual status-change automation warning foundation | Complete | Operator safety + architecture | Backend-only consequence preview is implemented through a read-only FlowRoutes-owned impact resolver. It reports whether selected status-based FlowRoutes would run and which routes are selected without starting route progress. The actual operator warning UX is deferred to Phase 11. |
 | 11 | Automation opportunity foundation + Routes / FlowRoutes UX | In progress; backend, preset architecture, and first Route authoring baseline complete | DB/schema + architecture + UI/UX | Automation Opportunities, global Point collapse, module-first preset contributions, Manage Routes/Assignments IA, modal Route/Point editing, drag ordering, explicit Route message eligibility, linear product boundaries, and Point placement policy are complete. Remaining work is new Route creation and focused authoring/discovery UX gaps. |
 | 12 | Standalone and multi-link Tasks | Complete | DB/schema + architecture + UI foundation | Zero-to-many TaskLinks, unlinked/Contact/non-Contact/multi-link Tasks, template/manual/automation invariants, dedicated Task index/show, Core-only operation, optional assignment/notification seams, FlowRoutes-owned Task correlation, module-contributed Point definition/action/authoring architecture, and full-suite green verification are complete. |
+| Next docs | Reporting foundation audit and durable module contract | Planned next documentation branch | Architecture + schema discovery | Expand the minimal Reporting documentation before implementation. Use FOSS feature shapes as reference, keep Reporting optional/independent, lock privacy/identity/retention/attribution boundaries, and define the first Webinar traffic/conversion report. |
 | Immediate | System-wide model creation and persistence-bloat audit | Planned next | Cross-module DB/payload audit | Inventory every create/update path, measure real row sizes, classify durable vs redundant data, and begin with ScheduledMessage/Webinar payload duplication. See `docs/model-persistence-bloat-audit.md`. |
 | 13 | Dashboard / contact workspace polish audit | Planned | UI/UX + possible schema | Review orientation surfaces after core runtime pieces settle. Add persisted preferences/acknowledgements only when needed. |
 | 14 | FOSS-informed module schema audit | Planned | DB/schema audit | Compare Engage Core modules against mature FOSS patterns to identify likely missing persisted concepts before production. Pull FlowRoutes-specific FOSS/OSS pattern review earlier into Phase 4 if helpful. |
@@ -620,6 +660,7 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | 10 | Manual status-change automation warning foundation | Complete | FlowRoutes exposes a read-only `ContactStatusAutomationImpactResolver` and plural status-trigger route resolution. No schema, controller, or Blade changes were required. The actual warning interaction belongs to Phase 11 UX work. |
 | 11 | Automation opportunity foundation + Routes / FlowRoutes UX | In progress; first authoring baseline complete | Shared opportunity persistence/evaluation and the current Routes management/editor baseline are complete. Remaining focused Routes work continues after the schema-sensitive Task slice. |
 | 12 | Standalone and multi-link Tasks | Complete | Task is one generic live work record across template/no-template, zero-to-many domain links, and manual/automation origin. TaskLinks, dedicated index/show, Core-only operation, generic linked-record presentation, Tasks/FlowRoutes boundary correction, and contributor-driven FlowRoutes Point architecture are complete and green. |
+| Next docs | Reporting foundation audit and module documentation | 1 focused documentation/audit branch | Do not implement immediately. Audit current observability/reporting inputs, define privacy-first first-party collection and attribution contracts, then produce the durable Reporting module plan. |
 | Immediate | System-wide model creation and persistence-bloat audit | Multi-session, split by model/domain | Treat as the next architecture audit, not deferred backlog. Inventory/measure all write paths and start with ScheduledMessage/Webinar payload duplication. |
 | 13 | Dashboard / contact workspace polish audit | 1–2 sessions | Review shared orientation surfaces after runtime behavior settles. Add persisted state only for proven needs such as acknowledgements or preferences. |
 | 14 | FOSS-informed module schema audit | 2–6 sessions, split by module group | Compare Engage Core module tables against mature FOSS patterns to catch likely missing persisted concepts before production. |
@@ -1027,7 +1068,13 @@ Completed behavior:
 
 This is durable schema/architecture work completed before production rollout, not a compatibility-preservation layer.
 
-## Recommended next implementation target
+## Recommended next documentation and implementation targets
+
+The next branch is a **Reporting foundation documentation and audit branch**. Reporting is currently only a minimal module placeholder, so the first deliverable is a durable module document and phased plan—not migrations or runtime implementation.
+
+The Reporting documentation must keep Reporting optional, independent, privacy-first, and malleable. It should use mature FOSS analytics/reporting systems only as feature-shape references, audit current first-party/server observability inputs, define event/identity/attribution/correlation and retention boundaries, and specify the first Webinar traffic-to-registration/conversion report.
+
+The next implementation safety audit remains the **system-wide model creation and persistence-bloat audit**. Reporting schema/collection work should not begin by copying the current oversized payload patterns into a new analytics store.
 
 **Phase 12 — Standalone and multi-link Tasks is complete.** The focused and full automated suites are green after the Task generalization and the expanded FlowRoutes contributor refactor.
 
@@ -1080,9 +1127,9 @@ AutomationActionPointHandler
 
 Normal `create_task` authoring is deliberately opinionated: it requires an active Task Template, explains that a new Task is created every time execution reaches the Point, and does not expose a title-only one-time-looking automation path.
 
-The next roadmap target is the **system-wide model creation and persistence-bloat audit** documented in `docs/model-persistence-bloat-audit.md`.
+After the Reporting documentation/audit locks the module boundary and phased plan, the next implementation safety target is the **system-wide model creation and persistence-bloat audit** documented in `docs/model-persistence-bloat-audit.md`.
 
-That audit is intentionally ahead of Phase 13 because the fresh registration runtime dump disproved the assumption that all scheduled-message payload paths are already compact. Phase 13 remains next after the persistence audit unless a production-readiness issue or focused remaining Phase 11 Route product gap is intentionally pulled forward.
+That audit remains ahead of broad Reporting persistence or Phase 13 implementation because the fresh registration runtime dump disproved the assumption that all scheduled-message payload paths are already compact. The Reporting plan should reference that constraint rather than inventing a second unmeasured persistence layer.
 
 The locked Route boundary remains:
 

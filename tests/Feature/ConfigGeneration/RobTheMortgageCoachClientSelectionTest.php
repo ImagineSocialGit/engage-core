@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\ConfigGeneration;
 
+use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
 use App\Support\Modules\ModuleManager;
 use Illuminate\Foundation\Application;
+use Illuminate\Support\ViewErrorBag;
 use Tests\TestCase;
 
 class RobTheMortgageCoachClientSelectionTest extends TestCase
@@ -47,6 +49,38 @@ class RobTheMortgageCoachClientSelectionTest extends TestCase
             'fallout_inactive',
         ], config('presets.modules.client.contact-statuses.groups.rob_the_mortgage_coach_default'));
 
+    }
+
+    public function test_rob_registration_contract_renders_only_transactional_consent_fields(): void
+    {
+        $content = app(WebinarRegisterPageConfig::class)->content(
+            page: 'register',
+            seriesSlug: 'consent-contract-audit',
+        );
+
+        $this->assertSame([
+            'transactional' => ['email' => true, 'sms' => true],
+            'marketing' => ['email' => false, 'sms' => false],
+        ], data_get($content, 'registration.consents'));
+
+        view()->share('errors', new ViewErrorBag());
+
+        $html = view('components.webinars.registration-form-modal', [
+            'page' => $content['registration'],
+            'tokens' => [],
+            'style' => [],
+            'series' => (object) ['slug' => 'consent-contract-audit'],
+            'webinarRegistrationChannels' => [
+                'transactional' => ['email', 'sms'],
+                'marketing' => ['email', 'sms'],
+            ],
+            'registrationPrefill' => [],
+        ])->render();
+
+        $this->assertStringContainsString('name="transactional_email_consent"', $html);
+        $this->assertStringContainsString('name="transactional_sms_consent"', $html);
+        $this->assertStringNotContainsString('name="marketing_email_consent"', $html);
+        $this->assertStringNotContainsString('name="marketing_sms_consent"', $html);
     }
 
     protected function tearDown(): void

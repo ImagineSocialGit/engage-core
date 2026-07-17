@@ -1,3 +1,4 @@
+
 # Engage Core Config Authoring Guide
 
 This guide is for creating or reviewing Engage Core default configs and client-specific configs.
@@ -1422,9 +1423,10 @@ landing
 registration
 ```
 
-Registration-modal content/style should own keys such as:
+Registration-modal content/style owns keys such as:
 
 ```text
+consents
 consent_header
 sections
 fields
@@ -1432,22 +1434,68 @@ legal_links
 registration-specific style classes
 ```
 
-Client registration wording may differ freely when the executable contract remains valid.
+Consent-field availability must be explicit:
 
-Config and presentation tests should verify:
+```php
+'registration' => [
+    'consents' => [
+        'transactional' => [
+            'email' => true,
+            'sms' => true,
+        ],
+        'marketing' => [
+            'email' => false,
+            'sms' => false,
+        ],
+    ],
+],
+```
+
+Use booleans for all four leaves. Do not infer enablement from copy presence, and do not use an empty enabled-field list as the disabling mechanism. Boolean leaves merge predictably through Core, client, and series config layers.
+
+Effective field visibility and acceptance are:
 
 ```text
-required structural keys
+configured boolean
+INTERSECTED WITH
+Messaging channel availability for webinar_registrations
+```
+
+A disabled or operationally unavailable field must not render and must be rejected when posted manually. The phone field is required only when an effective SMS consent field is selected. The Core default may expose all four fields while individual clients or series intentionally expose fewer.
+
+Use this config split:
+
+```text
+config/webinars/register/content.php
+    vertical-neutral Core defaults
+
+client/{client-key}/config/webinars/register/content.php
+    shared client registration foundation
+
+client/{client-key}/config/webinars/register/{series-slug}/content.php
+    topic-specific positioning and copy overrides
+```
+
+The shared client file should hold reusable form/consent/legal configuration, reviews, shared instructor identity and credentials, generic event details, common CTA defaults, and other client-wide registration content. Series files should hold only topic-specific hero copy, proof, urgency, problem framing, topic-specific instructor framing, CTA copy, and compliance exceptions.
+
+Topic-specific style files should normally inherit the shared client registration style with `return [];`. Add a style override only for a genuine visual exception.
+
+Client registration wording may differ freely when the executable contract remains valid. Config and presentation tests should verify:
+
+```text
+all four consent booleans resolve
+at least one transactional field is enabled
 visible/accepted channel consistency
-hidden SMS POST rejection
+disabled or unavailable channel POST rejection
 required field behavior
 consent storage and accepted_channels
 accessible labels and disclosures
 absolute non-placeholder legal links when enabled
 safe rendering of missing optional copy
+shared client config plus series override resolution
 ```
 
-Do not require one client's headings, labels, disclosures, or Tailwind utility strings to match another client's values.
+Do not require one client's headings, labels, disclosures, consent layout, or Tailwind utility strings to match another client's values.
 
 ## Webinar schedule profiles
 
