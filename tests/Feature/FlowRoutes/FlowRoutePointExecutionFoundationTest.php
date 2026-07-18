@@ -765,7 +765,10 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertSame($flowRoute->getKey(), $progress->flow_route_id);
         $this->assertSame('webinar.attended', $progress->meta['started_from_automation_event']['name'] ?? null);
 
-        Event::assertDispatched(ContactWorkflowStatusChanged::class);
+        $this->assertDatabaseHas('automation_event_outbox_events', [
+            'event_key' => ContactWorkflowStatusChanged::AUTOMATION_EVENT_KEY,
+            'contact_id' => $contact->getKey(),
+        ]);
     }
 
     public function test_task_completed_event_resumes_waiting_route_for_the_specific_route_created_task(): void

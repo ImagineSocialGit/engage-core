@@ -13,6 +13,9 @@ use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
 use App\Modules\Workflow\Actions\TransitionContactWorkflowStatusAction;
+use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
+use App\Support\AutomationEvents\Models\AutomationEventOutboxEvent;
+use App\Support\AutomationEvents\Services\AutomationEventOutbox;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -75,6 +78,8 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
             reason: 'manual_update',
             source: 'test',
         );
+
+        $this->publishWorkflowStatusChangeEvents();
 
         $progress = ContactFlowRouteProgress::query()->first();
 
@@ -191,12 +196,16 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
             source: 'test',
         );
 
+        $this->publishWorkflowStatusChangeEvents();
+
         app(TransitionContactWorkflowStatusAction::class)->handle(
             contact: $contact->refresh(),
             toStatus: $newStatus,
             reason: 'manual_update',
             source: 'test',
         );
+
+        $this->publishWorkflowStatusChangeEvents();
 
         $oldProgress = ContactFlowRouteProgress::query()
             ->where('flow_route_id', $oldRoute->id)
@@ -303,12 +312,16 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
             source: 'test',
         );
 
+        $this->publishWorkflowStatusChangeEvents();
+
         app(TransitionContactWorkflowStatusAction::class)->handle(
             contact: $contact->refresh(),
             toStatus: $newStatus,
             reason: 'manual_update',
             source: 'test',
         );
+
+        $this->publishWorkflowStatusChangeEvents();
 
         $this->assertSame(1, ContactFlowRouteProgress::query()->superseded()->count());
         $this->assertSame(0, ContactFlowRouteProgress::query()->active()->count());
@@ -403,6 +416,8 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
             source: 'test',
         );
 
+        $this->publishWorkflowStatusChangeEvents();
+
         $progresses = ContactFlowRouteProgress::query()
             ->where('flow_route_id', $flowRoute->getKey())
             ->get();
@@ -466,7 +481,32 @@ class HandleContactWorkflowStatusChangedTest extends TestCase
             source: 'test',
         );
 
+        $this->publishWorkflowStatusChangeEvents();
+
         $this->assertSame(0, ContactFlowRouteProgress::query()->count());
+    }
+
+    private function publishWorkflowStatusChangeEvents(): void
+    {
+        $outbox = app(AutomationEventOutbox::class);
+        $published = 0;
+
+        while ($event = AutomationEventOutboxEvent::query()
+            ->where('event_key', ContactWorkflowStatusChanged::AUTOMATION_EVENT_KEY)
+            ->where('status', AutomationEventOutboxEvent::STATUS_PENDING)
+            ->where('available_at', '<=', now())
+            ->orderBy('id')
+            ->first()
+        ) {
+            $published++;
+
+            $this->assertLessThanOrEqual(
+                100,
+                $published,
+                'Workflow status-change outbox delivery did not settle.',
+            );
+            $this->assertTrue($outbox->publish((int) $event->getKey()));
+        }
     }
 
     private function bindRouteToContactStatus(FlowRoute $flowRoute, ContactStatus $status): void

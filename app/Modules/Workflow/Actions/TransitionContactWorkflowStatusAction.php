@@ -7,12 +7,18 @@ use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Workflow\Data\ContactWorkflowStatusTransition;
 use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
+use App\Support\AutomationEvents\Data\AutomationEventData;
+use App\Support\AutomationEvents\Services\AutomationEventOutbox;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 class TransitionContactWorkflowStatusAction
 {
+    public function __construct(
+        private readonly AutomationEventOutbox $automationEventOutbox,
+    ) {}
+
     /**
      * @param array<string, mixed> $meta
      */
@@ -25,9 +31,7 @@ class TransitionContactWorkflowStatusAction
         array $meta = [],
         bool $force = false,
     ): ContactWorkflowProfile {
-        $transition = null;
-
-        $profile = DB::transaction(function () use (
+        return DB::transaction(function () use (
             $contact,
             $toStatus,
             $reason,
@@ -35,7 +39,6 @@ class TransitionContactWorkflowStatusAction
             $actor,
             $meta,
             $force,
-            &$transition,
         ): ContactWorkflowProfile {
             $occurredAt = CarbonImmutable::now();
 
@@ -113,14 +116,42 @@ class TransitionContactWorkflowStatusAction
                 'last_activity_at' => $occurredAt,
             ])->save();
 
+            $this->recordStatusChange($profile, $transition);
+
             return $profile->refresh()->load('contact', 'contactStatus');
         });
+    }
 
-        if ($transition instanceof ContactWorkflowStatusTransition) {
-            ContactWorkflowStatusChanged::dispatch($transition);
-        }
-
-        return $profile;
+    private function recordStatusChange(
+        ContactWorkflowProfile $profile,
+        ContactWorkflowStatusTransition $transition,
+    ): void {
+        $this->automationEventOutbox->record(
+            AutomationEventData::forSubject(
+                eventKey: ContactWorkflowStatusChanged::AUTOMATION_EVENT_KEY,
+                subject: $profile,
+                contactId: $transition->contactId,
+                occurredAt: $transition->occurredAt,
+                payload: [
+                    'workflow_transition' => [
+                        'contact_id' => $transition->contactId,
+                        'contact_workflow_profile_id' => $transition->contactWorkflowProfileId,
+                        'from_contact_status_id' => $transition->fromContactStatusId,
+                        'to_contact_status_id' => $transition->toContactStatusId,
+                        'reason' => $transition->reason,
+                        'source' => $transition->source,
+                        'actor_type' => $transition->actorType,
+                        'actor_id' => $transition->actorId,
+                        'occurred_at' => $transition->occurredAt->toISOString(),
+                        'meta' => $transition->meta,
+                    ],
+                ],
+                meta: [
+                    'source_module' => 'workflow',
+                    'source' => 'contact_workflow_status_changed',
+                ],
+            ),
+        );
     }
 
     /**

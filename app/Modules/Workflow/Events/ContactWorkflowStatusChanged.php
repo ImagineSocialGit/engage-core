@@ -11,6 +11,8 @@ class ContactWorkflowStatusChanged
     use Dispatchable;
     use SerializesModels;
 
+    public const AUTOMATION_EVENT_KEY = 'workflow.contact_status_changed';
+
     public function __construct(
         public readonly ContactWorkflowStatusTransition $transition,
     ) {}

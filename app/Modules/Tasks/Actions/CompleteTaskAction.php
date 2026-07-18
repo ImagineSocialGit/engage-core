@@ -4,6 +4,7 @@ namespace App\Modules\Tasks\Actions;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\Tasks\Events\TaskCompleted;
+use App\Modules\Tasks\Listeners\EmitTaskCompletedAutomationEvent;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Services\TaskContactLinkResolver;
 use Carbon\CarbonImmutable;
@@ -14,6 +15,7 @@ class CompleteTaskAction
 {
     public function __construct(
         private readonly TaskContactLinkResolver $contactLinks,
+        private readonly EmitTaskCompletedAutomationEvent $emitTaskCompletedAutomationEvent,
     ) {}
 
     /**
@@ -25,7 +27,12 @@ class CompleteTaskAction
         ?string $source = null,
         array $meta = [],
     ): Task {
-        $completedTask = DB::transaction(function () use ($task): array {
+        [$task, $completionEvent] = DB::transaction(function () use (
+            $task,
+            $actor,
+            $source,
+            $meta,
+        ): array {
             $task = Task::query()
                 ->lockForUpdate()
                 ->findOrFail($task->getKey());
@@ -43,21 +50,26 @@ class CompleteTaskAction
 
             $this->touchLinkedContacts($task);
 
-            return [$task, $wasCompleted];
-        });
+            if ($wasCompleted) {
+                return [$task, null];
+            }
 
-        /** @var Task $task */
-        [$task, $wasCompleted] = $completedTask;
-
-        if (! $wasCompleted) {
-            event(new TaskCompleted(
+            $completionEvent = new TaskCompleted(
                 task: $task,
                 actorType: $actor?->getMorphClass(),
                 actorId: $actor ? (int) $actor->getKey() : null,
                 source: $source ?: 'tasks',
                 meta: $meta,
                 occurredAt: CarbonImmutable::instance($task->completed_at),
-            ));
+            );
+
+            $this->emitTaskCompletedAutomationEvent->handle($completionEvent);
+
+            return [$task, $completionEvent];
+        });
+
+        if ($completionEvent instanceof TaskCompleted) {
+            event($completionEvent);
         }
 
         return $task->refresh();

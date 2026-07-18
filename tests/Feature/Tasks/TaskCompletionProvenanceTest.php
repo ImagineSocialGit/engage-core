@@ -11,6 +11,8 @@ use App\Modules\Tasks\Listeners\EmitTaskCompletedAutomationEvent;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Models\TaskLink;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
+use App\Support\AutomationEvents\Models\AutomationEventOutboxEvent;
+use App\Support\AutomationEvents\Services\AutomationEventOutbox;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -98,6 +100,8 @@ class TaskCompletionProvenanceTest extends TestCase
             ),
         );
 
+        $this->publishTaskCompletedEvents();
+
         Event::assertDispatched(
             AutomationEventRecorded::class,
             function (AutomationEventRecorded $event) use ($actor, $completedAt): bool {
@@ -124,6 +128,8 @@ class TaskCompletionProvenanceTest extends TestCase
             new TaskCompleted($task),
         );
 
+        $this->publishTaskCompletedEvents();
+
         Event::assertDispatched(
             AutomationEventRecorded::class,
             fn (AutomationEventRecorded $event): bool => $event->event->contactId === null
@@ -146,16 +152,18 @@ class TaskCompletionProvenanceTest extends TestCase
             new TaskCompleted($task),
         );
 
+        $this->publishTaskCompletedEvents();
+
         Event::assertDispatched(
             AutomationEventRecorded::class,
-            fn (AutomationEventRecorded $event): bool => data_get(
-                $event->event->payload,
-                'task.links.0',
-            ) === [
-                'role' => TaskLink::ROLE_SUBJECT,
-                'linkable_type' => $appointment->getMorphClass(),
-                'linkable_id' => $appointment->getKey(),
-            ],
+            function (AutomationEventRecorded $event) use ($appointment): bool {
+                $link = data_get($event->event->payload, 'task.links.0');
+
+                return is_array($link)
+                    && ($link['role'] ?? null) === TaskLink::ROLE_SUBJECT
+                    && ($link['linkable_type'] ?? null) === $appointment->getMorphClass()
+                    && (int) ($link['linkable_id'] ?? 0) === (int) $appointment->getKey();
+            },
         );
     }
 
@@ -177,6 +185,8 @@ class TaskCompletionProvenanceTest extends TestCase
         app(EmitTaskCompletedAutomationEvent::class)->handle(
             new TaskCompleted($task),
         );
+
+        $this->publishTaskCompletedEvents();
 
         Event::assertDispatched(
             AutomationEventRecorded::class,
@@ -201,6 +211,8 @@ class TaskCompletionProvenanceTest extends TestCase
         app(EmitTaskCompletedAutomationEvent::class)->handle(
             new TaskCompleted($task),
         );
+
+        $this->publishTaskCompletedEvents();
 
         Event::assertDispatched(
             AutomationEventRecorded::class,
@@ -234,6 +246,21 @@ class TaskCompletionProvenanceTest extends TestCase
                 && $event->source === 'crm'
                 && $event->meta['source'] === 'task_controller.complete',
         );
+    }
+
+    private function publishTaskCompletedEvents(): void
+    {
+        $outbox = app(AutomationEventOutbox::class);
+
+        while ($event = AutomationEventOutboxEvent::query()
+            ->where('event_key', TaskCompleted::NAME)
+            ->where('status', AutomationEventOutboxEvent::STATUS_PENDING)
+            ->where('available_at', '<=', now())
+            ->orderBy('id')
+            ->first()
+        ) {
+            $this->assertTrue($outbox->publish((int) $event->getKey()));
+        }
     }
 
     protected function tearDown(): void

@@ -8,6 +8,8 @@ use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Workflow\Actions\TransitionContactWorkflowStatusAction;
 use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
+use App\Support\AutomationEvents\Models\AutomationEventOutboxEvent;
+use App\Support\AutomationEvents\Services\AutomationEventOutbox;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
@@ -42,6 +44,8 @@ class TransitionContactWorkflowStatusActionTest extends TestCase
         $this->assertSame($contact->id, $profile->contact_id);
         $this->assertSame($status->id, $profile->contact_status_id);
         $this->assertNotNull($profile->last_status_changed_at);
+
+        $this->publishWorkflowStatusChangeEvents();
 
         Event::assertDispatched(
             ContactWorkflowStatusChanged::class,
@@ -93,6 +97,8 @@ class TransitionContactWorkflowStatusActionTest extends TestCase
         $this->assertSame($newStatus->id, $profile->meta['last_status_change']['to_contact_status_id']);
         $this->assertSame('Qualified by intake', $profile->meta['last_status_change']['reason']);
         $this->assertSame('workflow_test', $profile->meta['last_status_change']['source']);
+
+        $this->publishWorkflowStatusChangeEvents();
 
         Event::assertDispatched(
             ContactWorkflowStatusChanged::class,
@@ -159,6 +165,31 @@ class TransitionContactWorkflowStatusActionTest extends TestCase
             'contact_status_id' => $status->id,
         ]);
 
+        $this->publishWorkflowStatusChangeEvents();
+
         Event::assertDispatched(ContactWorkflowStatusChanged::class);
+    }
+
+    private function publishWorkflowStatusChangeEvents(): void
+    {
+        $outbox = app(AutomationEventOutbox::class);
+        $published = 0;
+
+        while ($event = AutomationEventOutboxEvent::query()
+            ->where('event_key', ContactWorkflowStatusChanged::AUTOMATION_EVENT_KEY)
+            ->where('status', AutomationEventOutboxEvent::STATUS_PENDING)
+            ->where('available_at', '<=', now())
+            ->orderBy('id')
+            ->first()
+        ) {
+            $published++;
+
+            $this->assertLessThanOrEqual(
+                100,
+                $published,
+                'Workflow status-change outbox delivery did not settle.',
+            );
+            $this->assertTrue($outbox->publish((int) $event->getKey()));
+        }
     }
 }

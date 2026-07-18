@@ -183,12 +183,29 @@ class AutomationEventOutbox
             eventKey: $outboxEvent->event_key,
             contactId: $outboxEvent->contact_id,
             subjectType: $outboxEvent->subject_type,
-            subjectId: $outboxEvent->subject_id,
+            subjectId: $this->subjectId($outboxEvent->subject_id),
             occurredAt: $outboxEvent->occurred_at,
             payload: is_array($outboxEvent->payload) ? $outboxEvent->payload : [],
             meta: is_array($outboxEvent->meta) ? $outboxEvent->meta : [],
             eventId: $outboxEvent->event_id,
         );
+    }
+
+    private function subjectId(?string $value): int|string|null
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (ctype_digit($value)) {
+            $integer = (int) $value;
+
+            if ((string) $integer === $value) {
+                return $integer;
+            }
+        }
+
+        return $value;
     }
 
     private function assertSameEvent(

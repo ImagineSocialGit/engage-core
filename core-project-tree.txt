@@ -832,6 +832,7 @@
 │   │       ├── Events
 │   │       │   └── ContactWorkflowStatusChanged.php
 │   │       ├── Listeners
+│   │       │   ├── DispatchContactWorkflowStatusChangedFromAutomationEvent.php
 │   │       │   └── RecordManualStatusTransitionAutomationBehavior.php
 │   │       ├── Models
 │   │       │   └── ContactWorkflowProfile.php
@@ -1522,6 +1523,7 @@
 │   │   │   └── FormsFoundationTest.php
 │   │   ├── InboundMessaging
 │   │   │   ├── HandleInboundEmailWebhookActionTest.php
+│   │   │   ├── InboundMessageAutomationOutboxTest.php
 │   │   │   └── InboundNormalReplyAutomationEventTest.php
 │   │   ├── Integrations
 │   │   │   └── Messaging
@@ -1612,6 +1614,7 @@
 │   │   │   ├── RecordManualTaskAfterAutomationEventBehaviorTest.php
 │   │   │   ├── RecordManualTaskAutomationBehaviorActionTest.php
 │   │   │   ├── RecordManualTaskCompletionAutomationBehaviorActionTest.php
+│   │   │   ├── TaskCompletionAutomationOutboxTest.php
 │   │   │   ├── TaskCompletionBehaviorTest.php
 │   │   │   ├── TaskCompletionProvenanceTest.php
 │   │   │   ├── TaskCreationBehaviorTest.php
@@ -1664,7 +1667,8 @@
 │   │   │   └── ZoomWebinarServiceSnapshotTest.php
 │   │   └── Workflow
 │   │       ├── RecordManualStatusTransitionAutomationBehaviorActionTest.php
-│   │       └── TransitionContactWorkflowStatusActionTest.php
+│   │       ├── TransitionContactWorkflowStatusActionTest.php
+│   │       └── WorkflowStatusAutomationOutboxTest.php
 │   ├── TestCase.php
 │   └── Unit
 │       └── Support
@@ -1672,4 +1676,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-487 directories, 1186 files
+487 directories, 1190 files

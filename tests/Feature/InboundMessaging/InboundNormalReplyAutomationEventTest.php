@@ -5,6 +5,8 @@ namespace Tests\Feature\InboundMessaging;
 use App\Modules\Core\Models\Contact;
 use App\Modules\InboundMessaging\Actions\RecordInboundMessageAction;
 use App\Modules\InboundMessaging\Models\InboundMessage;
+use App\Support\AutomationEvents\Models\AutomationEventOutboxEvent;
+use App\Support\AutomationEvents\Services\AutomationEventOutbox;
 use App\Support\AutomationOpportunities\Actions\RecordAutomationEventCorrelationEvidenceAction;
 use App\Support\AutomationOpportunities\Models\AutomationBehaviorOccurrence;
 use Carbon\CarbonImmutable;
@@ -45,6 +47,16 @@ class InboundNormalReplyAutomationEventTest extends TestCase
             ],
             sender: $contact,
         );
+
+        $outboxEvent = AutomationEventOutboxEvent::query()
+            ->where('event_key', RecordInboundMessageAction::NORMAL_REPLY_AUTOMATION_EVENT_KEY)
+            ->firstOrFail();
+
+        if ($outboxEvent->status !== AutomationEventOutboxEvent::STATUS_PUBLISHED) {
+            $this->assertTrue(
+                app(AutomationEventOutbox::class)->publish((int) $outboxEvent->getKey()),
+            );
+        }
 
         $occurrence = AutomationBehaviorOccurrence::query()
             ->forAction(RecordAutomationEventCorrelationEvidenceAction::ACTION_KEY)

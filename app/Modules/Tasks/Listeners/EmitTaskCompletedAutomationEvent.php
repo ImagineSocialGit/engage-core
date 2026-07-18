@@ -8,12 +8,13 @@ use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Models\TaskLink;
 use App\Modules\Tasks\Services\TaskContactLinkResolver;
 use App\Support\AutomationEvents\Data\AutomationEventData;
-use App\Support\AutomationEvents\Events\AutomationEventRecorded;
+use App\Support\AutomationEvents\Services\AutomationEventOutbox;
 
 class EmitTaskCompletedAutomationEvent
 {
     public function __construct(
         private readonly TaskContactLinkResolver $contactLinks,
+        private readonly AutomationEventOutbox $automationEventOutbox,
     ) {}
 
     public function handle(TaskCompleted $event): void
@@ -24,8 +25,8 @@ class EmitTaskCompletedAutomationEvent
             return;
         }
 
-        event(new AutomationEventRecorded(
-            AutomationEventData::forSubject(
+        $this->automationEventOutbox->record(
+            event: AutomationEventData::forSubject(
                 eventKey: TaskCompleted::NAME,
                 subject: $task,
                 contactId: $this->contactId($task),
@@ -63,7 +64,12 @@ class EmitTaskCompletedAutomationEvent
                     ],
                 ],
             ),
-        ));
+            idempotencyKey: implode(':', [
+                'tasks',
+                TaskCompleted::NAME,
+                $task->getKey(),
+            ]),
+        );
     }
 
     private function contactId(Task $task): ?int
