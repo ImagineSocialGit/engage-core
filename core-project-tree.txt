@@ -1629,6 +1629,7 @@
 │   │   │   ├── WebinarScheduleProfileDefinitionResolverMessageAreaTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
+│   │   │   ├── WebinarTokenReferenceContractTest.php
 │   │   │   ├── WebinarWaitlistSignupControllerTest.php
 │   │   │   └── ZoomWebinarServiceSnapshotTest.php
 │   │   └── Workflow
@@ -1641,4 +1642,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-482 directories, 1160 files
+482 directories, 1161 files
