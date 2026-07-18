@@ -12,9 +12,14 @@ use App\Modules\Messaging\ConfigContracts\MessagingConfigContractTargetProvider;
 use App\Modules\Messaging\ConfigContracts\PermissionInvitationConfigContract;
 use App\Modules\Messaging\ConfigContracts\SmsMessageDefinitionConfigContract;
 use App\Modules\Messaging\Console\Commands\SyncMessageTemplatePresetsCommand;
+use App\Modules\Messaging\Events\ScheduledMessageFailed;
+use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
+use App\Modules\Messaging\Jobs\PublishScheduledMessageOutboxEventsJob;
 use App\Modules\Messaging\Jobs\RecoverStaleScheduledMessageClaimsJob;
+use App\Modules\Messaging\Listeners\MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailed;
 use App\Modules\Messaging\Listeners\MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped;
+use App\Modules\Messaging\Listeners\MarkClaimedPermissionInvitationSentAfterScheduledMessageSent;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
@@ -115,12 +120,27 @@ class MessagingModuleServiceProvider extends ServiceProvider
                     ->job(new RecoverStaleScheduledMessageClaimsJob())
                     ->everyMinute()
                     ->withoutOverlapping();
+
+                $schedule
+                    ->job(new PublishScheduledMessageOutboxEventsJob())
+                    ->everyMinute()
+                    ->withoutOverlapping();
             },
+        );
+
+        Event::listen(
+            ScheduledMessageSent::class,
+            MarkClaimedPermissionInvitationSentAfterScheduledMessageSent::class,
         );
 
         Event::listen(
             ScheduledMessageSkipped::class,
             MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped::class,
+        );
+
+        Event::listen(
+            ScheduledMessageFailed::class,
+            MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailed::class,
         );
 
         if ($this->app->runningInConsole()) {

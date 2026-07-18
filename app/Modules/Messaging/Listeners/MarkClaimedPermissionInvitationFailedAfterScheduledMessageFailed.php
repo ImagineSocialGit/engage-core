@@ -2,18 +2,18 @@
 
 namespace App\Modules\Messaging\Listeners;
 
-use App\Modules\Messaging\Events\ScheduledMessageSkipped;
+use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use Illuminate\Support\Facades\DB;
 
-class MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped
+class MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailed
 {
     public function __construct(
         private readonly ContactPermissionInvitationService $permissionInvitationService,
     ) {}
 
-    public function handle(ScheduledMessageSkipped $event): void
+    public function handle(ScheduledMessageFailed $event): void
     {
         DB::transaction(function () use ($event): void {
             $scheduledMessage = $event->scheduledMessage;
@@ -30,10 +30,10 @@ class MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped
                 return;
             }
 
-            $reason = is_string($scheduledMessage->skip_reason)
-                && trim($scheduledMessage->skip_reason) !== ''
-                    ? trim($scheduledMessage->skip_reason)
-                    : 'Scheduled permission invitation was skipped after claim.';
+            $reason = is_string($scheduledMessage->failure_reason)
+                && trim($scheduledMessage->failure_reason) !== ''
+                    ? trim($scheduledMessage->failure_reason)
+                    : 'Scheduled permission invitation delivery failed.';
 
             $this->permissionInvitationService->markFailed(
                 invitation: $invitation,

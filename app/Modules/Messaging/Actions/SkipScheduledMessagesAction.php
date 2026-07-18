@@ -5,15 +5,19 @@ namespace App\Modules\Messaging\Actions;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
-use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
+use App\Modules\Messaging\Services\ScheduledMessageEventOutbox;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 class SkipScheduledMessagesAction
 {
+    public function __construct(
+        private readonly ScheduledMessageEventOutbox $eventOutbox,
+    ) {}
+
     public function forContext(Model $context, ?string $reason = null): int
     {
         return $this->skip(
@@ -117,17 +121,18 @@ class SkipScheduledMessagesAction
                 return 0;
             }
 
-            DB::afterCommit(function () use ($ids): void {
-                ScheduledMessage::query()
-                    ->whereKey($ids)
-                    ->where('status', ScheduledMessage::STATUS_SKIPPED)
-                    ->orderBy('id')
-                    ->chunkById(100, function ($messages): void {
-                        foreach ($messages as $scheduledMessage) {
-                            ScheduledMessageSkipped::dispatch($scheduledMessage);
-                        }
-                    });
-            });
+            ScheduledMessage::query()
+                ->whereKey($ids)
+                ->where('status', ScheduledMessage::STATUS_SKIPPED)
+                ->orderBy('id')
+                ->get()
+                ->each(function (ScheduledMessage $scheduledMessage): void {
+                    $this->eventOutbox->record(
+                        scheduledMessage: $scheduledMessage,
+                        eventType: ScheduledMessage::STATUS_SKIPPED,
+                        occurredAt: $scheduledMessage->skipped_at,
+                    );
+                });
 
             return $updated;
         });

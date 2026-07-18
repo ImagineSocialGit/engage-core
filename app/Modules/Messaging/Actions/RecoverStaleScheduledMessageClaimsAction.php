@@ -5,12 +5,14 @@ namespace App\Modules\Messaging\Actions;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Models\ScheduledMessageDeliveryAttempt;
 use App\Modules\Messaging\Services\ScheduledMessageDeliveryPolicy;
+use App\Modules\Messaging\Services\ScheduledMessageEventOutbox;
 use Illuminate\Support\Facades\DB;
 
 class RecoverStaleScheduledMessageClaimsAction
 {
     public function __construct(
         private readonly ScheduledMessageDeliveryPolicy $deliveryPolicy,
+        private readonly ScheduledMessageEventOutbox $eventOutbox,
     ) {}
 
     /**
@@ -107,6 +109,12 @@ class RecoverStaleScheduledMessageClaimsAction
                     completedAt: $recoveredAt,
                     reasonCode: 'stale_provider_submission_outcome_unknown',
                     reason: $reason,
+                );
+
+                $this->eventOutbox->record(
+                    scheduledMessage: $message,
+                    eventType: ScheduledMessage::STATUS_FAILED,
+                    occurredAt: $recoveredAt,
                 );
 
                 return [

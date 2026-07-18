@@ -3,7 +3,6 @@
 namespace App\Modules\Messaging\Jobs;
 
 use App\Modules\Messaging\Actions\RecoverStaleScheduledMessageClaimsAction;
-use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ScheduledMessageDeliveryPolicy;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -27,10 +26,6 @@ class RecoverStaleScheduledMessageClaimsJob implements ShouldBeUnique, ShouldQue
         ScheduledMessageDeliveryPolicy $deliveryPolicy,
     ): void {
         $result = $recoverStaleClaims->handle();
-
-        foreach ($result['failed'] as $message) {
-            ScheduledMessageFailed::dispatch($message);
-        }
 
         ScheduledMessage::query()
             ->where('status', ScheduledMessage::STATUS_PENDING)

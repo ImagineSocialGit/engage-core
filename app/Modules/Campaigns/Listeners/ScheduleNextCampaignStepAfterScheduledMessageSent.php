@@ -11,6 +11,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use Illuminate\Support\Facades\DB;
 
 class ScheduleNextCampaignStepAfterScheduledMessageSent
 {
@@ -29,40 +30,44 @@ class ScheduleNextCampaignStepAfterScheduledMessageSent
             return;
         }
 
-        $enrollment = CampaignEnrollment::query()->find((int) $campaignEnrollmentId);
+        DB::transaction(function () use ($scheduledMessage, $campaignEnrollmentId): void {
+            $enrollment = CampaignEnrollment::query()
+                ->lockForUpdate()
+                ->find((int) $campaignEnrollmentId);
 
-        if (! $enrollment) {
-            return;
-        }
+            if (! $enrollment) {
+                return;
+            }
 
-        $campaignStepId = $scheduledMessage->meta['campaign_step_id'] ?? null;
+            $campaignStepId = $scheduledMessage->meta['campaign_step_id'] ?? null;
 
-        if (
-            is_numeric($campaignStepId)
-            && (int) $enrollment->current_campaign_step_id !== (int) $campaignStepId
-        ) {
-            return;
-        }
+            if (
+                is_numeric($campaignStepId)
+                && (int) $enrollment->current_campaign_step_id !== (int) $campaignStepId
+            ) {
+                return;
+            }
 
-        $this->reevaluateCurrentDependencyAwareStep(
-            scheduledMessage: $scheduledMessage,
-            enrollment: $enrollment,
-            campaignStepId: $campaignStepId,
-        );
+            $this->reevaluateCurrentDependencyAwareStep(
+                scheduledMessage: $scheduledMessage,
+                enrollment: $enrollment,
+                campaignStepId: $campaignStepId,
+            );
 
-        if ($this->hasPendingSiblingVariantMessages($scheduledMessage, (int) $campaignEnrollmentId)) {
-            return;
-        }
+            if ($this->hasPendingSiblingVariantMessages($scheduledMessage, (int) $campaignEnrollmentId)) {
+                return;
+            }
 
-        $this->scheduleNextCampaignStepAction->handle(
-            enrollment: $enrollment,
-            dispatchKey: null,
-            context: $scheduledMessage->context,
-            payload: [],
-            meta: [
-                'previous_scheduled_message_id' => $scheduledMessage->id,
-            ],
-        );
+            $this->scheduleNextCampaignStepAction->handle(
+                enrollment: $enrollment,
+                dispatchKey: null,
+                context: $scheduledMessage->context,
+                payload: [],
+                meta: [
+                    'previous_scheduled_message_id' => $scheduledMessage->id,
+                ],
+            );
+        });
     }
 
     private function reevaluateCurrentDependencyAwareStep(

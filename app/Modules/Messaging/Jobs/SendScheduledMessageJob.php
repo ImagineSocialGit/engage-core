@@ -7,9 +7,6 @@ use App\Modules\Messaging\Contracts\Email\EmailMessage;
 use App\Modules\Messaging\Contracts\Sms\SmsMessage;
 use App\Modules\Messaging\Data\Delivery\MessageSendResult;
 use App\Modules\Messaging\Enums\MessageChannel;
-use App\Modules\Messaging\Events\ScheduledMessageFailed;
-use App\Modules\Messaging\Events\ScheduledMessageSent;
-use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
@@ -400,8 +397,6 @@ class SendScheduledMessageJob implements ShouldQueue
             return false;
         }
 
-        ScheduledMessageSent::dispatch($completed);
-
         return true;
     }
 
@@ -419,8 +414,6 @@ class SendScheduledMessageJob implements ShouldQueue
         if (! $completed instanceof ScheduledMessage) {
             return false;
         }
-
-        ScheduledMessageSkipped::dispatch($completed);
 
         return true;
     }
@@ -447,8 +440,6 @@ class SendScheduledMessageJob implements ShouldQueue
         if (! $completed instanceof ScheduledMessage) {
             return false;
         }
-
-        ScheduledMessageFailed::dispatch($completed);
 
         return true;
     }

@@ -13,6 +13,7 @@ class ScheduledMessageDeliveryLeaseManager
 {
     public function __construct(
         private readonly ScheduledMessageDeliveryPolicy $deliveryPolicy,
+        private readonly ScheduledMessageEventOutbox $eventOutbox,
     ) {}
 
     public function beginProviderSubmission(ScheduledMessage $claimedMessage): bool
@@ -127,6 +128,12 @@ class ScheduledMessageDeliveryLeaseManager
                 'reason' => $exception?->getMessage() ?? $result->reason,
                 'meta' => $result->meta,
             ])->save();
+
+            $this->eventOutbox->record(
+                scheduledMessage: $message,
+                eventType: $status,
+                occurredAt: $completedAt,
+            );
 
             return $message;
         });
