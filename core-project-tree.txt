@@ -873,8 +873,16 @@
 │       ├── AutomationEvents
 │       │   ├── Data
 │       │   │   └── AutomationEventData.php
-│       │   └── Events
-│       │       └── AutomationEventRecorded.php
+│       │   ├── Events
+│       │   │   └── AutomationEventRecorded.php
+│       │   ├── Jobs
+│       │   │   └── PublishAutomationEventOutboxEventsJob.php
+│       │   ├── Models
+│       │   │   ├── AutomationEventConsumerReceipt.php
+│       │   │   └── AutomationEventOutboxEvent.php
+│       │   └── Services
+│       │       ├── AutomationEventConsumer.php
+│       │       └── AutomationEventOutbox.php
 │       ├── AutomationOpportunities
 │       │   ├── Actions
 │       │   │   ├── AutomationBehaviorAction.php
@@ -1171,6 +1179,8 @@
 │   │   ├── 2026_07_02_000008_create_commerce_order_items_table.php
 │   │   ├── 2026_07_02_000009_create_commerce_order_events_table.php
 │   │   ├── 2026_07_13_120000_create_site_settings_table.php
+│   │   ├── 2026_07_18_220000_create_automation_event_outbox_events_table.php
+│   │   ├── 2026_07_18_220001_create_automation_event_consumer_receipts_table.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -1492,6 +1502,7 @@
 │   │   ├── Email
 │   │   │   └── HandleInboundEmailWebhookActionTest.php
 │   │   ├── FlowRoutes
+│   │   │   ├── AutomationEventReceiptTest.php
 │   │   │   ├── AutomationPointAuthoringRegistryTest.php
 │   │   │   ├── AutomationPointExtensionRegistryTest.php
 │   │   │   ├── ContactStatusAutomationImpactResolverTest.php
@@ -1594,6 +1605,9 @@
 │   │   │   ├── SetupValidationManagerTest.php
 │   │   │   ├── SetupValidationRegistrationTest.php
 │   │   │   └── ValidateSetupCommandTest.php
+│   │   ├── Support
+│   │   │   └── AutomationEvents
+│   │   │       └── AutomationEventOutboxTest.php
 │   │   ├── Tasks
 │   │   │   ├── RecordManualTaskAfterAutomationEventBehaviorTest.php
 │   │   │   ├── RecordManualTaskAutomationBehaviorActionTest.php
@@ -1628,6 +1642,7 @@
 │   │   │   ├── ProviderCancellationReconciliationTest.php
 │   │   │   ├── ResolveRegisterableWebinarActionTest.php
 │   │   │   ├── SyncWebinarScheduleProfilesMessageAreaTest.php
+│   │   │   ├── WebinarAutomationOutboxTest.php
 │   │   │   ├── WebinarMessageAreaRegistryTest.php
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
@@ -1657,4 +1672,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-482 directories, 1176 files
+487 directories, 1186 files

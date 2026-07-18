@@ -47,33 +47,16 @@ class CancelWebinarRegistrationAction
                 reason: 'Webinar registration cancelled.',
             );
 
-            DB::afterCommit(function () use ($locked, $cancelledAt, $source): void {
-                $committed = $locked->fresh([
-                    'contact',
-                    'webinar',
-                    'webinar.webinarSeries',
-                ]);
-
-                if (! $committed instanceof WebinarRegistration) {
-                    return;
-                }
-
-                try {
-                    $this->emitWebinarAutomationEvent->forRegistration(
-                        eventKey: 'webinar.cancelled',
-                        registration: $committed,
-                        occurredAt: $committed->cancelled_at ?? $cancelledAt,
-                        payload: [
-                            'cancellation' => [
-                                'source' => $source,
-                            ],
-                        ],
-                    );
-                } catch (Throwable $exception) {
-                    // Automation is downstream of the committed cancellation.
-                    report($exception);
-                }
-            });
+            $this->emitWebinarAutomationEvent->forRegistration(
+                eventKey: 'webinar.cancelled',
+                registration: $locked,
+                occurredAt: $locked->cancelled_at ?? $cancelledAt,
+                payload: [
+                    'cancellation' => [
+                        'source' => $source,
+                    ],
+                ],
+            );
 
             return $locked;
         });

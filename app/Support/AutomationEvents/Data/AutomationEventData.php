@@ -20,6 +20,7 @@ class AutomationEventData
         public readonly ?CarbonInterface $occurredAt = null,
         public readonly array $payload = [],
         public readonly array $meta = [],
+        public readonly ?string $eventId = null,
     ) {}
 
     /**
@@ -33,6 +34,7 @@ class AutomationEventData
         ?CarbonInterface $occurredAt = null,
         array $payload = [],
         array $meta = [],
+        ?string $eventId = null,
     ): self {
         return new self(
             eventKey: trim($eventKey),
@@ -42,6 +44,7 @@ class AutomationEventData
             occurredAt: $occurredAt ?? CarbonImmutable::now('UTC'),
             payload: $payload,
             meta: $meta,
+            eventId: $eventId,
         );
     }
 
@@ -56,6 +59,7 @@ class AutomationEventData
         ?CarbonInterface $occurredAt = null,
         array $payload = [],
         array $meta = [],
+        ?string $eventId = null,
     ): self {
         return self::make(
             eventKey: $eventKey,
@@ -64,12 +68,18 @@ class AutomationEventData
             occurredAt: $occurredAt,
             payload: $payload,
             meta: $meta,
+            eventId: $eventId,
         );
     }
 
     public function isValid(): bool
     {
-        return $this->eventKey !== '';
+        return trim($this->eventKey) !== '';
+    }
+
+    public function hasDurableIdentity(): bool
+    {
+        return is_string($this->eventId) && trim($this->eventId) !== '';
     }
 
     /**
@@ -78,6 +88,7 @@ class AutomationEventData
     public function toArray(): array
     {
         return [
+            'event_id' => $this->eventId,
             'event_key' => $this->eventKey,
             'contact_id' => $this->contactId,
             'subject_type' => $this->subjectType,

@@ -24,6 +24,7 @@ class CreateWebinarRegistrationAction
         private readonly PhoneNumberNormalizer $phoneNumberNormalizer,
         private readonly GrantMessageConsentsAction $grantMessageConsentsAction,
         private readonly CreateOrUpdateContactAction $createOrUpdateContact,
+        private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
         private readonly FinalizeWebinarRegistrationAction $finalizeRegistration,
     ) {}
 
@@ -107,12 +108,20 @@ class CreateWebinarRegistrationAction
                 now: $now,
             );
 
+            $registration->load([
+                'contact',
+                'webinar',
+                'webinar.webinarSeries',
+            ]);
+
+            $this->emitWebinarAutomationEvent->forRegistration(
+                eventKey: 'webinar.registered',
+                registration: $registration,
+                occurredAt: $registration->registered_at ?? $now,
+            );
+
             return WebinarRegistrationResult::created(
-                registration: $registration->load([
-                    'contact',
-                    'webinar',
-                    'webinar.webinarSeries',
-                ]),
+                registration: $registration,
                 consentGrants: $consentGrants,
             );
         });

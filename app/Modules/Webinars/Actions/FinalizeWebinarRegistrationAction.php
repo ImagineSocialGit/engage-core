@@ -17,7 +17,6 @@ class FinalizeWebinarRegistrationAction
         private readonly SyncWebinarRegistrationToProviderAction $syncToProvider,
         private readonly DispatchWebinarRegistrationMessagesAction $dispatchRegistrationMessages,
         private readonly DispatchConsentOptInMessageAction $dispatchConsentOptInMessage,
-        private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
     ) {}
 
     public function handle(WebinarRegistrationResult $result): void
@@ -36,18 +35,6 @@ class FinalizeWebinarRegistrationAction
             );
 
             return;
-        }
-
-        try {
-            $this->emitWebinarAutomationEvent->forRegistration(
-                eventKey: 'webinar.registered',
-                registration: $registration,
-                occurredAt: $registration->registered_at ?? now(),
-            );
-        } catch (Throwable $exception) {
-            // Automation is downstream of the committed registration and must
-            // not change whether the public registration succeeded.
-            report($exception);
         }
 
         try {

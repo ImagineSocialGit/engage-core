@@ -8,6 +8,7 @@ use App\Support\AutomationCapabilities\AutomationActionRegistry;
 use App\Support\AutomationCapabilities\AutomationCapabilityRegistry;
 use App\Support\AutomationCapabilities\AutomationPointDefinitionRegistry;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
+use App\Support\AutomationEvents\Jobs\PublishAutomationEventOutboxEventsJob;
 use App\Support\AutomationOpportunities\Actions\RecordAutomationEventCorrelationEvidenceAction;
 use App\Support\ConfigContracts\ConfigContractRegistry;
 use App\Support\ConfigContracts\ConfigContractTargetRegistry;
@@ -25,6 +26,7 @@ use App\Support\SetupValidation\Contributors\PresetCompositionSetupValidationCon
 use App\Support\SetupValidation\Contributors\ReferenceRegistrySetupValidationContributor;
 use App\Support\SetupValidation\SetupValidationManager;
 use App\Support\TokenContracts\TokenContractRegistry;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
@@ -128,6 +130,16 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->callAfterResolving(
+            Schedule::class,
+            function (Schedule $schedule): void {
+                $schedule
+                    ->job(new PublishAutomationEventOutboxEventsJob())
+                    ->everyMinute()
+                    ->withoutOverlapping();
+            },
+        );
+
         Event::listen(
             AutomationEventRecorded::class,
             RecordAutomationEventCorrelationEvidenceAction::class,

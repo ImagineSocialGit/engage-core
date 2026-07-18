@@ -5,11 +5,16 @@ namespace App\Modules\Webinars\Actions;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Support\AutomationEvents\Data\AutomationEventData;
-use App\Support\AutomationEvents\Events\AutomationEventRecorded;
+use App\Support\AutomationEvents\Services\AutomationEventOutbox;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Model;
 
 class EmitWebinarAutomationEventAction
 {
+    public function __construct(
+        private readonly AutomationEventOutbox $outbox,
+    ) {}
+
     /**
      * @param array<string, mixed> $payload
      * @param array<string, mixed> $meta
@@ -27,7 +32,7 @@ class EmitWebinarAutomationEventAction
             'webinar.webinarSeries',
         ]);
 
-        event(new AutomationEventRecorded(
+        $this->outbox->record(
             AutomationEventData::forSubject(
                 eventKey: $eventKey,
                 subject: $registration,
@@ -44,7 +49,8 @@ class EmitWebinarAutomationEventAction
                     'webinar_slug' => $registration->webinar_slug,
                 ], $meta),
             ),
-        ));
+            idempotencyKey: $this->idempotencyKey($eventKey, $registration),
+        );
     }
 
     /**
@@ -60,7 +66,7 @@ class EmitWebinarAutomationEventAction
     ): void {
         $webinar->loadMissing('webinarSeries');
 
-        event(new AutomationEventRecorded(
+        $this->outbox->record(
             AutomationEventData::forSubject(
                 eventKey: $eventKey,
                 subject: $webinar,
@@ -76,7 +82,8 @@ class EmitWebinarAutomationEventAction
                     'webinar_slug' => $webinar->slug,
                 ], $meta),
             ),
-        ));
+            idempotencyKey: $this->idempotencyKey($eventKey, $webinar),
+        );
     }
 
     /**
@@ -132,5 +139,14 @@ class EmitWebinarAutomationEventAction
             ],
             'webinar_series' => $webinar->webinarSeries?->toArray() ?? [],
         ];
+    }
+
+    private function idempotencyKey(string $eventKey, Model $subject): string
+    {
+        return 'webinars:'.hash('sha256', implode('|', [
+            trim($eventKey),
+            $subject->getMorphClass(),
+            (string) $subject->getKey(),
+        ]));
     }
 }

@@ -111,32 +111,20 @@ class RecordWebinarAttendanceAction
                 'meta' => $meta,
             ])->save();
 
-            DB::afterCommit(function () use ($registration, $provider, $match, $attendedAt): void {
-                $registration = $registration->fresh([
-                    'contact',
-                    'webinar',
-                    'webinar.webinarSeries',
-                ]);
-
-                if (! $registration) {
-                    return;
-                }
-
-                $this->emitWebinarAutomationEvent->forRegistration(
-                    eventKey: config('webinars.post_event.automation_events.attended.event_key', 'webinar.attended'),
-                    registration: $registration,
-                    occurredAt: $attendedAt,
-                    payload: [
-                        'attendance' => [
-                            'provider' => $provider,
-                            'status' => $match->status ?: 'attended',
-                            'duration' => $match->duration,
-                            'join_time' => $this->dateTimeString($match->joinTime),
-                            'leave_time' => $this->dateTimeString($match->leaveTime),
-                        ],
+            $this->emitWebinarAutomationEvent->forRegistration(
+                eventKey: config('webinars.post_event.automation_events.attended.event_key', 'webinar.attended'),
+                registration: $registration,
+                occurredAt: $attendedAt,
+                payload: [
+                    'attendance' => [
+                        'provider' => $provider,
+                        'status' => $match->status ?: 'attended',
+                        'duration' => $match->duration,
+                        'join_time' => $this->dateTimeString($match->joinTime),
+                        'leave_time' => $this->dateTimeString($match->leaveTime),
                     ],
-                );
-            });
+                ],
+            );
         });
     }
 
@@ -168,29 +156,17 @@ class RecordWebinarAttendanceAction
                 'meta' => $meta,
             ])->save();
 
-            DB::afterCommit(function () use ($registration, $provider, $recordedAt): void {
-                $registration = $registration->fresh([
-                    'contact',
-                    'webinar',
-                    'webinar.webinarSeries',
-                ]);
-
-                if (! $registration) {
-                    return;
-                }
-
-                $this->emitWebinarAutomationEvent->forRegistration(
-                    eventKey: config('webinars.post_event.automation_events.missed.event_key', 'webinar.missed'),
-                    registration: $registration,
-                    occurredAt: $recordedAt,
-                    payload: [
-                        'attendance' => [
-                            'provider' => $provider,
-                            'status' => 'missed',
-                        ],
+            $this->emitWebinarAutomationEvent->forRegistration(
+                eventKey: config('webinars.post_event.automation_events.missed.event_key', 'webinar.missed'),
+                registration: $registration,
+                occurredAt: $recordedAt,
+                payload: [
+                    'attendance' => [
+                        'provider' => $provider,
+                        'status' => 'missed',
                     ],
-                );
-            });
+                ],
+            );
         });
     }
 
