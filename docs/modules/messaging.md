@@ -707,6 +707,16 @@ Do not persist the same Contact, Webinar, registration, Campaign, Route, Task, o
 
 Raw provider payloads belong only in columns explicitly designed as raw provider snapshots. A runtime producer that violates this contract should be treated as persistence debt to correct through the system-wide model creation and persistence audit, not as an accepted UX tradeoff.
 
+### Delivery claims, attempts, and stale recovery
+
+`pending` to `sending` is a leased claim, not a permanent ownership transfer. Every claim has a unique claim token and explicit expiry. Terminal writes and retry release must present the active claim token so an expired worker cannot overwrite a later worker's outcome.
+
+Each claim creates a `scheduled_message_delivery_attempts` row. Attempt history is separate from the customer-visible terminal state on `scheduled_messages`; it records claim, provider-submission, release, recovery, and terminal outcome facts.
+
+The provider idempotency key identifies one logical ScheduledMessage delivery and remains stable across attempts. Providers with a verified idempotency contract may safely receive the same key after an ambiguous stale submission only inside the configured provider retention window. Resend receives this key through its supported idempotency header and uses a conservative retry window below its documented 24-hour retention. A provider without a verified idempotency guarantee, or a claim recovered after that guarantee expired, must not be retried automatically after submission began and the outcome became ambiguous; the ScheduledMessage becomes visibly failed for operator review instead of risking a duplicate.
+
+Messaging schedules stale-claim recovery every minute. An expired pre-submission claim is returned to `pending`, marked for recovery dispatch, and repeatedly eligible for recovery dispatch until a new worker successfully claims it. Recovery never rewrites an existing terminal outcome.
+
 ## FlowRoutes-created scheduled message provenance
 
 Messaging owns scheduled message delivery, recipient/context morphs, consent, suppression, gates, payloads, scheduling, and send lifecycle.

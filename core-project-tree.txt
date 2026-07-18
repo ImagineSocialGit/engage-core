@@ -439,6 +439,7 @@
 │   │   │   │   ├── GrantMessageConsentsAction.php
 │   │   │   │   ├── ImportMessageConsentAction.php
 │   │   │   │   ├── RecordMessageConsentAction.php
+│   │   │   │   ├── RecoverStaleScheduledMessageClaimsAction.php
 │   │   │   │   ├── RevokeMessageConsentAction.php
 │   │   │   │   ├── ScheduleMessageAction.php
 │   │   │   │   ├── SkipScheduledMessagesAction.php
@@ -495,6 +496,7 @@
 │   │   │   │   ├── ScheduledMessageSent.php
 │   │   │   │   └── ScheduledMessageSkipped.php
 │   │   │   ├── Jobs
+│   │   │   │   ├── RecoverStaleScheduledMessageClaimsJob.php
 │   │   │   │   └── SendScheduledMessageJob.php
 │   │   │   ├── Listeners
 │   │   │   │   └── MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped.php
@@ -506,6 +508,7 @@
 │   │   │   │   ├── MessageTemplateCatalogEntry.php
 │   │   │   │   ├── MessageTemplatePresetAssignment.php
 │   │   │   │   ├── MessageTemplatePreset.php
+│   │   │   │   ├── ScheduledMessageDeliveryAttempt.php
 │   │   │   │   └── ScheduledMessage.php
 │   │   │   ├── Payloads
 │   │   │   │   ├── EmailPayload.php
@@ -557,6 +560,8 @@
 │   │   │   │   ├── PhoneNumberNormalizer.php
 │   │   │   │   ├── ResolvedMessageDispatchBuilder.php
 │   │   │   │   ├── RouteAuthoringMessageTemplateEligibilityResolver.php
+│   │   │   │   ├── ScheduledMessageDeliveryLeaseManager.php
+│   │   │   │   ├── ScheduledMessageDeliveryPolicy.php
 │   │   │   │   ├── ScheduledMessageGate.php
 │   │   │   │   └── Sms
 │   │   │   │       ├── SmsMessagingService.php
@@ -1137,6 +1142,7 @@
 │   │   ├── 2026_05_19_211539_create_message_template_presets_table.php
 │   │   ├── 2026_05_19_211540_create_message_template_preset_assignments_table.php
 │   │   ├── 2026_05_19_211541_create_message_template_catalog_entries_table.php
+│   │   ├── 2026_05_19_211542_create_scheduled_message_delivery_attempts_table.php
 │   │   ├── 2026_05_19_221010_create_message_suppressions_table.php
 │   │   ├── 2026_06_12_050337_create_campaigns_table.php
 │   │   ├── 2026_06_12_050338_create_campaign_steps_table.php
@@ -1544,6 +1550,7 @@
 │   │   │   ├── ResolvedMessageDispatchIntegrationTest.php
 │   │   │   ├── ResolvedMessageDispatchSchemaTest.php
 │   │   │   ├── RouteAuthoringMessageTemplateEligibilityResolverTest.php
+│   │   │   ├── ScheduledMessageDeliveryLeaseTest.php
 │   │   │   ├── ScheduledMessageFlowRoutesBoundaryTest.php
 │   │   │   ├── ScheduleInternalNotificationActionTest.php
 │   │   │   ├── SemanticCampaignVariantIdentityResolutionTest.php
@@ -1642,4 +1649,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-482 directories, 1161 files
+482 directories, 1168 files

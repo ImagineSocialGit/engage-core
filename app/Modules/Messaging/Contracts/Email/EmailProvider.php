@@ -8,5 +8,8 @@ interface EmailProvider
 {
     public function provider(): string;
 
-    public function send(EmailMessage $message): MessageSendResult;
+    public function send(
+        EmailMessage $message,
+        ?string $idempotencyKey = null,
+    ): MessageSendResult;
 }

@@ -30,6 +30,19 @@ class EmailMessagingService
             return MessageSendResult::sent(provider: 'dev_sink');
         }
 
-        return $this->emailProviderManager->provider()->send($payload);
+        return $this->emailProviderManager->provider()->send(
+            message: $payload,
+            idempotencyKey: $this->providerIdempotencyKey($payload),
+        );
+    }
+
+    private function providerIdempotencyKey(EmailMessage $payload): ?string
+    {
+        $key = data_get($payload, 'meta.delivery.provider_idempotency_key')
+            ?? data_get($payload->devPayload(), 'meta.delivery.provider_idempotency_key');
+
+        return is_string($key) && trim($key) !== ''
+            ? trim($key)
+            : null;
     }
 }

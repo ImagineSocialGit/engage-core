@@ -118,6 +118,22 @@ return [
         'dedupe_enabled' => true,
     ],
 
+    'delivery' => [
+        'claim_lease_seconds' => env('MESSAGING_DELIVERY_CLAIM_LEASE_SECONDS', 900),
+        'stale_recovery_batch_size' => env('MESSAGING_DELIVERY_RECOVERY_BATCH_SIZE', 100),
+        'retry_backoff_seconds' => [60, 300],
+
+        'provider_idempotency' => [
+            'email' => [
+                'resend' => [
+                    'enabled' => true,
+                    'safe_retry_window_seconds' => 82800,
+                ],
+            ],
+            'sms' => [],
+        ],
+    ],
+
     'internal_notifications' => [
 
         'email' => [

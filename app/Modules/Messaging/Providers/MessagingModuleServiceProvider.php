@@ -13,6 +13,7 @@ use App\Modules\Messaging\ConfigContracts\PermissionInvitationConfigContract;
 use App\Modules\Messaging\ConfigContracts\SmsMessageDefinitionConfigContract;
 use App\Modules\Messaging\Console\Commands\SyncMessageTemplatePresetsCommand;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
+use App\Modules\Messaging\Jobs\RecoverStaleScheduledMessageClaimsJob;
 use App\Modules\Messaging\Listeners\MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
@@ -25,6 +26,7 @@ use App\Modules\Messaging\Services\MessageRecipientPayloadProviderRegistry;
 use App\Modules\Messaging\Services\Sms\SmsProviderManager;
 use App\Modules\Messaging\TokenContracts\MessagingTokenContextProvider;
 use App\Modules\Messaging\Validation\MessagingSetupValidationContributor;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -106,6 +108,16 @@ class MessagingModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->callAfterResolving(
+            Schedule::class,
+            function (Schedule $schedule): void {
+                $schedule
+                    ->job(new RecoverStaleScheduledMessageClaimsJob())
+                    ->everyMinute()
+                    ->withoutOverlapping();
+            },
+        );
+
         Event::listen(
             ScheduledMessageSkipped::class,
             MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped::class,

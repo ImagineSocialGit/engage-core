@@ -47,6 +47,11 @@ class ScheduledMessageFactory extends Factory
             'status' => ScheduledMessage::STATUS_PENDING,
 
             'sending_at' => null,
+            'claim_token' => null,
+            'claim_expires_at' => null,
+            'provider_idempotency_key' => null,
+            'provider_submission_started_at' => null,
+            'recovered_at' => null,
             'last_attempted_at' => null,
             'send_attempts' => 0,
             'provider' => null,

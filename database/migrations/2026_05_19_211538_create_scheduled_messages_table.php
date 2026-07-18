@@ -53,9 +53,32 @@ return new class extends Migration
             $table->text('failure_reason')->nullable();
             $table->text('skip_reason')->nullable();
 
+            $table->uuid('claim_token')->nullable();
+            $table->timestamp('claim_expires_at')->nullable();
+            $table->string('provider_idempotency_key', 128)
+                ->nullable();
+            $table->timestamp('provider_submission_started_at')
+                ->nullable();
+            $table->timestamp('recovered_at')
+                ->nullable();
+
             $table->json('meta')->nullable();
 
             $table->timestamps();
+
+            $table->unique('claim_token', 'scheduled_messages_claim_token_unique');
+            $table->unique(
+                'provider_idempotency_key',
+                'scheduled_messages_provider_idempotency_key_unique',
+            );
+            $table->index(
+                ['status', 'claim_expires_at'],
+                'scheduled_messages_stale_claim_index',
+            );
+            $table->index(
+                ['status', 'recovered_at'],
+                'scheduled_messages_recovered_pending_index',
+            );
 
             $table->index([
                 'channel',

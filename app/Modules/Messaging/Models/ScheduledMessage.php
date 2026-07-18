@@ -5,6 +5,7 @@ namespace App\Modules\Messaging\Models;
 use Database\Factories\ScheduledMessageFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ScheduledMessage extends Model
@@ -41,6 +42,11 @@ class ScheduledMessage extends Model
         'send_at',
         'status',
         'sending_at',
+        'claim_token',
+        'claim_expires_at',
+        'provider_idempotency_key',
+        'provider_submission_started_at',
+        'recovered_at',
         'last_attempted_at',
         'send_attempts',
         'provider',
@@ -64,6 +70,9 @@ class ScheduledMessage extends Model
             'payload' => 'array',
             'send_at' => 'datetime',
             'sending_at' => 'datetime',
+            'claim_expires_at' => 'datetime',
+            'provider_submission_started_at' => 'datetime',
+            'recovered_at' => 'datetime',
             'last_attempted_at' => 'datetime',
             'send_attempts' => 'integer',
             'sent_at' => 'datetime',
@@ -86,6 +95,11 @@ class ScheduledMessage extends Model
     public function behaviorOwner(): MorphTo
     {
         return $this->morphTo('behavior_owner');
+    }
+
+    public function deliveryAttempts(): HasMany
+    {
+        return $this->hasMany(ScheduledMessageDeliveryAttempt::class);
     }
 
     /**

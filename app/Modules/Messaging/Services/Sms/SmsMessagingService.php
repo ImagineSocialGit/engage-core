@@ -73,13 +73,22 @@ class SmsMessagingService
             ]);
         }
 
+        $providerMeta = [
+            'kind' => $kind,
+            'purpose' => $purpose,
+            'source_ip' => $sourceIp,
+        ];
+
+        $idempotencyKey = data_get($payload, 'meta.delivery.provider_idempotency_key')
+            ?? data_get($payload->devPayload(), 'meta.delivery.provider_idempotency_key');
+
+        if (is_string($idempotencyKey) && trim($idempotencyKey) !== '') {
+            $providerMeta['idempotency_key'] = trim($idempotencyKey);
+        }
+
         $result = $this->smsProviderManager
             ->defaultProvider()
-            ->send($to, $message, [
-                'kind' => $kind,
-                'purpose' => $purpose,
-                'source_ip' => $sourceIp,
-            ]);
+            ->send($to, $message, $providerMeta);
 
         if ($result->isSent()) {
             $this->smsSendGuard->record($to, $message, $kind, $sourceIp);
