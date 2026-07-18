@@ -80,6 +80,35 @@ playback or follow-up evidence, must survive provider refreshes. Zoom recording 
 uses `provider.data.zoom_uuid`; the legacy flat `meta.zoom_uuid` key is read only as a
 compatibility fallback and is removed after a successful Zoom synchronization.
 
+## Attendance reconciliation authority
+
+Provider attendance results carry explicit reconciliation authority through
+`ProviderAttendanceSnapshot`. A non-authoritative snapshot may contain valid positive
+attendance evidence. Webinars applies that evidence to matched registrations, but it
+must leave every unmatched registration unresolved. Only an authoritative snapshot may
+finalize unmatched active registrations as missed.
+
+Zoom participant-report responses with no participant records are non-authoritative.
+Elapsed time does not convert an empty response into proof that nobody attended. Invalid
+payloads, invalid participant items, and incomplete pagination are also
+non-authoritative. Zoom attendance snapshots are fetched directly for reconciliation;
+transient empty or incomplete results are not cached.
+
+An explicitly authoritative empty snapshot remains representable for a provider or
+reviewed workflow that can genuinely prove zero attendance. A Webinar with no
+registrations may complete attendance processing without provider authority because
+there is no registration outcome to classify.
+
+Attendance reconciliation state is stored under
+`webinar.meta.normalized.post_event`. The state records the provider, last check time,
+record count, snapshot authority/reason, readiness, and finalization time/reason. An
+unresolved result must not set `attendance_recorded_at`. CRM Webinar history exposes
+unresolved reasons for operator follow-up.
+
+Positive attended evidence takes precedence over a prior missed classification when a
+later provider snapshot is reconciled. Recording an attended outcome remains idempotent
+for registrations already recorded as attended.
+
 ## Public registration presentation and config ownership
 
 The public Webinar registration experience is configuration-driven and may differ substantially between clients.

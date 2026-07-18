@@ -52,9 +52,11 @@ return [
 
     'retry_seconds' => 60,
 
+    // Attendance authority comes from ProviderAttendanceSnapshot. Do not add
+    // a time-based rule that converts an empty participant report into a
+    // final missed classification.
     'attendance' => [
         'enabled' => true,
-        'empty_records_retry_for_minutes' => 15,
     ],
 
     'recordings' => [
@@ -102,5 +104,3 @@ return [
     ],
 
 ];
-
-

@@ -4,6 +4,7 @@ namespace App\Modules\Webinars\Contracts;
 
 use App\Modules\Webinars\Data\ProviderRegistrationData;
 use App\Modules\Webinars\Data\ProviderRecordingData;
+use App\Modules\Webinars\Data\ProviderAttendanceSnapshot;
 use App\Modules\Webinars\Data\ProviderWebhookEvent;
 use App\Modules\Webinars\Data\ProviderWebinarData;
 use App\Modules\Webinars\Data\ProviderWebinarSnapshot;
@@ -34,10 +35,13 @@ interface WebinarProvider
     public function parseWebhook(Request $request): ProviderWebhookEvent;
 
     /**
-     * @return iterable<WebinarAttendanceRecord>
+     * Provider integrations should return ProviderAttendanceSnapshot so
+     * callers can separate safe positive evidence from authoritative missed
+     * reconciliation. Legacy iterables are treated as non-authoritative.
+     *
+     * @return ProviderAttendanceSnapshot|iterable<WebinarAttendanceRecord>
      */
     public function listAttendanceRecords(Webinar $webinar): iterable;
 
     public function getRecording(Webinar $webinar): ?ProviderRecordingData;
 }
-

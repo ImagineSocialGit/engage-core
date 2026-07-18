@@ -154,6 +154,22 @@
                                     ])
                                     : null;
 
+                                $attendanceCheckedAt = data_get(
+                                    $webinar->meta,
+                                    'normalized.post_event.attendance_checked_at',
+                                );
+                                $attendanceReady = data_get(
+                                    $webinar->meta,
+                                    'normalized.post_event.attendance_ready',
+                                ) === true;
+                                $attendanceSnapshotReason = data_get(
+                                    $webinar->meta,
+                                    'normalized.post_event.attendance_snapshot_reason',
+                                );
+                                $attendanceSnapshotWarning = filled($attendanceSnapshotReason)
+                                    ? \Illuminate\Support\Str::headline((string) $attendanceSnapshotReason)
+                                    : null;
+
                                 $modalName = 'webinar-dev-testing-'.$webinar->id;
                             @endphp
 
@@ -171,6 +187,28 @@
                                         <span class="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">
                                             {{ $webinar->registrations->count() }} registrations
                                         </span>
+
+                                        @if($attendanceReady)
+                                            <span class="rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                                                Attendance reconciled
+                                            </span>
+                                        @elseif(filled($attendanceCheckedAt))
+                                            <span
+                                                class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-200"
+                                                title="{{ $attendanceSnapshotWarning ?? 'Attendance has not been finalized.' }}"
+                                            >
+                                                Attendance unresolved{{ $attendanceSnapshotWarning ? ': '.$attendanceSnapshotWarning : '' }}
+                                            </span>
+                                        @endif
+
+                                        @if($attendanceReady && $attendanceSnapshotWarning)
+                                            <span
+                                                class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-200"
+                                                title="The prior finalized attendance remains in effect."
+                                            >
+                                                Latest attendance check: {{ $attendanceSnapshotWarning }}
+                                            </span>
+                                        @endif
                                     </div>
                                 </td>
 
@@ -760,5 +798,3 @@
         </div>
     </div>
 </x-layouts.crm>
-
-

@@ -21,6 +21,7 @@ class RecordWebinarAttendanceAction
         Webinar $webinar,
         string $provider,
         Collection $attendanceRecords,
+        bool $finalizeMissed = true,
     ): void {
         $attendanceRecords = $attendanceRecords
             ->map(fn (WebinarAttendanceRecord|array $record) => $record instanceof WebinarAttendanceRecord
@@ -63,6 +64,10 @@ class RecordWebinarAttendanceAction
                 provider: $provider,
                 match: $match,
             );
+        }
+
+        if (! $finalizeMissed) {
+            return;
         }
 
         $registrations

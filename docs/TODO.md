@@ -1,4 +1,3 @@
-
 # Engage Core TODO
 
 ## Config generation lock-in
@@ -451,15 +450,9 @@ These are open code/runtime investigations surfaced by the first production Webi
 
 ### Webinar attendance and post-event provider reliability
 
-- [ ] Review `RecordWebinarProviderAttendanceAction` behavior when Zoom still returns zero attendance records after the retry window expires.
-  - Confirm whether zero attendance should permanently set `attendance_ready = true` and `attendance_recorded_at` or remain unresolved with an actionable state.
-- [ ] Distinguish legitimate empty attendance from provider-readiness and authorization failures.
-  - Empty provider results and access/scope failures need clearly different operational signals and retry behavior.
-- [ ] Review empty attendance caching semantics around `Cache::remember()`.
-  - A legitimate or premature empty result may be cached and reused on retries; verify whether empty responses should be cached, for how long, and under which provider states.
 - [ ] Make post-event sequencing and recovery intent easier to inspect.
   - `webinar.ended` handles attendance while recording completion resolves playback and dispatches follow-ups.
-  - Runtime behavior is valid, but current operational sequencing is easy to misread during recovery; improve first-class status/introspection before considering orchestration changes.
+  - Attendance snapshot authority and unresolved reasons are now visible in CRM Webinar history. Add explicit replay/recovery controls only after the desired operator authorization and audit contract is defined.
 
 ## Reporting foundation documentation and audit
 

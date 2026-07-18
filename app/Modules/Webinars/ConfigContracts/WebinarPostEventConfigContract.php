@@ -34,7 +34,6 @@ class WebinarPostEventConfigContract implements ConfigContract
             'retry_seconds' => ConfigField::required(ConfigSchema::integer()),
             'attendance' => ConfigField::required(ConfigSchema::object([
                 'enabled' => ConfigField::required(ConfigSchema::boolean()),
-                'empty_records_retry_for_minutes' => ConfigField::required(ConfigSchema::integer()),
             ])),
             'recordings' => ConfigField::required(ConfigSchema::object([
                 'enabled' => ConfigField::required(ConfigSchema::boolean()),

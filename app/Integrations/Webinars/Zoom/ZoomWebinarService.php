@@ -2,19 +2,19 @@
 
 namespace App\Integrations\Webinars\Zoom;
 
+use App\Integrations\Webinars\Zoom\Mappers\ZoomAttendanceMapper;
+use App\Modules\Webinars\Data\ProviderAttendanceSnapshot;
 use App\Modules\Webinars\Data\ProviderRecordingData;
 use App\Modules\Webinars\Data\ProviderWebinarData;
 use App\Modules\Webinars\Data\ProviderWebinarSnapshot;
-use App\Support\Caching\CacheKey;
 use Carbon\Carbon;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class ZoomWebinarService
 {
     public function __construct(
-        private readonly ZoomOAuthService $auth
+        private readonly ZoomOAuthService $auth,
+        private readonly ZoomAttendanceMapper $attendanceMapper,
     ) {}
 
     protected function client()
@@ -54,19 +54,17 @@ class ZoomWebinarService
         $response->throw();
     }
 
-    public function listPastWebinarParticipants(string $webinarId): Collection
+    public function listPastWebinarParticipants(string $webinarId): ProviderAttendanceSnapshot
     {
-        return Cache::remember(
-            CacheKey::externalApiResponse('zoom', 'past-webinar-participants', $webinarId),
-            (int) config('cache-keys.ttl.external_api_response_seconds'),
-            fn () => $this->fetchPastWebinarParticipants($webinarId)
-        );
+        return $this->fetchPastWebinarParticipants($webinarId);
     }
 
-    private function fetchPastWebinarParticipants(string $webinarId): Collection
+    private function fetchPastWebinarParticipants(string $webinarId): ProviderAttendanceSnapshot
     {
         $participants = collect();
         $nextPageToken = null;
+        $nonAuthoritativeReason = null;
+        $seenPageTokens = [];
 
         do {
             $response = $this->client()->get(
@@ -81,33 +79,119 @@ class ZoomWebinarService
 
             $payload = $response->json();
 
+            if (
+                ! is_array($payload)
+                || ! array_key_exists('participants', $payload)
+                || ! is_array($payload['participants'])
+            ) {
+                $nonAuthoritativeReason = 'invalid_provider_payload';
+
+                break;
+            }
+
+            $pageParticipants = collect($payload['participants']);
+
+            if ($pageParticipants->contains(
+                fn (mixed $participant): bool => ! $this->validParticipant($participant)
+            )) {
+                $nonAuthoritativeReason = 'invalid_provider_participant_item';
+            }
+
             $participants = $participants->merge(
-                collect($payload['participants'] ?? [])->map(function (array $participant) {
-                    return [
-                        'registrant_id' => $participant['registrant_id'] ?? null,
-                        'user_id' => $participant['id'] ?? null,
-                        'name' => $participant['name'] ?? null,
-                        'email' => isset($participant['user_email'])
-                            ? mb_strtolower(trim($participant['user_email']))
-                            : null,
-                        'join_time' => filled($participant['join_time'] ?? null)
-                            ? Carbon::parse($participant['join_time'])->utc()
-                            : null,
-                        'leave_time' => filled($participant['leave_time'] ?? null)
-                            ? Carbon::parse($participant['leave_time'])->utc()
-                            : null,
-                        'duration' => isset($participant['duration'])
-                            ? (int) $participant['duration']
-                            : null,
-                        'raw' => $participant,
-                    ];
-                })
+                $pageParticipants
+                    ->filter(fn (mixed $participant): bool => $this->validParticipant($participant))
+                    ->map(fn (array $participant): array => $this->normalizeParticipant($participant))
             );
 
-            $nextPageToken = $payload['next_page_token'] ?: null;
+            $rawNextPageToken = $payload['next_page_token'] ?? null;
+
+            if ($rawNextPageToken !== null && ! is_string($rawNextPageToken)) {
+                $nonAuthoritativeReason = 'invalid_provider_pagination_token';
+
+                break;
+            }
+
+            if (
+                filled($rawNextPageToken)
+                && in_array($rawNextPageToken, $seenPageTokens, true)
+            ) {
+                $nonAuthoritativeReason = 'repeated_provider_pagination_token';
+
+                break;
+            }
+
+            $nextPageToken = filled($rawNextPageToken)
+                ? $rawNextPageToken
+                : null;
+
+            if ($nextPageToken !== null) {
+                $seenPageTokens[] = $nextPageToken;
+            }
         } while ($nextPageToken);
 
-        return $participants->values();
+        $records = $this->attendanceMapper->map($participants->values());
+
+        if ($nonAuthoritativeReason !== null) {
+            return ProviderAttendanceSnapshot::nonAuthoritative(
+                records: $records,
+                reason: $nonAuthoritativeReason,
+            );
+        }
+
+        if ($records->isEmpty()) {
+            return ProviderAttendanceSnapshot::nonAuthoritative(
+                records: [],
+                reason: 'no_participant_records',
+            );
+        }
+
+        return ProviderAttendanceSnapshot::authoritative($records);
+    }
+
+    private function validParticipant(mixed $participant): bool
+    {
+        if (! is_array($participant)) {
+            return false;
+        }
+
+        $registrantId = $participant['registrant_id'] ?? null;
+        $email = $participant['user_email'] ?? $participant['email'] ?? null;
+
+        return (
+            (is_string($registrantId) || is_int($registrantId))
+            && filled($registrantId)
+        ) || (
+            is_string($email)
+            && trim($email) !== ''
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $participant
+     * @return array<string, mixed>
+     */
+    private function normalizeParticipant(array $participant): array
+    {
+        return [
+            'registrant_id' => $participant['registrant_id'] ?? null,
+            'user_id' => $participant['id'] ?? null,
+            'name' => $participant['name'] ?? null,
+            'email' => is_string($participant['user_email'] ?? null)
+                ? mb_strtolower(trim($participant['user_email']))
+                : (is_string($participant['email'] ?? null)
+                    ? mb_strtolower(trim($participant['email']))
+                    : null),
+            'join_time' => filled($participant['join_time'] ?? null)
+                ? Carbon::parse($participant['join_time'])->utc()
+                : null,
+            'leave_time' => filled($participant['leave_time'] ?? null)
+                ? Carbon::parse($participant['leave_time'])->utc()
+                : null,
+            'duration' => isset($participant['duration'])
+                ? (int) $participant['duration']
+                : null,
+            'raw' => $participant,
+        ];
     }
 
     public function listWebinarsByTitle(string $title): ProviderWebinarSnapshot
@@ -266,4 +350,3 @@ class ZoomWebinarService
         );
     }
 }
-

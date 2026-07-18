@@ -3,11 +3,10 @@
 namespace App\Integrations\Webinars\Zoom;
 
 use App\Modules\Webinars\Contracts\WebinarProvider;
+use App\Modules\Webinars\Data\ProviderAttendanceSnapshot;
 use App\Modules\Webinars\Data\ProviderRecordingData;
 use App\Modules\Webinars\Data\ProviderRegistrationData;
 use App\Modules\Webinars\Data\ProviderWebhookEvent;
-use App\Modules\Webinars\Data\WebinarAttendanceRecord;
-use App\Integrations\Webinars\Zoom\Mappers\ZoomAttendanceMapper;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use Illuminate\Http\Request;
@@ -17,7 +16,6 @@ class ZoomWebinarProvider implements WebinarProvider
     public function __construct(
         private readonly ZoomWebinarService $zoomWebinarService,
         private readonly ZoomWebhookHandler $zoomWebhookHandler,
-        private readonly ZoomAttendanceMapper $zoomAttendanceMapper,
     ) {}
 
     public function key(): string
@@ -82,14 +80,9 @@ class ZoomWebinarProvider implements WebinarProvider
         return $this->zoomWebhookHandler->parse($request);
     }
 
-    /**
-     * @return iterable<WebinarAttendanceRecord>
-     */
-    public function listAttendanceRecords(Webinar $webinar): iterable
+    public function listAttendanceRecords(Webinar $webinar): ProviderAttendanceSnapshot
     {
-        return $this->zoomAttendanceMapper->map(
-            $this->zoomWebinarService->listPastWebinarParticipants($webinar->external_id)
-        );
+        return $this->zoomWebinarService->listPastWebinarParticipants($webinar->external_id);
     }
 
     public function getRecording(Webinar $webinar): ?ProviderRecordingData
@@ -109,4 +102,3 @@ class ZoomWebinarProvider implements WebinarProvider
             : (string) $webinar->external_id;
     }
 }
-

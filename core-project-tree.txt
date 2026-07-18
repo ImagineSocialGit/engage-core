@@ -741,6 +741,7 @@
 │   │   │   │   └── Webhooks
 │   │   │   │       └── WebinarWebhookController.php
 │   │   │   ├── Data
+│   │   │   │   ├── ProviderAttendanceSnapshot.php
 │   │   │   │   ├── ProviderRecordingData.php
 │   │   │   │   ├── ProviderRegistrationData.php
 │   │   │   │   ├── ProviderWebhookEvent.php
@@ -1598,7 +1599,8 @@
 │   │   │   ├── ImportWebinarRegistrationsCommandTest.php
 │   │   │   ├── PostEvent
 │   │   │   │   ├── DispatchPostWebinarFollowUpsMessageAreaTest.php
-│   │   │   │   └── ProcessPostWebinarEventJobTest.php
+│   │   │   │   ├── ProcessPostWebinarEventJobTest.php
+│   │   │   │   └── ProviderAttendanceReconciliationTest.php
 │   │   │   ├── ResolveRegisterableWebinarActionTest.php
 │   │   │   ├── SyncWebinarScheduleProfilesMessageAreaTest.php
 │   │   │   ├── WebinarMessageAreaRegistryTest.php
@@ -1629,4 +1631,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-482 directories, 1148 files
+482 directories, 1150 files

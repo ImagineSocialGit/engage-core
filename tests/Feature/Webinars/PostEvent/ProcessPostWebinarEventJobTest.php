@@ -12,6 +12,7 @@ use App\Modules\Webinars\Actions\PostEvent\DispatchPostWebinarFollowUpsAction;
 use App\Modules\Webinars\Actions\PostEvent\RecordWebinarProviderAttendanceAction;
 use App\Modules\Webinars\Actions\PostEvent\ResolveWebinarPlaybackAction;
 use App\Modules\Webinars\Contracts\WebinarProvider;
+use App\Modules\Webinars\Data\ProviderAttendanceSnapshot;
 use App\Modules\Webinars\Data\ProviderRecordingData;
 use App\Modules\Webinars\Data\WebinarAttendanceRecord;
 use App\Modules\Webinars\Jobs\PostEvent\ProcessWebinarProviderEventJob;
@@ -62,7 +63,7 @@ class ProcessPostWebinarEventJobTest extends TestCase
             $mock->shouldReceive('listAttendanceRecords')
                 ->once()
                 ->withArgs(fn (Webinar $passedWebinar) => $passedWebinar->is($webinar))
-                ->andReturn(collect([$attendanceRecord]));
+                ->andReturn(ProviderAttendanceSnapshot::authoritative([$attendanceRecord]));
 
             $mock->shouldNotReceive('getRecording');
         });
@@ -139,7 +140,7 @@ class ProcessPostWebinarEventJobTest extends TestCase
             $mock->shouldReceive('listAttendanceRecords')
                 ->once()
                 ->withArgs(fn (Webinar $passedWebinar) => $passedWebinar->is($webinar))
-                ->andReturn(collect([$attendanceRecord]));
+                ->andReturn(ProviderAttendanceSnapshot::authoritative([$attendanceRecord]));
 
             $mock->shouldReceive('getRecording')
                 ->once()
@@ -225,7 +226,7 @@ class ProcessPostWebinarEventJobTest extends TestCase
             $mock->shouldReceive('listAttendanceRecords')
                 ->once()
                 ->withArgs(fn (Webinar $passedWebinar) => $passedWebinar->is($webinar))
-                ->andReturn(collect([$attendanceRecord]));
+                ->andReturn(ProviderAttendanceSnapshot::authoritative([$attendanceRecord]));
 
             $mock->shouldReceive('getRecording')
                 ->once()
@@ -464,5 +465,3 @@ class ProcessPostWebinarEventJobTest extends TestCase
         });
     }
 }
-
-
