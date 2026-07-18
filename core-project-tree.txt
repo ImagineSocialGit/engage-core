@@ -1379,6 +1379,8 @@
 │       │   ├── index.blade.php
 │       │   ├── notify-me.blade.php
 │       │   ├── register.blade.php
+│       │   ├── registration-cancellation-confirm.blade.php
+│       │   ├── registration-cancelled.blade.php
 │       │   └── thank-you.blade.php
 │       └── welcome.blade.php
 ├── routes
@@ -1391,6 +1393,7 @@
 │   ├── add-client-modules.sh
 │   ├── build-image-manifest.php
 │   ├── create-client.sh
+│   ├── make-module-dependency-cone-dump.sh
 │   ├── operations
 │   │   ├── configure-client-logging.sh
 │   │   ├── install-observability.sh
@@ -1400,6 +1403,7 @@
 │   │   ├── rollback-observability.sh
 │   │   └── verify-observability.sh
 │   ├── process-images.sh
+│   ├── run-tests-to-dump.sh
 │   └── upload-images.sh
 ├── tests
 │   ├── Feature
@@ -1545,6 +1549,9 @@
 │   │   │   ├── ModuleManagerTest.php
 │   │   │   ├── ModuleNavigationTest.php
 │   │   │   └── ModuleRouteMiddlewareTest.php
+│   │   ├── Observability
+│   │   │   ├── ObservabilityConfigurationContractTest.php
+│   │   │   └── RequestCorrelationTest.php
 │   │   ├── Portal
 │   │   │   └── PortalFoundationTest.php
 │   │   ├── Presets
@@ -1603,6 +1610,7 @@
 │   │   │   ├── WebinarRegistrationControllerTest.php
 │   │   │   ├── WebinarRegistrationFrontendContractTest.php
 │   │   │   ├── WebinarRegistrationMessageConsolidationTest.php
+│   │   │   ├── WebinarRegistrationOccurrenceResolutionTest.php
 │   │   │   ├── WebinarRegistrationProviderSyncTest.php
 │   │   │   ├── WebinarResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── WebinarScheduleProfileDefinitionResolverMessageAreaTest.php
@@ -1619,4 +1627,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-481 directories, 1139 files
+482 directories, 1146 files

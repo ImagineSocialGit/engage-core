@@ -82,11 +82,4 @@ return [
         'replay_cache_ttl_seconds' => 600,
     ],
 
-    'cache' => [
-
-        'next_webinar_ttl_seconds' => 300,
-
-        'webinar_page_ttl_seconds' => 300,
-    ],
-
 ];

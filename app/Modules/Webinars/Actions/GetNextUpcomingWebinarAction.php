@@ -15,24 +15,66 @@ class GetNextUpcomingWebinarAction
 
     public function getGlobal(): ?Webinar
     {
-        $webinarId = Cache::remember(
-            $this->globalCacheKey(),
-            $this->globalTtl(),
-            fn (): ?int => $this->resolveRegisterableWebinar->getGlobal()?->getKey(),
-        );
+        $cacheKey = $this->globalCacheKey();
+        $cached = $this->cachedWebinarId($cacheKey);
 
-        return $this->hydrateGlobal($webinarId);
+        if ($cached['found']) {
+            if ($cached['webinar_id'] === null) {
+                return null;
+            }
+
+            $webinar = $this->hydrateGlobal($cached['webinar_id']);
+
+            if (
+                $webinar
+                && $this->resolveRegisterableWebinar->isRegisterable($webinar)
+            ) {
+                return $webinar;
+            }
+
+            Cache::forget($cacheKey);
+        }
+
+        $webinar = $this->resolveRegisterableWebinar->getGlobal();
+
+        $this->cacheResolvedWebinar($cacheKey, $webinar);
+
+        return $webinar;
     }
 
     public function getForSeries(WebinarSeries $series): ?Webinar
     {
-        $webinarId = Cache::remember(
-            $this->seriesCacheKey($series),
-            $this->seriesTtl($series),
-            fn (): ?int => $this->resolveRegisterableWebinar->getForSeries($series)?->getKey(),
-        );
+        $cacheKey = $this->seriesCacheKey($series);
+        $cached = $this->cachedWebinarId($cacheKey);
 
-        return $this->hydrateForSeries($webinarId, $series);
+        if ($cached['found']) {
+            if ($cached['webinar_id'] === null) {
+                return null;
+            }
+
+            $webinar = $this->hydrateForSeries(
+                $cached['webinar_id'],
+                $series,
+            );
+
+            if (
+                $webinar
+                && $this->resolveRegisterableWebinar->isRegisterableForSeries(
+                    $webinar,
+                    $series,
+                )
+            ) {
+                return $webinar;
+            }
+
+            Cache::forget($cacheKey);
+        }
+
+        $webinar = $this->resolveRegisterableWebinar->getForSeries($series);
+
+        $this->cacheResolvedWebinar($cacheKey, $webinar);
+
+        return $webinar;
     }
 
     public function forgetGlobal(): void
@@ -54,54 +96,112 @@ class GetNextUpcomingWebinarAction
         }
     }
 
-    private function hydrateGlobal(?int $webinarId): ?Webinar
+    /**
+     * @return array{found: bool, webinar_id: int|null}
+     */
+    private function cachedWebinarId(string $cacheKey): array
     {
-        if (! $webinarId) {
-            return null;
+        $cached = Cache::get($cacheKey);
+
+        if (
+            is_array($cached)
+            && array_key_exists('webinar_id', $cached)
+        ) {
+            if ($cached['webinar_id'] === null) {
+                return [
+                    'found' => true,
+                    'webinar_id' => null,
+                ];
+            }
+
+            if (is_numeric($cached['webinar_id'])) {
+                return [
+                    'found' => true,
+                    'webinar_id' => (int) $cached['webinar_id'],
+                ];
+            }
+
+            return [
+                'found' => false,
+                'webinar_id' => null,
+            ];
         }
 
+        // Read legacy integer cache values safely during deployment.
+        if (is_numeric($cached)) {
+            return [
+                'found' => true,
+                'webinar_id' => (int) $cached,
+            ];
+        }
+
+        return [
+            'found' => false,
+            'webinar_id' => null,
+        ];
+    }
+
+    private function cacheResolvedWebinar(
+        string $cacheKey,
+        ?Webinar $webinar,
+    ): void {
+        Cache::put(
+            $cacheKey,
+            ['webinar_id' => $webinar?->getKey()],
+            $this->ttlForWebinar($webinar),
+        );
+    }
+
+    private function hydrateGlobal(int $webinarId): ?Webinar
+    {
         return Webinar::query()
-            ->with('series')
+            ->with('webinarSeries')
             ->whereKey($webinarId)
             ->first();
     }
 
-    private function hydrateForSeries(?int $webinarId, WebinarSeries $series): ?Webinar
-    {
-        if (! $webinarId) {
-            return null;
-        }
-
+    private function hydrateForSeries(
+        int $webinarId,
+        WebinarSeries $series,
+    ): ?Webinar {
         return Webinar::query()
             ->whereKey($webinarId)
             ->where('webinar_series_id', $series->getKey())
             ->first();
     }
 
-    private function globalTtl(): int
-    {
-        return $this->ttlForWebinar($this->resolveRegisterableWebinar->getGlobal());
-    }
-
-    private function seriesTtl(WebinarSeries $series): int
-    {
-        return $this->ttlForWebinar($this->resolveRegisterableWebinar->getForSeries($series));
-    }
-
     private function ttlForWebinar(?Webinar $webinar): int
     {
         if (! $webinar?->starts_at) {
-            return (int) config('cache-keys.ttl.next_upcoming_webinar_empty_seconds');
+            return max(
+                1,
+                (int) config(
+                    'cache-keys.ttl.next_upcoming_webinar_empty_seconds',
+                    300,
+                ),
+            );
         }
 
-        return max(
-            (int) config('cache-keys.ttl.next_upcoming_webinar_min_seconds'),
+        $configuredRefreshSeconds = max(
+            1,
+            (int) config(
+                'cache-keys.ttl.next_upcoming_webinar_min_seconds',
+                60,
+            ),
+        );
+
+        $remainingWindowSeconds = (int) ceil(
             now()->diffInSeconds(
                 $webinar->starts_at->copy()->addMinutes(
                     ResolveRegisterableWebinarAction::LATE_JOIN_MINUTES,
                 ),
                 false,
             ),
+        );
+
+        return max(
+            1,
+            min($configuredRefreshSeconds, $remainingWindowSeconds),
         );
     }
 

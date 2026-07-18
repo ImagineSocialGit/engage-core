@@ -1,4 +1,3 @@
-
 @php
     $landingPage = $page['landing'] ?? $page;
     $registrationPage = $page['registration'] ?? [];
@@ -412,6 +411,7 @@
             :tokens="$registrationTokens"
             :style="$registrationStyle"
             :series="$series"
+            :webinar="$webinar"
             :webinar-registration-channels="$webinarRegistrationChannels ?? []"
             :registration-prefill="$registrationPrefill ?? []"
         />

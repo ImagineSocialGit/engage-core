@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Webinars;
 
+use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\ViewErrorBag;
@@ -15,6 +16,10 @@ class WebinarRegistrationConsentHeaderPresentationTest extends TestCase
     {
         $series = WebinarSeries::factory()->create([
             'slug' => 'consent-header-presentation',
+        ]);
+
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
         ]);
 
         view()->share('errors', new ViewErrorBag());
@@ -32,6 +37,7 @@ class WebinarRegistrationConsentHeaderPresentationTest extends TestCase
                 ],
             ],
             'series' => $series,
+            'webinar' => $webinar,
             'webinarRegistrationChannels' => [
                 'transactional' => ['email'],
                 'marketing' => ['email'],
@@ -50,6 +56,10 @@ class WebinarRegistrationConsentHeaderPresentationTest extends TestCase
             'slug' => 'disabled-consent-header-presentation',
         ]);
 
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+        ]);
+
         view()->share('errors', new ViewErrorBag());
 
         $html = view('components.webinars.registration-form-modal', [
@@ -60,6 +70,7 @@ class WebinarRegistrationConsentHeaderPresentationTest extends TestCase
             'tokens' => [],
             'style' => [],
             'series' => $series,
+            'webinar' => $webinar,
             'webinarRegistrationChannels' => [
                 'transactional' => ['email'],
                 'marketing' => ['email'],

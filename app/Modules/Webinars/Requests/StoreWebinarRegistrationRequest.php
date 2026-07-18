@@ -4,7 +4,7 @@ namespace App\Modules\Webinars\Requests;
 
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Webinars\Actions\GetActiveWebinarSeriesAction;
-use App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction;
+use App\Modules\Webinars\Actions\ResolveRegisterableWebinarAction;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarSeries;
@@ -63,6 +63,7 @@ class StoreWebinarRegistrationRequest extends FormRequest
     {
         $this->merge([
             'email' => strtolower(trim((string) $this->input('email'))),
+            'webinar_id' => $this->query('webinar_id'),
 
             'transactional_email_consent' => $this->boolean('transactional_email_consent'),
             'transactional_sms_consent' => $this->boolean('transactional_sms_consent'),
@@ -77,6 +78,7 @@ class StoreWebinarRegistrationRequest extends FormRequest
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['nullable', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:255'],
+            'webinar_id' => ['required', 'integer', 'min:1'],
 
             'phone' => [
                 Rule::requiredIf(fn (): bool => $this->requiresPhoneNumber()),
@@ -225,9 +227,14 @@ class StoreWebinarRegistrationRequest extends FormRequest
         }
 
         $this->registerableWebinarResolved = true;
-        $seriesSlug = trim((string) $this->route('seriesSlug'));
 
-        if ($seriesSlug === '') {
+        $seriesSlug = trim((string) $this->route('seriesSlug'));
+        $webinarId = filter_var(
+            $this->query('webinar_id'),
+            FILTER_VALIDATE_INT,
+        );
+
+        if ($seriesSlug === '' || $webinarId === false) {
             return null;
         }
 
@@ -240,8 +247,11 @@ class StoreWebinarRegistrationRequest extends FormRequest
         }
 
         return $this->resolvedRegisterableWebinar = app(
-            GetNextUpcomingWebinarAction::class,
-        )->getForSeries($series);
+            ResolveRegisterableWebinarAction::class,
+        )->findForSeries(
+            series: $series,
+            webinarId: $webinarId,
+        );
     }
 
     private function duplicateRegistrationExists(): bool

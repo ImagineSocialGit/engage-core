@@ -10,7 +10,7 @@ class WebinarRegistrationCancelLinkGenerator
     public function forRegistration(WebinarRegistration $registration): string
     {
         $path = URL::temporarySignedRoute(
-            name: 'webinar.registration.cancel',
+            name: 'webinar.registration.cancellation.show',
             expiration: now()->addDays(30),
             parameters: [
                 'registration' => $registration,

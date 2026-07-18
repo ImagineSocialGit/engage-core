@@ -70,7 +70,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
                 'marketing_email_consent' => true,
             ],
             request: $this->registrationRequest(),
-            webinarSlug: $webinar,
+            webinar: $webinar,
         );
 
         $this->assertTrue($result->wasCreated());
@@ -160,7 +160,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
                 'marketing_sms_consent' => true,
             ],
             request: $this->registrationRequest(),
-            webinarSlug: $webinar,
+            webinar: $webinar,
         );
 
         $this->assertTrue($result->wasCreated());
@@ -225,7 +225,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
                 'transactional_email_consent' => true,
             ],
             request: Request::create('/register', 'POST'),
-            webinarSlug: $webinar,
+            webinar: $webinar,
         );
 
         $this->assertTrue($returned->wasExisting());

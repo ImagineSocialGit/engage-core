@@ -28,17 +28,6 @@ class CacheKey
         ]);
     }
 
-    public static function publicPageConfig(string $page, ?string $seriesSlug = null): string
-    {
-        return implode(':', [
-            'public-pages',
-            self::client(),
-            $page,
-            'config',
-            $seriesSlug ?: 'default',
-        ]);
-    }
-
     public static function zoomOAuthToken(string $accountKey = 'default'): string
     {
         return 'integrations:zoom:oauth-token:' . $accountKey;

@@ -78,7 +78,7 @@ class WebinarRegistrationProviderSyncTest extends TestCase
                 'REMOTE_ADDR' => '127.0.0.1',
                 'HTTP_USER_AGENT' => 'PHPUnit',
             ]),
-            webinarSlug: $webinar,
+            webinar: $webinar,
         );
 
         $this->assertTrue($result->wasCreated());

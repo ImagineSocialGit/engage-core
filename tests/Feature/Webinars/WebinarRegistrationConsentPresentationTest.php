@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Webinars;
 
+use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\ViewErrorBag;
@@ -134,6 +135,10 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
             'slug' => 'consent-presentation-'.bin2hex(random_bytes(4)),
         ]);
 
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+        ]);
+
         view()->share('errors', new ViewErrorBag());
 
         return view('components.webinars.registration-form-modal', [
@@ -141,6 +146,7 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
             'tokens' => [],
             'style' => [],
             'series' => $series,
+            'webinar' => $webinar,
             'webinarRegistrationChannels' => $channels,
             'registrationPrefill' => [],
         ])->render();

@@ -1,5 +1,3 @@
-
-
 # Engage Core — Client Environment Reference
 
 ## Purpose
@@ -87,22 +85,22 @@ Meaning:
 
 ```text
 CLIENT_KEY
-    selects client/{CLIENT_KEY}
+    selects client/[CLIENT_KEY]
 ```
 
 The selected client then contributes:
 
 ```text
-client/{CLIENT_KEY}/.env
+client/[CLIENT_KEY]/.env
     client deployment/runtime values
 
-client/{CLIENT_KEY}/config/client.php
+client/[CLIENT_KEY]/config/client.php
     client identity, selected preset, stable client timezone
 
-client/{CLIENT_KEY}/config/modules.php
+client/[CLIENT_KEY]/config/modules.php
     explicitly enabled runtime product modules
 
-client/{CLIENT_KEY}/config/**
+client/[CLIENT_KEY]/config/**
     version-controlled product/business behavior and client overrides
 ```
 
@@ -111,7 +109,7 @@ client/{CLIENT_KEY}/config/**
 The runtime module source of truth is:
 
 ```text
-client/{CLIENT_KEY}/config/modules.php
+client/[CLIENT_KEY]/config/modules.php
     -> config('modules.enabled')
     -> ModuleManager
     -> enabled module providers and runtime availability
@@ -124,7 +122,7 @@ Core keeps a generic default enabled-module list for the no-client/default appli
 Client timezone is stable client config:
 
 ```php
-client/{CLIENT_KEY}/config/client.php
+client/[CLIENT_KEY]/config/client.php
 
 'timezone' => 'America/Denver',
 ```
@@ -145,7 +143,7 @@ CRM_APP_URL=
 `bootstrap/app.php` derives the webhooks route host from `ROOT_DOMAIN`:
 
 ```text
-webhooks.<ROOT_DOMAIN>
+webhooks.[ROOT_DOMAIN]
 ```
 
 `WEBHOOKS_APP_URL` is not part of the active application environment contract.
@@ -153,10 +151,10 @@ webhooks.<ROOT_DOMAIN>
 Typical production topology:
 
 ```text
-<ROOT_DOMAIN>
-crm.<ROOT_DOMAIN>
-webinar.<ROOT_DOMAIN>
-webhooks.<ROOT_DOMAIN>
+[ROOT_DOMAIN]
+crm.[ROOT_DOMAIN]
+webinar.[ROOT_DOMAIN]
+webhooks.[ROOT_DOMAIN]
 ```
 
 ---
@@ -181,7 +179,7 @@ config/app.php
 The selected client's presentation/business timezone comes from:
 
 ```text
-client/{CLIENT_KEY}/config/client.php
+client/[CLIENT_KEY]/config/client.php
     -> config('client.timezone')
 ```
 
@@ -284,27 +282,28 @@ Do not populate them unless the actual deployment requires them.
 
 # 9. Cache
 
-Root `.env` owns cache backend and operational TTLs. The selected client `.env` owns `CACHE_PREFIX`.
+Root `.env` owns the cache backend and operational TTLs. The selected `[CLIENT]` environment owns `CACHE_PREFIX`.
 
 Current deployment path:
 
 ```env
 CACHE_STORE=redis
-CACHE_PREFIX=CHANGE_ME_cache_
-PUBLIC_RESPONSE_CACHE_ENABLED=true
+CACHE_PREFIX=[CLIENT_KEY]_cache_
 ```
 
-Current response-cache TTL overrides:
+Webinar registration and waitlist pages are rendered for every request. Do not add a response-cache toggle, a webinar landing-page TTL, or a custom public-page configuration TTL. Session state, CSRF tokens, validation errors, old input, and waitlist-prefill data must remain request-specific.
+
+Supported cache TTL overrides:
 
 ```env
 CACHE_NEXT_UPCOMING_WEBINAR_EMPTY_SECONDS=300
 CACHE_NEXT_UPCOMING_WEBINAR_MIN_SECONDS=60
 CACHE_ACTIVE_WEBINAR_SERIES_MIN_SECONDS=300
-CACHE_PUBLIC_PAGE_CONFIG_SECONDS=3600
-CACHE_WEBINAR_LANDING_PAGE_SECONDS=300
 CACHE_EXTERNAL_API_RESPONSE_SECONDS=300
 CACHE_IMAGE_MANIFEST_SECONDS=3600
 ```
+
+The Webinar module may cache identifiers for active series and registerable webinar occurrences. It does not cache final HTML. `WebinarRegisterPageConfig` reads merged Laravel configuration and does not maintain a separate public-page configuration cache.
 
 The prefix must be unique when Redis/cache infrastructure is shared.
 
@@ -451,7 +450,7 @@ Use prefixes and/or DB isolation deliberately. Never assume an unprefixed raw Re
 
 # 13. DigitalOcean Spaces
 
-These values are selected-client deployment values and belong in `client/{CLIENT_KEY}/.env`.
+These values are selected-client deployment values and belong in `client/[CLIENT_KEY]/.env`.
 
 Canonical variables:
 
@@ -663,7 +662,7 @@ They are commented out in the curated env example because Telnyx is the current 
 Runtime Webinar module availability comes from the selected client's module config:
 
 ```text
-client/{CLIENT_KEY}/config/modules.php
+client/[CLIENT_KEY]/config/modules.php
     -> config('modules.enabled')
     -> ModuleManager
 ```

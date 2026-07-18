@@ -389,22 +389,16 @@ class WebinarSyncTest extends TestCase
         $globalUpcomingKey = CacheKey::nextUpcomingWebinar();
         $seriesUpcomingKey = CacheKey::nextUpcomingWebinar($series->slug);
         $activeSeriesKey = CacheKey::activeWebinarSeries();
-        $pageConfigKey = CacheKey::publicPageConfig(
-            'webinar-registration',
-            $series->slug,
-        );
         $unrelatedKey = 'unrelated-cache-key';
 
         Cache::put($globalUpcomingKey, 100, now()->addMinutes(10));
         Cache::put($seriesUpcomingKey, 100, now()->addMinutes(10));
         Cache::put($activeSeriesKey, [$series->getKey()], now()->addMinutes(10));
-        Cache::put($pageConfigKey, ['stale' => true], now()->addMinutes(10));
         Cache::put($unrelatedKey, 'preserve me', now()->addMinutes(10));
 
         $this->assertTrue(Cache::has($globalUpcomingKey));
         $this->assertTrue(Cache::has($seriesUpcomingKey));
         $this->assertTrue(Cache::has($activeSeriesKey));
-        $this->assertTrue(Cache::has($pageConfigKey));
         $this->assertTrue(Cache::has($unrelatedKey));
 
         app(FlushWebinarCachesAction::class)->handle(
@@ -414,7 +408,6 @@ class WebinarSyncTest extends TestCase
         $this->assertFalse(Cache::has($globalUpcomingKey));
         $this->assertFalse(Cache::has($seriesUpcomingKey));
         $this->assertFalse(Cache::has($activeSeriesKey));
-        $this->assertFalse(Cache::has($pageConfigKey));
 
         $this->assertTrue(Cache::has($unrelatedKey));
     }

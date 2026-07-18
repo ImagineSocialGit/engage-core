@@ -27,20 +27,11 @@ class CreateWebinarRegistrationAction
         private readonly FinalizeWebinarRegistrationAction $finalizeRegistration,
     ) {}
 
-    /**
-     * The Webinar model is the authoritative occurrence selected by the public
-     * request resolver. String support remains temporarily for non-HTTP callers
-     * that already pass an exact webinar slug.
-     */
     public function handle(
         array $validated,
         Request $request,
-        Webinar|string $webinarSlug = 'default',
+        Webinar $webinar,
     ): WebinarRegistrationResult {
-        $webinar = $webinarSlug instanceof Webinar
-            ? $webinarSlug
-            : Webinar::query()->where('slug', $webinarSlug)->firstOrFail();
-
         $result = DB::transaction(function () use (
             $validated,
             $request,

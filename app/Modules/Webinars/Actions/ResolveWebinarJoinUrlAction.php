@@ -11,12 +11,25 @@ class ResolveWebinarJoinUrlAction
         private readonly SkipScheduledMessagesAction $skipScheduledMessagesAction,
     ) {}
 
-    public function execute(WebinarRegistration $registration): ?string
+    public function handle(WebinarRegistration $registration): ?string
     {
         $registration->loadMissing('webinar');
 
         $destination = data_get($registration->meta, 'provider.join_url')
             ?: $registration->webinar?->join_url;
+
+        return filled($destination) ? $destination : null;
+    }
+
+    /**
+     * Resolve a join URL and record an explicitly trusted join interaction.
+     *
+     * Public GET redirects must call handle() instead. This method remains the
+     * trusted-interaction entry point used by the development simulation flow.
+     */
+    public function execute(WebinarRegistration $registration): ?string
+    {
+        $destination = $this->handle($registration);
 
         if (blank($destination)) {
             return null;

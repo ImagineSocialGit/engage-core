@@ -69,7 +69,7 @@ class CreateWebinarRegistrationConsentOptInTest extends TestCase
         $result = app(CreateWebinarRegistrationAction::class)->handle(
             validated: $this->allConsentInput(),
             request: Request::create('/register', 'POST'),
-            webinarSlug: $webinar->slug,
+            webinar: $webinar,
         );
 
         $registration = $result->registration;
@@ -114,13 +114,13 @@ class CreateWebinarRegistrationConsentOptInTest extends TestCase
         $action->handle(
             validated: $this->allConsentInput(),
             request: Request::create('/register', 'POST'),
-            webinarSlug: $webinar->slug,
+            webinar: $webinar,
         );
 
         $action->handle(
             validated: $this->allConsentInput(),
             request: Request::create('/register', 'POST'),
-            webinarSlug: $webinar->slug,
+            webinar: $webinar,
         );
 
         $this->assertDatabaseCount('webinar_registrations', 1);

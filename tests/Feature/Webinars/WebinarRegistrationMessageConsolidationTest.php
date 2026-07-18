@@ -54,7 +54,7 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
                 'marketing_sms_consent' => true,
             ],
             request: Request::create('/register', 'POST'),
-            webinarSlug: $webinar->slug,
+            webinar: $webinar,
         );
 
         $registration = $result->registration;
@@ -329,7 +329,7 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
                 'transactional_email_consent' => true,
             ],
             request: Request::create('/register', 'POST'),
-            webinarSlug: $webinar->slug,
+            webinar: $webinar,
         );
 
         $registration = $result->registration;
@@ -438,7 +438,7 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
         $config = require base_path('config/messaging/delivery_consolidation.php');
         data_set($config, 'policies.webinar_registration.enabled', true);
 
-        Config::set('client.name', 'Slam Dunk Home Loans');
+        Config::set('client.name', 'Example Company');
         Config::set('messaging.delivery_consolidation', $config);
     }
 

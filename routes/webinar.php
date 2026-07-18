@@ -18,9 +18,13 @@ Route::middleware('module:webinars')->group(function () {
     Route::get('/p/{token}', WebinarPlaybackRedirectController::class)
         ->name('webinar.playback.redirect');
 
-    Route::get('/registrations/{registration}/cancel', WebinarRegistrationCancellationController::class)
+    Route::get('/registrations/{registration}/cancel', [WebinarRegistrationCancellationController::class, 'show'])
         ->middleware(['signed:relative', 'throttle:6,1'])
-        ->name('webinar.registration.cancel');
+        ->name('webinar.registration.cancellation.show');
+
+    Route::post('/registrations/{registration}/cancel', [WebinarRegistrationCancellationController::class, 'store'])
+        ->middleware(['signed:relative', 'throttle:6,1'])
+        ->name('webinar.registration.cancellation.store');
 
     Route::pattern('seriesSlug', '(?!staging-login$)[a-z0-9-]+');
 
@@ -37,7 +41,7 @@ Route::middleware('module:webinars')->group(function () {
         ->name('webinar.waitlist.store');
 
     Route::post('/{seriesSlug}', [WebinarRegistrationController::class, 'store'])
-        ->middleware('throttle:webinar-registration')
+        ->middleware(['signed:relative', 'throttle:webinar-registration'])
         ->name('webinar.registration.store');
 
     Route::get('/{seriesSlug}/thank-you', [WebinarRegistrationController::class, 'showThankYou'])

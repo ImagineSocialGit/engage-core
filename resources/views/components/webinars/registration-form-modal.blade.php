@@ -3,6 +3,7 @@
     'tokens',
     'style' => [],
     'series',
+    'webinar',
     'webinarRegistrationChannels' => [],
     'registrationPrefill' => [],
 ])
@@ -122,12 +123,17 @@
 
             <form
                 method="POST"
-                action="{{ route('webinar.registration.store', $series->slug) }}"
+                action="{{ \Illuminate\Support\Facades\URL::signedRoute(
+                    'webinar.registration.store',
+                    [
+                        'seriesSlug' => $series->slug,
+                        'webinar_id' => $webinar->getKey(),
+                    ],
+                    absolute: false,
+                ) }}"
                 class="{{ $tokens['form_grid'] ?? 'space-y-4' }}"
             >
                 @csrf
-
-                
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
                         <x-ui.form.label for="first_name">
