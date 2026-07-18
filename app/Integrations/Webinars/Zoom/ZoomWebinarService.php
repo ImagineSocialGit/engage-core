@@ -51,6 +51,10 @@ class ZoomWebinarService
             ], fn (mixed $value): bool => filled($value))
         );
 
+        if ($response->status() === 404) {
+            return;
+        }
+
         $response->throw();
     }
 

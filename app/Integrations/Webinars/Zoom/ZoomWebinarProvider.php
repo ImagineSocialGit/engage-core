@@ -55,7 +55,8 @@ class ZoomWebinarProvider implements WebinarProvider
 
         $webinar = $registration->webinar;
 
-        $registrantId = data_get($registration->meta, 'provider.registrant_id')
+        $registrantId = data_get($registration->meta, 'provider.data.registrant_id')
+            ?? data_get($registration->meta, 'provider.registrant_id')
             ?? data_get($registration->meta, 'provider.id');
 
         if (! $webinar || blank($webinar->external_id) || blank($registrantId)) {
@@ -65,10 +66,12 @@ class ZoomWebinarProvider implements WebinarProvider
         $this->zoomWebinarService->cancelRegistrant(
             webinarId: (string) $webinar->external_id,
             registrantId: (string) $registrantId,
-            occurrenceId: data_get($registration->meta, 'provider.occurrence_id')
+            occurrenceId: data_get($registration->meta, 'provider.data.occurrence_id')
+                ?? data_get($registration->meta, 'provider.data.raw.occurrence_id')
+                ?? data_get($registration->meta, 'provider.occurrence_id')
                 ?? data_get($registration->meta, 'provider.raw.occurrence_id')
         );
-}
+    }
 
     public function listWebinarsByTitle(string $title): iterable
     {

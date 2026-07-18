@@ -170,6 +170,31 @@
                                     ? \Illuminate\Support\Str::headline((string) $attendanceSnapshotReason)
                                     : null;
 
+                                $providerCancellationFailures = $webinar->registrations->filter(
+                                    fn ($registration): bool => data_get(
+                                        $registration->meta,
+                                        'provider_cancellation.status',
+                                    ) === 'failed',
+                                );
+                                $providerCancellationsPending = $webinar->registrations->filter(
+                                    fn ($registration): bool => in_array(data_get(
+                                        $registration->meta,
+                                        'provider_cancellation.status',
+                                    ), ['pending', 'cancelling'], true),
+                                );
+                                $followUpFailures = $webinar->registrations->filter(
+                                    fn ($registration): bool => data_get(
+                                        $registration->meta,
+                                        'post_event_follow_up.status',
+                                    ) === 'failed',
+                                );
+                                $followUpsPending = $webinar->registrations->filter(
+                                    fn ($registration): bool => data_get(
+                                        $registration->meta,
+                                        'post_event_follow_up.status',
+                                    ) === 'planning',
+                                );
+
                                 $modalName = 'webinar-dev-testing-'.$webinar->id;
                             @endphp
 
@@ -209,7 +234,82 @@
                                                 Latest attendance check: {{ $attendanceSnapshotWarning }}
                                             </span>
                                         @endif
+
+                                        @if($providerCancellationFailures->isNotEmpty())
+                                            <span class="rounded-full bg-red-50 px-2 py-0.5 font-semibold text-red-700 ring-1 ring-red-200">
+                                                {{ $providerCancellationFailures->count() }} provider cancellation {{ $providerCancellationFailures->count() === 1 ? 'failure' : 'failures' }}
+                                            </span>
+                                        @endif
+
+                                        @if($providerCancellationsPending->isNotEmpty())
+                                            <span class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-200">
+                                                {{ $providerCancellationsPending->count() }} provider {{ $providerCancellationsPending->count() === 1 ? 'cancellation' : 'cancellations' }} pending
+                                            </span>
+                                        @endif
+
+                                        @if($followUpFailures->isNotEmpty())
+                                            <span class="rounded-full bg-red-50 px-2 py-0.5 font-semibold text-red-700 ring-1 ring-red-200">
+                                                {{ $followUpFailures->count() }} follow-up planning {{ $followUpFailures->count() === 1 ? 'failure' : 'failures' }}
+                                            </span>
+                                        @endif
+
+                                        @if($followUpsPending->isNotEmpty())
+                                            <span class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-200">
+                                                {{ $followUpsPending->count() }} follow-up {{ $followUpsPending->count() === 1 ? 'attempt' : 'attempts' }} in progress
+                                            </span>
+                                        @endif
                                     </div>
+
+                                    @if($providerCancellationFailures->isNotEmpty())
+                                        <div class="mt-3 space-y-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900">
+                                            <p class="font-semibold">Provider cancellation needs attention</p>
+
+                                            @foreach($providerCancellationFailures as $failedRegistration)
+                                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                                    <span>
+                                                        {{ $failedRegistration->contact?->name ?: $failedRegistration->contact?->email ?: 'Registration #'.$failedRegistration->id }}
+                                                    </span>
+
+                                                    <form method="POST" action="{{ route('crm.webinar-registrations.provider-cancellation.retry', $failedRegistration) }}">
+                                                        @csrf
+
+                                                        <button
+                                                            type="submit"
+                                                            class="inline-flex items-center rounded-md bg-red-700 px-2.5 py-1.5 font-semibold text-white hover:bg-red-600"
+                                                        >
+                                                            Retry provider cancellation
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+
+                                    @if($followUpFailures->isNotEmpty())
+                                        <div class="mt-3 space-y-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900">
+                                            <p class="font-semibold">Post-webinar follow-up needs attention</p>
+
+                                            @foreach($followUpFailures as $failedRegistration)
+                                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                                    <span>
+                                                        {{ $failedRegistration->contact?->name ?: $failedRegistration->contact?->email ?: 'Registration #'.$failedRegistration->id }}
+                                                        — {{ \Illuminate\Support\Str::headline((string) data_get($failedRegistration->meta, 'post_event_follow_up.failure_reason', 'unknown_failure')) }}
+                                                    </span>
+
+                                                    <form method="POST" action="{{ route('crm.webinar-registrations.follow-up.retry', $failedRegistration) }}">
+                                                        @csrf
+
+                                                        <button
+                                                            type="submit"
+                                                            class="inline-flex items-center rounded-md bg-red-700 px-2.5 py-1.5 font-semibold text-white hover:bg-red-600"
+                                                        >
+                                                            Retry follow-up planning
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
                                 </td>
 
                                 <td class="px-6 py-4 text-slate-600">

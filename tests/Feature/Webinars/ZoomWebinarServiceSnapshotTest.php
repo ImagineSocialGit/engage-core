@@ -171,6 +171,23 @@ class ZoomWebinarServiceSnapshotTest extends TestCase
         $this->assertSame('registrant-1', $snapshot->records[0]->registrantId);
     }
 
+    public function test_cancelling_an_already_absent_registrant_is_idempotent(): void
+    {
+        Http::fake([
+            '*' => Http::response([], 404),
+        ]);
+
+        $this->service()->cancelRegistrant(
+            webinarId: 'zoom-1001',
+            registrantId: 'registrant-1',
+        );
+
+        Http::assertSent(function ($request): bool {
+            return $request->method() === 'DELETE'
+                && $request->url() === 'https://api.zoom.test/v2/webinars/zoom-1001/registrants/registrant-1';
+        });
+    }
+
     private function service(int $accessTokenCalls = 1): ZoomWebinarService
     {
         Config::set('webinars.providers.zoom.base_url', 'https://api.zoom.test/v2');

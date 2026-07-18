@@ -16,6 +16,8 @@ use App\Modules\Tasks\Controllers\TaskController;
 use App\Modules\Webinars\Controllers\CRM\WebinarController;
 use App\Modules\Webinars\Controllers\CRM\WebinarDevController;
 use App\Modules\Webinars\Controllers\CRM\WebinarMessageTemplateController;
+use App\Modules\Webinars\Controllers\CRM\WebinarProviderCancellationController;
+use App\Modules\Webinars\Controllers\CRM\WebinarRegistrationFollowUpController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
@@ -38,6 +40,12 @@ Route::middleware('auth')->group(function () {
                 Route::patch('/', [WebinarMessageTemplateController::class, 'update'])
                     ->name('update');
             });
+
+        Route::post('/webinar-registrations/{registration}/provider-cancellation/retry', WebinarProviderCancellationController::class)
+            ->name('crm.webinar-registrations.provider-cancellation.retry');
+
+        Route::post('/webinar-registrations/{registration}/follow-up/retry', WebinarRegistrationFollowUpController::class)
+            ->name('crm.webinar-registrations.follow-up.retry');
 
         Route::post('/webinar-series', [WebinarController::class, 'storeSeries'])
             ->name('crm.webinar-series.store');

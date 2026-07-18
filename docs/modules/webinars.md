@@ -80,6 +80,30 @@ playback or follow-up evidence, must survive provider refreshes. Zoom recording 
 uses `provider.data.zoom_uuid`; the legacy flat `meta.zoom_uuid` key is read only as a
 compatibility fallback and is removed after a successful Zoom synchronization.
 
+## Provider cancellation reconciliation
+
+The local Webinar registration is the source of truth for cancellation. A public
+cancellation commits the local `cancelled` status, `cancelled_at`, cancellation
+provenance, and scheduled-message skips before any provider request is attempted.
+Provider outages must never roll back or hide that local outcome.
+
+Provider cancellation is a durable, queued reconciliation workflow. Its state belongs
+under `webinar_registration.meta.provider_cancellation` and records status, provider,
+queue/provider attempt counts, timestamps, failure stage, and error class/code. Raw
+exception messages and provider payloads are not persisted in this state.
+
+The supported states are `pending`, `cancelling`, `succeeded`, `failed`, and
+`not_required`. A cancellation is not required only when the Webinar has no usable
+provider/external identity. A provider-backed Webinar with a missing registrant
+identifier is a retryable failure, because registration synchronization may still
+publish that identifier. Recent pending/cancelling claims suppress duplicate work;
+stale claims may be reclaimed. Provider deletion must be idempotent, including treating
+an already-absent remote registrant as success.
+
+The CRM Webinar list exposes failed and pending provider cancellations. Operators may
+requeue a failed registration without changing the already-committed customer-facing
+cancellation or emitting a second cancellation event.
+
 ## Attendance reconciliation authority
 
 Provider attendance results carry explicit reconciliation authority through
@@ -108,6 +132,33 @@ unresolved reasons for operator follow-up.
 Positive attended evidence takes precedence over a prior missed classification when a
 later provider snapshot is reconciled. Recording an attended outcome remains idempotent
 for registrations already recorded as attended.
+
+## Post-webinar follow-up outcome accounting
+
+Post-webinar follow-up planning must produce a durable result for every Webinar
+registration before the Webinar-level `normalized.post_event.follow_ups_dispatched_at` checkpoint is written. Planning state
+belongs under `webinar_registration.meta.post_event_follow_up` and records the attendance outcome,
+attempt count, per-channel result, scheduled-message IDs, timestamps, and a safe failure
+reason/error class/code.
+
+The terminal planning states are `scheduled` and `not_applicable`. Cancelled
+registrations, disabled outcome areas, unavailable or unaccepted channels, and Messaging
+planning-gate rejections are explicitly not applicable. Missing Contacts, missing
+definitions, and dispatch exceptions are `failed`; they remain retryable and visible.
+An empty Messaging result therefore becomes an explained terminal outcome rather than
+an unexplained success. A transient `planning` claim may be reclaimed after it becomes
+stale.
+
+The Webinar-level follow-up summary counts scheduled, not-applicable, failed,
+in-progress, and unresolved registrations. The completion checkpoint is earned only
+when no registration is failed, in progress, or unresolved. Replays use the existing
+Messaging occurrence/dedupe identity, so already-created ScheduledMessage rows are
+reused. This state accounts for planning only; Messaging continues to own delivery,
+provider-send, skip, and failure lifecycle.
+
+CRM Webinar history exposes failed planning outcomes and provides an idempotent queued
+retry for one registration. Webinar-ended automation remains independent and is emitted
+once even when follow-up planning still needs a retry.
 
 ## Public registration presentation and config ownership
 

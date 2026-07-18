@@ -694,6 +694,7 @@
 │   │   │   ├── Actions
 │   │   │   │   ├── AddRegistrantToWebinarProviderAction.php
 │   │   │   │   ├── CancelWebinarRegistrationAction.php
+│   │   │   │   ├── CancelWebinarRegistrationWithProviderAction.php
 │   │   │   │   ├── CreateWebinarRegistrationAction.php
 │   │   │   │   ├── CreateWebinarWaitlistSignupAction.php
 │   │   │   │   ├── DispatchWebinarRegistrationMessagesAction.php
@@ -710,6 +711,7 @@
 │   │   │   │   │   ├── RecordWebinarAttendanceAction.php
 │   │   │   │   │   ├── RecordWebinarProviderAttendanceAction.php
 │   │   │   │   │   └── ResolveWebinarPlaybackAction.php
+│   │   │   │   ├── QueueWebinarProviderCancellationAction.php
 │   │   │   │   ├── ResolveRegisterableWebinarAction.php
 │   │   │   │   ├── ResolveWebinarJoinUrlAction.php
 │   │   │   │   ├── ResolveWebinarPlaybackUrlAction.php
@@ -731,7 +733,9 @@
 │   │   │   │   ├── CRM
 │   │   │   │   │   ├── WebinarController.php
 │   │   │   │   │   ├── WebinarDevController.php
-│   │   │   │   │   └── WebinarMessageTemplateController.php
+│   │   │   │   │   ├── WebinarMessageTemplateController.php
+│   │   │   │   │   ├── WebinarProviderCancellationController.php
+│   │   │   │   │   └── WebinarRegistrationFollowUpController.php
 │   │   │   │   ├── Public
 │   │   │   │   │   ├── WebinarJoinRedirectController.php
 │   │   │   │   │   ├── WebinarPlaybackRedirectController.php
@@ -748,8 +752,10 @@
 │   │   │   │   ├── ProviderWebinarData.php
 │   │   │   │   ├── ProviderWebinarSnapshot.php
 │   │   │   │   ├── WebinarAttendanceRecord.php
+│   │   │   │   ├── WebinarFollowUpDispatchResult.php
 │   │   │   │   ├── WebinarMessageAreaDefinition.php
 │   │   │   │   ├── WebinarMessageData.php
+│   │   │   │   ├── WebinarProviderCancellationResult.php
 │   │   │   │   ├── WebinarProviderSyncResult.php
 │   │   │   │   ├── WebinarRegistrationConsentTransition.php
 │   │   │   │   ├── WebinarRegistrationImportResult.php
@@ -758,10 +764,12 @@
 │   │   │   ├── Enums
 │   │   │   │   └── WebinarTag.php
 │   │   │   ├── Jobs
+│   │   │   │   ├── CancelWebinarRegistrationWithProviderJob.php
 │   │   │   │   ├── NotifyWebinarWaitlistJob.php
 │   │   │   │   ├── PostEvent
 │   │   │   │   │   ├── ProcessPostWebinarEventJob.php
-│   │   │   │   │   └── ProcessWebinarProviderEventJob.php
+│   │   │   │   │   ├── ProcessWebinarProviderEventJob.php
+│   │   │   │   │   └── RetryWebinarRegistrationFollowUpJob.php
 │   │   │   │   └── SyncWebinarRegistrationToProviderJob.php
 │   │   │   ├── Models
 │   │   │   │   ├── Webinar.php
@@ -1600,7 +1608,9 @@
 │   │   │   ├── PostEvent
 │   │   │   │   ├── DispatchPostWebinarFollowUpsMessageAreaTest.php
 │   │   │   │   ├── ProcessPostWebinarEventJobTest.php
-│   │   │   │   └── ProviderAttendanceReconciliationTest.php
+│   │   │   │   ├── ProviderAttendanceReconciliationTest.php
+│   │   │   │   └── WebinarFollowUpOutcomeAccountingTest.php
+│   │   │   ├── ProviderCancellationReconciliationTest.php
 │   │   │   ├── ResolveRegisterableWebinarActionTest.php
 │   │   │   ├── SyncWebinarScheduleProfilesMessageAreaTest.php
 │   │   │   ├── WebinarMessageAreaRegistryTest.php
@@ -1631,4 +1641,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-482 directories, 1150 files
+482 directories, 1160 files

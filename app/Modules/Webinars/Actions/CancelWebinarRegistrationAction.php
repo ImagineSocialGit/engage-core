@@ -4,90 +4,92 @@ namespace App\Modules\Webinars\Actions;
 
 use App\Modules\Messaging\Actions\SkipScheduledMessagesAction;
 use App\Modules\Webinars\Models\WebinarRegistration;
-use App\Modules\Webinars\Services\WebinarProviderManager;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class CancelWebinarRegistrationAction
 {
     public function __construct(
-        private readonly WebinarProviderManager $webinarProviderManager,
         private readonly SkipScheduledMessagesAction $skipScheduledMessagesAction,
         private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
+        private readonly QueueWebinarProviderCancellationAction $queueProviderCancellation,
     ) {}
 
     public function handle(WebinarRegistration $registration, string $source = 'email_link'): WebinarRegistration
     {
-        $registration->loadMissing(['contact', 'webinar', 'webinar.webinarSeries']);
+        $registration = DB::transaction(function () use ($registration, $source): WebinarRegistration {
+            $locked = WebinarRegistration::query()
+                ->lockForUpdate()
+                ->findOrFail($registration->getKey());
 
-        if ($registration->status === 'cancelled') {
-            return $registration;
-        }
+            $locked->loadMissing(['contact', 'webinar', 'webinar.webinarSeries']);
 
-        $this->cancelWithProvider($registration);
+            if ($locked->status === 'cancelled') {
+                return $locked;
+            }
 
-        return DB::transaction(function () use ($registration, $source) {
             $cancelledAt = now();
-
-            $meta = $registration->meta ?? [];
+            $meta = is_array($locked->meta) ? $locked->meta : [];
 
             $meta['cancellation'] = [
                 'source' => $source,
                 'cancelled_at' => $cancelledAt->toISOString(),
             ];
 
-            $registration->forceFill([
+            $locked->forceFill([
                 'status' => 'cancelled',
                 'cancelled_at' => $cancelledAt,
                 'meta' => $meta,
             ])->save();
 
             $this->skipScheduledMessagesAction->forContext(
-                context: $registration,
+                context: $locked,
                 reason: 'Webinar registration cancelled.',
             );
 
-            DB::afterCommit(function () use ($registration, $cancelledAt, $source) {
-                $registration = $registration->fresh([
+            DB::afterCommit(function () use ($locked, $cancelledAt, $source): void {
+                $committed = $locked->fresh([
                     'contact',
                     'webinar',
                     'webinar.webinarSeries',
                 ]);
 
-                if (! $registration) {
+                if (! $committed instanceof WebinarRegistration) {
                     return;
                 }
 
-                $this->emitWebinarAutomationEvent->forRegistration(
-                    eventKey: 'webinar.cancelled',
-                    registration: $registration,
-                    occurredAt: $registration->cancelled_at ?? $cancelledAt,
-                    payload: [
-                        'cancellation' => [
-                            'source' => $source,
+                try {
+                    $this->emitWebinarAutomationEvent->forRegistration(
+                        eventKey: 'webinar.cancelled',
+                        registration: $committed,
+                        occurredAt: $committed->cancelled_at ?? $cancelledAt,
+                        payload: [
+                            'cancellation' => [
+                                'source' => $source,
+                            ],
                         ],
-                    ],
-                );
+                    );
+                } catch (Throwable $exception) {
+                    // Automation is downstream of the committed cancellation.
+                    report($exception);
+                }
             });
 
-            return $registration->refresh();
+            return $locked;
         });
-    }
-
-    private function cancelWithProvider(WebinarRegistration $registration): void
-    {
-        $webinar = $registration->webinar;
-
-        if (! $webinar || blank($webinar->providerKey()) || blank($webinar->external_id)) {
-            return;
-        }
 
         try {
-            $this->webinarProviderManager
-                ->provider($webinar->providerKey())
-                ->cancelRegistration($registration);
+            $this->queueProviderCancellation->handle($registration);
         } catch (Throwable $exception) {
+            // Provider reconciliation is downstream of the committed local
+            // cancellation and must not change the public cancellation result.
             report($exception);
         }
+
+        return $registration->fresh([
+            'contact',
+            'webinar',
+            'webinar.webinarSeries',
+        ]) ?? $registration;
     }
 }
