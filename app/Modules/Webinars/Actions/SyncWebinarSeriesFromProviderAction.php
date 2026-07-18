@@ -4,12 +4,13 @@ namespace App\Modules\Webinars\Actions;
 
 use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
 use App\Modules\Webinars\Data\ProviderWebinarData;
+use App\Modules\Webinars\Data\ProviderWebinarSnapshot;
 use App\Modules\Webinars\Jobs\NotifyWebinarWaitlistJob;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use App\Modules\Webinars\Services\WebinarProviderManager;
-use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -30,12 +31,13 @@ class SyncWebinarSeriesFromProviderAction
         $webinarProvider = $this->webinarProviderManager->provider();
         $provider = $webinarProvider->key();
 
-        $fetchedWebinars = collect($webinarProvider->listWebinarsByTitle($series->title))
-            ->values();
+        $snapshot = $this->providerSnapshot(
+            $webinarProvider->listWebinarsByTitle($series->title),
+        );
+        $fetchedWebinars = collect($snapshot->webinars)->values();
 
         $created = 0;
         $updated = 0;
-        $deleted = 0;
         $missing = [];
 
         $fetchedExternalIds = $fetchedWebinars
@@ -64,7 +66,11 @@ class SyncWebinarSeriesFromProviderAction
                 'ends_at' => $fetchedWebinar->endsAt,
                 'timezone' => $fetchedWebinar->timezone,
                 'description' => $fetchedWebinar->description,
-                'meta' => $fetchedWebinar->meta,
+                'meta' => $this->mergeProviderMeta(
+                    webinar: $webinar,
+                    provider: $provider,
+                    providerMeta: $fetchedWebinar->meta,
+                ),
             ]);
 
             if (! $webinar->exists) {
@@ -82,26 +88,19 @@ class SyncWebinarSeriesFromProviderAction
             $updated++;
         });
 
-        $missingWebinars = $this->missingWebinars(
-            series: $series,
-            provider: $provider,
-            fetchedExternalIds: $fetchedExternalIds,
-        );
-
-        foreach ($missingWebinars as $missingWebinar) {
-            $hasRegistrations = $missingWebinar->registrations()->exists();
-
-            if (! $hasRegistrations) {
-                $missingWebinar->delete();
-                $deleted++;
-
-                continue;
+        if ($snapshot->authoritative) {
+            foreach ($this->missingWebinars(
+                series: $series,
+                provider: $provider,
+                fetchedExternalIds: $fetchedExternalIds,
+            ) as $missingWebinar) {
+                $missing[] = [
+                    'webinar_id' => $missingWebinar->getKey(),
+                    'external_id' => $missingWebinar->external_id,
+                    'title' => $missingWebinar->title,
+                    'has_registrations' => $missingWebinar->registrations()->exists(),
+                ];
             }
-
-            $missing[] = [
-                'title' => $missingWebinar->title,
-                'has_registrations' => $hasRegistrations,
-            ];
         }
 
         $this->getNextUpcomingWebinarAction->forgetForSeries($series);
@@ -126,10 +125,50 @@ class SyncWebinarSeriesFromProviderAction
         return [
             'created' => $created,
             'updated' => $updated,
-            'deleted' => $deleted,
+            'deleted' => 0,
             'conflicts' => [],
             'missing' => $missing,
+            'reconciliation' => [
+                'authoritative' => $snapshot->authoritative,
+                'reason' => $snapshot->reason,
+                'missing_candidates' => count($missing),
+            ],
         ];
+    }
+
+    private function providerSnapshot(iterable $providerResult): ProviderWebinarSnapshot
+    {
+        if ($providerResult instanceof ProviderWebinarSnapshot) {
+            return $providerResult;
+        }
+
+        return ProviderWebinarSnapshot::nonAuthoritative(
+            webinars: $providerResult,
+            reason: 'provider_snapshot_authority_unspecified',
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $providerMeta
+     * @return array<string, mixed>
+     */
+    private function mergeProviderMeta(
+        Webinar $webinar,
+        string $provider,
+        array $providerMeta,
+    ): array {
+        $meta = is_array($webinar->meta) ? $webinar->meta : [];
+
+        if ($provider === 'zoom') {
+            unset($meta['zoom_uuid']);
+        }
+
+        $meta['provider'] = [
+            'key' => $provider,
+            'data' => $providerMeta,
+        ];
+
+        return $meta;
     }
 
     private function hasUnnotifiedWaitlistSignups(WebinarSeries $series): bool
@@ -154,7 +193,7 @@ class SyncWebinarSeriesFromProviderAction
             ->get();
     }
 
-    protected function makeSlug(string $title, ?Carbon $startTime, string $externalId): string
+    protected function makeSlug(string $title, ?CarbonInterface $startTime, string $externalId): string
     {
         if ($startTime) {
             return Str::slug($title.'-'.$startTime->format('Y-m-d-gia'));
@@ -163,3 +202,4 @@ class SyncWebinarSeriesFromProviderAction
         return Str::slug($title.'-'.$externalId);
     }
 }
+

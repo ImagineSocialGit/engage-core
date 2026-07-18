@@ -5,6 +5,8 @@ namespace App\Modules\Webinars\Contracts;
 use App\Modules\Webinars\Data\ProviderRegistrationData;
 use App\Modules\Webinars\Data\ProviderRecordingData;
 use App\Modules\Webinars\Data\ProviderWebhookEvent;
+use App\Modules\Webinars\Data\ProviderWebinarData;
+use App\Modules\Webinars\Data\ProviderWebinarSnapshot;
 use App\Modules\Webinars\Data\WebinarAttendanceRecord;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
@@ -17,7 +19,11 @@ interface WebinarProvider
     public function key(): string;
 
     /**
-     * @return iterable<\App\Modules\Webinars\Data\ProviderWebinarData>
+     * Provider integrations should return ProviderWebinarSnapshot so callers
+     * can distinguish authoritative reconciliation data from safe import-only
+     * results. Legacy iterables are treated as non-authoritative.
+     *
+     * @return ProviderWebinarSnapshot|iterable<ProviderWebinarData>
      */
     public function listWebinarsByTitle(string $title): iterable;
 
@@ -34,3 +40,4 @@ interface WebinarProvider
 
     public function getRecording(Webinar $webinar): ?ProviderRecordingData;
 }
+

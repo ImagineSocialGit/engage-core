@@ -4,6 +4,7 @@ namespace Tests\Feature\CRM;
 
 use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
 use App\Modules\Webinars\Data\ProviderWebinarData;
+use App\Modules\Webinars\Data\ProviderWebinarSnapshot;
 use App\Integrations\Webinars\Zoom\ZoomWebinarService;
 use App\Modules\Webinars\Jobs\NotifyWebinarWaitlistJob;
 use App\Modules\Core\Models\Contact;
@@ -13,6 +14,7 @@ use App\Modules\Webinars\Models\WebinarSeries;
 use App\Support\Caching\CacheKey;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
@@ -36,7 +38,7 @@ class WebinarSyncTest extends TestCase
         $zoomWebinarService->shouldReceive('listWebinarsByTitle')
             ->once()
             ->with('Home Buyer Game Plan')
-            ->andReturn(collect([
+            ->andReturn(ProviderWebinarSnapshot::authoritative([
                 $this->providerWebinar(
                     externalId: 'zoom-1001',
                     joinUrl: 'https://example.com/join-1001',
@@ -89,12 +91,22 @@ class WebinarSyncTest extends TestCase
         ]);
 
         $this->assertSame(
-            ['zoom_uuid' => 'uuid-1001'],
+            [
+                'provider' => [
+                    'key' => 'zoom',
+                    'data' => ['zoom_uuid' => 'uuid-1001'],
+                ],
+            ],
             Webinar::query()->where('external_id', 'zoom-1001')->firstOrFail()->meta
         );
 
         $this->assertSame(
-            ['zoom_uuid' => 'uuid-1002'],
+            [
+                'provider' => [
+                    'key' => 'zoom',
+                    'data' => ['zoom_uuid' => 'uuid-1002'],
+                ],
+            ],
             Webinar::query()->where('external_id', 'zoom-1002')->firstOrFail()->meta
         );
 
@@ -125,6 +137,21 @@ class WebinarSyncTest extends TestCase
             'description' => 'Old description',
             'meta' => [
                 'zoom_uuid' => 'old-uuid',
+                'normalized' => [
+                    'post_event' => [
+                        'attendance_recorded_at' => '2026-05-01T20:30:00Z',
+                    ],
+                ],
+                'automation_events' => [
+                    'webinar_ended_recorded_at' => '2026-05-01T20:31:00Z',
+                ],
+                'provider' => [
+                    'key' => 'zoom',
+                    'data' => [
+                        'zoom_uuid' => 'older-uuid',
+                        'obsolete_provider_value' => 'remove-me',
+                    ],
+                ],
             ],
         ]);
 
@@ -132,7 +159,7 @@ class WebinarSyncTest extends TestCase
         $zoomWebinarService->shouldReceive('listWebinarsByTitle')
             ->once()
             ->with('Home Buyer Game Plan')
-            ->andReturn(collect([
+            ->andReturn(ProviderWebinarSnapshot::authoritative([
                 $this->providerWebinar(
                     externalId: 'zoom-1001',
                     joinUrl: 'https://example.com/new-join',
@@ -160,12 +187,25 @@ class WebinarSyncTest extends TestCase
         $this->assertSame('https://example.com/old-register', $webinar->registration_url);
         $this->assertSame('America/Chicago', $webinar->timezone);
         $this->assertSame('Updated description', $webinar->description);
-        $this->assertSame(['zoom_uuid' => 'new-uuid'], $webinar->meta);
+        $this->assertSame(
+            '2026-05-01T20:30:00Z',
+            data_get($webinar->meta, 'normalized.post_event.attendance_recorded_at'),
+        );
+        $this->assertSame(
+            '2026-05-01T20:31:00Z',
+            data_get($webinar->meta, 'automation_events.webinar_ended_recorded_at'),
+        );
+        $this->assertSame('zoom', data_get($webinar->meta, 'provider.key'));
+        $this->assertSame(
+            ['zoom_uuid' => 'new-uuid'],
+            data_get($webinar->meta, 'provider.data'),
+        );
+        $this->assertArrayNotHasKey('zoom_uuid', $webinar->meta);
 
         Carbon::setTestNow();
     }
 
-    public function test_sync_deletes_missing_webinar_with_no_registrations(): void
+    public function test_sync_reports_authoritative_empty_snapshot_without_deleting_webinar(): void
     {
         $this->freezeTime();
 
@@ -186,7 +226,7 @@ class WebinarSyncTest extends TestCase
             'starts_at' => Carbon::parse('2026-05-15 19:00:00', 'America/Chicago')->utc(),
             'ends_at' => Carbon::parse('2026-05-15 20:00:00', 'America/Chicago')->utc(),
             'timezone' => 'America/Chicago',
-            'description' => 'Will be deleted',
+            'description' => 'Must be preserved for review',
             'meta' => [
                 'zoom_uuid' => 'uuid-missing-1',
             ],
@@ -196,7 +236,7 @@ class WebinarSyncTest extends TestCase
         $zoomWebinarService->shouldReceive('listWebinarsByTitle')
             ->once()
             ->with('Home Buyer Game Plan')
-            ->andReturn(collect([]));
+            ->andReturn(ProviderWebinarSnapshot::authoritative([]));
 
         $this->app->instance(ZoomWebinarService::class, $zoomWebinarService);
 
@@ -205,13 +245,18 @@ class WebinarSyncTest extends TestCase
         ]);
 
         $response->assertRedirect(route('crm.webinar-series.index'));
-        $response->assertSessionHas('success', 'Sync complete: 0 created, 0 updated, 1 deleted, 0 missing preserved.');
+        $response->assertSessionHas('success', 'Sync complete: 0 created, 0 updated, 0 deleted, 1 missing preserved.');
 
-        $this->assertDatabaseMissing('webinars', [
+        $this->assertDatabaseHas('webinars', [
             'id' => $missingWebinar->id,
         ]);
 
-        $this->assertSame([], session('sync_missing', []));
+        $missing = session('sync_missing', []);
+
+        $this->assertCount(1, $missing);
+        $this->assertSame($missingWebinar->getKey(), $missing[0]['webinar_id']);
+        $this->assertSame('zoom-missing-1', $missing[0]['external_id']);
+        $this->assertFalse($missing[0]['has_registrations']);
 
         Carbon::setTestNow();
     }
@@ -264,7 +309,7 @@ class WebinarSyncTest extends TestCase
         $zoomWebinarService->shouldReceive('listWebinarsByTitle')
             ->once()
             ->with('Home Buyer Game Plan')
-            ->andReturn(collect([]));
+            ->andReturn(ProviderWebinarSnapshot::authoritative([]));
 
         $this->app->instance(ZoomWebinarService::class, $zoomWebinarService);
 
@@ -287,6 +332,53 @@ class WebinarSyncTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_sync_skips_missing_reconciliation_for_non_authoritative_empty_snapshot(): void
+    {
+        $this->freezeTime();
+
+        $user = User::factory()->create();
+
+        $series = WebinarSeries::query()->create([
+            'title' => 'Home Buyer Game Plan',
+        ]);
+
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+            'platform' => 'zoom',
+            'external_id' => 'zoom-existing',
+            'title' => 'Home Buyer Game Plan',
+        ]);
+
+        $zoomWebinarService = Mockery::mock(ZoomWebinarService::class);
+        $zoomWebinarService->shouldReceive('listWebinarsByTitle')
+            ->once()
+            ->with('Home Buyer Game Plan')
+            ->andReturn(ProviderWebinarSnapshot::nonAuthoritative(
+                webinars: [],
+                reason: 'no_exact_title_matches',
+            ));
+
+        $this->app->instance(ZoomWebinarService::class, $zoomWebinarService);
+
+        $response = $this->actingAs($user)->post(route('crm.webinar-series.sync'), [
+            'webinar_series_id' => $series->id,
+        ]);
+
+        $response->assertRedirect(route('crm.webinar-series.index'));
+        $response->assertSessionHas('success', 'Sync complete: 0 created, 0 updated, 0 deleted, 0 missing preserved.');
+        $response->assertSessionHas(
+            'error',
+            'Zoom returned a non-authoritative Webinar result. Returned webinars were imported, but missing-webinar reconciliation was skipped and no local webinars were removed.',
+        );
+
+        $this->assertDatabaseHas('webinars', [
+            'id' => $webinar->getKey(),
+        ]);
+        $this->assertSame([], session('sync_missing', []));
+
+        Carbon::setTestNow();
+    }
+
     public function test_sync_dispatches_waitlist_notifications_when_series_becomes_scheduled(): void
     {
         Queue::fake();
@@ -304,7 +396,7 @@ class WebinarSyncTest extends TestCase
 
         $zoomWebinarService->shouldReceive('listWebinarsByTitle')
             ->once()
-            ->andReturn(collect([
+            ->andReturn(ProviderWebinarSnapshot::authoritative([
                 $this->providerWebinar(
                     externalId: 'zoom-1001',
                     joinUrl: 'https://example.com/join',
@@ -357,7 +449,7 @@ class WebinarSyncTest extends TestCase
         $zoomWebinarService->shouldReceive('listWebinarsByTitle')
             ->once()
             ->with('Home Buyer Game Plan')
-            ->andReturn(collect([
+            ->andReturn(ProviderWebinarSnapshot::authoritative([
                 $this->providerWebinar(
                     externalId: 'zoom-existing',
                     joinUrl: 'https://example.com/existing-join',
@@ -375,6 +467,53 @@ class WebinarSyncTest extends TestCase
         ]);
 
         Queue::assertNotPushed(NotifyWebinarWaitlistJob::class);
+    }
+
+    public function test_provider_connection_failure_preserves_existing_webinars(): void
+    {
+        $user = User::factory()->create();
+
+        $series = WebinarSeries::factory()->create([
+            'title' => 'Home Buyer Game Plan',
+        ]);
+
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+            'platform' => 'zoom',
+            'external_id' => 'zoom-existing',
+            'title' => 'Home Buyer Game Plan',
+            'meta' => [
+                'normalized' => [
+                    'post_event' => [
+                        'attendance_recorded_at' => '2026-05-01T20:30:00Z',
+                    ],
+                ],
+            ],
+        ]);
+
+        $zoomWebinarService = Mockery::mock(ZoomWebinarService::class);
+        $zoomWebinarService->shouldReceive('listWebinarsByTitle')
+            ->once()
+            ->with('Home Buyer Game Plan')
+            ->andThrow(new ConnectionException('Provider unavailable.'));
+
+        $this->app->instance(ZoomWebinarService::class, $zoomWebinarService);
+
+        $response = $this->actingAs($user)->post(route('crm.webinar-series.sync'), [
+            'webinar_series_id' => $series->getKey(),
+        ]);
+
+        $response->assertRedirect(route('crm.webinar-series.index'));
+        $response->assertSessionHas('zoom_sync_error', 'Unable to connect to Zoom.');
+
+        $this->assertDatabaseHas('webinars', [
+            'id' => $webinar->getKey(),
+            'external_id' => 'zoom-existing',
+        ]);
+        $this->assertSame(
+            '2026-05-01T20:30:00Z',
+            data_get($webinar->fresh()->meta, 'normalized.post_event.attendance_recorded_at'),
+        );
     }
 
     public function test_sync_flushes_webinar_public_data_caches(): void

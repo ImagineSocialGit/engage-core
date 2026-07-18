@@ -141,6 +141,13 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
             'tokens' => [],
             'style' => [],
             'series' => (object) ['slug' => 'consent-contract-audit'],
+            'webinar' => new class
+            {
+                public function getKey(): int
+                {
+                    return 1;
+                }
+            },
             'webinarRegistrationChannels' => [
                 'transactional' => ['email', 'sms'],
                 'marketing' => ['email', 'sms'],

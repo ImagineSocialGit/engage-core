@@ -4,6 +4,7 @@ namespace App\Integrations\Webinars\Zoom;
 
 use App\Modules\Webinars\Data\ProviderRecordingData;
 use App\Modules\Webinars\Data\ProviderWebinarData;
+use App\Modules\Webinars\Data\ProviderWebinarSnapshot;
 use App\Support\Caching\CacheKey;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -109,10 +110,11 @@ class ZoomWebinarService
         return $participants->values();
     }
 
-    public function listWebinarsByTitle(string $title): Collection
+    public function listWebinarsByTitle(string $title): ProviderWebinarSnapshot
     {
         $webinars = collect();
         $nextPageToken = null;
+        $nonAuthoritativeReason = null;
 
         do {
             $response = $this->client()->get('/users/me/webinars', [
@@ -124,17 +126,66 @@ class ZoomWebinarService
 
             $payload = $response->json();
 
-            $webinars = $webinars->merge(
-                collect($payload['webinars'] ?? [])
-            );
+            if (
+                ! is_array($payload)
+                || ! array_key_exists('webinars', $payload)
+                || ! is_array($payload['webinars'])
+            ) {
+                $nonAuthoritativeReason = 'invalid_provider_payload';
 
-            $nextPageToken = $payload['next_page_token'] ?: null;
+                break;
+            }
+
+            $pageWebinars = collect($payload['webinars']);
+
+            if ($pageWebinars->contains(fn (mixed $webinar): bool =>
+                ! is_array($webinar)
+                || blank($webinar['id'] ?? null)
+                || blank($webinar['topic'] ?? null)
+            )) {
+                $nonAuthoritativeReason = 'invalid_provider_webinar_item';
+            }
+
+            $webinars = $webinars->merge($pageWebinars->filter(
+                fn (mixed $webinar): bool =>
+                    is_array($webinar)
+                    && filled($webinar['id'] ?? null)
+                    && filled($webinar['topic'] ?? null)
+            ));
+
+            $rawNextPageToken = $payload['next_page_token'] ?? null;
+
+            if ($rawNextPageToken !== null && ! is_string($rawNextPageToken)) {
+                $nonAuthoritativeReason = 'invalid_provider_pagination_token';
+
+                break;
+            }
+
+            $nextPageToken = filled($rawNextPageToken)
+                ? $rawNextPageToken
+                : null;
         } while ($nextPageToken);
 
-        return $webinars
+        $matchedWebinars = $webinars
             ->filter(fn (array $webinar) => ($webinar['topic'] ?? null) === $title)
             ->map(fn (array $webinar) => $this->normalizeWebinar($webinar))
             ->values();
+
+        if ($nonAuthoritativeReason !== null) {
+            return ProviderWebinarSnapshot::nonAuthoritative(
+                webinars: $matchedWebinars,
+                reason: $nonAuthoritativeReason,
+            );
+        }
+
+        if ($matchedWebinars->isEmpty()) {
+            return ProviderWebinarSnapshot::nonAuthoritative(
+                webinars: [],
+                reason: 'no_exact_title_matches',
+            );
+        }
+
+        return ProviderWebinarSnapshot::authoritative($matchedWebinars);
     }
 
     public function getWebinarRecording(string $webinarIdOrUuid): ?ProviderRecordingData
@@ -215,3 +266,4 @@ class ZoomWebinarService
         );
     }
 }
+

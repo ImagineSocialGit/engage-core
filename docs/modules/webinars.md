@@ -1,4 +1,3 @@
-
 # Webinars Module
 
 ## Config and token contracts
@@ -55,6 +54,31 @@ Webinars may depend on:
 - Messaging
 
 Webinars may use Messaging to send registration confirmations, reminders, waitlist notices, and post-webinar transactional follow-ups. Webinar surfaces may collect consent, but consent-domain storage and consent acknowledgements are Messaging-owned.
+
+## Provider synchronization and metadata ownership
+
+Provider list results must carry explicit reconciliation authority through a
+`ProviderWebinarSnapshot`. A title-filtered Zoom result with no exact matches is
+non-authoritative because it does not prove that the provider series is empty.
+Malformed or incomplete provider pagination is also non-authoritative.
+
+A non-authoritative snapshot may import valid returned webinars, but it must not
+identify local webinars as missing. An authoritative snapshot may report missing
+candidates for operator review, but provider synchronization must never delete or
+archive local webinars automatically. Removal is a separate, explicit workflow.
+
+Provider-owned metadata belongs under this namespace:
+
+```text
+webinar.meta.provider.key
+webinar.meta.provider.data
+```
+
+Synchronization replaces only `provider.key` and `provider.data`. Application-owned
+metadata, including normalized webinar data, automation events, and locally recorded
+playback or follow-up evidence, must survive provider refreshes. Zoom recording lookup
+uses `provider.data.zoom_uuid`; the legacy flat `meta.zoom_uuid` key is read only as a
+compatibility fallback and is removed after a successful Zoom synchronization.
 
 ## Public registration presentation and config ownership
 

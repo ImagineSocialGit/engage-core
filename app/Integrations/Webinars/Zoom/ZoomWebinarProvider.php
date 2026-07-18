@@ -101,10 +101,12 @@ class ZoomWebinarProvider implements WebinarProvider
 
     private function recordingLookupId(Webinar $webinar): string
     {
-        $uuid = data_get($webinar->meta, 'zoom_uuid');
+        $uuid = data_get($webinar->meta, 'provider.data.zoom_uuid')
+            ?? data_get($webinar->meta, 'zoom_uuid');
 
         return filled($uuid)
             ? (string) $uuid
             : (string) $webinar->external_id;
     }
 }
+

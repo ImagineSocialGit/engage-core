@@ -745,6 +745,7 @@
 │   │   │   │   ├── ProviderRegistrationData.php
 │   │   │   │   ├── ProviderWebhookEvent.php
 │   │   │   │   ├── ProviderWebinarData.php
+│   │   │   │   ├── ProviderWebinarSnapshot.php
 │   │   │   │   ├── WebinarAttendanceRecord.php
 │   │   │   │   ├── WebinarMessageAreaDefinition.php
 │   │   │   │   ├── WebinarMessageData.php
@@ -1616,7 +1617,8 @@
 │   │   │   ├── WebinarScheduleProfileDefinitionResolverMessageAreaTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
-│   │   │   └── WebinarWaitlistSignupControllerTest.php
+│   │   │   ├── WebinarWaitlistSignupControllerTest.php
+│   │   │   └── ZoomWebinarServiceSnapshotTest.php
 │   │   └── Workflow
 │   │       ├── RecordManualStatusTransitionAutomationBehaviorActionTest.php
 │   │       └── TransitionContactWorkflowStatusActionTest.php
@@ -1627,4 +1629,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-482 directories, 1146 files
+482 directories, 1148 files

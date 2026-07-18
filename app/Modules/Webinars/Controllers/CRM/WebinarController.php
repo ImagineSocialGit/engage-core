@@ -107,7 +107,7 @@ class WebinarController extends Controller
                 ->with('zoom_sync_error', 'Unable to connect to Zoom.');
         }
 
-        return redirect()
+        $redirect = redirect()
             ->route('crm.webinar-series.index')
             ->with(
                 'success',
@@ -116,6 +116,15 @@ class WebinarController extends Controller
             )
             ->with('sync_conflicts', $result['conflicts'])
             ->with('sync_missing', $result['missing']);
+
+        if (! data_get($result, 'reconciliation.authoritative', false)) {
+            $redirect->with(
+                'error',
+                'Zoom returned a non-authoritative Webinar result. Returned webinars were imported, but missing-webinar reconciliation was skipped and no local webinars were removed.',
+            );
+        }
+
+        return $redirect;
     }
 
     public function fixActive(WebinarSeries $series): RedirectResponse
@@ -173,4 +182,5 @@ class WebinarController extends Controller
         return app()->environment(['local', 'staging']);
     }
 }
+
 
