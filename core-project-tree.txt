@@ -343,9 +343,10 @@
 │   │   │   │   ├── RecordInboundMessageAction.php
 │   │   │   │   └── Sms
 │   │   │   │       ├── HandleInboundSmsWebhookAction.php
-│   │   │   │       └── Inbound
-│   │   │   │           ├── RespondToSmsHelpInboundMessageAction.php
-│   │   │   │           └── RevokeSmsConsentFromInboundMessageAction.php
+│   │   │   │       ├── Inbound
+│   │   │   │       │   ├── RespondToSmsHelpInboundMessageAction.php
+│   │   │   │       │   └── RevokeSmsConsentFromInboundMessageAction.php
+│   │   │   │       └── ProcessInboundSmsMessageAction.php
 │   │   │   ├── Contracts
 │   │   │   │   ├── Email
 │   │   │   │   │   └── EmailWebhookHandler.php
@@ -360,7 +361,8 @@
 │   │   │   ├── Events
 │   │   │   │   └── InboundMessageReceived.php
 │   │   │   ├── Models
-│   │   │   │   └── InboundMessage.php
+│   │   │   │   ├── InboundMessage.php
+│   │   │   │   └── InboundMessageReceipt.php
 │   │   │   ├── Providers
 │   │   │   │   └── InboundMessagingModuleServiceProvider.php
 │   │   │   ├── Requests
@@ -1182,6 +1184,7 @@
 │   │   ├── 2026_07_13_120000_create_site_settings_table.php
 │   │   ├── 2026_07_18_220000_create_automation_event_outbox_events_table.php
 │   │   ├── 2026_07_18_220001_create_automation_event_consumer_receipts_table.php
+│   │   ├── 2026_07_19_031500_create_inbound_message_receipts_table.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -1524,7 +1527,8 @@
 │   │   ├── InboundMessaging
 │   │   │   ├── HandleInboundEmailWebhookActionTest.php
 │   │   │   ├── InboundMessageAutomationOutboxTest.php
-│   │   │   └── InboundNormalReplyAutomationEventTest.php
+│   │   │   ├── InboundNormalReplyAutomationEventTest.php
+│   │   │   └── ProcessInboundSmsMessageActionTest.php
 │   │   ├── Integrations
 │   │   │   └── Messaging
 │   │   │       └── Sms
@@ -1626,6 +1630,7 @@
 │   │   │   ├── EmailWebhookControllerTest.php
 │   │   │   ├── SmsWebhookControllerTest.php
 │   │   │   ├── TelnyxInboundSmsWebhookTest.php
+│   │   │   ├── TelnyxWebhookTimestampValidationTest.php
 │   │   │   └── ZoomWebhookTest.php
 │   │   ├── Webinars
 │   │   │   ├── CoreWebinarScheduleProfileExtractionTest.php
@@ -1676,4 +1681,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-487 directories, 1190 files
+487 directories, 1195 files

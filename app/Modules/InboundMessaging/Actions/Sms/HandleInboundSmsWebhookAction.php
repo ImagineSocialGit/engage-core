@@ -3,18 +3,18 @@
 namespace App\Modules\InboundMessaging\Actions\Sms;
 
 use App\Modules\InboundMessaging\Actions\RecordInboundMessageAction;
-use App\Modules\Messaging\Enums\MessageChannel;
-use App\Modules\InboundMessaging\Services\InboundMessageRouter;
 use App\Modules\InboundMessaging\Services\Sms\InboundSmsMessageClassifier;
 use App\Modules\InboundMessaging\Services\Sms\InboundSmsPurposeResolver;
 use App\Modules\InboundMessaging\Services\Sms\InboundSmsSenderResolver;
 use App\Modules\InboundMessaging\Services\Sms\SmsWebhookPayload;
+use App\Modules\Messaging\Enums\MessageChannel;
+use InvalidArgumentException;
 
 class HandleInboundSmsWebhookAction
 {
     public function __construct(
         private readonly RecordInboundMessageAction $recordInboundMessageAction,
-        private readonly InboundMessageRouter $inboundMessageRouter,
+        private readonly ProcessInboundSmsMessageAction $processInboundSmsMessageAction,
         private readonly InboundSmsMessageClassifier $inboundSmsMessageClassifier,
         private readonly InboundSmsPurposeResolver $inboundSmsPurposeResolver,
         private readonly InboundSmsSenderResolver $inboundSmsSenderResolver,
@@ -24,6 +24,14 @@ class HandleInboundSmsWebhookAction
     {
         if (! $payload->isInboundMessage) {
             return null;
+        }
+
+        if ($payload->providerEventId === null
+            && $payload->providerMessageId === null
+        ) {
+            throw new InvalidArgumentException(
+                'Inbound SMS webhook requires a provider event or message identifier.',
+            );
         }
 
         $from = $this->inboundSmsSenderResolver->normalizePhone($payload->from);
@@ -60,6 +68,6 @@ class HandleInboundSmsWebhookAction
             sender: $sender,
         );
 
-        return $this->inboundMessageRouter->route($inboundMessage);
+        return $this->processInboundSmsMessageAction->handle($inboundMessage);
     }
 }

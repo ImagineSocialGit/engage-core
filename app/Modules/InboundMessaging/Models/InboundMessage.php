@@ -5,6 +5,7 @@ namespace App\Modules\InboundMessaging\Models;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class InboundMessage extends Model
@@ -56,6 +57,11 @@ class InboundMessage extends Model
             self::CLASSIFICATION_NORMAL_REPLY,
             self::CLASSIFICATION_IGNORED,
         ];
+    }
+
+    public function receipt(): HasOne
+    {
+        return $this->hasOne(InboundMessageReceipt::class);
     }
 
     public function sender(): MorphTo

@@ -31,6 +31,7 @@ return [
         'api_key' => env('TELNYX_API_KEY'),
         'from' => env('TELNYX_FROM'),
         'webhook_public_key' => env('TELNYX_WEBHOOK_PUBLIC_KEY'),
+        'max_timestamp_drift_seconds' => env('TELNYX_WEBHOOK_MAX_TIMESTAMP_DRIFT_SECONDS', 300),
     ],
 
     'ses' => [

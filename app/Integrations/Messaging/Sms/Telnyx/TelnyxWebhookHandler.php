@@ -23,7 +23,7 @@ class TelnyxWebhookHandler implements SmsWebhookHandler
 
         if (
             ! is_string($signature) || trim($signature) === '' ||
-            ! is_string($timestamp) || trim($timestamp) === '' ||
+            ! is_string($timestamp) || ! $this->hasFreshTimestamp($timestamp) ||
             ! is_string($publicKey) || trim($publicKey) === ''
         ) {
             return false;
@@ -50,7 +50,7 @@ class TelnyxWebhookHandler implements SmsWebhookHandler
 
         return sodium_crypto_sign_verify_detached(
             $decodedSignature,
-            $timestamp.'|'.$request->getContent(),
+            trim($timestamp).'|'.$request->getContent(),
             $decodedPublicKey,
         );
     }
@@ -78,6 +78,22 @@ class TelnyxWebhookHandler implements SmsWebhookHandler
     public function response(?string $message = null): Response
     {
         return response()->noContent();
+    }
+
+    private function hasFreshTimestamp(string $timestamp): bool
+    {
+        $timestamp = trim($timestamp);
+
+        if (! preg_match('/^\d{1,11}$/', $timestamp)) {
+            return false;
+        }
+
+        $maxDrift = max(1, (int) config(
+            'services.telnyx.max_timestamp_drift_seconds',
+            300,
+        ));
+
+        return abs(Carbon::now()->getTimestamp() - (int) $timestamp) <= $maxDrift;
     }
 
     private function isInboundEventType(?string $eventType): bool

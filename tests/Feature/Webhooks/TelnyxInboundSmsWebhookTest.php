@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Webhooks;
 
+use App\Modules\InboundMessaging\Actions\RecordInboundMessageAction;
 use App\Modules\InboundMessaging\Actions\Sms\Inbound\RespondToSmsHelpInboundMessageAction;
 use App\Modules\InboundMessaging\Actions\Sms\Inbound\RevokeSmsConsentFromInboundMessageAction;
 use App\Modules\InboundMessaging\Contracts\Sms\SmsWebhookHandler;
@@ -11,6 +12,7 @@ use App\Modules\Messaging\Models\ConsentRevocation;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use App\Modules\InboundMessaging\Models\InboundMessage;
+use App\Modules\InboundMessaging\Models\InboundMessageReceipt;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\InternalNotifications\Models\TeamMember;
@@ -430,6 +432,88 @@ class TelnyxInboundSmsWebhookTest extends TestCase
         ]);
 
         $this->assertDatabaseCount('consent_revocations', 0);
+    }
+
+
+    public function test_duplicate_help_webhook_returns_stored_response_without_reprocessing(): void
+    {
+        $payload = [
+            'provider_event_id' => 'evt_duplicate_help',
+            'provider_message_id' => 'msg_duplicate_help',
+            'body' => 'HELP',
+        ];
+
+        $this->postTelnyxWebhook($payload)
+            ->assertOk()
+            ->assertSee('Reply STOP to opt out of SMS messages.');
+        $this->postTelnyxWebhook($payload)
+            ->assertOk()
+            ->assertSee('Reply STOP to opt out of SMS messages.');
+
+        $this->assertDatabaseCount('inbound_messages', 1);
+        $this->assertDatabaseCount('inbound_message_receipts', 1);
+
+        $receipt = InboundMessageReceipt::query()->firstOrFail();
+
+        $this->assertSame(InboundMessageReceipt::STATUS_COMPLETED, $receipt->status);
+        $this->assertSame(1, $receipt->attempts);
+        $this->assertStringContainsString('Reply STOP', $receipt->response_message);
+    }
+
+    public function test_duplicate_stop_webhook_revokes_consent_once(): void
+    {
+        $contact = Contact::factory()->create([
+            'phone' => '+15551234567',
+        ]);
+        $this->grantSmsConsent($contact, 'marketing', 'webinar');
+        $payload = [
+            'provider_event_id' => 'evt_duplicate_stop',
+            'provider_message_id' => 'msg_duplicate_stop',
+            'provider_context_id' => self::MARKETING_PROFILE_ID,
+            'from' => '+15551234567',
+            'body' => 'STOP',
+        ];
+
+        $this->postTelnyxWebhook($payload)->assertOk();
+        $this->postTelnyxWebhook($payload)->assertOk();
+
+        $this->assertDatabaseCount('inbound_messages', 1);
+        $this->assertDatabaseCount('inbound_message_receipts', 1);
+        $this->assertDatabaseCount('consent_revocations', 1);
+    }
+
+    public function test_duplicate_normal_reply_schedules_one_notification_and_one_automation_event(): void
+    {
+        Queue::fake();
+
+        $teamMember = TeamMember::factory()->create([
+            'email' => 'duplicate-test@example.com',
+        ]);
+        $contact = Contact::factory()->create([
+            'phone' => '+15551234567',
+        ]);
+        $this->assignContactToTeamMember($contact, $teamMember);
+        $payload = [
+            'provider_event_id' => 'evt_duplicate_reply',
+            'provider_message_id' => 'msg_duplicate_reply',
+            'provider_context_id' => self::MARKETING_PROFILE_ID,
+            'from' => '+15551234567',
+            'body' => 'Please call me',
+        ];
+
+        $this->postTelnyxWebhook($payload)->assertOk();
+        $this->postTelnyxWebhook($payload)->assertOk();
+
+        $this->assertDatabaseCount('inbound_messages', 1);
+        $this->assertDatabaseCount('inbound_message_receipts', 1);
+        $this->assertSame(1, ScheduledMessage::query()
+            ->where('scope', 'inbound_messages')
+            ->where('message_type', 'inbound_reply')
+            ->count());
+        $this->assertSame(1, \App\Support\AutomationEvents\Models\AutomationEventOutboxEvent::query()
+            ->where('event_key', RecordInboundMessageAction::NORMAL_REPLY_AUTOMATION_EVENT_KEY)
+            ->count());
+        Queue::assertPushedTimes(SendScheduledMessageJob::class, 1);
     }
 
     private function grantSmsConsent(Contact $contact, string $purpose, string $scope): MessageConsent
