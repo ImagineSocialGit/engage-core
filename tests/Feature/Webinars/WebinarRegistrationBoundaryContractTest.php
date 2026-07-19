@@ -227,6 +227,41 @@ class WebinarRegistrationBoundaryContractTest extends TestCase
         );
     }
 
+    public function test_expired_cancellation_signatures_render_the_webinar_error_page_without_mutation(): void
+    {
+        $registration = WebinarRegistration::factory()->create([
+            'status' => 'registered',
+            'cancelled_at' => null,
+        ]);
+
+        foreach ([
+            ['get', 'webinar.registration.cancellation.show'],
+            ['post', 'webinar.registration.cancellation.store'],
+        ] as [$method, $routeName]) {
+            $path = URL::temporarySignedRoute(
+                name: $routeName,
+                expiration: now()->subMinute(),
+                parameters: [
+                    'registration' => $registration,
+                ],
+                absolute: false,
+            );
+
+            $url = rtrim(route('webinar.index'), '/').$path;
+
+            $this->{$method}($url)
+                ->assertForbidden()
+                ->assertViewIs('webinar.signed-link-invalid')
+                ->assertSee('This webinar link is no longer valid.')
+                ->assertDontSee('Unsubscribe Link Expired');
+        }
+
+        $registration->refresh();
+
+        $this->assertSame('registered', $registration->status);
+        $this->assertNull($registration->cancelled_at);
+    }
+
     private function signedCancellationUrl(
         string $routeName,
         WebinarRegistration $registration,

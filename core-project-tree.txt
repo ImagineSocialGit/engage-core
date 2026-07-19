@@ -1429,6 +1429,7 @@
 │       │   ├── register.blade.php
 │       │   ├── registration-cancellation-confirm.blade.php
 │       │   ├── registration-cancelled.blade.php
+│       │   ├── signed-link-invalid.blade.php
 │       │   └── thank-you.blade.php
 │       └── welcome.blade.php
 ├── routes
@@ -1666,6 +1667,7 @@
 │   │   │   ├── ResolveRegisterableWebinarActionTest.php
 │   │   │   ├── SyncWebinarScheduleProfilesMessageAreaTest.php
 │   │   │   ├── WebinarAutomationOutboxTest.php
+│   │   │   ├── WebinarDevControllerEnvironmentGuardTest.php
 │   │   │   ├── WebinarMessageAreaRegistryTest.php
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
@@ -1696,4 +1698,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-490 directories, 1207 files
+490 directories, 1209 files

@@ -67,13 +67,38 @@ $app = Application::configure(basePath: dirname(__DIR__))
             ],
         );
     })
-    ->withExceptions(function ($exceptions): void {
+    ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (
             InvalidSignatureException $exception,
             $request
         ) {
+            $routeName = $request->route()?->getName();
+
+            $view = match (true) {
+                in_array($routeName, [
+                    'messaging.email.unsubscribe',
+                    'messaging.email.unsubscribe.store',
+                ], true) => 'messaging.unsubscribe-invalid',
+
+                in_array($routeName, [
+                    'messaging.email.transactional-opt-out',
+                    'messaging.email.transactional-opt-out.store',
+                ], true) => 'messaging.transactional-opt-out-invalid',
+
+                str_starts_with(
+                    (string) $routeName,
+                    'webinar.'
+                ) => 'webinar.signed-link-invalid',
+
+                default => null,
+            };
+
+            if ($view === null) {
+                return null;
+            }
+
             return response()->view(
-                'messaging.unsubscribe-invalid',
+                $view,
                 status: 403,
             );
         });
