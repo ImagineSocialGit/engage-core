@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 class StartFlowRoutesFromAutomationEventAction
 {
     public function __construct(
-        private readonly ExecuteCurrentFlowRoutePointAction $executeCurrentFlowRoutePoint,
+        private readonly ExecuteFlowRouteProgressUntilIdleAction $executeFlowRouteProgressUntilIdle,
         private readonly FlowRouteTriggerBindingResolver $flowRouteTriggerBindingResolver,
         private readonly CreateContactFlowRoutePlanAction $createContactFlowRoutePlan,
     ) {}
@@ -41,21 +41,12 @@ class StartFlowRoutesFromAutomationEventAction
             $progress = $this->startProgress($flowRoute, $event);
 
             if ($progress instanceof ContactFlowRouteProgress) {
-                $this->executeProgressUntilIdle($progress);
+                $this->executeFlowRouteProgressUntilIdle->handle(
+                    progress: $progress,
+                    source: 'automation_event_start',
+                );
             }
         }
-    }
-
-    private function executeProgressUntilIdle(ContactFlowRouteProgress $progress): void
-    {
-        $attempts = 0;
-        $result = null;
-
-        do {
-            $result = $this->executeCurrentFlowRoutePoint->handle($progress);
-            $progress->refresh();
-            $attempts++;
-        } while ($attempts < 25 && $result->shouldAdvance() && $progress->isActive());
     }
 
     private function startProgress(

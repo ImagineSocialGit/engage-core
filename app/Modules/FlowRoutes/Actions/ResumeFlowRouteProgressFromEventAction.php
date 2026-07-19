@@ -15,7 +15,7 @@ class ResumeFlowRouteProgressFromEventAction
     private const TASK_COMPLETED_EVENT = 'task.completed';
 
     public function __construct(
-        private readonly ExecuteCurrentFlowRoutePointAction $executeCurrentFlowRoutePoint,
+        private readonly ExecuteFlowRouteProgressUntilIdleAction $executeFlowRouteProgressUntilIdle,
     ) {}
 
     public function handle(FlowRouteExternalEvent $event): FlowRouteExternalEventResumeResult
@@ -58,29 +58,16 @@ class ResumeFlowRouteProgressFromEventAction
 
                 $result->recordMatched($prepared->getKey());
 
-                $executionResult = $this->executeProgressUntilIdle($prepared);
+                $executionResult = $this->executeFlowRouteProgressUntilIdle->handle(
+                    progress: $prepared,
+                    source: 'automation_event_resume',
+                );
 
                 $result->recordResumed($executionResult);
             }
         });
 
         return $result;
-    }
-
-    private function executeProgressUntilIdle(ContactFlowRouteProgress $progress): PointExecutionResult
-    {
-        $attempts = 0;
-        $result = null;
-
-        do {
-            $result = $this->executeCurrentFlowRoutePoint->handle($progress);
-            $progress->refresh();
-            $attempts++;
-        } while ($attempts < 25 && $result->shouldAdvance() && $progress->isActive());
-
-        return $result ?? PointExecutionResult::blocked('flow_route_progress_not_executed', [
-            'progress_id' => $progress->getKey(),
-        ]);
     }
 
     private function prepareProgressForEventResume(

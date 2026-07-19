@@ -50,6 +50,23 @@ Status-triggered FlowRoutes also assume required ContactStatus definitions alrea
 
 Normal setup should use the app-level `presets:sync` command so dependencies are created first.
 
+## Runtime execution budget and continuation
+
+Immediately advancing points execute in bounded process slices. The root/process-owned
+`FLOW_ROUTE_IMMEDIATE_EXECUTION_BUDGET` setting controls the maximum number of points in one
+slice and defaults to `25`.
+
+Exhausting that budget is not a terminal or waiting Route state. FlowRoutes keeps the progress
+`active`, records an `immediate_execution_continuation` handoff in progress metadata, and
+dispatches `ContinueFlowRouteProgressJob` to `FLOW_ROUTE_CONTINUATION_QUEUE`. The continuation
+job executes another bounded slice and repeats this persisted/scheduled handoff until the Route
+completes, waits, blocks, fails, or is cancelled/superseded.
+
+The continuation job is unique until processing and uses a per-progress overlap lock. Operators
+should treat a failed continuation job together with `immediate_execution_continuation.status =
+failed` as actionable queue/runtime failure; the Route remains active so it can be inspected and
+deliberately retried.
+
 
 ### Module-first preset contribution architecture
 
@@ -1264,5 +1281,3 @@ The Route index should not repeat assignment detail inside Route details. `Runs 
 One-step automatic behavior may be presented separately from multi-step Routes so a simple action is not forced into the same visual weight as a real Route.
 
 Route Management UX should explain available actions through `FlowRouteCapability` metadata and module-owned public seams rather than importing module internals.
-
-

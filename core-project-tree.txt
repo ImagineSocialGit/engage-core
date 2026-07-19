@@ -226,6 +226,7 @@
 │   │   │   │   ├── CompleteContactFlowRouteProgressAction.php
 │   │   │   │   ├── CreateContactFlowRoutePlanAction.php
 │   │   │   │   ├── ExecuteCurrentFlowRoutePointAction.php
+│   │   │   │   ├── ExecuteFlowRouteProgressUntilIdleAction.php
 │   │   │   │   ├── HandleContactWorkflowStatusChangedAction.php
 │   │   │   │   ├── MarkFlowRouteProgressWaitingAction.php
 │   │   │   │   ├── ReconcileFlowRouteProgressToCurrentVersionAction.php
@@ -276,6 +277,7 @@
 │   │   │   ├── Enums
 │   │   │   │   └── FlowRoutePointType.php
 │   │   │   ├── Jobs
+│   │   │   │   ├── ContinueFlowRouteProgressJob.php
 │   │   │   │   └── ResumeFlowRouteProgressJob.php
 │   │   │   ├── Listeners
 │   │   │   │   ├── HandleContactWorkflowStatusChanged.php
@@ -984,6 +986,7 @@
 │   ├── contacts.php
 │   ├── database.php
 │   ├── filesystems.php
+│   ├── flow_routes.php
 │   ├── generated
 │   ├── horizon.php
 │   ├── logging.php
@@ -1522,6 +1525,7 @@
 │   │   │   ├── FlowRouteConditionBranchPointTest.php
 │   │   │   ├── FlowRouteControllerTest.php
 │   │   │   ├── FlowRouteEditorControllerTest.php
+│   │   │   ├── FlowRouteImmediateExecutionContinuationTest.php
 │   │   │   ├── FlowRouteIndexAuthoringLinkTest.php
 │   │   │   ├── FlowRoutePointExecutionFoundationTest.php
 │   │   │   ├── FlowRoutePointPlacementPolicyTest.php
@@ -1689,4 +1693,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-490 directories, 1200 files
+490 directories, 1204 files
