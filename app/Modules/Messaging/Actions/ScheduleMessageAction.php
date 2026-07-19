@@ -29,12 +29,27 @@ class ScheduleMessageAction
         $purpose = $this->normalizeEnumValue($purpose);
         $scope = $this->normalizeSegment($scope);
         $messageType = $this->normalizeSegment($messageType);
-        $sendAt = $sendAt ? Carbon::parse($sendAt) : now();
+
+        $sourceSendAt = $sendAt ? Carbon::parse($sendAt) : now();
+        $sourceTimezone = $sourceSendAt->getTimezone()->getName();
+        $sendAt = $sourceSendAt->copy()->utc();
+
         $meta ??= [];
+        $meta = array_replace_recursive($meta, [
+            'message_scheduling' => [
+                'source_timezone' => $sourceTimezone,
+                'source_send_at' => $sourceSendAt->toIso8601String(),
+                'utc_send_at' => $sendAt->toIso8601String(),
+            ],
+        ]);
 
         $queue = $this->nullableString($meta['queue'] ?? null);
-        $definitionConfigPath = $this->nullableString($meta['definition_config_path'] ?? null);
-        $dispatchKeys = $this->normalizeDispatchKeys($meta['dispatch_keys'] ?? []);
+        $definitionConfigPath = $this->nullableString(
+            $meta['definition_config_path'] ?? null,
+        );
+        $dispatchKeys = $this->normalizeDispatchKeys(
+            $meta['dispatch_keys'] ?? [],
+        );
 
         $attributes = [
             'recipient_type' => $recipient->getMorphClass(),
@@ -73,7 +88,11 @@ class ScheduleMessageAction
         if ($scheduledMessage->wasRecentlyCreated) {
             $dispatch = SendScheduledMessageJob::dispatch(
                 scheduledMessageId: $scheduledMessage->id,
-                horizon: $this->horizonPayload($scheduledMessage, $sendAt, $context),
+                horizon: $this->horizonPayload(
+                    $scheduledMessage,
+                    $sendAt,
+                    $context,
+                ),
             )->delay($sendAt)->afterCommit();
 
             if ($queue !== null) {
@@ -94,18 +113,22 @@ class ScheduleMessageAction
     ): array {
         return array_filter([
             'scheduled_message_id' => $scheduledMessage->id,
-            'recipient_type' => class_basename((string) $scheduledMessage->recipient_type),
+            'recipient_type' => class_basename(
+                (string) $scheduledMessage->recipient_type,
+            ),
             'recipient_id' => $scheduledMessage->recipient_id,
             'channel' => $scheduledMessage->channel,
             'purpose' => $scheduledMessage->purpose,
             'scope' => $scheduledMessage->scope,
             'message_type' => $scheduledMessage->message_type,
             'queue' => $scheduledMessage->queue,
-            'send_at' => $sendAt->toDateTimeString(),
+            'send_at' => $sendAt->toIso8601String(),
             'context_type' => $context ? class_basename($context) : null,
             'context_id' => $context?->getKey(),
             'behavior_owner_type' => $scheduledMessage->behavior_owner_type
-                ? class_basename((string) $scheduledMessage->behavior_owner_type)
+                ? class_basename(
+                    (string) $scheduledMessage->behavior_owner_type,
+                )
                 : null,
             'behavior_owner_id' => $scheduledMessage->behavior_owner_id,
             'dispatch_keys' => $scheduledMessage->dispatch_keys,

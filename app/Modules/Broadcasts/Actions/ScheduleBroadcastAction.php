@@ -28,6 +28,7 @@ class ScheduleBroadcastAction
             $sendAt = $this->resolveSendAt($broadcast);
             $contacts = $this->recipientResolver->resolve($broadcast);
             $scheduledRecipientCount = 0;
+            $skippedRecipientCount = 0;
             $consentPolicy = $this->consentPolicy($broadcast);
 
             foreach ($contacts as $contact) {
@@ -65,6 +66,8 @@ class ScheduleBroadcastAction
                             ],
                         ]),
                     ])->save();
+
+                    $skippedRecipientCount++;
 
                     continue;
                 }
@@ -123,6 +126,8 @@ class ScheduleBroadcastAction
                         ]),
                     ])->save();
 
+                    $skippedRecipientCount++;
+
                     continue;
                 }
 
@@ -140,11 +145,35 @@ class ScheduleBroadcastAction
                 $scheduledRecipientCount++;
             }
 
+            $evaluatedAt = now();
+            $eligibleRecipientCount = $contacts->count();
+            $completedWithoutScheduledMessages = $scheduledRecipientCount === 0;
+
+            $outcome = match (true) {
+                $eligibleRecipientCount === 0 => 'no_eligible_recipients',
+                $completedWithoutScheduledMessages => 'no_messages_scheduled',
+                default => 'messages_scheduled',
+            };
+
             $broadcast->forceFill([
-                'status' => Broadcast::STATUS_SCHEDULED,
+                'status' => $completedWithoutScheduledMessages
+                    ? Broadcast::STATUS_COMPLETED
+                    : Broadcast::STATUS_SCHEDULED,
                 'send_at' => $sendAt,
-                'recipient_count' => $contacts->count(),
+                'recipient_count' => $eligibleRecipientCount,
                 'scheduled_count' => $scheduledRecipientCount,
+                'completed_at' => $completedWithoutScheduledMessages
+                    ? $evaluatedAt
+                    : null,
+                'meta' => array_replace_recursive($broadcast->meta ?? [], [
+                    'scheduling' => [
+                        'evaluated_at' => $evaluatedAt->toISOString(),
+                        'outcome' => $outcome,
+                        'eligible_recipient_count' => $eligibleRecipientCount,
+                        'scheduled_recipient_count' => $scheduledRecipientCount,
+                        'skipped_recipient_count' => $skippedRecipientCount,
+                    ],
+                ]),
             ])->save();
 
             return $broadcast->refresh();

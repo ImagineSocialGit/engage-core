@@ -505,4 +505,55 @@ class DashboardControllerTest extends TestCase
         $response->assertSee('Overdue but lower preset priority');
     }
 
+    public function test_dashboard_acknowledgement_only_accepts_single_slash_same_origin_return_paths(): void
+    {
+        $user = User::factory()->create();
+        $fallback = route('crm.index');
+
+        $unsafeReturnTos = [
+            '//attacker.example/path',
+            '///attacker.example/path',
+            '\\\\attacker.example\\path',
+            '/\\attacker.example/path',
+            'https://attacker.example/path',
+            rtrim(route('crm.index'), '/').'/contacts',
+            '/%2F%2Fattacker.example/path',
+            '/%252F%252Fattacker.example/path',
+            '/%5Cattacker.example/path',
+            "/contacts\r\nLocation: https://attacker.example",
+            '/contacts%0D%0ALocation%3A%20https%3A%2F%2Fattacker.example',
+        ];
+
+        foreach ($unsafeReturnTos as $index => $returnTo) {
+            $itemKey = 'unsafe-return-'.$index;
+
+            $this->actingAs($user)
+                ->post(route('crm.dashboard.acknowledgements.store'), [
+                    'item_type' => 'safe_return_test',
+                    'item_key' => $itemKey,
+                    'return_to' => $returnTo,
+                ])
+                ->assertRedirect($fallback);
+
+            $this->assertDatabaseHas('dashboard_acknowledgements', [
+                'user_id' => $user->getKey(),
+                'surface' => DashboardAcknowledgement::SURFACE_CRM_DASHBOARD,
+                'item_type' => 'safe_return_test',
+                'item_key' => $itemKey,
+            ]);
+        }
+
+        $safeReturnTo = '/contacts/123?tab=activity#recent';
+
+        $this->actingAs($user)
+            ->post(route('crm.dashboard.acknowledgements.store'), [
+                'item_type' => 'safe_return_test',
+                'item_key' => 'safe-return',
+                'return_to' => $safeReturnTo,
+            ])
+            ->assertRedirect(
+                rtrim(route('crm.index'), '/').$safeReturnTo,
+            );
+    }
+
 }

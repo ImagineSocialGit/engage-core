@@ -100,6 +100,8 @@ Owning module resolves behavior
 
 `ResolvedMessageDispatch` is the normalized final dispatch contract. It contains the exact resolved `send_at`, optional polymorphic `behaviorOwner` provenance, optional stable `occurrenceKey` identity, and the generic information required for Messaging to apply delivery safety and persist a `ScheduledMessage`.
 
+`MessageSendTimeResolver` may return a timezone-aware client-local value because calendar behavior such as `next_day_at` belongs to the client's timezone. `ScheduleMessageAction` is the persistence boundary: it converts that instant to UTC before both database persistence and queue delay registration. It records the original timezone, source ISO-8601 timestamp, and normalized UTC timestamp under `ScheduledMessage.meta.message_scheduling`. Horizon `send_at` metadata is also an ISO-8601 UTC timestamp with an explicit offset; offset-free diagnostic timestamps are not allowed.
+
 The builder accepts an optional polymorphic `behaviorOwner` model. When present, `ScheduledMessage` persists that provenance through `behavior_owner_type` / `behavior_owner_id`. Messaging stores the morph generically and does not import concrete feature-module models to understand their behavior.
 
 Examples:

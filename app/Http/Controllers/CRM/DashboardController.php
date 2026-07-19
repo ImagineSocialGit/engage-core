@@ -369,22 +369,56 @@ class DashboardController extends Controller
 
     private function safeReturnTo(?string $returnTo): string
     {
-        if (! is_string($returnTo) || trim($returnTo) === '') {
-            return route('crm.index');
+        $fallback = route('crm.index');
+
+        if (! is_string($returnTo)
+            || trim($returnTo) === ''
+            || preg_match('/[\x00-\x1F\x7F]/', $returnTo) === 1
+        ) {
+            return $fallback;
         }
 
         $returnTo = trim($returnTo);
-        $appUrl = rtrim((string) config('app.url'), '/');
 
-        if (str_starts_with($returnTo, '/')) {
-            return $returnTo;
+        if (! str_starts_with($returnTo, '/')
+            || str_starts_with($returnTo, '//')
+            || str_contains($returnTo, '\\')
+        ) {
+            return $fallback;
         }
 
-        if ($appUrl !== '' && str_starts_with($returnTo, $appUrl.'/')) {
-            return $returnTo;
+        $decoded = $returnTo;
+        $fullyDecoded = false;
+
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            if (preg_match('/[\x00-\x1F\x7F]/', $decoded) === 1
+                || str_contains($decoded, '\\')
+                || str_starts_with($decoded, '//')
+            ) {
+                return $fallback;
+            }
+
+            $next = rawurldecode($decoded);
+
+            if ($next === $decoded) {
+                $fullyDecoded = true;
+
+                break;
+            }
+
+            $decoded = $next;
         }
 
-        return route('crm.index');
+        if (! $fullyDecoded
+            || ! str_starts_with($decoded, '/')
+            || str_starts_with($decoded, '//')
+            || str_contains($decoded, '\\')
+            || preg_match('/[\x00-\x1F\x7F]/', $decoded) === 1
+        ) {
+            return $fallback;
+        }
+
+        return $returnTo;
     }
 
     private function dueLabel(mixed $date): ?string

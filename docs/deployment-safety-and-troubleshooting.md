@@ -210,7 +210,7 @@ Diagnostic rule:
 
 > Inspect the actual Horizon `Delayed Until` value and/or serialized queue delay metadata before manipulating Redis or requeueing jobs. Do not assume a persisted database `send_at` value proves the Redis delay is wrong.
 
-Timezone-aware Carbon values should be normalized consistently before persistence so `ScheduledMessage.send_at` represents the same instant as the queue delay. A persistence discrepancy is a code/data consistency issue to fix; it is not, by itself, proof that the queued delay is wrong.
+`ScheduleMessageAction` normalizes timezone-aware Carbon values to UTC before persistence and queue delay registration. `ScheduledMessage.send_at`, the queued delay, and Horizon `send_at` metadata therefore represent the same instant. The message's `meta.message_scheduling` payload retains the source timezone and both source and UTC ISO-8601 values for diagnosis. A discrepancy in older data is a code/data consistency issue; it is not, by itself, proof that the queued delay is wrong.
 
 ---
 

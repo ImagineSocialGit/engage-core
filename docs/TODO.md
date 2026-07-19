@@ -408,11 +408,10 @@ These are open code/runtime investigations surfaced by the first production Webi
 
 ### Messaging, scheduling, and queue diagnostics
 
-- [ ] Verify `ScheduledMessage.send_at` persists the same absolute instant as the timezone-aware queued delay.
-  - A production case persisted the wrong UTC value while the actual queued delay retained the correct execution instant.
-  - Treat this as a persistence/runtime consistency issue; do not infer the Redis delay is wrong from the database timestamp alone.
-- [ ] Make queued send-time diagnostics timezone-explicit.
-  - Current Horizon/debug `send_at` metadata that uses `toDateTimeString()` drops timezone information and can make a correct instant look ambiguous.
+- [X] Verify `ScheduledMessage.send_at` persists the same absolute instant as the timezone-aware queued delay.
+  - `ScheduleMessageAction` now normalizes the source instant to UTC before both persistence and queue delay registration and retains source/UTC values in `meta.message_scheduling`.
+- [X] Make queued send-time diagnostics timezone-explicit.
+  - Horizon/debug `send_at` metadata now uses an ISO-8601 UTC value with an explicit offset.
 - [X] Normalize multi-CTA support across config validation and runtime unresolved-token validation.
   - Config validation accepted `ctas` with `{cta}` while runtime unresolved-token validation did not consistently accept the same shape.
 - [ ] Add a safer first-class operational recovery mechanism for exact skipped/failed `ScheduledMessage` rows.

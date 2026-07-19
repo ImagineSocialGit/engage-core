@@ -202,6 +202,7 @@ Current runtime direction:
     Broadcast listeners record sent/skipped/failed Messaging lifecycle events
     Broadcast completes when every BroadcastRecipient is terminal
 
+Scheduling also has an immediate terminal path. `ScheduleBroadcastAction` records eligible, scheduled, and skipped recipient counts in `broadcasts.meta.scheduling`. When the scheduled recipient count is zero, the Broadcast completes in the scheduling transaction with either `no_eligible_recipients` or `no_messages_scheduled`; it must not remain `scheduled` waiting for a Messaging lifecycle event that cannot occur. A mixed result remains `scheduled` while any recipient has a ScheduledMessage still capable of reaching a terminal delivery outcome.
 
 ### Imported-contact permission invitations
 

@@ -544,9 +544,26 @@ class ScheduleBroadcastActionTest extends TestCase
             ->where('contact_id', $contact->id)
             ->first();
 
-        $this->assertSame(Broadcast::STATUS_SCHEDULED, $scheduledBroadcast->status);
+        $this->assertSame(Broadcast::STATUS_COMPLETED, $scheduledBroadcast->status);
         $this->assertSame(1, $scheduledBroadcast->recipient_count);
         $this->assertSame(0, $scheduledBroadcast->scheduled_count);
+        $this->assertNotNull($scheduledBroadcast->completed_at);
+        $this->assertSame(
+            'no_messages_scheduled',
+            data_get($scheduledBroadcast->meta, 'scheduling.outcome'),
+        );
+        $this->assertSame(
+            1,
+            data_get($scheduledBroadcast->meta, 'scheduling.eligible_recipient_count'),
+        );
+        $this->assertSame(
+            0,
+            data_get($scheduledBroadcast->meta, 'scheduling.scheduled_recipient_count'),
+        );
+        $this->assertSame(
+            1,
+            data_get($scheduledBroadcast->meta, 'scheduling.skipped_recipient_count'),
+        );
         $this->assertSame(0, ScheduledMessage::query()->count());
 
         $this->assertNotNull($recipient);
@@ -598,9 +615,18 @@ class ScheduleBroadcastActionTest extends TestCase
             ->where('contact_id', $contact->id)
             ->first();
 
-        $this->assertSame(Broadcast::STATUS_SCHEDULED, $scheduledBroadcast->status);
+        $this->assertSame(Broadcast::STATUS_COMPLETED, $scheduledBroadcast->status);
         $this->assertSame(1, $scheduledBroadcast->recipient_count);
         $this->assertSame(0, $scheduledBroadcast->scheduled_count);
+        $this->assertNotNull($scheduledBroadcast->completed_at);
+        $this->assertSame(
+            'no_messages_scheduled',
+            data_get($scheduledBroadcast->meta, 'scheduling.outcome'),
+        );
+        $this->assertSame(
+            1,
+            data_get($scheduledBroadcast->meta, 'scheduling.skipped_recipient_count'),
+        );
 
         $this->assertNotNull($recipient);
         $this->assertSame(BroadcastRecipient::STATUS_SKIPPED, $recipient->status);
@@ -721,11 +747,23 @@ class ScheduleBroadcastActionTest extends TestCase
 
         $scheduledBroadcast = app(ScheduleBroadcastAction::class)->handle($broadcast);
 
-        $recipient = BroadcastRecipient::query()->where('broadcast_id', $broadcast->id)->first();
+        $recipient = BroadcastRecipient::query()
+            ->where('broadcast_id', $broadcast->id)
+            ->first();
 
-        $this->assertSame(Broadcast::STATUS_SCHEDULED, $scheduledBroadcast->status);
+        $this->assertSame(Broadcast::STATUS_COMPLETED, $scheduledBroadcast->status);
         $this->assertSame(1, $scheduledBroadcast->recipient_count);
         $this->assertSame(0, $scheduledBroadcast->scheduled_count);
+        $this->assertNotNull($scheduledBroadcast->completed_at);
+        $this->assertSame(
+            'no_messages_scheduled',
+            data_get($scheduledBroadcast->meta, 'scheduling.outcome'),
+        );
+        $this->assertSame(
+            1,
+            data_get($scheduledBroadcast->meta, 'scheduling.skipped_recipient_count'),
+        );
+
         $this->assertSame($contact->id, $recipient->contact_id);
         $this->assertSame(BroadcastRecipient::STATUS_SKIPPED, $recipient->status);
         $this->assertNull($recipient->scheduled_message_ids);
