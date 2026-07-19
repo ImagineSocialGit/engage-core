@@ -2,18 +2,38 @@
 
 namespace App\Modules\Messaging\Controllers\Public;
 
+use App\Http\Controllers\Controller;
+use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\RevokeMessageConsentAction;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
-use App\Http\Controllers\Controller;
 use App\Modules\Messaging\Models\ConsentRevocation;
-use App\Modules\Core\Models\Contact;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\URL;
 use Illuminate\View\View;
 
 class ConsentRevocationController extends Controller
 {
     public function emailMarketingUnsubscribe(
+        Request $request,
+        Contact $contact
+    ): View {
+        if (! $request->hasValidSignature()) {
+            return view('messaging.unsubscribe-invalid');
+        }
+
+        return view('messaging.unsubscribe-confirm', [
+            'confirmUrl' => URL::temporarySignedRoute(
+                name: 'messaging.email.unsubscribe.store',
+                expiration: now()->addMinutes(30),
+                parameters: [
+                    'contact' => $contact,
+                ],
+            ),
+        ]);
+    }
+
+    public function storeEmailMarketingUnsubscribe(
         Request $request,
         Contact $contact,
         RevokeMessageConsentAction $revokeMessageConsentAction
@@ -38,6 +58,32 @@ class ConsentRevocationController extends Controller
     }
 
     public function emailTransactionalOptOut(
+        Request $request,
+        Contact $contact
+    ): View {
+        if (! $request->hasValidSignature()) {
+            return view('messaging.transactional-opt-out-invalid');
+        }
+
+        $scope = trim((string) $request->query('scope', ''));
+
+        if ($scope === '') {
+            return view('messaging.transactional-opt-out-invalid');
+        }
+
+        return view('messaging.transactional-opt-out-confirm', [
+            'confirmUrl' => URL::temporarySignedRoute(
+                name: 'messaging.email.transactional-opt-out.store',
+                expiration: now()->addMinutes(30),
+                parameters: [
+                    'contact' => $contact,
+                    'scope' => $scope,
+                ],
+            ),
+        ]);
+    }
+
+    public function storeEmailTransactionalOptOut(
         Request $request,
         Contact $contact,
         RevokeMessageConsentAction $revokeMessageConsentAction

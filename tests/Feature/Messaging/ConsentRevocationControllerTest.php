@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Messaging;
 
+use App\Modules\Campaigns\Models\CampaignEnrollment;
+use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
-use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Messaging\Models\ConsentRevocation;
-use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Services\MessageEligibilityGate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -17,23 +17,25 @@ class ConsentRevocationControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_signed_transactional_opt_out_revokes_only_requested_scope(): void
+    public function test_signed_transactional_opt_out_requires_confirmation_and_revokes_only_requested_scope(): void
     {
         $contact = $this->createContact();
 
         $this->grantConsent($contact, MessagePurpose::Transactional, 'webinar');
         $this->grantConsent($contact, MessagePurpose::Transactional, 'waitlist');
 
-        $url = URL::temporarySignedRoute(
-            'messaging.email.transactional-opt-out',
-            now()->addDays(7),
-            [
-                'contact' => $contact,
-                'scope' => 'webinar',
-            ]
+        $response = $this->get(
+            $this->signedTransactionalOptOutUrl($contact, 'webinar')
         );
 
-        $this->get($url)
+        $response
+            ->assertOk()
+            ->assertViewIs('messaging.transactional-opt-out-confirm')
+            ->assertViewHas('confirmUrl');
+
+        $this->assertDatabaseCount('consent_revocations', 0);
+
+        $this->post($response->viewData('confirmUrl'))
             ->assertOk()
             ->assertViewIs('messaging.transactional-opt-out-confirmed');
 
@@ -52,14 +54,23 @@ class ConsentRevocationControllerTest extends TestCase
         ]);
     }
 
-    public function test_marketing_unsubscribe_revokes_all_marketing_scopes(): void
+    public function test_marketing_unsubscribe_requires_confirmation_before_revoking_all_scopes(): void
     {
         $contact = $this->createContact();
 
         $this->grantConsent($contact, MessagePurpose::Marketing, 'webinar');
         $this->grantConsent($contact, MessagePurpose::Marketing, 'waitlist');
 
-        $this->get($this->signedUnsubscribeUrl($contact))
+        $response = $this->get($this->signedUnsubscribeUrl($contact));
+
+        $response
+            ->assertOk()
+            ->assertViewIs('messaging.unsubscribe-confirm')
+            ->assertViewHas('confirmUrl');
+
+        $this->assertDatabaseCount('consent_revocations', 0);
+
+        $this->post($response->viewData('confirmUrl'))
             ->assertOk()
             ->assertViewIs('messaging.unsubscribe-confirmed');
 
@@ -75,13 +86,10 @@ class ConsentRevocationControllerTest extends TestCase
             'scope' => 'waitlist',
         ]);
 
-        $this->assertSame(
-            2,
-            ConsentRevocation::query()->count()
-        );
+        $this->assertSame(2, ConsentRevocation::query()->count());
     }
 
-    public function test_unsigned_marketing_unsubscribe_is_rejected(): void
+    public function test_unsigned_marketing_unsubscribe_get_is_rejected(): void
     {
         $contact = $this->createContact();
 
@@ -98,10 +106,27 @@ class ConsentRevocationControllerTest extends TestCase
             ->assertOk()
             ->assertViewIs('messaging.unsubscribe-invalid');
 
-        $this->assertDatabaseCount(
-            'consent_revocations',
-            0
+        $this->assertDatabaseCount('consent_revocations', 0);
+    }
+
+    public function test_unsigned_marketing_unsubscribe_post_is_rejected(): void
+    {
+        $contact = $this->createContact();
+
+        $this->grantConsent(
+            $contact,
+            MessagePurpose::Marketing,
+            'webinar'
         );
+
+        $this->post(route(
+            'messaging.email.unsubscribe.store',
+            ['contact' => $contact]
+        ))
+            ->assertOk()
+            ->assertViewIs('messaging.unsubscribe-invalid');
+
+        $this->assertDatabaseCount('consent_revocations', 0);
     }
 
     public function test_expired_marketing_unsubscribe_is_rejected(): void
@@ -126,13 +151,10 @@ class ConsentRevocationControllerTest extends TestCase
             ->assertOk()
             ->assertViewIs('messaging.unsubscribe-invalid');
 
-        $this->assertDatabaseCount(
-            'consent_revocations',
-            0
-        );
+        $this->assertDatabaseCount('consent_revocations', 0);
     }
 
-    public function test_marketing_unsubscribe_is_idempotent(): void
+    public function test_marketing_unsubscribe_post_is_idempotent(): void
     {
         $contact = $this->createContact();
 
@@ -142,21 +164,18 @@ class ConsentRevocationControllerTest extends TestCase
             'webinar'
         );
 
-        $url = $this->signedUnsubscribeUrl($contact);
+        $confirmUrl = $this->marketingConfirmationUrl($contact);
 
-        $this->get($url)
+        $this->post($confirmUrl)
             ->assertViewIs('messaging.unsubscribe-confirmed');
 
-        $this->get($url)
+        $this->post($confirmUrl)
             ->assertViewIs('messaging.unsubscribe-already-confirmed');
 
-        $this->assertSame(
-            1,
-            ConsentRevocation::query()->count()
-        );
+        $this->assertSame(1, ConsentRevocation::query()->count());
     }
 
-    public function test_gate_blocks_marketing_after_unsubscribe(): void
+    public function test_gate_blocks_marketing_after_confirmed_unsubscribe(): void
     {
         $contact = $this->createContact();
 
@@ -177,9 +196,7 @@ class ConsentRevocationControllerTest extends TestCase
             )
         );
 
-        $this->get(
-            $this->signedUnsubscribeUrl($contact)
-        );
+        $this->post($this->marketingConfirmationUrl($contact));
 
         $this->assertFalse(
             $gate->canSend(
@@ -191,7 +208,7 @@ class ConsentRevocationControllerTest extends TestCase
         );
     }
 
-    public function test_marketing_unsubscribe_does_not_revoke_transactional(): void
+    public function test_marketing_unsubscribe_does_not_revoke_transactional_consent(): void
     {
         $contact = $this->createContact();
 
@@ -207,24 +224,23 @@ class ConsentRevocationControllerTest extends TestCase
             'webinar'
         );
 
-        $this->get(
-            $this->signedUnsubscribeUrl($contact)
-        );
+        $this->post($this->marketingConfirmationUrl($contact));
 
-        $this->assertDatabaseMissing(
-            'consent_revocations',
-            [
-                'contact_id' => $contact->id,
-                'purpose' => MessagePurpose::Transactional->value,
-            ]
-        );
+        $this->assertDatabaseMissing('consent_revocations', [
+            'contact_id' => $contact->id,
+            'purpose' => MessagePurpose::Transactional->value,
+        ]);
     }
 
     public function test_marketing_unsubscribe_does_not_mutate_campaign_enrollments(): void
     {
         $contact = $this->createContact();
 
-        $this->grantConsent($contact, MessagePurpose::Marketing, 'webinar');
+        $this->grantConsent(
+            $contact,
+            MessagePurpose::Marketing,
+            'webinar'
+        );
 
         $enrollment = CampaignEnrollment::create([
             'contact_id' => $contact->id,
@@ -237,13 +253,16 @@ class ConsentRevocationControllerTest extends TestCase
             'started_at' => now()->subDays(2),
         ]);
 
-        $this->get($this->signedUnsubscribeUrl($contact))
+        $this->post($this->marketingConfirmationUrl($contact))
             ->assertOk()
             ->assertViewIs('messaging.unsubscribe-confirmed');
 
         $enrollment->refresh();
 
-        $this->assertSame(CampaignEnrollment::STATUS_ACTIVE, $enrollment->status);
+        $this->assertSame(
+            CampaignEnrollment::STATUS_ACTIVE,
+            $enrollment->status
+        );
         $this->assertSame(2, $enrollment->current_step);
         $this->assertNull($enrollment->paused_at);
     }
@@ -270,14 +289,40 @@ class ConsentRevocationControllerTest extends TestCase
         ]);
     }
 
-    private function signedUnsubscribeUrl(
-        Contact $contact
-    ): string {
+    private function marketingConfirmationUrl(Contact $contact): string
+    {
+        $response = $this->get(
+            $this->signedUnsubscribeUrl($contact)
+        );
+
+        $response
+            ->assertOk()
+            ->assertViewIs('messaging.unsubscribe-confirm');
+
+        return $response->viewData('confirmUrl');
+    }
+
+    private function signedUnsubscribeUrl(Contact $contact): string
+    {
         return URL::temporarySignedRoute(
             'messaging.email.unsubscribe',
             now()->addDays(7),
             [
                 'contact' => $contact,
+            ]
+        );
+    }
+
+    private function signedTransactionalOptOutUrl(
+        Contact $contact,
+        string $scope
+    ): string {
+        return URL::temporarySignedRoute(
+            'messaging.email.transactional-opt-out',
+            now()->addDays(7),
+            [
+                'contact' => $contact,
+                'scope' => $scope,
             ]
         );
     }

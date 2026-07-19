@@ -1414,9 +1414,11 @@
 │       │   │   ├── accepted.blade.php
 │       │   │   └── show.blade.php
 │       │   ├── transactional-opt-out-already-confirmed.blade.php
+│       │   ├── transactional-opt-out-confirm.blade.php
 │       │   ├── transactional-opt-out-confirmed.blade.php
 │       │   ├── transactional-opt-out-invalid.blade.php
 │       │   ├── unsubscribe-already-confirmed.blade.php
+│       │   ├── unsubscribe-confirm.blade.php
 │       │   ├── unsubscribe-confirmed.blade.php
 │       │   └── unsubscribe-invalid.blade.php
 │       ├── staging
@@ -1694,4 +1696,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-490 directories, 1205 files
+490 directories, 1207 files
