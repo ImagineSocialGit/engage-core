@@ -162,6 +162,7 @@ class ModuleDependencyBoundaryTest extends TestCase
     {
         $this->assertModuleDoesNotImport('Campaigns', [
             'Broadcasts',
+            'FlowRoutes',
             'Mortgage',
             'Webinars',
             'Workflow',
@@ -173,10 +174,6 @@ class ModuleDependencyBoundaryTest extends TestCase
             'Mortgage',
             'Webinars',
             'Workflow',
-        ]);
-
-        $this->assertOnlyAllowedImports('Campaigns', 'App\\Modules\\FlowRoutes\\', [
-            'app/Modules/Campaigns/Models/CampaignEnrollment.php',
         ]);
     }
 

@@ -452,25 +452,35 @@ Campaigns should treat source morphs as context unless an explicit public integr
 
 
 
-## FlowRoutes-created campaign enrollment provenance
+## FlowRoutes-created campaign enrollment correlation
 
-Campaigns owns campaign enrollment lifecycle, progression, cancellation, exit behavior, and campaign scheduling.
+Campaigns owns campaign enrollment lifecycle, progression, cancellation, exit
+behavior, and campaign scheduling.
 
-When FlowRoutes enrolls or cancels a Campaign through Campaigns public actions/services, CampaignEnrollment should preserve the existing source morph/start context and also store structured FlowRoutes provenance where applicable:
+When a FlowRoutes automation action creates a CampaignEnrollment through the
+Campaigns-owned action seam, FlowRoutes records the created artifact on its own
+ContactFlowRouteProgressItem:
 
 ```text
-flow_route_progress_id
-flow_route_plan_id
-flow_route_plan_item_id
-flow_route_progress_item_id
-flow_route_id
-flow_route_point_id
-flow_route_capability_id
+created_subject_type
+created_subject_id
+correlation_key = campaign_enrollment.id
+correlation_type = campaign_enrollment
+correlation.campaign_enrollment_id
+correlation.campaign_key
 ```
 
-`source_type` / `source_id` answers what domain thing caused or contextualized the enrollment. The FlowRoutes provenance fields answer which route instance/plan item created or controlled the enrollment. These are related but not interchangeable.
+CampaignEnrollment keeps its normal source morph, start context, and opaque
+caller metadata. It must not add first-class FlowRoutes foreign keys,
+relationships, or imports merely to duplicate provenance already owned by
+FlowRoutes.
 
-Campaigns should not import FlowRoutes runtime internals. FlowRoutes should not mutate CampaignEnrollment internals directly.
+Caller-supplied metadata may be copied to the first ScheduledMessage for compact
+diagnostics. Campaigns treats that metadata as opaque and must not parse or
+reconstruct FlowRoutes runtime state from CampaignEnrollment columns.
+
+Campaigns should not import FlowRoutes runtime internals. FlowRoutes should not
+mutate CampaignEnrollment internals directly.
 
 
 ## Campaign preset sync force behavior

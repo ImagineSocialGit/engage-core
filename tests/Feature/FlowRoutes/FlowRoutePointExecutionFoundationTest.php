@@ -539,7 +539,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertSame($template->key, data_get($progressItem->correlation, 'task_template_key'));
     }
 
-    public function test_enroll_campaign_point_keeps_provenance_on_enrollment_and_message_metadata(): void
+    public function test_enroll_campaign_point_records_created_enrollment_in_flow_routes_owned_state(): void
     {
         Queue::fake();
 
@@ -640,36 +640,52 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
 
         $enrollment = CampaignEnrollment::query()->firstOrFail();
         $scheduledMessage = ScheduledMessage::query()->firstOrFail();
-
-        $this->assertSame($setup['progress']->getKey(), $enrollment->flow_route_progress_id);
-        $this->assertSame($setup['flow_route']->getKey(), $enrollment->flow_route_id);
-        $this->assertSame($setup['flow_route_points'][0]->getKey(), $enrollment->flow_route_point_id);
-        $this->assertNotNull($enrollment->flow_route_plan_id);
-        $this->assertNotNull($enrollment->flow_route_plan_item_id);
-        $this->assertNotNull($enrollment->flow_route_progress_item_id);
+        $progressItem = ContactFlowRouteProgressItem::query()
+            ->where('contact_flow_route_progress_id', $setup['progress']->getKey())
+            ->where('flow_route_point_id', $setup['flow_route_points'][0]->getKey())
+            ->firstOrFail();
 
         $this->assertSame(
-            $enrollment->flow_route_progress_id,
+            $enrollment->getMorphClass(),
+            $progressItem->created_subject_type,
+        );
+        $this->assertSame(
+            $enrollment->getKey(),
+            $progressItem->created_subject_id,
+        );
+        $this->assertSame('campaign_enrollment.id', $progressItem->correlation_key);
+        $this->assertSame('campaign_enrollment', $progressItem->correlation_type);
+        $this->assertSame(
+            $enrollment->getKey(),
+            data_get($progressItem->correlation, 'campaign_enrollment_id'),
+        );
+        $this->assertSame(
+            'route_campaign',
+            data_get($progressItem->correlation, 'campaign_key'),
+        );
+
+        $this->assertSame(
+            $setup['progress']->getKey(),
             data_get($scheduledMessage->meta, 'flow_route.flow_route_progress_id'),
         );
         $this->assertSame(
-            $enrollment->flow_route_plan_id,
+            $progressItem->contact_flow_route_plan_id,
             data_get($scheduledMessage->meta, 'flow_route.flow_route_plan_id'),
         );
         $this->assertSame(
-            $enrollment->flow_route_plan_item_id,
+            $progressItem->contact_flow_route_plan_item_id,
             data_get($scheduledMessage->meta, 'flow_route.flow_route_plan_item_id'),
         );
         $this->assertSame(
-            $enrollment->flow_route_progress_item_id,
+            $progressItem->getKey(),
             data_get($scheduledMessage->meta, 'flow_route.flow_route_progress_item_id'),
         );
         $this->assertSame(
-            $enrollment->flow_route_id,
+            $setup['flow_route']->getKey(),
             data_get($scheduledMessage->meta, 'flow_route.flow_route_id'),
         );
         $this->assertSame(
-            $enrollment->flow_route_point_id,
+            $setup['flow_route_points'][0]->getKey(),
             data_get($scheduledMessage->meta, 'flow_route.flow_route_point_id'),
         );
     }

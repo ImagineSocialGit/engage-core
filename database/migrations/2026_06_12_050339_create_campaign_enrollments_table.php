@@ -3,13 +3,6 @@
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Core\Models\Contact;
-use App\Modules\FlowRoutes\Models\ContactFlowRoutePlan;
-use App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem;
-use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
-use App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem;
-use App\Modules\FlowRoutes\Models\FlowRoute;
-use App\Modules\FlowRoutes\Models\FlowRouteCapability;
-use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -33,41 +26,6 @@ return new class extends Migration
 
             $table->string('source_type', 120)->nullable();
             $table->unsignedBigInteger('source_id')->nullable();
-
-            $table->foreignIdFor(ContactFlowRouteProgress::class, 'flow_route_progress_id')
-                ->nullable()
-                ->constrained('contact_flow_route_progress')
-                ->nullOnDelete();
-
-            $table->foreignIdFor(ContactFlowRoutePlan::class, 'flow_route_plan_id')
-                ->nullable()
-                ->constrained('contact_flow_route_plans')
-                ->nullOnDelete();
-
-            $table->foreignIdFor(ContactFlowRoutePlanItem::class, 'flow_route_plan_item_id')
-                ->nullable()
-                ->constrained('contact_flow_route_plan_items')
-                ->nullOnDelete();
-
-            $table->foreignIdFor(ContactFlowRouteProgressItem::class, 'flow_route_progress_item_id')
-                ->nullable()
-                ->constrained('contact_flow_route_progress_items')
-                ->nullOnDelete();
-
-            $table->foreignIdFor(FlowRoute::class)
-                ->nullable()
-                ->constrained('flow_routes')
-                ->nullOnDelete();
-
-            $table->foreignIdFor(FlowRoutePoint::class)
-                ->nullable()
-                ->constrained('flow_route_points')
-                ->nullOnDelete();
-
-            $table->foreignIdFor(FlowRouteCapability::class)
-                ->nullable()
-                ->constrained('flow_route_capabilities')
-                ->nullOnDelete();
 
             $table->string('campaign_key', 120)->index();
 
@@ -116,12 +74,6 @@ return new class extends Migration
                 'source_id',
                 'campaign_key',
             ], 'campaign_enrollments_source_campaign_index');
-
-            $table->index(['flow_route_progress_id', 'status'], 'ce_route_progress_status_idx');
-            $table->index(['flow_route_plan_item_id', 'status'], 'ce_route_plan_item_status_idx');
-            $table->index(['flow_route_progress_item_id', 'status'], 'ce_route_progress_item_status_idx');
-            $table->index(['flow_route_id', 'flow_route_point_id', 'status'], 'ce_route_point_status_idx');
-            $table->index(['flow_route_capability_id', 'status'], 'ce_route_capability_status_idx');
         });
     }
 

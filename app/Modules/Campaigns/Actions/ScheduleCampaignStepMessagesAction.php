@@ -241,7 +241,6 @@ class ScheduleCampaignStepMessagesAction
         ?array $meta,
     ): array {
         return array_replace_recursive(
-            $this->flowRouteMetaFromEnrollment($enrollment),
             [
                 'campaign_enrollment_id' => $enrollment->id,
                 'campaign_id' => $campaign->id,
@@ -253,28 +252,14 @@ class ScheduleCampaignStepMessagesAction
                 'campaign_step_variant_source_config_path' => $variant->source_config_path,
                 'campaign_step_variant_source_version' => $variant->source_version,
                 'campaign_variant_strategy' => $strategy,
-                'campaign_step_waits_for_all_scheduled_variants' => in_array($strategy, ['send_all_eligible', 'dependency_aware'], true),
+                'campaign_step_waits_for_all_scheduled_variants' => in_array(
+                    $strategy,
+                    ['send_all_eligible', 'dependency_aware'],
+                    true,
+                ),
             ],
             $meta ?? [],
         );
-    }
-
-    /**
-     * @return array<string, array<string, int>>
-     */
-    private function flowRouteMetaFromEnrollment(CampaignEnrollment $enrollment): array
-    {
-        $flowRoute = array_filter([
-            'flow_route_progress_id' => $enrollment->flow_route_progress_id,
-            'flow_route_plan_id' => $enrollment->flow_route_plan_id,
-            'flow_route_plan_item_id' => $enrollment->flow_route_plan_item_id,
-            'flow_route_progress_item_id' => $enrollment->flow_route_progress_item_id,
-            'flow_route_id' => $enrollment->flow_route_id,
-            'flow_route_point_id' => $enrollment->flow_route_point_id,
-            'flow_route_capability_id' => $enrollment->flow_route_capability_id,
-        ], fn (mixed $value): bool => $value !== null);
-
-        return $flowRoute === [] ? [] : ['flow_route' => $flowRoute];
     }
 
     /**
