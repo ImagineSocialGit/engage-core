@@ -43,6 +43,10 @@ class ZoomWebhookHandler
                 : null,
             nativeEvent: $nativeEvent,
             payload: $request->all(),
+            signatureFingerprint: hash(
+                'sha256',
+                (string) $request->header('x-zm-signature'),
+            ),
         );
     }
 

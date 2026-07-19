@@ -685,8 +685,10 @@ ZOOM_BASE_URL=https://api.zoom.us/v2
 ZOOM_OAUTH_URL=https://zoom.us/oauth/token
 ZOOM_OAUTH_TOKEN_TTL_SECONDS=3500
 ZOOM_WEBHOOK_MAX_TIMESTAMP_DRIFT_SECONDS=300
-ZOOM_WEBHOOK_REPLAY_CACHE_TTL_SECONDS=600
+WEBHOOK_INBOX_CLAIM_LEASE_SECONDS=300
 ```
+
+`WEBHOOK_INBOX_CLAIM_LEASE_SECONDS` is provider-neutral and controls when interrupted durable webhook work may be reclaimed for processing. It applies to Zoom and Resend receipts; it is not a cache replay TTL.
 
 `WEBINARS_ENABLED` is not part of the current canonical runtime contract. Module availability is decided through client module config.
 

@@ -191,6 +191,7 @@ When delivery-event processing is used:
 - [ ] Signature verification tested.
 - [ ] Timestamp drift setting appropriate.
 - [ ] A real test reaches the expected sent/delivery lifecycle.
+- [ ] A simulated processing failure leaves a retryable durable receipt and the provider retry completes it.
 
 ## Environment separation
 
@@ -320,7 +321,6 @@ ZOOM_BASE_URL=https://api.zoom.us/v2
 ZOOM_OAUTH_URL=https://zoom.us/oauth/token
 ZOOM_OAUTH_TOKEN_TTL_SECONDS=3500
 ZOOM_WEBHOOK_MAX_TIMESTAMP_DRIFT_SECONDS=300
-ZOOM_WEBHOOK_REPLAY_CACHE_TTL_SECONDS=600
 ```
 
 ## App type and activation
@@ -390,7 +390,9 @@ Checklist:
 - [ ] `recording.completed` subscribed when replay follow-ups are used.
 - [ ] Any equivalent/required completion event intentionally subscribed.
 - [ ] Signature validation succeeds.
-- [ ] Replay/timestamp protection succeeds.
+- [ ] Timestamp validation succeeds.
+- [ ] A completed duplicate returns safely without dispatching twice.
+- [ ] A simulated processing failure leaves a retryable durable receipt and the provider retry completes it.
 - [ ] Real or simulated event reaches the intended queued job.
 
 ## End-to-end Zoom verification

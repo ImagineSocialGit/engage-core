@@ -15,6 +15,7 @@ use App\Modules\Campaigns\Services\ContactShow\ContactCampaignsVisibilityDataPro
 use App\Modules\Campaigns\TokenContracts\CampaignTokenContextProvider;
 use App\Modules\Campaigns\TokenContracts\CampaignTokenSourceProvider;
 use App\Modules\Campaigns\Validation\CampaignsSetupValidationContributor;
+use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use Illuminate\Support\Facades\Event;
@@ -64,6 +65,11 @@ class CampaignsModuleServiceProvider extends ServiceProvider
 
         Event::listen(
             ScheduledMessageSkipped::class,
+            ScheduleNextCampaignStepAfterScheduledMessageSent::class,
+        );
+
+        Event::listen(
+            ScheduledMessageFailed::class,
             ScheduleNextCampaignStepAfterScheduledMessageSent::class,
         );
 

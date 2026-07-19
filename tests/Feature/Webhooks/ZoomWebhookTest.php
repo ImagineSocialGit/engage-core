@@ -2,12 +2,19 @@
 
 namespace Tests\Feature\Webhooks;
 
+use App\Modules\Webinars\Actions\PostEvent\HandleWebinarProviderWebhookEventAction;
 use App\Modules\Webinars\Jobs\PostEvent\ProcessWebinarProviderEventJob;
+use App\Support\Webhooks\Models\WebhookInboxReceipt;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Mockery;
+use RuntimeException;
 use Tests\TestCase;
 
 class ZoomWebhookTest extends TestCase
 {
+    use RefreshDatabase;
+
     private ?string $reusedTimestamp = null;
 
     protected function setUp(): void
@@ -15,9 +22,10 @@ class ZoomWebhookTest extends TestCase
         parent::setUp();
 
         config([
+            'client.key' => 'test-client',
             'webinars.provider' => 'zoom',
             'services.zoom.webhook_secret' => 'test_zoom_webhook_secret',
-
+            'services.zoom.max_timestamp_drift_seconds' => 300,
             'webinars.providers.zoom.webhook_events' => [
                 'webinar.ended' => 'webinar.ended',
                 'webinar.completed' => 'webinar.ended',
@@ -26,7 +34,7 @@ class ZoomWebhookTest extends TestCase
         ]);
     }
 
-    public function test_it_handles_zoom_url_validation(): void
+    public function test_it_handles_zoom_url_validation_without_creating_a_receipt(): void
     {
         $plainToken = 'plain-token-from-zoom';
 
@@ -47,9 +55,11 @@ class ZoomWebhookTest extends TestCase
                 config('services.zoom.webhook_secret')
             ),
         ]);
+
+        $this->assertDatabaseCount('webhook_inbox_receipts', 0);
     }
 
-    public function test_it_rejects_invalid_signatures(): void
+    public function test_it_rejects_invalid_signatures_without_creating_a_receipt(): void
     {
         $response = $this
             ->withHeaders([
@@ -66,9 +76,10 @@ class ZoomWebhookTest extends TestCase
             ]);
 
         $response->assertUnauthorized();
+        $this->assertDatabaseCount('webhook_inbox_receipts', 0);
     }
 
-    public function test_it_dispatches_generic_runner_for_signed_events_with_a_webinar_id(): void
+    public function test_it_dispatches_generic_runner_and_completes_a_receipt(): void
     {
         Queue::fake();
 
@@ -90,9 +101,17 @@ class ZoomWebhookTest extends TestCase
                 && $job->externalWebinarId === $webinarId
                 && $job->event === 'webinar.started';
         });
+
+        $this->assertDatabaseHas('webhook_inbox_receipts', [
+            'client_key' => 'test-client',
+            'provider' => 'zoom',
+            'event_type' => 'webinar.started',
+            'status' => WebhookInboxReceipt::STATUS_COMPLETED,
+            'attempts' => 1,
+        ]);
     }
 
-    public function test_it_ignores_supported_events_without_a_webinar_id(): void
+    public function test_it_ignores_supported_events_without_a_webinar_id_and_completes_receipt(): void
     {
         Queue::fake();
 
@@ -106,6 +125,11 @@ class ZoomWebhookTest extends TestCase
         $response->assertNoContent();
 
         Queue::assertNotPushed(ProcessWebinarProviderEventJob::class);
+        $this->assertDatabaseHas('webhook_inbox_receipts', [
+            'provider' => 'zoom',
+            'event_type' => 'webinar.ended',
+            'status' => WebhookInboxReceipt::STATUS_COMPLETED,
+        ]);
     }
 
     public function test_it_dispatches_finalize_job_for_webinar_ended_events(): void
@@ -172,7 +196,7 @@ class ZoomWebhookTest extends TestCase
         $response->assertNotFound();
     }
 
-    public function test_it_rejects_requests_with_stale_timestamps(): void
+    public function test_it_rejects_requests_with_stale_timestamps_without_creating_a_receipt(): void
     {
         $timestamp = (string) (time() - 1000);
 
@@ -185,7 +209,7 @@ class ZoomWebhookTest extends TestCase
             ],
         ];
 
-        $body = json_encode($payload, JSON_UNESCAPED_SLASHES);
+        $body = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
         $signature = 'v0='.hash_hmac(
             'sha256',
@@ -206,10 +230,13 @@ class ZoomWebhookTest extends TestCase
         );
 
         $response->assertUnauthorized();
+        $this->assertDatabaseCount('webhook_inbox_receipts', 0);
     }
 
-    public function test_it_rejects_replayed_requests(): void
+    public function test_completed_replay_returns_existing_outcome_without_dispatching_twice(): void
     {
+        Queue::fake();
+
         $payload = [
             'event' => 'webinar.started',
             'payload' => [
@@ -219,16 +246,78 @@ class ZoomWebhookTest extends TestCase
             ],
         ];
 
-        $firstResponse = $this->signedZoomPost($payload);
+        $this->signedZoomPost($payload)->assertNoContent();
 
-        $firstResponse->assertNoContent();
+        $this
+            ->signedZoomPost($payload, reuseTimestamp: true)
+            ->assertNoContent();
 
-        $secondResponse = $this->signedZoomPost(
-            $payload,
-            reuseTimestamp: true
-        );
+        Queue::assertPushed(ProcessWebinarProviderEventJob::class, 1);
+        $this->assertDatabaseCount('webhook_inbox_receipts', 1);
+        $this->assertDatabaseHas('webhook_inbox_receipts', [
+            'provider' => 'zoom',
+            'status' => WebhookInboxReceipt::STATUS_COMPLETED,
+            'attempts' => 1,
+        ]);
+    }
 
-        $secondResponse->assertUnauthorized();
+    public function test_failed_processing_is_recorded_and_same_signed_request_can_resume(): void
+    {
+        $calls = 0;
+        $action = Mockery::mock(HandleWebinarProviderWebhookEventAction::class);
+        $action->shouldReceive('execute')
+            ->twice()
+            ->andReturnUsing(function () use (&$calls): void {
+                $calls++;
+
+                if ($calls === 1) {
+                    throw new RuntimeException('Simulated Zoom processing failure.');
+                }
+            });
+
+        app()->instance(HandleWebinarProviderWebhookEventAction::class, $action);
+
+        $payload = [
+            'event' => 'webinar.ended',
+            'payload' => [
+                'object' => [
+                    'id' => '123456789',
+                ],
+            ],
+        ];
+
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->signedZoomPost($payload);
+
+            $this->fail('Expected the simulated processing failure.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame(
+                'Simulated Zoom processing failure.',
+                $exception->getMessage(),
+            );
+        } finally {
+            $this->withExceptionHandling();
+        }
+
+        $this->assertDatabaseHas('webhook_inbox_receipts', [
+            'provider' => 'zoom',
+            'status' => WebhookInboxReceipt::STATUS_RETRYABLE_FAILED,
+            'attempts' => 1,
+        ]);
+
+        $this
+            ->signedZoomPost($payload, reuseTimestamp: true)
+            ->assertNoContent();
+
+        $receipt = WebhookInboxReceipt::query()->sole();
+
+        $this->assertSame(WebhookInboxReceipt::STATUS_COMPLETED, $receipt->status);
+        $this->assertSame(2, $receipt->attempts);
+        $this->assertNotNull($receipt->completed_at);
+        $this->assertNull($receipt->failed_at);
+        $this->assertNull($receipt->last_error);
     }
 
     private function signedZoomPost(
@@ -241,7 +330,7 @@ class ZoomWebhookTest extends TestCase
 
         $this->reusedTimestamp = $timestamp;
 
-        $body = json_encode($payload, JSON_UNESCAPED_SLASHES);
+        $body = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
         $signature = 'v0='.hash_hmac(
             'sha256',

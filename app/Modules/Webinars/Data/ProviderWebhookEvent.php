@@ -11,6 +11,8 @@ class ProviderWebhookEvent
         public readonly ?string $externalWebinarUuid = null,
         public readonly ?string $nativeEvent = null,
         public readonly array $payload = [],
+        public readonly ?string $providerEventId = null,
+        public readonly ?string $signatureFingerprint = null,
     ) {}
 
     public function isValidationEvent(): bool

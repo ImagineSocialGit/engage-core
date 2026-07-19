@@ -79,7 +79,6 @@ return [
 
         'max_timestamp_drift_seconds' => 300,
 
-        'replay_cache_ttl_seconds' => 600,
     ],
 
 ];

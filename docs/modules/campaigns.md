@@ -178,6 +178,20 @@ unavailable
 
 `terminal` means the sibling variant has reached a final Messaging outcome such as sent, skipped, or failed when the runtime intentionally treats those as no-longer-pending for progression/dependency purposes.
 
+### Terminal delivery failure policy
+
+A Messaging-owned `ScheduledMessage` reaches terminal failure only after Messaging has exhausted the delivery behavior represented by that message. Campaigns treats that failed delivery as an accounted-for terminal variant, not as an invisible reason to strand the enrollment.
+
+The Campaign progression policy is:
+
+```text
+pending or sending sibling variant exists
+    wait on the current Campaign step
+
+every scheduled sibling variant is sent, skipped, or failed
+    record the failed-message outcome and policy on CampaignEnrollment.meta
+    continue to the next schedulable Campaign step
+
 Dependency checks should be scoped to:
 
 ```text

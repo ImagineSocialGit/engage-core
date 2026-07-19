@@ -951,15 +951,20 @@
 │       │   │   ├── SetupValidationFinding.php
 │       │   │   └── SetupValidationResult.php
 │       │   └── SetupValidationManager.php
-│       └── TokenContracts
-│           ├── Contracts
-│           │   ├── ComputedTokenValueProvider.php
-│           │   ├── TokenContextProvider.php
-│           │   └── TokenSourceProvider.php
-│           ├── Data
-│           │   ├── TokenContextDefinition.php
-│           │   └── TokenSourceDefinition.php
-│           └── TokenContractRegistry.php
+│       ├── TokenContracts
+│       │   ├── Contracts
+│       │   │   ├── ComputedTokenValueProvider.php
+│       │   │   ├── TokenContextProvider.php
+│       │   │   └── TokenSourceProvider.php
+│       │   ├── Data
+│       │   │   ├── TokenContextDefinition.php
+│       │   │   └── TokenSourceDefinition.php
+│       │   └── TokenContractRegistry.php
+│       └── Webhooks
+│           ├── Models
+│           │   └── WebhookInboxReceipt.php
+│           └── Services
+│               └── WebhookInbox.php
 ├── artisan
 ├── bootstrap
 │   ├── app.php
@@ -1028,6 +1033,7 @@
 │   ├── sms.php
 │   ├── staging.php
 │   ├── theme
+│   ├── webhooks.php
 │   ├── webinars
 │   │   ├── content.php
 │   │   ├── index
@@ -1185,6 +1191,7 @@
 │   │   ├── 2026_07_18_220000_create_automation_event_outbox_events_table.php
 │   │   ├── 2026_07_18_220001_create_automation_event_consumer_receipts_table.php
 │   │   ├── 2026_07_19_031500_create_inbound_message_receipts_table.php
+│   │   ├── 2026_07_19_040000_create_webhook_inbox_receipts_table.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -1460,6 +1467,7 @@
 │   │   │   └── ScheduleBroadcastActionTest.php
 │   │   ├── Campaigns
 │   │   │   ├── CampaignMessageTemplateControllerTest.php
+│   │   │   ├── CampaignScheduledMessageTerminalReconciliationTest.php
 │   │   │   ├── CampaignsSetupValidationContributorTest.php
 │   │   │   ├── CampaignStepVariantsTest.php
 │   │   │   ├── CampaignVariantDependencyAwareTest.php
@@ -1681,4 +1689,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-487 directories, 1195 files
+490 directories, 1200 files

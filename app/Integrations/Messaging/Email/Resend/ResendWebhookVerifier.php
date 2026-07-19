@@ -2,12 +2,8 @@
 
 namespace App\Integrations\Messaging\Email\Resend;
 
-use Illuminate\Support\Facades\Cache;
-
 class ResendWebhookVerifier
 {
-    private const REPLAY_CACHE_TTL_SECONDS = 86400;
-
     /**
      * @param array<string, mixed> $headers
      */
@@ -32,17 +28,13 @@ class ResendWebhookVerifier
             return false;
         }
 
-        if (! $this->signatureMatches(
+        return $this->signatureMatches(
             eventId: $eventId,
             timestamp: $timestamp,
             payload: $payload,
             signatureHeader: $signature,
             secret: $secret,
-        )) {
-            return false;
-        }
-
-        return $this->markEventSeen($eventId);
+        );
     }
 
     /**
@@ -134,14 +126,5 @@ class ResendWebhookVerifier
             ->filter()
             ->values()
             ->all();
-    }
-
-    private function markEventSeen(string $eventId): bool
-    {
-        return Cache::add(
-            key: 'webhooks:resend:'.$eventId,
-            value: true,
-            ttl: now()->addSeconds(self::REPLAY_CACHE_TTL_SECONDS),
-        );
     }
 }

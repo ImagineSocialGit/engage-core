@@ -46,7 +46,6 @@ return [
         'client_secret' => env('ZOOM_CLIENT_SECRET'),
         'webhook_secret' => env('ZOOM_WEBHOOK_SECRET'),
         'max_timestamp_drift_seconds' => env('ZOOM_WEBHOOK_MAX_TIMESTAMP_DRIFT_SECONDS', 300),
-        'replay_cache_ttl_seconds' => env('ZOOM_WEBHOOK_REPLAY_CACHE_TTL_SECONDS', 600),
     ],
 
 ];
