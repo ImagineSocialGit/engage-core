@@ -121,17 +121,33 @@
 
         <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
             <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div class="flex items-center justify-between px-12 py-2">
+                <div class="flex flex-col gap-3 px-12 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <h2 class="text-sm font-semibold text-slate-900">
-                        {{ $showArchived ? 'All Webinars' : 'Upcoming Webinars' }}
+                        {{ $showAttention ? 'Registration Recovery' : ($showArchived ? 'All Webinars' : 'Upcoming Webinars') }}
                     </h2>
 
-                    <a
-                        href="{{ $showArchived ? route('crm.webinar-series.index') : route('crm.webinar-series.index', ['archived' => 1]) }}"
-                        class="text-sm font-medium text-slate-600 hover:text-slate-900 underline"
-                    >
-                        {{ $showArchived ? 'View Upcoming' : 'View Archived' }}
-                    </a>
+                    <div class="flex flex-wrap items-center gap-3 text-sm font-medium">
+                        <a
+                            href="{{ route('crm.webinar-series.index') }}"
+                            class="{{ ! $showArchived && ! $showAttention ? 'text-slate-950' : 'text-slate-600' }} underline hover:text-slate-900"
+                        >
+                            Upcoming
+                        </a>
+
+                        <a
+                            href="{{ route('crm.webinar-series.index', ['attention' => 1]) }}"
+                            class="{{ $showAttention ? 'text-red-700' : 'text-slate-600' }} underline hover:text-red-700"
+                        >
+                            Needs attention
+                        </a>
+
+                        <a
+                            href="{{ route('crm.webinar-series.index', ['archived' => 1]) }}"
+                            class="{{ $showArchived && ! $showAttention ? 'text-slate-950' : 'text-slate-600' }} underline hover:text-slate-900"
+                        >
+                            Archived
+                        </a>
+                    </div>
                 </div>
 
                 <table class="min-w-full text-sm">
@@ -169,6 +185,31 @@
                                 $attendanceSnapshotWarning = filled($attendanceSnapshotReason)
                                     ? \Illuminate\Support\Str::headline((string) $attendanceSnapshotReason)
                                     : null;
+
+                                $finalizationFailures = $webinar->registrations->filter(
+                                    fn ($registration): bool => data_get(
+                                        $registration->meta,
+                                        'registration_finalization.status',
+                                    ) === 'failed' && data_get(
+                                        $registration->meta,
+                                        'provider_sync.status',
+                                    ) !== 'reconciliation_required',
+                                );
+                                $finalizationReconciliations = $webinar->registrations->filter(
+                                    fn ($registration): bool => data_get(
+                                        $registration->meta,
+                                        'registration_finalization.status',
+                                    ) === 'reconciliation_required' || data_get(
+                                        $registration->meta,
+                                        'provider_sync.status',
+                                    ) === 'reconciliation_required',
+                                );
+                                $finalizationsPending = $webinar->registrations->filter(
+                                    fn ($registration): bool => in_array(data_get(
+                                        $registration->meta,
+                                        'registration_finalization.status',
+                                    ), ['pending', 'queued', 'processing'], true),
+                                );
 
                                 $providerCancellationFailures = $webinar->registrations->filter(
                                     fn ($registration): bool => data_get(
@@ -235,6 +276,24 @@
                                             </span>
                                         @endif
 
+                                        @if($finalizationFailures->isNotEmpty())
+                                            <span class="rounded-full bg-red-50 px-2 py-0.5 font-semibold text-red-700 ring-1 ring-red-200">
+                                                {{ $finalizationFailures->count() }} registration finalization {{ $finalizationFailures->count() === 1 ? 'failure' : 'failures' }}
+                                            </span>
+                                        @endif
+
+                                        @if($finalizationReconciliations->isNotEmpty())
+                                            <span class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-200">
+                                                {{ $finalizationReconciliations->count() }} provider {{ $finalizationReconciliations->count() === 1 ? 'verification' : 'verifications' }} required
+                                            </span>
+                                        @endif
+
+                                        @if($finalizationsPending->isNotEmpty())
+                                            <span class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-200">
+                                                {{ $finalizationsPending->count() }} registration {{ $finalizationsPending->count() === 1 ? 'finalization' : 'finalizations' }} pending
+                                            </span>
+                                        @endif
+
                                         @if($providerCancellationFailures->isNotEmpty())
                                             <span class="rounded-full bg-red-50 px-2 py-0.5 font-semibold text-red-700 ring-1 ring-red-200">
                                                 {{ $providerCancellationFailures->count() }} provider cancellation {{ $providerCancellationFailures->count() === 1 ? 'failure' : 'failures' }}
@@ -259,6 +318,110 @@
                                             </span>
                                         @endif
                                     </div>
+
+                                    @if($finalizationFailures->isNotEmpty())
+                                        <div class="mt-3 space-y-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900">
+                                            <div>
+                                                <p class="font-semibold">Registration finalization needs attention</p>
+                                                <p class="mt-1 text-red-800">These failures are safe to retry because no ambiguous provider submission remains unresolved.</p>
+                                            </div>
+
+                                            @foreach($finalizationFailures as $failedRegistration)
+                                                <div id="webinar-registration-{{ $failedRegistration->id }}" class="flex flex-wrap items-center justify-between gap-3 rounded-md bg-white/70 p-2 ring-1 ring-red-200">
+                                                    <span>
+                                                        <span class="font-semibold">{{ $failedRegistration->contact?->name ?: $failedRegistration->contact?->email ?: 'Registration #'.$failedRegistration->id }}</span>
+                                                        — {{ \Illuminate\Support\Str::headline((string) data_get($failedRegistration->meta, 'registration_finalization.failure_reason', 'unknown_failure')) }}
+                                                        · {{ (int) data_get($failedRegistration->meta, 'registration_finalization.attempts', 0) }} attempts
+                                                    </span>
+
+                                                    <form method="POST" action="{{ route('crm.webinar-registrations.finalization.retry', $failedRegistration) }}">
+                                                        @csrf
+
+                                                        <button
+                                                            type="submit"
+                                                            class="inline-flex items-center rounded-md bg-red-700 px-2.5 py-1.5 font-semibold text-white hover:bg-red-600"
+                                                        >
+                                                            Retry finalization
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+
+                                    @if($finalizationReconciliations->isNotEmpty())
+                                        <div class="mt-3 space-y-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+                                            <div>
+                                                <p class="font-semibold">Provider verification required</p>
+                                                <p class="mt-1 text-amber-900">Check the provider’s registrant list first. Do not authorize resubmission until you have confirmed the registration is absent.</p>
+                                            </div>
+
+                                            @foreach($finalizationReconciliations as $reconciliationRegistration)
+                                                <div id="webinar-registration-{{ $reconciliationRegistration->id }}" class="space-y-3 rounded-md bg-white/80 p-3 ring-1 ring-amber-300">
+                                                    <div>
+                                                        <span class="font-semibold">{{ $reconciliationRegistration->contact?->name ?: $reconciliationRegistration->contact?->email ?: 'Registration #'.$reconciliationRegistration->id }}</span>
+                                                        — {{ \Illuminate\Support\Str::headline((string) data_get($reconciliationRegistration->meta, 'registration_finalization.failure_reason', 'provider_submission_outcome_unknown')) }}
+                                                        · {{ \Illuminate\Support\Str::headline((string) data_get($reconciliationRegistration->meta, 'provider_sync.provider', $webinar->providerKey())) }}
+                                                    </div>
+
+                                                    <form method="POST" action="{{ route('crm.webinar-registrations.finalization.reconcile', $reconciliationRegistration) }}" class="grid gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 sm:grid-cols-2">
+                                                        @csrf
+                                                        <input type="hidden" name="decision" value="provider_exists">
+
+                                                        <label class="grid gap-1 font-semibold text-emerald-950">
+                                                            Provider registrant ID
+                                                            <input
+                                                                type="text"
+                                                                name="provider_registrant_id"
+                                                                maxlength="255"
+                                                                required
+                                                                class="rounded-md border border-emerald-300 bg-white px-2.5 py-2 text-xs text-slate-900"
+                                                            >
+                                                        </label>
+
+                                                        <label class="grid gap-1 font-semibold text-emerald-950">
+                                                            Provider join URL
+                                                            <input
+                                                                type="url"
+                                                                name="provider_join_url"
+                                                                maxlength="2048"
+                                                                required
+                                                                placeholder="https://..."
+                                                                class="rounded-md border border-emerald-300 bg-white px-2.5 py-2 text-xs text-slate-900"
+                                                            >
+                                                        </label>
+
+                                                        <label class="grid gap-1 font-semibold text-emerald-950 sm:col-span-2">
+                                                            Verification notes — optional
+                                                            <textarea name="notes" rows="2" maxlength="2000" class="rounded-md border border-emerald-300 bg-white px-2.5 py-2 text-xs text-slate-900"></textarea>
+                                                        </label>
+
+                                                        <div class="sm:col-span-2">
+                                                            <button type="submit" class="rounded-md bg-emerald-700 px-2.5 py-1.5 font-semibold text-white hover:bg-emerald-600">
+                                                                Confirm provider registration exists
+                                                            </button>
+                                                        </div>
+                                                    </form>
+
+                                                    <form method="POST" action="{{ route('crm.webinar-registrations.finalization.reconcile', $reconciliationRegistration) }}" class="grid gap-2 rounded-md border border-amber-300 bg-amber-100 p-3">
+                                                        @csrf
+                                                        <input type="hidden" name="decision" value="provider_absent">
+
+                                                        <label class="grid gap-1 font-semibold text-amber-950">
+                                                            Verification notes — optional
+                                                            <textarea name="notes" rows="2" maxlength="2000" class="rounded-md border border-amber-400 bg-white px-2.5 py-2 text-xs text-slate-900"></textarea>
+                                                        </label>
+
+                                                        <div>
+                                                            <button type="submit" class="rounded-md bg-amber-800 px-2.5 py-1.5 font-semibold text-white hover:bg-amber-700">
+                                                                Confirm absent and authorize one resubmission
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
 
                                     @if($providerCancellationFailures->isNotEmpty())
                                         <div class="mt-3 space-y-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900">

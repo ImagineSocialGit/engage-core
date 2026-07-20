@@ -39,6 +39,7 @@ class WebinarController extends Controller
             ->get();
 
         $showArchived = $request->boolean('archived');
+        $showAttention = $request->boolean('attention');
 
         $query = Webinar::query()
             ->with([
@@ -49,12 +50,29 @@ class WebinarController extends Controller
                     ->latest('id'),
             ]);
 
-        if (! $showArchived) {
+        if ($showAttention) {
+            $query->whereHas('registrations', fn ($query) => $query
+                ->where(function ($query): void {
+                    $query
+                        ->whereIn('meta->registration_finalization->status', [
+                            'failed',
+                            'reconciliation_required',
+                        ])
+                        ->orWhere(
+                            'meta->provider_sync->status',
+                            'reconciliation_required',
+                        );
+                }));
+        } elseif (! $showArchived) {
             $query->where('ends_at', '>', now());
         }
 
         $webinars = $query
-            ->orderBy('starts_at')
+            ->when(
+                $showAttention,
+                fn ($query) => $query->orderByDesc('starts_at'),
+                fn ($query) => $query->orderBy('starts_at'),
+            )
             ->limit(50)
             ->get();
 
@@ -65,6 +83,7 @@ class WebinarController extends Controller
             'series' => $series,
             'scheduleProfiles' => $scheduleProfiles,
             'showArchived' => $showArchived,
+            'showAttention' => $showAttention,
             'webinarDevEnabled' => $this->devTestingAllowed(),
             'webinarSmokeEnabled' => $this->devTestingAllowed(),
         ]);
@@ -182,5 +201,3 @@ class WebinarController extends Controller
         return app()->environment(['local', 'staging']);
     }
 }
-
-

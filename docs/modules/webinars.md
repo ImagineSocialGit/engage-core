@@ -200,6 +200,31 @@ The recovery scheduler may requeue only locally recoverable finalization work. I
 requeue terminal failures or reconciliation-required provider outcomes. Operator visibility
 and manual reconciliation controls are separate CRM recovery behavior.
 
+### Operator finalization recovery
+
+The CRM Webinar index has a dedicated registration-recovery view. It includes upcoming or
+ended webinars whenever a registration remains `failed` or `reconciliation_required` and
+shows recovery controls only for those unresolved registrations. Successful registrations
+must not expose retry or reconciliation actions.
+
+A terminal `failed` finalization may be retried by an authenticated operator only when no
+ambiguous provider submission remains. The retry records operator identity and prior failure
+reason, resets locally safe provider failure state, and returns through the same durable queue
+handoff used by initial registration.
+
+A `reconciliation_required` registration must be checked directly in the provider before any
+new submission is authorized. The operator records exactly one of two outcomes:
+
+- **Provider registration exists:** record the provider registrant identifier and join URL,
+  mark provider synchronization successful, and queue finalization to plan confirmations
+  without another provider POST.
+- **Provider registration is absent:** record the verification outcome, clear stale local
+  provider data, authorize one safe resubmission, and queue finalization.
+
+Both outcomes preserve operator identity, timestamp, optional notes, and the prior ambiguity
+reason under finalization/provider-sync reconciliation metadata. Reapplying reconciliation
+after the registration leaves the reconciliation-required state must be rejected idempotently.
+
 ## Public registration presentation and config ownership
 
 The public Webinar registration experience is configuration-driven and may differ substantially between clients.

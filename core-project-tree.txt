@@ -730,6 +730,8 @@
 │   │   │   │   ├── ResolveRegisterableWebinarAction.php
 │   │   │   │   ├── ResolveWebinarJoinUrlAction.php
 │   │   │   │   ├── ResolveWebinarPlaybackUrlAction.php
+│   │   │   │   ├── ResolveWebinarRegistrationReconciliationAction.php
+│   │   │   │   ├── RetryWebinarRegistrationFinalizationAction.php
 │   │   │   │   ├── SyncWebinarRegistrationToProviderAction.php
 │   │   │   │   ├── SyncWebinarScheduleProfilesAction.php
 │   │   │   │   └── SyncWebinarSeriesFromProviderAction.php
@@ -750,6 +752,7 @@
 │   │   │   │   │   ├── WebinarDevController.php
 │   │   │   │   │   ├── WebinarMessageTemplateController.php
 │   │   │   │   │   ├── WebinarProviderCancellationController.php
+│   │   │   │   │   ├── WebinarRegistrationFinalizationController.php
 │   │   │   │   │   └── WebinarRegistrationFollowUpController.php
 │   │   │   │   ├── Public
 │   │   │   │   │   ├── WebinarJoinRedirectController.php
@@ -800,6 +803,7 @@
 │   │   │   ├── Providers
 │   │   │   │   └── WebinarsModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   │   ├── ResolveWebinarRegistrationReconciliationRequest.php
 │   │   │   │   ├── StoreWebinarRegistrationRequest.php
 │   │   │   │   ├── StoreWebinarSeriesRequest.php
 │   │   │   │   ├── StoreWebinarWaitlistSignupRequest.php
@@ -1682,6 +1686,7 @@
 │   │   │   ├── WebinarRegistrationFrontendContractTest.php
 │   │   │   ├── WebinarRegistrationMessageConsolidationTest.php
 │   │   │   ├── WebinarRegistrationOccurrenceResolutionTest.php
+│   │   │   ├── WebinarRegistrationOperatorRecoveryTest.php
 │   │   │   ├── WebinarRegistrationProviderSyncTest.php
 │   │   │   ├── WebinarResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── WebinarScheduleProfileDefinitionResolverMessageAreaTest.php
@@ -1701,4 +1706,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-490 directories, 1212 files
+490 directories, 1217 files

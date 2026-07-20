@@ -18,8 +18,9 @@ class DashboardPanelRegistry
         $registered = collect(app()->tagged(self::TAG))
             ->filter(fn (mixed $provider): bool => $provider instanceof DashboardPanelProvider)
             ->mapWithKeys(fn (DashboardPanelProvider $provider): array => [$provider->key() => $provider]);
+        $slots = $this->dashboardSlots();
 
-        return collect($this->dashboardSlots())
+        $resolved = collect($slots)
             ->mapWithKeys(function (array $slotConfig, string $slot) use ($registered, $request): array {
                 $configuredKeys = collect((array) ($slotConfig['panels'] ?? []))
                     ->map(fn (mixed $key): string => (string) $key)
@@ -43,20 +44,12 @@ class DashboardPanelRegistry
                         order: $configuredKeys->search($provider->key(), true),
                     ))
                     ->filter()
-                    ->sort(function (array $a, array $b): int {
-                        $priority = ((int) ($b['priority'] ?? 0)) <=> ((int) ($a['priority'] ?? 0));
-
-                        if ($priority !== 0) {
-                            return $priority;
-                        }
-
-                        return ((int) ($a['order'] ?? 999)) <=> ((int) ($b['order'] ?? 999));
-                    })
-                    ->take($max)
                     ->values();
 
                 return [$slot => $panels];
             });
+
+        return $this->placePanelsInRequestedSlots($resolved, $slots);
     }
 
     public static function providerTag(): string
@@ -150,12 +143,6 @@ class DashboardPanelRegistry
         $panel['target_ref'] ??= str_replace(['.', '-'], '_', $provider->key()).'Panel';
         $panel['order'] = is_int($order) ? $order : ((int) ($panel['order'] ?? 999));
 
-        $priorityOverrides = $slotConfig['priorities'] ?? [];
-
-        if (is_array($priorityOverrides) && array_key_exists($provider->key(), $priorityOverrides)) {
-            $panel['priority'] = (int) $priorityOverrides[$provider->key()];
-        }
-
         $count = (int) ($panel['count'] ?? 0);
         $hideWhenEmpty = (bool) ($panel['hide_when_empty'] ?? $slotConfig['hide_when_empty'] ?? false);
         $items = $panel['items'] ?? [];
@@ -169,4 +156,65 @@ class DashboardPanelRegistry
 
         return $panel;
     }
+    /**
+     * @param Collection<string, Collection<int, array<string, mixed>>> $resolved
+     * @param array<string, array<string, mixed>> $slots
+     * @return Collection<string, Collection<int, array<string, mixed>>>
+     */
+    private function placePanelsInRequestedSlots(
+        Collection $resolved,
+        array $slots,
+    ): Collection {
+        $placed = collect($slots)
+            ->mapWithKeys(fn (array $config, string $slot): array => [$slot => collect()]);
+
+        foreach ($resolved as $sourceSlot => $panels) {
+            foreach ($panels as $panel) {
+                $requestedSlot = is_string($panel['slot'] ?? null)
+                    ? $panel['slot']
+                    : $sourceSlot;
+                $targetSlot = array_key_exists($requestedSlot, $slots)
+                    ? $requestedSlot
+                    : $sourceSlot;
+
+                $placed->get($targetSlot)?->push($panel);
+            }
+        }
+
+        return $placed->map(function (Collection $panels, string $slot) use ($slots): Collection {
+            $slotConfig = $slots[$slot] ?? [];
+            $priorityOverrides = is_array($slotConfig['priorities'] ?? null)
+                ? $slotConfig['priorities']
+                : [];
+            $max = max(0, (int) ($slotConfig['max'] ?? 99));
+
+            if ($max === 0) {
+                return collect();
+            }
+
+            return $panels
+                ->map(function (array $panel) use ($priorityOverrides): array {
+                    $key = $panel['key'] ?? null;
+
+                    if (is_string($key) && array_key_exists($key, $priorityOverrides)) {
+                        $panel['priority'] = (int) $priorityOverrides[$key];
+                    }
+
+                    return $panel;
+                })
+                ->sort(function (array $a, array $b): int {
+                    $priority = ((int) ($b['priority'] ?? 0)) <=> ((int) ($a['priority'] ?? 0));
+
+                    if ($priority !== 0) {
+                        return $priority;
+                    }
+
+                    return ((int) ($a['order'] ?? 999)) <=> ((int) ($b['order'] ?? 999));
+                })
+                ->unique(fn (array $panel): string => (string) ($panel['key'] ?? ''))
+                ->take($max)
+                ->values();
+        });
+    }
+
 }

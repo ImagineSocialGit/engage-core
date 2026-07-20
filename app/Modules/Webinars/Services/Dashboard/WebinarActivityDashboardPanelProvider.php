@@ -27,45 +27,148 @@ class WebinarActivityDashboardPanelProvider implements DashboardPanelProvider
      */
     public function panel(Request $request): array
     {
-        $acknowledgedIds = $this->acknowledgedItemKeys($request, DashboardAcknowledgement::TYPE_WEBINAR_REGISTRATION);
+        $acknowledgedIds = $this->acknowledgedItemKeys(
+            $request,
+            DashboardAcknowledgement::TYPE_WEBINAR_REGISTRATION,
+        );
 
-        $baseQuery = WebinarRegistration::query()
+        $attentionQuery = WebinarRegistration::query()
             ->with(['contact', 'webinar.webinarSeries'])
-            ->where('registered_at', '>=', now()->subDays(7))
-            ->when($acknowledgedIds !== [], fn (Builder $query) => $query->whereNotIn('id', $acknowledgedIds));
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereIn('meta->registration_finalization->status', [
+                        'failed',
+                        'reconciliation_required',
+                    ])
+                    ->orWhere(
+                        'meta->provider_sync->status',
+                        'reconciliation_required',
+                    );
+            });
 
-        $recentCount = (clone $baseQuery)->count();
-
-        $registrations = (clone $baseQuery)
-            ->latest('registered_at')
+        $attentionCount = (clone $attentionQuery)->count();
+        $attentionRegistrations = (clone $attentionQuery)
+            ->latest('updated_at')
             ->latest('id')
             ->limit(8)
             ->get();
 
+        $recentQuery = WebinarRegistration::query()
+            ->with(['contact', 'webinar.webinarSeries'])
+            ->where('registered_at', '>=', now()->subDays(7))
+            ->where(function (Builder $query): void {
+                $query
+                    ->where(function (Builder $query): void {
+                        $query
+                            ->whereNull('meta->registration_finalization->status')
+                            ->orWhereNotIn('meta->registration_finalization->status', [
+                                'failed',
+                                'reconciliation_required',
+                            ]);
+                    })
+                    ->where(function (Builder $query): void {
+                        $query
+                            ->whereNull('meta->provider_sync->status')
+                            ->orWhere(
+                                'meta->provider_sync->status',
+                                '!=',
+                                'reconciliation_required',
+                            );
+                    });
+            })
+            ->when($acknowledgedIds !== [], fn (Builder $query) => $query->whereNotIn('id', $acknowledgedIds));
+
+        $recentCount = (clone $recentQuery)->count();
+        $recentRegistrations = (clone $recentQuery)
+            ->latest('registered_at')
+            ->latest('id')
+            ->limit(max(0, 8 - $attentionRegistrations->count()))
+            ->get();
+
+        $items = $attentionRegistrations
+            ->map(fn (WebinarRegistration $registration): array => $this->recoveryItem($registration))
+            ->concat($recentRegistrations->map(
+                fn (WebinarRegistration $registration): array => $this->webinarRegistrationItem($registration),
+            ))
+            ->values();
+
         return [
             'key' => $this->key(),
             'module' => $this->module(),
-            'slot' => 'context',
-            'priority' => 50,
+            'slot' => $attentionCount > 0 ? 'immediate_work' : 'context',
+            'priority' => $attentionCount > 0 ? 140 : 50,
             'order' => 10,
             'view' => 'webinar_activity',
-            'title' => 'Webinar activity',
-            'description' => 'Supporting context for recent registrations. This is not the main daily triage list.',
+            'title' => $attentionCount > 0
+                ? 'Webinar registration recovery'
+                : 'Webinar activity',
+            'description' => $attentionCount > 0
+                ? 'Registration finalization failures require operator review before confirmations can continue.'
+                : 'Supporting context for recent registrations. This is not the main daily triage list.',
             'empty_title' => 'No new webinar activity to review.',
             'empty_description' => 'Recent signups will appear here as context beneath the main work panels.',
-            'summary_label' => 'webinar updates',
-            'count' => $recentCount,
-            'attention_count' => 0,
+            'summary_label' => $attentionCount > 0
+                ? 'webinar registration failures'
+                : 'webinar updates',
+            'count' => $attentionCount + $recentCount,
+            'attention_count' => $attentionCount,
             'hide_when_empty' => true,
-            'items' => $registrations
-                ->map(fn (WebinarRegistration $registration): array => $this->webinarRegistrationItem($registration))
-                ->values(),
-            'actions' => module_enabled('webinars') ? [
+            'items' => $items,
+            'actions' => module_enabled('webinars') ? array_values(array_filter([
+                $attentionCount > 0 ? [
+                    'label' => 'Resolve registration failures',
+                    'href' => route('crm.webinar-series.index', ['attention' => 1]),
+                ] : null,
                 [
                     'label' => 'View webinars',
                     'href' => route('crm.webinar-series.index'),
                 ],
-            ] : [],
+            ])) : [],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function recoveryItem(WebinarRegistration $registration): array
+    {
+        $contact = $registration->contact;
+        $webinar = $registration->webinar;
+        $contactName = $contact
+            ? $this->contactName($contact)
+            : 'Registration #'.$registration->getKey();
+        $status = data_get(
+            $registration->meta,
+            'provider_sync.status',
+        ) === 'reconciliation_required'
+            ? 'reconciliation_required'
+            : (string) data_get(
+                $registration->meta,
+                'registration_finalization.status',
+                'failed',
+            );
+        $reason = (string) data_get(
+            $registration->meta,
+            'registration_finalization.failure_reason',
+            'unknown_failure',
+        );
+
+        return [
+            'key' => (string) $registration->id,
+            'type' => 'webinar_registration_finalization',
+            'sort_at' => $registration->updated_at,
+            'label' => $status === 'reconciliation_required'
+                ? 'Provider verification required'
+                : 'Finalization failed',
+            'tone' => 'amber',
+            'title' => $contactName.' needs registration recovery',
+            'subtitle' => trim(implode(' · ', array_filter([
+                $webinar?->title,
+                Str::headline($status),
+            ]))),
+            'description' => Str::headline($reason),
+            'href' => route('crm.webinar-series.index', ['attention' => 1]),
+            'action_label' => 'Review recovery',
         ];
     }
 
