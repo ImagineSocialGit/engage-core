@@ -44,7 +44,9 @@ Route::middleware('module:webinars')->group(function () {
         ->middleware(['signed:relative', 'throttle:webinar-registration'])
         ->name('webinar.registration.store');
 
-    Route::get('/{seriesSlug}/thank-you', [WebinarRegistrationController::class, 'showThankYou'])
+    Route::get('/{seriesSlug}/thank-you/{registration}', [WebinarRegistrationController::class, 'showThankYou'])
+        ->middleware('signed:relative')
+        ->whereNumber('registration')
         ->name('webinar.thank-you');
 });
 

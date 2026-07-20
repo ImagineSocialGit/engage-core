@@ -160,6 +160,26 @@ CRM Webinar history exposes failed planning outcomes and provides an idempotent 
 retry for one registration. Webinar-ended automation remains independent and is emitted
 once even when follow-up planning still needs a retry.
 
+## Truthful public registration completion
+
+The public thank-you URL is temporary-signed and identifies the exact
+`WebinarRegistration` created or resolved by the submission. It must verify that the
+registration belongs to the requested WebinarSeries and must render the registered
+Webinar occurrence rather than resolving the series' current next Webinar.
+
+Public completion language is derived from durable registration-finalization state:
+
+- `processing` means the local registration is saved but initial provider/message work is not complete.
+- `confirmed` means initial registration finalization completed or a compatible legacy registration is already registered/attended.
+- `delayed` means initial finalization failed or requires provider reconciliation; the attendee is told not to submit again.
+- `cancelled` means the registration is no longer active.
+
+Internal failure reasons, provider diagnostics, and reconciliation details are never
+rendered publicly. Consent-acknowledgement-only work must not downgrade an initial
+registration that was already completed. Processing pages may refresh the same signed
+URL until durable state changes, but they must not claim provider confirmation or
+message delivery before finalization completes.
+
 ## Registration finalization durability
 
 A successful public submission commits the local WebinarRegistration, consent transitions,

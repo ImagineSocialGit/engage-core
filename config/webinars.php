@@ -79,6 +79,11 @@ return [
             'interaction_value' => 'human',
         ],
 
+        'thank_you' => [
+            'link_expiration_minutes' => 10080,
+            'refresh_seconds' => 5,
+        ],
+
         /*
         | Registration finalization is staged in WebinarRegistration.meta before
         | any provider or Messaging work begins. The scheduled recovery pass can

@@ -730,6 +730,7 @@
 │   │   │   │   ├── ResolveRegisterableWebinarAction.php
 │   │   │   │   ├── ResolveWebinarJoinUrlAction.php
 │   │   │   │   ├── ResolveWebinarPlaybackUrlAction.php
+│   │   │   │   ├── ResolveWebinarRegistrationPublicStatusAction.php
 │   │   │   │   ├── ResolveWebinarRegistrationReconciliationAction.php
 │   │   │   │   ├── RetryWebinarRegistrationFinalizationAction.php
 │   │   │   │   ├── SyncWebinarRegistrationToProviderAction.php
@@ -825,7 +826,8 @@
 │   │   │   │   ├── WebinarJoinLinkGenerator.php
 │   │   │   │   ├── WebinarPlaybackLinkGenerator.php
 │   │   │   │   ├── WebinarRegisterPageConfig.php
-│   │   │   │   └── WebinarRegistrationCancelLinkGenerator.php
+│   │   │   │   ├── WebinarRegistrationCancelLinkGenerator.php
+│   │   │   │   └── WebinarRegistrationThankYouLinkGenerator.php
 │   │   │   ├── TokenContracts
 │   │   │   │   ├── WebinarMessageTokenValueProvider.php
 │   │   │   │   ├── WebinarTokenContextProvider.php
@@ -1688,6 +1690,7 @@
 │   │   │   ├── WebinarRegistrationOccurrenceResolutionTest.php
 │   │   │   ├── WebinarRegistrationOperatorRecoveryTest.php
 │   │   │   ├── WebinarRegistrationProviderSyncTest.php
+│   │   │   ├── WebinarRegistrationThankYouTest.php
 │   │   │   ├── WebinarResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── WebinarScheduleProfileDefinitionResolverMessageAreaTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
@@ -1706,4 +1709,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-490 directories, 1217 files
+490 directories, 1220 files

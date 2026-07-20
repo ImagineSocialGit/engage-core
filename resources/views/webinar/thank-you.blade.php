@@ -1,14 +1,4 @@
 @php
-    $style = array_replace_recursive(
-        config('webinars.style', []),
-        config('webinars.thank-you.style', []),
-    );
-
-    $page = array_replace_recursive(
-        config('webinars.content', []),
-        config('webinars.thank-you.content', []),
-    );
-
     $eventDetailsItems = collect($page['event_details']['items'] ?? [])->map(function (array $item) use ($webinar) {
         $key = $item['key'] ?? null;
 
@@ -26,10 +16,13 @@
 @endphp
 
 <x-layouts.public
-    :title="$page['title'] ?? 'You’re Registered'"
+    :title="$page['meta_title'] ?? 'Webinar Registration'"
     :meta-description="$page['meta_description'] ?? null"
 >
-    <section class="{{ $style['section'] ?? 'bg-white text-ink' }}">
+    <section
+        class="{{ $style['section'] ?? 'bg-white text-ink' }}"
+        data-registration-status="{{ $registrationStatus }}"
+    >
         @if($page['hero']['enabled'] ?? false)
             <div class="{{ $style['hero']['section'] ?? '' }}">
                 <div class="{{ $style['hero']['inner'] ?? '' }}">
@@ -46,7 +39,7 @@
                     @endif
 
                     @if(filled($page['hero']['body'] ?? null))
-                        <p class="{{ $style['hero']['body'] ?? '' }}">  
+                        <p class="{{ $style['hero']['body'] ?? '' }}">
                             {{ $page['hero']['body'] }}
                         </p>
                     @endif
@@ -121,4 +114,10 @@
             </div>
         @endif
     </section>
+
+    @if(is_int($refreshSeconds))
+        <script>
+            window.setTimeout(() => window.location.reload(), {{ $refreshSeconds * 1000 }});
+        </script>
+    @endif
 </x-layouts.public>

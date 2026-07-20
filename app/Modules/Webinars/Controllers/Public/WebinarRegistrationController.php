@@ -7,9 +7,15 @@ use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Webinars\Actions\CreateWebinarRegistrationAction;
 use App\Modules\Webinars\Actions\GetActiveWebinarSeriesAction;
 use App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction;
+use App\Modules\Webinars\Actions\ResolveWebinarRegistrationPublicStatusAction;
+use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use App\Modules\Webinars\Requests\StoreWebinarRegistrationRequest;
+use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
+use App\Modules\Webinars\Support\WebinarRegistrationThankYouLinkGenerator;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
+use Illuminate\View\View;
 
 class WebinarRegistrationController extends Controller
 {
@@ -86,7 +92,7 @@ class WebinarRegistrationController extends Controller
 
         $webinar = $getNextUpcomingWebinarAction->getForSeries($series);
 
-        $config = app(\App\Modules\Webinars\Support\WebinarRegisterPageConfig::class);
+        $config = app(WebinarRegisterPageConfig::class);
         $channelAvailability = app(MessageChannelAvailability::class);
 
         if (! $webinar) {
@@ -130,7 +136,8 @@ class WebinarRegistrationController extends Controller
         string $seriesSlug,
         CreateWebinarRegistrationAction $createWebinarRegistrationAction,
         GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
-    ) {
+        WebinarRegistrationThankYouLinkGenerator $thankYouLinks,
+    ): RedirectResponse {
         $series = $getActiveWebinarSeriesAction->findBySlug($seriesSlug);
 
         abort_unless($series, 404);
@@ -143,29 +150,69 @@ class WebinarRegistrationController extends Controller
             ]);
         }
 
-        $createWebinarRegistrationAction->handle(
+        $result = $createWebinarRegistrationAction->handle(
             $request->validated(),
             $request,
             $webinar,
         );
 
-        return redirect()->route('webinar.thank-you', $seriesSlug);
+        return redirect()->to(
+            $thankYouLinks->forRegistration($result->registration),
+        );
     }
 
     public function showThankYou(
         string $seriesSlug,
+        WebinarRegistration $registration,
         GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
-        GetNextUpcomingWebinarAction $getNextUpcomingWebinarAction
-    ) {
+        ResolveWebinarRegistrationPublicStatusAction $resolvePublicStatus,
+        WebinarRegisterPageConfig $config,
+    ): View {
         $series = $getActiveWebinarSeriesAction->findBySlug($seriesSlug);
 
         abort_unless($series, 404);
 
-        $webinar = $getNextUpcomingWebinarAction->getForSeries($series);
+        $registration->loadMissing('webinar.webinarSeries');
+        $webinar = $registration->webinar;
+
+        abort_unless(
+            $webinar
+            && (int) $webinar->webinar_series_id === (int) $series->getKey(),
+            404,
+        );
+
+        $registrationStatus = $resolvePublicStatus->handle($registration);
+        $page = $config->content(
+            'thank-you',
+            $series->slug,
+            $series->meta ?? [],
+        );
+        $stateContent = data_get($page, "states.{$registrationStatus}", []);
+        unset($page['states']);
+
+        if (is_array($stateContent)) {
+            $page = array_replace_recursive($page, $stateContent);
+        }
+
+        $refreshSeconds = $registrationStatus
+            === ResolveWebinarRegistrationPublicStatusAction::STATUS_PROCESSING
+                ? max(
+                    3,
+                    (int) config(
+                        'webinars.registration.thank_you.refresh_seconds',
+                        5,
+                    ),
+                )
+                : null;
 
         return view('webinar.thank-you', [
             'series' => $series,
             'webinar' => $webinar,
+            'registration' => $registration,
+            'registrationStatus' => $registrationStatus,
+            'refreshSeconds' => $refreshSeconds,
+            'page' => $page,
+            'style' => $config->style('thank-you', $series->slug),
         ]);
     }
 }

@@ -9,9 +9,11 @@ use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Support\Caching\CacheKey;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class WebinarRegistrationControllerTest extends TestCase
@@ -453,7 +455,7 @@ class WebinarRegistrationControllerTest extends TestCase
                 'marketing_sms_consent' => false,
             ]);
 
-        $response->assertRedirect(route('webinar.thank-you', $series->slug));
+        $this->assertRegistrationThankYouRedirect($response, $series);
         $response->assertSessionDoesntHaveErrors('email');
         $this->assertDatabaseCount('webinar_registrations', 1);
     }
@@ -557,10 +559,12 @@ class WebinarRegistrationControllerTest extends TestCase
             'external_id' => null,
         ]);
 
-        $this->post(
+        $firstResponse = $this->post(
             $this->registrationUrl($series, $webinar),
             $this->registrationPayload(['email' => 'first@example.com']),
-        )->assertRedirect(route('webinar.thank-you', $series->slug));
+        );
+
+        $this->assertRegistrationThankYouRedirect($firstResponse, $series);
 
         $response = $this->from(route('webinar.show', $series->slug))->post(
             $this->registrationUrl($series, $webinar),
@@ -655,6 +659,36 @@ class WebinarRegistrationControllerTest extends TestCase
         $this->assertStringContainsString('value="+15555550123"', $html);
         $this->assertStringContainsString('name="transactional_email_consent"', $html);
         $this->assertStringNotContainsString('name="transactional_email_consent" type="checkbox" value="1" checked', $html);
+    }
+
+    private function assertRegistrationThankYouRedirect(
+        TestResponse $response,
+        WebinarSeries $series,
+    ): void {
+        $response->assertRedirect();
+
+        $location = (string) $response->headers->get('Location');
+        $path = parse_url($location, PHP_URL_PATH);
+        $expectedHost = parse_url(
+            route('webinar.show', ['seriesSlug' => $series->slug]),
+            PHP_URL_HOST,
+        );
+        $actualHost = parse_url($location, PHP_URL_HOST);
+
+        $this->assertIsString($path);
+        $this->assertStringContainsString(
+            "/{$series->slug}/thank-you/",
+            $path,
+        );
+        $this->assertIsString($expectedHost);
+        $this->assertSame($expectedHost, $actualHost);
+        $this->assertTrue(
+            URL::hasValidSignature(
+                Request::create($location, 'GET'),
+                absolute: false,
+            ),
+            'The registration thank-you redirect must contain a valid relative signature.',
+        );
     }
 
     /**
