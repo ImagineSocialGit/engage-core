@@ -41,7 +41,7 @@ return [
 
     'queues' => [
 
-        'registrations' => env('WEBINAR_REGISTRATION_QUEUE', 'webinars'),
+        'registration' => env('WEBINAR_REGISTRATION_QUEUE', 'webinars'),
 
         'webhooks' => env('WEBINAR_WEBHOOK_QUEUE', 'webhooks'),
 
@@ -59,17 +59,22 @@ return [
 
         'require_unique_email_per_webinar' => true,
 
-        'cooldowns' => [
-            'per_email_minutes' => 15,
-            'per_phone_minutes' => 15,
-            'per_ip_minutes' => 15,
+        'rate_limits' => [
+            'per_ip_per_minute' => 10,
+            'per_ip_per_hour' => 100,
+            'per_email_per_hour' => 6,
+            'per_phone_per_hour' => 6,
         ],
 
-        'rate_limits' => [
-
-            'per_ip_per_minute' => 400,
-
-            'per_email_per_hour' => 500,
+        /*
+        | This is intentionally lightweight friction rather than CAPTCHA. The
+        | server still treats the honeypot and JavaScript proofs as advisory
+        | layers behind CSRF, signed URLs, validation, and rate limiting.
+        */
+        'bot_protection' => [
+            'enabled' => true,
+            'ready_value' => 'ready',
+            'interaction_value' => 'human',
         ],
     ],
 

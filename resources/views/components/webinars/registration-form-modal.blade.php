@@ -1,3 +1,4 @@
+
 @props([
     'page',
     'tokens',
@@ -46,6 +47,15 @@
         $marketingSmsAvailable ? 'marketingSmsConsent' : null,
     ]));
     $smsConsentRequirement = implode(' || ', $smsConsentModels);
+
+    $botReadyValue = (string) config(
+        'webinars.registration.bot_protection.ready_value',
+        'ready',
+    );
+    $botInteractionValue = (string) config(
+        'webinars.registration.bot_protection.interaction_value',
+        'human',
+    );
 
     $legalLinks = collect($page['legal_links']['links'] ?? [])
         ->filter(function (mixed $link): bool {
@@ -132,8 +142,77 @@
                     absolute: false,
                 ) }}"
                 class="{{ $tokens['form_grid'] ?? 'space-y-4' }}"
+                x-data="{
+                    transactionalEmailConsent: @js((bool) old('transactional_email_consent')),
+                    transactionalSmsConsent: @js((bool) old('transactional_sms_consent')),
+                    marketingSmsConsent: @js((bool) old('marketing_sms_consent')),
+                    registrationFormReady: '',
+                    registrationFormInteracted: '',
+                    transactionalConsentError: false,
+                    submitting: false,
+                    submitRegistration(event) {
+                        if (! this.transactionalEmailConsent && ! this.transactionalSmsConsent) {
+                            event.preventDefault()
+                            this.transactionalConsentError = true
+                            this.$nextTick(() => this.$refs.transactionalConsentGroup?.focus())
+
+                            return
+                        }
+
+                        if (! this.registrationFormReady || ! this.registrationFormInteracted) {
+                            event.preventDefault()
+
+                            return
+                        }
+
+                        this.submitting = true
+                    },
+                }"
+                x-init="window.setTimeout(() => registrationFormReady = @js($botReadyValue), 750)"
+                @focusin="registrationFormInteracted = @js($botInteractionValue)"
+                @input="registrationFormInteracted = @js($botInteractionValue)"
+                @change="registrationFormInteracted = @js($botInteractionValue); transactionalConsentError = false"
+                @keydown="registrationFormInteracted = @js($botInteractionValue)"
+                @pointerdown="registrationFormInteracted = @js($botInteractionValue)"
+                @submit="submitRegistration($event)"
             >
                 @csrf
+
+                <input
+                    type="hidden"
+                    name="registration_form_ready"
+                    x-model="registrationFormReady"
+                >
+
+                <input
+                    type="hidden"
+                    name="registration_form_interacted"
+                    x-model="registrationFormInteracted"
+                >
+
+                <div
+                    aria-hidden="true"
+                    class="pointer-events-none absolute -left-[10000px] top-auto h-px w-px overflow-hidden"
+                >
+                    <label for="company_website">Company website</label>
+                    <input
+                        id="company_website"
+                        name="company_website"
+                        type="text"
+                        value=""
+                        tabindex="-1"
+                        autocomplete="off"
+                    >
+                </div>
+
+                @error('registration_form')
+                    <div
+                        role="alert"
+                        class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+                    >
+                        {{ $message }}
+                    </div>
+                @enderror
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
                         <x-ui.form.label for="first_name">
@@ -144,6 +223,9 @@
                             id="first_name"
                             name="first_name"
                             required
+                            autocomplete="given-name"
+                            maxlength="100"
+                            :aria-invalid="$errors->has('first_name') ? 'true' : 'false'"
                             :value="old('first_name', $registrationPrefill['first_name'] ?? null)"
                             :placeholder="$page['fields']['first_name']['placeholder'] ?? 'First name'"
                         />
@@ -163,6 +245,9 @@
                         <x-ui.form.input
                             id="last_name"
                             name="last_name"
+                            autocomplete="family-name"
+                            maxlength="100"
+                            :aria-invalid="$errors->has('last_name') ? 'true' : 'false'"
                             :value="old('last_name', $registrationPrefill['last_name'] ?? null)"
                             :placeholder="$page['fields']['last_name']['placeholder'] ?? 'Last name'"
                         />
@@ -186,6 +271,10 @@
                             name="email"
                             type="email"
                             required
+                            inputmode="email"
+                            autocomplete="email"
+                            maxlength="255"
+                            :aria-invalid="$errors->has('email') ? 'true' : 'false'"
                             :value="old('email', $registrationPrefill['email'] ?? null)"
                             :placeholder="$page['fields']['email']['placeholder'] ?? 'Email address'"
                         />
@@ -208,7 +297,12 @@
                                 name="phone"
                                 type="tel"
                                 inputmode="tel"
-                                autocomplete="tel"
+                                autocomplete="tel-national"
+                                x-mask="(999) 999-9999"
+                                pattern="\(\d{3}\) \d{3}-\d{4}"
+                                maxlength="14"
+                                title="Enter a 10-digit phone number, including the area code."
+                                :aria-invalid="$errors->has('phone') ? 'true' : 'false'"
                                 aria-describedby="phone_sms_helper"
                                 x-bind:required="{{ $smsConsentRequirement }}"
                                 x-bind:aria-required="({{ $smsConsentRequirement }}) ? 'true' : 'false'"
@@ -221,7 +315,12 @@
                                 name="phone"
                                 type="tel"
                                 inputmode="tel"
-                                autocomplete="tel"
+                                autocomplete="tel-national"
+                                x-mask="(999) 999-9999"
+                                pattern="\(\d{3}\) \d{3}-\d{4}"
+                                maxlength="14"
+                                title="Enter a 10-digit phone number, including the area code."
+                                :aria-invalid="$errors->has('phone') ? 'true' : 'false'"
                                 :value="old('phone', $registrationPrefill['phone'] ?? null)"
                                 :placeholder="$page['fields']['phone']['placeholder'] ?? 'Phone number'"
                             />
@@ -252,7 +351,11 @@
                 @endif
 
                 @if($transactionalConsentAvailable)
-                    <fieldset class="mx-2 rounded-2xl bg-slate-50 pt-2 pb-4 px-4 border border-slate-300">
+                    <fieldset
+                        x-ref="transactionalConsentGroup"
+                        tabindex="-1"
+                        class="mx-2 rounded-2xl bg-slate-50 pt-2 pb-4 px-4 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    >
                     <legend class="text-base font-semibold text-slate-900">
                         {{ $notificationSection['title'] ?? 'Webinar Registration (Required)' }}
                     </legend>
@@ -275,6 +378,7 @@
                                         name="transactional_email_consent"
                                         type="checkbox"
                                         value="1"
+                                        x-model="transactionalEmailConsent"
                                         @checked(old('transactional_email_consent'))
                                         @if(filled($page['fields']['consent_messages']['email']['helper'] ?? null))
                                             aria-describedby="transactional_email_consent_helper"
@@ -345,6 +449,15 @@
                             </div>
                         @endif
                     </div>
+
+                    <p
+                        x-cloak
+                        x-show="transactionalConsentError"
+                        role="alert"
+                        class="{{ $tokens['field_error'] ?? 'mt-3 text-sm text-red-600' }}"
+                    >
+                        Choose email or text so we can send your webinar details.
+                    </p>
 
                     @error('transactional_consent')
                         <p class="{{ $tokens['field_error'] ?? 'mt-3 text-sm text-red-600' }}">
@@ -456,8 +569,16 @@
                     </p>
                 @endif
 
-                <x-ui.button type="submit" class="{{ $tokens['primary_button'] ?? 'w-full' }}">
-                    {{ $page['submit']['label'] ?? 'Reserve My Spot' }}
+                <x-ui.button
+                    type="submit"
+                    x-bind:disabled="submitting || ! registrationFormReady"
+                    x-bind:aria-busy="submitting ? 'true' : 'false'"
+                    class="{{ $tokens['primary_button'] ?? 'w-full' }} disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                    <span x-show="! submitting">
+                        {{ $page['submit']['label'] ?? 'Reserve My Spot' }}
+                    </span>
+                    <span x-cloak x-show="submitting">Submitting…</span>
                 </x-ui.button>
             </form>
         </x-ui.card>

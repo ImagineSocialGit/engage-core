@@ -185,6 +185,66 @@ class CreateWebinarRegistrationActionTest extends TestCase
         $this->assertSame(['email', 'sms'], $registration->meta['accepted_channels']['marketing']);
     }
 
+    public function test_existing_contact_acquisition_source_is_preserved_when_the_contact_registers(): void
+    {
+        $webinar = Webinar::factory()->create([
+            'external_id' => null,
+        ]);
+
+        $contact = Contact::factory()->create([
+            'first_name' => 'Original',
+            'last_name' => 'Contact',
+            'email' => 'jeff@example.com',
+            'phone' => null,
+            'source' => 'import',
+            'subsource' => 'legacy_system',
+        ]);
+
+        $dispatchRegistration = Mockery::mock(DispatchWebinarRegistrationMessagesAction::class);
+        $dispatchRegistration
+            ->shouldReceive('handle')
+            ->once()
+            ->withArgs(fn (
+                WebinarRegistration $registration,
+                ?array $contextKeys,
+                array $consentGrants,
+            ): bool => $registration->contact_id === $contact->getKey()
+                && $contextKeys === null
+                && count($consentGrants) === 1)
+            ->andReturn([]);
+        app()->instance(DispatchWebinarRegistrationMessagesAction::class, $dispatchRegistration);
+
+        $provider = Mockery::mock(AddRegistrantToWebinarProviderAction::class);
+        $provider->shouldReceive('handle')->never();
+        app()->instance(AddRegistrantToWebinarProviderAction::class, $provider);
+
+        $result = app(CreateWebinarRegistrationAction::class)->handle(
+            validated: [
+                'first_name' => 'Jeff',
+                'last_name' => 'Yarnall',
+                'email' => 'JEFF@example.com',
+                'phone' => '(615) 555-0123',
+                'transactional_email_consent' => true,
+            ],
+            request: $this->registrationRequest(),
+            webinar: $webinar,
+        );
+
+        $this->assertTrue($result->wasCreated());
+
+        $contact->refresh();
+
+        $this->assertSame('Jeff', $contact->first_name);
+        $this->assertSame('Yarnall', $contact->last_name);
+        $this->assertSame('+16155550123', $contact->phone);
+        $this->assertSame('import', $contact->source);
+        $this->assertSame('legacy_system', $contact->subsource);
+        $this->assertDatabaseHas('webinar_registrations', [
+            'contact_id' => $contact->getKey(),
+            'webinar_id' => $webinar->getKey(),
+        ]);
+    }
+
     public function test_existing_registration_dispatches_only_new_consent_acknowledgements_as_standalone_messages(): void
     {
         Queue::fake();

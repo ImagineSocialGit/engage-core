@@ -31,6 +31,12 @@ class WebinarRegistrationControllerTest extends TestCase
         ]);
     }
 
+    public function test_registration_queue_configuration_matches_the_runtime_job_key(): void
+    {
+        $this->assertIsString(config('webinars.queues.registration'));
+        $this->assertNull(config('webinars.queues.registrations'));
+    }
+
     public function test_show_displays_notify_me_page_when_no_upcoming_webinar_exists(): void
     {
         $series = WebinarSeries::factory()->create([
@@ -222,6 +228,9 @@ class WebinarRegistrationControllerTest extends TestCase
         ]);
 
         $response = $this->post($this->registrationUrl($series, 999999), [
+            'company_website' => '',
+            'registration_form_ready' => 'ready',
+            'registration_form_interacted' => 'human',
             'first_name' => 'Jeff',
             'last_name' => 'Yarnall',
             'email' => 'jeff@example.com',
@@ -292,6 +301,9 @@ class WebinarRegistrationControllerTest extends TestCase
 
         $response = $this->from(route('webinar.show', $series->slug))
             ->post($this->registrationUrl($series, $webinar), [
+                'company_website' => '',
+                'registration_form_ready' => 'ready',
+                'registration_form_interacted' => 'human',
                 'first_name' => 'Jeff',
                 'last_name' => 'Yarnall',
                 'email' => 'jeff@example.com',
@@ -320,6 +332,9 @@ class WebinarRegistrationControllerTest extends TestCase
 
         $response = $this->from(route('webinar.show', $series->slug))
             ->post($this->registrationUrl($series, $webinar), [
+                'company_website' => '',
+                'registration_form_ready' => 'ready',
+                'registration_form_interacted' => 'human',
                 'first_name' => 'Jeff',
                 'last_name' => 'Yarnall',
                 'email' => 'jeff@example.com',
@@ -350,6 +365,9 @@ class WebinarRegistrationControllerTest extends TestCase
 
         $response = $this->from(route('webinar.show', $series->slug))
             ->post($this->registrationUrl($series, $webinar), [
+                'company_website' => '',
+                'registration_form_ready' => 'ready',
+                'registration_form_interacted' => 'human',
                 'first_name' => 'Jeff',
                 'last_name' => 'Yarnall',
                 'email' => 'jeff@example.com',
@@ -380,6 +398,9 @@ class WebinarRegistrationControllerTest extends TestCase
 
         $response = $this->from(route('webinar.show', $series->slug))
             ->post($this->registrationUrl($series, $webinar), [
+                'company_website' => '',
+                'registration_form_ready' => 'ready',
+                'registration_form_interacted' => 'human',
                 'first_name' => 'Jeff',
                 'last_name' => 'Yarnall',
                 'email' => 'jeff@example.com',
@@ -394,7 +415,7 @@ class WebinarRegistrationControllerTest extends TestCase
         $response->assertSessionHasErrors('phone');
     }
 
-    public function test_store_fails_validation_when_email_already_registered_for_webinar(): void
+    public function test_store_treats_an_existing_registration_as_idempotent_success(): void
     {
         $series = WebinarSeries::factory()->create([
             'status' => 'active',
@@ -404,6 +425,7 @@ class WebinarRegistrationControllerTest extends TestCase
         $webinar = Webinar::factory()->create([
             'webinar_series_id' => $series->id,
             'starts_at' => now()->addDay(),
+            'external_id' => null,
         ]);
 
         $contact = Contact::factory()->create([
@@ -418,6 +440,9 @@ class WebinarRegistrationControllerTest extends TestCase
 
         $response = $this->from(route('webinar.show', $series->slug))
             ->post($this->registrationUrl($series, $webinar), [
+                'company_website' => '',
+                'registration_form_ready' => 'ready',
+                'registration_form_interacted' => 'human',
                 'first_name' => 'Jeff',
                 'last_name' => 'Yarnall',
                 'email' => 'JEFF@example.com',
@@ -428,10 +453,123 @@ class WebinarRegistrationControllerTest extends TestCase
                 'marketing_sms_consent' => false,
             ]);
 
-        $response->assertRedirect(route('webinar.show', $series->slug));
-        $response->assertSessionHasErrors([
-            'email' => 'This email has already been used to register for this webinar.',
+        $response->assertRedirect(route('webinar.thank-you', $series->slug));
+        $response->assertSessionDoesntHaveErrors('email');
+        $this->assertDatabaseCount('webinar_registrations', 1);
+    }
+
+    public function test_store_rejects_an_invalid_phone_number_as_a_validation_error(): void
+    {
+        $this->enableWebinarRegistrationSms();
+
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'invalid-phone',
         ]);
+
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->id,
+            'starts_at' => now()->addDay(),
+            'external_id' => null,
+        ]);
+
+        $response = $this->from(route('webinar.show', $series->slug))
+            ->post($this->registrationUrl($series, $webinar), $this->registrationPayload([
+                'phone' => 'not-a-phone-number',
+                'transactional_sms_consent' => true,
+            ]));
+
+        $response->assertRedirect(route('webinar.show', $series->slug));
+        $response->assertSessionHasErrors('phone');
+        $this->assertDatabaseCount('contacts', 0);
+        $this->assertDatabaseCount('webinar_registrations', 0);
+    }
+
+    public function test_store_rejects_a_filled_honeypot_without_persisting_registration_data(): void
+    {
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'honeypot-test',
+        ]);
+
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->id,
+            'starts_at' => now()->addDay(),
+            'external_id' => null,
+        ]);
+
+        $response = $this->from(route('webinar.show', $series->slug))
+            ->post($this->registrationUrl($series, $webinar), $this->registrationPayload([
+                'company_website' => 'https://spam.example',
+            ]));
+
+        $response->assertRedirect(route('webinar.show', $series->slug));
+        $response->assertSessionHasErrors('registration_form');
+        $this->assertDatabaseCount('contacts', 0);
+        $this->assertDatabaseCount('webinar_registrations', 0);
+    }
+
+    public function test_store_rejects_submission_without_javascript_readiness_and_interaction_proofs(): void
+    {
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'javascript-proof-test',
+        ]);
+
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->id,
+            'starts_at' => now()->addDay(),
+            'external_id' => null,
+        ]);
+
+        $payload = $this->registrationPayload();
+        unset(
+            $payload['registration_form_ready'],
+            $payload['registration_form_interacted'],
+        );
+
+        $response = $this->from(route('webinar.show', $series->slug))
+            ->post($this->registrationUrl($series, $webinar), $payload);
+
+        $response->assertRedirect(route('webinar.show', $series->slug));
+        $response->assertSessionHasErrors('registration_form');
+        $this->assertDatabaseCount('contacts', 0);
+        $this->assertDatabaseCount('webinar_registrations', 0);
+    }
+
+    public function test_registration_rate_limiter_blocks_repeated_attempts_from_one_ip(): void
+    {
+        Config::set('webinars.registration.rate_limits', [
+            'per_ip_per_minute' => 1,
+            'per_ip_per_hour' => 10,
+            'per_email_per_hour' => 10,
+            'per_phone_per_hour' => 10,
+        ]);
+
+        $series = WebinarSeries::factory()->create([
+            'status' => 'active',
+            'slug' => 'rate-limit-test',
+        ]);
+
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->id,
+            'starts_at' => now()->addDay(),
+            'external_id' => null,
+        ]);
+
+        $this->post(
+            $this->registrationUrl($series, $webinar),
+            $this->registrationPayload(['email' => 'first@example.com']),
+        )->assertRedirect(route('webinar.thank-you', $series->slug));
+
+        $response = $this->from(route('webinar.show', $series->slug))->post(
+            $this->registrationUrl($series, $webinar),
+            $this->registrationPayload(['email' => 'second@example.com']),
+        );
+
+        $response->assertRedirect(route('webinar.show', $series->slug));
+        $response->assertSessionHasErrors('email');
+        $this->assertDatabaseCount('webinar_registrations', 1);
     }
 
     public function test_show_resolves_public_layout_image_client_key_from_client_config(): void
@@ -517,6 +655,27 @@ class WebinarRegistrationControllerTest extends TestCase
         $this->assertStringContainsString('value="+15555550123"', $html);
         $this->assertStringContainsString('name="transactional_email_consent"', $html);
         $this->assertStringNotContainsString('name="transactional_email_consent" type="checkbox" value="1" checked', $html);
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
+    private function registrationPayload(array $overrides = []): array
+    {
+        return array_replace([
+            'company_website' => '',
+            'registration_form_ready' => 'ready',
+            'registration_form_interacted' => 'human',
+            'first_name' => 'Jeff',
+            'last_name' => 'Yarnall',
+            'email' => 'jeff@example.com',
+            'phone' => null,
+            'transactional_email_consent' => true,
+            'transactional_sms_consent' => false,
+            'marketing_email_consent' => false,
+            'marketing_sms_consent' => false,
+        ], $overrides);
     }
 
     private function registrationPath(

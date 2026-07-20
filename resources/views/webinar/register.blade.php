@@ -1,3 +1,4 @@
+
 @php
     $landingPage = $page['landing'] ?? $page;
     $registrationPage = $page['registration'] ?? [];
@@ -36,6 +37,48 @@
     :title="$page['title'] ?? 'Register for Webinar'"
     :meta-description="$page['meta_description'] ?? null"
 >
+    @once
+        <script>
+            document.addEventListener('alpine:init', () => {
+                if (window.__engageWebinarPhoneMaskRegistered) {
+                    return
+                }
+
+                window.__engageWebinarPhoneMaskRegistered = true
+
+                Alpine.directive('mask', (element, { expression }, { cleanup }) => {
+                    if (expression !== '(999) 999-9999') {
+                        return
+                    }
+
+                    const formatPhone = () => {
+                        let digits = String(element.value ?? '').replace(/\D/g, '')
+
+                        if (digits.length > 10 && digits.startsWith('1')) {
+                            digits = digits.slice(1)
+                        }
+
+                        digits = digits.slice(0, 10)
+
+                        if (digits.length === 0) {
+                            element.value = ''
+                        } else if (digits.length <= 3) {
+                            element.value = `(${digits}`
+                        } else if (digits.length <= 6) {
+                            element.value = `(${digits.slice(0, 3)}) ${digits.slice(3)}`
+                        } else {
+                            element.value = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+                        }
+                    }
+
+                    element.addEventListener('input', formatPhone)
+                    queueMicrotask(formatPhone)
+
+                    cleanup(() => element.removeEventListener('input', formatPhone))
+                })
+            })
+        </script>
+    @endonce
     <section
         x-data="webinarRegistrationPage(@js([
             'countdownTarget' => $countdownTarget,

@@ -3,19 +3,27 @@
 namespace App\Modules\Webinars\Requests;
 
 use App\Modules\Messaging\Services\MessageChannelAvailability;
+use App\Modules\Messaging\Services\PhoneNumberNormalizer;
 use App\Modules\Webinars\Actions\GetActiveWebinarSeriesAction;
 use App\Modules\Webinars\Actions\ResolveRegisterableWebinarAction;
 use App\Modules\Webinars\Models\Webinar;
-use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
+use InvalidArgumentException;
 
 class StoreWebinarRegistrationRequest extends FormRequest
 {
     private const SURFACE = 'webinar_registrations';
+
+    private const HONEYPOT_FIELD = 'company_website';
+
+    private const READY_FIELD = 'registration_form_ready';
+
+    private const INTERACTION_FIELD = 'registration_form_interacted';
 
     /**
      * @var array<string, array{channel: string, purpose: string, scope: string, config_path: string}>
@@ -61,8 +69,13 @@ class StoreWebinarRegistrationRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $phone = $this->input('phone');
+
         $this->merge([
+            'first_name' => $this->trimmedString($this->input('first_name')),
+            'last_name' => $this->nullableTrimmedString($this->input('last_name')),
             'email' => strtolower(trim((string) $this->input('email'))),
+            'phone' => $this->nullableTrimmedString($phone),
             'webinar_id' => $this->query('webinar_id'),
 
             'transactional_email_consent' => $this->boolean('transactional_email_consent'),
@@ -85,12 +98,17 @@ class StoreWebinarRegistrationRequest extends FormRequest
                 'nullable',
                 'string',
                 'max:30',
+                $this->validPhoneNumberRule(),
             ],
 
             'transactional_email_consent' => ['boolean'],
             'transactional_sms_consent' => ['boolean'],
             'marketing_email_consent' => ['boolean'],
             'marketing_sms_consent' => ['boolean'],
+
+            self::HONEYPOT_FIELD => ['nullable', 'string', 'max:255'],
+            self::READY_FIELD => ['nullable', 'string', 'max:20'],
+            self::INTERACTION_FIELD => ['nullable', 'string', 'max:20'],
         ];
     }
 
@@ -98,19 +116,16 @@ class StoreWebinarRegistrationRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
+                if ($this->rejectLikelyAutomatedSubmission($validator)) {
+                    return;
+                }
+
                 $this->rejectUnavailableSelectedChannels($validator);
 
                 if (! $this->hasSelectedAvailableTransactionalChannel()) {
                     $validator->errors()->add(
                         'transactional_consent',
-                        'Consent to at least one available webinar notification channel is required.'
-                    );
-                }
-
-                if ($this->duplicateRegistrationExists()) {
-                    $validator->errors()->add(
-                        'email',
-                        'This email has already been used to register for this webinar.'
+                        'Choose at least one available method for receiving webinar details.',
                     );
                 }
             },
@@ -120,8 +135,71 @@ class StoreWebinarRegistrationRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'phone.required' => 'Since you checked SMS consent fields, please enter a phone number.',
+            'phone.required' => 'Enter a mobile phone number when selecting SMS.',
+            'phone.max' => 'Enter a phone number with no more than 30 characters.',
         ];
+    }
+
+    private function validPhoneNumberRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($value === null || $value === '') {
+                return;
+            }
+
+            try {
+                $normalized = app(PhoneNumberNormalizer::class)->normalize(
+                    is_string($value) ? $value : null,
+                );
+            } catch (InvalidArgumentException) {
+                $normalized = null;
+            }
+
+            if ($normalized === null) {
+                $fail('Enter a valid phone number, including the area code.');
+            }
+        };
+    }
+
+    private function rejectLikelyAutomatedSubmission(Validator $validator): bool
+    {
+        if (! (bool) config('webinars.registration.bot_protection.enabled', true)) {
+            return false;
+        }
+
+        $honeypot = $this->input(self::HONEYPOT_FIELD);
+        $ready = $this->input(self::READY_FIELD);
+        $interaction = $this->input(self::INTERACTION_FIELD);
+
+        $expectedReady = (string) config(
+            'webinars.registration.bot_protection.ready_value',
+            'ready',
+        );
+        $expectedInteraction = (string) config(
+            'webinars.registration.bot_protection.interaction_value',
+            'human',
+        );
+
+        $honeypotFilled = is_string($honeypot)
+            ? trim($honeypot) !== ''
+            : $honeypot !== null;
+
+        if (
+            ! $honeypotFilled
+            && is_string($ready)
+            && hash_equals($expectedReady, $ready)
+            && is_string($interaction)
+            && hash_equals($expectedInteraction, $interaction)
+        ) {
+            return false;
+        }
+
+        $validator->errors()->add(
+            'registration_form',
+            'We could not verify this form submission. Refresh the page and try again.',
+        );
+
+        return true;
     }
 
     private function requiresPhoneNumber(): bool
@@ -152,7 +230,7 @@ class StoreWebinarRegistrationRequest extends FormRequest
             if ($this->boolean($field) && ! $this->consentFieldSelectable($field)) {
                 $validator->errors()->add(
                     $field,
-                    'This communication option is not available for this registration form.'
+                    'This communication option is not available for this registration form.',
                 );
             }
         }
@@ -254,26 +332,19 @@ class StoreWebinarRegistrationRequest extends FormRequest
         );
     }
 
-    private function duplicateRegistrationExists(): bool
+    private function trimmedString(mixed $value): mixed
     {
-        $email = strtolower(trim((string) $this->input('email')));
-
-        if ($email === '') {
-            return false;
-        }
-
-        $webinar = $this->registerableWebinar();
-
-        if (! $webinar) {
-            return false;
-        }
-
-        return WebinarRegistration::query()
-            ->where('webinar_id', $webinar->getKey())
-            ->whereHas('contact', function ($query) use ($email): void {
-                $query->whereRaw('LOWER(email) = ?', [$email]);
-            })
-            ->exists();
+        return is_string($value) ? trim($value) : $value;
     }
 
+    private function nullableTrimmedString(mixed $value): mixed
+    {
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
+    }
 }

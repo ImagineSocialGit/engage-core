@@ -22,6 +22,13 @@ use Illuminate\Support\ServiceProvider;
 
 class WebinarsModuleServiceProvider extends ServiceProvider
 {
+    private const SENSITIVE_PUBLIC_FORM_FIELDS = [
+        '_token',
+        'company_website',
+        'registration_form_ready',
+        'registration_form_interacted',
+    ];
+
     public function register(): void
     {
         $this->app->tag([
@@ -67,28 +74,41 @@ class WebinarsModuleServiceProvider extends ServiceProvider
         RateLimiter::for($limiterName, function (Request $request) use ($flow) {
             $perIpPerMinute = max(
                 1,
-                (int) config('webinars.registration.rate_limits.per_ip_per_minute', 5)
+                (int) config('webinars.registration.rate_limits.per_ip_per_minute', 10),
+            );
+
+            $perIpPerHour = max(
+                $perIpPerMinute,
+                (int) config('webinars.registration.rate_limits.per_ip_per_hour', 100),
             );
 
             $perEmailPerHour = max(
                 1,
-                (int) config('webinars.registration.rate_limits.per_email_per_hour', 3)
+                (int) config('webinars.registration.rate_limits.per_email_per_hour', 6),
             );
 
             $perPhonePerHour = max(
                 1,
-                (int) config('webinars.registration.rate_limits.per_phone_per_hour', $perEmailPerHour)
+                (int) config('webinars.registration.rate_limits.per_phone_per_hour', 6),
             );
 
             $seriesSlug = $this->seriesSlug($request);
+            $ipIdentity = $this->hashedRateLimitIdentity(
+                'webinar-public:ip:'.(string) $request->ip(),
+            );
+
             $limits = [
                 Limit::perMinute($perIpPerMinute)
-                    ->by('webinar-public:ip:'.$this->hashedRateLimitIdentity(
-                        'webinar-public:ip:'.(string) $request->ip(),
-                    ))
+                    ->by('webinar-public:ip-minute:'.$ipIdentity)
                     ->response($this->webinarRegistrationThrottleResponse(
                         'email',
-                        'Too many attempts. Please wait a moment and try again.'
+                        'Too many attempts. Please wait a moment and try again.',
+                    )),
+                Limit::perHour($perIpPerHour)
+                    ->by('webinar-public:ip-hour:'.$ipIdentity)
+                    ->response($this->webinarRegistrationThrottleResponse(
+                        'email',
+                        'Too many attempts from this connection. Please try again later.',
                     )),
             ];
 
@@ -104,7 +124,7 @@ class WebinarsModuleServiceProvider extends ServiceProvider
                     )))
                     ->response($this->webinarRegistrationThrottleResponse(
                         'email',
-                        'Too many attempts for this email. Please wait a moment and try again.'
+                        'Too many attempts for this email. Please wait and try again.',
                     ));
             }
 
@@ -120,7 +140,7 @@ class WebinarsModuleServiceProvider extends ServiceProvider
                     )))
                     ->response($this->webinarRegistrationThrottleResponse(
                         'phone',
-                        'Too many attempts for this phone number. Please wait a moment and try again.'
+                        'Too many attempts for this phone number. Please wait and try again.',
                     ));
             }
 
@@ -153,7 +173,7 @@ class WebinarsModuleServiceProvider extends ServiceProvider
         return function (Request $request, array $headers) use ($field, $message) {
             return redirect()
                 ->back()
-                ->withInput($request->except('_token'))
+                ->withInput($request->except(self::SENSITIVE_PUBLIC_FORM_FIELDS))
                 ->withErrors([
                     $field => $message,
                 ])

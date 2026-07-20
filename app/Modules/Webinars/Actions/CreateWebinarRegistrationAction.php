@@ -13,12 +13,15 @@ use App\Modules\Messaging\Services\PhoneNumberNormalizer;
 use App\Modules\Webinars\Data\WebinarRegistrationResult;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class CreateWebinarRegistrationAction
 {
+    private const MAX_CREATE_ATTEMPTS = 2;
+
     public function __construct(
         private readonly MessageChannelAvailability $messageChannelAvailability,
         private readonly PhoneNumberNormalizer $phoneNumberNormalizer,
@@ -33,98 +36,31 @@ class CreateWebinarRegistrationAction
         Request $request,
         Webinar $webinar,
     ): WebinarRegistrationResult {
-        $result = DB::transaction(function () use (
-            $validated,
-            $request,
-            $webinar,
-        ): WebinarRegistrationResult {
-            $normalizedPhone = $this->phoneNumberNormalizer->normalize(
-                $validated['phone'] ?? null,
-            );
+        $result = null;
 
-            $contact = $this->createOrUpdateContact->handle(
-                data: [
-                    'email' => $validated['email'],
-                    'first_name' => $validated['first_name'],
-                    'last_name' => $validated['last_name'] ?? null,
-                    'phone' => $normalizedPhone,
-                    'source' => 'webinar',
-                    'subsource' => $webinar->slug,
-                ],
-            );
+        for ($attempt = 1; $attempt <= self::MAX_CREATE_ATTEMPTS; $attempt++) {
+            try {
+                $result = DB::transaction(fn (): WebinarRegistrationResult => $this->createOrResolve(
+                    validated: $validated,
+                    request: $request,
+                    webinar: $webinar,
+                ));
 
-            $registration = WebinarRegistration::query()
-                ->where('contact_id', $contact->getKey())
-                ->where('webinar_id', $webinar->getKey())
-                ->first();
+                break;
+            } catch (UniqueConstraintViolationException $exception) {
+                if ($attempt >= self::MAX_CREATE_ATTEMPTS) {
+                    throw $exception;
+                }
 
-            if ($registration instanceof WebinarRegistration) {
-                return WebinarRegistrationResult::existing(
-                    registration: $registration,
-                    consentGrants: $this->storeMessageConsents(
-                        validated: $validated,
-                        request: $request,
-                        contact: $contact,
-                        registration: $registration,
-                    ),
-                );
+                // A concurrent request may have committed the Contact or
+                // WebinarRegistration first. Retry once and resolve that row
+                // through the normal idempotent path.
             }
+        }
 
-            $now = now();
-
-            $registration = WebinarRegistration::query()->create([
-                'contact_id' => $contact->getKey(),
-                'webinar_id' => $webinar->getKey(),
-                'webinar_slug' => $webinar->slug,
-                'status' => 'pending',
-                'source' => 'webinar_subdomain',
-                'registered_at' => $now,
-                'attended_at' => null,
-                'meta' => [
-                    // Consent/business provenance. Reporting must not reuse this
-                    // as anonymous visitor identity.
-                    'request_ip' => $request->ip(),
-                    'user_agent' => $request->userAgent(),
-                    'accepted_channels' => [
-                        'transactional' => $this->acceptedChannels(
-                            validated: $validated,
-                            purpose: MessagePurpose::Transactional,
-                            scope: 'webinar',
-                        ),
-                        'marketing' => $this->acceptedChannels(
-                            validated: $validated,
-                            purpose: MessagePurpose::Marketing,
-                            scope: 'webinar_nurture',
-                        ),
-                    ],
-                ],
-            ]);
-
-            $consentGrants = $this->storeMessageConsents(
-                validated: $validated,
-                request: $request,
-                contact: $contact,
-                registration: $registration,
-                now: $now,
-            );
-
-            $registration->load([
-                'contact',
-                'webinar',
-                'webinar.webinarSeries',
-            ]);
-
-            $this->emitWebinarAutomationEvent->forRegistration(
-                eventKey: 'webinar.registered',
-                registration: $registration,
-                occurredAt: $registration->registered_at ?? $now,
-            );
-
-            return WebinarRegistrationResult::created(
-                registration: $registration,
-                consentGrants: $consentGrants,
-            );
-        });
+        if (! $result instanceof WebinarRegistrationResult) {
+            throw new \LogicException('Webinar registration could not be resolved.');
+        }
 
         // This runs only after the local registration/consent transaction has
         // committed. Provider or delivery failures cannot roll it back.
@@ -137,6 +73,111 @@ class CreateWebinarRegistrationAction
         }
 
         return $result;
+    }
+
+    private function createOrResolve(
+        array $validated,
+        Request $request,
+        Webinar $webinar,
+    ): WebinarRegistrationResult {
+        $email = strtolower(trim((string) $validated['email']));
+        $normalizedPhone = $this->phoneNumberNormalizer->normalize(
+            $validated['phone'] ?? null,
+        );
+
+        $existingContact = Contact::query()
+            ->whereRaw('LOWER(email) = ?', [$email])
+            ->lockForUpdate()
+            ->first();
+
+        $contactData = [
+            'email' => $email,
+            'first_name' => $validated['first_name'],
+            'last_name' => $validated['last_name'] ?? null,
+            'phone' => $normalizedPhone,
+        ];
+
+        if (! $existingContact instanceof Contact) {
+            $contactData['source'] = 'webinar';
+            $contactData['subsource'] = $webinar->slug;
+        }
+
+        $contact = $this->createOrUpdateContact->handle(
+            data: $contactData,
+        );
+
+        $registration = WebinarRegistration::query()
+            ->where('contact_id', $contact->getKey())
+            ->where('webinar_id', $webinar->getKey())
+            ->lockForUpdate()
+            ->first();
+
+        if ($registration instanceof WebinarRegistration) {
+            return WebinarRegistrationResult::existing(
+                registration: $registration,
+                consentGrants: $this->storeMessageConsents(
+                    validated: $validated,
+                    request: $request,
+                    contact: $contact,
+                    registration: $registration,
+                ),
+            );
+        }
+
+        $now = now();
+
+        $registration = WebinarRegistration::query()->create([
+            'contact_id' => $contact->getKey(),
+            'webinar_id' => $webinar->getKey(),
+            'webinar_slug' => $webinar->slug,
+            'status' => 'pending',
+            'source' => 'webinar_subdomain',
+            'registered_at' => $now,
+            'attended_at' => null,
+            'meta' => [
+                // Consent/business provenance. Reporting must not reuse this
+                // as anonymous visitor identity.
+                'request_ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'accepted_channels' => [
+                    'transactional' => $this->acceptedChannels(
+                        validated: $validated,
+                        purpose: MessagePurpose::Transactional,
+                        scope: 'webinar',
+                    ),
+                    'marketing' => $this->acceptedChannels(
+                        validated: $validated,
+                        purpose: MessagePurpose::Marketing,
+                        scope: 'webinar_nurture',
+                    ),
+                ],
+            ],
+        ]);
+
+        $consentGrants = $this->storeMessageConsents(
+            validated: $validated,
+            request: $request,
+            contact: $contact,
+            registration: $registration,
+            now: $now,
+        );
+
+        $registration->load([
+            'contact',
+            'webinar',
+            'webinar.webinarSeries',
+        ]);
+
+        $this->emitWebinarAutomationEvent->forRegistration(
+            eventKey: 'webinar.registered',
+            registration: $registration,
+            occurredAt: $registration->registered_at ?? $now,
+        );
+
+        return WebinarRegistrationResult::created(
+            registration: $registration,
+            consentGrants: $consentGrants,
+        );
     }
 
     /**
