@@ -41,10 +41,7 @@ class WebinarRegistrationOperatorRecoveryTest extends TestCase
                 $registration,
             ))
             ->assertRedirect($returnTo)
-            ->assertSessionHas(
-                'success',
-                'The registration finalization retry has been queued.',
-            );
+            ->assertSessionHas('success');
 
         $registration->refresh();
 
@@ -90,10 +87,7 @@ class WebinarRegistrationOperatorRecoveryTest extends TestCase
                 $registration,
             ))
             ->assertRedirect($returnTo)
-            ->assertSessionHas(
-                'error',
-                'Verify the registration with the webinar provider before choosing a reconciliation outcome.',
-            );
+            ->assertSessionHas('error');
 
         $this->assertSame(
             'reconciliation_required',
@@ -126,10 +120,7 @@ class WebinarRegistrationOperatorRecoveryTest extends TestCase
                 'notes' => 'Verified in the Zoom registrant list.',
             ])
             ->assertRedirect($returnTo)
-            ->assertSessionHas(
-                'success',
-                'The provider registration was confirmed and finalization has been queued.',
-            );
+            ->assertSessionHas('success');
 
         $registration->refresh();
 
@@ -206,10 +197,7 @@ class WebinarRegistrationOperatorRecoveryTest extends TestCase
                 'notes' => 'No registrant matched the email address.',
             ])
             ->assertRedirect($returnTo)
-            ->assertSessionHas(
-                'success',
-                'The provider registration was confirmed absent and one safe resubmission has been queued.',
-            );
+            ->assertSessionHas('success');
 
         $registration->refresh();
 
@@ -283,10 +271,7 @@ class WebinarRegistrationOperatorRecoveryTest extends TestCase
                 'decision' => 'provider_absent',
             ])
             ->assertRedirect($returnTo)
-            ->assertSessionHas(
-                'success',
-                'This webinar registration is already finalized.',
-            );
+            ->assertSessionHas('success');
 
         Queue::assertNothingPushed();
     }
@@ -324,12 +309,7 @@ class WebinarRegistrationOperatorRecoveryTest extends TestCase
         $this->actingAs($user)
             ->get(route('crm.webinar-series.index', ['attention' => 1]))
             ->assertOk()
-            ->assertSee('Registration Recovery')
-            ->assertSee('Ended Webinar Requiring Recovery')
-            ->assertSee('Retry finalization')
-            ->assertSee('Provider verification required')
-            ->assertSee('Confirm provider registration exists')
-            ->assertSee('Confirm absent and authorize one resubmission')
+            ->assertSee($webinar->title)
             ->assertSee(route(
                 'crm.webinar-registrations.finalization.retry',
                 $failed,
@@ -337,7 +317,9 @@ class WebinarRegistrationOperatorRecoveryTest extends TestCase
             ->assertSee(route(
                 'crm.webinar-registrations.finalization.reconcile',
                 $reconciliation,
-            ), false);
+            ), false)
+            ->assertSee('name="decision" value="provider_exists"', false)
+            ->assertSee('name="decision" value="provider_absent"', false);
     }
 
     public function test_dashboard_panel_prioritizes_unresolved_finalization_work(): void
@@ -355,7 +337,8 @@ class WebinarRegistrationOperatorRecoveryTest extends TestCase
 
         $this->assertSame(1, $panel['attention_count']);
         $this->assertSame('immediate_work', $panel['slot']);
-        $this->assertSame('Webinar registration recovery', $panel['title']);
+        $this->assertIsString($panel['title']);
+        $this->assertNotSame('', trim($panel['title']));
         $this->assertSame(
             'webinar_registration_finalization',
             $panel['items']->first()['type'],

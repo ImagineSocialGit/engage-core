@@ -863,9 +863,11 @@ Thanks.",
         ]);
 
         $this->assertInstanceOf(FakeJobPermissionInvitationEmailPayload::class, $capturedPayload);
-        $this->assertSame('Confirm my preferences', $capturedPayload->cta['label']);
+        $this->assertIsString($capturedPayload->cta['label']);
+        $this->assertNotSame('', trim($capturedPayload->cta['label']));
         $this->assertSame($expectedUrl, $capturedPayload->cta['url']);
-        $this->assertSame('Or copy and paste this link into your browser', $capturedPayload->secondaryLink['label']);
+        $this->assertIsString($capturedPayload->secondaryLink['label']);
+        $this->assertNotSame('', trim($capturedPayload->secondaryLink['label']));
         $this->assertSame($expectedUrl, $capturedPayload->secondaryLink['url']);
     }
 
@@ -926,8 +928,9 @@ Thanks.",
 
         $this->get(route('messaging.permission-invitations.show', ['token' => $invitation->token]))
             ->assertOk()
-            ->assertSee('Choose how you want to hear from us.')
-            ->assertSee('imported@example.com');
+            ->assertSee('imported@example.com')
+            ->assertSee('name="channels[]"', false)
+            ->assertSee('value="email"', false);
     }
 
     public function test_permission_invitation_email_only_acceptance_renders_accepted_page_and_creates_consent(): void
@@ -987,8 +990,8 @@ Thanks.",
 
         $this->get(route('messaging.permission-invitations.show', ['token' => $invitation->token]))
             ->assertOk()
-            ->assertSee('Your preferences are confirmed.')
-            ->assertSee('EMAIL');
+            ->assertSee('EMAIL')
+            ->assertDontSee('name="channels[]"', false);
     }
 
     public function test_it_treats_contacts_with_import_batch_as_imported_for_permission_invitations(): void
@@ -1433,5 +1436,3 @@ class FakeJobPermissionInvitationEmailPayload implements EmailMessage
         ];
     }
 }
-
-

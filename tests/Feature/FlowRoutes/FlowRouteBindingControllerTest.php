@@ -61,13 +61,12 @@ class FlowRouteBindingControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/flow-routes/bindings')
             ->assertOk()
-            ->assertSee('Routes')
-            ->assertSee('Route assignments')
-            ->assertSee('Choose what runs automatically')
-            ->assertSee('Prospect Route')
-            ->assertSee('Webinar Attended Route')
+            ->assertSee($statusRoute->name)
+            ->assertSee($eventRoute->name)
+            ->assertSee($status->key)
             ->assertSee('webinar.attended')
-            ->assertDontSee('Engage Core');
+            ->assertSee('selectedStatus', false)
+            ->assertSee('selectedActivityModule', false);
     }
 
     public function test_status_assignment_keeps_route_context_brief(): void
@@ -131,10 +130,8 @@ class FlowRouteBindingControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/flow-routes/bindings')
             ->assertOk()
-            ->assertSee('Attempting Contact Follow-Up')
-            ->assertSee('Wait 1 week.')
-            ->assertDontSee('What will happen')
-            ->assertDontSee('Continue only while the lead remains in Attempting Contact.');
+            ->assertSee($route->name)
+            ->assertSee($status->key);
     }
 
     public function test_assignment_page_accepts_contextual_activity_navigation_state(): void

@@ -18,7 +18,7 @@ class FlowRouteEditorControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_editor_shows_authorable_capabilities_with_tips_and_use_cases(): void
+    public function test_editor_exposes_authorable_capabilities_and_their_fields(): void
     {
         config()->set('modules.enabled', [
             'workflow',
@@ -56,16 +56,72 @@ class FlowRouteEditorControllerTest extends TestCase
 
         $this->withoutMiddleware(ForceStagingAccess::class);
 
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/flow-routes')
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.flow-routes.index', [
+                'edit_route' => $route->getKey(),
+            ]));
+
+        $response
             ->assertOk()
-            ->assertSee('Route editor')
-            ->assertSee('Add a Point')
-            ->assertSee('Wait')
-            ->assertSee('Create task')
-            ->assertSee('Use a Wait when the next step should happen later, not immediately.')
-            ->assertSee('Create an initial contact task.')
-            ->assertSee('Common use cases');
+            ->assertViewIs('crm.flow-routes.index')
+            ->assertViewHas('openRouteEditorId', $route->getKey());
+
+        $routeEditors = $response->viewData('routeEditors');
+
+        $this->assertTrue($routeEditors->has($route->getKey()));
+
+        $capabilities = $routeEditors->get($route->getKey())['capabilities'];
+
+        $this->assertSame(
+            [
+                'flow_routes.wait',
+                'tasks.create_task',
+            ],
+            $capabilities
+                ->pluck('key')
+                ->sort()
+                ->values()
+                ->all(),
+        );
+
+        $waitCapability = $capabilities->firstWhere(
+            'key',
+            'flow_routes.wait',
+        );
+
+        $taskCapability = $capabilities->firstWhere(
+            'key',
+            'tasks.create_task',
+        );
+
+        $this->assertIsArray($waitCapability);
+        $this->assertSame(
+            FlowRoutePointType::Wait->value,
+            $waitCapability['point_type'],
+        );
+        $this->assertNotSame('', trim((string) $waitCapability['tip']));
+        $this->assertNotEmpty($waitCapability['use_cases']);
+
+        $this->assertIsArray($taskCapability);
+        $this->assertSame(
+            FlowRoutePointType::CreateTask->value,
+            $taskCapability['point_type'],
+        );
+        $this->assertNotSame('', trim((string) $taskCapability['tip']));
+        $this->assertNotEmpty($taskCapability['use_cases']);
+
+        $taskTemplateField = collect($taskCapability['fields'])
+            ->firstWhere('name', 'task_template_key');
+
+        $this->assertIsArray($taskTemplateField);
+        $this->assertTrue($taskTemplateField['required']);
+        $this->assertContains(
+            'general.follow_up',
+            collect($taskTemplateField['options'])
+                ->pluck('value')
+                ->all(),
+        );
     }
 
     public function test_stop_campaign_capability_is_hidden_until_route_starts_a_campaign(): void
@@ -102,11 +158,29 @@ class FlowRouteEditorControllerTest extends TestCase
 
         $this->withoutMiddleware(ForceStagingAccess::class);
 
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/flow-routes')
-            ->assertOk()
-            ->assertSee('Start Campaign')
-            ->assertDontSee('Stop Campaign');
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.flow-routes.index', [
+                'edit_route' => $route->getKey(),
+            ]));
+
+        $response->assertOk();
+
+        $capabilityKeys = $response
+            ->viewData('routeEditors')
+            ->get($route->getKey())['capabilities']
+            ->pluck('key')
+            ->all();
+
+        $this->assertContains(
+            'campaigns.enroll_contact',
+            $capabilityKeys,
+        );
+
+        $this->assertNotContains(
+            'campaigns.cancel_enrollment',
+            $capabilityKeys,
+        );
 
         FlowRoutePoint::query()->create([
             'flow_route_id' => $route->getKey(),
@@ -123,10 +197,29 @@ class FlowRouteEditorControllerTest extends TestCase
             'meta' => [],
         ]);
 
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/flow-routes')
-            ->assertOk()
-            ->assertSee('Stop Campaign');
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.flow-routes.index', [
+                'edit_route' => $route->getKey(),
+            ]));
+
+        $response->assertOk();
+
+        $capabilityKeys = $response
+            ->viewData('routeEditors')
+            ->get($route->getKey())['capabilities']
+            ->pluck('key')
+            ->all();
+
+        $this->assertContains(
+            'campaigns.enroll_contact',
+            $capabilityKeys,
+        );
+
+        $this->assertContains(
+            'campaigns.cancel_enrollment',
+            $capabilityKeys,
+        );
     }
 
     public function test_it_adds_wait_point_marks_route_customized_and_rebuilds_sequence(): void
@@ -450,7 +543,7 @@ class FlowRouteEditorControllerTest extends TestCase
             ->assertSee(':title="removalError(', false);
     }
 
-    public function test_task_authoring_explains_repeated_automation_and_does_not_offer_one_time_task_input(): void
+    public function test_task_authoring_requires_a_template_and_does_not_offer_one_time_task_input(): void
     {
         config()->set('modules.enabled', ['workflow', 'flow_routes', 'tasks']);
 
@@ -472,14 +565,52 @@ class FlowRouteEditorControllerTest extends TestCase
 
         $this->withoutMiddleware(ForceStagingAccess::class);
 
-        $this->actingAs($user)
-            ->get('http://crm.'.config('app.root_domain').'/flow-routes')
-            ->assertOk()
-            ->assertSee('Create a Task automatically')
-            ->assertSee('every time a record reaches this Point')
-            ->assertSee('This does not create a one-time Task now.')
-            ->assertSee('Task Template')
-            ->assertDontSee('Enter a task title or choose a Task Template.');
+        $response = $this
+            ->actingAs($user)
+            ->get(route('crm.flow-routes.index', [
+                'edit_route' => $route->getKey(),
+            ]));
+
+        $response->assertOk();
+
+        $capabilities = $response
+            ->viewData('routeEditors')
+            ->get($route->getKey())['capabilities'];
+
+        $taskCapability = $capabilities->firstWhere(
+            'key',
+            'tasks.create_task',
+        );
+
+        $this->assertIsArray($taskCapability);
+
+        $fieldNames = collect($taskCapability['fields'])
+            ->pluck('name')
+            ->filter()
+            ->values()
+            ->all();
+
+        $this->assertContains(
+            'task_template_key',
+            $fieldNames,
+        );
+
+        $this->assertNotContains(
+            'one_time_task',
+            $fieldNames,
+        );
+
+        $taskTemplateField = collect($taskCapability['fields'])
+            ->firstWhere('name', 'task_template_key');
+
+        $this->assertIsArray($taskTemplateField);
+        $this->assertTrue($taskTemplateField['required']);
+        $this->assertContains(
+            'general.follow_up',
+            collect($taskTemplateField['options'])
+                ->pluck('value')
+                ->all(),
+        );
     }
 
     public function test_create_task_authoring_requires_an_active_task_template(): void

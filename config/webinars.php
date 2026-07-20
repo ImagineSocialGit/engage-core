@@ -86,6 +86,15 @@ return [
 
         'join_confirmation' => [
             'link_expiration_minutes' => 30,
+
+            /*
+             * Browser proof travels only in the URL fragment. Ordinary GET/HEAD
+             * requests, scanners, and prefetchers never send it to the server.
+             * The proof remains valid through the Webinar plus a short grace
+             * window so reminders created days earlier still auto-continue.
+             */
+            'browser_proof_grace_minutes' => 1440,
+            'browser_proof_fallback_days' => 30,
         ],
 
         /*

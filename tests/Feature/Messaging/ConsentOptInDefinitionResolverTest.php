@@ -4,6 +4,7 @@ namespace Tests\Feature\Messaging;
 
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
+use App\Modules\Messaging\Services\ConsentDomainRegistry;
 use App\Modules\Messaging\Services\ConsentOptInDefinitionResolver;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
@@ -20,13 +21,17 @@ class ConsentOptInDefinitionResolverTest extends TestCase
             messageScope: 'webinar_nurture',
         );
 
+        $topic = app(ConsentDomainRegistry::class)->topicForDomain('webinar');
+        $subject = $definition['payload']['subject'] ?? null;
+        $body = $definition['payload']['body'] ?? null;
+
         $this->assertSame('webinar', $definition['scope']);
         $this->assertSame(EmailPayload::class, $definition['payload_class']);
-        $this->assertSame('You’re subscribed', $definition['payload']['subject']);
-        $this->assertSame(
-            'You’re subscribed to receive marketing emails from Acme Events related to webinars and webinar follow-up. You can unsubscribe at any time.',
-            $definition['payload']['body'],
-        );
+        $this->assertIsString($subject);
+        $this->assertNotSame('', trim($subject));
+        $this->assertIsString($body);
+        $this->assertStringContainsString('Acme Events', $body);
+        $this->assertStringContainsString($topic, $body);
     }
 
     public function test_marketing_sms_uses_same_domain_topic(): void
@@ -39,11 +44,15 @@ class ConsentOptInDefinitionResolverTest extends TestCase
             messageScope: 'webinar_waitlist',
         );
 
+        $topic = app(ConsentDomainRegistry::class)->topicForDomain('webinar');
+        $message = $definition['payload']['message'] ?? null;
+
         $this->assertSame('webinar', $definition['scope']);
         $this->assertSame(SmsPayload::class, $definition['payload_class']);
-        $this->assertStringContainsString('Acme Events', $definition['payload']['message']);
-        $this->assertStringContainsString('webinars and webinar follow-up', $definition['payload']['message']);
-        $this->assertStringContainsString('Reply STOP to opt out.', $definition['payload']['message']);
+        $this->assertIsString($message);
+        $this->assertStringContainsString('Acme Events', $message);
+        $this->assertStringContainsString($topic, $message);
+        $this->assertStringContainsString('STOP', $message);
     }
 
     public function test_client_or_module_config_can_override_domain_copy(): void

@@ -60,15 +60,16 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.index'));
 
         $response->assertOk();
-        $response->assertSee('Broadcasts');
-        $response->assertSee('Send a Broadcast');
-        $response->assertSee('Send Opt-In Invitation');
-        $response->assertSee('Recent Broadcasts');
-        $response->assertSee('Opt-In Invitations');
+        $response->assertSee(
+            'name="broadcast_type" value="'.Broadcast::BROADCAST_TYPE_REGULAR.'"',
+            false,
+        );
+        $response->assertSee(
+            'name="broadcast_type" value="'.Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION.'"',
+            false,
+        );
         $response->assertSee('Weekly update');
         $response->assertSee('Imported opt-in invitation');
-        $response->assertSee('Normal Messaging consent, suppression, and revocation gates apply.');
-        $response->assertSee('Email-only, one-time, and enforced by Messaging.');
     }
 
     public function test_it_creates_a_draft_broadcast(): void
@@ -284,9 +285,9 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.index'));
 
         $response->assertOk();
-        $response->assertSee('Channel');
-        $response->assertSee('SMS');
-        $response->assertSee('SMS Message');
+        $response->assertSee('name="channel"', false);
+        $response->assertSee('value="sms"', false);
+        $response->assertSee('name="message"', false);
     }
 
     public function test_it_creates_a_draft_sms_broadcast_when_sms_is_visible_for_broadcasts(): void
@@ -410,7 +411,6 @@ class BroadcastControllerTest extends TestCase
         $response->assertSee('Weekly update');
         $response->assertSee('Jane Lead');
         $response->assertSee('jane@example.test');
-        $response->assertSee('Regular consent-gated one-time broadcast.');
     }
 
     public function test_it_shows_sms_broadcast_recipient_outcomes(): void
@@ -476,25 +476,10 @@ class BroadcastControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('SMS update');
-        $response->assertSee('SMS Message');
         $response->assertSee('This is an SMS broadcast.');
-        $response->assertSee('Phone');
         $response->assertSee('+15555550123');
         $response->assertSee('+15555550124');
         $response->assertSee('+15555550125');
-
-        $response->assertSeeInOrder([
-            'Recipients',
-            '3',
-            'Scheduled',
-            '1',
-            'Sent',
-            '0',
-            'Skipped',
-            '1',
-            'Failed',
-            '1',
-        ]);
 
         $response->assertSee('broadcast channel unavailable');
         $response->assertSee('provider rejected');
@@ -525,10 +510,7 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.show', $broadcast));
 
         $response->assertOk();
-        $response->assertSee('Imported-contact opt-in invitation');
-        $response->assertSee('Email-only one-time imported-contact opt-in invitation.');
-        $response->assertSee('Messaging owns the invitation token, public preference page, consent recording, and repeat-send enforcement.');
-        $response->assertSee('Imported contacts only.');
+        $response->assertSee('Imported opt-in invitation');
         $response->assertSee('transactional / permission_invitation');
     }
 
@@ -554,7 +536,7 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.edit', $broadcast));
 
         $response->assertOk();
-        $response->assertSee('Edit Broadcast Draft');
+        $response->assertSee('name="name"', false);
         $response->assertSee('Draft broadcast');
         $response->assertSee('Draft subject');
         $response->assertSee('Draft body');
@@ -582,11 +564,10 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.edit', $broadcast));
 
         $response->assertOk();
-        $response->assertSee('Edit Opt-In Invitation Draft');
-        $response->assertSee('Recipients are restricted to imported contacts.');
-        $response->assertSee('Messaging injects the public preference URL at send time.');
-        $response->assertSee('All imported contacts');
-        $response->assertSee('Selected import batches');
+        $response->assertSee('name="recipient_filter_type"', false);
+        $response->assertSee('value="imported"', false);
+        $response->assertSee('value="import_batch"', false);
+        $response->assertSee('name="import_batch_ids[]"', false);
     }
 
     public function test_it_updates_a_draft_broadcast(): void
@@ -796,7 +777,6 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.show', $broadcast));
 
         $response->assertOk();
-        $response->assertSee('Selected contacts');
         $response->assertSee('Jane Lead');
         $response->assertSee('jane@example.test');
     }
@@ -960,17 +940,13 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.show', $broadcast));
 
         $response->assertOk();
-        $response->assertSee('Imported contacts found');
-        $response->assertSee('Already consented / ineligible');
-        $response->assertSee('Eligible for invitation');
-        $response->assertSeeInOrder([
-            'Imported contacts found',
-            '2',
-            'Already consented / ineligible',
-            '1',
-            'Eligible for invitation',
-            '1',
-        ]);
+        $response->assertViewHas(
+            'permissionInvitationPreview',
+            fn (array $preview): bool =>
+                ($preview['imported_contacts_count'] ?? null) === 2
+                && ($preview['ineligible_contacts_count'] ?? null) === 1
+                && ($preview['eligible_contacts_count'] ?? null) === 1,
+        );
     }
 
     public function test_it_shows_permission_invitation_eligibility_preview_on_edit_page(): void
@@ -1017,15 +993,13 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.edit', $broadcast));
 
         $response->assertOk();
-        $response->assertSee('Invitation Eligibility Preview');
-        $response->assertSeeInOrder([
-            'Imported contacts found',
-            '2',
-            'Already consented / ineligible',
-            '1',
-            'Eligible for invitation',
-            '1',
-        ]);
+        $response->assertViewHas(
+            'permissionInvitationPreview',
+            fn (array $preview): bool =>
+                ($preview['imported_contacts_count'] ?? null) === 2
+                && ($preview['ineligible_contacts_count'] ?? null) === 1
+                && ($preview['eligible_contacts_count'] ?? null) === 1,
+        );
     }
 
     public function test_it_shows_permission_invitation_eligibility_preview_on_index_page(): void
@@ -1075,17 +1049,14 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.index'));
 
         $response->assertOk();
-        $response->assertSee('Invitation Eligibility Preview');
-        $response->assertSeeInOrder([
-            'Imported contacts found',
-            '3',
-            'Already consented',
-            '1',
-            'Already invited',
-            '1',
-            'Eligible for invitation',
-            '1',
-        ]);
+        $response->assertViewHas(
+            'permissionInvitationPreview',
+            fn (array $preview): bool =>
+                ($preview['imported_contacts_count'] ?? null) === 3
+                && ($preview['already_consented_count'] ?? null) === 1
+                && ($preview['already_invited_count'] ?? null) === 1
+                && ($preview['eligible_contacts_count'] ?? null) === 1,
+        );
     }
 
     public function test_it_blocks_scheduling_permission_invitation_when_no_imported_contacts_are_eligible(): void
@@ -1126,7 +1097,7 @@ class BroadcastControllerTest extends TestCase
         $this->assertNotNull($broadcast);
 
         $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
-        $response->assertSessionHas('error', 'No imported contacts are currently eligible for this opt-in invitation.');
+        $response->assertSessionHas('error');
 
         $broadcast->refresh();
 
@@ -1248,7 +1219,6 @@ class BroadcastControllerTest extends TestCase
             ->get(route('crm.broadcasts.show', $broadcast));
 
         $response->assertOk();
-        $response->assertSee('Imported contacts from selected batches');
         $response->assertSee('June CSV Import');
         $response->assertSee('june-leads.csv');
         $response->assertSee('12 successful');

@@ -823,6 +823,7 @@
 │   │   │   │   ├── WebinarScheduleProfileDefinitionResolver.php
 │   │   │   │   └── WebinarScheduleProfileResolver.php
 │   │   │   ├── Support
+│   │   │   │   ├── WebinarJoinBrowserProof.php
 │   │   │   │   ├── WebinarJoinLinkGenerator.php
 │   │   │   │   ├── WebinarPlaybackLinkGenerator.php
 │   │   │   │   ├── WebinarRegisterPageConfig.php
@@ -1418,6 +1419,7 @@
 │       │       └── message-templates
 │       │           └── index.blade.php
 │       ├── email.blade.php
+│       ├── email-text.blade.php
 │       ├── messaging
 │       │   ├── permission-invitations
 │       │   │   ├── accepted.blade.php
@@ -1452,6 +1454,7 @@
 │   ├── add-client-modules.sh
 │   ├── build-image-manifest.php
 │   ├── create-client.sh
+│   ├── dump-client-files.sh
 │   ├── make-module-dependency-cone-dump.sh
 │   ├── operations
 │   │   ├── configure-client-logging.sh
@@ -1675,6 +1678,7 @@
 │   │   │   │   └── WebinarFollowUpOutcomeAccountingTest.php
 │   │   │   ├── ProviderCancellationReconciliationTest.php
 │   │   │   ├── ResolveRegisterableWebinarActionTest.php
+│   │   │   ├── SlamDunkWebinarConfigurationContractTest.php
 │   │   │   ├── SyncWebinarScheduleProfilesMessageAreaTest.php
 │   │   │   ├── WebinarAutomationOutboxTest.php
 │   │   │   ├── WebinarDevControllerEnvironmentGuardTest.php
@@ -1683,6 +1687,7 @@
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
 │   │   │   ├── WebinarRegisterPageConfigTest.php
 │   │   │   ├── WebinarRegistrationBoundaryContractTest.php
+│   │   │   ├── WebinarRegistrationCombinedConsentTest.php
 │   │   │   ├── WebinarRegistrationConsentHeaderPresentationTest.php
 │   │   │   ├── WebinarRegistrationConsentPresentationTest.php
 │   │   │   ├── WebinarRegistrationControllerTest.php
@@ -1710,4 +1715,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-490 directories, 1221 files
+490 directories, 1226 files

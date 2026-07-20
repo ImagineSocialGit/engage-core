@@ -132,6 +132,54 @@ class EmailPayload implements EmailMessage
         return trim($this->interpolate($body));
     }
 
+    public function plainText(): string
+    {
+        $body = $this->text();
+        $ctaBlock = $this->plainTextCtaBlock();
+
+        if (str_contains($body, '{cta}')) {
+            $body = str_replace('{cta}', $ctaBlock, $body);
+        } elseif ($ctaBlock !== '') {
+            $body = rtrim($body)."\n\n".$ctaBlock;
+        }
+
+        $sections = [trim($body)];
+
+        $secondaryLink = $this->resolvedArray(
+            'secondary_link',
+            $this->secondaryLink,
+        );
+
+        if ($this->validLink($secondaryLink)) {
+            $sections[] = trim((string) $secondaryLink['label'])
+                .":\n"
+                .trim((string) $secondaryLink['url']);
+        }
+
+        $footer = $this->footer ?? $this->configValue('footer');
+
+        if (is_string($footer) && trim($footer) !== '') {
+            $sections[] = trim($footer);
+        }
+
+        $transactionalOptOutUrl = $this->transactionalOptOutUrl();
+        $marketingUnsubscribeUrl = $this->marketingUnsubscribeUrl();
+
+        if (is_string($transactionalOptOutUrl) && trim($transactionalOptOutUrl) !== '') {
+            $sections[] = "Don't want these emails?\n".trim($transactionalOptOutUrl);
+        } elseif (is_string($marketingUnsubscribeUrl) && trim($marketingUnsubscribeUrl) !== '') {
+            $sections[] = "Unsubscribe:\n".trim($marketingUnsubscribeUrl);
+        }
+
+        return trim(implode(
+            "\n\n",
+            array_values(array_filter(
+                $sections,
+                fn (mixed $section): bool => is_string($section) && trim($section) !== '',
+            )),
+        ))."\n";
+    }
+
     public function html(): string
     {
         return View::make(
@@ -174,12 +222,14 @@ class EmailPayload implements EmailMessage
         return new class(
             $this->subject(),
             $this->html(),
+            $this->plainText(),
             $this->fromAddress(),
             $this->fromName(),
         ) extends Mailable {
             public function __construct(
                 private readonly string $subjectLine,
                 private readonly string $htmlBody,
+                private readonly string $plainTextBody,
                 private readonly string $senderAddress,
                 private readonly ?string $senderName,
             ) {}
@@ -189,7 +239,10 @@ class EmailPayload implements EmailMessage
                 return $this
                     ->from($this->senderAddress, $this->senderName)
                     ->subject($this->subjectLine)
-                    ->html($this->htmlBody);
+                    ->html($this->htmlBody)
+                    ->text('email-text', [
+                        'content' => $this->plainTextBody,
+                    ]);
             }
         };
     }
@@ -375,6 +428,51 @@ class EmailPayload implements EmailMessage
                 $resolved,
             ),
         ));
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function resolvedCtas(): array
+    {
+        $resolved = $this->resolvedListArray('ctas', $this->ctas);
+
+        if ($resolved === []) {
+            $single = $this->resolvedArray('cta', $this->cta);
+
+            if ($this->validLink($single)) {
+                $resolved[] = $single;
+            }
+        }
+
+        return array_values(array_filter(
+            $resolved,
+            fn (array $cta): bool => $this->validLink($cta),
+        ));
+    }
+
+    private function plainTextCtaBlock(): string
+    {
+        return implode(
+            "\n\n",
+            array_map(
+                fn (array $cta): string => trim((string) $cta['label'])
+                    .":\n"
+                    .trim((string) $cta['url']),
+                $this->resolvedCtas(),
+            ),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $link
+     */
+    private function validLink(array $link): bool
+    {
+        return is_string($link['label'] ?? null)
+            && trim((string) $link['label']) !== ''
+            && is_string($link['url'] ?? null)
+            && trim((string) $link['url']) !== '';
     }
 
     private function marketingUnsubscribeUrl(): ?string

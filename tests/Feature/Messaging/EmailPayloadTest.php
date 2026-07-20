@@ -360,6 +360,66 @@ Thanks.",
         $this->assertStringContainsString('href="https://example.test/preferences/token"', $html);
     }
 
+    public function test_it_renders_readable_plain_text_links_instead_of_bracketed_html_fallbacks(): void
+    {
+        $payload = EmailPayload::fromArray([
+            'email' => 'test@example.com',
+            'subject' => 'Starting Soon',
+            'body' => "Hi Jeff,\n\nWe start in 10 minutes.\n\n{cta}\n\nSee you soon.",
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'reminder',
+            'cta' => [
+                'label' => 'Join Webinar',
+                'url' => 'https://webinar.example.test/j/example-token#join_proof=proof-token',
+            ],
+            'secondary_link' => [
+                'label' => 'Need to cancel?',
+                'url' => 'https://webinar.example.test/cancel/example-token',
+            ],
+        ]);
+
+        $plainText = $payload->plainText();
+
+        $this->assertStringContainsString(
+            "Join Webinar:\nhttps://webinar.example.test/j/example-token#join_proof=proof-token",
+            $plainText,
+        );
+        $this->assertStringContainsString(
+            "Need to cancel?:\nhttps://webinar.example.test/cancel/example-token",
+            $plainText,
+        );
+        $this->assertStringNotContainsString(
+            '[https://webinar.example.test/j/example-token]Join Webinar',
+            $plainText,
+        );
+        $this->assertStringNotContainsString('{cta}', $plainText);
+    }
+
+    public function test_mailable_declares_an_explicit_plain_text_alternative(): void
+    {
+        $payload = EmailPayload::fromArray([
+            'email' => 'test@example.com',
+            'subject' => 'Starting Soon',
+            'body' => "We start soon.\n\n{cta}",
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'reminder',
+            'cta' => [
+                'label' => 'Join Webinar',
+                'url' => 'https://webinar.example.test/j/example-token',
+            ],
+        ]);
+
+        $mailable = $payload->mailable()->build();
+
+        $this->assertSame('email-text', $mailable->textView);
+        $this->assertSame(
+            $payload->plainText(),
+            $mailable->viewData['content'] ?? null,
+        );
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

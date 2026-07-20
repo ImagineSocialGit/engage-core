@@ -111,28 +111,15 @@ class FlowRouteControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/flow-routes')
             ->assertOk()
-            ->assertSee('Manage Routes')
-            ->assertSee('Assignments')
-            ->assertSee('Attempting Contact Follow-Up')
-            ->assertSee('When a lead moves to Attempting Contact.')
-            ->assertSee('2 Points')
-            ->assertSee('Show route flow')
-            ->assertDontSee('Details')
-            ->assertDontSee('Runs when')
-            ->assertSee('Wait 1 week')
-            ->assertSee('Continue only while the lead remains in Attempting Contact.')
+            ->assertSee($route->name)
+            ->assertSee('Wait one week')
+            ->assertSee('Create follow-up task')
             ->assertSee('aria-label="Route flow"', false)
             ->assertSee('data-module="tasks"', false)
-            ->assertSee('Assigned')
             ->assertSee(
-                route('crm.flow-routes.bindings.index', [
-                    'tab' => 'status',
-                    'status' => 'attempting_contact',
-                ]).'#status-attempting-contact'
-            )
-            ->assertDontSee('Availability')
-            ->assertDontSee('Available</dd>', false)
-            ->assertDontSee('Engage Core');
+                route('crm.flow-routes.bindings.index'),
+                false,
+            );
     }
 
     public function test_index_separates_currently_running_and_available_automatic_behavior(): void
@@ -181,17 +168,11 @@ class FlowRouteControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/flow-routes')
             ->assertOk()
-            ->assertSee('Automatic Behavior')
-            ->assertSee('Webinars')
-            ->assertSee('When someone attends a webinar.')
-            ->assertSee('Currently runs')
-            ->assertSee('Move the contact to Attended Webinar.')
-            ->assertSee('Available but not assigned')
-            ->assertSee('Start Campaign: Webinar Attended Nurture.')
-            ->assertSee('If assigned, messages are still sent only when communication permissions and delivery rules allow.')
-            ->assertDontSee('Webinar Attended Status Transition')
-            ->assertDontSee('Webinar Attended Follow-Up')
-            ->assertDontSee('Engage Core');
+            ->assertSee('webinar.attended')
+            ->assertSee('Attended Webinar')
+            ->assertSee('Webinar Attended Nurture')
+            ->assertDontSee($assignedRoute->name)
+            ->assertDontSee($availableRoute->name);
 
         $this->assertFalse($availableRoute->activeTriggerBindings()->exists());
     }

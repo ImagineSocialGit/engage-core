@@ -4,6 +4,7 @@ namespace App\Modules\Webinars\Support;
 
 use App\Modules\Webinars\Models\Webinar;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 class WebinarPlaybackLinkGenerator
 {
@@ -15,10 +16,23 @@ class WebinarPlaybackLinkGenerator
             ])->save();
         }
 
-        $path = route('webinar.playback.redirect', [
+        $routeUrl = route('webinar.playback.redirect', [
             'token' => $webinar->playback_token,
-        ], false);
+        ]);
 
-        return rtrim(config('app.webinar_url', config('app.url')), '/').$path;
+        $path = parse_url($routeUrl, PHP_URL_PATH);
+
+        if (! is_string($path) || trim($path) === '') {
+            throw new RuntimeException(
+                'Unable to resolve the Webinar playback route path.',
+            );
+        }
+
+        $baseUrl = rtrim(
+            (string) config('app.webinar_url', config('app.url')),
+            '/',
+        );
+
+        return $baseUrl.'/'.ltrim($path, '/');
     }
 }

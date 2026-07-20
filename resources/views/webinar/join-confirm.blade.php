@@ -7,11 +7,17 @@
                         Webinar access
                     </p>
 
-                    <h1 class="text-3xl font-extrabold tracking-tight text-slate-950">
+                    <h1
+                        id="webinar-join-heading"
+                        class="text-3xl font-extrabold tracking-tight text-slate-950"
+                    >
                         Ready to join?
                     </h1>
 
-                    <p class="text-base leading-7 text-slate-600">
+                    <p
+                        id="webinar-join-status"
+                        class="text-base leading-7 text-slate-600"
+                    >
                         Continue below when you are ready to open the webinar.
                     </p>
                 </div>
@@ -34,14 +40,32 @@
                     </div>
                 @endif
 
-                <form method="POST" action="{{ $continueUrl }}">
+                @if(session('join_auto_continue_failed'))
+                    <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-sm leading-6 text-amber-900">
+                        {{ session('join_auto_continue_failed') }}
+                    </div>
+                @endif
+
+                <form
+                    id="webinar-join-form"
+                    method="POST"
+                    action="{{ $continueUrl }}"
+                >
                     @csrf
 
-                    <button
-                        type="submit"
-                        class="inline-flex w-full items-center justify-center rounded-xl bg-slate-950 px-6 py-3 text-sm font-extrabold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-300"
+                    <input
+                        id="webinar-browser-proof"
+                        type="hidden"
+                        name="browser_proof"
+                        value=""
                     >
-                        Join webinar
+
+                    <button
+                        id="webinar-join-button"
+                        type="submit"
+                        class="inline-flex w-full items-center justify-center rounded-xl bg-slate-950 px-6 py-3 text-sm font-extrabold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-300 disabled:cursor-wait disabled:bg-slate-500"
+                    >
+                        Continue to Zoom
                     </button>
                 </form>
 
@@ -51,4 +75,43 @@
             </div>
         </section>
     </main>
+
+    <script>
+        (() => {
+            const fragment = new URLSearchParams(
+                window.location.hash.replace(/^#/, '')
+            );
+            const proof = fragment.get('join_proof');
+
+            if (!proof) {
+                return;
+            }
+
+            const form = document.getElementById('webinar-join-form');
+            const proofInput = document.getElementById('webinar-browser-proof');
+            const button = document.getElementById('webinar-join-button');
+            const heading = document.getElementById('webinar-join-heading');
+            const status = document.getElementById('webinar-join-status');
+
+            if (!form || !proofInput || !button || !heading || !status) {
+                return;
+            }
+
+            history.replaceState(
+                null,
+                '',
+                window.location.pathname + window.location.search
+            );
+
+            proofInput.value = proof;
+            button.disabled = true;
+            button.textContent = 'Opening Zoom…';
+            heading.textContent = 'Opening your webinar…';
+            status.textContent = 'You will be redirected to Zoom automatically.';
+
+            window.setTimeout(() => {
+                form.submit();
+            }, 150);
+        })();
+    </script>
 </x-layouts.public>

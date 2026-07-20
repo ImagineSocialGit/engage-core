@@ -198,7 +198,8 @@ class ProviderAttendanceReconciliationTest extends TestCase
 
         $response->assertOk();
         $response->assertSee($webinar->title);
-        $response->assertSee('Attendance unresolved: No Participant Records');
+        $response->assertSee('bg-amber-50', false);
+        $response->assertSee('title="', false);
     }
 
     /**

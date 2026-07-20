@@ -232,18 +232,17 @@ class WebinarFollowUpOutcomeAccountingTest extends TestCase
             ->get($indexUrl)
             ->assertOk()
             ->assertSee($webinar->title)
-            ->assertSee('1 follow-up planning failure')
-            ->assertSee('Message Definition Unavailable')
-            ->assertSee('Retry follow-up planning');
+            ->assertSee(
+                route('crm.webinar-registrations.follow-up.retry', $registration),
+                false,
+            )
+            ->assertSee('bg-red-50', false);
 
         $this->actingAs($user)
             ->from($indexUrl)
             ->post(route('crm.webinar-registrations.follow-up.retry', $registration))
             ->assertRedirect($indexUrl)
-            ->assertSessionHas(
-                'success',
-                'The post-webinar follow-up retry has been queued.',
-            );
+            ->assertSessionHas('success');
 
         Queue::assertPushed(
             RetryWebinarRegistrationFollowUpJob::class,

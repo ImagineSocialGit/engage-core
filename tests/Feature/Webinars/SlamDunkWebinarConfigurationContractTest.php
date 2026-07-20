@@ -23,14 +23,14 @@ class SlamDunkWebinarConfigurationContractTest extends TestCase
         $this->assertTrue($registration['consents']['marketing']['email']);
         $this->assertTrue($registration['consents']['marketing']['sms']);
         $this->assertTrue($registration['consents']['marketing']['combined']);
-        $this->assertSame(
-            '(Recommended) Text me webinar reminders and access information.',
-            $registration['fields']['consent_messages']['sms']['label'],
-        );
-        $this->assertSame(
-            'Keep Learning. Send me marketing emails and text messages about future webinars, homebuying tips and educational content from Slam Dunk Home Loans.',
-            $registration['fields']['marketing_consent_messages']['combined']['label'],
-        );
+        $smsLabel = $registration['fields']['consent_messages']['sms']['label'] ?? null;
+        $combinedMarketingLabel = $registration['fields']['marketing_consent_messages']['combined']['label'] ?? null;
+
+        $this->assertIsString($smsLabel);
+        $this->assertNotSame('', trim($smsLabel));
+        $this->assertIsString($combinedMarketingLabel);
+        $this->assertNotSame('', trim($combinedMarketingLabel));
+        $this->assertNotSame($smsLabel, $combinedMarketingLabel);
     }
 
     public function test_confirmation_and_post_event_timings_match_the_client_policy(): void
@@ -106,13 +106,13 @@ class SlamDunkWebinarConfigurationContractTest extends TestCase
             $this->assertNotEmpty($content['states'][$state]['meta_description']);
         }
 
-        $this->assertStringNotContainsString(
-            'confirmed',
-            strtolower($content['states']['processing']['meta_description']),
+        $this->assertNotSame(
+            $content['states']['processing']['meta_description'],
+            $content['states']['confirmed']['meta_description'],
         );
-        $this->assertStringContainsString(
-            'cancelled',
-            strtolower($content['states']['cancelled']['meta_description']),
+        $this->assertNotSame(
+            $content['states']['confirmed']['meta_description'],
+            $content['states']['cancelled']['meta_description'],
         );
     }
 

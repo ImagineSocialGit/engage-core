@@ -54,10 +54,13 @@ class WebinarRegistrationCombinedConsentTest extends TestCase
         $this->assertIsInt($emailPosition);
         $this->assertLessThan($emailPosition, $smsPosition);
 
-        $this->assertStringContainsString(
-            '(Recommended) Text me webinar reminders and access information.',
-            $html,
+        $smsLabel = config(
+            'webinars.register.content.registration.fields.consent_messages.sms.label',
         );
+
+        $this->assertIsString($smsLabel);
+        $this->assertNotSame('', trim($smsLabel));
+        $this->assertStringContainsString(e($smsLabel), $html);
         $this->assertStringContainsString(
             'name="transactional_email_consent"',
             $html,
@@ -67,11 +70,14 @@ class WebinarRegistrationCombinedConsentTest extends TestCase
             $html,
         );
 
-        $this->assertStringContainsString('name="marketing_consent"', $html);
-        $this->assertStringContainsString(
-            'Keep Learning. Send me marketing emails and text messages about future webinars, homebuying tips and educational content from Slam Dunk Home Loans.',
-            $html,
+        $combinedMarketingLabel = config(
+            'webinars.register.content.registration.fields.marketing_consent_messages.combined.label',
         );
+
+        $this->assertIsString($combinedMarketingLabel);
+        $this->assertNotSame('', trim($combinedMarketingLabel));
+        $this->assertStringContainsString('name="marketing_consent"', $html);
+        $this->assertStringContainsString(e($combinedMarketingLabel), $html);
         $this->assertStringNotContainsString('name="marketing_email_consent"', $html);
         $this->assertStringNotContainsString('name="marketing_sms_consent"', $html);
     }

@@ -60,19 +60,12 @@ class MessageTemplatePresetControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/message-templates')
             ->assertOk()
-            ->assertSee('Message Templates')
-            ->assertSee('Template library')
-            ->assertSee('Filter templates')
-            ->assertSee('Messages in this group')
+            ->assertSee($preset->name)
             ->assertSee('Webinars')
             ->assertSee('Webinar Confirmations')
             ->assertSee('Confirmation Email')
-            ->assertSee('Selected group')
-            ->assertSee('Used by')
-            ->assertSee('Tokens used')
             ->assertSee('You are registered')
-            ->assertDontSee('Selected for workflows')
-            ->assertDontSee('Use selected template')
+            ->assertSee('first_name')
             ->assertDontSee('payload_class');
     }
 
@@ -165,20 +158,15 @@ class MessageTemplatePresetControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/message-templates?preset='.$preset->getKey())
             ->assertOk()
-            ->assertSee('Used by')
-            ->assertSee('Campaigns')
+            ->assertSee($preset->name)
             ->assertSee('Webinar Attended Nurture')
             ->assertSee('Step 2 Email')
             ->assertSee('Step 3 Email')
-            ->assertSee('Messages in this group')
-            ->assertSee('Change template selection from the campaign, webinar, or automatic follow-up setup screen.')
-            ->assertSee('Manage selection')
             ->assertSee(route('crm.campaigns.message-templates.index', [
                 'campaign' => 'webinar_attended_nurture',
                 'step' => 2,
             ]))
-            ->assertDontSee('Active template')
-            ->assertDontSee('Use selected template');
+            ->assertDontSee('name="message_template_preset_id"', false);
     }
 
     public function test_it_updates_email_template_safe_copy_fields(): void
@@ -422,6 +410,3 @@ class MessageTemplatePresetControllerTest extends TestCase
         $this->assertEqualsCanonicalizing(['cta', 'first_name', 'webinar_playback_url'], $preset->tokens);
     }
 }
-
-
-

@@ -51,21 +51,15 @@ class CampaignMessageTemplateControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/campaigns/message-templates?campaign='.$campaign->getKey())
             ->assertOk()
-            ->assertSee('Campaign Message Templates')
-            ->assertSee('Message selection')
-            ->assertSee('Webinar Attended Nurture')
-            ->assertSee('Step 1')
-            ->assertSee('Delivery options')
-            ->assertSee('Email follow-up')
-            ->assertSee('Active template')
-            ->assertSee('Step 1 Email')
-            ->assertSee('Save selection')
-            ->assertSee('Edit copy')
+            ->assertSee($campaign->name)
+            ->assertSee($step->name)
+            ->assertSee($emailVariant->name)
+            ->assertSee($emailPreset->name)
+            ->assertSee('name="campaign_step_variant_id"', false)
+            ->assertSee('name="message_template_preset_id"', false)
             ->assertSee(route('crm.messaging.message-templates.index', ['module' => 'campaigns']), false)
-            ->assertSee('Campaigns decide the journey, business moments, timing, and step order')
-            ->assertDontSee('Subject')
-            ->assertDontSee('Body')
-            ->assertDontSee('Template title');
+            ->assertDontSee('name="subject"', false)
+            ->assertDontSee('name="body"', false);
     }
 
     public function test_it_updates_the_selected_template_for_a_campaign_step_variant(): void
@@ -313,4 +307,3 @@ class CampaignMessageTemplateControllerTest extends TestCase
         return $preset;
     }
 }
-

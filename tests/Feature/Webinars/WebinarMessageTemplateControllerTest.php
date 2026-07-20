@@ -60,28 +60,23 @@ class WebinarMessageTemplateControllerTest extends TestCase
 
         $this->withoutMiddleware(ForceStagingAccess::class);
 
+        $areas = config('webinars.message_areas');
+
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/webinars/message-templates')
             ->assertOk()
-            ->assertSee('Webinar Messages')
-            ->assertSee('Message selection')
-            ->assertSee('Setup readiness')
-            ->assertSee('Registration confirmations')
-            ->assertSee('Registration opt-in confirmations')
-            ->assertSee('Reminder messages')
-            ->assertSee('Waitlist availability messages')
-            ->assertSee('Waitlist opt-in confirmations')
-            ->assertSee('Attended replay follow-up')
-            ->assertSee('Missed replay follow-up')
-            ->assertSee('Active template')
+            ->assertSee($areas['confirmation']['label'])
+            ->assertSee($areas['registration_opt_in']['label'])
+            ->assertSee($areas['reminders']['label'])
+            ->assertSee($areas['waitlist']['label'])
+            ->assertSee($areas['waitlist_opt_in']['label'])
+            ->assertSee($areas['post_attended']['label'])
+            ->assertSee($areas['post_missed']['label'])
             ->assertSee('Confirmation Email')
-            ->assertSee('Save selection')
-            ->assertSee('Edit copy')
+            ->assertSee('name="message_template_preset_id"', false)
             ->assertSee(route('crm.messaging.message-templates.index', ['module' => 'webinars']), false)
-            ->assertSee('Webinars decide when lifecycle messages are scheduled')
-            ->assertDontSee('Subject')
-            ->assertDontSee('Body')
-            ->assertDontSee('Template title');
+            ->assertDontSee('name="subject"', false)
+            ->assertDontSee('name="body"', false);
     }
 
     public function test_opt_in_section_explains_messaging_owned_delivery_without_requesting_a_webinar_template(): void
@@ -131,12 +126,8 @@ class WebinarMessageTemplateControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/webinars/message-templates?section=registration_opt_in')
             ->assertOk()
-            ->assertSee('Messaging-managed')
-            ->assertSee('Messaging owns this opt-in acknowledgement')
-            ->assertSee('No Webinar template selection is required here')
-            ->assertSee('Included with confirmation')
-            ->assertDontSee('No synced Messaging template is available for this webinar message area yet.')
-            ->assertDontSee('Template for this message');
+            ->assertSee(config('webinars.message_areas.registration_opt_in.label'))
+            ->assertDontSee('name="message_template_preset_id"', false);
     }
 
     public function test_it_updates_the_selected_template_for_a_webinar_message_context(): void
@@ -454,10 +445,8 @@ class WebinarMessageTemplateControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/webinars/message-templates?section=confirmation')
             ->assertOk()
-            ->assertSee('After 10 minutes')
-            ->assertDontSee('Timing</dt>
-                                                            <dd class="mt-1 font-semibold text-slate-900">
-                                                                Immediate', false);
+            ->assertSee('10 minutes')
+            ->assertDontSee('>Immediate<', false);
     }
 
     public function test_index_displays_next_day_at_timing_from_the_active_webinar_schedule_profile(): void
@@ -520,7 +509,7 @@ class WebinarMessageTemplateControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/webinars/message-templates?section=post_attended')
             ->assertOk()
-            ->assertSee('Next day at 09:00');
+            ->assertSee('09:00');
     }
 
 
@@ -539,8 +528,8 @@ class WebinarMessageTemplateControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/webinars/message-templates')
             ->assertOk()
-            ->assertDontSee('Missed replay follow-up')
-            ->assertSee('Attended replay follow-up');
+            ->assertDontSee(config('webinars.message_areas.post_missed.label'))
+            ->assertSee(config('webinars.message_areas.post_attended.label'));
     }
 
     public function test_update_rejects_a_template_assignment_for_a_disabled_message_area(): void

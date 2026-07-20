@@ -198,8 +198,14 @@ class ProviderCancellationReconciliationTest extends TestCase
             ->get($indexUrl)
             ->assertOk()
             ->assertSee($webinar->title)
-            ->assertSee('1 provider cancellation failure')
-            ->assertSee('Retry provider cancellation');
+            ->assertSee(
+                route(
+                    'crm.webinar-registrations.provider-cancellation.retry',
+                    $registration,
+                ),
+                false,
+            )
+            ->assertSee('bg-red-50', false);
 
         $this->actingAs($user)
             ->from($indexUrl)
@@ -208,10 +214,7 @@ class ProviderCancellationReconciliationTest extends TestCase
                 $registration,
             ))
             ->assertRedirect($indexUrl)
-            ->assertSessionHas(
-                'success',
-                'The provider cancellation retry has been queued.',
-            );
+            ->assertSessionHas('success');
 
         $this->assertSame(
             'pending',

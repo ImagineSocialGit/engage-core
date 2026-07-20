@@ -5,7 +5,9 @@ namespace App\Modules\Webinars\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Modules\Webinars\Actions\ResolveWebinarJoinUrlAction;
 use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Support\WebinarJoinBrowserProof;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\URL;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -40,9 +42,27 @@ class WebinarJoinRedirectController extends Controller
 
     public function store(
         string $token,
+        Request $request,
         ResolveWebinarJoinUrlAction $resolveWebinarJoinUrlAction,
+        WebinarJoinBrowserProof $browserProof,
     ): RedirectResponse {
         $registration = $this->registrationForToken($token);
+        $submittedProof = trim((string) $request->input('browser_proof', ''));
+
+        if (
+            $submittedProof !== ''
+            && ! $browserProof->validFor($submittedProof, $registration)
+        ) {
+            return redirect()
+                ->route('webinar.join.redirect', [
+                    'token' => $registration->join_token,
+                ])
+                ->with(
+                    'join_auto_continue_failed',
+                    'Automatic continuation expired. Use the button below to continue safely.',
+                );
+        }
+
         $destination = $resolveWebinarJoinUrlAction->execute($registration);
 
         if (blank($destination)) {

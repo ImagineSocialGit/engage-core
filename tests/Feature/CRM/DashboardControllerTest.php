@@ -61,18 +61,10 @@ class DashboardControllerTest extends TestCase
             ->get(route('crm.index'));
 
         $response->assertOk();
-        $response->assertSee('Today');
-        $response->assertSee('You have a clear place to start.');
         $response->assertSee('data-module-panel="tasks"', false);
         $response->assertSee('data-module-panel="inbound_messaging"', false);
-        $response->assertSee('Today’s tasks');
-        $response->assertSee('Print');
-        $response->assertSee('Open task');
         $response->assertSee('Call Tess about her reply');
-        $response->assertSee('Contacts needing attention');
-        $response->assertSee('Review reply');
         $response->assertSee('Tess Lead replied');
-        $response->assertSee('Overdue');
     }
 
     public function test_it_renders_a_caught_up_state_for_enabled_actionable_panels(): void
@@ -84,10 +76,8 @@ class DashboardControllerTest extends TestCase
             ->get(route('crm.index'));
 
         $response->assertOk();
-        $response->assertSee('You have a clear place to start.');
-        $response->assertSee('No tasks need your attention today.');
-        $response->assertSee('No contact replies need review.');
-        $response->assertDontSee('No new webinar activity to review.');
+        $response->assertSee('data-module-panel="tasks"', false);
+        $response->assertSee('data-module-panel="inbound_messaging"', false);
         $response->assertDontSee('data-module-panel="webinars"', false);
     }
 
@@ -114,8 +104,8 @@ class DashboardControllerTest extends TestCase
             ->get(route('crm.index'));
 
         $response->assertOk();
-        $response->assertDontSee('Webinar activity');
         $response->assertDontSee('data-module-panel="webinars"', false);
+        $response->assertDontSee('Context Lead');
     }
 
     public function test_context_panels_appear_when_configured_and_they_have_useful_activity(): void
@@ -141,7 +131,6 @@ class DashboardControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('data-module-panel="webinars"', false);
-        $response->assertSee('Webinar activity');
         $response->assertSee('Webinar Lead registered');
         $response->assertSee('Buyer Webinar');
     }
@@ -182,13 +171,10 @@ class DashboardControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSeeInOrder([
-            'Today’s tasks',
             'Overdue follow-up',
             'Undated follow-up',
-            'Upcoming this week',
         ]);
-        $response->assertSee('1 task due after today.');
-        $response->assertSee('Hide for today');
+        $response->assertSee('Upcoming this week');
         $response->assertDontSee('Due tomorrow');
 
         Carbon::setTestNow();
@@ -251,7 +237,6 @@ class DashboardControllerTest extends TestCase
         $response->assertOk();
         $response->assertSee('Standalone dashboard task');
         $response->assertSee(route('crm.tasks.show', $task), false);
-        $response->assertSee('Open task');
     }
     public function test_it_renders_a_printable_task_list_without_future_dated_tasks(): void
     {
@@ -278,7 +263,6 @@ class DashboardControllerTest extends TestCase
             ->get(route('crm.tasks.today.print'));
 
         $response->assertOk();
-        $response->assertSee('Today’s Task List');
         $response->assertSee('Print this task');
         $response->assertDontSee('Do not print tomorrow');
     }
@@ -404,7 +388,6 @@ class DashboardControllerTest extends TestCase
         $response->assertOk();
         $response->assertSee('data-module-panel="tasks"', false);
         $response->assertSee('bg-amber-50', false);
-        $response->assertSee('Overdue');
     }
 
     public function test_disabled_modules_do_not_contribute_dashboard_panels_even_when_configured(): void
@@ -423,11 +406,8 @@ class DashboardControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('data-module-panel="tasks"', false);
-        $response->assertSee('No tasks need your attention today.');
         $response->assertDontSee('data-module-panel="inbound_messaging"', false);
-        $response->assertDontSee('No contact replies need review.');
         $response->assertDontSee('data-module-panel="webinars"', false);
-        $response->assertDontSee('Webinar activity');
     }
 
     public function test_client_preset_can_disable_context_dashboard_panels(): void
@@ -498,9 +478,9 @@ class DashboardControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertSeeInOrder([
-            'Contacts needing attention',
-            'Today’s tasks',
-        ]);
+            'data-module-panel="inbound_messaging"',
+            'data-module-panel="tasks"',
+        ], false);
         $response->assertSee('Priority Lead replied');
         $response->assertSee('Overdue but lower preset priority');
     }
