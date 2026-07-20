@@ -1,4 +1,3 @@
-
 @props([
     'page',
     'tokens',
@@ -38,15 +37,55 @@
     $marketingSmsAvailable = $marketingSmsConfigured
         && in_array('sms', $marketingChannels, true);
 
+    $transactionalConsentOrder = collect(
+        data_get($page, 'consents.transactional.order', ['email', 'sms']),
+    )
+        ->filter(fn (mixed $channel): bool => in_array($channel, ['email', 'sms'], true))
+        ->unique()
+        ->values();
+
+    foreach (['email', 'sms'] as $channel) {
+        if (! $transactionalConsentOrder->contains($channel)) {
+            $transactionalConsentOrder->push($channel);
+        }
+    }
+
+    $requiredTransactionalChannels = collect(
+        data_get($page, 'consents.transactional.required_channels', []),
+    )
+        ->filter(fn (mixed $channel): bool => in_array($channel, ['email', 'sms'], true))
+        ->unique()
+        ->values();
+
+    $transactionalEmailRequired = $requiredTransactionalChannels->contains('email');
+    $transactionalSmsRequired = $requiredTransactionalChannels->contains('sms');
+    $hasExplicitRequiredTransactionalChannels = $requiredTransactionalChannels->isNotEmpty();
+
+    $combinedMarketingConfigured = data_get($page, 'consents.marketing.combined', false) === true;
+    $combinedMarketingAvailable = $combinedMarketingConfigured
+        && $marketingEmailAvailable
+        && $marketingSmsAvailable;
+
     $transactionalConsentAvailable = $transactionalEmailAvailable || $transactionalSmsAvailable;
-    $marketingConsentAvailable = $marketingEmailAvailable || $marketingSmsAvailable;
+    $marketingConsentAvailable = $combinedMarketingAvailable
+        || $marketingEmailAvailable
+        || $marketingSmsAvailable;
     $smsAvailable = $transactionalSmsAvailable || $marketingSmsAvailable;
 
     $smsConsentModels = array_values(array_filter([
         $transactionalSmsAvailable ? 'transactionalSmsConsent' : null,
-        $marketingSmsAvailable ? 'marketingSmsConsent' : null,
+        $combinedMarketingAvailable
+            ? 'marketingConsent'
+            : ($marketingSmsAvailable ? 'marketingSmsConsent' : null),
     ]));
-    $smsConsentRequirement = implode(' || ', $smsConsentModels);
+    $smsConsentRequirement = $smsConsentModels === []
+        ? 'false'
+        : implode(' || ', $smsConsentModels);
+
+    $transactionalConsentErrorMessage = $notificationSection['error']
+        ?? ($transactionalEmailRequired
+            ? 'Choose email so we can send your webinar confirmation and access details.'
+            : 'Choose email or text so we can send your webinar details.');
 
     $botReadyValue = (string) config(
         'webinars.registration.bot_protection.ready_value',
@@ -145,13 +184,32 @@
                 x-data="{
                     transactionalEmailConsent: @js((bool) old('transactional_email_consent')),
                     transactionalSmsConsent: @js((bool) old('transactional_sms_consent')),
+                    marketingConsent: @js((bool) old('marketing_consent')),
                     marketingSmsConsent: @js((bool) old('marketing_sms_consent')),
+                    transactionalEmailRequired: @js($transactionalEmailRequired),
+                    transactionalSmsRequired: @js($transactionalSmsRequired),
+                    hasExplicitRequiredTransactionalChannels: @js($hasExplicitRequiredTransactionalChannels),
                     registrationFormReady: '',
                     registrationFormInteracted: '',
                     transactionalConsentError: false,
                     submitting: false,
+                    hasRequiredTransactionalConsent() {
+                        if (this.transactionalEmailRequired && ! this.transactionalEmailConsent) {
+                            return false
+                        }
+
+                        if (this.transactionalSmsRequired && ! this.transactionalSmsConsent) {
+                            return false
+                        }
+
+                        if (! this.hasExplicitRequiredTransactionalChannels) {
+                            return this.transactionalEmailConsent || this.transactionalSmsConsent
+                        }
+
+                        return true
+                    },
                     submitRegistration(event) {
-                        if (! this.transactionalEmailConsent && ! this.transactionalSmsConsent) {
+                        if (! this.hasRequiredTransactionalConsent()) {
                             event.preventDefault()
                             this.transactionalConsentError = true
                             this.$nextTick(() => this.$refs.transactionalConsentGroup?.focus())
@@ -367,87 +425,95 @@
                     @endif
 
                     <div class="mt-3 space-y-4">
-                        @if($transactionalEmailAvailable)
-                            <div>
-                                <label
-                                    for="transactional_email_consent"
-                                    class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
-                                >
-                                    <input
-                                        id="transactional_email_consent"
-                                        name="transactional_email_consent"
-                                        type="checkbox"
-                                        value="1"
-                                        x-model="transactionalEmailConsent"
-                                        @checked(old('transactional_email_consent'))
-                                        @if(filled($page['fields']['consent_messages']['email']['helper'] ?? null))
-                                            aria-describedby="transactional_email_consent_helper"
-                                        @endif
-                                        class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
+                        @foreach($transactionalConsentOrder as $channel)
+                            @if($channel === 'sms' && $transactionalSmsAvailable)
+                                <div>
+                                    <label
+                                        for="transactional_sms_consent"
+                                        class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
                                     >
+                                        <input
+                                            id="transactional_sms_consent"
+                                            name="transactional_sms_consent"
+                                            type="checkbox"
+                                            value="1"
+                                            x-model="transactionalSmsConsent"
+                                            @checked(old('transactional_sms_consent'))
+                                            @if($transactionalSmsRequired)
+                                                required
+                                                aria-required="true"
+                                            @endif
+                                            @if(filled($page['fields']['consent_messages']['sms']['disclosure'] ?? null))
+                                                aria-describedby="transactional_sms_consent_disclosure"
+                                            @endif
+                                            class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
+                                        >
 
-                                    <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }} font-medium">
-                                        {{ $page['fields']['consent_messages']['email']['label'] ?? 'Email me webinar information.' }}
-                                    </span>
-                                </label>
+                                        <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }} font-medium">
+                                            {{ $page['fields']['consent_messages']['sms']['label'] ?? 'Text me webinar reminders and access information. (Optional)' }}
+                                        </span>
+                                    </label>
 
-                                @if(filled($page['fields']['consent_messages']['email']['helper'] ?? null))
-                                    <p
-                                        id="transactional_email_consent_helper"
-                                        class="pl-7 text-xs leading-5 text-slate-500"
+                                    @if(filled($page['fields']['consent_messages']['sms']['disclosure'] ?? null))
+                                        <p
+                                            id="transactional_sms_consent_disclosure"
+                                            class="pl-7 text-xs leading-5 text-slate-500"
+                                        >
+                                            {{ $page['fields']['consent_messages']['sms']['disclosure'] }}
+                                        </p>
+                                    @endif
+
+                                    @error('transactional_sms_consent')
+                                        <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                                            {{ $message }}
+                                        </p>
+                                    @enderror
+                                </div>
+                            @elseif($channel === 'email' && $transactionalEmailAvailable)
+                                <div>
+                                    <label
+                                        for="transactional_email_consent"
+                                        class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
                                     >
-                                        {{ $page['fields']['consent_messages']['email']['helper'] }}
-                                    </p>
-                                @endif
+                                        <input
+                                            id="transactional_email_consent"
+                                            name="transactional_email_consent"
+                                            type="checkbox"
+                                            value="1"
+                                            x-model="transactionalEmailConsent"
+                                            @checked(old('transactional_email_consent'))
+                                            @if($transactionalEmailRequired)
+                                                required
+                                                aria-required="true"
+                                            @endif
+                                            @if(filled($page['fields']['consent_messages']['email']['helper'] ?? null))
+                                                aria-describedby="transactional_email_consent_helper"
+                                            @endif
+                                            class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
+                                        >
 
-                                @error('transactional_email_consent')
-                                    <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
-                                        {{ $message }}
-                                    </p>
-                                @enderror
-                            </div>
-                        @endif
+                                        <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }} font-medium">
+                                            {{ $page['fields']['consent_messages']['email']['label'] ?? 'Email me webinar information.' }}
+                                        </span>
+                                    </label>
 
-                        @if($transactionalSmsAvailable)
-                            <div>
-                                <label
-                                    for="transactional_sms_consent"
-                                    class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
-                                >
-                                    <input
-                                        id="transactional_sms_consent"
-                                        name="transactional_sms_consent"
-                                        type="checkbox"
-                                        value="1"
-                                        x-model="transactionalSmsConsent"
-                                        @checked(old('transactional_sms_consent'))
-                                        @if(filled($page['fields']['consent_messages']['sms']['disclosure'] ?? null))
-                                            aria-describedby="transactional_sms_consent_disclosure"
-                                        @endif
-                                        class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
-                                    >
+                                    @if(filled($page['fields']['consent_messages']['email']['helper'] ?? null))
+                                        <p
+                                            id="transactional_email_consent_helper"
+                                            class="pl-7 text-xs leading-5 text-slate-500"
+                                        >
+                                            {{ $page['fields']['consent_messages']['email']['helper'] }}
+                                        </p>
+                                    @endif
 
-                                    <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }} font-medium">
-                                        {{ $page['fields']['consent_messages']['sms']['label'] ?? 'Text me webinar reminders and access information. (Optional)' }}
-                                    </span>
-                                </label>
-
-                                @if(filled($page['fields']['consent_messages']['sms']['disclosure'] ?? null))
-                                    <p
-                                        id="transactional_sms_consent_disclosure"
-                                        class="pl-7 text-xs leading-5 text-slate-500"
-                                    >
-                                        {{ $page['fields']['consent_messages']['sms']['disclosure'] }}
-                                    </p>
-                                @endif
-
-                                @error('transactional_sms_consent')
-                                    <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
-                                        {{ $message }}
-                                    </p>
-                                @enderror
-                            </div>
-                        @endif
+                                    @error('transactional_email_consent')
+                                        <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                                            {{ $message }}
+                                        </p>
+                                    @enderror
+                                </div>
+                            @endif
+                        @endforeach
                     </div>
 
                     <p
@@ -456,7 +522,7 @@
                         role="alert"
                         class="{{ $tokens['field_error'] ?? 'mt-3 text-sm text-red-600' }}"
                     >
-                        Choose email or text so we can send your webinar details.
+                        {{ $transactionalConsentErrorMessage }}
                     </p>
 
                     @error('transactional_consent')
@@ -480,73 +546,114 @@
                     @endif
 
                     <div class="mt-1 space-y-4">
-                        @if($marketingEmailAvailable)
+                        @if($combinedMarketingAvailable)
                             <div>
                                 <label
-                                    for="marketing_email_consent"
+                                    for="marketing_consent"
                                     class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
                                 >
                                     <input
-                                        id="marketing_email_consent"
-                                        name="marketing_email_consent"
+                                        id="marketing_consent"
+                                        name="marketing_consent"
                                         type="checkbox"
                                         value="1"
-                                        @checked(old('marketing_email_consent'))
-                                        class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
-                                    >
-
-                                    <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }} font-medium">
-                                        {{ $page['fields']['marketing_consent_messages']['email']['label'] ?? 'Send me future webinar and educational emails.' }}
-                                    </span>
-                                </label>
-
-                                @error('marketing_email_consent')
-                                    <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
-                                        {{ $message }}
-                                    </p>
-                                @enderror
-                            </div>
-                        @endif
-
-                        @if($marketingSmsAvailable)
-                            <div>
-                                <label
-                                    for="marketing_sms_consent"
-                                    class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
-                                >
-                                    <input
-                                        id="marketing_sms_consent"
-                                        name="marketing_sms_consent"
-                                        type="checkbox"
-                                        value="1"
-                                        x-model="marketingSmsConsent"
-                                        @checked(old('marketing_sms_consent'))
-                                        @if(filled($page['fields']['marketing_consent_messages']['sms']['disclosure'] ?? null))
-                                            aria-describedby="marketing_sms_consent_disclosure"
+                                        x-model="marketingConsent"
+                                        @checked(old('marketing_consent'))
+                                        @if(filled($page['fields']['marketing_consent_messages']['combined']['disclosure'] ?? null))
+                                            aria-describedby="marketing_consent_disclosure"
                                         @endif
                                         class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
                                     >
 
                                     <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }} font-medium">
-                                        {{ $page['fields']['marketing_consent_messages']['sms']['label'] ?? 'Send me future webinar and educational texts.' }}
+                                        {{ $page['fields']['marketing_consent_messages']['combined']['label'] ?? 'Keep learning. Send me future webinar and educational emails and text messages.' }}
                                     </span>
                                 </label>
 
-                                @error('marketing_sms_consent')
+                                @if(filled($page['fields']['marketing_consent_messages']['combined']['disclosure'] ?? null))
+                                    <p
+                                        id="marketing_consent_disclosure"
+                                        class="pl-7 text-xs leading-5 text-slate-500"
+                                    >
+                                        {{ $page['fields']['marketing_consent_messages']['combined']['disclosure'] }}
+                                    </p>
+                                @endif
+
+                                @error('marketing_consent')
                                     <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
                                         {{ $message }}
                                     </p>
                                 @enderror
-                            
-                                @if(filled($page['fields']['marketing_consent_messages']['sms']['disclosure'] ?? null))
-                                    <p
-                                        id="marketing_sms_consent_disclosure"
-                                        class="pl-7 text-xs leading-5 text-slate-500"
-                                    >
-                                        {{ $page['fields']['marketing_consent_messages']['sms']['disclosure'] }}
-                                    </p>
-                                @endif
                             </div>
+                        @else
+                            @if($marketingEmailAvailable)
+                                <div>
+                                    <label
+                                        for="marketing_email_consent"
+                                        class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
+                                    >
+                                        <input
+                                            id="marketing_email_consent"
+                                            name="marketing_email_consent"
+                                            type="checkbox"
+                                            value="1"
+                                            @checked(old('marketing_email_consent'))
+                                            class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
+                                        >
+
+                                        <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }} font-medium">
+                                            {{ $page['fields']['marketing_consent_messages']['email']['label'] ?? 'Send me future webinar and educational emails.' }}
+                                        </span>
+                                    </label>
+
+                                    @error('marketing_email_consent')
+                                        <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                                            {{ $message }}
+                                        </p>
+                                    @enderror
+                                </div>
+                            @endif
+
+                            @if($marketingSmsAvailable)
+                                <div>
+                                    <label
+                                        for="marketing_sms_consent"
+                                        class="{{ $checkbox['wrapper'] ?? 'flex items-start gap-3' }}"
+                                    >
+                                        <input
+                                            id="marketing_sms_consent"
+                                            name="marketing_sms_consent"
+                                            type="checkbox"
+                                            value="1"
+                                            x-model="marketingSmsConsent"
+                                            @checked(old('marketing_sms_consent'))
+                                            @if(filled($page['fields']['marketing_consent_messages']['sms']['disclosure'] ?? null))
+                                                aria-describedby="marketing_sms_consent_disclosure"
+                                            @endif
+                                            class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
+                                        >
+
+                                        <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }} font-medium">
+                                            {{ $page['fields']['marketing_consent_messages']['sms']['label'] ?? 'Send me future webinar and educational texts.' }}
+                                        </span>
+                                    </label>
+
+                                    @error('marketing_sms_consent')
+                                        <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                                            {{ $message }}
+                                        </p>
+                                    @enderror
+
+                                    @if(filled($page['fields']['marketing_consent_messages']['sms']['disclosure'] ?? null))
+                                        <p
+                                            id="marketing_sms_consent_disclosure"
+                                            class="pl-7 text-xs leading-5 text-slate-500"
+                                        >
+                                            {{ $page['fields']['marketing_consent_messages']['sms']['disclosure'] }}
+                                        </p>
+                                    @endif
+                                </div>
+                            @endif
                         @endif
                     </div>
                     </fieldset>

@@ -82,6 +82,7 @@ final class ClientEnvironmentLoader
         'TWILIO_VIRTUAL_PHONE',
 
         'WEBINAR_PROVIDER',
+        'WEBINAR_BOOKING_URL',
 
         'ZOOM_ACCOUNT_ID',
         'ZOOM_CLIENT_ID',

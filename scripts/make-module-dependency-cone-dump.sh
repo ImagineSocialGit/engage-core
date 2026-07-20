@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Run from the Engage Core repository root.
+# Place in scripts/ under the Engage Core repository root.
 # Produces: file_dumps/<ModuleName>_dependency_cone_dump.txt
 
-ROOT_DIR="$(pwd)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 MODULES_DIR="$ROOT_DIR/app/Modules"
 MODULE_CONFIG="$ROOT_DIR/config/modules.php"
 OUTPUT_DIR="$ROOT_DIR/file_dumps"
 
 if [[ ! -d "$MODULES_DIR" ]]; then
     echo "Error: app/Modules was not found under: $ROOT_DIR" >&2
-    echo "Run this script from the Engage Core repository root." >&2
+    echo "Place this script in the Engage Core repository scripts/ directory." >&2
     exit 1
 fi
 
@@ -226,7 +227,11 @@ is_forbidden_file() {
             ;;
     esac
 
-    if [[ "$base" == ".env" || "$base" == .env.* ]]; then
+    if [[ "$base" == ".env" ]]; then
+        return 0
+    fi
+
+    if [[ "$base" == .env.* && "$base" != ".env.example" ]]; then
         return 0
     fi
 
@@ -334,6 +339,7 @@ BASELINE_PATHS=(
     "app/Support/Modules/ModuleManager.php"
     "config/app.php"
     "config/modules.php"
+    ".env.example"
 )
 
 for relative_path in "${BASELINE_PATHS[@]}"; do
@@ -348,6 +354,169 @@ for baseline_dir in "$ROOT_DIR/app/Providers" "$ROOT_DIR/routes"; do
         add_file "$file" "$BASELINE_FILES"
     done < <(find "$baseline_dir" -type f -print)
 done
+
+
+CONFIG_FILES="$TMP_DIR/config-files.txt"
+MIGRATION_FILES="$TMP_DIR/migration-files.txt"
+MIGRATION_TABLE_INDEX="$TMP_DIR/migration-table-index.tsv"
+MODEL_TABLES="$TMP_DIR/model-tables.txt"
+RUNTIME_FILES="$TMP_DIR/runtime-files.txt"
+RUNTIME_QUEUE="$TMP_DIR/runtime-queue.txt"
+RUNTIME_PROCESSED="$TMP_DIR/runtime-processed.txt"
+: > "$CONFIG_FILES"
+: > "$MIGRATION_FILES"
+: > "$MIGRATION_TABLE_INDEX"
+: > "$MODEL_TABLES"
+: > "$RUNTIME_FILES"
+: > "$RUNTIME_QUEUE"
+: > "$RUNTIME_PROCESSED"
+
+extract_config_roots() {
+    local file="$1"
+
+    grep -Eho "config\([[:space:]]*['\"][A-Za-z0-9_.-]+['\"]" "$file" 2>/dev/null \
+        | sed -E "s/^config\([[:space:]]*['\"]//; s/['\"]$//" \
+        | cut -d. -f1 \
+        | sort -u \
+        || true
+}
+
+extract_database_tables() {
+    local file="$1"
+
+    grep -Eho "(Schema::(create|table|hasTable)|DB::table|from|join|leftJoin|rightJoin|updateOrInsert|insertOrIgnore)\([[:space:]]*['\"][A-Za-z0-9_]+['\"]" "$file" 2>/dev/null \
+        | sed -E "s/^.*\([[:space:]]*['\"]//; s/['\"]$//" \
+        | sort -u \
+        || true
+}
+
+build_migration_table_index() {
+    php -d display_errors=1 -r '
+$root = rtrim($argv[1], DIRECTORY_SEPARATOR);
+$directory = $root.DIRECTORY_SEPARATOR."database".DIRECTORY_SEPARATOR."migrations";
+$files = glob($directory.DIRECTORY_SEPARATOR."*.php") ?: [];
+
+foreach ($files as $file) {
+    $source = file_get_contents($file);
+
+    if (!is_string($source) || $source === "") {
+        continue;
+    }
+
+    $tables = [];
+
+    $singleTablePatterns = [
+        "/Schema\\s*::\\s*(?:connection\\s*\\([^;]*?\\)\\s*->\\s*)?(?:create|table|drop|dropIfExists)\\s*\\(\\s*([\\x27\\x22])([A-Za-z0-9_]+)\\1/s",
+    ];
+
+    foreach ($singleTablePatterns as $pattern) {
+        if (preg_match_all($pattern, $source, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $tables[$match[2]] = true;
+            }
+        }
+    }
+
+    $renamePattern = "/Schema\\s*::\\s*(?:connection\\s*\\([^;]*?\\)\\s*->\\s*)?rename\\s*\\(\\s*([\\x27\\x22])([A-Za-z0-9_]+)\\1\\s*,\\s*([\\x27\\x22])([A-Za-z0-9_]+)\\3/s";
+
+    if (preg_match_all($renamePattern, $source, $matches, PREG_SET_ORDER)) {
+        foreach ($matches as $match) {
+            $tables[$match[2]] = true;
+            $tables[$match[4]] = true;
+        }
+    }
+
+    foreach (array_keys($tables) as $table) {
+        echo $table."\t".$file."\n";
+    }
+}
+' "$ROOT_DIR" | sort -u > "$MIGRATION_TABLE_INDEX"
+}
+
+add_migrations_for_table() {
+    local table="$1"
+
+    [[ -n "$table" ]] || return 0
+
+    while IFS=$'\t' read -r indexed_table migration; do
+        [[ "$indexed_table" == "$table" ]] || continue
+        add_file "$migration" "$MIGRATION_FILES"
+    done < "$MIGRATION_TABLE_INDEX"
+}
+
+resolve_non_class_dependencies() {
+    local file="$1"
+    local config_root
+    local config_file
+    local table
+
+    while IFS= read -r config_root; do
+        [[ -n "$config_root" ]] || continue
+        config_file="$ROOT_DIR/config/${config_root}.php"
+        add_file "$config_file" "$CONFIG_FILES"
+    done < <(extract_config_roots "$file")
+
+    while IFS= read -r table; do
+        add_migrations_for_table "$table"
+    done < <(extract_database_tables "$file")
+}
+
+resolve_model_tables() {
+    php -d display_errors=1 -r '
+require $argv[1]."/vendor/autoload.php";
+
+$files = file($argv[2], FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+
+foreach ($files as $file) {
+    if (!is_file($file) || pathinfo($file, PATHINFO_EXTENSION) !== "php") {
+        continue;
+    }
+
+    $source = file_get_contents($file);
+
+    if (!is_string($source) || $source === "") {
+        continue;
+    }
+
+    if (!preg_match("/^\s*namespace\s+([^;]+);/m", $source, $namespaceMatch)) {
+        continue;
+    }
+
+    if (!preg_match("/^\s*(?:(?:final|abstract|readonly)\s+)*class\s+([A-Za-z_][A-Za-z0-9_]*)/m", $source, $classMatch)) {
+        continue;
+    }
+
+    $class = trim($namespaceMatch[1])."\\".$classMatch[1];
+
+    if (!class_exists($class) || !is_subclass_of($class, \Illuminate\Database\Eloquent\Model::class)) {
+        continue;
+    }
+
+    $reflection = new ReflectionClass($class);
+
+    if ($reflection->isAbstract()) {
+        continue;
+    }
+
+    try {
+        $model = $reflection->newInstanceWithoutConstructor();
+        $table = $model->getTable();
+    } catch (Throwable) {
+        continue;
+    }
+
+    if (is_string($table) && trim($table) !== "") {
+        echo trim($table)."\n";
+    }
+}
+' "$ROOT_DIR" "$RUNTIME_PROCESSED" | sort -u > "$MODEL_TABLES"
+
+    while IFS= read -r table; do
+        add_migrations_for_table "$table"
+    done < "$MODEL_TABLES"
+}
+
+build_migration_table_index
 
 class_to_file() {
     local class="$1"
@@ -380,6 +549,67 @@ class_to_file() {
     printf '%s/%s\n' "$ROOT_DIR" "$relative"
 }
 
+extract_same_namespace_project_classes() {
+    local file="$1"
+
+    php -d display_errors=1 -r '
+$root = rtrim($argv[1], DIRECTORY_SEPARATOR);
+$file = $argv[2];
+$source = file_get_contents($file);
+
+if (!is_string($source) || $source === "") {
+    exit(0);
+}
+
+if (!preg_match("/^\\s*namespace\\s+([^;]+);/m", $source, $namespaceMatch)) {
+    exit(0);
+}
+
+$namespace = trim($namespaceMatch[1]);
+
+if (!preg_match("/^(?:App|Database\\\\Factories|Database\\\\Seeders|Tests)(?:\\\\|$)/", $namespace)) {
+    exit(0);
+}
+
+$tokens = token_get_all($source);
+$seen = [];
+
+foreach ($tokens as $token) {
+    if (!is_array($token) || $token[0] !== T_STRING) {
+        continue;
+    }
+
+    $name = $token[1];
+
+    if (!preg_match("/^[A-Z][A-Za-z0-9_]*$/", $name)) {
+        continue;
+    }
+
+    $class = $namespace."\\".$name;
+
+    if (str_starts_with($class, "App\\")) {
+        $relative = "app".DIRECTORY_SEPARATOR.str_replace("\\", DIRECTORY_SEPARATOR, substr($class, 4)).".php";
+    } elseif (str_starts_with($class, "Database\\Factories\\")) {
+        $relative = "database".DIRECTORY_SEPARATOR."factories".DIRECTORY_SEPARATOR.str_replace("\\", DIRECTORY_SEPARATOR, substr($class, 19)).".php";
+    } elseif (str_starts_with($class, "Database\\Seeders\\")) {
+        $relative = "database".DIRECTORY_SEPARATOR."seeders".DIRECTORY_SEPARATOR.str_replace("\\", DIRECTORY_SEPARATOR, substr($class, 17)).".php";
+    } elseif (str_starts_with($class, "Tests\\")) {
+        $relative = "tests".DIRECTORY_SEPARATOR.str_replace("\\", DIRECTORY_SEPARATOR, substr($class, 6)).".php";
+    } else {
+        continue;
+    }
+
+    if (is_file($root.DIRECTORY_SEPARATOR.$relative)) {
+        $seen[$class] = true;
+    }
+}
+
+foreach (array_keys($seen) as $class) {
+    echo $class."\n";
+}
+' "$ROOT_DIR" "$file"
+}
+
 extract_project_classes() {
     local file="$1"
 
@@ -408,6 +638,8 @@ extract_project_classes() {
             | sed -E 's/^[[:space:]]*use[[:space:]]+//' \
             || true
     )
+
+    extract_same_namespace_project_classes "$file"
 }
 
 record_possible_boundary_violation() {
@@ -486,7 +718,58 @@ while [[ -s "$QUEUE_FILES" ]]; do
     sort -u "$NEXT_QUEUE" > "$QUEUE_FILES"
 done
 
-cat "$MATCHED_FILES" "$BASELINE_FILES" "$IMPORT_FILES" \
+# Build a runtime-only dependency traversal for config, table, and model-derived
+# migration resolution. Seed it from every runtime PHP file already admitted by
+# the broader cone traversal. Tests, docs, factories, seeders, config files, and
+# migrations remain evidence-only and cannot introduce runtime dependencies.
+while IFS= read -r file; do
+    [[ -f "$file" && "$file" == *.php ]] || continue
+
+    case "${file#$ROOT_DIR/}" in
+        app/*|bootstrap/*|routes/*)
+            printf '%s\n' "$file"
+            ;;
+    esac
+done < "$PROCESSED_FILES" | sort -u > "$RUNTIME_QUEUE"
+
+while [[ -s "$RUNTIME_QUEUE" ]]; do
+    CURRENT_RUNTIME_QUEUE="$TMP_DIR/current-runtime-queue.txt"
+    NEXT_RUNTIME_QUEUE="$TMP_DIR/next-runtime-queue.txt"
+    mv "$RUNTIME_QUEUE" "$CURRENT_RUNTIME_QUEUE"
+    : > "$NEXT_RUNTIME_QUEUE"
+
+    while IFS= read -r file; do
+        [[ -f "$file" ]] || continue
+        grep -Fxq "$file" "$RUNTIME_PROCESSED" && continue
+        printf '%s\n' "$file" >> "$RUNTIME_PROCESSED"
+        printf '%s\n' "$file" >> "$RUNTIME_FILES"
+
+        resolve_non_class_dependencies "$file"
+
+        while IFS= read -r class; do
+            [[ -n "$class" ]] || continue
+            resolved="$(class_to_file "$class" 2>/dev/null || true)"
+            [[ -n "$resolved" && -f "$resolved" ]] || continue
+            is_forbidden_file "$resolved" && continue
+            is_allowed_cone_file "$resolved" || continue
+
+            case "${resolved#$ROOT_DIR/}" in
+                app/*|bootstrap/*|routes/*)
+                    if ! grep -Fxq "$resolved" "$RUNTIME_PROCESSED"; then
+                        printf '%s\n' "$resolved" >> "$NEXT_RUNTIME_QUEUE"
+                    fi
+                    ;;
+            esac
+        done < <(extract_project_classes "$file" | sort -u)
+    done < "$CURRENT_RUNTIME_QUEUE"
+
+    sort -u "$NEXT_RUNTIME_QUEUE" > "$RUNTIME_QUEUE"
+done
+
+sort -u "$RUNTIME_FILES" -o "$RUNTIME_FILES"
+resolve_model_tables
+
+cat "$MATCHED_FILES" "$BASELINE_FILES" "$IMPORT_FILES" "$CONFIG_FILES" "$MIGRATION_FILES" \
     | sort -u \
     | while IFS= read -r file; do
         [[ -f "$file" ]] || continue
@@ -497,13 +780,16 @@ cat "$MATCHED_FILES" "$BASELINE_FILES" "$IMPORT_FILES" \
 
 comm -23 \
     <(sort -u "$IMPORT_FILES") \
-    <(cat "$MATCHED_FILES" "$BASELINE_FILES" | sort -u) \
+    <(cat "$MATCHED_FILES" "$BASELINE_FILES" "$CONFIG_FILES" "$MIGRATION_FILES" | sort -u) \
     > "$IMPORT_ONLY_FILES"
 
 FILE_COUNT="$(wc -l < "$FINAL_FILES" | tr -d ' ')"
 BASELINE_COUNT="$(sort -u "$BASELINE_FILES" | wc -l | tr -d ' ')"
 IMPORT_CANDIDATE_COUNT="$(sort -u "$IMPORT_FILES" | wc -l | tr -d ' ')"
 IMPORT_ONLY_COUNT="$(wc -l < "$IMPORT_ONLY_FILES" | tr -d ' ')"
+CONFIG_DEPENDENCY_COUNT="$(sort -u "$CONFIG_FILES" | wc -l | tr -d ' ')"
+MIGRATION_DEPENDENCY_COUNT="$(sort -u "$MIGRATION_FILES" | wc -l | tr -d ' ')"
+MODEL_TABLE_COUNT="$(sort -u "$MODEL_TABLES" | wc -l | tr -d ' ')"
 BOUNDARY_VIOLATION_COUNT="$(wc -l < "$BOUNDARY_VIOLATIONS" | tr -d ' ')"
 GENERATED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 
@@ -519,6 +805,9 @@ GENERATED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     echo "Baseline candidates included: $BASELINE_COUNT"
     echo "Import-resolved candidates found: $IMPORT_CANDIDATE_COUNT"
     echo "Files added only through import resolution: $IMPORT_ONLY_COUNT"
+    echo "Config files added through config-key resolution: $CONFIG_DEPENDENCY_COUNT"
+    echo "Runtime Eloquent model tables resolved: $MODEL_TABLE_COUNT"
+    echo "Migrations added through table ownership resolution: $MIGRATION_DEPENDENCY_COUNT"
     echo "Possible module boundary violations: $BOUNDARY_VIOLATION_COUNT"
     echo
     echo "Allowed module dependency closure:"
@@ -535,9 +824,14 @@ GENERATED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     printf '  - app/Modules/%s plus recursively declared depends_on modules (complete)\n' "$MODULE_NAME"
     echo "  - module-name and namespace references across non-module project roots"
     echo "  - shared routing, middleware, provider, module, and test infrastructure"
-    echo "  - recursive project-local PHP import resolution"
+    echo "  - recursive project-local PHP import and same-namespace class resolution"
+    echo "  - runtime traversal seeded from every admitted app/, bootstrap/, and routes/ PHP file"
+    echo "  - config(...) root resolution to config/<root>.php"
+    echo "  - runtime-only explicit database table resolution to migrations that create, alter, rename, or drop those tables"
+    echo "  - runtime-only Eloquent model getTable() resolution to migrations that create, alter, rename, or drop those tables"
+    echo "  - .env.example included as shared environment contract"
     echo "  - imports into out-of-closure modules reported but not included"
-    echo "  - all .env and .env.* files excluded"
+    echo "  - all environment files excluded except .env.example"
     echo
     echo "POSSIBLE MODULE BOUNDARY VIOLATIONS"
     echo "==================================="
@@ -589,4 +883,7 @@ echo "Allowed module closure: $(paste -sd ',' "$ALLOWED_MODULE_DIRS" | sed 's/,/
 echo "Baseline candidates: $BASELINE_COUNT"
 echo "Import-resolved candidates found: $IMPORT_CANDIDATE_COUNT"
 echo "Files added only through imports: $IMPORT_ONLY_COUNT"
+echo "Config dependencies: $CONFIG_DEPENDENCY_COUNT"
+echo "Runtime Eloquent model tables resolved: $MODEL_TABLE_COUNT"
+echo "Migration ownership dependencies: $MIGRATION_DEPENDENCY_COUNT"
 echo "Possible module boundary violations: $BOUNDARY_VIOLATION_COUNT"

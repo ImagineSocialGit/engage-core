@@ -26,6 +26,10 @@ return [
         'enabled' => true,
     ],
 
+    'booking' => [
+        'url' => null,
+    ],
+
     'outcome_messages' => [
         'channels' => [
             'email',

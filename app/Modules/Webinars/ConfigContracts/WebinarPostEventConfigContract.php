@@ -38,6 +38,11 @@ class WebinarPostEventConfigContract implements ConfigContract
             'recordings' => ConfigField::required(ConfigSchema::object([
                 'enabled' => ConfigField::required(ConfigSchema::boolean()),
             ])),
+            'booking' => ConfigField::required(ConfigSchema::object([
+                'url' => ConfigField::required(
+                    ConfigSchema::string(nullable: true),
+                ),
+            ])),
             'outcome_messages' => ConfigField::required(ConfigSchema::object([
                 // Legacy fields remain accepted during client-config migration,
                 // but message-area enablement and identity now live under

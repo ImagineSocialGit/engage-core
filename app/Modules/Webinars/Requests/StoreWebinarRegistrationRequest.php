@@ -70,6 +70,9 @@ class StoreWebinarRegistrationRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $phone = $this->input('phone');
+        $combinedMarketingConsent = $this->combinedMarketingConsentEnabled()
+            ? $this->boolean('marketing_consent')
+            : null;
 
         $this->merge([
             'first_name' => $this->trimmedString($this->input('first_name')),
@@ -80,8 +83,11 @@ class StoreWebinarRegistrationRequest extends FormRequest
 
             'transactional_email_consent' => $this->boolean('transactional_email_consent'),
             'transactional_sms_consent' => $this->boolean('transactional_sms_consent'),
-            'marketing_email_consent' => $this->boolean('marketing_email_consent'),
-            'marketing_sms_consent' => $this->boolean('marketing_sms_consent'),
+            'marketing_consent' => $this->boolean('marketing_consent'),
+            'marketing_email_consent' => $combinedMarketingConsent
+                ?? $this->boolean('marketing_email_consent'),
+            'marketing_sms_consent' => $combinedMarketingConsent
+                ?? $this->boolean('marketing_sms_consent'),
         ]);
     }
 
@@ -103,6 +109,7 @@ class StoreWebinarRegistrationRequest extends FormRequest
 
             'transactional_email_consent' => ['boolean'],
             'transactional_sms_consent' => ['boolean'],
+            'marketing_consent' => ['boolean'],
             'marketing_email_consent' => ['boolean'],
             'marketing_sms_consent' => ['boolean'],
 
@@ -122,10 +129,10 @@ class StoreWebinarRegistrationRequest extends FormRequest
 
                 $this->rejectUnavailableSelectedChannels($validator);
 
-                if (! $this->hasSelectedAvailableTransactionalChannel()) {
+                if (! $this->hasRequiredTransactionalConsent()) {
                     $validator->errors()->add(
                         'transactional_consent',
-                        'Choose at least one available method for receiving webinar details.',
+                        $this->transactionalConsentValidationMessage(),
                     );
                 }
             },
@@ -213,15 +220,67 @@ class StoreWebinarRegistrationRequest extends FormRequest
         return false;
     }
 
-    private function hasSelectedAvailableTransactionalChannel(): bool
+    private function hasRequiredTransactionalConsent(): bool
     {
-        foreach (['transactional_email_consent', 'transactional_sms_consent'] as $field) {
-            if ($this->consentFieldSelectable($field) && $this->boolean($field)) {
-                return true;
+        $requiredChannels = $this->requiredTransactionalChannels();
+
+        if ($requiredChannels === []) {
+            foreach (['transactional_email_consent', 'transactional_sms_consent'] as $field) {
+                if ($this->consentFieldSelectable($field) && $this->boolean($field)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        foreach ($requiredChannels as $channel) {
+            $field = "transactional_{$channel}_consent";
+
+            if (! $this->consentFieldSelectable($field) || ! $this->boolean($field)) {
+                return false;
             }
         }
 
-        return false;
+        return true;
+    }
+
+    /** @return array<int, string> */
+    private function requiredTransactionalChannels(): array
+    {
+        $channels = data_get(
+            $this->registrationConsentConfiguration(),
+            'transactional.required_channels',
+            [],
+        );
+
+        if (! is_array($channels)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(
+            $channels,
+            fn (mixed $channel): bool => in_array($channel, ['email', 'sms'], true),
+        )));
+    }
+
+    private function transactionalConsentValidationMessage(): string
+    {
+        $requiredChannels = $this->requiredTransactionalChannels();
+
+        if ($requiredChannels === ['email']) {
+            return 'Choose email so we can send your webinar confirmation and access details.';
+        }
+
+        if ($requiredChannels === ['sms']) {
+            return 'Choose text messages so we can send your webinar access details.';
+        }
+
+        if ($requiredChannels !== []) {
+            return 'Choose every required communication method for this webinar registration.';
+        }
+
+        return 'Choose at least one available method for receiving webinar details.';
     }
 
     private function rejectUnavailableSelectedChannels(Validator $validator): void
@@ -234,6 +293,17 @@ class StoreWebinarRegistrationRequest extends FormRequest
                 );
             }
         }
+    }
+
+    private function combinedMarketingConsentEnabled(): bool
+    {
+        return data_get(
+            $this->registrationConsentConfiguration(),
+            'marketing.combined',
+            false,
+        ) === true
+            && $this->consentFieldSelectable('marketing_email_consent')
+            && $this->consentFieldSelectable('marketing_sms_consent');
     }
 
     private function consentFieldSelectable(string $field): bool
