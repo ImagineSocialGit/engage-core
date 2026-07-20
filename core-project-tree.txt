@@ -1434,6 +1434,7 @@
 │       │   └── login.blade.php
 │       ├── webinar
 │       │   ├── index.blade.php
+│       │   ├── join-confirm.blade.php
 │       │   ├── notify-me.blade.php
 │       │   ├── register.blade.php
 │       │   ├── registration-cancellation-confirm.blade.php
@@ -1709,4 +1710,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-490 directories, 1220 files
+490 directories, 1221 files

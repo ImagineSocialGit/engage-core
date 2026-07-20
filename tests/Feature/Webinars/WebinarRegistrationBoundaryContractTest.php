@@ -180,7 +180,7 @@ class WebinarRegistrationBoundaryContractTest extends TestCase
         );
     }
 
-    public function test_join_redirect_get_does_not_record_a_trusted_click_or_skip_live_reminders(): void
+    public function test_join_get_head_and_repeated_get_only_show_confirmation_without_mutation(): void
     {
         $webinar = Webinar::factory()->create([
             'join_url' => 'https://example.test/webinar/join',
@@ -209,8 +209,20 @@ class WebinarRegistrationBoundaryContractTest extends TestCase
         ]);
 
         foreach (['get', 'head', 'get'] as $method) {
-            $this->{$method}($url)
-                ->assertRedirect('https://example.test/webinar/join');
+            $response = $this->{$method}($url)->assertOk();
+
+            if ($method === 'get') {
+                $response
+                    ->assertViewIs('webinar.join-confirm')
+                    ->assertViewHas('registration', function (
+                        WebinarRegistration $viewRegistration,
+                    ) use ($registration): bool {
+                        return $viewRegistration->is($registration);
+                    })
+                    ->assertViewHas('continueUrl')
+                    ->assertSee('Ready to join?')
+                    ->assertDontSee('https://example.test/webinar/join');
+            }
         }
 
         $registration->refresh();
@@ -225,6 +237,207 @@ class WebinarRegistrationBoundaryContractTest extends TestCase
             ScheduledMessage::STATUS_PENDING,
             $scheduledMessage->status,
         );
+    }
+
+    public function test_signed_join_post_records_trusted_interaction_and_skips_eligible_reminders(): void
+    {
+        $webinar = Webinar::factory()->create([
+            'join_url' => 'https://example.test/webinar/join',
+        ]);
+
+        $registration = WebinarRegistration::factory()
+            ->for($webinar)
+            ->create([
+                'status' => 'registered',
+                'meta' => [
+                    'existing' => 'preserved',
+                ],
+            ]);
+
+        $skippableMessage = ScheduledMessage::factory()->create([
+            'context_type' => $registration->getMorphClass(),
+            'context_id' => $registration->getKey(),
+            'status' => ScheduledMessage::STATUS_PENDING,
+            'meta' => [
+                'skip_when_join_clicked' => true,
+            ],
+        ]);
+
+        $unrelatedMessage = ScheduledMessage::factory()->create([
+            'context_type' => $registration->getMorphClass(),
+            'context_id' => $registration->getKey(),
+            'status' => ScheduledMessage::STATUS_PENDING,
+            'meta' => [
+                'skip_when_join_clicked' => false,
+            ],
+        ]);
+
+        $url = $this->signedJoinContinuationUrl($registration);
+
+        $this->post($url)
+            ->assertRedirect('https://example.test/webinar/join');
+
+        $registration->refresh();
+        $skippableMessage->refresh();
+        $unrelatedMessage->refresh();
+
+        $this->assertSame('preserved', data_get($registration->meta, 'existing'));
+        $this->assertNotNull(data_get($registration->meta, 'join_clicked_at'));
+        $this->assertSame(1, data_get($registration->meta, 'join_click_count'));
+        $this->assertSame(
+            'public_signed_post',
+            data_get($registration->meta, 'join_interaction.source'),
+        );
+        $this->assertSame(
+            data_get($registration->meta, 'join_interaction.first_confirmed_at'),
+            data_get($registration->meta, 'join_interaction.last_confirmed_at'),
+        );
+        $this->assertSame(
+            1,
+            data_get($registration->meta, 'join_interaction.confirmed_count'),
+        );
+        $this->assertSame(
+            ScheduledMessage::STATUS_SKIPPED,
+            $skippableMessage->status,
+        );
+        $this->assertSame(
+            ScheduledMessage::STATUS_PENDING,
+            $unrelatedMessage->status,
+        );
+    }
+
+    public function test_repeated_signed_join_posts_preserve_first_confirmation_and_remain_controlled(): void
+    {
+        $webinar = Webinar::factory()->create([
+            'join_url' => 'https://example.test/webinar/join',
+        ]);
+
+        $registration = WebinarRegistration::factory()
+            ->for($webinar)
+            ->create([
+                'status' => 'registered',
+            ]);
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'context_type' => $registration->getMorphClass(),
+            'context_id' => $registration->getKey(),
+            'status' => ScheduledMessage::STATUS_PENDING,
+            'meta' => [
+                'skip_when_join_clicked' => true,
+            ],
+        ]);
+
+        $url = $this->signedJoinContinuationUrl($registration);
+
+        $this->post($url)
+            ->assertRedirect('https://example.test/webinar/join');
+
+        $registration->refresh();
+        $firstConfirmedAt = data_get(
+            $registration->meta,
+            'join_interaction.first_confirmed_at',
+        );
+
+        $this->post($url)
+            ->assertRedirect('https://example.test/webinar/join');
+
+        $registration->refresh();
+        $scheduledMessage->refresh();
+
+        $this->assertSame(
+            $firstConfirmedAt,
+            data_get($registration->meta, 'join_interaction.first_confirmed_at'),
+        );
+        $this->assertSame(2, data_get($registration->meta, 'join_click_count'));
+        $this->assertSame(
+            2,
+            data_get($registration->meta, 'join_interaction.confirmed_count'),
+        );
+        $this->assertSame(
+            ScheduledMessage::STATUS_SKIPPED,
+            $scheduledMessage->status,
+        );
+    }
+
+    public function test_invalid_or_expired_join_post_signature_does_not_mutate_registration(): void
+    {
+        $webinar = Webinar::factory()->create([
+            'join_url' => 'https://example.test/webinar/join',
+        ]);
+
+        $registration = WebinarRegistration::factory()
+            ->for($webinar)
+            ->create([
+                'status' => 'registered',
+                'meta' => [
+                    'existing' => 'preserved',
+                ],
+            ]);
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'context_type' => $registration->getMorphClass(),
+            'context_id' => $registration->getKey(),
+            'status' => ScheduledMessage::STATUS_PENDING,
+            'meta' => [
+                'skip_when_join_clicked' => true,
+            ],
+        ]);
+
+        $expiredPath = URL::temporarySignedRoute(
+            name: 'webinar.join.continue',
+            expiration: now()->subMinute(),
+            parameters: [
+                'token' => $registration->join_token,
+            ],
+            absolute: false,
+        );
+
+        $expiredUrl = rtrim(route('webinar.index'), '/').$expiredPath;
+
+        $this->post($expiredUrl)
+            ->assertForbidden()
+            ->assertViewIs('webinar.signed-link-invalid');
+
+        $registration->refresh();
+        $scheduledMessage->refresh();
+
+        $this->assertSame([
+            'existing' => 'preserved',
+        ], $registration->meta);
+        $this->assertSame(
+            ScheduledMessage::STATUS_PENDING,
+            $scheduledMessage->status,
+        );
+    }
+
+    public function test_cancelled_registration_cannot_render_or_continue_join_flow(): void
+    {
+        $webinar = Webinar::factory()->create([
+            'join_url' => 'https://example.test/webinar/join',
+        ]);
+
+        $registration = WebinarRegistration::factory()
+            ->for($webinar)
+            ->create([
+                'status' => 'cancelled',
+                'cancelled_at' => now(),
+                'meta' => [
+                    'existing' => 'preserved',
+                ],
+            ]);
+
+        $this->get(route('webinar.join.redirect', [
+            'token' => $registration->join_token,
+        ]))->assertNotFound();
+
+        $this->post($this->signedJoinContinuationUrl($registration))
+            ->assertNotFound();
+
+        $registration->refresh();
+
+        $this->assertSame([
+            'existing' => 'preserved',
+        ], $registration->meta);
     }
 
     public function test_expired_cancellation_signatures_render_the_webinar_error_page_without_mutation(): void
@@ -271,6 +484,21 @@ class WebinarRegistrationBoundaryContractTest extends TestCase
             expiration: now()->addMinutes(30),
             parameters: [
                 'registration' => $registration,
+            ],
+            absolute: false,
+        );
+
+        return rtrim(route('webinar.index'), '/').$path;
+    }
+
+    private function signedJoinContinuationUrl(
+        WebinarRegistration $registration,
+    ): string {
+        $path = URL::temporarySignedRoute(
+            name: 'webinar.join.continue',
+            expiration: now()->addMinutes(30),
+            parameters: [
+                'token' => $registration->join_token,
             ],
             absolute: false,
         );

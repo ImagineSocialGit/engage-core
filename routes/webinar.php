@@ -12,8 +12,13 @@ Route::middleware('module:webinars')->group(function () {
     Route::get('/', [WebinarRegistrationController::class, 'index'])
         ->name('webinar.index');
 
-    Route::get('/j/{token}', WebinarJoinRedirectController::class)
+    Route::get('/j/{token}', [WebinarJoinRedirectController::class, 'show'])
+        ->middleware('throttle:12,1')
         ->name('webinar.join.redirect');
+
+    Route::post('/j/{token}', [WebinarJoinRedirectController::class, 'store'])
+        ->middleware(['signed:relative', 'throttle:6,1'])
+        ->name('webinar.join.continue');
 
     Route::get('/p/{token}', WebinarPlaybackRedirectController::class)
         ->name('webinar.playback.redirect');

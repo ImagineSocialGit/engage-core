@@ -84,6 +84,10 @@ return [
             'refresh_seconds' => 5,
         ],
 
+        'join_confirmation' => [
+            'link_expiration_minutes' => 30,
+        ],
+
         /*
         | Registration finalization is staged in WebinarRegistration.meta before
         | any provider or Messaging work begins. The scheduled recovery pass can
