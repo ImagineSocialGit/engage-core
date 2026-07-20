@@ -160,6 +160,46 @@ CRM Webinar history exposes failed planning outcomes and provides an idempotent 
 retry for one registration. Webinar-ended automation remains independent and is emitted
 once even when follow-up planning still needs a retry.
 
+## Registration finalization durability
+
+A successful public submission commits the local WebinarRegistration, consent transitions,
+and a durable `webinar_registration.meta.registration_finalization` intent before provider
+synchronization or registration-message planning begins. Queue dispatch is a recoverable
+handoff rather than the only record that work remains.
+
+Finalization modes are `initial_registration` and `consent_acknowledgements`. Persisted
+consent-transition identities allow a queued worker to rebuild only the acknowledgements
+that became active during the committed registration transaction. Initial finalization may
+plan confirmation/reminder messages only after provider synchronization is either successful
+or explicitly not required.
+
+Supported finalization states are:
+
+```text
+pending
+queued
+processing
+completed
+failed
+reconciliation_required
+```
+
+Pending, stale queued, and stale processing states are recoverable through the scheduled
+registration-finalization recovery job. Queue-dispatch failure records safe exception
+class/code evidence and a future retry time without exposing raw exception messages. Retry
+exhaustion becomes a terminal `failed` state rather than disappearing from queue history.
+
+Provider synchronization distinguishes safe retries from ambiguous submissions. A provider
+rate-limit response may be retried. A definitive client-side provider rejection is terminal.
+Connection loss, timeout-like responses, unexpected exceptions after submission begins, and
+stale in-flight submissions become `reconciliation_required`; they must not be automatically
+posted to the provider again because the remote registration may already exist. Confirmation
+planning remains blocked until that state is reconciled.
+
+The recovery scheduler may requeue only locally recoverable finalization work. It must not
+requeue terminal failures or reconciliation-required provider outcomes. Operator visibility
+and manual reconciliation controls are separate CRM recovery behavior.
+
 ## Public registration presentation and config ownership
 
 The public Webinar registration experience is configuration-driven and may differ substantially between clients.

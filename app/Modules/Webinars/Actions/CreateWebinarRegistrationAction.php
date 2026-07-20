@@ -10,12 +10,15 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\PhoneNumberNormalizer;
+use App\Modules\Webinars\Data\WebinarRegistrationConsentTransition;
+use App\Modules\Webinars\Data\WebinarRegistrationFinalizationResult;
 use App\Modules\Webinars\Data\WebinarRegistrationResult;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 use Throwable;
 
 class CreateWebinarRegistrationAction
@@ -29,6 +32,7 @@ class CreateWebinarRegistrationAction
         private readonly CreateOrUpdateContactAction $createOrUpdateContact,
         private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
         private readonly FinalizeWebinarRegistrationAction $finalizeRegistration,
+        private readonly QueueWebinarRegistrationFinalizationAction $queueFinalization,
     ) {}
 
     public function handle(
@@ -59,18 +63,25 @@ class CreateWebinarRegistrationAction
         }
 
         if (! $result instanceof WebinarRegistrationResult) {
-            throw new \LogicException('Webinar registration could not be resolved.');
+            throw new LogicException('Webinar registration could not be resolved.');
         }
 
-        // This runs only after the local registration/consent transaction has
-        // committed. Provider or delivery failures cannot roll it back.
-        try {
-            $this->finalizeRegistration->handle($result);
-        } catch (Throwable $exception) {
-            // The local registration is already committed. Downstream failures
-            // are operational failures, not registration failures.
-            report($exception);
+        if ($result->wasExisting()) {
+            try {
+                $finalization = $this->finalizeRegistration->handle($result);
+
+                if ($finalization?->shouldRetry()) {
+                    $this->queueFinalization->handle($result->registration);
+                }
+            } catch (Throwable $exception) {
+                report($exception);
+                $this->safelyQueueFinalization($result->registration);
+            }
+
+            return $result;
         }
+
+        $this->safelyQueueFinalization($result->registration);
 
         return $result;
     }
@@ -113,7 +124,7 @@ class CreateWebinarRegistrationAction
             ->first();
 
         if ($registration instanceof WebinarRegistration) {
-            return WebinarRegistrationResult::existing(
+            $result = WebinarRegistrationResult::existing(
                 registration: $registration,
                 consentGrants: $this->storeMessageConsents(
                     validated: $validated,
@@ -122,6 +133,10 @@ class CreateWebinarRegistrationAction
                     registration: $registration,
                 ),
             );
+
+            $this->stageFinalization($result);
+
+            return $result;
         }
 
         $now = now();
@@ -174,10 +189,148 @@ class CreateWebinarRegistrationAction
             occurredAt: $registration->registered_at ?? $now,
         );
 
-        return WebinarRegistrationResult::created(
+        $result = WebinarRegistrationResult::created(
             registration: $registration,
             consentGrants: $consentGrants,
         );
+
+        $this->stageFinalization($result);
+
+        return $result;
+    }
+
+    private function stageFinalization(
+        WebinarRegistrationResult $result,
+    ): void {
+        $registration = $result->registration;
+        $meta = is_array($registration->meta) ? $registration->meta : [];
+        $existingState = is_array(
+            $meta[WebinarRegistrationFinalizationResult::META_KEY] ?? null,
+        )
+            ? $meta[WebinarRegistrationFinalizationResult::META_KEY]
+            : [];
+        $transitions = $this->activeConsentTransitions($result);
+        $stagedAt = now()->toISOString();
+
+        if ($result->wasCreated()) {
+            $meta[WebinarRegistrationFinalizationResult::META_KEY] = [
+                'status' => 'pending',
+                'mode' => 'initial_registration',
+                'consent_transitions' => $transitions,
+                'attempts' => 0,
+                'queue_dispatch_attempts' => 0,
+                'staged_at' => $stagedAt,
+                'last_state_changed_at' => $stagedAt,
+                'failure_reason' => null,
+            ];
+
+            $registration->forceFill(['meta' => $meta])->save();
+
+            return;
+        }
+
+        if ($transitions === []) {
+            return;
+        }
+
+        $existingStatus = (string) ($existingState['status'] ?? '');
+        $existingMode = (string) ($existingState['mode'] ?? '');
+
+        if (
+            $existingMode === 'initial_registration'
+            && $existingStatus !== 'completed'
+        ) {
+            $meta[WebinarRegistrationFinalizationResult::META_KEY] = array_replace(
+                $existingState,
+                [
+                    'consent_transitions' => $this->mergeConsentTransitions(
+                        is_array($existingState['consent_transitions'] ?? null)
+                            ? $existingState['consent_transitions']
+                            : [],
+                        $transitions,
+                    ),
+                    'last_state_changed_at' => $stagedAt,
+                ],
+            );
+
+            $registration->forceFill(['meta' => $meta])->save();
+
+            return;
+        }
+
+        $meta[WebinarRegistrationFinalizationResult::META_KEY] = [
+            'status' => 'pending',
+            'mode' => 'consent_acknowledgements',
+            'consent_transitions' => $transitions,
+            'attempts' => 0,
+            'queue_dispatch_attempts' => 0,
+            'staged_at' => $stagedAt,
+            'last_state_changed_at' => $stagedAt,
+            'failure_reason' => null,
+            'initial_completed_at' => $existingMode === 'initial_registration'
+                ? ($existingState['completed_at'] ?? null)
+                : ($existingState['initial_completed_at'] ?? null),
+        ];
+
+        $registration->forceFill(['meta' => $meta])->save();
+    }
+
+    /**
+     * @return array<int, array<string, int|string|bool>>
+     */
+    private function activeConsentTransitions(
+        WebinarRegistrationResult $result,
+    ): array {
+        return array_values(array_map(
+            static fn (MessageConsentGrantResult $grant): array =>
+                WebinarRegistrationConsentTransition::fromGrant($grant)->toArray(),
+            array_values(array_filter(
+                $result->consentGrants,
+                static fn (mixed $grant): bool =>
+                    $grant instanceof MessageConsentGrantResult
+                    && $grant->becameActive,
+            )),
+        ));
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $existing
+     * @param array<int, array<string, mixed>> $incoming
+     * @return array<int, array<string, mixed>>
+     */
+    private function mergeConsentTransitions(
+        array $existing,
+        array $incoming,
+    ): array {
+        $merged = [];
+
+        foreach ([...$existing, ...$incoming] as $transition) {
+            if (! is_array($transition)) {
+                continue;
+            }
+
+            $consentId = (int) ($transition['consent_id'] ?? 0);
+
+            if ($consentId <= 0) {
+                continue;
+            }
+
+            $merged[$consentId] = $transition;
+        }
+
+        return array_values($merged);
+    }
+
+    private function safelyQueueFinalization(
+        WebinarRegistration $registration,
+    ): void {
+        try {
+            $this->queueFinalization->handle($registration);
+        } catch (Throwable $exception) {
+            // The durable pending state was committed with the registration.
+            // The scheduled recovery pass can retry this handoff later.
+            report($exception);
+        }
     }
 
     /**

@@ -726,6 +726,7 @@
 │   │   │   │   │   ├── RecordWebinarProviderAttendanceAction.php
 │   │   │   │   │   └── ResolveWebinarPlaybackAction.php
 │   │   │   │   ├── QueueWebinarProviderCancellationAction.php
+│   │   │   │   ├── QueueWebinarRegistrationFinalizationAction.php
 │   │   │   │   ├── ResolveRegisterableWebinarAction.php
 │   │   │   │   ├── ResolveWebinarJoinUrlAction.php
 │   │   │   │   ├── ResolveWebinarPlaybackUrlAction.php
@@ -772,6 +773,7 @@
 │   │   │   │   ├── WebinarProviderCancellationResult.php
 │   │   │   │   ├── WebinarProviderSyncResult.php
 │   │   │   │   ├── WebinarRegistrationConsentTransition.php
+│   │   │   │   ├── WebinarRegistrationFinalizationResult.php
 │   │   │   │   ├── WebinarRegistrationImportResult.php
 │   │   │   │   ├── WebinarRegistrationImportRow.php
 │   │   │   │   └── WebinarRegistrationResult.php
@@ -784,6 +786,7 @@
 │   │   │   │   │   ├── ProcessPostWebinarEventJob.php
 │   │   │   │   │   ├── ProcessWebinarProviderEventJob.php
 │   │   │   │   │   └── RetryWebinarRegistrationFollowUpJob.php
+│   │   │   │   ├── RecoverWebinarRegistrationFinalizationsJob.php
 │   │   │   │   └── SyncWebinarRegistrationToProviderJob.php
 │   │   │   ├── Models
 │   │   │   │   ├── Webinar.php
@@ -1698,4 +1701,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-490 directories, 1209 files
+490 directories, 1212 files

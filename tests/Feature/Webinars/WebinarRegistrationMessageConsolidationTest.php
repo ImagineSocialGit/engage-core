@@ -9,6 +9,8 @@ use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Webinars\Actions\CreateWebinarRegistrationAction;
+use App\Modules\Webinars\Actions\FinalizeWebinarRegistrationAction;
+use App\Modules\Webinars\Jobs\SyncWebinarRegistrationToProviderJob;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
@@ -58,6 +60,12 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
         );
 
         $registration = $result->registration;
+
+        (new SyncWebinarRegistrationToProviderJob(
+            (int) $registration->getKey(),
+        ))->handle(
+            app(FinalizeWebinarRegistrationAction::class),
+        );
 
         $messages = ScheduledMessage::query()
             ->where('context_type', $registration->getMorphClass())
@@ -333,6 +341,12 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
         );
 
         $registration = $result->registration;
+
+        (new SyncWebinarRegistrationToProviderJob(
+            (int) $registration->getKey(),
+        ))->handle(
+            app(FinalizeWebinarRegistrationAction::class),
+        );
 
         $message = ScheduledMessage::query()
             ->where('context_type', $registration->getMorphClass())

@@ -43,6 +43,8 @@ return [
 
         'registration' => env('WEBINAR_REGISTRATION_QUEUE', 'webinars'),
 
+        'registration_recovery' => 'default',
+
         'webhooks' => env('WEBINAR_WEBHOOK_QUEUE', 'webhooks'),
 
         'notifications' => env('WEBINAR_REMINDER_QUEUE', 'notifications'),
@@ -75,6 +77,26 @@ return [
             'enabled' => true,
             'ready_value' => 'ready',
             'interaction_value' => 'human',
+        ],
+
+        /*
+        | Registration finalization is staged in WebinarRegistration.meta before
+        | any provider or Messaging work begins. The scheduled recovery pass can
+        | requeue abandoned local work, but never retries an ambiguous provider
+        | submission whose remote outcome is unknown.
+        */
+        'finalization' => [
+            'job_tries' => 5,
+            'job_backoff_seconds' => [60, 300, 900, 3600],
+            'retry_delay_seconds' => 60,
+            'queue_failure_retry_seconds' => 60,
+            'queue_stale_after_seconds' => 300,
+            'processing_stale_after_seconds' => 600,
+            'provider_claim_stale_after_seconds' => 600,
+            'in_progress_release_seconds' => 30,
+            'overlap_expiry_seconds' => 900,
+            'recovery_batch_size' => 100,
+            'recovery_cron' => '* * * * *',
         ],
     ],
 

@@ -9,12 +9,14 @@ use App\Modules\Webinars\ConfigContracts\WebinarScheduleProfileConfigContract;
 use App\Modules\Webinars\ConfigContracts\WebinarsConfigContractTargetProvider;
 use App\Modules\Webinars\Console\Commands\ImportWebinarRegistrationsCommand;
 use App\Modules\Webinars\Console\Commands\SyncWebinarScheduleProfilesCommand;
+use App\Modules\Webinars\Jobs\RecoverWebinarRegistrationFinalizationsJob;
 use App\Modules\Webinars\Services\ContactPanels\WebinarContactPanelProvider;
 use App\Modules\Webinars\Services\Dashboard\WebinarActivityDashboardPanelProvider;
 use App\Modules\Webinars\TokenContracts\WebinarTokenContextProvider;
 use App\Modules\Webinars\TokenContracts\WebinarTokenSourceProvider;
 use App\Modules\Webinars\Validation\WebinarsSetupValidationContributor;
 use App\Support\Dashboard\DashboardPanelRegistry;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -55,6 +57,19 @@ class WebinarsModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->callAfterResolving(
+            Schedule::class,
+            function (Schedule $schedule): void {
+                $schedule
+                    ->job(new RecoverWebinarRegistrationFinalizationsJob())
+                    ->cron((string) config(
+                        'webinars.registration.finalization.recovery_cron',
+                        '* * * * *',
+                    ))
+                    ->withoutOverlapping();
+            },
+        );
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 ImportWebinarRegistrationsCommand::class,
