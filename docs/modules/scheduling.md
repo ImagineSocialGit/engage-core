@@ -4,7 +4,7 @@ Scheduling is a current universal module.
 
 Scheduling owns reusable appointment and booking capability that can be used by multiple verticals without pushing appointment state into Core or vertical-specific tables.
 
-## Client-facing expectation
+## Product expectation
 
 Scheduling should follow the Engage Core product barometer:
 
@@ -12,7 +12,7 @@ Scheduling should follow the Engage Core product barometer:
 A client-facing scheduling task should be completable in 10-15 minutes total, and common appointment scheduling should usually take far less.
 ```
 
-Scheduling an appointment for a known person on a known day should feel closer to a 30-second task than a configuration workflow.
+Scheduling a known appointment on a known day should feel closer to a 30-second task than a configuration workflow.
 
 Client-facing Scheduling UX should focus on fast actions:
 
@@ -28,55 +28,54 @@ Developer/operator-facing setup may own the more complex work:
 
 ```text
 Define bookable services.
-Configure availability patterns.
-Wire reminders.
+Assign hosts.
+Configure availability and blackout rules.
 Connect external calendar providers.
-Attach forms/tasks/portal behavior.
+Wire reminders and follow-up behavior.
 ```
 
 Scheduling should not become a generic calendar-builder product for clients to maintain.
 
+## Universal public booking surface
+
+Scheduling should provide every client with an optional generic public booking surface where visitors can select a public service and book directly.
+
+The public host is selected-client deployment configuration. It must not be derived from a fixed subdomain prefix.
+
+Examples:
+
+```text
+https://schedule.[ROOT_DOMAIN]
+https://booking.[ROOT_DOMAIN]
+https://appointments.[ROOT_DOMAIN]
+https://[CUSTOM_SCHEDULING_DOMAIN]
+```
+
+The expected environment contract is:
+
+```text
+SCHEDULING_APP_URL=https://booking.[ROOT_DOMAIN]
+```
+
+All future public booking, cancellation, and reschedule URLs should resolve from that configured base URL.
+
+The universal booking surface is separate from CRM, Portal, and Webinars. A webinar-triggered booking journey may add source context, eligibility, and tailored copy through a thin client-specific integration layer, but it must consume generic Scheduling contracts and must not shape Scheduling around Webinars.
+
 ## Responsibility
 
-Scheduling should answer:
+Scheduling answers:
 
 ```text
-What can be booked, when can it be booked, who is attending, where does it happen when that matters, and what is the lifecycle state of the appointment?
+What can be booked?
+Which hosts can deliver it?
+When is it available?
+What capacity remains?
+Who is attending?
+Where does it happen when that matters?
+What is the lifecycle state of the appointment?
 ```
 
-Scheduling should stay vertical-neutral.
-
-It may support dog training sessions, consultations, coaching calls, music lessons, studio bookings, internal meetings, customer-facing appointments, or other bookable interactions without owning the vertical meaning of those interactions.
-
-## FOSS feature-shape assumptions
-
-Before proposing schema, Scheduling was evaluated against common patterns in mature open-source and open-source-adjacent scheduling systems.
-
-Those systems commonly support:
-
-```text
-- bookable services or event types
-- appointment or reservation records
-- customers / attendees
-- staff / providers / hosts
-- availability windows
-- timezone handling
-- reschedule and cancellation lifecycle
-- calendar views
-- external calendar sync
-- public booking links or booking pages
-- reminders and notifications
-- automation hooks / webhooks / workflows
-- intake questions or custom fields
-- resource booking
-- team scheduling or routing
-- optional payment collection
-- reporting / exports
-```
-
-Engage Core should use those products as feature-shape references, not as implementation sources.
-
-The durable conclusion is that Scheduling should have a roomy, generic foundation for services, availability, appointments, and attendees, while consuming other Engage Core modules for delivery, manual work, portal access, forms, commerce, location, and automation reactions.
+Scheduling stays vertical-neutral. It may support consultations, coaching calls, music lessons, pet-service appointments, studio bookings, internal meetings, or other bookable interactions without owning their vertical meaning.
 
 ## Owns
 
@@ -84,44 +83,29 @@ Scheduling owns:
 
 ```text
 bookable_services
+scheduling_hosts
+bookable_service_hosts
 scheduling_availability_windows
 appointments
 appointment_attendees
+appointment_lifecycle_events
 ```
 
-Scheduling should also own, when implemented:
+Scheduling also owns:
 
 ```text
-appointment status/lifecycle behavior
-availability/rule evaluation
-reschedule/cancel rules
-appointment-related domain events
-generic booking-page orchestration, if generic enough
-appointment reminder orchestration requests
-appointment-related task orchestration requests
-optional saved-location references on appointments
+service duration, interval, notice, horizon, buffer, capacity, and confirmation policy
+host identity and capacity
+service-to-host eligibility
+availability and blackout rule evaluation
+read-only bookable-slot calculation
+appointment lifecycle and reschedule lineage
+appointment-related source context
+booking holds and transaction-time booking validation when implemented
+appointment-related domain and automation event intent when implemented
 ```
 
-Scheduling should not own message delivery, task lifecycle, portal accounts, form definitions, commerce/order records, geocoding, or vertical-specific meaning.
-
-## Does not own
-
-Scheduling does not own:
-
-```text
-notification delivery
-internal notification preferences
-task assignment/digest lifecycle
-customer portal identity/auth
-form definitions/submissions
-payments/orders/products
-external calendar adapter internals
-location normalization/geocoding
-vertical-specific appointment outcomes
-pet-specific training goals
-music-specific lesson curriculum
-mortgage-specific consultation outcomes
-```
+Scheduling does not own message delivery, consent, task lifecycle, portal accounts, form definitions, commerce records, geocoding, or provider adapter internals.
 
 ## Consumes
 
@@ -143,14 +127,14 @@ Expected usage:
 
 ```text
 Core -> contact-linked appointments
-Messaging -> appointment reminders/customer notifications
+Messaging -> customer-facing reminders and lifecycle messages
 InternalNotifications -> team-facing scheduling alerts
-Tasks -> manual follow-up work generated from appointment outcomes
-Portal -> customer self-booking and customer-facing schedule views
-Forms -> intake questions/submissions attached to appointment flows
-Commerce -> paid booking/order/payment records
-Location -> optional saved appointment places, service-area checks, venue reuse, or radius eligibility
-Integrations -> external calendar/provider adapters behind Scheduling-owned contracts
+Tasks -> manual work generated from appointment outcomes
+Portal -> authenticated customer schedule views or booking entry
+Forms -> intake submissions associated with booking flows
+Commerce -> optional paid-booking order/payment state
+Location -> optional reusable saved places and service-area checks
+Integrations -> calendar and meeting-provider adapters behind Scheduling contracts
 ```
 
 ## Consumed by
@@ -163,268 +147,148 @@ Music
 Mortgage
 FlowRoutes
 Campaigns
-Broadcasts
 Reporting
 Portal
 Forms
 Documents
 Commerce
-Location
+Webinars through a client-specific integration layer
 ```
 
-Consumers should use public Scheduling actions/services/contracts/events/read services rather than directly mutating Scheduling internals.
+Consumers must use public Scheduling actions, services, contracts, events, or read services rather than directly mutating Scheduling tables.
 
-## Public seams to add later
-
-The first foundation slice does not need full actions yet.
-
-Likely future public seams:
-
-```text
-CreateAppointmentAction
-RescheduleAppointmentAction
-CancelAppointmentAction
-CompleteAppointmentAction
-MarkAppointmentNoShowAction
-FindBookableAvailabilityAction
-SchedulingReadService
-AppointmentReminderScheduler
-AppointmentTaskOrchestrator
-AppointmentAutomationEventEmitter
-```
-
-Public actions should exist before other modules directly create or mutate Scheduling records.
-
-## Automation events
-
-Scheduling should use the existing app-level automation event seam when appointment outcomes become automation-worthy.
-
-Current seam:
-
-```text
-App\Support\AutomationEvents\Data\AutomationEventData
-App\Support\AutomationEvents\Events\AutomationEventRecorded
-```
-
-Likely future Scheduling automation events:
-
-```text
-appointment.created
-appointment.scheduled
-appointment.confirmed
-appointment.rescheduled
-appointment.canceled
-appointment.completed
-appointment.no_show
-```
-
-Scheduling should emit automation events after it records its own domain state.
-
-FlowRoutes should listen to `AutomationEventRecorded`, not Scheduling-specific events.
-
-Good:
-
-```text
-Scheduling records appointment.completed
-Scheduling emits AutomationEventRecorded(appointment.completed)
-FlowRoutes reacts through the generic automation event seam
-```
-
-Bad:
-
-```text
-Scheduling imports FlowRoutes
-FlowRoutes adds a Scheduling-specific listener
-Producer module calls FlowRouteExternalEvent directly
-```
-
-## Messaging, tasks, and notifications
-
-Scheduling products commonly include reminders and notifications.
-
-In Engage Core, Scheduling should orchestrate appointment reminder intent, but Messaging and InternalNotifications should deliver messages or team alerts.
-
-When Scheduling schedules a customer-facing appointment message through Messaging, the scheduled message should use Messaging's existing recipient/context split:
-
-```text
-recipient_type / recipient_id
-    Who receives the scheduled message.
-
-context_type / context_id
-    What domain record the scheduled message is about.
-```
-
-Example:
-
-```text
-Appointment reminder
-    recipient = Contact
-    context = Appointment
-```
-
-Scheduling should not ask Messaging for new `subject_type` / `subject_id` columns. `scheduled_messages.context_type` / `scheduled_messages.context_id` is already the canonical scheduled-message "about this record" morph.
-
-Good:
-
-```text
-Scheduling -> Messaging public action/service for customer reminder scheduling
-ScheduledMessage recipient = Contact
-ScheduledMessage context = Appointment
-Scheduling -> InternalNotifications public action/service for team alerts
-```
-
-Bad:
-
-```text
-Scheduling owns message consent
-Scheduling owns scheduled_messages
-Scheduling adds duplicate subject_type / subject_id fields to Messaging
-Scheduling owns team notification preferences
-```
-
-Scheduling products commonly create follow-up work.
-
-In Engage Core, Scheduling may create appointment-related Tasks through public task-facing actions when Tasks is enabled.
-
-Good:
-
-```text
-Scheduling -> CreateTaskAction
-```
-
-Bad:
-
-```text
-Scheduling writes directly to tasks table internals without a public task action/service
-```
-
-## Forms, portal, commerce, and location
-
-Scheduling products commonly include intake questions.
-
-In Engage Core, Forms should own form definitions, versions, submissions, values, and review state. Scheduling may reference or require a form but should not own configurable form behavior.
-
-Scheduling products commonly include customer self-booking.
-
-In Engage Core, Portal should own customer account access and customer-facing shells. Scheduling may contribute booking screens through Portal extension points later.
-
-Scheduling products commonly include paid bookings.
-
-In Engage Core, Commerce should own products, orders, order items, and normalized purchase/payment records. Scheduling may reference payment/commerce state later through public Commerce seams.
-
-Scheduling products commonly include calendar sync and locations.
-
-External calendar adapters belong under `app/Integrations` behind Scheduling-owned contracts/managers. Reusable service-area/radius/location behavior belongs to Location.
-
-Appointments may optionally reference a saved `Location` record for reusable offices, venues, service addresses, or other normalized places. That relationship is optional. Scheduling still works with `location_type` and `location_details` when Location is not enabled or when the appointment uses a one-off, virtual, phone, or freeform location.
-
-This is a schema relationship, not a feature-visibility dependency. Scheduling should not require the Location module to be explicitly enabled for normal appointment scheduling.
-
-## Schema foundation
-
-The first Scheduling foundation should add these tables:
-
-```text
-bookable_services
-scheduling_availability_windows
-appointments
-appointment_attendees
-```
-
-These tables are intentionally roomy but generic.
-
-They include generic fields such as:
-
-```text
-status
-source
-provider
-external_id
-external_url
-starts_at / ends_at where appropriate
-confirmed_at / completed_at / no_show_at / canceled_at where appropriate
-meta json
-timestamps
-soft deletes
-```
-
-They avoid vertical-specific columns and UI-specific assumptions.
-
-## Table notes
+## Current persistence foundation
 
 ### bookable_services
 
-Represents something that can be scheduled or booked.
+Represents something that can be scheduled.
 
-Examples:
+Important policy fields:
 
 ```text
-Consultation
-Dog training session
-Music lesson
-Studio booking
-Coaching call
-Internal appointment type
+key
+status
+duration_minutes
+slot_interval_minutes
+buffer_before_minutes
+buffer_after_minutes
+minimum_notice_minutes
+booking_horizon_days
+cancellation_notice_minutes
+reschedule_notice_minutes
+timezone
+capacity
+requires_confirmation
+is_public
+location_type
+location_details
+source
+meta
 ```
+
+Provider identity currently retained on this table is legacy foundation state. Provider connection, remote identity, and synchronization state should move to dedicated provider-owned persistence when that batch is implemented.
+
+### scheduling_hosts
+
+Represents a person, team, room, or other generic appointment host.
 
 Important fields:
 
 ```text
 key
 name
-description
 status
-duration_minutes
-buffer_before_minutes
-buffer_after_minutes
-location_type
-location_details
+hostable_type / hostable_id
+timezone
 capacity
-requires_confirmation
-is_public
+email
+phone
 sort_order
 source
-provider
-external_id
-external_url
 meta
 ```
+
+The optional `hostable` morph links a host to a Core or other allowed model without making that model own Scheduling state.
+
+### bookable_service_hosts
+
+Represents host eligibility for a service.
+
+Important fields:
+
+```text
+bookable_service_id
+scheduling_host_id
+is_active
+capacity_override
+sort_order
+meta
+```
+
+An inactive assignment remains explicit configuration and must not cause the service to fall back to unhosted booking.
+
+A service with no assignment records may still be unhosted when service-wide availability exists.
 
 ### scheduling_availability_windows
 
-Represents reusable availability or unavailability windows.
+Represents positive availability or a blackout.
 
-It may apply to a bookable service, a provider/owner via morphs, or both.
-
-Important fields:
+Every rule is explicitly one of:
 
 ```text
-bookable_service_id
-owner_type / owner_id
-timezone
-weekday
-starts_at / ends_at
-start_time / end_time
-capacity
-rrule
-is_available
-source
-provider
-external_id
-meta
+weekly
+absolute
 ```
+
+Weekly rule shape:
+
+```text
+window_type = weekly
+weekday
+start_time
+end_time
+timezone
+starts_at = null
+ends_at = null
+```
+
+Absolute rule shape:
+
+```text
+window_type = absolute
+starts_at
+ends_at
+timezone
+weekday = null
+start_time = null
+end_time = null
+```
+
+Every rule targets at least one of:
+
+```text
+service only
+host only
+service + host
+```
+
+`is_available = false` represents a blackout or exception using the same closed shapes.
+
+Availability rows do not store arbitrary RRULE expressions or provider remote identity. External busy intervals belong to provider synchronization/read contracts rather than reusable manual availability rules.
 
 ### appointments
 
-Represents a scheduled booking/appointment record.
+Represents the local source of truth for a scheduled appointment.
 
 Important fields:
 
 ```text
 bookable_service_id
+scheduling_host_id
 contact_id
-location_id nullable
+location_reference_type / location_reference_id
 primary_attendee_type / primary_attendee_id
+source_context_type / source_context_id
 rescheduled_from_id
 status
 title
@@ -439,99 +303,279 @@ no_show_at
 canceled_at
 cancellation_reason
 source
-provider
-external_id
-external_url
 created_by_type / created_by_id
 meta
 ```
 
-`location_id` is optional and points to a saved Location-owned place when available. `location_type` and `location_details` remain the freeform/fallback path for one-off, virtual, phone, customer-address, provider-supplied, or not-yet-normalized locations.
+The optional `locationReference` morph allows a saved Location-owned place without creating a Scheduling-to-Location module dependency. Freeform `location_type` and `location_details` remain valid for virtual, phone, one-off, provider-generated, or not-yet-normalized locations.
 
-Cancellation and rescheduling stay on `appointments` for the first foundation slice. A separate audit table can be added later only if lifecycle audit requirements justify it.
+External calendar systems never own appointment lifecycle. Provider failure leaves the local Appointment valid and later synchronization work pending or failed.
 
 ### appointment_attendees
 
 Represents people or subjects attached to an appointment.
 
-Important fields:
-
-```text
-appointment_id
-attendee_type / attendee_id
-contact_id
-name
-email
-phone
-role
-status
-responded_at
-joined_at
-canceled_at
-meta
-```
-
 `contact_id` is optional convenience/context. It does not make Scheduling own contact identity.
 
+### appointment_lifecycle_events
+
+Provides durable append-style appointment lifecycle history with:
+
+```text
+event_id
+event_key
+from_status / to_status
+actor_type / actor_id
+source
+reason
+context
+occurred_at
+```
+
+Lifecycle mutation actions should update the Appointment and record the corresponding lifecycle event in the same transaction.
+
+## Executable availability engine
+
+The read-only availability engine consists of:
+
+```text
+AvailabilitySearch
+AvailabilityInterval
+BookableSlot
+AvailabilityRuleResolver
+AppointmentOccupancyResolver
+FindBookableAvailabilityAction
+```
+
+`AvailabilitySearch` normalizes the requested UTC range, display timezone, optional host filter, evaluation time, service minimum notice, and booking horizon. Requests are bounded to prevent accidental unbounded rule expansion.
+
+`AvailabilityInterval` is an internal normalized UTC interval. It retains host identity, applicable capacity, rule scope, source-window identity, and timezone provenance.
+
+`BookableSlot` is the transport-neutral result contract. It exposes service and host identity, UTC instants, display timezone, effective capacity, remaining capacity, and source-rule provenance without exposing Eloquent models.
+
+### Availability precedence
+
+Within one scope:
+
+```text
+positive rules are unioned
+```
+
+Across applicable scopes:
+
+```text
+positive layers are intersected
+```
+
+At every applicable scope:
+
+```text
+blackouts are subtracted
+```
+
+For a host-specific service, applicable layers are evaluated in this order:
+
+```text
+service-wide availability
+host-wide availability
+service-host-specific availability
+```
+
+A missing optional layer does not eliminate availability. A configured positive layer restricts availability; when that layer has no matching interval in the requested range, no slot survives that layer.
+
+Blackouts apply even when their scope has no positive rule of its own.
+
+### Weekly timezone and DST behavior
+
+Weekly rules are interpreted as wall-clock times in the rule timezone and then converted to UTC.
+
+A local time that does not exist because of a daylight-saving transition is skipped rather than silently shifted to another wall time.
+
+Appointment duration and slot interval represent elapsed minutes. A slot crossing a DST transition may therefore display a larger or smaller wall-clock jump while retaining its configured elapsed duration.
+
+### Slot alignment
+
+Candidate starts align to `slot_interval_minutes` on the service timezone wall-clock grid.
+
+A candidate must be continuously covered for its full `duration_minutes`. When it crosses adjacent interval segments with different capacity limits, the lowest capacity across the covered segments applies.
+
+### Effective capacity
+
+Effective slot capacity is the lowest applicable configured limit from:
+
+```text
+service capacity
+host capacity
+service-host assignment capacity_override
+availability-window capacity
+```
+
+Remaining capacity is calculated independently for each limiting dimension:
+
+```text
+service/service-host occupancy consumes service, assignment, and window capacity
+all appointments on a host consume host capacity
+```
+
+Appointments in these states consume capacity:
+
+```text
+pending
+scheduled
+confirmed
+```
+
+Appointments in these states do not consume future capacity:
+
+```text
+canceled
+completed
+no_show
+```
+
+The candidate appointment's buffers and each existing appointment service's buffers are applied before testing overlap.
+
+### Host resolution
+
+When a host filter is supplied, only that active, actively assigned host is evaluated.
+
+Without a host filter:
+
+```text
+active service-host assignments are evaluated independently
+returned slots retain scheduling_host_id
+inactive assignments are excluded
+an existing but inactive assignment does not become an unhosted slot
+services with no assignment rows may produce unhosted service-wide slots
+```
+
+Round-robin host selection is not part of the read-only engine.
+
+## Booking safety boundary
+
+Availability results are advisory snapshots, not reservations.
+
+The read-only engine does not guarantee that a returned slot remains available. Safe booking requires later infrastructure for:
+
+```text
+server-generated opaque expiring slot offers
+short-lived booking holds
+idempotency keys
+transaction-time rule and occupancy revalidation
+collision protection
+atomic Appointment creation
+```
+
+Public or CRM booking actions must never trust client-supplied service, host, start, end, capacity, or provenance values without resolving and revalidating a server-issued slot offer.
+
+## Messaging, tasks, and automation
+
+Scheduling owns appointment communication timing and intent. Messaging owns templates, consent, suppression, channel eligibility, delivery, retries, and evidence.
+
+Push notification support belongs to Messaging as another delivery channel. Scheduling must not hard-code email and SMS as the only possible channels.
+
+Scheduling may create follow-up work through Tasks public actions. It must not write Tasks internals directly.
+
+Scheduling should record its own state first and then emit neutral automation events through:
+
+```text
+App\Support\AutomationEvents\Data\AutomationEventData
+App\Support\AutomationEvents\Events\AutomationEventRecorded
+```
+
+Planned neutral event vocabulary:
+
+```text
+appointment.scheduled
+appointment.rescheduled
+appointment.canceled
+appointment.completed
+appointment.no_show
+```
+
+FlowRoutes listens through the generic automation-event seam. Scheduling does not depend on FlowRoutes.
+
+## Provider boundary
+
+External calendar and meeting providers are adapters behind Scheduling-owned contracts.
+
+Providers may:
+
+```text
+supply free/busy intervals
+create or update remote calendar events
+create meeting links
+return synchronization results and remote identity
+```
+
+Providers may not:
+
+```text
+own Appointment lifecycle
+be treated as the booking source of truth
+write Scheduling tables directly outside Scheduling services
+make local appointment validity depend on immediate provider success
+```
+
+Provider persistence should separately represent connections, remote event identity, synchronization operations, attempts, status, errors, retries, and reconciliation.
+
+## Public seams
+
+Implemented:
+
+```text
+FindBookableAvailabilityAction
+```
+
+Planned:
+
+```text
+IssueBookableSlotOfferAction
+CreateBookingHoldAction
+ReleaseBookingHoldAction
+CreateAppointmentAction
+RescheduleAppointmentAction
+CancelAppointmentAction
+ConfirmAppointmentAction
+CompleteAppointmentAction
+MarkAppointmentNoShowAction
+SchedulingReadService
+AppointmentReminderScheduler
+AppointmentAutomationEventEmitter
+```
+
+Public actions should exist before another module or surface directly creates or mutates Scheduling records.
 
 ## FlowRoutes integration
 
-This module should integrate with FlowRoutes through the ownership-preserving automation extension pattern used across Engage Core.
+Scheduling integrates with FlowRoutes through the ownership-preserving automation extension pattern.
 
-When this module has automation-worthy outcomes, it records its own domain state first and then emits neutral `AutomationEventRecorded` events. FlowRoutes listens to the generic automation-event seam, not module-specific events.
+Scheduling owns its business records, lifecycle, public business actions, and neutral automation events. FlowRoutes owns route structure, progression, correlation, resume behavior, and created-artifact references in FlowRoutes-owned state.
 
-When FlowRoutes creates or mutates this module's records, it does so only through public actions/services/contracts exposed by this module. FlowRoutes must not write this module's private tables directly.
-
-When this module contributes a cross-module Route business action, the module owns the Point-definition schema, semantic/domain-reference validation, neutral automation action handler, and authoring contribution through the shared Support-layer automation registries. FlowRoutes owns the Route envelope, orchestration/progression, native orchestration Points, created-artifact references, correlation, and resume matching.
-
-Preferred boundary:
-
-```text
-Owning module
-    owns business records and lifecycle
-    owns contributed Point schema and semantic validation
-    owns neutral business-action execution
-    owns Point-specific authoring fields/rules/guidance when authorable
-
-FlowRoutes
-    owns route structure and progression
-    adapts neutral business-action results into Point execution results
-    records created-artifact identity in FlowRoutes-owned state
-    owns correlation and resume matching
-```
-
-Do not add `flow_route_*` foreign keys to this module's artifacts merely for provenance symmetry. Add artifact-side provenance only when this module has an independently justified neutral provenance contract that is useful outside FlowRoutes.
+Do not add `flow_route_*` foreign keys to Scheduling artifacts merely for provenance symmetry.
 
 ## Deferred work
 
-Deferred until needed:
+Deferred after the executable availability engine:
 
 ```text
-admin Scheduling UI
-customer booking UI
-Portal extension points
-availability engine
+opaque expiring slot offers
+booking holds
+transaction-safe appointment creation
+reschedule and cancellation actions
+CRM Scheduling workspace
+public service selection and booking pages
+SCHEDULING_APP_URL routing and setup validation
 calendar views
-external calendar sync
-appointment reminder scheduler
-appointment task orchestration
-appointment automation event emitter
+provider connection and synchronization persistence
+external free/busy adapters
+meeting-link generation
+appointment reminder scheduling
+appointment automation event emission
 paid booking integration
 resource booking
-round-robin/team routing
-Scheduling presets
+round-robin or weighted host routing
 Reporting dashboards
 vertical-specific Scheduling interpretation
+client-specific webinar booking entry
 ```
-
-## Open questions
-
-```text
-Should appointment reminder definitions live in Messaging config under transactional:scheduling?
-Should Scheduling use a generic AppointmentReminderScheduler or defer until real reminders are needed?
-Should availability support resources as a first-class concept, or is owner/service enough for now?
-Should paid booking state be linked directly to Commerce orders or through a future booking-payment pivot?
-Should appointment attendees later support PortalUser directly once Portal exists?
-```
-
-

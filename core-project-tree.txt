@@ -626,9 +626,13 @@
 │   │   │   └── Support
 │   │   ├── Scheduling
 │   │   │   ├── Actions
+│   │   │   │   └── FindBookableAvailabilityAction.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   ├── Data
+│   │   │   │   ├── AvailabilityInterval.php
+│   │   │   │   ├── AvailabilitySearch.php
+│   │   │   │   └── BookableSlot.php
 │   │   │   ├── Enums
 │   │   │   │   └── SchedulingAvailabilityWindowType.php
 │   │   │   ├── Models
@@ -643,6 +647,9 @@
 │   │   │   │   └── SchedulingModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
+│   │   │   │   └── Availability
+│   │   │   │       ├── AppointmentOccupancyResolver.php
+│   │   │   │       └── AvailabilityRuleResolver.php
 │   │   │   └── Support
 │   │   ├── Tasks
 │   │   │   ├── Actions
@@ -1648,6 +1655,7 @@
 │   │   │   ├── ModuleFirstPresetCompositionTest.php
 │   │   │   └── PresetCompositionSyncCutoverTest.php
 │   │   ├── Scheduling
+│   │   │   ├── FindBookableAvailabilityActionTest.php
 │   │   │   ├── SchedulingAvailabilityWindowFoundationTest.php
 │   │   │   ├── SchedulingFoundationTest.php
 │   │   │   └── SchedulingHostAndServiceFoundationTest.php
@@ -1740,4 +1748,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-492 directories, 1249 files
+493 directories, 1256 files
