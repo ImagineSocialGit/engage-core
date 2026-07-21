@@ -629,6 +629,8 @@
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   ├── Data
+│   │   │   ├── Enums
+│   │   │   │   └── SchedulingAvailabilityWindowType.php
 │   │   │   ├── Models
 │   │   │   │   ├── AppointmentAttendee.php
 │   │   │   │   ├── AppointmentLifecycleEvent.php
@@ -1645,6 +1647,7 @@
 │   │   │   ├── ModuleFirstPresetCompositionTest.php
 │   │   │   └── PresetCompositionSyncCutoverTest.php
 │   │   ├── Scheduling
+│   │   │   ├── SchedulingAvailabilityWindowFoundationTest.php
 │   │   │   ├── SchedulingFoundationTest.php
 │   │   │   └── SchedulingHostAndServiceFoundationTest.php
 │   │   ├── SetupValidation
@@ -1735,4 +1738,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-491 directories, 1245 files
+492 directories, 1247 files

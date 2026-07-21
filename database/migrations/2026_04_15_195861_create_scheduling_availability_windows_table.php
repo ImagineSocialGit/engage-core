@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Scheduling\Models\BookableService;
+use App\Modules\Scheduling\Models\SchedulingHost;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -17,25 +18,25 @@ return new class extends Migration
                 ->constrained()
                 ->nullOnDelete();
 
-            $table->nullableMorphs('owner');
+            $table->foreignIdFor(SchedulingHost::class)
+                ->nullable()
+                ->constrained()
+                ->nullOnDelete();
 
+            $table->string('window_type')->default('weekly')->index();
             $table->string('timezone')->default('UTC')->index();
 
             $table->unsignedTinyInteger('weekday')->nullable()->index();
-            $table->timestamp('starts_at')->nullable()->index();
-            $table->timestamp('ends_at')->nullable()->index();
             $table->time('start_time')->nullable();
             $table->time('end_time')->nullable();
 
-            $table->unsignedInteger('capacity')->nullable();
-            $table->string('rrule')->nullable();
+            $table->timestamp('starts_at')->nullable()->index();
+            $table->timestamp('ends_at')->nullable()->index();
 
+            $table->unsignedInteger('capacity')->nullable();
             $table->boolean('is_available')->default(true)->index();
 
             $table->string('source')->default('manual')->index();
-            $table->string('provider')->nullable()->index();
-            $table->string('external_id')->nullable()->index();
-
             $table->json('meta')->nullable();
 
             $table->timestamps();
@@ -43,20 +44,23 @@ return new class extends Migration
 
             $table->index([
                 'bookable_service_id',
+                'scheduling_host_id',
+                'window_type',
                 'is_available',
+            ], 'scheduling_availability_scope_type_index');
+
+            $table->index([
+                'window_type',
                 'weekday',
-            ], 'scheduling_availability_service_weekday_index');
-
-            $table->index([
-                'owner_type',
-                'owner_id',
                 'is_available',
-            ], 'scheduling_availability_owner_available_index');
+            ], 'scheduling_availability_weekly_lookup_index');
 
             $table->index([
-                'provider',
-                'external_id',
-            ], 'scheduling_availability_provider_external_index');
+                'window_type',
+                'starts_at',
+                'ends_at',
+                'is_available',
+            ], 'scheduling_availability_absolute_lookup_index');
         });
     }
 

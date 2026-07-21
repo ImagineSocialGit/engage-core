@@ -70,23 +70,26 @@ class SchedulingFoundationTest extends TestCase
 
         $this->assertTableHasColumns('scheduling_availability_windows', [
             'bookable_service_id',
-            'owner_type',
-            'owner_id',
+            'scheduling_host_id',
+            'window_type',
             'timezone',
             'weekday',
-            'starts_at',
-            'ends_at',
             'start_time',
             'end_time',
+            'starts_at',
+            'ends_at',
             'capacity',
-            'rrule',
             'is_available',
             'source',
-            'provider',
-            'external_id',
             'meta',
             'deleted_at',
         ]);
+
+        $this->assertFalse(Schema::hasColumn('scheduling_availability_windows', 'owner_type'));
+        $this->assertFalse(Schema::hasColumn('scheduling_availability_windows', 'owner_id'));
+        $this->assertFalse(Schema::hasColumn('scheduling_availability_windows', 'rrule'));
+        $this->assertFalse(Schema::hasColumn('scheduling_availability_windows', 'provider'));
+        $this->assertFalse(Schema::hasColumn('scheduling_availability_windows', 'external_id'));
 
         $this->assertTableHasColumns('appointments', [
             'bookable_service_id',

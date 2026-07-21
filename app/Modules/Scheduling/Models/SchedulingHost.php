@@ -63,6 +63,23 @@ class SchedulingHost extends Model
         return $this->hasMany(BookableServiceHost::class);
     }
 
+    public function availabilityWindows(): HasMany
+    {
+        return $this->hasMany(SchedulingAvailabilityWindow::class);
+    }
+
+    public function hostWideAvailabilityWindows(): HasMany
+    {
+        return $this->availabilityWindows()
+            ->whereNull('bookable_service_id');
+    }
+
+    public function serviceScopedAvailabilityWindows(): HasMany
+    {
+        return $this->availabilityWindows()
+            ->whereNotNull('bookable_service_id');
+    }
+
     public function bookableServices(): BelongsToMany
     {
         return $this->belongsToMany(
