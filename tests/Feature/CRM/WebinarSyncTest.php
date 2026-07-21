@@ -3,8 +3,10 @@
 namespace Tests\Feature\CRM;
 
 use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
+use App\Integrations\Webinars\Zoom\ZoomEventService;
 use App\Modules\Webinars\Data\ProviderWebinarData;
 use App\Modules\Webinars\Data\ProviderWebinarSnapshot;
+use App\Modules\Webinars\Enums\WebinarProviderEventType;
 use App\Integrations\Webinars\Zoom\ZoomWebinarService;
 use App\Modules\Webinars\Jobs\NotifyWebinarWaitlistJob;
 use App\Modules\Core\Models\Contact;
@@ -71,6 +73,7 @@ class WebinarSyncTest extends TestCase
         $this->assertDatabaseHas('webinars', [
             'webinar_series_id' => $series->id,
             'platform' => 'zoom',
+            'provider_event_type' => 'webinar',
             'external_id' => 'zoom-1001',
             'title' => 'Home Buyer Game Plan',
             'timezone' => 'America/Chicago',
@@ -82,6 +85,7 @@ class WebinarSyncTest extends TestCase
         $this->assertDatabaseHas('webinars', [
             'webinar_series_id' => $series->id,
             'platform' => 'zoom',
+            'provider_event_type' => 'webinar',
             'external_id' => 'zoom-1002',
             'title' => 'Home Buyer Game Plan',
             'timezone' => 'America/Chicago',
@@ -368,7 +372,7 @@ class WebinarSyncTest extends TestCase
         $response->assertSessionHas('success', 'Sync complete: 0 created, 0 updated, 0 deleted, 0 missing preserved.');
         $response->assertSessionHas(
             'error',
-            'Zoom returned a non-authoritative Webinar result. Returned webinars were imported, but missing-webinar reconciliation was skipped and no local webinars were removed.',
+            'Zoom returned a non-authoritative Webinar result. Returned events were imported, but missing-event reconciliation was skipped and no local events were removed.',
         );
 
         $this->assertDatabaseHas('webinars', [
@@ -549,6 +553,119 @@ class WebinarSyncTest extends TestCase
         $this->assertFalse(Cache::has($activeSeriesKey));
 
         $this->assertTrue(Cache::has($unrelatedKey));
+    }
+
+    public function test_series_creation_requires_and_persists_provider_event_type(): void
+    {
+        $user = User::factory()->create();
+
+        $missingType = $this->actingAs($user)
+            ->from(route('crm.webinar-series.index'))
+            ->post(route('crm.webinar-series.store'), [
+                'title' => 'Weekly Planning Session',
+            ]);
+
+        $missingType->assertRedirect(route('crm.webinar-series.index'));
+        $missingType->assertSessionHasErrors('provider_event_type');
+
+        $response = $this->actingAs($user)->post(route('crm.webinar-series.store'), [
+            'title' => 'Weekly Planning Session',
+            'provider_event_type' => WebinarProviderEventType::Meeting->value,
+        ]);
+
+        $response->assertRedirect(route('crm.webinar-series.index'));
+        $response->assertSessionHas('success', 'Webinar series created.');
+
+        $this->assertDatabaseHas('webinar_series', [
+            'title' => 'Weekly Planning Session',
+            'platform' => 'zoom',
+            'provider_event_type' => WebinarProviderEventType::Meeting->value,
+        ]);
+    }
+
+    public function test_series_event_type_update_does_not_retype_existing_occurrences(): void
+    {
+        $user = User::factory()->create();
+        $series = WebinarSeries::factory()->create([
+            'provider_event_type' => WebinarProviderEventType::Webinar->value,
+        ]);
+        $historicalOccurrence = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+            'provider_event_type' => WebinarProviderEventType::Webinar->value,
+        ]);
+
+        $response = $this->actingAs($user)->patch(
+            route('crm.webinar-series.provider-event-type.update', $series),
+            [
+                'provider_event_type' => WebinarProviderEventType::Meeting->value,
+            ],
+        );
+
+        $response->assertRedirect(route('crm.webinar-series.index'));
+        $response->assertSessionHas(
+            'success',
+            'Series event type updated to Meeting. Existing occurrences were not changed.',
+        );
+
+        $this->assertSame(
+            WebinarProviderEventType::Meeting->value,
+            $series->refresh()->provider_event_type,
+        );
+        $this->assertSame(
+            WebinarProviderEventType::Webinar->value,
+            $historicalOccurrence->refresh()->provider_event_type,
+        );
+    }
+
+    public function test_meeting_series_sync_uses_meeting_provider_adapter(): void
+    {
+        $this->freezeTime();
+
+        $user = User::factory()->create();
+        $series = WebinarSeries::factory()->meeting()->create([
+            'title' => 'Weekly Planning Session',
+        ]);
+
+        $events = Mockery::mock(ZoomEventService::class);
+        $events->shouldReceive('listEventsByTitle')
+            ->once()
+            ->with(
+                WebinarProviderEventType::Meeting,
+                'Weekly Planning Session',
+            )
+            ->andReturn(ProviderWebinarSnapshot::authoritative([
+                $this->providerWebinar(
+                    externalId: 'zoom-meeting-1001',
+                    title: 'Weekly Planning Session',
+                    joinUrl: 'https://example.com/meeting-1001',
+                    startsAt: now()->addWeek(),
+                    endsAt: now()->addWeek()->addHour(),
+                    description: 'A synced Zoom Meeting',
+                    meta: ['zoom_uuid' => 'meeting-uuid-1001'],
+                ),
+            ]));
+
+        $this->app->instance(ZoomEventService::class, $events);
+
+        $response = $this->actingAs($user)->post(route('crm.webinar-series.sync'), [
+            'webinar_series_id' => $series->getKey(),
+        ]);
+
+        $response->assertRedirect(route('crm.webinar-series.index'));
+        $response->assertSessionHas(
+            'success',
+            'Sync complete: 1 created, 0 updated, 0 deleted, 0 missing preserved.',
+        );
+
+        $this->assertDatabaseHas('webinars', [
+            'webinar_series_id' => $series->getKey(),
+            'platform' => 'zoom',
+            'provider_event_type' => WebinarProviderEventType::Meeting->value,
+            'external_id' => 'zoom-meeting-1001',
+            'title' => 'Weekly Planning Session',
+        ]);
+
+        Carbon::setTestNow();
     }
 
     private function providerWebinar(

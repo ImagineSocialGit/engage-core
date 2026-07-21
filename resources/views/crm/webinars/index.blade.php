@@ -20,6 +20,31 @@
             </div>
         @endif
 
+        @if(session('occurrence_replacement_result'))
+            @php
+                $replacementResult = session('occurrence_replacement_result');
+                $replacementQueueCounts = $replacementResult['queue_status_counts'] ?? [];
+            @endphp
+
+            <div class="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-4 text-sm text-indigo-950">
+                <p class="font-semibold">
+                    Occurrence replacement: {{ $replacementResult['source_title'] }} → {{ $replacementResult['replacement_title'] }}
+                </p>
+                <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-indigo-900">
+                    <span>{{ $replacementResult['eligible_registrations'] }} eligible</span>
+                    <span>{{ $replacementResult['created_registrations'] }} created</span>
+                    <span>{{ $replacementResult['adopted_registrations'] }} adopted</span>
+                    <span>{{ $replacementResult['skipped_source_messages'] }} obsolete messages skipped</span>
+                    @foreach($replacementQueueCounts as $status => $count)
+                        <span>{{ $count }} {{ \Illuminate\Support\Str::headline((string) $status) }}</span>
+                    @endforeach
+                </div>
+                <p class="mt-2 text-xs text-indigo-800">
+                    Each replacement registration finalizes independently. Failed or ambiguous registrations appear under Needs attention.
+                </p>
+            </div>
+        @endif
+
         @if (session('zoom_sync_error'))
             <div
                 x-data="{ open: true }"
@@ -51,7 +76,7 @@
 
         @if(session('sync_conflicts') && count(session('sync_conflicts')))
             <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                <p class="font-medium">Active webinar conflicts detected.</p>
+                <p class="font-medium">Active webinar event conflicts detected.</p>
 
                 <ul class="mt-2 space-y-1 text-sm">
                     @foreach(session('sync_conflicts') as $conflict)
@@ -78,7 +103,7 @@
 
         @if(session('sync_missing') && count(session('sync_missing')))
             <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                <p class="font-medium">Missing webinars preserved (not deleted).</p>
+                <p class="font-medium">Missing provider events preserved (not deleted).</p>
 
                 <ul class="mt-2 space-y-1 text-sm">
                     @foreach(session('sync_missing') as $item)
@@ -112,9 +137,9 @@
 
         @if($webinarDevEnabled ?? $webinarSmokeEnabled ?? false)
             <div class="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
-                <p class="font-semibold">Webinar Testing Tools Enabled</p>
+                <p class="font-semibold">Webinar Event Testing Tools Enabled</p>
                 <p class="mt-1 text-indigo-800">
-                    Use the Testing button on any webinar to open dev/staging-only controls for confirmations, reminders, join simulation, FlowRoute events, replay URLs, and post-webinar follow-ups.
+                    Use the Testing button on any event to open dev/staging-only controls for confirmations, reminders, join simulation, FlowRoute events, replay URLs, and post-webinar follow-ups.
                 </p>
             </div>
         @endif
@@ -123,7 +148,7 @@
             <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="flex flex-col gap-3 px-12 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <h2 class="text-sm font-semibold text-slate-900">
-                        {{ $showAttention ? 'Registration Recovery' : ($showArchived ? 'All Webinars' : 'Upcoming Webinars') }}
+                        {{ $showAttention ? 'Registration Recovery' : ($showArchived ? 'All Events' : 'Upcoming Events') }}
                     </h2>
 
                     <div class="flex flex-wrap items-center gap-3 text-sm font-medium">
@@ -169,6 +194,35 @@
                                         'seriesSlug' => $webinar->webinarSeries->slug,
                                     ])
                                     : null;
+                                $eventTypeLabel = $providerEventTypeOptions[$webinar->providerEventTypeKey()]
+                                    ?? \Illuminate\Support\Str::headline($webinar->providerEventTypeKey());
+                                $replacementCandidates = $replacementCandidatesBySourceId[$webinar->getKey()]
+                                    ?? collect();
+                                $replacementRegistrations = $webinar->registrations->filter(
+                                    fn ($registration): bool => $registration->replacement_of_registration_id !== null,
+                                );
+                                $replacementCompleted = $replacementRegistrations->filter(
+                                    fn ($registration): bool => in_array(data_get(
+                                        $registration->meta,
+                                        'registration_finalization.status',
+                                    ), ['completed'], true),
+                                );
+                                $replacementPending = $replacementRegistrations->filter(
+                                    fn ($registration): bool => in_array(data_get(
+                                        $registration->meta,
+                                        'registration_finalization.status',
+                                    ), ['pending', 'queued', 'processing'], true),
+                                );
+                                $replacementAttention = $replacementRegistrations->filter(
+                                    fn ($registration): bool => in_array(data_get(
+                                        $registration->meta,
+                                        'registration_finalization.status',
+                                    ), ['failed', 'reconciliation_required'], true)
+                                        || data_get(
+                                            $registration->meta,
+                                            'provider_sync.status',
+                                        ) === 'reconciliation_required',
+                                );
 
                                 $attendanceCheckedAt = data_get(
                                     $webinar->meta,
@@ -244,6 +298,22 @@
                                     {{ $webinar->title }}
 
                                     <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                                        <span class="rounded-full bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-700 ring-1 ring-indigo-200">
+                                            Zoom {{ $eventTypeLabel }}
+                                        </span>
+
+                                        @if($webinar->replacementOf)
+                                            <span class="rounded-full bg-sky-50 px-2 py-0.5 font-semibold text-sky-700 ring-1 ring-sky-200">
+                                                Replaces #{{ $webinar->replacementOf->getKey() }}
+                                            </span>
+                                        @endif
+
+                                        @if($webinar->replacement)
+                                            <span class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-200">
+                                                Replaced by #{{ $webinar->replacement->getKey() }}
+                                            </span>
+                                        @endif
+
                                         @if($webinar->playback_url)
                                             <span class="rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 ring-1 ring-emerald-200">
                                                 Replay set
@@ -253,6 +323,24 @@
                                         <span class="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">
                                             {{ $webinar->registrations->count() }} registrations
                                         </span>
+
+                                        @if($replacementRegistrations->isNotEmpty())
+                                            <span class="rounded-full bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-700 ring-1 ring-indigo-200">
+                                                {{ $replacementCompleted->count() }} replacement completed
+                                            </span>
+
+                                            @if($replacementPending->isNotEmpty())
+                                                <span class="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-200">
+                                                    {{ $replacementPending->count() }} replacement pending
+                                                </span>
+                                            @endif
+
+                                            @if($replacementAttention->isNotEmpty())
+                                                <span class="rounded-full bg-red-50 px-2 py-0.5 font-semibold text-red-700 ring-1 ring-red-200">
+                                                    {{ $replacementAttention->count() }} replacement needs attention
+                                                </span>
+                                            @endif
+                                        @endif
 
                                         @if($attendanceReady)
                                             <span class="rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 ring-1 ring-emerald-200">
@@ -318,6 +406,78 @@
                                             </span>
                                         @endif
                                     </div>
+
+                                    @if($webinar->replacement)
+                                        <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+                                            <p class="font-semibold">
+                                                This occurrence was replaced by
+                                                {{ $webinar->replacement->title }}
+                                                @if($webinar->replacement->starts_at)
+                                                    on {{ $webinar->replacement->starts_at->copy()->setTimezone($webinar->replacement->timezone)->format('M j, Y g:i A') }}
+                                                @endif
+                                                .
+                                            </p>
+                                            <p class="mt-1 text-amber-900">
+                                                Existing join tokens resolve through the replacement registration chain.
+                                            </p>
+                                        </div>
+                                    @elseif($replacementCandidates->isNotEmpty())
+                                        <details class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800">
+                                            <summary class="cursor-pointer font-semibold text-slate-950">
+                                                Replace this occurrence
+                                            </summary>
+
+                                            <form
+                                                method="POST"
+                                                action="{{ route('crm.webinars.replacements.store', $webinar) }}"
+                                                class="mt-3 space-y-3"
+                                            >
+                                                @csrf
+
+                                                <label class="grid gap-1 font-semibold text-slate-800">
+                                                    Replacement occurrence
+                                                    <select
+                                                        name="replacement_webinar_id"
+                                                        class="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"
+                                                        required
+                                                    >
+                                                        <option value="">Select the synced replacement</option>
+                                                        @foreach($replacementCandidates as $candidate)
+                                                            @php
+                                                                $candidateTypeLabel = $providerEventTypeOptions[$candidate->providerEventTypeKey()]
+                                                                    ?? \Illuminate\Support\Str::headline($candidate->providerEventTypeKey());
+                                                            @endphp
+                                                            <option value="{{ $candidate->getKey() }}">
+                                                                {{ $candidateTypeLabel }} #{{ $candidate->getKey() }}
+                                                                — {{ $candidate->starts_at?->copy()->setTimezone($candidate->timezone)->format('M j, Y g:i A') ?? 'Unscheduled' }}
+                                                                — {{ $candidate->external_id }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                </label>
+
+                                                <label class="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-950">
+                                                    <input
+                                                        type="checkbox"
+                                                        name="confirm_replacement"
+                                                        value="1"
+                                                        class="mt-0.5 rounded border-amber-400"
+                                                        required
+                                                    >
+                                                    <span>
+                                                        I understand this preserves both occurrences, skips obsolete pending messages, and reprovisions each active registration independently.
+                                                    </span>
+                                                </label>
+
+                                                <button
+                                                    type="submit"
+                                                    class="inline-flex items-center rounded-md bg-slate-900 px-3 py-2 font-semibold text-white hover:bg-slate-700"
+                                                >
+                                                    Confirm occurrence replacement
+                                                </button>
+                                            </form>
+                                        </details>
+                                    @endif
 
                                     @if($finalizationFailures->isNotEmpty())
                                         <div class="mt-3 space-y-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900">
@@ -476,7 +636,10 @@
                                 </td>
 
                                 <td class="px-6 py-4 text-slate-600">
-                                    {{ $webinar->webinarSeries?->title ?? '—' }}
+                                    <div>{{ $webinar->webinarSeries?->title ?? '—' }}</div>
+                                    <div class="mt-1 text-xs font-semibold text-indigo-700">
+                                        Zoom {{ $eventTypeLabel }}
+                                    </div>
                                 </td>
 
                                 <td class="px-6 py-4 text-slate-700">
@@ -918,7 +1081,7 @@
                                 type="text"
                                 value="{{ old('title') }}"
                                 class="mt-1 block w-full rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-0"
-                                placeholder="Exact Zoom webinar series title"
+                                placeholder="Exact Zoom event series title"
                                 required
                             >
 
@@ -928,6 +1091,36 @@
                                 </p>
                             @enderror
                         </div>
+
+                        <div>
+                            <label for="provider_event_type" class="block text-sm font-medium text-slate-700">
+                                Zoom Event Type
+                            </label>
+
+                            <select
+                                id="provider_event_type"
+                                name="provider_event_type"
+                                class="mt-1 block w-full rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-0"
+                                required
+                            >
+                                <option value="">Select an event type</option>
+                                @foreach($providerEventTypeOptions as $eventType => $eventTypeLabel)
+                                    <option value="{{ $eventType }}" @selected(old('provider_event_type') === $eventType)>
+                                        Zoom {{ $eventTypeLabel }}
+                                    </option>
+                                @endforeach
+                            </select>
+
+                            @error('provider_event_type')
+                                <p class="mt-2 text-sm text-red-600">
+                                    {{ $message }}
+                                </p>
+                            @enderror
+                        </div>
+
+                        <p class="text-xs leading-5 text-slate-500">
+                            This selects the provider adapter used for future synchronization. Existing occurrences are never retyped automatically.
+                        </p>
 
                         <button
                             type="submit"
@@ -965,6 +1158,7 @@
                                         @selected(old('webinar_series_id') == $seriesItem->id)
                                     >
                                         {{ $seriesItem->title }}
+                                        — Zoom {{ $providerEventTypeOptions[$seriesItem->providerEventTypeKey()] ?? \Illuminate\Support\Str::headline($seriesItem->providerEventTypeKey()) }}
                                     </option>
                                 @endforeach
                             </select>
@@ -997,9 +1191,14 @@
                                     <div class="flex items-start justify-between gap-3">
                                         <div>
                                             <p class="font-semibold text-slate-900">{{ $seriesItem->title }}</p>
-                                            <p class="mt-1 text-xs text-slate-500">
-                                                Schedule: {{ $seriesItem->webinarScheduleProfile?->name ?? (($scheduleProfiles ?? collect())->firstWhere('is_default', true)?->name ?? 'Default profile') }}
-                                            </p>
+                                            <div class="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                                                <span class="rounded-full bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-700 ring-1 ring-indigo-200">
+                                                    Zoom {{ $providerEventTypeOptions[$seriesItem->providerEventTypeKey()] ?? \Illuminate\Support\Str::headline($seriesItem->providerEventTypeKey()) }}
+                                                </span>
+                                                <span class="text-slate-500">
+                                                    Schedule: {{ $seriesItem->webinarScheduleProfile?->name ?? (($scheduleProfiles ?? collect())->firstWhere('is_default', true)?->name ?? 'Default profile') }}
+                                                </span>
+                                            </div>
                                         </div>
 
                                         <form
@@ -1018,6 +1217,44 @@
                                             </button>
                                         </form>
                                     </div>
+
+                                    <form
+                                        method="POST"
+                                        action="{{ route('crm.webinar-series.provider-event-type.update', $seriesItem) }}"
+                                        class="mt-3 space-y-2"
+                                    >
+                                        @csrf
+                                        @method('PATCH')
+
+                                        <div class="flex gap-2">
+                                            <select
+                                                name="provider_event_type"
+                                                class="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-0"
+                                                aria-label="Zoom event type for {{ $seriesItem->title }}"
+                                                required
+                                            >
+                                                @foreach($providerEventTypeOptions as $eventType => $eventTypeLabel)
+                                                    <option
+                                                        value="{{ $eventType }}"
+                                                        @selected($seriesItem->providerEventTypeKey() === $eventType)
+                                                    >
+                                                        Zoom {{ $eventTypeLabel }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+
+                                            <button
+                                                type="submit"
+                                                class="rounded-lg border border-indigo-300 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                                            >
+                                                Save type
+                                            </button>
+                                        </div>
+
+                                        <p class="text-[11px] leading-4 text-slate-500">
+                                            Changes future provider sync only. Existing occurrences remain historically typed.
+                                        </p>
+                                    </form>
 
                                     @if(($scheduleProfiles ?? collect())->isNotEmpty())
                                         <form

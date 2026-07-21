@@ -829,12 +829,14 @@
 │   │   │   ├── Providers
 │   │   │   │   └── WebinarsModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   │   ├── ReplaceWebinarOccurrenceRequest.php
 │   │   │   │   ├── ResolveWebinarRegistrationReconciliationRequest.php
 │   │   │   │   ├── StoreWebinarRegistrationRequest.php
 │   │   │   │   ├── StoreWebinarSeriesRequest.php
 │   │   │   │   ├── StoreWebinarWaitlistSignupRequest.php
 │   │   │   │   ├── SyncWebinarSeriesRequest.php
 │   │   │   │   ├── UpdateWebinarMessageTemplateRequest.php
+│   │   │   │   ├── UpdateWebinarSeriesProviderEventTypeRequest.php
 │   │   │   │   └── UpdateWebinarSeriesScheduleProfileRequest.php
 │   │   │   ├── Services
 │   │   │   │   ├── ContactPanels
@@ -1727,6 +1729,7 @@
 │   │   │   ├── WebinarMessageAreaRegistryTest.php
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
+│   │   │   ├── WebinarOccurrenceReplacementControllerTest.php
 │   │   │   ├── WebinarOccurrenceReplacementTest.php
 │   │   │   ├── WebinarProviderEventTypeFoundationTest.php
 │   │   │   ├── WebinarRegisterPageConfigTest.php
@@ -1760,4 +1763,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-494 directories, 1267 files
+494 directories, 1270 files

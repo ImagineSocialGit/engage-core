@@ -3,10 +3,11 @@
 namespace App\Modules\Webinars\Requests;
 
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
+use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class StoreWebinarSeriesRequest extends FormRequest
+class UpdateWebinarSeriesProviderEventTypeRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -16,7 +17,6 @@ class StoreWebinarSeriesRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title' => ['required', 'string', 'max:255', 'unique:webinar_series,title'],
             'provider_event_type' => [
                 'required',
                 'string',
@@ -28,7 +28,10 @@ class StoreWebinarSeriesRequest extends FormRequest
     /** @return array<int, string> */
     private function supportedProviderEventTypes(): array
     {
-        $provider = config('webinars.provider', 'zoom');
+        $series = $this->route('series');
+        $provider = $series instanceof WebinarSeries
+            ? $series->providerKey()
+            : config('webinars.provider', 'zoom');
         $provider = is_string($provider) && trim($provider) !== ''
             ? strtolower(trim($provider))
             : 'zoom';
