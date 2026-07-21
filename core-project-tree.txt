@@ -630,8 +630,10 @@
 │   │   │   ├── Models
 │   │   │   │   ├── AppointmentAttendee.php
 │   │   │   │   ├── Appointment.php
+│   │   │   │   ├── BookableServiceHost.php
 │   │   │   │   ├── BookableService.php
-│   │   │   │   └── SchedulingAvailabilityWindow.php
+│   │   │   │   ├── SchedulingAvailabilityWindow.php
+│   │   │   │   └── SchedulingHost.php
 │   │   │   ├── Providers
 │   │   │   │   └── SchedulingModuleServiceProvider.php
 │   │   │   ├── Requests
@@ -1077,6 +1079,7 @@
 │   │   ├── AppointmentAttendeeFactory.php
 │   │   ├── AppointmentFactory.php
 │   │   ├── BookableServiceFactory.php
+│   │   ├── BookableServiceHostFactory.php
 │   │   ├── BroadcastFactory.php
 │   │   ├── BroadcastRecipientFactory.php
 │   │   ├── CampaignFactory.php
@@ -1119,6 +1122,7 @@
 │   │   ├── PortalUserFactory.php
 │   │   ├── ScheduledMessageFactory.php
 │   │   ├── SchedulingAvailabilityWindowFactory.php
+│   │   ├── SchedulingHostFactory.php
 │   │   ├── TaskFactory.php
 │   │   ├── TaskLinkFactory.php
 │   │   ├── TaskTemplateFactory.php
@@ -1146,10 +1150,12 @@
 │   │   ├── 2026_04_15_195857_create_contact_locations_table.php
 │   │   ├── 2026_04_15_195858_create_location_areas_table.php
 │   │   ├── 2026_04_15_195859_create_location_area_assignments_table.php
+│   │   ├── 2026_04_15_195859_create_scheduling_hosts_table.php
 │   │   ├── 2026_04_15_195860_create_bookable_services_table.php
 │   │   ├── 2026_04_15_195861_create_scheduling_availability_windows_table.php
 │   │   ├── 2026_04_15_195862_create_appointments_table.php
 │   │   ├── 2026_04_15_195863_create_appointment_attendees_table.php
+│   │   ├── 2026_04_15_195864_create_bookable_service_hosts_table.php
 │   │   ├── 2026_04_15_195870_create_portal_users_table.php
 │   │   ├── 2026_04_15_195871_create_portal_contact_links_table.php
 │   │   ├── 2026_04_15_195872_create_portal_invitations_table.php
@@ -1633,7 +1639,8 @@
 │   │   │   ├── ModuleFirstPresetCompositionTest.php
 │   │   │   └── PresetCompositionSyncCutoverTest.php
 │   │   ├── Scheduling
-│   │   │   └── SchedulingFoundationTest.php
+│   │   │   ├── SchedulingFoundationTest.php
+│   │   │   └── SchedulingHostAndServiceFoundationTest.php
 │   │   ├── SetupValidation
 │   │   │   ├── ConfigContractsSetupValidationContributorTest.php
 │   │   │   ├── MessageConfigValidatorTest.php
@@ -1720,4 +1727,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-491 directories, 1230 files
+491 directories, 1237 files

@@ -11,20 +11,26 @@ return new class extends Migration
         Schema::create('bookable_services', function (Blueprint $table) {
             $table->id();
 
-            $table->string('key')->nullable()->unique();
+            $table->string('key')->unique();
             $table->string('name');
             $table->text('description')->nullable();
 
             $table->string('status')->default('active')->index();
 
-            $table->unsignedInteger('duration_minutes')->nullable();
+            $table->unsignedInteger('duration_minutes');
+            $table->unsignedInteger('slot_interval_minutes')->default(15);
             $table->unsignedInteger('buffer_before_minutes')->default(0);
             $table->unsignedInteger('buffer_after_minutes')->default(0);
+            $table->unsignedInteger('minimum_notice_minutes')->default(0);
+            $table->unsignedInteger('booking_horizon_days')->default(60);
+            $table->unsignedInteger('cancellation_notice_minutes')->default(0);
+            $table->unsignedInteger('reschedule_notice_minutes')->default(0);
+            $table->string('timezone')->default('UTC')->index();
 
             $table->string('location_type')->nullable()->index();
             $table->json('location_details')->nullable();
 
-            $table->unsignedInteger('capacity')->nullable();
+            $table->unsignedInteger('capacity')->default(1);
 
             $table->boolean('requires_confirmation')->default(false)->index();
             $table->boolean('is_public')->default(false)->index();
@@ -32,6 +38,8 @@ return new class extends Migration
             $table->unsignedInteger('sort_order')->default(0)->index();
 
             $table->string('source')->default('manual')->index();
+
+            // Retained until the dedicated provider/synchronization persistence batch.
             $table->string('provider')->nullable()->index();
             $table->string('external_id')->nullable()->index();
             $table->string('external_url')->nullable();
@@ -41,8 +49,15 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['status', 'is_public', 'sort_order'], 'bookable_services_visibility_index');
-            $table->index(['provider', 'external_id'], 'bookable_services_provider_external_index');
+            $table->index(
+                ['status', 'is_public', 'sort_order'],
+                'bookable_services_visibility_index',
+            );
+
+            $table->index(
+                ['provider', 'external_id'],
+                'bookable_services_provider_external_index',
+            );
         });
     }
 
