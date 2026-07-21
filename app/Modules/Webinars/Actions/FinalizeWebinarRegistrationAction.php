@@ -35,11 +35,25 @@ class FinalizeWebinarRegistrationAction
             'contact',
             'webinar',
             'webinar.webinarSeries',
+            'replacementOfRegistration',
+            'replacementRegistration',
         ]) ?? $registration;
 
-        $consentGrants = $this->rehydrateConsentGrants(
-            $claim['consent_transitions'],
-        );
+        if (
+            $claim['mode'] === 'replacement_reprovisioning'
+            && ! $registration->replacementOfRegistration instanceof WebinarRegistration
+        ) {
+            return $this->markFailed(
+                registration: $registration,
+                reason: 'replacement_source_registration_missing',
+            );
+        }
+
+        $consentGrants = $claim['mode'] === 'replacement_reprovisioning'
+            ? []
+            : $this->rehydrateConsentGrants(
+                $claim['consent_transitions'],
+            );
 
         if (count($consentGrants) !== count($claim['consent_transitions'])) {
             return $this->markFailed(
@@ -110,15 +124,39 @@ class FinalizeWebinarRegistrationAction
             );
         }
 
+        $registration = $registration->fresh([
+            'contact',
+            'webinar',
+            'webinar.webinarSeries',
+            'replacementOfRegistration',
+            'replacementRegistration',
+        ]) ?? $registration;
+
+        if (
+            $claim['mode'] !== 'replacement_reprovisioning'
+            && $registration->replacementRegistration instanceof WebinarRegistration
+        ) {
+            return $this->markCompleted(
+                registration: $registration,
+                reason: 'occurrence_replaced_before_registration_messages',
+                providerSyncStatus: $syncResult->status,
+            );
+        }
+
         try {
             $this->dispatchRegistrationMessages->handle(
                 $registration->fresh([
                     'contact',
                     'webinar',
                     'webinar.webinarSeries',
+                    'replacementOfRegistration',
                 ]) ?? $registration,
-                null,
-                $consentGrants,
+                $claim['mode'] === 'replacement_reprovisioning'
+                    ? ['reminders']
+                    : null,
+                $claim['mode'] === 'replacement_reprovisioning'
+                    ? []
+                    : $consentGrants,
             );
         } catch (Throwable $exception) {
             report($exception);
@@ -132,7 +170,9 @@ class FinalizeWebinarRegistrationAction
 
         return $this->markCompleted(
             registration: $registration,
-            reason: 'registration_messages_planned',
+            reason: $claim['mode'] === 'replacement_reprovisioning'
+                ? 'replacement_reminders_planned'
+                : 'registration_messages_planned',
             providerSyncStatus: $syncResult->status,
         );
     }
@@ -412,9 +452,11 @@ class FinalizeWebinarRegistrationAction
     /** @param array<string, mixed> $state */
     private function mode(array $state): string
     {
-        return ($state['mode'] ?? null) === 'consent_acknowledgements'
-            ? 'consent_acknowledgements'
-            : 'initial_registration';
+        return match ($state['mode'] ?? null) {
+            'consent_acknowledgements' => 'consent_acknowledgements',
+            'replacement_reprovisioning' => 'replacement_reprovisioning',
+            default => 'initial_registration',
+        };
     }
 
     private function isFreshTimestamp(

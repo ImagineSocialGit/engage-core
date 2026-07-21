@@ -8,12 +8,12 @@ use Database\Factories\WebinarRegistrationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
 
 class WebinarRegistration extends Model
 {
-
     use HasFactory;
 
     protected static function newFactory(): WebinarRegistrationFactory
@@ -24,6 +24,7 @@ class WebinarRegistration extends Model
     protected $fillable = [
         'contact_id',
         'webinar_id',
+        'replacement_of_registration_id',
         'join_token',
         'webinar_slug',
         'status',
@@ -49,6 +50,16 @@ class WebinarRegistration extends Model
     public function webinar(): BelongsTo
     {
         return $this->belongsTo(Webinar::class);
+    }
+
+    public function replacementOfRegistration(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'replacement_of_registration_id');
+    }
+
+    public function replacementRegistration(): HasOne
+    {
+        return $this->hasOne(self::class, 'replacement_of_registration_id');
     }
 
     public function scheduledMessages(): MorphMany

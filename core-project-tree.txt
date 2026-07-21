@@ -744,6 +744,7 @@
 │   │   │   │   │   └── ResolveWebinarProviderEventTargetAction.php
 │   │   │   │   ├── QueueWebinarProviderCancellationAction.php
 │   │   │   │   ├── QueueWebinarRegistrationFinalizationAction.php
+│   │   │   │   ├── ReplaceWebinarOccurrenceAction.php
 │   │   │   │   ├── ResolveRegisterableWebinarAction.php
 │   │   │   │   ├── ResolveWebinarJoinUrlAction.php
 │   │   │   │   ├── ResolveWebinarPlaybackUrlAction.php
@@ -1231,6 +1232,7 @@
 │   │   ├── 2026_07_18_220001_create_automation_event_consumer_receipts_table.php
 │   │   ├── 2026_07_19_031500_create_inbound_message_receipts_table.php
 │   │   ├── 2026_07_19_040000_create_webhook_inbox_receipts_table.php
+│   │   ├── 2026_07_21_180000_add_webinar_replacement_links.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -1716,6 +1718,7 @@
 │   │   │   ├── WebinarMessageAreaRegistryTest.php
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
+│   │   │   ├── WebinarOccurrenceReplacementTest.php
 │   │   │   ├── WebinarProviderEventTypeFoundationTest.php
 │   │   │   ├── WebinarRegisterPageConfigTest.php
 │   │   │   ├── WebinarRegistrationBoundaryContractTest.php
@@ -1748,4 +1751,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-493 directories, 1256 files
+493 directories, 1259 files

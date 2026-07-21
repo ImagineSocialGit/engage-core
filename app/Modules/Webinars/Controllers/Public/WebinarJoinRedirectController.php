@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Webinars\Actions\ResolveWebinarJoinUrlAction;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Support\WebinarJoinBrowserProof;
+use App\Modules\Webinars\Support\WebinarRegistrationThankYouLinkGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -17,12 +18,30 @@ class WebinarJoinRedirectController extends Controller
     public function show(
         string $token,
         ResolveWebinarJoinUrlAction $resolveWebinarJoinUrlAction,
-    ): Response {
+        WebinarRegistrationThankYouLinkGenerator $thankYouLinks,
+    ): Response|RedirectResponse {
         $registration = $this->registrationForToken($token);
         $destination = $resolveWebinarJoinUrlAction->handle($registration);
 
         if (blank($destination)) {
-            throw new NotFoundHttpException('No join URL is available for this registration.');
+            return $this->replacementRecoveryResponse(
+                registration: $registration,
+                resolveWebinarJoinUrlAction: $resolveWebinarJoinUrlAction,
+                thankYouLinks: $thankYouLinks,
+            );
+        }
+
+        $displayRegistration = $resolveWebinarJoinUrlAction
+            ->canonicalRegistration($registration);
+
+        if (
+            $displayRegistration->webinar
+            && ! $displayRegistration->is($registration)
+        ) {
+            $registration->setRelation(
+                'webinar',
+                $displayRegistration->webinar,
+            );
         }
 
         $continueUrl = URL::temporarySignedRoute(
@@ -36,6 +55,7 @@ class WebinarJoinRedirectController extends Controller
 
         return response()->view('webinar.join-confirm', [
             'registration' => $registration,
+            'displayRegistration' => $displayRegistration,
             'continueUrl' => $continueUrl,
         ]);
     }
@@ -45,6 +65,7 @@ class WebinarJoinRedirectController extends Controller
         Request $request,
         ResolveWebinarJoinUrlAction $resolveWebinarJoinUrlAction,
         WebinarJoinBrowserProof $browserProof,
+        WebinarRegistrationThankYouLinkGenerator $thankYouLinks,
     ): RedirectResponse {
         $registration = $this->registrationForToken($token);
         $submittedProof = trim((string) $request->input('browser_proof', ''));
@@ -66,10 +87,32 @@ class WebinarJoinRedirectController extends Controller
         $destination = $resolveWebinarJoinUrlAction->execute($registration);
 
         if (blank($destination)) {
-            throw new NotFoundHttpException('No join URL is available for this registration.');
+            return $this->replacementRecoveryResponse(
+                registration: $registration,
+                resolveWebinarJoinUrlAction: $resolveWebinarJoinUrlAction,
+                thankYouLinks: $thankYouLinks,
+            );
         }
 
         return redirect()->away($destination);
+    }
+
+    private function replacementRecoveryResponse(
+        WebinarRegistration $registration,
+        ResolveWebinarJoinUrlAction $resolveWebinarJoinUrlAction,
+        WebinarRegistrationThankYouLinkGenerator $thankYouLinks,
+    ): RedirectResponse {
+        if (! $resolveWebinarJoinUrlAction->requiresReplacementRecovery($registration)) {
+            throw new NotFoundHttpException(
+                'No join URL is available for this registration.',
+            );
+        }
+
+        return redirect()->to(
+            $thankYouLinks->forRegistration(
+                $resolveWebinarJoinUrlAction->canonicalRegistration($registration),
+            ),
+        );
     }
 
     private function registrationForToken(string $token): WebinarRegistration

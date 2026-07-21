@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Webinar extends Model
 {
@@ -21,6 +22,7 @@ class Webinar extends Model
 
     protected $fillable = [
         'webinar_series_id',
+        'replacement_of_webinar_id',
         'webinar_schedule_profile_id',
         'title',
         'slug',
@@ -68,6 +70,7 @@ class Webinar extends Model
                 'starts_at',
                 'ends_at',
                 'webinar_series_id',
+                'replacement_of_webinar_id',
                 'webinar_schedule_profile_id',
                 'platform',
                 'provider_event_type',
@@ -89,6 +92,16 @@ class Webinar extends Model
     public function webinarSeries(): BelongsTo
     {
         return $this->belongsTo(WebinarSeries::class);
+    }
+
+    public function replacementOf(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'replacement_of_webinar_id');
+    }
+
+    public function replacement(): HasOne
+    {
+        return $this->hasOne(self::class, 'replacement_of_webinar_id');
     }
 
     public function webinarScheduleProfile(): BelongsTo
