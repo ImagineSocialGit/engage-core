@@ -167,8 +167,10 @@ class EmailPayload implements EmailMessage
 
         if (is_string($transactionalOptOutUrl) && trim($transactionalOptOutUrl) !== '') {
             $sections[] = "Don't want these emails?\n".trim($transactionalOptOutUrl);
-        } elseif (is_string($marketingUnsubscribeUrl) && trim($marketingUnsubscribeUrl) !== '') {
-            $sections[] = "Unsubscribe:\n".trim($marketingUnsubscribeUrl);
+        }
+
+        if (is_string($marketingUnsubscribeUrl) && trim($marketingUnsubscribeUrl) !== '') {
+            $sections[] = "Unsubscribe from marketing emails:\n".trim($marketingUnsubscribeUrl);
         }
 
         return trim(implode(

@@ -245,7 +245,7 @@ class CreateWebinarRegistrationActionTest extends TestCase
         ]);
     }
 
-    public function test_existing_registration_dispatches_only_new_consent_acknowledgements_as_standalone_messages(): void
+    public function test_existing_registration_forwards_only_new_consent_acknowledgements_to_registration_message_planning(): void
     {
         Queue::fake();
 
@@ -261,22 +261,45 @@ class CreateWebinarRegistrationActionTest extends TestCase
             'webinar_slug' => $webinar->slug,
         ]);
 
-        $dispatchRegistration = Mockery::mock(DispatchWebinarRegistrationMessagesAction::class);
-        $dispatchRegistration->shouldReceive('handle')->never();
-        app()->instance(DispatchWebinarRegistrationMessagesAction::class, $dispatchRegistration);
+        $dispatchRegistration = Mockery::mock(
+            DispatchWebinarRegistrationMessagesAction::class,
+        );
 
-        $standalone = Mockery::mock(DispatchConsentOptInMessageAction::class);
-        $standalone->shouldReceive('handle')
+        $dispatchRegistration
+            ->shouldReceive('handle')
             ->once()
             ->withArgs(fn (
-                Contact $passedContact,
-                MessageConsentGrantResult $grant,
-            ): bool => $passedContact->is($contact)
-                && $grant->channel === 'email'
-                && $grant->purpose === 'transactional'
-                && $grant->becameActive)
+                WebinarRegistration $registration,
+                ?array $contextKeys,
+                array $consentGrants,
+            ): bool => $registration->is($existing)
+                && $contextKeys === null
+                && count($consentGrants) === 1
+                && collect($consentGrants)->every(
+                    fn (MessageConsentGrantResult $grant): bool =>
+                        $grant->channel === 'email'
+                        && $grant->purpose === 'transactional'
+                        && $grant->becameActive,
+                ))
             ->andReturn([]);
-        app()->instance(DispatchConsentOptInMessageAction::class, $standalone);
+
+        app()->instance(
+            DispatchWebinarRegistrationMessagesAction::class,
+            $dispatchRegistration,
+        );
+
+        $standalone = Mockery::mock(
+            DispatchConsentOptInMessageAction::class,
+        );
+
+        $standalone
+            ->shouldReceive('handle')
+            ->never();
+
+        app()->instance(
+            DispatchConsentOptInMessageAction::class,
+            $standalone,
+        );
 
         $returned = app(CreateWebinarRegistrationAction::class)->handle(
             validated: [

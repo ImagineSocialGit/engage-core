@@ -12,6 +12,7 @@ use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Modules\Webinars\Services\WebinarMessageAreaRegistry;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
+use App\Support\Urls\AbsoluteUrl;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 use Illuminate\Support\Collection;
 use Throwable;
@@ -20,6 +21,7 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
 {
     private const SOURCE = 'webinars.schedule_profiles';
     private const MESSAGE_AREA_SOURCE = 'webinars.message_areas';
+    private const PUBLIC_URL_SOURCE = 'app';
     private const MODULE = 'webinars';
 
     public function __construct(
@@ -30,6 +32,8 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
 
     public function findings(): iterable
     {
+        yield from $this->validatePublicUrl();
+
         try {
             $this->messageAreaRegistry->all();
         } catch (Throwable $exception) {
@@ -49,6 +53,33 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
         yield from $this->validateConfigProfiles();
         yield from $this->validateRuntimeProfiles();
         yield from $this->validateSelectedProfiles();
+    }
+
+    /**
+     * @return iterable<int, SetupValidationFinding>
+     */
+    private function validatePublicUrl(): iterable
+    {
+        $configuredUrl = config('app.webinar_url');
+
+        try {
+            AbsoluteUrl::origin($configuredUrl);
+        } catch (Throwable $exception) {
+            yield $this->error(
+                code: 'webinars.public_url.invalid',
+                message: $exception->getMessage(),
+                path: 'app.webinar_url',
+                context: [
+                    'configured_value' => is_scalar($configuredUrl)
+                        ? (string) $configuredUrl
+                        : get_debug_type($configuredUrl),
+                ],
+                meta: [
+                    'exception' => $exception::class,
+                ],
+                source: self::PUBLIC_URL_SOURCE,
+            );
+        }
     }
 
     /**

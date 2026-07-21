@@ -5,7 +5,9 @@ namespace Tests\Feature\Messaging;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Mail;
 use InvalidArgumentException;
+use Symfony\Component\Mime\Email;
 use Tests\TestCase;
 
 class EmailPayloadTest extends TestCase
@@ -396,6 +398,45 @@ Thanks.",
         $this->assertStringNotContainsString('{cta}', $plainText);
     }
 
+    public function test_combined_delivery_renders_both_transactional_and_marketing_preference_links(): void
+    {
+        $payload = EmailPayload::fromArray([
+            'email' => 'test@example.com',
+            'subject' => 'Registration confirmed',
+            'body' => 'Your registration is confirmed.',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'transactional_opt_out_url' => 'https://example.test/webinar-opt-out',
+            'unsubscribe_url' => 'https://example.test/marketing-unsubscribe',
+        ]);
+
+        $plainText = $payload->plainText();
+        $html = $payload->html();
+
+        $this->assertStringContainsString(
+            "Don't want these emails?\nhttps://example.test/webinar-opt-out",
+            $plainText,
+        );
+        $this->assertStringContainsString(
+            "Unsubscribe from marketing emails:\nhttps://example.test/marketing-unsubscribe",
+            $plainText,
+        );
+
+        $this->assertStringContainsString(
+            'href="https://example.test/webinar-opt-out"',
+            $html,
+        );
+        $this->assertStringContainsString(
+            'href="https://example.test/marketing-unsubscribe"',
+            $html,
+        );
+        $this->assertStringContainsString(
+            'unsubscribe from marketing emails here',
+            $html,
+        );
+    }
+
     public function test_mailable_declares_an_explicit_plain_text_alternative(): void
     {
         $payload = EmailPayload::fromArray([
@@ -417,6 +458,51 @@ Thanks.",
         $this->assertSame(
             $payload->plainText(),
             $mailable->viewData['content'] ?? null,
+        );
+    }
+
+    public function test_application_serialization_keeps_both_mime_parts_unindented(): void
+    {
+        $payload = EmailPayload::fromArray([
+            'email' => 'test@example.com',
+            'subject' => 'Starting Soon',
+            'body' => "We start soon.\n\n{cta}",
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'reminder',
+            'cta' => [
+                'label' => 'Join Webinar',
+                'url' => 'https://webinar.example.test/j/example-token',
+            ],
+        ]);
+
+        $capturedMessage = null;
+        $mailable = $payload->mailable()->to($payload->to());
+
+        $mailable->withSymfonyMessage(
+            function (Email $message) use (&$capturedMessage): void {
+                $capturedMessage = $message;
+            },
+        );
+
+        Mail::mailer('array')->send($mailable);
+
+        $this->assertInstanceOf(Email::class, $capturedMessage);
+
+        $serialized = $capturedMessage->toString();
+        $plainTextPosition = strpos($serialized, 'Content-Type: text/plain;');
+        $htmlPosition = strpos($serialized, 'Content-Type: text/html;');
+
+        $this->assertStringContainsString(
+            'Content-Type: multipart/alternative;',
+            $serialized,
+        );
+        $this->assertNotFalse($plainTextPosition);
+        $this->assertNotFalse($htmlPosition);
+        $this->assertLessThan($htmlPosition, $plainTextPosition);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?:\r\n|\n)[ \t]+Content-Type: text\/html;/',
+            $serialized,
         );
     }
 

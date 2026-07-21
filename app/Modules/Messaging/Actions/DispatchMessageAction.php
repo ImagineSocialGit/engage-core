@@ -163,7 +163,23 @@ class DispatchMessageAction
             return null;
         }
 
-        if (($definition['timing'] ?? null) === 'scheduled' && $dispatch->sendAt->lt(now())) {
+        $dedupeKey = $this->dedupeKeyBuilder->build(
+            recipient: $recipient,
+            definition: $definition,
+            context: $context,
+            sendAt: $dispatch->sendAt,
+            behaviorOwner: $dispatch->behaviorOwner,
+            occurrenceKey: $dispatch->occurrenceKey,
+        );
+
+        if (
+            ($definition['timing'] ?? null) === 'scheduled'
+            && $dispatch->sendAt->lt(now())
+            && ! $this->mayMergeIntoPendingConsolidatedDelivery(
+                dedupeKey: $dedupeKey,
+                dispatch: $dispatch,
+            )
+        ) {
             return null;
         }
 
@@ -195,16 +211,23 @@ class DispatchMessageAction
             sendAt: $dispatch->sendAt,
             context: $context,
             behaviorOwner: $dispatch->behaviorOwner,
-            dedupeKey: $this->dedupeKeyBuilder->build(
-                recipient: $recipient,
-                definition: $definition,
-                context: $context,
-                sendAt: $dispatch->sendAt,
-                behaviorOwner: $dispatch->behaviorOwner,
-                occurrenceKey: $dispatch->occurrenceKey,
-            ),
+            dedupeKey: $dedupeKey,
             meta: $messageMeta,
         );
+    }
+
+    private function mayMergeIntoPendingConsolidatedDelivery(
+        string $dedupeKey,
+        ResolvedMessageDispatch $dispatch,
+    ): bool {
+        if (! is_array(data_get($dispatch->meta, 'delivery_consolidation'))) {
+            return false;
+        }
+
+        return ScheduledMessage::query()
+            ->where('dedupe_key', $dedupeKey)
+            ->where('status', ScheduledMessage::STATUS_PENDING)
+            ->exists();
     }
 
     private function normalizeEnumValue(MessageChannel|MessagePurpose|string $value): string

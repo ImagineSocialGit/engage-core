@@ -11,6 +11,7 @@ class MessageDeliveryConsolidator
 {
     public function __construct(
         private readonly EmailConsentRevocationLinkGenerator $emailConsentRevocationLinkGenerator,
+        private readonly MessageDeliveryPrimarySelector $primarySelector,
     ) {}
 
     public function coversIntent(
@@ -90,7 +91,10 @@ class MessageDeliveryConsolidator
     public function consolidate(array $intents, string $policyKey): array
     {
         $policyKey = $this->normalizeSegment($policyKey);
-        $policy = config("messaging.delivery_consolidation.policies.{$policyKey}", []);
+        $policy = config(
+            "messaging.delivery_consolidation.policies.{$policyKey}",
+            [],
+        );
 
         if (! is_array($policy) || ! ($policy['enabled'] ?? false)) {
             return $intents;
@@ -110,13 +114,42 @@ class MessageDeliveryConsolidator
                 continue;
             }
 
-            $primary = $this->primaryIntent($intents, $group, $consumed);
+            $candidateMembers = $this->candidateMemberIntents(
+                intents: $intents,
+                group: $group,
+                consumed: $consumed,
+            );
+
+            if ($candidateMembers === []) {
+                continue;
+            }
+
+            $primary = $this->primarySelector->select(
+                intents: $intents,
+                group: $group,
+                consumed: $consumed,
+            );
+
+            $templateSource = 'primary_intent';
+
+            if (! $primary instanceof MessageDeliveryIntent) {
+                $primary = $this->standalonePrimaryIntent(
+                    members: $candidateMembers,
+                    group: $group,
+                );
+                $templateSource = 'standalone_intent';
+            }
 
             if (! $primary instanceof MessageDeliveryIntent) {
                 continue;
             }
 
-            $members = $this->memberIntents($intents, $primary, $group, $consumed);
+            $members = $this->memberIntents(
+                intents: $intents,
+                primary: $primary,
+                group: $group,
+                consumed: $consumed,
+            );
 
             if ($members === []) {
                 continue;
@@ -128,6 +161,7 @@ class MessageDeliveryConsolidator
                 group: $group,
                 primary: $primary,
                 members: $members,
+                templateSource: $templateSource,
             );
 
             if (! $consolidated instanceof MessageDeliveryIntent) {
@@ -168,33 +202,57 @@ class MessageDeliveryConsolidator
      * @param array<int, MessageDeliveryIntent> $intents
      * @param array<string, mixed> $group
      * @param array<int, bool> $consumed
+     * @return array<int, MessageDeliveryIntent>
      */
-    private function primaryIntent(array $intents, array $group, array $consumed): ?MessageDeliveryIntent
-    {
-        $primaryKey = $this->nullableSegment($group['primary_intent'] ?? null);
+    private function candidateMemberIntents(
+        array $intents,
+        array $group,
+        array $consumed,
+    ): array {
+        $memberKeys = $this->memberIntentKeys($group);
         $channel = $this->nullableSegment($group['channel'] ?? null);
 
-        if ($primaryKey === null || $channel === null) {
-            return null;
+        if ($memberKeys === [] || $channel === null) {
+            return [];
         }
 
-        foreach ($intents as $intent) {
-            if (isset($consumed[spl_object_id($intent)])) {
-                continue;
-            }
+        return array_values(array_filter(
+            $intents,
+            fn (MessageDeliveryIntent $intent): bool =>
+                ! isset($consumed[spl_object_id($intent)])
+                && $intent->channel() === $channel
+                && in_array(
+                    $this->normalizeSegment($intent->key),
+                    $memberKeys,
+                    true,
+                ),
+        ));
+    }
 
-            if ($this->normalizeSegment($intent->key) !== $primaryKey) {
-                continue;
-            }
+    /**
+     * @param array<int, MessageDeliveryIntent> $members
+     * @param array<string, mixed> $group
+     */
+    private function standalonePrimaryIntent(
+        array $members,
+        array $group,
+    ): ?MessageDeliveryIntent {
+        $preferredKeys = array_values(array_unique(array_filter(array_map(
+            fn (mixed $key): ?string => $this->nullableSegment($key),
+            is_array($group['standalone_primary_intents'] ?? null)
+                ? $group['standalone_primary_intents']
+                : [],
+        ))));
 
-            if ($intent->channel() !== $channel) {
-                continue;
+        foreach ($preferredKeys as $preferredKey) {
+            foreach ($members as $member) {
+                if ($this->normalizeSegment($member->key) === $preferredKey) {
+                    return $member;
+                }
             }
-
-            return $intent;
         }
 
-        return null;
+        return $members[0] ?? null;
     }
 
     /**
@@ -209,10 +267,7 @@ class MessageDeliveryConsolidator
         array $group,
         array $consumed,
     ): array {
-        $memberKeys = array_values(array_unique(array_filter(array_map(
-            fn (mixed $key): ?string => $this->nullableSegment($key),
-            is_array($group['member_intents'] ?? null) ? $group['member_intents'] : [],
-        ))));
+        $memberKeys = $this->memberIntentKeys($group);
 
         if ($memberKeys === []) {
             return [];
@@ -259,6 +314,7 @@ class MessageDeliveryConsolidator
         array $group,
         MessageDeliveryIntent $primary,
         array $members,
+        string $templateSource,
     ): ?MessageDeliveryIntent {
         $definition = $primary->definition;
         $dispatchKeys = $definition['dispatch_keys'] ?? null;
@@ -332,9 +388,10 @@ class MessageDeliveryConsolidator
                     'consent_ids' => $consentIds,
                     'primary_intent_key' => $this->normalizeSegment($primary->key),
                     'template_key' => $definitionKey,
-                    'template_source' => 'primary_intent',
+                    'template_source' => $templateSource,
                     'payload_key' => $placement['payload_key'],
                     'position' => $placement['position'],
+                    'separator' => $placement['separator'],
                     'fragment_tokens' => array_keys($resolvedFragments),
                 ],
             ],
@@ -351,11 +408,15 @@ class MessageDeliveryConsolidator
             sendAt: $primary->sendAt,
             behaviorOwner: $primary->behaviorOwner,
             behavior: $primary->behavior,
-            occurrenceKey: implode(':', array_filter([
-                $primary->occurrenceKey,
-                'delivery_consolidation',
-                $groupKey,
-            ], fn (mixed $value): bool => is_string($value) && trim($value) !== '')),
+            occurrenceKey: $templateSource === 'primary_intent'
+                ? $primary->occurrenceKey
+                : implode(':', array_filter([
+                    $primary->occurrenceKey,
+                    'delivery_consolidation',
+                    $groupKey,
+                ], fn (mixed $value): bool =>
+                    is_string($value) && trim($value) !== ''
+                )),
             meta: $meta,
         );
     }
@@ -409,7 +470,7 @@ class MessageDeliveryConsolidator
      * @param array<string, mixed> $definition
      * @param array<string, mixed> $group
      * @param array<int, string> $fragmentTokens
-     * @return array{definition: array<string, mixed>, payload_key: string, position: string}|null
+     * @return array{definition: array<string, mixed>, payload_key: string, position: string, separator: string}|null
      */
     private function applyFragmentPlacement(
         array $definition,
@@ -456,6 +517,7 @@ class MessageDeliveryConsolidator
             'definition' => $definition,
             'payload_key' => $payloadKey,
             'position' => $position,
+            'separator' => $separator,
         ];
     }
 
@@ -507,6 +569,20 @@ class MessageDeliveryConsolidator
         }
 
         return null;
+    }
+
+    /**
+     * @param array<string, mixed> $group
+     * @return array<int, string>
+     */
+    private function memberIntentKeys(array $group): array
+    {
+        return array_values(array_unique(array_filter(array_map(
+            fn (mixed $key): ?string => $this->nullableSegment($key),
+            is_array($group['member_intents'] ?? null)
+                ? $group['member_intents']
+                : [],
+        ))));
     }
 
     private function sameModel(Model $left, Model $right): bool

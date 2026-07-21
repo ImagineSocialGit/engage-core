@@ -3,6 +3,7 @@
 namespace App\Modules\Webinars\Support;
 
 use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Support\Urls\AbsoluteUrl;
 use Illuminate\Support\Facades\URL;
 
 class WebinarRegistrationCancelLinkGenerator
@@ -18,6 +19,9 @@ class WebinarRegistrationCancelLinkGenerator
             absolute: false,
         );
 
-        return rtrim(config('app.webinar_url', config('app.url')), '/').$path;
+        return AbsoluteUrl::join(
+            config('app.webinar_url', config('app.url')),
+            $path,
+        );
     }
 }

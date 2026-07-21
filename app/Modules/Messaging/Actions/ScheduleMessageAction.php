@@ -6,11 +6,16 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Services\PendingMessageDeliveryConsolidator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 class ScheduleMessageAction
 {
+    public function __construct(
+        private readonly PendingMessageDeliveryConsolidator $pendingMessageDeliveryConsolidator,
+    ) {}
+
     public function handle(
         Model $recipient,
         MessageChannel|string $channel,
@@ -85,7 +90,20 @@ class ScheduleMessageAction
             )
             : ScheduledMessage::query()->create($attributes);
 
-        if ($scheduledMessage->wasRecentlyCreated) {
+        $wasRecentlyCreated = $scheduledMessage->wasRecentlyCreated;
+
+        if (
+            ! $wasRecentlyCreated
+            && is_array(data_get($meta, 'delivery_consolidation'))
+        ) {
+            $scheduledMessage = $this->pendingMessageDeliveryConsolidator
+                ->merge(
+                    scheduledMessage: $scheduledMessage,
+                    incomingAttributes: $attributes,
+                );
+        }
+
+        if ($wasRecentlyCreated) {
             $dispatch = SendScheduledMessageJob::dispatch(
                 scheduledMessageId: $scheduledMessage->id,
                 horizon: $this->horizonPayload(

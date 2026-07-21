@@ -25,7 +25,7 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_all_four_selected_consents_preserve_primary_templates_while_scheduling_one_email_and_two_sms_messages(): void
+    public function test_all_four_selected_consents_schedule_one_acknowledgement_bearing_delivery_per_channel(): void
     {
         Queue::fake();
 
@@ -45,16 +45,11 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
         ]);
 
         $result = app(CreateWebinarRegistrationAction::class)->handle(
-            validated: [
-                'first_name' => 'Jeff',
-                'last_name' => 'Yarnall',
-                'email' => 'jeff@example.com',
-                'phone' => '(555) 555-0123',
-                'transactional_email_consent' => true,
-                'transactional_sms_consent' => true,
-                'marketing_email_consent' => true,
-                'marketing_sms_consent' => true,
-            ],
+            validated: $this->registrationInput(
+                transactionalSms: true,
+                marketingEmail: true,
+                marketingSms: true,
+            ),
             request: Request::create('/register', 'POST'),
             webinar: $webinar,
         );
@@ -73,74 +68,35 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
             ->orderBy('id')
             ->get();
 
-        $this->assertCount(3, $messages);
+        $this->assertCount(2, $messages);
         $this->assertSame(1, $messages->where('channel', 'email')->count());
-        $this->assertSame(2, $messages->where('channel', 'sms')->count());
+        $this->assertSame(1, $messages->where('channel', 'sms')->count());
+        $this->assertSame(0, $messages->where('message_type', 'opt_in')->count());
 
         $email = $messages->firstWhere('channel', 'email');
-
-        $transactionalSms = $messages
-            ->where('channel', 'sms')
-            ->firstWhere('purpose', 'transactional');
-
-        $marketingSms = $messages
-            ->where('channel', 'sms')
-            ->firstWhere('purpose', 'marketing');
+        $sms = $messages->firstWhere('channel', 'sms');
 
         $this->assertNotNull($email);
-        $this->assertNotNull($transactionalSms);
-        $this->assertNotNull($marketingSms);
+        $this->assertNotNull($sms);
 
         $this->assertSame('confirmation', $email->message_type);
-        $this->assertSame('confirmation', $transactionalSms->message_type);
-        $this->assertSame('opt_in', $marketingSms->message_type);
+        $this->assertSame('confirmation', $sms->message_type);
 
-        /*
-        * The selected primary email template must remain authoritative.
-        * Consolidation may configure how acknowledgement placeholders are
-        * separated, but both placeholders must be appended in policy order.
-        */
         $this->assertSame(
             'Original email confirmation',
             $email->payload['subject'],
         );
-
-        $emailBody = (string) $email->payload['body'];
-        $webinarEmailPlaceholder =
-            '{delivery_consolidation_webinar_email_acknowledgement}';
-        $marketingEmailPlaceholder =
-            '{delivery_consolidation_marketing_email_acknowledgement}';
-
         $this->assertStringStartsWith(
             'Original email confirmation body.',
-            $emailBody,
+            (string) $email->payload['body'],
         );
-
         $this->assertStringContainsString(
-            $webinarEmailPlaceholder,
-            $emailBody,
+            '{delivery_consolidation_webinar_email_acknowledgement}',
+            (string) $email->payload['body'],
         );
-
         $this->assertStringContainsString(
-            $marketingEmailPlaceholder,
-            $emailBody,
-        );
-
-        $webinarEmailPosition = strpos(
-            $emailBody,
-            $webinarEmailPlaceholder,
-        );
-
-        $marketingEmailPosition = strpos(
-            $emailBody,
-            $marketingEmailPlaceholder,
-        );
-
-        $this->assertIsInt($webinarEmailPosition);
-        $this->assertIsInt($marketingEmailPosition);
-        $this->assertTrue(
-            $webinarEmailPosition < $marketingEmailPosition,
-            'The webinar acknowledgement should precede the marketing acknowledgement.',
+            '{delivery_consolidation_marketing_email_acknowledgement}',
+            (string) $email->payload['body'],
         );
 
         $this->assertEqualsCanonicalizing([
@@ -153,123 +109,281 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
             'url' => '{cancel_registration_url}',
         ], $email->payload['secondary_link']);
 
-        $webinarEmailAcknowledgement = data_get(
-            $email->payload,
-            'tokens.delivery_consolidation_webinar_email_acknowledgement',
-        );
-
-        $marketingEmailAcknowledgement = data_get(
-            $email->payload,
-            'tokens.delivery_consolidation_marketing_email_acknowledgement',
-        );
-
-        $this->assertIsString($webinarEmailAcknowledgement);
-        $this->assertNotSame('', trim($webinarEmailAcknowledgement));
-
-        $this->assertIsString($marketingEmailAcknowledgement);
-        $this->assertNotSame('', trim($marketingEmailAcknowledgement));
-        $this->assertStringContainsString(
-            'Example Company',
-            $marketingEmailAcknowledgement,
-        );
-
-        /*
-        * The selected primary SMS copy must remain intact and the transactional
-        * acknowledgement placeholder must appear after it. Separator formatting
-        * remains policy-configurable.
-        */
-        $transactionalSmsMessage =
-            (string) $transactionalSms->payload['message'];
-
-        $webinarSmsPlaceholder =
-            '{delivery_consolidation_webinar_sms_acknowledgement}';
-
         $this->assertStringStartsWith(
             'Original SMS confirmation.',
-            $transactionalSmsMessage,
+            (string) $sms->payload['message'],
         );
-
         $this->assertStringContainsString(
-            $webinarSmsPlaceholder,
-            $transactionalSmsMessage,
+            '{delivery_consolidation_webinar_sms_acknowledgement}',
+            (string) $sms->payload['message'],
         );
-
-        $primarySmsPosition = strpos(
-            $transactionalSmsMessage,
-            'Original SMS confirmation.',
+        $this->assertStringContainsString(
+            '{delivery_consolidation_marketing_sms_acknowledgement}',
+            (string) $sms->payload['message'],
         );
-
-        $webinarSmsPosition = strpos(
-            $transactionalSmsMessage,
-            $webinarSmsPlaceholder,
-        );
-
-        $this->assertIsInt($primarySmsPosition);
-        $this->assertIsInt($webinarSmsPosition);
-        $this->assertTrue(
-            $primarySmsPosition < $webinarSmsPosition,
-            'The SMS acknowledgement should follow the primary confirmation copy.',
-        );
-
-        $webinarSmsAcknowledgement = data_get(
-            $transactionalSms->payload,
-            'tokens.delivery_consolidation_webinar_sms_acknowledgement',
-        );
-
-        $this->assertIsString($webinarSmsAcknowledgement);
-        $this->assertNotSame('', trim($webinarSmsAcknowledgement));
 
         $this->assertEqualsCanonicalizing([
             'webinar.registration.confirmation',
             'consent.transactional.email.acknowledgement',
             'consent.marketing.email.acknowledgement',
-        ], data_get(
-            $email->meta,
-            'delivery_consolidation.intent_keys',
-        ));
+        ], data_get($email->meta, 'delivery_consolidation.intent_keys'));
+
+        $this->assertEqualsCanonicalizing([
+            'webinar.registration.confirmation',
+            'consent.transactional.sms.acknowledgement',
+            'consent.marketing.sms.acknowledgement',
+        ], data_get($sms->meta, 'delivery_consolidation.intent_keys'));
 
         $this->assertCount(
             2,
             data_get($email->meta, 'delivery_consolidation.consent_ids'),
+        );
+        $this->assertCount(
+            2,
+            data_get($sms->meta, 'delivery_consolidation.consent_ids'),
         );
 
         $this->assertSame(
             'primary_intent',
             data_get($email->meta, 'delivery_consolidation.template_source'),
         );
+        $this->assertSame(
+            'primary_intent',
+            data_get($sms->meta, 'delivery_consolidation.template_source'),
+        );
+
+        Queue::assertPushed(SendScheduledMessageJob::class, 2);
+    }
+
+    public function test_acknowledgements_move_to_the_first_future_reminder_when_confirmation_is_past(): void
+    {
+        Queue::fake();
+
+        $this->configureConsolidation();
+        $this->configureChannelAvailability();
+        $this->configureRegistrationDefinitionsWithReminder();
+        $this->configurePastConfirmationFutureReminderProfile();
+
+        $series = WebinarSeries::factory()->create();
+
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+            'external_id' => null,
+            'starts_at' => now()->addMinutes(20),
+        ]);
+
+        $result = app(CreateWebinarRegistrationAction::class)->handle(
+            validated: $this->registrationInput(
+                marketingEmail: true,
+            ),
+            request: Request::create('/register', 'POST'),
+            webinar: $webinar,
+        );
+
+        $registration = $result->registration;
+
+        (new SyncWebinarRegistrationToProviderJob(
+            (int) $registration->getKey(),
+        ))->handle(
+            app(FinalizeWebinarRegistrationAction::class),
+        );
+
+        $messages = ScheduledMessage::query()
+            ->where('context_type', $registration->getMorphClass())
+            ->where('context_id', $registration->getKey())
+            ->get();
+
+        $this->assertCount(1, $messages);
+
+        $message = $messages->first();
+
+        $this->assertSame('email', $message->channel);
+        $this->assertSame('reminder', $message->message_type);
+        $this->assertSame('Upcoming reminder', $message->payload['subject']);
+        $this->assertStringContainsString(
+            '{delivery_consolidation_webinar_email_acknowledgement}',
+            (string) $message->payload['body'],
+        );
+        $this->assertStringContainsString(
+            '{delivery_consolidation_marketing_email_acknowledgement}',
+            (string) $message->payload['body'],
+        );
+        $this->assertSame(
+            'webinar.registration.reminder_10_minute',
+            data_get(
+                $message->meta,
+                'delivery_consolidation.primary_intent_key',
+            ),
+        );
+
+        Queue::assertPushed(SendScheduledMessageJob::class, 1);
+    }
+
+    public function test_new_consent_on_an_existing_registration_merges_into_the_pending_lifecycle_delivery(): void
+    {
+        Queue::fake();
+
+        $this->configureConsolidation();
+        $this->configureChannelAvailability();
+        $this->configureRegistrationDefinitions();
+        $this->configureConfirmationScheduleProfile();
+
+        $series = WebinarSeries::factory()->create();
+
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+            'external_id' => null,
+            'starts_at' => now()->addDays(2),
+        ]);
+
+        $action = app(CreateWebinarRegistrationAction::class);
+
+        $first = $action->handle(
+            validated: $this->registrationInput(),
+            request: Request::create('/register', 'POST'),
+            webinar: $webinar,
+        );
+
+        (new SyncWebinarRegistrationToProviderJob(
+            (int) $first->registration->getKey(),
+        ))->handle(
+            app(FinalizeWebinarRegistrationAction::class),
+        );
+
+        $before = ScheduledMessage::query()
+            ->where('context_type', $first->registration->getMorphClass())
+            ->where('context_id', $first->registration->getKey())
+            ->sole();
+
+        $this->assertStringContainsString(
+            '{delivery_consolidation_webinar_email_acknowledgement}',
+            (string) $before->payload['body'],
+        );
+        $this->assertStringNotContainsString(
+            '{delivery_consolidation_marketing_email_acknowledgement}',
+            (string) $before->payload['body'],
+        );
+
+        $action->handle(
+            validated: $this->registrationInput(
+                marketingEmail: true,
+            ),
+            request: Request::create('/register', 'POST'),
+            webinar: $webinar,
+        );
+
+        $messages = ScheduledMessage::query()
+            ->where('context_type', $first->registration->getMorphClass())
+            ->where('context_id', $first->registration->getKey())
+            ->get();
+
+        $this->assertCount(1, $messages);
+
+        $after = $messages->first();
+
+        $this->assertSame($before->getKey(), $after->getKey());
+        $this->assertStringContainsString(
+            '{delivery_consolidation_webinar_email_acknowledgement}',
+            (string) $after->payload['body'],
+        );
+        $this->assertStringContainsString(
+            '{delivery_consolidation_marketing_email_acknowledgement}',
+            (string) $after->payload['body'],
+        );
 
         $this->assertEqualsCanonicalizing([
             'webinar.registration.confirmation',
-            'consent.transactional.sms.acknowledgement',
-        ], data_get(
-            $transactionalSms->meta,
-            'delivery_consolidation.intent_keys',
-        ));
+            'consent.transactional.email.acknowledgement',
+            'consent.marketing.email.acknowledgement',
+        ], data_get($after->meta, 'delivery_consolidation.intent_keys'));
 
         $this->assertCount(
-            1,
-            data_get(
-                $transactionalSms->meta,
-                'delivery_consolidation.consent_ids',
+            2,
+            data_get($after->meta, 'delivery_consolidation.consent_ids'),
+        );
+
+        Queue::assertPushed(SendScheduledMessageJob::class, 1);
+    }
+
+    public function test_new_consent_merges_into_an_overdue_pending_reminder_without_creating_a_standalone_delivery(): void
+    {
+        Queue::fake();
+
+        $this->configureConsolidation();
+        $this->configureChannelAvailability();
+        $this->configureRegistrationDefinitionsWithReminder();
+        $this->configurePastConfirmationFutureReminderProfile();
+
+        $series = WebinarSeries::factory()->create();
+
+        $webinar = Webinar::factory()->create([
+            'webinar_series_id' => $series->getKey(),
+            'external_id' => null,
+            'starts_at' => now()->addMinutes(20),
+        ]);
+
+        $action = app(CreateWebinarRegistrationAction::class);
+
+        $first = $action->handle(
+            validated: $this->registrationInput(),
+            request: Request::create('/register', 'POST'),
+            webinar: $webinar,
+        );
+
+        (new SyncWebinarRegistrationToProviderJob(
+            (int) $first->registration->getKey(),
+        ))->handle(
+            app(FinalizeWebinarRegistrationAction::class),
+        );
+
+        $before = ScheduledMessage::query()
+            ->where('context_type', $first->registration->getMorphClass())
+            ->where('context_id', $first->registration->getKey())
+            ->sole();
+
+        $this->assertSame('reminder', $before->message_type);
+        $this->assertTrue($before->send_at->isFuture());
+        $this->assertStringContainsString(
+            '{delivery_consolidation_webinar_email_acknowledgement}',
+            (string) $before->payload['body'],
+        );
+
+        $this->travel(11)->minutes();
+
+        $action->handle(
+            validated: $this->registrationInput(
+                marketingEmail: true,
             ),
+            request: Request::create('/register', 'POST'),
+            webinar: $webinar,
         );
 
-        $this->assertSame(
-            'primary_intent',
-            data_get(
-                $transactionalSms->meta,
-                'delivery_consolidation.template_source',
-            ),
+        $messages = ScheduledMessage::query()
+            ->where('context_type', $first->registration->getMorphClass())
+            ->where('context_id', $first->registration->getKey())
+            ->get();
+
+        $this->assertCount(1, $messages);
+
+        $after = $messages->first();
+
+        $this->assertSame($before->getKey(), $after->getKey());
+        $this->assertSame('pending', $after->status);
+        $this->assertTrue($after->send_at->isPast());
+        $this->assertStringContainsString(
+            '{delivery_consolidation_webinar_email_acknowledgement}',
+            (string) $after->payload['body'],
+        );
+        $this->assertStringContainsString(
+            '{delivery_consolidation_marketing_email_acknowledgement}',
+            (string) $after->payload['body'],
+        );
+        $this->assertCount(
+            2,
+            data_get($after->meta, 'delivery_consolidation.consent_ids'),
         );
 
-        $this->assertNull(
-            data_get($marketingSms->meta, 'delivery_consolidation'),
-        );
-
-        $this->assertSame('marketing', $marketingSms->purpose);
-        $this->assertSame('webinar', $marketingSms->scope);
-
-        Queue::assertPushed(SendScheduledMessageJob::class, 3);
+        Queue::assertPushed(SendScheduledMessageJob::class, 1);
     }
 
     public function test_consolidation_preserves_db_assigned_confirmation_template_and_profile_behavior(): void
@@ -445,6 +559,122 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
         ));
 
         Queue::assertPushed(SendScheduledMessageJob::class, 1);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function registrationInput(
+        bool $transactionalSms = false,
+        bool $marketingEmail = false,
+        bool $marketingSms = false,
+    ): array {
+        return array_filter([
+            'first_name' => 'Jeff',
+            'last_name' => 'Yarnall',
+            'email' => 'jeff@example.com',
+            'phone' => ($transactionalSms || $marketingSms)
+                ? '(555) 555-0123'
+                : null,
+            'transactional_email_consent' => true,
+            'transactional_sms_consent' => $transactionalSms,
+            'marketing_email_consent' => $marketingEmail,
+            'marketing_sms_consent' => $marketingSms,
+        ], fn (mixed $value): bool => $value !== null);
+    }
+
+    private function configureRegistrationDefinitionsWithReminder(): void
+    {
+        Config::set('messaging.email.definitions.transactional.webinar', [
+            'confirmations' => [[
+                'key' => 'confirmation',
+                'dispatch_key' => 'registration_created',
+                'message_type' => 'confirmation',
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'confirmation_messages',
+                'payload' => [
+                    'subject' => 'Past confirmation',
+                    'body' => 'Past confirmation body.',
+                ],
+            ]],
+            'reminders' => [[
+                'key' => 'reminder_10_minute',
+                'dispatch_key' => 'registration_created',
+                'message_type' => 'reminder',
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'reminders',
+                'payload' => [
+                    'subject' => 'Upcoming reminder',
+                    'body' => 'Upcoming reminder body.',
+                ],
+            ]],
+        ]);
+
+        Config::set(
+            'messaging.sms.definitions.transactional.webinar',
+            [],
+        );
+    }
+
+    private function configurePastConfirmationFutureReminderProfile(): WebinarScheduleProfile
+    {
+        $profile = WebinarScheduleProfile::factory()->create([
+            'key' => 'reminder_fallback_test',
+            'name' => 'Reminder Fallback Test',
+            'status' => WebinarScheduleProfile::STATUS_ACTIVE,
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+
+        WebinarScheduleProfileItem::factory()->create([
+            'webinar_schedule_profile_id' => $profile->getKey(),
+            'key' => 'email_confirmation',
+            'context_key' => 'confirmation',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'surface' => 'webinar_registrations',
+            'message_type' => 'confirmation',
+            'dispatch_key' => 'registration_created',
+            'message_template_key' => 'confirmation',
+            'is_enabled' => true,
+            'is_active' => true,
+            'timing' => 'scheduled',
+            'schedule' => [
+                'type' => 'anchored',
+                'minutes' => -40,
+            ],
+            'conditions' => [],
+        ]);
+
+        WebinarScheduleProfileItem::factory()->create([
+            'webinar_schedule_profile_id' => $profile->getKey(),
+            'key' => 'email_reminder_10_minute',
+            'context_key' => 'reminder',
+            'channel' => 'email',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'surface' => 'webinar_registrations',
+            'message_type' => 'reminder',
+            'dispatch_key' => 'registration_created',
+            'message_template_key' => 'reminder_10_minute',
+            'is_enabled' => true,
+            'is_active' => true,
+            'timing' => 'scheduled',
+            'schedule' => [
+                'type' => 'anchored',
+                'minutes' => -10,
+            ],
+            'conditions' => [],
+        ]);
+
+        return $profile;
     }
 
     private function configureConsolidation(): void

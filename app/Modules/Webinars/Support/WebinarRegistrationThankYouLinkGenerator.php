@@ -3,6 +3,7 @@
 namespace App\Modules\Webinars\Support;
 
 use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Support\Urls\AbsoluteUrl;
 use Illuminate\Support\Facades\URL;
 use LogicException;
 
@@ -38,33 +39,9 @@ class WebinarRegistrationThankYouLinkGenerator
             absolute: false,
         );
 
-        return $this->routeOrigin($seriesSlug).$path;
-    }
-
-    private function routeOrigin(string $seriesSlug): string
-    {
-        $showUrl = route('webinar.show', [
-            'seriesSlug' => $seriesSlug,
-        ]);
-        $scheme = parse_url($showUrl, PHP_URL_SCHEME);
-        $host = parse_url($showUrl, PHP_URL_HOST);
-        $port = parse_url($showUrl, PHP_URL_PORT);
-
-        if (! is_string($scheme)
-            || trim($scheme) === ''
-            || ! is_string($host)
-            || trim($host) === ''
-        ) {
-            throw new LogicException(
-                'The Webinar route origin could not be resolved.',
-            );
-        }
-
-        return sprintf(
-            '%s://%s%s',
-            $scheme,
-            $host,
-            is_int($port) ? ':'.$port : '',
+        return AbsoluteUrl::join(
+            config('app.webinar_url', config('app.url')),
+            $path,
         );
     }
 }

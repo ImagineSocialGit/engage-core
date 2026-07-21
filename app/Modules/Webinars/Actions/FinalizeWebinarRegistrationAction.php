@@ -3,7 +3,6 @@
 namespace App\Modules\Webinars\Actions;
 
 use App\Modules\Core\Models\Contact;
-use App\Modules\Messaging\Actions\DispatchConsentOptInMessageAction;
 use App\Modules\Messaging\Data\Consent\MessageConsentGrantResult;
 use App\Modules\Webinars\Data\WebinarRegistrationConsentTransition;
 use App\Modules\Webinars\Data\WebinarRegistrationFinalizationResult;
@@ -18,7 +17,6 @@ class FinalizeWebinarRegistrationAction
     public function __construct(
         private readonly SyncWebinarRegistrationToProviderAction $syncToProvider,
         private readonly DispatchWebinarRegistrationMessagesAction $dispatchRegistrationMessages,
-        private readonly DispatchConsentOptInMessageAction $dispatchConsentOptInMessage,
     ) {}
 
     public function handle(
@@ -52,8 +50,7 @@ class FinalizeWebinarRegistrationAction
 
         if ($claim['mode'] === 'consent_acknowledgements') {
             try {
-                $this->dispatchStandaloneConsentAcknowledgements(
-                    contact: $registration->contact,
+                $this->dispatchConsentAcknowledgements(
                     registration: $registration,
                     consentGrants: $consentGrants,
                 );
@@ -247,32 +244,21 @@ class FinalizeWebinarRegistrationAction
     /**
      * @param array<int, MessageConsentGrantResult> $consentGrants
      */
-    private function dispatchStandaloneConsentAcknowledgements(
-        ?Contact $contact,
+    private function dispatchConsentAcknowledgements(
         WebinarRegistration $registration,
         array $consentGrants,
     ): void {
-        if (! $contact instanceof Contact) {
+        if (! $registration->contact instanceof Contact) {
             throw new \RuntimeException(
                 'Webinar registration contact is unavailable for consent acknowledgement planning.',
             );
         }
 
-        foreach ($consentGrants as $grant) {
-            $this->dispatchConsentOptInMessage->handle(
-                contact: $contact,
-                grant: $grant,
-                payload: [
-                    'webinar_registration_id' => $registration->getKey(),
-                    'webinar_id' => $registration->webinar_id,
-                    'webinar_slug' => $registration->webinar_slug,
-                ],
-                context: $registration,
-                resolverContext: [
-                    'webinar_slug' => $registration->webinar_slug,
-                ],
-            );
-        }
+        $this->dispatchRegistrationMessages->handle(
+            registration: $registration,
+            contextKeys: null,
+            consentGrants: $consentGrants,
+        );
     }
 
     /**

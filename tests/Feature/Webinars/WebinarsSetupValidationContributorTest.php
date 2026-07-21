@@ -22,6 +22,7 @@ class WebinarsSetupValidationContributorTest extends TestCase
     {
         parent::setUp();
 
+        Config::set('app.webinar_url', 'https://webinar.example.test');
         Config::set('webinars.schedule_profiles', []);
         Config::set('messaging.email', []);
         Config::set('messaging.sms', []);
@@ -30,6 +31,29 @@ class WebinarsSetupValidationContributorTest extends TestCase
         $this->configureEmailAvailability();
     }
 
+
+    public function test_it_reports_a_scheme_less_public_webinar_url(): void
+    {
+        Config::set('app.webinar_url', 'webinar.example.test');
+
+        $finding = collect($this->findings())
+            ->firstWhere('code', 'webinars.public_url.invalid');
+
+        $this->assertIsArray($finding);
+        $this->assertSame('app', $finding['source']);
+        $this->assertSame('app.webinar_url', $finding['path']);
+    }
+
+    public function test_it_reports_an_unsupported_public_webinar_url_scheme(): void
+    {
+        Config::set('app.webinar_url', 'ftp://webinar.example.test');
+
+        $finding = collect($this->findings())
+            ->firstWhere('code', 'webinars.public_url.invalid');
+
+        $this->assertIsArray($finding);
+        $this->assertSame('app.webinar_url', $finding['path']);
+    }
 
     public function test_it_reports_invalid_message_area_configuration_as_a_setup_finding(): void
     {
@@ -540,6 +564,3 @@ class WebinarsSetupValidationContributorTest extends TestCase
         );
     }
 }
-
-
-

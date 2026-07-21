@@ -7,8 +7,10 @@ return [
              * Core defaults to separate deliveries. A client may enable this
              * policy without changing consent persistence or provider behavior.
              *
-             * Consolidation decorates the selected primary message definition.
-             * It must never replace client-authored or CRM-selected templates.
+             * Consolidation decorates the first eligible lifecycle message:
+             * confirmation first, then the earliest future reminder. When no
+             * lifecycle delivery remains, same-channel acknowledgements may use
+             * one standalone acknowledgement template as their shared carrier.
              */
             'enabled' => false,
 
@@ -16,7 +18,14 @@ return [
                 'initial_email' => [
                     'channel' => 'email',
                     'primary_intent' => 'webinar.registration.confirmation',
+                    'fallback_message_types' => [
+                        'reminder',
+                    ],
                     'member_intents' => [
+                        'consent.transactional.email.acknowledgement',
+                        'consent.marketing.email.acknowledgement',
+                    ],
+                    'standalone_primary_intents' => [
                         'consent.transactional.email.acknowledgement',
                         'consent.marketing.email.acknowledgement',
                     ],
@@ -43,8 +52,16 @@ return [
                 'initial_sms' => [
                     'channel' => 'sms',
                     'primary_intent' => 'webinar.registration.confirmation',
+                    'fallback_message_types' => [
+                        'reminder',
+                    ],
                     'member_intents' => [
                         'consent.transactional.sms.acknowledgement',
+                        'consent.marketing.sms.acknowledgement',
+                    ],
+                    'standalone_primary_intents' => [
+                        'consent.transactional.sms.acknowledgement',
+                        'consent.marketing.sms.acknowledgement',
                     ],
 
                     'placement' => [
@@ -57,6 +74,10 @@ return [
                         'delivery_consolidation_webinar_sms_acknowledgement' => [
                             'intent_key' => 'consent.transactional.sms.acknowledgement',
                             'text' => 'Webinar text updates are enabled. Message frequency varies. Message and data rates may apply. Reply HELP for help or STOP to opt out.',
+                        ],
+                        'delivery_consolidation_marketing_sms_acknowledgement' => [
+                            'intent_key' => 'consent.marketing.sms.acknowledgement',
+                            'text' => 'Marketing text updates from :client_name are also enabled.',
                         ],
                     ],
                 ],

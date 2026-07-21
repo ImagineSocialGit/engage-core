@@ -65,6 +65,24 @@ return [
             'transport' => 'resend',
         ],
 
+        /*
+         * SMTP canary for comparing provider-side MIME generation with the
+         * Resend API transport. It uses the same verified domain and API key.
+         */
+        'resend_smtp' => [
+            'transport' => 'smtp',
+            'scheme' => null,
+            'host' => 'smtp.resend.com',
+            'port' => 587,
+            'username' => 'resend',
+            'password' => env('RESEND_API_KEY'),
+            'timeout' => 10,
+            'local_domain' => env(
+                'MAIL_EHLO_DOMAIN',
+                parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST),
+            ),
+        ],
+
         'sendmail' => [
             'transport' => 'sendmail',
             'path' => env('MAIL_SENDMAIL_PATH', '/usr/sbin/sendmail -bs -i'),

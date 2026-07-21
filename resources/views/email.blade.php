@@ -147,11 +147,13 @@
                                         Opt out here
                                     </a>.
                                 </p>
-                            @elseif(! empty($unsubscribeUrl))
-                                <p style="margin:0; font-size:12px; line-height:20px; color:#64748b;">
+                            @endif
+
+                            @if(! empty($unsubscribeUrl))
+                                <p style="margin:{{ ! empty($transactionalOptOutUrl) ? '8px 0 0' : '0' }}; font-size:12px; line-height:20px; color:#64748b;">
                                     You can
                                     <a href="{{ $unsubscribeUrl }}" style="color:#0f172a; text-decoration:underline;">
-                                        unsubscribe here
+                                        unsubscribe from marketing emails here
                                     </a>.
                                 </p>
                             @endif

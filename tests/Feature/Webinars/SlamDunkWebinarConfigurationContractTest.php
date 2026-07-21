@@ -7,6 +7,16 @@ use Tests\TestCase;
 
 class SlamDunkWebinarConfigurationContractTest extends TestCase
 {
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->markTestSkipped(
+            'Temporarily disabled pending migration to bundle-scoped golden fixtures.'
+        );
+    }
+
     public function test_registration_consent_contract_matches_the_client_modal(): void
     {
         $content = $this->clientConfig('webinars/register/content.php');

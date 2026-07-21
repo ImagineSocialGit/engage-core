@@ -6,13 +6,68 @@ use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Support\WebinarJoinLinkGenerator;
+use App\Modules\Webinars\Support\WebinarPlaybackLinkGenerator;
+use App\Modules\Webinars\Support\WebinarRegistrationCancelLinkGenerator;
+use App\Modules\Webinars\Support\WebinarRegistrationThankYouLinkGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class WebinarRegistrationBoundaryContractTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_generated_public_webinar_links_are_absolute_and_preserve_credentials(): void
+    {
+        Config::set('app.webinar_url', 'https://webinar.example.test');
+
+        $webinar = Webinar::factory()->create([
+            'playback_token' => null,
+        ]);
+
+        $registration = WebinarRegistration::factory()
+            ->for($webinar)
+            ->create();
+
+        $links = [
+            'join' => app(WebinarJoinLinkGenerator::class)
+                ->forRegistration($registration),
+            'cancellation' => app(WebinarRegistrationCancelLinkGenerator::class)
+                ->forRegistration($registration),
+            'thank_you' => app(WebinarRegistrationThankYouLinkGenerator::class)
+                ->forRegistration($registration),
+            'playback' => app(WebinarPlaybackLinkGenerator::class)
+                ->forWebinar($webinar),
+        ];
+
+        foreach ($links as $link) {
+            $this->assertSame('https', parse_url($link, PHP_URL_SCHEME));
+            $this->assertSame(
+                'webinar.example.test',
+                parse_url($link, PHP_URL_HOST),
+            );
+        }
+
+        $this->assertStringStartsWith(
+            'join_proof=',
+            (string) parse_url($links['join'], PHP_URL_FRAGMENT),
+        );
+
+        parse_str(
+            (string) parse_url($links['cancellation'], PHP_URL_QUERY),
+            $cancellationQuery,
+        );
+        parse_str(
+            (string) parse_url($links['thank_you'], PHP_URL_QUERY),
+            $thankYouQuery,
+        );
+
+        foreach ([$cancellationQuery, $thankYouQuery] as $signedQuery) {
+            $this->assertArrayHasKey('expires', $signedQuery);
+            $this->assertArrayHasKey('signature', $signedQuery);
+        }
+    }
 
     public function test_waitlist_and_registration_use_separate_named_limiters(): void
     {
