@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\BookableService;
+use App\Modules\Scheduling\Models\SchedulingHost;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -21,10 +22,14 @@ class AppointmentFactory extends Factory
 
         return [
             'bookable_service_id' => BookableService::factory(),
+            'scheduling_host_id' => null,
             'contact_id' => Contact::factory(),
-            'location_id' => null,
+            'location_reference_type' => null,
+            'location_reference_id' => null,
             'primary_attendee_type' => null,
             'primary_attendee_id' => null,
+            'source_context_type' => null,
+            'source_context_id' => null,
             'rescheduled_from_id' => null,
             'status' => Appointment::STATUS_SCHEDULED,
             'title' => fake()->sentence(4),
@@ -40,13 +45,26 @@ class AppointmentFactory extends Factory
             'canceled_at' => null,
             'cancellation_reason' => null,
             'source' => 'manual',
-            'provider' => null,
-            'external_id' => null,
-            'external_url' => null,
             'created_by_type' => null,
             'created_by_id' => null,
             'meta' => null,
         ];
+    }
+
+    public function forSchedulingHost(?SchedulingHost $host = null): self
+    {
+        return $this->state([
+            'scheduling_host_id' => $host?->getKey()
+                ?? SchedulingHost::factory(),
+        ]);
+    }
+
+    public function forLocationReference(Model $locationReference): self
+    {
+        return $this->state([
+            'location_reference_type' => $locationReference->getMorphClass(),
+            'location_reference_id' => $locationReference->getKey(),
+        ]);
     }
 
     public function forPrimaryAttendee(Model $attendee): self
@@ -54,6 +72,14 @@ class AppointmentFactory extends Factory
         return $this->state([
             'primary_attendee_type' => $attendee->getMorphClass(),
             'primary_attendee_id' => $attendee->getKey(),
+        ]);
+    }
+
+    public function fromSourceContext(Model $sourceContext): self
+    {
+        return $this->state([
+            'source_context_type' => $sourceContext->getMorphClass(),
+            'source_context_id' => $sourceContext->getKey(),
         ]);
     }
 

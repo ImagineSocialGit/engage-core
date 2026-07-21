@@ -151,6 +151,13 @@ class ModuleDependencyBoundaryTest extends TestCase
         ]);
     }
 
+    public function test_scheduling_module_does_not_import_location_models(): void
+    {
+        $this->assertModuleDoesNotImport('Scheduling', [
+            'Location',
+        ]);
+    }
+
     public function test_workflow_module_does_not_import_flow_routes(): void
     {
         $this->assertModuleDoesNotImport('Workflow', [

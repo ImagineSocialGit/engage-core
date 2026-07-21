@@ -3,7 +3,6 @@
 namespace App\Modules\Scheduling\Models;
 
 use App\Modules\Core\Models\Contact;
-use App\Modules\Location\Models\Location;
 use Database\Factories\AppointmentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,11 +16,6 @@ class Appointment extends Model
     use HasFactory;
     use SoftDeletes;
 
-    protected static function newFactory(): AppointmentFactory
-    {
-        return AppointmentFactory::new();
-    }
-
     public const STATUS_PENDING = 'pending';
     public const STATUS_SCHEDULED = 'scheduled';
     public const STATUS_CONFIRMED = 'confirmed';
@@ -29,12 +23,22 @@ class Appointment extends Model
     public const STATUS_CANCELED = 'canceled';
     public const STATUS_NO_SHOW = 'no_show';
 
+    protected $attributes = [
+        'status' => self::STATUS_SCHEDULED,
+        'timezone' => 'UTC',
+        'source' => 'manual',
+    ];
+
     protected $fillable = [
         'bookable_service_id',
+        'scheduling_host_id',
         'contact_id',
-        'location_id',
+        'location_reference_type',
+        'location_reference_id',
         'primary_attendee_type',
         'primary_attendee_id',
+        'source_context_type',
+        'source_context_id',
         'rescheduled_from_id',
         'status',
         'title',
@@ -50,21 +54,25 @@ class Appointment extends Model
         'canceled_at',
         'cancellation_reason',
         'source',
-        'provider',
-        'external_id',
-        'external_url',
         'created_by_type',
         'created_by_id',
         'meta',
     ];
 
+    protected static function newFactory(): AppointmentFactory
+    {
+        return AppointmentFactory::new();
+    }
+
     protected function casts(): array
     {
         return [
             'bookable_service_id' => 'integer',
+            'scheduling_host_id' => 'integer',
             'contact_id' => 'integer',
-            'location_id' => 'integer',
+            'location_reference_id' => 'integer',
             'primary_attendee_id' => 'integer',
+            'source_context_id' => 'integer',
             'rescheduled_from_id' => 'integer',
             'location_details' => 'array',
             'starts_at' => 'datetime',
@@ -83,24 +91,50 @@ class Appointment extends Model
         return $this->belongsTo(BookableService::class);
     }
 
+    public function schedulingHost(): BelongsTo
+    {
+        return $this->belongsTo(SchedulingHost::class);
+    }
+
     public function contact(): BelongsTo
     {
         return $this->belongsTo(Contact::class);
     }
 
-    public function location(): BelongsTo
+    public function locationReference(): MorphTo
     {
-        return $this->belongsTo(Location::class);
+        return $this->morphTo(
+            __FUNCTION__,
+            'location_reference_type',
+            'location_reference_id',
+        );
     }
 
     public function primaryAttendee(): MorphTo
     {
-        return $this->morphTo(__FUNCTION__, 'primary_attendee_type', 'primary_attendee_id');
+        return $this->morphTo(
+            __FUNCTION__,
+            'primary_attendee_type',
+            'primary_attendee_id',
+        );
+    }
+
+    public function sourceContext(): MorphTo
+    {
+        return $this->morphTo(
+            __FUNCTION__,
+            'source_context_type',
+            'source_context_id',
+        );
     }
 
     public function createdBy(): MorphTo
     {
-        return $this->morphTo(__FUNCTION__, 'created_by_type', 'created_by_id');
+        return $this->morphTo(
+            __FUNCTION__,
+            'created_by_type',
+            'created_by_id',
+        );
     }
 
     public function rescheduledFrom(): BelongsTo
@@ -116,5 +150,12 @@ class Appointment extends Model
     public function attendees(): HasMany
     {
         return $this->hasMany(AppointmentAttendee::class);
+    }
+
+    public function lifecycleEvents(): HasMany
+    {
+        return $this->hasMany(AppointmentLifecycleEvent::class)
+            ->orderBy('occurred_at')
+            ->orderBy('id');
     }
 }
