@@ -49,10 +49,23 @@ class WebinarRegistrationBoundaryContractTest extends TestCase
             );
         }
 
-        $this->assertStringStartsWith(
-            'join_proof=',
-            (string) parse_url($links['join'], PHP_URL_FRAGMENT),
+        $joinFragment = (string) parse_url(
+            $links['join'],
+            PHP_URL_FRAGMENT,
         );
+
+        $this->assertStringStartsWith('join_proof=', $joinFragment);
+
+        $joinProof = rawurldecode(substr(
+            $joinFragment,
+            strlen('join_proof='),
+        ));
+
+        $this->assertMatchesRegularExpression(
+            '/^v[1-9][0-9]*\.[0-9a-f]{8}\.[A-Za-z0-9_-]+$/D',
+            $joinProof,
+        );
+        $this->assertLessThanOrEqual(40, strlen($joinProof));
 
         parse_str(
             (string) parse_url($links['cancellation'], PHP_URL_QUERY),

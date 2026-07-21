@@ -1686,6 +1686,7 @@
 │   │   │   ├── SyncWebinarScheduleProfilesMessageAreaTest.php
 │   │   │   ├── WebinarAutomationOutboxTest.php
 │   │   │   ├── WebinarDevControllerEnvironmentGuardTest.php
+│   │   │   ├── WebinarJoinBrowserProofTest.php
 │   │   │   ├── WebinarMessageAreaRegistryTest.php
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
@@ -1719,4 +1720,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-491 directories, 1229 files
+491 directories, 1230 files

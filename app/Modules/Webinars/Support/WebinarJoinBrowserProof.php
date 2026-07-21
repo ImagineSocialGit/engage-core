@@ -3,59 +3,272 @@
 namespace App\Modules\Webinars\Support;
 
 use App\Modules\Webinars\Models\WebinarRegistration;
-use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Crypt;
-use JsonException;
+use LogicException;
+use Stringable;
 
 class WebinarJoinBrowserProof
 {
+    private const SIGNING_CONTEXT = 'engage_core:webinar_join_browser_proof';
+
     public function issue(WebinarRegistration $registration): string
     {
         $registration->loadMissing('webinar');
 
-        return Crypt::encryptString(json_encode([
-            'version' => 1,
-            'registration_id' => (int) $registration->getKey(),
-            'join_token' => (string) $registration->join_token,
-            'expires_at' => $this->expiresAt($registration)->getTimestamp(),
-        ], JSON_THROW_ON_ERROR));
+        $registrationId = $registration->getKey();
+        $joinToken = $this->joinToken($registration);
+
+        if (
+            ! is_numeric($registrationId)
+            || $joinToken === null
+        ) {
+            throw new LogicException(
+                'A persisted WebinarRegistration with a join token is required to issue a browser proof.',
+            );
+        }
+
+        $version = $this->version();
+        $expiresAt = $this->expiresAt($registration)->getTimestamp();
+        $encodedExpiration = $this->encodeExpiration($expiresAt);
+        $tag = $this->authenticationTag(
+            version: $version,
+            expiresAt: $expiresAt,
+            registrationId: (string) $registrationId,
+            joinToken: $joinToken,
+        );
+
+        return implode('.', [
+            'v'.$version,
+            $encodedExpiration,
+            $this->base64UrlEncode($tag),
+        ]);
     }
 
     public function validFor(
         string $proof,
         WebinarRegistration $registration,
     ): bool {
-        try {
-            $payload = json_decode(
-                Crypt::decryptString($proof),
-                true,
-                flags: JSON_THROW_ON_ERROR,
-            );
-        } catch (DecryptException|JsonException) {
+        $parsed = $this->parse($proof);
+
+        if ($parsed === null) {
             return false;
         }
 
-        if (! is_array($payload)) {
+        if ($parsed['expires_at'] < now()->getTimestamp()) {
             return false;
         }
 
-        $registrationId = $payload['registration_id'] ?? null;
-        $joinToken = $payload['join_token'] ?? null;
-        $expiresAt = $payload['expires_at'] ?? null;
+        $registrationId = $registration->getKey();
+        $joinToken = $this->joinToken($registration);
 
         if (
             ! is_numeric($registrationId)
-            || (int) $registrationId !== (int) $registration->getKey()
-            || ! is_string($joinToken)
-            || ! is_string($registration->join_token)
-            || ! hash_equals($registration->join_token, $joinToken)
-            || ! is_numeric($expiresAt)
+            || $joinToken === null
         ) {
             return false;
         }
 
-        return (int) $expiresAt >= now()->getTimestamp();
+        $expectedTag = $this->authenticationTag(
+            version: $parsed['version'],
+            expiresAt: $parsed['expires_at'],
+            registrationId: (string) $registrationId,
+            joinToken: $joinToken,
+        );
+
+        return hash_equals($expectedTag, $parsed['tag']);
+    }
+
+    private function joinToken(
+        WebinarRegistration $registration,
+    ): ?string {
+        $value = $registration->join_token;
+
+        if (is_string($value)) {
+            $value = trim($value);
+
+            return $value !== '' ? $value : null;
+        }
+
+        if ($value instanceof Stringable) {
+            $value = trim((string) $value);
+
+            return $value !== '' ? $value : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{version: int, expires_at: int, tag: string}|null
+     */
+    private function parse(string $proof): ?array
+    {
+        $segments = explode('.', trim($proof));
+
+        if (count($segments) !== 3) {
+            return null;
+        }
+
+        [$versionSegment, $expirationSegment, $tagSegment] = $segments;
+
+        if (preg_match('/^v([1-9][0-9]*)$/D', $versionSegment, $matches) !== 1) {
+            return null;
+        }
+
+        $version = (int) $matches[1];
+
+        if ($version !== $this->version()) {
+            return null;
+        }
+
+        $expiresAt = $this->decodeExpiration($expirationSegment);
+
+        if ($expiresAt === null) {
+            return null;
+        }
+
+        $tag = $this->base64UrlDecode($tagSegment);
+
+        if ($tag === null || strlen($tag) !== $this->tagBytes()) {
+            return null;
+        }
+
+        return [
+            'version' => $version,
+            'expires_at' => $expiresAt,
+            'tag' => $tag,
+        ];
+    }
+
+    private function authenticationTag(
+        int $version,
+        int $expiresAt,
+        string $registrationId,
+        string $joinToken,
+    ): string {
+        $payload = implode("\n", [
+            self::SIGNING_CONTEXT,
+            'v'.$version,
+            $registrationId,
+            $joinToken,
+            (string) $expiresAt,
+        ]);
+
+        return substr(
+            hash_hmac('sha256', $payload, $this->signingKey(), true),
+            0,
+            $this->tagBytes(),
+        );
+    }
+
+    private function signingKey(): string
+    {
+        $configuredKey = config('app.key');
+
+        if (! is_string($configuredKey) || trim($configuredKey) === '') {
+            throw new LogicException(
+                'APP_KEY is required to sign Webinar browser proofs.',
+            );
+        }
+
+        $configuredKey = trim($configuredKey);
+
+        if (! str_starts_with($configuredKey, 'base64:')) {
+            return $configuredKey;
+        }
+
+        $decoded = base64_decode(substr($configuredKey, 7), true);
+
+        if (! is_string($decoded) || $decoded === '') {
+            throw new LogicException(
+                'APP_KEY contains invalid base64 data.',
+            );
+        }
+
+        return $decoded;
+    }
+
+    private function encodeExpiration(int $timestamp): string
+    {
+        return str_pad(
+            strtolower(dechex($timestamp)),
+            8,
+            '0',
+            STR_PAD_LEFT,
+        );
+    }
+
+    private function decodeExpiration(string $encoded): ?int
+    {
+        if (preg_match('/^[0-9a-f]{8}$/D', $encoded) !== 1) {
+            return null;
+        }
+
+        $timestamp = hexdec($encoded);
+
+        if (! is_int($timestamp) && ! is_float($timestamp)) {
+            return null;
+        }
+
+        $timestamp = (int) $timestamp;
+
+        return $timestamp > 0 ? $timestamp : null;
+    }
+
+    private function base64UrlEncode(string $value): string
+    {
+        return rtrim(
+            strtr(base64_encode($value), '+/', '-_'),
+            '=',
+        );
+    }
+
+    private function base64UrlDecode(string $value): ?string
+    {
+        if (
+            $value === ''
+            || preg_match('/^[A-Za-z0-9_-]+$/D', $value) !== 1
+        ) {
+            return null;
+        }
+
+        $padding = strlen($value) % 4;
+
+        if ($padding !== 0) {
+            $value .= str_repeat('=', 4 - $padding);
+        }
+
+        $decoded = base64_decode(
+            strtr($value, '-_', '+/'),
+            true,
+        );
+
+        return is_string($decoded) ? $decoded : null;
+    }
+
+    private function version(): int
+    {
+        return max(
+            1,
+            (int) config(
+                'webinars.registration.join_confirmation.browser_proof_version',
+                1,
+            ),
+        );
+    }
+
+    private function tagBytes(): int
+    {
+        return min(
+            32,
+            max(
+                16,
+                (int) config(
+                    'webinars.registration.join_confirmation.browser_proof_tag_bytes',
+                    16,
+                ),
+            ),
+        );
     }
 
     private function expiresAt(
@@ -80,7 +293,9 @@ class WebinarJoinBrowserProof
         $webinarEndsAt = $registration->webinar?->ends_at;
 
         if ($webinarEndsAt) {
-            $eventExpiry = $webinarEndsAt->copy()->addMinutes($graceMinutes);
+            $eventExpiry = $webinarEndsAt
+                ->copy()
+                ->addMinutes($graceMinutes);
 
             if ($eventExpiry->isFuture()) {
                 return $eventExpiry;

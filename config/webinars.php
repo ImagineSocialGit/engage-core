@@ -93,6 +93,8 @@ return [
              * The proof remains valid through the Webinar plus a short grace
              * window so reminders created days earlier still auto-continue.
              */
+            'browser_proof_version' => 1,
+            'browser_proof_tag_bytes' => 16,
             'browser_proof_grace_minutes' => 1440,
             'browser_proof_fallback_days' => 30,
         ],
