@@ -19,6 +19,12 @@ return new class extends Migration
             $table->foreignIdFor(Contact::class)->constrained()->cascadeOnDelete();
             $table->foreignIdFor(Webinar::class)->constrained()->cascadeOnDelete();
 
+            $table->foreignId('replacement_of_registration_id')
+                ->nullable()
+                ->unique('webinar_registrations_replacement_of_unique')
+                ->constrained('webinar_registrations')
+                ->nullOnDelete();
+
             $table->string('join_token')->unique();
 
             $table->string('webinar_slug')->default('default')->index();
@@ -30,7 +36,7 @@ return new class extends Migration
             $table->timestamp('registered_at')->nullable();
             $table->timestamp('attended_at')->nullable()->index();
             $table->timestamp('cancelled_at')->nullable()->index();
-            
+
             $table->timestamps();
 
             $table->unique(

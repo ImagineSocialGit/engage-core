@@ -89,6 +89,8 @@ scheduling_availability_windows
 appointments
 appointment_attendees
 appointment_lifecycle_events
+bookable_slot_offers
+booking_holds
 ```
 
 Scheduling also owns:
@@ -101,7 +103,8 @@ availability and blackout rule evaluation
 read-only bookable-slot calculation
 appointment lifecycle and reschedule lineage
 appointment-related source context
-booking holds and transaction-time booking validation when implemented
+opaque expiring slot offers and short-lived booking holds
+transaction-time slot, occupancy, capacity, and idempotency revalidation
 appointment-related domain and automation event intent when implemented
 ```
 
@@ -453,20 +456,95 @@ Round-robin host selection is not part of the read-only engine.
 
 ## Booking safety boundary
 
-Availability results are advisory snapshots, not reservations.
+Availability results remain advisory snapshots rather than reservations.
 
-The read-only engine does not guarantee that a returned slot remains available. Safe booking requires later infrastructure for:
+The implemented booking-safety layer consists of:
 
 ```text
-server-generated opaque expiring slot offers
-short-lived booking holds
-idempotency keys
-transaction-time rule and occupancy revalidation
-collision protection
-atomic Appointment creation
+BookableSlotOffer
+BookingHold
+IssueBookableSlotOfferAction
+CreateBookingHoldAction
+ExpireBookingHoldsJob
 ```
 
-Public or CRM booking actions must never trust client-supplied service, host, start, end, capacity, or provenance values without resolving and revalidating a server-issued slot offer.
+### bookable_slot_offers
+
+A slot offer is an opaque, server-issued, expiring identity for one exact slot. It snapshots:
+
+```text
+offer_id
+bookable_service_id
+scheduling_host_id
+starts_at / ends_at
+display_timezone
+capacity / remaining_capacity
+source_scopes
+source_window_ids
+issued_at
+expires_at
+consumed_at
+```
+
+The caller receives only the opaque `offer_id`. Public or CRM booking actions must not accept caller-authored service, host, start, end, capacity, timezone, or rule-provenance values as authoritative booking input.
+
+`IssueBookableSlotOfferAction` revalidates the supplied server-side `BookableSlot` before persisting the offer. An offer may be consumed only once and cannot create a hold after `expires_at`.
+
+### booking_holds
+
+A booking hold is a short-lived capacity reservation with:
+
+```text
+hold_id
+bookable_slot_offer_id
+bookable_service_id
+scheduling_host_id
+appointment_id
+idempotency_key
+status
+starts_at / ends_at
+occupancy_starts_at / occupancy_ends_at
+capacity
+held_at
+expires_at
+released_at
+converted_at
+```
+
+Supported statuses are:
+
+```text
+active
+converted
+released
+expired
+```
+
+`CreateBookingHoldAction` accepts only:
+
+```text
+offer_id
+idempotency_key
+```
+
+It locks the offer, service, optional host, optional assignment, relevant appointments, and overlapping active holds in a deterministic transaction. It reruns exact-slot availability, applies current buffers and capacity, rejects stale or consumed offers, and prevents separate offers from over-reserving one slot.
+
+The same idempotency key returns the original hold for the same offer and is rejected when reused for another offer.
+
+### Expiration contract
+
+`booking_holds.expires_at` is authoritative. A hold consumes capacity only while:
+
+```text
+status = active
+expires_at > now()
+```
+
+Correctness never depends on cleanup timing. `ExpireBookingHoldsJob` runs every minute and marks due active rows as `expired` for housekeeping and reporting, but new hold attempts immediately ignore an elapsed hold even before that job runs.
+
+A future browser countdown should render the absolute server-provided expiration. Refreshing or reopening the page must not restart or extend the hold.
+
+Atomic hold-to-Appointment conversion remains deferred. The conversion action must lock and validate the active hold, create the Appointment and initial lifecycle event in one transaction, then mark the hold converted.
 
 ## Messaging, tasks, and automation
 
@@ -525,13 +603,13 @@ Implemented:
 
 ```text
 FindBookableAvailabilityAction
+IssueBookableSlotOfferAction
+CreateBookingHoldAction
 ```
 
 Planned:
 
 ```text
-IssueBookableSlotOfferAction
-CreateBookingHoldAction
 ReleaseBookingHoldAction
 CreateAppointmentAction
 RescheduleAppointmentAction
@@ -556,11 +634,12 @@ Do not add `flow_route_*` foreign keys to Scheduling artifacts merely for proven
 
 ## Deferred work
 
-Deferred after the executable availability engine:
+Deferred after the booking-hold foundation:
 
 ```text
-opaque expiring slot offers
-booking holds
+active booking holds in normal availability-result occupancy
+explicit booking-hold release
+atomic hold-to-Appointment conversion
 transaction-safe appointment creation
 reschedule and cancellation actions
 CRM Scheduling workspace

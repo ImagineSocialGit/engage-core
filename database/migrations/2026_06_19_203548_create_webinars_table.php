@@ -21,6 +21,12 @@ return new class extends Migration
                 ->constrained('webinar_series')
                 ->nullOnDelete();
 
+            $table->foreignId('replacement_of_webinar_id')
+                ->nullable()
+                ->unique('webinars_replacement_of_unique')
+                ->constrained('webinars')
+                ->nullOnDelete();
+
             $table->foreignIdFor(WebinarScheduleProfile::class)
                 ->nullable()
                 ->constrained('webinar_schedule_profiles')
@@ -71,4 +77,3 @@ return new class extends Migration
         Schema::dropIfExists('webinars');
     }
 };
-

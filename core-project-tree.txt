@@ -626,7 +626,9 @@
 │   │   │   └── Support
 │   │   ├── Scheduling
 │   │   │   ├── Actions
-│   │   │   │   └── FindBookableAvailabilityAction.php
+│   │   │   │   ├── CreateBookingHoldAction.php
+│   │   │   │   ├── FindBookableAvailabilityAction.php
+│   │   │   │   └── IssueBookableSlotOfferAction.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   ├── Data
@@ -635,12 +637,16 @@
 │   │   │   │   └── BookableSlot.php
 │   │   │   ├── Enums
 │   │   │   │   └── SchedulingAvailabilityWindowType.php
+│   │   │   ├── Jobs
+│   │   │   │   └── ExpireBookingHoldsJob.php
 │   │   │   ├── Models
 │   │   │   │   ├── AppointmentAttendee.php
 │   │   │   │   ├── AppointmentLifecycleEvent.php
 │   │   │   │   ├── Appointment.php
 │   │   │   │   ├── BookableServiceHost.php
 │   │   │   │   ├── BookableService.php
+│   │   │   │   ├── BookableSlotOffer.php
+│   │   │   │   ├── BookingHold.php
 │   │   │   │   ├── SchedulingAvailabilityWindow.php
 │   │   │   │   └── SchedulingHost.php
 │   │   │   ├── Providers
@@ -1060,6 +1066,7 @@
 │   │   ├── keys.php
 │   │   └── tokens.php
 │   ├── reminders.php
+│   ├── scheduling.php
 │   ├── security.php
 │   ├── services.php
 │   ├── session.php
@@ -1232,7 +1239,8 @@
 │   │   ├── 2026_07_18_220001_create_automation_event_consumer_receipts_table.php
 │   │   ├── 2026_07_19_031500_create_inbound_message_receipts_table.php
 │   │   ├── 2026_07_19_040000_create_webhook_inbox_receipts_table.php
-│   │   ├── 2026_07_21_180000_add_webinar_replacement_links.php
+│   │   ├── 2026_07_21_180100_create_bookable_slot_offers_table.php
+│   │   ├── 2026_07_21_180101_create_booking_holds_table.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -1657,6 +1665,7 @@
 │   │   │   ├── ModuleFirstPresetCompositionTest.php
 │   │   │   └── PresetCompositionSyncCutoverTest.php
 │   │   ├── Scheduling
+│   │   │   ├── BookableSlotOfferAndBookingHoldActionTest.php
 │   │   │   ├── FindBookableAvailabilityActionTest.php
 │   │   │   ├── SchedulingAvailabilityWindowFoundationTest.php
 │   │   │   ├── SchedulingFoundationTest.php
@@ -1751,4 +1760,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-493 directories, 1259 files
+494 directories, 1267 files
