@@ -42,6 +42,11 @@ return [
                     'label' => 'Webinar',
                     'provider' => App\Integrations\Webinars\Zoom\ZoomWebinarProvider::class,
                 ],
+
+                'meeting' => [
+                    'label' => 'Meeting',
+                    'provider' => App\Integrations\Webinars\Zoom\ZoomMeetingProvider::class,
+                ],
             ],
 
             'base_url' => env('ZOOM_BASE_URL', 'https://api.zoom.us/v2'),

@@ -34,6 +34,8 @@
 │   │       └── Zoom
 │   │           ├── Mappers
 │   │           │   └── ZoomAttendanceMapper.php
+│   │           ├── ZoomEventService.php
+│   │           ├── ZoomMeetingProvider.php
 │   │           ├── ZoomOAuthService.php
 │   │           ├── ZoomWebhookHandler.php
 │   │           ├── ZoomWebhookVerifier.php
@@ -1720,6 +1722,7 @@
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
 │   │   │   ├── WebinarTokenReferenceContractTest.php
 │   │   │   ├── WebinarWaitlistSignupControllerTest.php
+│   │   │   ├── ZoomMeetingProviderContractTest.php
 │   │   │   └── ZoomWebinarServiceSnapshotTest.php
 │   │   └── Workflow
 │   │       ├── RecordManualStatusTransitionAutomationBehaviorActionTest.php
@@ -1732,4 +1735,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-491 directories, 1242 files
+491 directories, 1245 files

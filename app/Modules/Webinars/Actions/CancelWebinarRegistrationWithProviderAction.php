@@ -38,8 +38,16 @@ class CancelWebinarRegistrationWithProviderAction
         }
 
         try {
+            $webinar = $registration->webinar;
+
+            if (! $webinar) {
+                throw new \RuntimeException(
+                    'Webinar registration provider cancellation requires its Webinar occurrence.',
+                );
+            }
+
             $this->webinarProviderManager
-                ->provider($provider)
+                ->forWebinar($webinar)
                 ->cancelRegistration($registration);
         } catch (Throwable $exception) {
             $this->recordFailure($registration, $exception);

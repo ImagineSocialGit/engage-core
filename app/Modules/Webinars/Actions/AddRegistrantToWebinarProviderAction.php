@@ -16,7 +16,7 @@ class AddRegistrantToWebinarProviderAction
     public function handle(Webinar $webinar, WebinarRegistration $registration): ProviderRegistrationData
     {
         return $this->webinarProviderManager
-            ->provider($webinar->providerKey())
+            ->forWebinar($webinar)
             ->registerAttendee($webinar, $registration);
     }
 }

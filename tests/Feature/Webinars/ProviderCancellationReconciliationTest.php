@@ -92,9 +92,9 @@ class ProviderCancellationReconciliationTest extends TestCase
             ->andReturnNull();
 
         $manager = Mockery::mock(WebinarProviderManager::class);
-        $manager->shouldReceive('provider')
+        $manager->shouldReceive('forWebinar')
             ->twice()
-            ->with('zoom')
+            ->with(Mockery::on(fn (Webinar $resolved): bool => $resolved->is($webinar)))
             ->andReturn($provider);
 
         $action = new CancelWebinarRegistrationWithProviderAction($manager);
@@ -146,7 +146,7 @@ class ProviderCancellationReconciliationTest extends TestCase
             ]);
 
         $manager = Mockery::mock(WebinarProviderManager::class);
-        $manager->shouldReceive('provider')->never();
+        $manager->shouldReceive('forWebinar')->never();
 
         $result = (new CancelWebinarRegistrationWithProviderAction($manager))
             ->handle($registration);
