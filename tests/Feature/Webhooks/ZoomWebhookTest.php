@@ -29,6 +29,7 @@ class ZoomWebhookTest extends TestCase
             'webinars.providers.zoom.webhook_events' => [
                 'webinar.ended' => 'webinar.ended',
                 'webinar.completed' => 'webinar.ended',
+                'meeting.ended' => 'webinar.ended',
                 'recording.completed' => 'webinar.recording_completed',
             ],
         ]);
@@ -90,6 +91,7 @@ class ZoomWebhookTest extends TestCase
             'payload' => [
                 'object' => [
                     'id' => $webinarId,
+                    'uuid' => 'webinar-instance-uuid',
                 ],
             ],
         ]);
@@ -99,6 +101,8 @@ class ZoomWebhookTest extends TestCase
         Queue::assertPushed(ProcessWebinarProviderEventJob::class, function (ProcessWebinarProviderEventJob $job) use ($webinarId) {
             return $job->provider === 'zoom'
                 && $job->externalWebinarId === $webinarId
+                && $job->externalWebinarUuid === 'webinar-instance-uuid'
+                && $job->providerEventType === 'webinar'
                 && $job->event === 'webinar.started';
         });
 
@@ -152,6 +156,7 @@ class ZoomWebhookTest extends TestCase
         Queue::assertPushed(ProcessWebinarProviderEventJob::class, function (ProcessWebinarProviderEventJob $job) use ($webinarId) {
             return $job->provider === 'zoom'
                 && $job->externalWebinarId === $webinarId
+                && $job->providerEventType === 'webinar'
                 && $job->event === 'webinar.ended';
         });
     }
@@ -176,7 +181,101 @@ class ZoomWebhookTest extends TestCase
         Queue::assertPushed(ProcessWebinarProviderEventJob::class, function (ProcessWebinarProviderEventJob $job) use ($webinarId) {
             return $job->provider === 'zoom'
                 && $job->externalWebinarId === $webinarId
+                && $job->providerEventType === 'webinar'
                 && $job->event === 'webinar.ended';
+        });
+    }
+
+    public function test_it_dispatches_meeting_ended_with_meeting_identity(): void
+    {
+        Queue::fake();
+
+        $meetingId = '223344556';
+
+        $response = $this->signedZoomPost([
+            'event' => 'meeting.ended',
+            'payload' => [
+                'object' => [
+                    'id' => $meetingId,
+                    'uuid' => 'meeting-instance-uuid',
+                    'type' => 2,
+                ],
+            ],
+        ]);
+
+        $response->assertNoContent();
+
+        Queue::assertPushed(ProcessWebinarProviderEventJob::class, function (ProcessWebinarProviderEventJob $job) use ($meetingId) {
+            return $job->provider === 'zoom'
+                && $job->externalWebinarId === $meetingId
+                && $job->externalWebinarUuid === 'meeting-instance-uuid'
+                && $job->providerEventType === 'meeting'
+                && $job->event === 'webinar.ended';
+        });
+    }
+
+    public function test_recording_completed_uses_zoom_object_type_for_provider_identity(): void
+    {
+        Queue::fake();
+
+        $this->signedZoomPost([
+            'event' => 'recording.completed',
+            'payload' => [
+                'object' => [
+                    'id' => '445566778',
+                    'uuid' => 'webinar-recording-uuid',
+                    'type' => 5,
+                ],
+            ],
+        ])->assertNoContent();
+
+        $this->signedZoomPost([
+            'event' => 'recording.completed',
+            'payload' => [
+                'object' => [
+                    'id' => '556677889',
+                    'uuid' => 'meeting-recording-uuid',
+                    'type' => 2,
+                ],
+            ],
+        ])->assertNoContent();
+
+        Queue::assertPushed(ProcessWebinarProviderEventJob::class, function (ProcessWebinarProviderEventJob $job): bool {
+            return $job->externalWebinarId === '445566778'
+                && $job->externalWebinarUuid === 'webinar-recording-uuid'
+                && $job->providerEventType === 'webinar'
+                && $job->event === 'webinar.recording_completed';
+        });
+
+        Queue::assertPushed(ProcessWebinarProviderEventJob::class, function (ProcessWebinarProviderEventJob $job): bool {
+            return $job->externalWebinarId === '556677889'
+                && $job->externalWebinarUuid === 'meeting-recording-uuid'
+                && $job->providerEventType === 'meeting'
+                && $job->event === 'webinar.recording_completed';
+        });
+    }
+
+    public function test_recording_completed_without_a_known_type_preserves_uuid_for_safe_resolution(): void
+    {
+        Queue::fake();
+
+        $response = $this->signedZoomPost([
+            'event' => 'recording.completed',
+            'payload' => [
+                'object' => [
+                    'id' => '667788990',
+                    'uuid' => 'generic-recording-uuid',
+                ],
+            ],
+        ]);
+
+        $response->assertNoContent();
+
+        Queue::assertPushed(ProcessWebinarProviderEventJob::class, function (ProcessWebinarProviderEventJob $job): bool {
+            return $job->externalWebinarId === '667788990'
+                && $job->externalWebinarUuid === 'generic-recording-uuid'
+                && $job->providerEventType === null
+                && $job->event === 'webinar.recording_completed';
         });
     }
 

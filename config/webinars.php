@@ -56,6 +56,7 @@ return [
             'webhook_events' => [
                 'webinar.ended' => 'webinar.ended',
                 'webinar.completed' => 'webinar.ended',
+                'meeting.ended' => 'webinar.ended',
                 'recording.completed' => 'webinar.recording_completed',
             ],
         ],

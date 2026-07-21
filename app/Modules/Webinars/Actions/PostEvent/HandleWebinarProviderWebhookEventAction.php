@@ -17,6 +17,8 @@ class HandleWebinarProviderWebhookEventAction
             provider: $event->provider,
             externalWebinarId: $event->externalWebinarId,
             event: $event->event,
+            providerEventType: $event->providerEventType,
+            externalWebinarUuid: $event->externalWebinarUuid,
         )->onQueue('post_event');
     }
 }

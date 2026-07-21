@@ -225,25 +225,28 @@ class WebinarJoinBrowserProof
 
     private function base64UrlDecode(string $value): ?string
     {
-        if (
-            $value === ''
-            || preg_match('/^[A-Za-z0-9_-]+$/D', $value) !== 1
-        ) {
+        if ($value === '' || preg_match('/^[A-Za-z0-9_-]+$/D', $value) !== 1) {
             return null;
         }
 
+        $encoded = $value;
         $padding = strlen($value) % 4;
 
         if ($padding !== 0) {
             $value .= str_repeat('=', 4 - $padding);
         }
 
-        $decoded = base64_decode(
-            strtr($value, '-_', '+/'),
-            true,
-        );
+        $decoded = base64_decode(strtr($value, '-_', '+/'), true);
 
-        return is_string($decoded) ? $decoded : null;
+        if (! is_string($decoded)) {
+            return null;
+        }
+
+        if ($this->base64UrlEncode($decoded) !== $encoded) {
+            return null;
+        }
+
+        return $decoded;
     }
 
     private function version(): int

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Webinars\Jobs\PostEvent;
 
+use App\Modules\Webinars\Actions\PostEvent\ResolveWebinarProviderEventTargetAction;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Services\WebinarProviderManager;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,6 +19,8 @@ class ProcessWebinarProviderEventJob implements ShouldQueue
         public string $provider,
         public string $externalWebinarId,
         public string $event,
+        public ?string $providerEventType = null,
+        public ?string $externalWebinarUuid = null,
     ) {}
 
     public function handle(WebinarProviderManager $webinarProviderManager): void
@@ -34,18 +37,19 @@ class ProcessWebinarProviderEventJob implements ShouldQueue
             return;
         }
 
-        $provider = $webinarProviderManager->provider($this->provider);
+        $webinar = app(ResolveWebinarProviderEventTargetAction::class)->execute(
+            provider: $this->provider,
+            externalWebinarId: $this->externalWebinarId,
+            providerEventType: $this->providerEventType,
+            externalWebinarUuid: $this->externalWebinarUuid,
+        );
 
-        $webinar = Webinar::query()
-            ->where('platform', $this->provider)
-            ->where('external_id', $this->externalWebinarId)
-            ->first();
-
-        if (! $webinar) {
+        if (! $webinar instanceof Webinar) {
             return;
         }
 
-        $lock = Cache::lock($this->lockKey(), 600);
+        $provider = $webinarProviderManager->forWebinar($webinar);
+        $lock = Cache::lock($this->lockKey($webinar), 600);
 
         if (! $lock->get()) {
             $this->release(60);
@@ -83,13 +87,14 @@ class ProcessWebinarProviderEventJob implements ShouldQueue
         return [300, 300, 600, 600, 900, 900, 1800];
     }
 
-    private function lockKey(): string
+    private function lockKey(Webinar $webinar): string
     {
         return implode(':', [
             'webinars',
             'post_event',
-            $this->provider,
-            $this->externalWebinarId,
+            $webinar->providerKey(),
+            $webinar->providerEventTypeKey(),
+            $webinar->external_id,
             $this->event,
         ]);
     }

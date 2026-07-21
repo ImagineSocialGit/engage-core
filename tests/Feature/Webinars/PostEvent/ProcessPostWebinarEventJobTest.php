@@ -15,6 +15,7 @@ use App\Modules\Webinars\Contracts\WebinarProvider;
 use App\Modules\Webinars\Data\ProviderAttendanceSnapshot;
 use App\Modules\Webinars\Data\ProviderRecordingData;
 use App\Modules\Webinars\Data\WebinarAttendanceRecord;
+use App\Modules\Webinars\Enums\WebinarProviderEventType;
 use App\Modules\Webinars\Jobs\PostEvent\ProcessWebinarProviderEventJob;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
@@ -281,6 +282,116 @@ class ProcessPostWebinarEventJobTest extends TestCase
         }
     }
 
+
+    public function test_it_routes_a_colliding_external_id_to_the_typed_meeting_adapter(): void
+    {
+        Queue::fake();
+
+        Config::set('webinars.post_event.events', [
+            'webinar.ended' => [
+                RecordWebinarProviderAttendanceAction::class,
+            ],
+        ]);
+
+        Config::set('webinars.post_event.attendance.enabled', true);
+
+        $webinar = Webinar::factory()->create([
+            'platform' => 'zoom',
+            'provider_event_type' => WebinarProviderEventType::Webinar->value,
+            'external_id' => '123456789',
+            'meta' => [],
+        ]);
+
+        $meeting = Webinar::factory()->meeting()->create([
+            'platform' => 'zoom',
+            'external_id' => '123456789',
+            'meta' => [],
+        ]);
+
+        $provider = $this->mock(WebinarProvider::class, function (MockInterface $mock) use ($meeting): void {
+            $mock->shouldReceive('key')
+                ->zeroOrMoreTimes()
+                ->andReturn('zoom');
+
+            $mock->shouldReceive('listAttendanceRecords')
+                ->once()
+                ->withArgs(fn (Webinar $passedWebinar): bool => $passedWebinar->is($meeting))
+                ->andReturn(ProviderAttendanceSnapshot::authoritative([]));
+
+            $mock->shouldNotReceive('getRecording');
+        });
+
+        $this->mock(WebinarProviderManager::class, function (MockInterface $mock) use ($provider, $meeting): void {
+            $mock->shouldReceive('forWebinar')
+                ->once()
+                ->withArgs(fn (Webinar $passedWebinar): bool => $passedWebinar->is($meeting))
+                ->andReturn($provider);
+        });
+
+        app(ProcessWebinarProviderEventJob::class, [
+            'provider' => 'zoom',
+            'externalWebinarId' => '123456789',
+            'event' => 'webinar.ended',
+            'providerEventType' => WebinarProviderEventType::Meeting->value,
+        ])->handle(
+            webinarProviderManager: app(WebinarProviderManager::class),
+        );
+
+        $this->assertNull(data_get(
+            $webinar->fresh()->meta,
+            'normalized.post_event.attendance_recorded_at',
+        ));
+        $this->assertNotNull(data_get(
+            $meeting->fresh()->meta,
+            'normalized.post_event.attendance_recorded_at',
+        ));
+    }
+
+    public function test_it_safely_no_ops_for_an_untyped_colliding_provider_event(): void
+    {
+        Queue::fake();
+
+        Config::set('webinars.post_event.events', [
+            'webinar.recording_completed' => [
+                ResolveWebinarPlaybackAction::class,
+            ],
+        ]);
+
+        $webinar = Webinar::factory()->create([
+            'platform' => 'zoom',
+            'provider_event_type' => WebinarProviderEventType::Webinar->value,
+            'external_id' => '123456789',
+            'meta' => [],
+        ]);
+
+        $meeting = Webinar::factory()->meeting()->create([
+            'platform' => 'zoom',
+            'external_id' => '123456789',
+            'meta' => [],
+        ]);
+
+        $this->mock(WebinarProviderManager::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('forWebinar');
+        });
+
+        app(ProcessWebinarProviderEventJob::class, [
+            'provider' => 'zoom',
+            'externalWebinarId' => '123456789',
+            'event' => 'webinar.recording_completed',
+        ])->handle(
+            webinarProviderManager: app(WebinarProviderManager::class),
+        );
+
+        $this->assertNull(data_get(
+            $webinar->fresh()->meta,
+            'normalized.post_event.playback_resolved_at',
+        ));
+        $this->assertNull(data_get(
+            $meeting->fresh()->meta,
+            'normalized.post_event.playback_resolved_at',
+        ));
+    }
+
     public function test_it_safely_no_ops_when_event_has_no_configured_actions(): void
     {
         Queue::fake();
@@ -453,14 +564,17 @@ class ProcessPostWebinarEventJobTest extends TestCase
     {
         $this->mock(WebinarProviderManager::class, function (MockInterface $mock) use ($provider, $shouldResolve): void {
             if (! $shouldResolve) {
-                $mock->shouldNotReceive('provider');
+                $mock->shouldNotReceive('forWebinar');
 
                 return;
             }
 
-            $mock->shouldReceive('provider')
+            $mock->shouldReceive('forWebinar')
                 ->once()
-                ->with('zoom')
+                ->withArgs(fn (Webinar $webinar): bool =>
+                    $webinar->providerKey() === 'zoom'
+                    && $webinar->providerEventTypeKey() === WebinarProviderEventType::Webinar->value
+                )
                 ->andReturn($provider);
         });
     }
