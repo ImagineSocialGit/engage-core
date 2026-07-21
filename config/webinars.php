@@ -4,6 +4,14 @@ return [
 
     'provider' => env('WEBINAR_PROVIDER', 'zoom'),
 
+    /*
+    | Provider family and provider event type are separate identities. The
+    | series stores the selected type, while each synced Webinar preserves the
+    | immutable remote type that created it. Existing clients default to Zoom
+    | Webinars until an administrator explicitly selects another type.
+    */
+    'provider_event_type' => 'webinar',
+
 
     /*
     | Consent domains are module-owned permission boundaries. Message scopes
@@ -26,7 +34,16 @@ return [
 
     'providers' => [
         'zoom' => [
+            /* Legacy fallback retained for Webinar-only client overrides. */
             'provider' => App\Integrations\Webinars\Zoom\ZoomWebinarProvider::class,
+
+            'event_types' => [
+                'webinar' => [
+                    'label' => 'Webinar',
+                    'provider' => App\Integrations\Webinars\Zoom\ZoomWebinarProvider::class,
+                ],
+            ],
+
             'base_url' => env('ZOOM_BASE_URL', 'https://api.zoom.us/v2'),
             'oauth_url' => env('ZOOM_OAUTH_URL', 'https://zoom.us/oauth/token'),
             'oauth_token_ttl_seconds' => env('ZOOM_OAUTH_TOKEN_TTL_SECONDS', 3500),

@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Modules\Webinars\Enums\WebinarProviderEventType;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -23,6 +24,7 @@ class WebinarFactory extends Factory
             'external_id' => (string) fake()->unique()->numberBetween(100000, 999999),
             'host_account_key' => 'default',
             'platform' => 'zoom',
+            'provider_event_type' => WebinarProviderEventType::Webinar->value,
             'title' => $title,
             'slug' => Str::slug($title).'-'.fake()->unique()->numberBetween(1000, 9999),
             'description' => fake()->paragraph(),
@@ -33,5 +35,12 @@ class WebinarFactory extends Factory
             'registration_url' => fake()->url(),
             'meta' => [],
         ];
+    }
+
+    public function meeting(): self
+    {
+        return $this->state(fn (): array => [
+            'provider_event_type' => WebinarProviderEventType::Meeting->value,
+        ]);
     }
 }

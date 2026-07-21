@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Modules\Webinars\Enums\WebinarProviderEventType;
 use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -21,7 +22,16 @@ class WebinarSeriesFactory extends Factory
             'title' => $title,
             'slug' => Str::slug($title),
             'status' => 'active',
+            'platform' => 'zoom',
+            'provider_event_type' => WebinarProviderEventType::Webinar->value,
             'meta' => [],
         ];
+    }
+
+    public function meeting(): self
+    {
+        return $this->state(fn (): array => [
+            'provider_event_type' => WebinarProviderEventType::Meeting->value,
+        ]);
     }
 }

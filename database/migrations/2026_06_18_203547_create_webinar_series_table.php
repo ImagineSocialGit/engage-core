@@ -18,6 +18,14 @@ return new class extends Migration
             $table->string('slug')->unique();
             $table->string('title');
 
+            $table->string('platform')->default('zoom');
+            $table->string('provider_event_type')->default('webinar');
+
+            $table->index(
+                ['platform', 'provider_event_type'],
+                'webinar_series_provider_identity_index',
+            );
+
             $table->string('status')->default('active')->index();
 
             $table->foreignIdFor(WebinarScheduleProfile::class)

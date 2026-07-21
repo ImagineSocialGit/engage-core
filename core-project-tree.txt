@@ -786,6 +786,7 @@
 │   │   │   │   ├── WebinarRegistrationImportRow.php
 │   │   │   │   └── WebinarRegistrationResult.php
 │   │   │   ├── Enums
+│   │   │   │   ├── WebinarProviderEventType.php
 │   │   │   │   └── WebinarTag.php
 │   │   │   ├── Jobs
 │   │   │   │   ├── CancelWebinarRegistrationWithProviderJob.php
@@ -1697,6 +1698,7 @@
 │   │   │   ├── WebinarMessageAreaRegistryTest.php
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
+│   │   │   ├── WebinarProviderEventTypeFoundationTest.php
 │   │   │   ├── WebinarRegisterPageConfigTest.php
 │   │   │   ├── WebinarRegistrationBoundaryContractTest.php
 │   │   │   ├── WebinarRegistrationCombinedConsentTest.php
@@ -1727,4 +1729,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-491 directories, 1237 files
+491 directories, 1239 files

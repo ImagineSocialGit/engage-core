@@ -2,10 +2,12 @@
 
 namespace App\Modules\Webinars\Models;
 
-use Database\Factories\WebinarSeriesFactory;
 use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
+use App\Modules\Webinars\Enums\WebinarProviderEventType;
+use Database\Factories\WebinarSeriesFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
@@ -22,6 +24,8 @@ class WebinarSeries extends Model
         'title',
         'slug',
         'status',
+        'platform',
+        'provider_event_type',
         'webinar_schedule_profile_id',
         'meta',
     ];
@@ -32,10 +36,19 @@ class WebinarSeries extends Model
 
     protected static function booted(): void
     {
-        static::creating(function ($series) {
-            if (empty($series->slug)) {
+        static::creating(function (WebinarSeries $series): void {
+            if (blank($series->slug)) {
                 $series->slug = Str::slug($series->title);
             }
+
+            if (blank($series->platform)) {
+                $series->platform = static::configuredProviderKey();
+            }
+
+            $series->provider_event_type = WebinarProviderEventType::normalize(
+                $series->provider_event_type
+                    ?? config('webinars.provider_event_type'),
+            );
         });
 
         static::saved(function (WebinarSeries $series): void {
@@ -43,7 +56,9 @@ class WebinarSeries extends Model
                 'slug',
                 'title',
                 'status',
-        'webinar_schedule_profile_id',
+                'platform',
+                'provider_event_type',
+                'webinar_schedule_profile_id',
                 'meta',
             ])) {
                 return;
@@ -64,8 +79,36 @@ class WebinarSeries extends Model
         return $this->hasMany(Webinar::class, 'webinar_series_id');
     }
 
-    public function webinarScheduleProfile(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function webinarScheduleProfile(): BelongsTo
     {
         return $this->belongsTo(WebinarScheduleProfile::class);
+    }
+
+    public function providerKey(): string
+    {
+        $provider = is_string($this->platform)
+            ? strtolower(trim($this->platform))
+            : '';
+
+        return $provider !== ''
+            ? $provider
+            : static::configuredProviderKey();
+    }
+
+    public function providerEventTypeKey(): string
+    {
+        return WebinarProviderEventType::normalize(
+            $this->provider_event_type
+                ?? config('webinars.provider_event_type'),
+        );
+    }
+
+    private static function configuredProviderKey(): string
+    {
+        $provider = config('webinars.provider', 'zoom');
+
+        return is_string($provider) && trim($provider) !== ''
+            ? strtolower(trim($provider))
+            : 'zoom';
     }
 }

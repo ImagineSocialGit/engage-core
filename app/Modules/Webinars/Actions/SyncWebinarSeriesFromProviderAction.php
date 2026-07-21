@@ -28,8 +28,9 @@ class SyncWebinarSeriesFromProviderAction
             $this->getNextUpcomingWebinarAction->getForSeries($series)
         );
 
-        $webinarProvider = $this->webinarProviderManager->provider();
-        $provider = $webinarProvider->key();
+        $webinarProvider = $this->webinarProviderManager->forSeries($series);
+        $provider = $series->providerKey();
+        $providerEventType = $series->providerEventTypeKey();
 
         $snapshot = $this->providerSnapshot(
             $webinarProvider->listWebinarsByTitle($series->title),
@@ -46,14 +47,17 @@ class SyncWebinarSeriesFromProviderAction
             ->values()
             ->all();
 
-        $fetchedWebinars->each(function (ProviderWebinarData $fetchedWebinar) use ($series, $provider, &$created, &$updated): void {
+        $fetchedWebinars->each(function (ProviderWebinarData $fetchedWebinar) use ($series, $provider, $providerEventType, &$created, &$updated): void {
             $webinar = Webinar::query()->firstOrNew([
                 'platform' => $provider,
+                'provider_event_type' => $providerEventType,
                 'external_id' => $fetchedWebinar->externalId,
                 'webinar_series_id' => $series->id,
             ]);
 
             $webinar->fill([
+                'platform' => $provider,
+                'provider_event_type' => $providerEventType,
                 'title' => $fetchedWebinar->title,
                 'slug' => $this->makeSlug(
                     title: $fetchedWebinar->title,
@@ -92,11 +96,14 @@ class SyncWebinarSeriesFromProviderAction
             foreach ($this->missingWebinars(
                 series: $series,
                 provider: $provider,
+                providerEventType: $providerEventType,
                 fetchedExternalIds: $fetchedExternalIds,
             ) as $missingWebinar) {
                 $missing[] = [
                     'webinar_id' => $missingWebinar->getKey(),
                     'external_id' => $missingWebinar->external_id,
+                    'platform' => $missingWebinar->providerKey(),
+                    'provider_event_type' => $missingWebinar->providerEventTypeKey(),
                     'title' => $missingWebinar->title,
                     'has_registrations' => $missingWebinar->registrations()->exists(),
                 ];
@@ -131,6 +138,8 @@ class SyncWebinarSeriesFromProviderAction
             'reconciliation' => [
                 'authoritative' => $snapshot->authoritative,
                 'reason' => $snapshot->reason,
+                'provider' => $provider,
+                'provider_event_type' => $providerEventType,
                 'missing_candidates' => count($missing),
             ],
         ];
@@ -182,10 +191,12 @@ class SyncWebinarSeriesFromProviderAction
     protected function missingWebinars(
         WebinarSeries $series,
         string $provider,
+        string $providerEventType,
         array $fetchedExternalIds,
     ): Collection {
         return $series->webinars()
             ->where('platform', $provider)
+            ->where('provider_event_type', $providerEventType)
             ->when(
                 filled($fetchedExternalIds),
                 fn ($query) => $query->whereNotIn('external_id', $fetchedExternalIds),
@@ -202,4 +213,3 @@ class SyncWebinarSeriesFromProviderAction
         return Str::slug($title.'-'.$externalId);
     }
 }
-
