@@ -21,6 +21,7 @@ final class ClientEnvironmentLoader
         'ROOT_DOMAIN',
         'WEBINAR_APP_URL',
         'CRM_APP_URL',
+        'SCHEDULING_APP_URL',
 
         'DB_DATABASE',
         'DB_USERNAME',

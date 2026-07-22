@@ -38,7 +38,7 @@ Scheduling should not become a generic calendar-builder product for clients to m
 
 ## Universal public booking surface
 
-Scheduling should provide every client with an optional generic public booking surface where visitors can select a public service and book directly.
+Scheduling provides every client with an optional generic public booking surface where visitors can discover public services and current availability. Booking submission is layered onto the same surface in the next implementation slice.
 
 The public host is selected-client deployment configuration. It must not be derived from a fixed subdomain prefix.
 
@@ -57,7 +57,18 @@ The expected environment contract is:
 SCHEDULING_APP_URL=https://booking.[ROOT_DOMAIN]
 ```
 
-All future public booking, cancellation, and reschedule URLs should resolve from that configured base URL.
+`config/scheduling.php` validates that value as a root-level HTTP or HTTPS origin, derives the route host, and disables only the public surface when the value is missing or malformed. `ClientEnvironmentLoader` treats `SCHEDULING_APP_URL` as selected-client deployment configuration.
+
+The currently implemented read-only public routes are:
+
+```text
+GET /
+GET /services/{serviceKey}
+```
+
+They are registered only on the configured host while the Scheduling module is enabled. The catalog returns active services with `is_public = true`. Service pages accept one bounded local date, calculate live availability through `FindBookableAvailabilityAction`, show times in the service timezone, and omit host identity, capacity, occupancy, availability-window identity, and other trusted booking details. Identical times produced by multiple eligible hosts are presented once.
+
+All public booking, cancellation, and reschedule URLs should resolve from the configured base URL.
 
 The universal booking surface is separate from CRM, Portal, and Webinars. A webinar-triggered booking journey may add source context, eligibility, and tailored copy through a thin client-specific integration layer, but it must consume generic Scheduling contracts and must not shape Scheduling around Webinars.
 
@@ -109,6 +120,7 @@ transaction-time slot, occupancy, capacity, and idempotency revalidation
 reschedule-aware offer issuance with one trusted source-Appointment exclusion
 atomic hold-to-reschedule replacement with attendee and vertical-subject preservation
 appointment lifecycle transitions and neutral automation event emission
+configured-host public service discovery and bounded availability presentation
 ```
 
 Scheduling does not own message delivery, consent, task lifecycle, portal accounts, form definitions, commerce records, geocoding, or provider adapter internals.
@@ -699,6 +711,7 @@ Provider persistence should separately represent connections, remote event ident
 Implemented:
 
 ```text
+PublicBookingController read-only catalog and availability surface
 FindBookableAvailabilityAction
 IssueBookableSlotOfferAction
 CreateBookingHoldAction
@@ -737,8 +750,8 @@ Deferred after the booking transaction foundation:
 ```text
 non-hold CRM/manual appointment creation
 CRM Scheduling workspace
-public service selection and booking pages
-SCHEDULING_APP_URL routing and setup validation
+public booking submission, attendee capture, opaque offer issuance, and hold conversion
+SCHEDULING_APP_URL setup validation
 calendar views
 provider connection and synchronization persistence
 external free/busy adapters

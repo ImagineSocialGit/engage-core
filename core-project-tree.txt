@@ -639,6 +639,7 @@
 │   │   │   │   └── TransitionAppointmentStatusAction.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
+│   │   │   │   └── PublicBookingController.php
 │   │   │   ├── Data
 │   │   │   │   ├── AppointmentBookingData.php
 │   │   │   │   ├── AppointmentLifecycleContext.php
@@ -1487,6 +1488,9 @@
 │       │   ├── unsubscribe-confirm.blade.php
 │       │   ├── unsubscribe-confirmed.blade.php
 │       │   └── unsubscribe-invalid.blade.php
+│       ├── scheduling
+│       │   └── public
+│       │       └── index.blade.php
 │       ├── staging
 │       │   └── login.blade.php
 │       ├── webinar
@@ -1501,6 +1505,7 @@
 │       └── welcome.blade.php
 ├── routes
 │   ├── crm.php
+│   ├── scheduling.php
 │   ├── staging.php
 │   ├── webhooks.php
 │   ├── webinar.php
@@ -1688,6 +1693,7 @@
 │   │   │   ├── BookableSlotOfferAndBookingHoldActionTest.php
 │   │   │   ├── BookingHoldConversionAndReleaseActionTest.php
 │   │   │   ├── FindBookableAvailabilityActionTest.php
+│   │   │   ├── PublicSchedulingSurfaceTest.php
 │   │   │   ├── RescheduleAppointmentActionTest.php
 │   │   │   ├── RescheduleSlotOfferAndBookingHoldActionTest.php
 │   │   │   ├── SchedulingAvailabilityWindowFoundationTest.php
@@ -1787,4 +1793,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-494 directories, 1294 files
+496 directories, 1298 files
