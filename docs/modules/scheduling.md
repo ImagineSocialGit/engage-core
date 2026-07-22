@@ -106,7 +106,7 @@ appointment-related source context
 opaque expiring slot offers and short-lived booking holds
 hold-aware availability, explicit hold release, and atomic hold-to-Appointment conversion
 transaction-time slot, occupancy, capacity, and idempotency revalidation
-appointment-related domain and automation event intent when implemented
+appointment lifecycle transitions and neutral automation event emission
 ```
 
 Scheduling does not own message delivery, consent, task lifecycle, portal accounts, form definitions, commerce records, geocoding, or provider adapter internals.
@@ -561,13 +561,58 @@ A future browser countdown should render the absolute server-provided expiration
 
 `ReleaseBookingHoldAction` releases an active hold explicitly, treats repeated release requests idempotently, marks an elapsed active hold expired, and rejects release after conversion.
 
-`ConvertBookingHoldToAppointmentAction` uses the hold itself as the conversion identity. It locks the hold and authoritative service/host records, creates the Appointment, one accepted primary attendee snapshot, and the initial lifecycle event in one transaction, then marks the hold converted and links the Appointment. A retry returns the already-created Appointment.
+`ConvertBookingHoldToAppointmentAction` uses the hold itself as the conversion identity. It locks the hold and authoritative service/host records, creates the Appointment, one primary attendee snapshot, and the initial lifecycle plus neutral automation event in one transaction, then marks the hold converted and links the Appointment. A retry returns the already-created Appointment.
 
 The caller may provide a Core Contact and a separate polymorphic primary attendee. This preserves the common one-on-one path while supporting vertical-owned subjects such as pets without adding a Scheduling dependency on the vertical module. The existing one-to-many attendee relationship remains available for future additional participants.
 
-Services with `requires_confirmation = false` create a `scheduled` Appointment and a `scheduled` lifecycle event. Services requiring confirmation create a `pending` Appointment and a `created` lifecycle event whose target status is `pending`.
+Services with `requires_confirmation = false` create a `scheduled` Appointment, an accepted primary attendee with `responded_at` set to booking time, and a `scheduled` lifecycle event. Services requiring confirmation create a `pending` Appointment, an invited primary attendee with no response timestamp, and a `created` lifecycle event whose target status is `pending`.
 
 Conversion copies the held start/end interval plus current service-owned host identity, location snapshot, and operational timezone from authoritative Scheduling records. Caller-provided service, host, time, capacity, or location values are never authoritative conversion inputs.
+
+## Appointment lifecycle state machine
+
+The implemented lifecycle layer consists of:
+
+```text
+AppointmentLifecycleContext
+TransitionAppointmentStatusAction
+ConfirmAppointmentAction
+CancelAppointmentAction
+CompleteAppointmentAction
+MarkAppointmentNoShowAction
+```
+
+`AppointmentLifecycleContext` carries transport-neutral actor, source, reason, occurrence time, optional confirming attendee, force authorization, and compact provenance. Controllers, public links, provider callbacks, CRM actions, or optional integrations may call the semantic actions without embedding transport behavior in Scheduling.
+
+Supported transitions are:
+
+```text
+pending -> confirmed | canceled | completed | no_show
+scheduled -> confirmed | canceled | completed | no_show
+confirmed -> canceled | completed | no_show
+completed | canceled | no_show -> terminal
+```
+
+Repeating the same terminal or confirmation action is idempotent. A conflicting transition from a terminal outcome is rejected. Completion and no-show cannot be recorded before the Appointment starts. Cancellation enforces `bookable_services.cancellation_notice_minutes` unless the caller supplies explicit force authorization.
+
+Confirmation updates the identified AppointmentAttendee, or the primary attendee when no explicit attendee is supplied, from `invited` or `tentative` to `accepted` and records `responded_at`. An already accepted attendee preserves the original response timestamp. A supplied attendee must belong to the Appointment.
+
+This confirmation action is deliberately transport-neutral. When InboundMessaging is enabled and client configuration opts into appointment confirmations by text, a later integration may correlate configured replies such as `Y`, `YES`, or `CONFIRM` to the exact Appointment and attendee, then invoke `ConfirmAppointmentAction` with `source = sms_reply`. Scheduling does not parse inbound text and does not depend on InboundMessaging. Clients without InboundMessaging retain the full appointment lifecycle.
+
+Canceling an Appointment marks its `invited`, `accepted`, and `tentative` attendee rows canceled. Completion and no-show do not overwrite attendee-level outcomes, preserving truthful group-appointment behavior even though most current appointments are one-on-one.
+
+Every initial creation and successful lifecycle transition records append-only `appointment_lifecycle_events` history and a durable neutral automation outbox event in the same transaction. Current event vocabulary is:
+
+```text
+appointment.created
+appointment.scheduled
+appointment.confirmed
+appointment.canceled
+appointment.completed
+appointment.no_show
+```
+
+Automation payloads contain structural identities, statuses, times, and provenance. They do not duplicate attendee names, email addresses, or phone numbers.
 
 ## Messaging, tasks, and automation
 
@@ -584,15 +629,18 @@ App\Support\AutomationEvents\Data\AutomationEventData
 App\Support\AutomationEvents\Events\AutomationEventRecorded
 ```
 
-Planned neutral event vocabulary:
+Implemented neutral event vocabulary:
 
 ```text
+appointment.created
 appointment.scheduled
-appointment.rescheduled
+appointment.confirmed
 appointment.canceled
 appointment.completed
 appointment.no_show
 ```
+
+`appointment.rescheduled` remains deferred to the dedicated rescheduling transaction.
 
 FlowRoutes listens through the generic automation-event seam. Scheduling does not depend on FlowRoutes.
 
@@ -630,6 +678,11 @@ IssueBookableSlotOfferAction
 CreateBookingHoldAction
 ReleaseBookingHoldAction
 ConvertBookingHoldToAppointmentAction
+ConfirmAppointmentAction
+CancelAppointmentAction
+CompleteAppointmentAction
+MarkAppointmentNoShowAction
+TransitionAppointmentStatusAction
 ```
 
 Planned:
@@ -637,13 +690,8 @@ Planned:
 ```text
 CreateAppointmentAction for non-hold CRM/manual creation
 RescheduleAppointmentAction
-CancelAppointmentAction
-ConfirmAppointmentAction
-CompleteAppointmentAction
-MarkAppointmentNoShowAction
 SchedulingReadService
 AppointmentReminderScheduler
-AppointmentAutomationEventEmitter
 ```
 
 Public actions should exist before another module or surface directly creates or mutates Scheduling records.
@@ -662,7 +710,7 @@ Deferred after the booking transaction foundation:
 
 ```text
 non-hold CRM/manual appointment creation
-reschedule and cancellation actions
+reschedule action
 CRM Scheduling workspace
 public service selection and booking pages
 SCHEDULING_APP_URL routing and setup validation
@@ -671,7 +719,6 @@ provider connection and synchronization persistence
 external free/busy adapters
 meeting-link generation
 appointment reminder scheduling
-appointment automation event emission
 paid booking integration
 resource booking
 round-robin or weighted host routing

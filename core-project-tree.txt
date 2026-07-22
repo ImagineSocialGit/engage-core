@@ -626,15 +626,21 @@
 │   │   │   └── Support
 │   │   ├── Scheduling
 │   │   │   ├── Actions
+│   │   │   │   ├── CancelAppointmentAction.php
+│   │   │   │   ├── CompleteAppointmentAction.php
+│   │   │   │   ├── ConfirmAppointmentAction.php
 │   │   │   │   ├── ConvertBookingHoldToAppointmentAction.php
 │   │   │   │   ├── CreateBookingHoldAction.php
 │   │   │   │   ├── FindBookableAvailabilityAction.php
 │   │   │   │   ├── IssueBookableSlotOfferAction.php
-│   │   │   │   └── ReleaseBookingHoldAction.php
+│   │   │   │   ├── MarkAppointmentNoShowAction.php
+│   │   │   │   ├── ReleaseBookingHoldAction.php
+│   │   │   │   └── TransitionAppointmentStatusAction.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   ├── Data
 │   │   │   │   ├── AppointmentBookingData.php
+│   │   │   │   ├── AppointmentLifecycleContext.php
 │   │   │   │   ├── AvailabilityInterval.php
 │   │   │   │   ├── AvailabilitySearch.php
 │   │   │   │   └── BookableSlot.php
@@ -1673,6 +1679,7 @@
 │   │   │   ├── ModuleFirstPresetCompositionTest.php
 │   │   │   └── PresetCompositionSyncCutoverTest.php
 │   │   ├── Scheduling
+│   │   │   ├── AppointmentLifecycleActionTest.php
 │   │   │   ├── BookableSlotOfferAndBookingHoldActionTest.php
 │   │   │   ├── BookingHoldConversionAndReleaseActionTest.php
 │   │   │   ├── FindBookableAvailabilityActionTest.php
@@ -1771,4 +1778,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-494 directories, 1278 files
+494 directories, 1285 files

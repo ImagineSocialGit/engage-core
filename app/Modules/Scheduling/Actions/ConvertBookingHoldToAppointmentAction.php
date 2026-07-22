@@ -3,21 +3,24 @@
 namespace App\Modules\Scheduling\Actions;
 
 use App\Modules\Scheduling\Data\AppointmentBookingData;
+use App\Modules\Scheduling\Data\AppointmentLifecycleContext;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\AppointmentAttendee;
-use App\Modules\Scheduling\Models\AppointmentLifecycleEvent;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use Carbon\CarbonImmutable;
 use DomainException;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use LogicException;
 
 class ConvertBookingHoldToAppointmentAction
 {
+    public function __construct(
+        private readonly TransitionAppointmentStatusAction $lifecycle,
+    ) {}
+
     public function handle(
         string $holdId,
         AppointmentBookingData $booking,
@@ -103,6 +106,9 @@ class ConvertBookingHoldToAppointmentAction
             $status = $service->requires_confirmation
                 ? Appointment::STATUS_PENDING
                 : Appointment::STATUS_SCHEDULED;
+            $attendeeStatus = $service->requires_confirmation
+                ? AppointmentAttendee::STATUS_INVITED
+                : AppointmentAttendee::STATUS_ACCEPTED;
             $primaryAttendee = $booking->primaryAttendee();
             $offer = $hold->bookableSlotOffer()->first();
 
@@ -146,8 +152,8 @@ class ConvertBookingHoldToAppointmentAction
                 'email' => $booking->attendeeEmail(),
                 'phone' => $booking->attendeePhone(),
                 'role' => 'primary',
-                'status' => AppointmentAttendee::STATUS_ACCEPTED,
-                'responded_at' => $now,
+                'status' => $attendeeStatus,
+                'responded_at' => $service->requires_confirmation ? null : $now,
                 'meta' => array_replace_recursive(
                     $booking->attendeeMeta,
                     [
@@ -158,14 +164,18 @@ class ConvertBookingHoldToAppointmentAction
                 ),
             ]);
 
-            $this->recordInitialLifecycleEvent(
+            $this->lifecycle->recordInitial(
                 appointment: $appointment,
-                status: $status,
-                actor: $booking->createdBy,
-                source: $booking->source,
-                hold: $hold,
-                slotOfferId: $offer?->offer_id,
-                occurredAt: $now,
+                context: new AppointmentLifecycleContext(
+                    actor: $booking->createdBy,
+                    source: $booking->source,
+                    reason: 'booking_hold_converted',
+                    occurredAt: $now,
+                    context: array_filter([
+                        'booking_hold_id' => $hold->hold_id,
+                        'slot_offer_id' => $offer?->offer_id,
+                    ], static fn (mixed $value): bool => $value !== null),
+                ),
             );
 
             $hold->forceFill([
@@ -221,34 +231,6 @@ class ConvertBookingHoldToAppointmentAction
         }
 
         return $host;
-    }
-
-    private function recordInitialLifecycleEvent(
-        Appointment $appointment,
-        string $status,
-        ?Model $actor,
-        string $source,
-        BookingHold $hold,
-        ?string $slotOfferId,
-        CarbonImmutable $occurredAt,
-    ): void {
-        AppointmentLifecycleEvent::query()->create([
-            'appointment_id' => $appointment->getKey(),
-            'event_key' => $status === Appointment::STATUS_PENDING
-                ? AppointmentLifecycleEvent::EVENT_CREATED
-                : AppointmentLifecycleEvent::EVENT_SCHEDULED,
-            'from_status' => null,
-            'to_status' => $status,
-            'actor_type' => $actor?->getMorphClass(),
-            'actor_id' => $actor?->getKey(),
-            'source' => $source,
-            'reason' => 'booking_hold_converted',
-            'context' => array_filter([
-                'booking_hold_id' => $hold->hold_id,
-                'slot_offer_id' => $slotOfferId,
-            ], static fn (mixed $value): bool => $value !== null),
-            'occurred_at' => $occurredAt,
-        ]);
     }
 
     private function sameHost(mixed $left, mixed $right): bool
