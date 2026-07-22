@@ -104,6 +104,7 @@ read-only bookable-slot calculation
 appointment lifecycle and reschedule lineage
 appointment-related source context
 opaque expiring slot offers and short-lived booking holds
+hold-aware availability, explicit hold release, and atomic hold-to-Appointment conversion
 transaction-time slot, occupancy, capacity, and idempotency revalidation
 appointment-related domain and automation event intent when implemented
 ```
@@ -316,9 +317,16 @@ External calendar systems never own appointment lifecycle. Provider failure leav
 
 ### appointment_attendees
 
-Represents people or subjects attached to an appointment.
+Represents people or subjects attached to an appointment. Most bookings create one primary attendee snapshot, but the table remains one-to-many so group, household, staff-assisted, or other multi-attendee appointments do not require a schema change.
 
-`contact_id` is optional convenience/context. It does not make Scheduling own contact identity.
+The attendee identity and associated Contact are intentionally separate:
+
+```text
+attendee_type / attendee_id = the appointment subject
+contact_id = the associated Core contact when one exists
+```
+
+For an ordinary one-on-one appointment, both identities may point to the same Contact. For a pet-service appointment, the polymorphic attendee and Appointment `primary_attendee` may point to a PetServices-owned pet while `contact_id` points to the owner. Scheduling stores the appointment relationship and snapshots; PetServices continues to own pet identity and domain meaning.
 
 ### appointment_lifecycle_events
 
@@ -347,6 +355,7 @@ AvailabilityInterval
 BookableSlot
 AvailabilityRuleResolver
 AppointmentOccupancyResolver
+BookingOccupancyResolver
 FindBookableAvailabilityAction
 ```
 
@@ -413,11 +422,13 @@ service-host assignment capacity_override
 availability-window capacity
 ```
 
-Remaining capacity is calculated independently for each limiting dimension:
+Remaining capacity is calculated independently for each limiting dimension across blocking Appointments and effectively active BookingHolds:
 
 ```text
 service/service-host occupancy consumes service, assignment, and window capacity
-all appointments on a host consume host capacity
+all appointments and active holds on a host consume host capacity
+converted holds stop consuming capacity as holds because their Appointment replaces that occupancy atomically
+released, expired, and elapsed active holds do not consume capacity
 ```
 
 Appointments in these states consume capacity:
@@ -465,6 +476,8 @@ BookableSlotOffer
 BookingHold
 IssueBookableSlotOfferAction
 CreateBookingHoldAction
+ReleaseBookingHoldAction
+ConvertBookingHoldToAppointmentAction
 ExpireBookingHoldsJob
 ```
 
@@ -544,7 +557,17 @@ Correctness never depends on cleanup timing. `ExpireBookingHoldsJob` runs every 
 
 A future browser countdown should render the absolute server-provided expiration. Refreshing or reopening the page must not restart or extend the hold.
 
-Atomic hold-to-Appointment conversion remains deferred. The conversion action must lock and validate the active hold, create the Appointment and initial lifecycle event in one transaction, then mark the hold converted.
+### Hold release and conversion
+
+`ReleaseBookingHoldAction` releases an active hold explicitly, treats repeated release requests idempotently, marks an elapsed active hold expired, and rejects release after conversion.
+
+`ConvertBookingHoldToAppointmentAction` uses the hold itself as the conversion identity. It locks the hold and authoritative service/host records, creates the Appointment, one accepted primary attendee snapshot, and the initial lifecycle event in one transaction, then marks the hold converted and links the Appointment. A retry returns the already-created Appointment.
+
+The caller may provide a Core Contact and a separate polymorphic primary attendee. This preserves the common one-on-one path while supporting vertical-owned subjects such as pets without adding a Scheduling dependency on the vertical module. The existing one-to-many attendee relationship remains available for future additional participants.
+
+Services with `requires_confirmation = false` create a `scheduled` Appointment and a `scheduled` lifecycle event. Services requiring confirmation create a `pending` Appointment and a `created` lifecycle event whose target status is `pending`.
+
+Conversion copies the held start/end interval plus current service-owned host identity, location snapshot, and operational timezone from authoritative Scheduling records. Caller-provided service, host, time, capacity, or location values are never authoritative conversion inputs.
 
 ## Messaging, tasks, and automation
 
@@ -605,13 +628,14 @@ Implemented:
 FindBookableAvailabilityAction
 IssueBookableSlotOfferAction
 CreateBookingHoldAction
+ReleaseBookingHoldAction
+ConvertBookingHoldToAppointmentAction
 ```
 
 Planned:
 
 ```text
-ReleaseBookingHoldAction
-CreateAppointmentAction
+CreateAppointmentAction for non-hold CRM/manual creation
 RescheduleAppointmentAction
 CancelAppointmentAction
 ConfirmAppointmentAction
@@ -634,13 +658,10 @@ Do not add `flow_route_*` foreign keys to Scheduling artifacts merely for proven
 
 ## Deferred work
 
-Deferred after the booking-hold foundation:
+Deferred after the booking transaction foundation:
 
 ```text
-active booking holds in normal availability-result occupancy
-explicit booking-hold release
-atomic hold-to-Appointment conversion
-transaction-safe appointment creation
+non-hold CRM/manual appointment creation
 reschedule and cancellation actions
 CRM Scheduling workspace
 public service selection and booking pages

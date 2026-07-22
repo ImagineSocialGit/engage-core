@@ -8,17 +8,16 @@ use App\Modules\Scheduling\Data\BookableSlot;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookableServiceHost;
 use App\Modules\Scheduling\Models\SchedulingHost;
-use App\Modules\Scheduling\Services\Availability\AppointmentOccupancyResolver;
+use App\Modules\Scheduling\Services\Availability\BookingOccupancyResolver;
 use App\Modules\Scheduling\Services\Availability\AvailabilityRuleResolver;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Collection;
 use Throwable;
 
 class FindBookableAvailabilityAction
 {
     public function __construct(
         private readonly AvailabilityRuleResolver $rules,
-        private readonly AppointmentOccupancyResolver $occupancy,
+        private readonly BookingOccupancyResolver $occupancy,
     ) {}
 
     /**
@@ -125,6 +124,7 @@ class FindBookableAvailabilityAction
         }
 
         $appointments = $this->occupancy->blockingAppointments($search, $host);
+        $holds = $this->occupancy->activeHolds($search, $host);
         $slots = [];
 
         foreach ($this->continuousRuns($intervals) as $run) {
@@ -161,6 +161,7 @@ class FindBookableAvailabilityAction
                         startsAt: $slotStartsAt,
                         endsAt: $slotEndsAt,
                         appointments: $appointments,
+                        holds: $holds,
                     );
 
                     if ($remainingCapacity > 0) {

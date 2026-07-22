@@ -626,12 +626,15 @@
 │   │   │   └── Support
 │   │   ├── Scheduling
 │   │   │   ├── Actions
+│   │   │   │   ├── ConvertBookingHoldToAppointmentAction.php
 │   │   │   │   ├── CreateBookingHoldAction.php
 │   │   │   │   ├── FindBookableAvailabilityAction.php
-│   │   │   │   └── IssueBookableSlotOfferAction.php
+│   │   │   │   ├── IssueBookableSlotOfferAction.php
+│   │   │   │   └── ReleaseBookingHoldAction.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   ├── Data
+│   │   │   │   ├── AppointmentBookingData.php
 │   │   │   │   ├── AvailabilityInterval.php
 │   │   │   │   ├── AvailabilitySearch.php
 │   │   │   │   └── BookableSlot.php
@@ -655,7 +658,8 @@
 │   │   │   ├── Services
 │   │   │   │   └── Availability
 │   │   │   │       ├── AppointmentOccupancyResolver.php
-│   │   │   │       └── AvailabilityRuleResolver.php
+│   │   │   │       ├── AvailabilityRuleResolver.php
+│   │   │   │       └── BookingOccupancyResolver.php
 │   │   │   └── Support
 │   │   ├── Tasks
 │   │   │   ├── Actions
@@ -756,6 +760,7 @@
 │   │   │   │   ├── ResolveWebinarPlaybackUrlAction.php
 │   │   │   │   ├── ResolveWebinarRegistrationPublicStatusAction.php
 │   │   │   │   ├── ResolveWebinarRegistrationReconciliationAction.php
+│   │   │   │   ├── ResolveWebinarRegistrationReplacementChainAction.php
 │   │   │   │   ├── RetryWebinarRegistrationFinalizationAction.php
 │   │   │   │   ├── SyncWebinarRegistrationToProviderAction.php
 │   │   │   │   ├── SyncWebinarScheduleProfilesAction.php
@@ -804,6 +809,7 @@
 │   │   │   │   ├── WebinarRegistrationFinalizationResult.php
 │   │   │   │   ├── WebinarRegistrationImportResult.php
 │   │   │   │   ├── WebinarRegistrationImportRow.php
+│   │   │   │   ├── WebinarRegistrationReplacementChain.php
 │   │   │   │   └── WebinarRegistrationResult.php
 │   │   │   ├── Enums
 │   │   │   │   ├── WebinarProviderEventType.php
@@ -1668,6 +1674,7 @@
 │   │   │   └── PresetCompositionSyncCutoverTest.php
 │   │   ├── Scheduling
 │   │   │   ├── BookableSlotOfferAndBookingHoldActionTest.php
+│   │   │   ├── BookingHoldConversionAndReleaseActionTest.php
 │   │   │   ├── FindBookableAvailabilityActionTest.php
 │   │   │   ├── SchedulingAvailabilityWindowFoundationTest.php
 │   │   │   ├── SchedulingFoundationTest.php
@@ -1744,6 +1751,7 @@
 │   │   │   ├── WebinarRegistrationOperatorRecoveryTest.php
 │   │   │   ├── WebinarRegistrationProviderSyncTest.php
 │   │   │   ├── WebinarRegistrationThankYouTest.php
+│   │   │   ├── WebinarReplacementPublicLifecycleTest.php
 │   │   │   ├── WebinarResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── WebinarScheduleProfileDefinitionResolverMessageAreaTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
@@ -1763,4 +1771,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-494 directories, 1270 files
+494 directories, 1278 files

@@ -2,7 +2,6 @@
 
 namespace App\Modules\Scheduling\Actions;
 
-use App\Modules\Scheduling\Data\AvailabilityInterval;
 use App\Modules\Scheduling\Data\AvailabilitySearch;
 use App\Modules\Scheduling\Data\BookableSlot;
 use App\Modules\Scheduling\Models\Appointment;
@@ -11,7 +10,7 @@ use App\Modules\Scheduling\Models\BookableServiceHost;
 use App\Modules\Scheduling\Models\BookableSlotOffer;
 use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingHost;
-use App\Modules\Scheduling\Services\Availability\AppointmentOccupancyResolver;
+use App\Modules\Scheduling\Services\Availability\BookingOccupancyResolver;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Database\Eloquent\Collection;
@@ -24,7 +23,7 @@ class CreateBookingHoldAction
 {
     public function __construct(
         private readonly FindBookableAvailabilityAction $findAvailability,
-        private readonly AppointmentOccupancyResolver $appointmentOccupancy,
+        private readonly BookingOccupancyResolver $occupancy,
     ) {}
 
     public function handle(
@@ -83,7 +82,7 @@ class CreateBookingHoldAction
                     );
                 }
 
-                [$host, $assignment] = $this->lockedTarget($offer, $service);
+                $host = $this->lockedTarget($offer, $service);
                 $search = new AvailabilitySearch(
                     service: $service,
                     startsAt: $offer->starts_at,
@@ -93,25 +92,19 @@ class CreateBookingHoldAction
                     evaluatedAt: $now,
                 );
 
-                $appointments = $this->appointmentOccupancy
+                $appointments = $this->occupancy
                     ->blockingAppointments($search, $host);
 
                 $this->lockAppointments($appointments);
 
-                $currentSlot = $this->exactCurrentSlot($search, $offer);
+                $occupancyStartsAt = CarbonImmutable::instance($offer->starts_at)
+                    ->utc()
+                    ->subMinutes(max(0, (int) $service->buffer_before_minutes));
+                $occupancyEndsAt = CarbonImmutable::instance($offer->ends_at)
+                    ->utc()
+                    ->addMinutes(max(0, (int) $service->buffer_after_minutes));
 
-                if (! $currentSlot instanceof BookableSlot) {
-                    throw new DomainException('The selected slot is no longer available.');
-                }
-
-                $occupancyStartsAt = $currentSlot->startsAt->subMinutes(
-                    max(0, (int) $service->buffer_before_minutes),
-                );
-                $occupancyEndsAt = $currentSlot->endsAt->addMinutes(
-                    max(0, (int) $service->buffer_after_minutes),
-                );
-
-                $holds = $this->lockedOverlappingHolds(
+                $this->lockOverlappingHolds(
                     service: $service,
                     host: $host,
                     startsAt: $occupancyStartsAt,
@@ -119,29 +112,12 @@ class CreateBookingHoldAction
                     now: $now,
                 );
 
-                $sameServiceHostHolds = $holds
-                    ->filter(fn (BookingHold $hold): bool =>
-                        (int) $hold->bookable_service_id === (int) $service->getKey()
-                        && $this->sameHost($hold->scheduling_host_id, $host?->getKey())
-                    )
-                    ->count();
+                $currentSlot = $this->exactCurrentSlot($search, $offer);
 
-                if ($sameServiceHostHolds >= $currentSlot->remainingCapacity) {
-                    throw new DomainException('The selected slot no longer has available capacity.');
-                }
-
-                if ($host !== null) {
-                    $hostRemainingAfterAppointments = $this->hostRemainingAfterAppointments(
-                        service: $service,
-                        host: $host,
-                        startsAt: $currentSlot->startsAt,
-                        endsAt: $currentSlot->endsAt,
-                        appointments: $appointments,
+                if (! $currentSlot instanceof BookableSlot) {
+                    throw new DomainException(
+                        'The selected slot is no longer available or no longer has available capacity.',
                     );
-
-                    if ($holds->count() >= $hostRemainingAfterAppointments) {
-                        throw new DomainException('The selected host no longer has available capacity.');
-                    }
                 }
 
                 $ttlSeconds = max(
@@ -199,13 +175,10 @@ class CreateBookingHoldAction
         }
     }
 
-    /**
-     * @return array{0: SchedulingHost|null, 1: BookableServiceHost|null}
-     */
     private function lockedTarget(
         BookableSlotOffer $offer,
         BookableService $service,
-    ): array {
+    ): ?SchedulingHost {
         if ($offer->scheduling_host_id === null) {
             $hasAssignments = BookableServiceHost::query()
                 ->where('bookable_service_id', $service->getKey())
@@ -218,7 +191,7 @@ class CreateBookingHoldAction
                 );
             }
 
-            return [null, null];
+            return null;
         }
 
         $host = SchedulingHost::withTrashed()
@@ -247,7 +220,7 @@ class CreateBookingHoldAction
             );
         }
 
-        return [$host, $assignment];
+        return $host;
     }
 
     private function exactCurrentSlot(
@@ -285,16 +258,13 @@ class CreateBookingHoldAction
             ->get();
     }
 
-    /**
-     * @return Collection<int, BookingHold>
-     */
-    private function lockedOverlappingHolds(
+    private function lockOverlappingHolds(
         BookableService $service,
         ?SchedulingHost $host,
         CarbonImmutable $startsAt,
         CarbonImmutable $endsAt,
         CarbonImmutable $now,
-    ): Collection {
+    ): void {
         $query = BookingHold::query()
             ->effectivelyActive($now)
             ->overlappingOccupancy($startsAt, $endsAt);
@@ -307,49 +277,11 @@ class CreateBookingHoldAction
                 ->whereNull('scheduling_host_id');
         }
 
-        return $query
+        $query
             ->orderBy('id')
             ->lockForUpdate()
             ->get();
     }
-
-    /**
-     * @param Collection<int, Appointment> $appointments
-     */
-    private function hostRemainingAfterAppointments(
-        BookableService $service,
-        SchedulingHost $host,
-        CarbonImmutable $startsAt,
-        CarbonImmutable $endsAt,
-        Collection $appointments,
-    ): int {
-        $probe = clone $service;
-        $probe->capacity = PHP_INT_MAX;
-
-        return $this->appointmentOccupancy->remainingCapacity(
-            service: $probe,
-            host: $host,
-            assignment: null,
-            availability: new AvailabilityInterval(
-                startsAt: $startsAt,
-                endsAt: $endsAt,
-                hostId: (int) $host->getKey(),
-            ),
-            startsAt: $startsAt,
-            endsAt: $endsAt,
-            appointments: $appointments,
-        );
-    }
-
-    private function sameHost(mixed $left, mixed $right): bool
-    {
-        if ($left === null || $right === null) {
-            return $left === null && $right === null;
-        }
-
-        return (int) $left === (int) $right;
-    }
-
 
     private function isUniqueConstraintViolation(QueryException $exception): bool
     {

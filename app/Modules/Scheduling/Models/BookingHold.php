@@ -155,6 +155,30 @@ class BookingHold extends Model
             && CarbonImmutable::instance($this->expires_at)->utc()->greaterThan($at);
     }
 
+    public function isConverted(): bool
+    {
+        return $this->status === self::STATUS_CONVERTED;
+    }
+
+    public function isReleased(): bool
+    {
+        return $this->status === self::STATUS_RELEASED;
+    }
+
+    public function isExpired(): bool
+    {
+        return $this->status === self::STATUS_EXPIRED;
+    }
+
+    public function isTerminal(): bool
+    {
+        return in_array($this->status, [
+            self::STATUS_CONVERTED,
+            self::STATUS_RELEASED,
+            self::STATUS_EXPIRED,
+        ], true);
+    }
+
     public function remainingSeconds(?CarbonInterface $at = null): int
     {
         $at = $at !== null
@@ -219,6 +243,70 @@ class BookingHold extends Model
         if ((int) $this->capacity < 1) {
             throw new InvalidArgumentException(
                 'Booking hold capacity must be at least 1.',
+            );
+        }
+
+        $this->assertValidStatusState();
+    }
+
+    private function assertValidStatusState(): void
+    {
+        if ($this->status === self::STATUS_ACTIVE) {
+            $this->assertNullTerminalFields('active');
+
+            return;
+        }
+
+        if ($this->status === self::STATUS_CONVERTED) {
+            if ($this->appointment_id === null || $this->converted_at === null) {
+                throw new InvalidArgumentException(
+                    'Converted booking holds require appointment_id and converted_at.',
+                );
+            }
+
+            if ($this->released_at !== null) {
+                throw new InvalidArgumentException(
+                    'Converted booking holds cannot include released_at.',
+                );
+            }
+
+            return;
+        }
+
+        if ($this->status === self::STATUS_RELEASED) {
+            if ($this->released_at === null) {
+                throw new InvalidArgumentException(
+                    'Released booking holds require released_at.',
+                );
+            }
+
+            if ($this->appointment_id !== null || $this->converted_at !== null) {
+                throw new InvalidArgumentException(
+                    'Released booking holds cannot reference an appointment or converted_at.',
+                );
+            }
+
+            return;
+        }
+
+        if ($this->appointment_id !== null
+            || $this->released_at !== null
+            || $this->converted_at !== null
+        ) {
+            throw new InvalidArgumentException(
+                'Expired booking holds cannot reference terminal release or conversion fields.',
+            );
+        }
+    }
+
+    private function assertNullTerminalFields(string $status): void
+    {
+        if ($this->appointment_id !== null
+            || $this->released_at !== null
+            || $this->converted_at !== null
+        ) {
+            throw new InvalidArgumentException(
+                ucfirst($status).' booking holds cannot include terminal release or conversion fields.',
             );
         }
     }
