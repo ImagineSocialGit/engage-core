@@ -144,6 +144,12 @@ return [
     ],
 
     'registration' => [
+        'questions_section' => [
+            'enabled' => true,
+            'title' => 'Help us tailor the class',
+            'body' => 'Choose the question or concern that matters most to you.',
+        ],
+        'questions' => [],
         'consents' => [
             'transactional' => [
                 'email' => true,

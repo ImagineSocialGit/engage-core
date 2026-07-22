@@ -12,7 +12,10 @@ class WebinarContactPanelProvider implements ContactPanelProvider
     public function panels(Contact $contact): array
     {
         $registrations = WebinarRegistration::query()
-            ->with('webinar.webinarSeries')
+            ->with([
+                'webinar.webinarSeries',
+                'responses',
+            ])
             ->where('contact_id', $contact->id)
             ->latest('registered_at')
             ->latest('id')

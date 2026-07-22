@@ -9,6 +9,7 @@ use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarRegistrationResponse;
 use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Services\ContactPanels\WebinarContactPanelProvider;
 use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -322,6 +323,50 @@ class WebinarRegistrationQuestionTest extends TestCase
         $this->assertCount(1, $sourceRegistration->responses()->get());
         $this->assertCount(0, $replacementRegistration->responses()->get());
         $this->assertDatabaseCount('webinar_registration_responses', 1);
+    }
+
+
+    public function test_contact_webinar_history_displays_response_snapshots_and_other_text(): void
+    {
+        [$series, $webinar] = $this->occurrence('question-crm-history');
+        $contact = Contact::factory()->create();
+        $registration = WebinarRegistration::factory()
+            ->for($contact)
+            ->for($webinar)
+            ->create();
+
+        $registration->responses()->create([
+            'question_key' => 'primary_homebuying_question',
+            'question_label' => 'What is your biggest question or concern about buying a home?',
+            'question_type' => 'select',
+            'answer_key' => 'other',
+            'answer_label' => 'Other',
+            'answer_text' => 'I want to understand how buying affects my monthly budget.',
+            'definition_version' => '2026_07',
+            'sort_order' => 10,
+        ]);
+
+        $panel = app(WebinarContactPanelProvider::class)->panels($contact)[0];
+        $registrations = $panel->data['registrations'];
+        $loadedRegistration = $registrations->sole();
+
+        $this->assertTrue($loadedRegistration->relationLoaded('responses'));
+
+        $html = view($panel->view, [
+            ...$panel->data,
+            'contactPanel' => $panel,
+        ])->render();
+
+        $this->assertStringContainsString('Registration Questions', $html);
+        $this->assertStringContainsString(
+            'What is your biggest question or concern about buying a home?',
+            $html,
+        );
+        $this->assertStringContainsString('Other', $html);
+        $this->assertStringContainsString(
+            'I want to understand how buying affects my monthly budget.',
+            $html,
+        );
     }
 
     /**
