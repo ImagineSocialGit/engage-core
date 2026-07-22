@@ -7,6 +7,7 @@ use App\Modules\Scheduling\Data\AppointmentLifecycleContext;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\AppointmentAttendee;
 use App\Modules\Scheduling\Models\BookableService;
+use App\Modules\Scheduling\Models\BookableSlotOffer;
 use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use Carbon\CarbonImmutable;
@@ -32,12 +33,24 @@ class ConvertBookingHoldToAppointmentAction
                 ->where('hold_id', $holdId)
                 ->first([
                     'id',
+                    'bookable_slot_offer_id',
                     'bookable_service_id',
                     'scheduling_host_id',
                 ]);
 
             if (! $snapshot instanceof BookingHold) {
                 throw new DomainException('The booking hold could not be found.');
+            }
+
+            $offer = BookableSlotOffer::query()
+                ->whereKey($snapshot->bookable_slot_offer_id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $offer instanceof BookableSlotOffer) {
+                throw new LogicException(
+                    'The booking hold no longer references a slot offer.',
+                );
             }
 
             $service = BookableService::withTrashed()
@@ -54,11 +67,18 @@ class ConvertBookingHoldToAppointmentAction
                 throw new DomainException('The booking hold could not be found.');
             }
 
-            if ((int) $hold->bookable_service_id !== (int) $snapshot->bookable_service_id
+            if ((int) $hold->bookable_slot_offer_id !== (int) $snapshot->bookable_slot_offer_id
+                || (int) $hold->bookable_service_id !== (int) $snapshot->bookable_service_id
                 || ! $this->sameHost($hold->scheduling_host_id, $snapshot->scheduling_host_id)
             ) {
                 throw new LogicException(
                     'The booking hold target changed while it was being converted.',
+                );
+            }
+
+            if ($offer->isRescheduleOffer()) {
+                throw new DomainException(
+                    'A reschedule-scoped booking hold must be converted through RescheduleAppointmentAction.',
                 );
             }
 
@@ -110,7 +130,6 @@ class ConvertBookingHoldToAppointmentAction
                 ? AppointmentAttendee::STATUS_INVITED
                 : AppointmentAttendee::STATUS_ACCEPTED;
             $primaryAttendee = $booking->primaryAttendee();
-            $offer = $hold->bookableSlotOffer()->first();
 
             $appointment = Appointment::query()->create([
                 'bookable_service_id' => $service->getKey(),
@@ -136,8 +155,8 @@ class ConvertBookingHoldToAppointmentAction
                     [
                         'booking' => array_filter([
                             'hold_id' => $hold->hold_id,
-                            'slot_offer_id' => $offer?->offer_id,
-                            'display_timezone' => $offer?->display_timezone,
+                            'slot_offer_id' => $offer->offer_id,
+                            'display_timezone' => $offer->display_timezone,
                         ], static fn (mixed $value): bool => $value !== null),
                     ],
                 ),
@@ -173,7 +192,7 @@ class ConvertBookingHoldToAppointmentAction
                     occurredAt: $now,
                     context: array_filter([
                         'booking_hold_id' => $hold->hold_id,
-                        'slot_offer_id' => $offer?->offer_id,
+                        'slot_offer_id' => $offer->offer_id,
                     ], static fn (mixed $value): bool => $value !== null),
                 ),
             );

@@ -38,6 +38,11 @@ return new class extends Migration
                 ->constrained('appointments')
                 ->nullOnDelete();
 
+            $table->unique(
+                'rescheduled_from_id',
+                'appointments_rescheduled_from_unique',
+            );
+
             $table->string('status')->default('scheduled')->index();
 
             $table->string('title')->nullable();

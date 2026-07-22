@@ -153,6 +153,107 @@ class TransitionAppointmentStatusAction
     }
 
     /**
+     * @param array<string, mixed> $additionalContext
+     */
+    public function recordRescheduled(
+        Appointment $replacement,
+        Appointment $original,
+        string $originalStatus,
+        AppointmentLifecycleContext $context,
+        array $additionalContext = [],
+    ): Appointment {
+        $replacementId = $this->requiredAppointmentId($replacement);
+        $originalId = $this->requiredAppointmentId($original);
+        $originalStatus = trim($originalStatus);
+
+        if ($originalStatus === '') {
+            throw new InvalidArgumentException(
+                'Appointment reschedule lifecycle recording requires the original status.',
+            );
+        }
+
+        return DB::transaction(function () use (
+            $replacementId,
+            $originalId,
+            $originalStatus,
+            $context,
+            $additionalContext,
+        ): Appointment {
+            $snapshot = Appointment::withTrashed()
+                ->whereKey($replacementId)
+                ->first(['id', 'bookable_service_id']);
+
+            if (! $snapshot instanceof Appointment) {
+                throw new DomainException(
+                    'The replacement appointment could not be found.',
+                );
+            }
+
+            $service = BookableService::withTrashed()
+                ->whereKey($snapshot->bookable_service_id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $service instanceof BookableService) {
+                throw new LogicException(
+                    'The replacement appointment no longer references a bookable service.',
+                );
+            }
+
+            $appointments = Appointment::withTrashed()
+                ->whereKey([$originalId, $replacementId])
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy(fn (Appointment $appointment): int => (int) $appointment->getKey());
+            $lockedOriginal = $appointments->get($originalId);
+            $lockedReplacement = $appointments->get($replacementId);
+
+            if (! $lockedOriginal instanceof Appointment
+                || ! $lockedReplacement instanceof Appointment
+                || $lockedOriginal->trashed()
+                || $lockedReplacement->trashed()
+            ) {
+                throw new DomainException(
+                    'The rescheduled appointment lineage could not be found.',
+                );
+            }
+
+            if ((int) $lockedOriginal->bookable_service_id !== (int) $service->getKey()
+                || (int) $lockedReplacement->bookable_service_id !== (int) $service->getKey()
+            ) {
+                throw new LogicException(
+                    'Rescheduled appointments must reference the same bookable service.',
+                );
+            }
+
+            if ((int) $lockedReplacement->rescheduled_from_id !== (int) $lockedOriginal->getKey()) {
+                throw new LogicException(
+                    'The replacement appointment does not reference the original appointment.',
+                );
+            }
+
+            $existing = AppointmentLifecycleEvent::query()
+                ->where('appointment_id', $lockedReplacement->getKey())
+                ->where('event_key', AppointmentLifecycleEvent::EVENT_RESCHEDULED)
+                ->orderBy('id')
+                ->first();
+
+            if (! $existing instanceof AppointmentLifecycleEvent) {
+                $this->recordRescheduledLifecycleAndAutomationEvent(
+                    replacement: $lockedReplacement,
+                    original: $lockedOriginal,
+                    originalStatus: $originalStatus,
+                    context: $context,
+                    additionalContext: $additionalContext,
+                );
+            }
+
+            return $lockedReplacement->refresh();
+        });
+    }
+
+    /**
      * @return array{0: Appointment, 1: BookableService}
      */
     private function lockedAppointmentAndService(int $appointmentId): array
@@ -344,6 +445,99 @@ class TransitionAppointmentStatusAction
                 'canceled_at' => $occurredAt,
                 'updated_at' => $occurredAt,
             ]);
+    }
+
+    /**
+     * @param array<string, mixed> $additionalContext
+     */
+    private function recordRescheduledLifecycleAndAutomationEvent(
+        Appointment $replacement,
+        Appointment $original,
+        string $originalStatus,
+        AppointmentLifecycleContext $context,
+        array $additionalContext = [],
+    ): AppointmentLifecycleEvent {
+        $eventContext = array_replace(
+            $context->context,
+            $additionalContext,
+            [
+                'original_appointment_id' => (int) $original->getKey(),
+                'replacement_appointment_id' => (int) $replacement->getKey(),
+                'original_status' => $originalStatus,
+                'original_terminal_status' => (string) $original->status,
+                'original_starts_at' => $original->starts_at?->toISOString(),
+                'original_ends_at' => $original->ends_at?->toISOString(),
+                'replacement_status' => (string) $replacement->status,
+                'replacement_starts_at' => $replacement->starts_at?->toISOString(),
+                'replacement_ends_at' => $replacement->ends_at?->toISOString(),
+            ],
+        );
+
+        $lifecycleEvent = AppointmentLifecycleEvent::query()->create([
+            'appointment_id' => $replacement->getKey(),
+            'event_key' => AppointmentLifecycleEvent::EVENT_RESCHEDULED,
+            'from_status' => $originalStatus,
+            'to_status' => $replacement->status,
+            'actor_type' => $context->actor?->getMorphClass(),
+            'actor_id' => $context->actor?->getKey(),
+            'source' => $context->source,
+            'reason' => $context->reason,
+            'context' => $eventContext,
+            'occurred_at' => $context->occurredAt,
+        ]);
+
+        $this->automationEvents->record(
+            AutomationEventData::forSubject(
+                eventKey: 'appointment.'.AppointmentLifecycleEvent::EVENT_RESCHEDULED,
+                subject: $replacement,
+                contactId: $replacement->contact_id,
+                occurredAt: $context->occurredAt,
+                payload: [
+                    'appointment_id' => (int) $replacement->getKey(),
+                    'replacement_appointment_id' => (int) $replacement->getKey(),
+                    'original_appointment_id' => (int) $original->getKey(),
+                    'bookable_service_id' => (int) $replacement->bookable_service_id,
+                    'scheduling_host_id' => $replacement->scheduling_host_id !== null
+                        ? (int) $replacement->scheduling_host_id
+                        : null,
+                    'previous_scheduling_host_id' => $original->scheduling_host_id !== null
+                        ? (int) $original->scheduling_host_id
+                        : null,
+                    'contact_id' => $replacement->contact_id !== null
+                        ? (int) $replacement->contact_id
+                        : null,
+                    'primary_attendee_type' => $replacement->primary_attendee_type,
+                    'primary_attendee_id' => $replacement->primary_attendee_id !== null
+                        ? (int) $replacement->primary_attendee_id
+                        : null,
+                    'from_status' => $originalStatus,
+                    'original_status' => (string) $original->status,
+                    'status' => (string) $replacement->status,
+                    'previous_starts_at' => $original->starts_at?->toISOString(),
+                    'previous_ends_at' => $original->ends_at?->toISOString(),
+                    'starts_at' => $replacement->starts_at?->toISOString(),
+                    'ends_at' => $replacement->ends_at?->toISOString(),
+                    'timezone' => $replacement->timezone,
+                ],
+                meta: [
+                    'source' => $context->source,
+                    'reason' => $context->reason,
+                    'actor_type' => $context->actor?->getMorphClass(),
+                    'actor_id' => $context->actor?->getKey(),
+                    'force' => $context->force,
+                ],
+                eventId: $lifecycleEvent->event_id,
+            ),
+            idempotencyKey: implode(':', [
+                'scheduling',
+                'appointment',
+                $replacement->getKey(),
+                'lifecycle',
+                $lifecycleEvent->event_id,
+            ]),
+        );
+
+        return $lifecycleEvent;
     }
 
     /**

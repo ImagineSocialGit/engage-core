@@ -1,4 +1,3 @@
-
 # Scheduling Module
 
 Scheduling is a current universal module.
@@ -108,6 +107,7 @@ opaque expiring slot offers and short-lived booking holds
 hold-aware availability, explicit hold release, and atomic hold-to-Appointment conversion
 transaction-time slot, occupancy, capacity, and idempotency revalidation
 reschedule-aware offer issuance with one trusted source-Appointment exclusion
+atomic hold-to-reschedule replacement with attendee and vertical-subject preservation
 appointment lifecycle transitions and neutral automation event emission
 ```
 
@@ -547,7 +547,7 @@ It locks the offer, service, optional host, optional assignment, optional resche
 
 The same idempotency key returns the original hold for the same offer and is rejected when reused for another offer.
 
-### Reschedule preparation boundary
+### Reschedule transaction
 
 A reschedule-scoped offer is the only authority for which Appointment may be ignored during replacement-slot calculation. The caller still submits only:
 
@@ -558,7 +558,15 @@ idempotency_key
 
 The caller cannot nominate an Appointment to exclude. `CreateBookingHoldAction` resolves that identity from the locked offer, re-locks the source Appointment, verifies that it still belongs to the service, remains `pending`, `scheduled`, or `confirmed`, and has not already produced a replacement, then excludes exactly that Appointment from occupancy revalidation. Competing Appointments, active holds, host capacity, service capacity, assignment overrides, availability-window capacity, and all non-source buffers remain authoritative.
 
-This preparation slice does not create the replacement Appointment, cancel the original, enforce `reschedule_notice_minutes`, copy attendees, or emit `appointment.rescheduled`. Those behaviors belong to the later atomic hold-to-reschedule transaction.
+`RescheduleAppointmentAction` accepts an `AppointmentRescheduleData` containing the opaque hold ID, transport-neutral lifecycle context, and an explicit confirmation-preservation decision. It locks the authoritative offer, service, optional host, hold, source Appointment, and source attendees; enforces `bookable_services.reschedule_notice_minutes` unless force authorization is supplied; and completes the replacement in one transaction.
+
+The replacement copies the source Appointment's Contact, polymorphic primary subject, source context, location reference and snapshot, title, description, timezone, and attendee snapshots. This keeps the common Contact-only one-on-one path simple while preserving future vertical-owned subjects such as pets without adding a Scheduling dependency on Pet Services.
+
+The replacement host and start/end interval come only from the active reschedule hold. The source Appointment becomes `canceled` with the reschedule reason, and its active attendee rows become canceled. No standalone `appointment.canceled` lifecycle or automation event is emitted for that internal replacement step.
+
+Only one direct replacement may reference a source Appointment. The existing `rescheduled_from_id` lineage is enforced by a database unique constraint and by source-row locking. Retrying the same converted hold returns the existing replacement; another hold for the already-replaced source is rejected.
+
+For services not requiring confirmation, the replacement becomes `scheduled` and its primary attendee becomes accepted at reschedule time. For services requiring confirmation, the default replacement becomes `pending` with an invited primary attendee and no response timestamp. A caller may explicitly preserve confirmation only when the source Appointment was already confirmed; the replacement then becomes `confirmed` and the primary attendee remains accepted.
 
 ### Expiration contract
 
@@ -577,7 +585,7 @@ A future browser countdown should render the absolute server-provided expiration
 
 `ReleaseBookingHoldAction` releases an active hold explicitly, treats repeated release requests idempotently, marks an elapsed active hold expired, and rejects release after conversion.
 
-`ConvertBookingHoldToAppointmentAction` uses the hold itself as the conversion identity. It locks the hold and authoritative service/host records, creates the Appointment, one primary attendee snapshot, and the initial lifecycle plus neutral automation event in one transaction, then marks the hold converted and links the Appointment. A retry returns the already-created Appointment.
+`ConvertBookingHoldToAppointmentAction` uses the hold itself as the conversion identity for ordinary bookings. It locks the hold and authoritative service/host records, creates the Appointment, one primary attendee snapshot, and the initial lifecycle plus neutral automation event in one transaction, then marks the hold converted and links the Appointment. A retry returns the already-created Appointment. Reschedule-scoped holds are rejected and must be completed through `RescheduleAppointmentAction`, preventing an accidental unrelated second Appointment.
 
 The caller may provide a Core Contact and a separate polymorphic primary attendee. This preserves the common one-on-one path while supporting vertical-owned subjects such as pets without adding a Scheduling dependency on the vertical module. The existing one-to-many attendee relationship remains available for future additional participants.
 
@@ -591,11 +599,13 @@ The implemented lifecycle layer consists of:
 
 ```text
 AppointmentLifecycleContext
+AppointmentRescheduleData
 TransitionAppointmentStatusAction
 ConfirmAppointmentAction
 CancelAppointmentAction
 CompleteAppointmentAction
 MarkAppointmentNoShowAction
+RescheduleAppointmentAction
 ```
 
 `AppointmentLifecycleContext` carries transport-neutral actor, source, reason, occurrence time, optional confirming attendee, force authorization, and compact provenance. Controllers, public links, provider callbacks, CRM actions, or optional integrations may call the semantic actions without embedding transport behavior in Scheduling.
@@ -626,9 +636,10 @@ appointment.confirmed
 appointment.canceled
 appointment.completed
 appointment.no_show
+appointment.rescheduled
 ```
 
-Automation payloads contain structural identities, statuses, times, and provenance. They do not duplicate attendee names, email addresses, or phone numbers.
+Automation payloads contain structural identities, statuses, times, and provenance. They do not duplicate attendee names, email addresses, or phone numbers. `appointment.rescheduled` uses the replacement Appointment as its canonical subject and carries both original and replacement identities, hosts, statuses, and times.
 
 ## Messaging, tasks, and automation
 
@@ -654,9 +665,8 @@ appointment.confirmed
 appointment.canceled
 appointment.completed
 appointment.no_show
+appointment.rescheduled
 ```
-
-`appointment.rescheduled` remains deferred to the atomic hold-to-reschedule transaction. Reschedule-aware offers and holds are implemented, but they do not mutate either Appointment.
 
 FlowRoutes listens through the generic automation-event seam. Scheduling does not depend on FlowRoutes.
 
@@ -694,6 +704,7 @@ IssueBookableSlotOfferAction
 CreateBookingHoldAction
 ReleaseBookingHoldAction
 ConvertBookingHoldToAppointmentAction
+RescheduleAppointmentAction
 ConfirmAppointmentAction
 CancelAppointmentAction
 CompleteAppointmentAction
@@ -705,7 +716,6 @@ Planned:
 
 ```text
 CreateAppointmentAction for non-hold CRM/manual creation
-RescheduleAppointmentAction
 SchedulingReadService
 AppointmentReminderScheduler
 ```
@@ -726,7 +736,6 @@ Deferred after the booking transaction foundation:
 
 ```text
 non-hold CRM/manual appointment creation
-atomic hold-to-reschedule action
 CRM Scheduling workspace
 public service selection and booking pages
 SCHEDULING_APP_URL routing and setup validation
