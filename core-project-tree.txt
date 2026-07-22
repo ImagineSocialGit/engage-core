@@ -862,6 +862,7 @@
 │   │   │   │   ├── WebinarMessageAreaRegistry.php
 │   │   │   │   ├── WebinarMessageReadinessService.php
 │   │   │   │   ├── WebinarProviderManager.php
+│   │   │   │   ├── WebinarRegisterPageDefinitionValidator.php
 │   │   │   │   ├── WebinarRegistrationCsvReader.php
 │   │   │   │   ├── WebinarRegistrationQuestionResolver.php
 │   │   │   │   ├── WebinarScheduleProfileDefinitionResolver.php
@@ -1794,4 +1795,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-496 directories, 1299 files
+496 directories, 1300 files

@@ -148,10 +148,16 @@ class WebinarRegistrationConsentContentConfigTest extends TestCase
         );
     }
 
-    public function test_client_overrides_can_customize_copy_without_copying_the_base_shape(): void
+    public function test_explicit_series_policy_can_allow_registration_copy_overrides(): void
     {
         Config::set('webinars.content', []);
         Config::set('webinars.register.content', [
+            'series_overrides' => [
+                'landing' => [],
+                'registration' => [
+                    'sections' => true,
+                ],
+            ],
             'registration' => [
                 'consents' => [
                     'transactional' => ['email' => true, 'sms' => false],

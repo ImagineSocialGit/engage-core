@@ -9,12 +9,9 @@ class WebinarRegisterPageConfig
     /**
      * Content consumed by the reusable registration form/modal.
      *
-     * These are ownership buckets, not immutable values. Base, client,
-     * series metadata, and series config may all override individual leaves.
-     *
      * @var array<int, string>
      */
-    private const REGISTRATION_CONTENT_KEYS = [
+    public const REGISTRATION_CONTENT_KEYS = [
         'form_card',
         'consents',
         'consent_header',
@@ -24,6 +21,34 @@ class WebinarRegisterPageConfig
         'legal_links',
         'questions_section',
         'questions',
+    ];
+
+    /**
+     * Landing-page sections that may be named in the shared series override
+     * policy. A section is still protected unless the active policy sets its
+     * value to true.
+     *
+     * @var array<int, string>
+     */
+    public const LANDING_CONTENT_KEYS = [
+        'title',
+        'meta_description',
+        'header',
+        'hero',
+        'urgency_stats',
+        'webinar_title',
+        'primary_cta',
+        'countdown',
+        'event_details',
+        'problem',
+        'instructor',
+        'secondary_cta',
+        'trust',
+        'final_close',
+        'compliance',
+        'sticky_desktop',
+        'sticky_mobile',
+        'blocks',
     ];
 
     /**
@@ -49,8 +74,8 @@ class WebinarRegisterPageConfig
 
     /**
      * Numeric landing-page collections whose meaning is positional only inside
-     * one configuration layer. A later layer replaces the complete collection
-     * instead of merging items by numeric index.
+     * one configuration layer. A later allowed layer replaces the complete
+     * collection instead of merging items by numeric index.
      *
      * @var array<int, string>
      */
@@ -83,11 +108,24 @@ class WebinarRegisterPageConfig
             );
         }
 
+        $pageContent = is_array($pageContent) ? $pageContent : [];
+        $policy = $this->normalizeSeriesOverridePolicy(
+            $pageContent['series_overrides'] ?? null,
+        );
+
         return $this->mergeRegisterLayers([
             $this->normalizeRegisterContentLayer(is_array($global) ? $global : []),
-            $this->normalizeRegisterContentLayer(is_array($pageContent) ? $pageContent : []),
-            $this->normalizeRegisterContentLayer($seriesMetaContent),
-            $this->normalizeRegisterContentLayer(is_array($seriesContent) ? $seriesContent : []),
+            $this->normalizeRegisterContentLayer($pageContent),
+            $this->filterSeriesContentLayer(
+                $this->normalizeRegisterContentLayer($seriesMetaContent),
+                $policy,
+            ),
+            $this->filterSeriesContentLayer(
+                $this->normalizeRegisterContentLayer(
+                    is_array($seriesContent) ? $seriesContent : [],
+                ),
+                $policy,
+            ),
         ]);
     }
 
@@ -113,6 +151,54 @@ class WebinarRegisterPageConfig
             $this->normalizeRegisterStyleLayer(is_array($pageStyle) ? $pageStyle : []),
             $this->normalizeRegisterStyleLayer(is_array($seriesStyle) ? $seriesStyle : []),
         ]);
+    }
+
+    /**
+     * Return the active, runtime-safe series override policy. Only known
+     * sections explicitly set to true are retained.
+     *
+     * @return array{landing: array<string, bool>, registration: array<string, bool>}
+     */
+    public function seriesOverridePolicy(): array
+    {
+        return $this->normalizeSeriesOverridePolicy(
+            config('webinars.register.content.series_overrides'),
+        );
+    }
+
+    /**
+     * Identify top-level series content sections that the active shared policy
+     * does not permit. The returned paths use the normalized ownership buckets.
+     *
+     * @param array<string, mixed> $layer
+     * @param array{landing?: array<string, bool>, registration?: array<string, bool>}|null $policy
+     * @return array<int, string>
+     */
+    public function unauthorizedSeriesOverridePaths(
+        array $layer,
+        ?array $policy = null,
+    ): array {
+        $normalized = $this->normalizeRegisterContentLayer($layer);
+        $policy = $policy ?? $this->seriesOverridePolicy();
+        $paths = [];
+
+        foreach (['landing', 'registration'] as $bucket) {
+            $allowed = is_array($policy[$bucket] ?? null)
+                ? $policy[$bucket]
+                : [];
+
+            foreach (array_keys($normalized[$bucket]) as $section) {
+                if (($allowed[$section] ?? false) === true) {
+                    continue;
+                }
+
+                $paths[] = "{$bucket}.{$section}";
+            }
+        }
+
+        sort($paths);
+
+        return array_values(array_unique($paths));
     }
 
     /**
@@ -171,9 +257,9 @@ class WebinarRegisterPageConfig
     }
 
     /**
-     * Numeric question lists are atomic configuration. A later client,
-     * series-metadata, or series-file layer replaces the complete list rather
-     * than recursively merging questions and options by numeric position.
+     * Numeric question lists are atomic configuration. A later allowed layer
+     * replaces the complete list rather than recursively merging questions and
+     * options by numeric position.
      *
      * @param array<string, mixed> $current
      * @param array<string, mixed> $incoming
@@ -214,7 +300,11 @@ class WebinarRegisterPageConfig
             ? $layer['registration']
             : [];
 
-        unset($layer['landing'], $layer['registration']);
+        unset(
+            $layer['landing'],
+            $layer['registration'],
+            $layer['series_overrides'],
+        );
 
         $legacyRegistration = $this->only($layer, self::REGISTRATION_CONTENT_KEYS);
         $legacyLanding = $this->except($layer, self::REGISTRATION_CONTENT_KEYS);
@@ -227,9 +317,7 @@ class WebinarRegisterPageConfig
 
     /**
      * Accept both the explicit namespaced contract and legacy flat config.
-     *
-     * Shared token/component styles are copied into the registration contract
-     * so existing client style files do not need to duplicate them.
+     * Shared token/component styles are copied into the registration contract.
      *
      * @param array<string, mixed> $layer
      * @return array{landing: array<string, mixed>, registration: array<string, mixed>}
@@ -257,6 +345,82 @@ class WebinarRegisterPageConfig
                 $explicitRegistration,
             ),
         ];
+    }
+
+    /**
+     * @param array{landing: array<string, mixed>, registration: array<string, mixed>} $layer
+     * @param array{landing: array<string, bool>, registration: array<string, bool>} $policy
+     * @return array{landing: array<string, mixed>, registration: array<string, mixed>}
+     */
+    private function filterSeriesContentLayer(array $layer, array $policy): array
+    {
+        return [
+            'landing' => $this->onlyEnabledSections(
+                $layer['landing'],
+                $policy['landing'],
+            ),
+            'registration' => $this->onlyEnabledSections(
+                $layer['registration'],
+                $policy['registration'],
+            ),
+        ];
+    }
+
+    /**
+     * @return array{landing: array<string, bool>, registration: array<string, bool>}
+     */
+    private function normalizeSeriesOverridePolicy(mixed $policy): array
+    {
+        $policy = is_array($policy) ? $policy : [];
+
+        return [
+            'landing' => $this->normalizePolicyBucket(
+                $policy['landing'] ?? null,
+                self::LANDING_CONTENT_KEYS,
+            ),
+            'registration' => $this->normalizePolicyBucket(
+                $policy['registration'] ?? null,
+                self::REGISTRATION_CONTENT_KEYS,
+            ),
+        ];
+    }
+
+    /**
+     * @param array<int, string> $knownSections
+     * @return array<string, bool>
+     */
+    private function normalizePolicyBucket(
+        mixed $bucket,
+        array $knownSections,
+    ): array {
+        if (! is_array($bucket)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($knownSections as $section) {
+            if (($bucket[$section] ?? false) === true) {
+                $normalized[$section] = true;
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $sections
+     * @param array<string, bool> $policy
+     * @return array<string, mixed>
+     */
+    private function onlyEnabledSections(array $sections, array $policy): array
+    {
+        return array_filter(
+            $sections,
+            fn (mixed $section): bool => is_string($section)
+                && ($policy[$section] ?? false) === true,
+            ARRAY_FILTER_USE_KEY,
+        );
     }
 
     /**

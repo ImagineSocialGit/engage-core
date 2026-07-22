@@ -26,6 +26,11 @@ class WebinarsSetupValidationContributorTest extends TestCase
 
         Config::set('app.webinar_url', 'https://webinar.example.test');
         Config::set('webinars.schedule_profiles', []);
+        Config::set('webinars.content', []);
+        Config::set('webinars.register', [
+            'content' => $this->validRegisterContent(),
+            'style' => [],
+        ]);
         Config::set('messaging.email', []);
         Config::set('messaging.sms', []);
 
@@ -523,6 +528,170 @@ class WebinarsSetupValidationContributorTest extends TestCase
         );
     }
 
+    public function test_it_reports_malformed_override_policy_and_forbidden_series_sections(): void
+    {
+        $content = $this->validRegisterContent();
+        $content['series_overrides']['landing']['hero'] = 'enabled';
+        Config::set('webinars.register.content', $content);
+        Config::set('webinars.register.configured-series.content', [
+            'hero' => [
+                'title' => 'Blocked because the policy value is malformed.',
+            ],
+            'registration' => [
+                'fields' => [
+                    'email' => [
+                        'label' => 'Protected field label',
+                    ],
+                ],
+            ],
+        ]);
+
+        $findings = collect($this->findings());
+
+        $this->assertTrue(
+            $findings->contains(fn (array $finding): bool =>
+                $finding['code'] === 'webinars.register_page.override_policy_invalid'
+                && $finding['path'] === 'webinars.register.content.series_overrides.landing.hero'
+            ),
+        );
+        $this->assertEqualsCanonicalizing([
+            'webinars.register.configured-series.content.landing.hero',
+            'webinars.register.configured-series.content.registration.fields',
+        ], $findings
+            ->where('code', 'webinars.register_page.series_override_forbidden')
+            ->pluck('path')
+            ->values()
+            ->all());
+    }
+
+    public function test_it_reports_invalid_registration_question_definitions_before_public_rendering(): void
+    {
+        Config::set('webinars.register.configured-series.content', [
+            'registration' => [
+                'questions' => [
+                    $this->questionDefinition('duplicate_question'),
+                    $this->questionDefinition('duplicate_question'),
+                ],
+            ],
+        ]);
+
+        $finding = collect($this->findings())
+            ->firstWhere(
+                'code',
+                'webinars.register_page.question_definition_invalid',
+            );
+
+        $this->assertIsArray($finding);
+        $this->assertSame(
+            'webinars.register.configured-series.content.registration.questions',
+            $finding['path'],
+        );
+        $this->assertStringContainsString('duplicated', $finding['message']);
+    }
+
+    public function test_it_reports_an_unsupported_trust_variant(): void
+    {
+        $content = $this->validRegisterContent();
+        $content['trust']['variant'] = 'carousel';
+        Config::set('webinars.register.content', $content);
+
+        $finding = collect($this->findings())
+            ->firstWhere('code', 'webinars.register_page.trust_variant_invalid');
+
+        $this->assertIsArray($finding);
+        $this->assertSame(
+            'webinars.register.content.landing.trust.variant',
+            $finding['path'],
+        );
+    }
+
+    public function test_it_reports_invalid_trust_variant_collections_story_keys_and_ratings(): void
+    {
+        $content = $this->validRegisterContent();
+        $content['instructor']['body'] = ['first' => 'Not a list'];
+        $content['trust'] = [
+            'enabled' => true,
+            'variant' => 'stories',
+            'reviews' => [],
+            'stories' => [
+                [
+                    'key' => 'duplicate_story',
+                    'title' => 'First story',
+                    'context' => 'First context.',
+                    'outcome' => 'First outcome.',
+                    'quote' => 'First quote.',
+                    'rating' => 6,
+                ],
+                [
+                    'key' => 'duplicate_story',
+                    'title' => '',
+                    'context' => 'Second context.',
+                    'outcome' => 'Second outcome.',
+                    'quote' => 'Second quote.',
+                    'rating' => 5,
+                ],
+            ],
+        ];
+        Config::set('webinars.register.content', $content);
+
+        $codes = array_column($this->findings(), 'code');
+
+        $this->assertContains('webinars.register_page.collection_invalid', $codes);
+        $this->assertContains('webinars.register_page.story_key_duplicate', $codes);
+        $this->assertContains('webinars.register_page.rating_invalid', $codes);
+        $this->assertContains('webinars.register_page.trust_content_missing', $codes);
+    }
+
+    public function test_it_accepts_valid_configured_and_metadata_series_page_definitions(): void
+    {
+        Config::set('webinars.register.configured-series.content', [
+            'hero' => [
+                'title' => 'Configured series hero',
+            ],
+            'registration' => [
+                'questions' => [
+                    $this->questionDefinition('configured_question'),
+                ],
+            ],
+            'trust' => [
+                'enabled' => true,
+                'variant' => 'stories',
+                'reviews' => [],
+                'stories' => [
+                    [
+                        'key' => 'configured_story',
+                        'title' => 'Configured story',
+                        'context' => 'Configured context.',
+                        'outcome' => 'Configured outcome.',
+                        'quote' => 'Configured quote.',
+                        'rating' => 5,
+                    ],
+                ],
+            ],
+        ]);
+
+        WebinarSeries::factory()->create([
+            'slug' => 'metadata-series',
+            'meta' => [
+                'public_page' => [
+                    'hero' => [
+                        'title' => 'Metadata series hero',
+                    ],
+                ],
+            ],
+        ]);
+
+        $registerFindings = array_values(array_filter(
+            $this->findings(),
+            fn (array $finding): bool => str_starts_with(
+                $finding['code'],
+                'webinars.register_page.',
+            ),
+        ));
+
+        $this->assertSame([], $registerFindings);
+    }
+
     public function test_manager_resolves_tagged_webinars_contributor(): void
     {
         $this->profile([
@@ -544,6 +713,61 @@ class WebinarsSetupValidationContributorTest extends TestCase
                 $result->findings(),
             ),
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validRegisterContent(): array
+    {
+        return [
+            'series_overrides' => [
+                'landing' => [
+                    'hero' => true,
+                    'instructor' => true,
+                    'trust' => true,
+                ],
+                'registration' => [
+                    'questions_section' => true,
+                    'questions' => true,
+                ],
+            ],
+            'instructor' => [
+                'body' => [],
+                'credibility' => [],
+            ],
+            'registration' => [
+                'questions' => [],
+            ],
+            'trust' => [
+                'enabled' => false,
+                'variant' => 'reviews',
+                'reviews' => [],
+                'stories' => [],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function questionDefinition(string $key): array
+    {
+        return [
+            'key' => $key,
+            'label' => 'Configured question?',
+            'type' => 'select',
+            'required' => true,
+            'options' => [
+                ['key' => 'option_one', 'label' => 'Option One'],
+                ['key' => 'other', 'label' => 'Other'],
+            ],
+            'other' => [
+                'option_key' => 'other',
+                'required' => true,
+                'max_length' => 500,
+            ],
+        ];
     }
 
     private function configureValidZoomReadiness(): void

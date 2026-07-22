@@ -1,8 +1,8 @@
 <?php
 
 // Shared registration-page content.
-// Client and series files may override landing-page positioning, proof, CTA copy,
-// registration copy, and consent-field availability without replacing this shape.
+// Client configuration may replace shared defaults. Series metadata and series files
+// may replace only sections explicitly enabled by series_overrides below.
 
 return [
 
@@ -17,16 +17,27 @@ return [
     ],
 
     'series_overrides' => [
-        'eyebrow' => true,
-        'hero_title' => true,
-        'hero_body' => true,
-        'urgency_stats' => true,
-        'event_details' => true,
-        'primary_cta' => true,
-        'instructor' => true,
-        'secondary_cta' => true,
-        'trust' => true,
-        'hero_image' => true,
+        'landing' => [
+            'title' => true,
+            'meta_description' => true,
+            'hero' => true,
+            'urgency_stats' => true,
+            'webinar_title' => true,
+            'primary_cta' => true,
+            'event_details' => true,
+            'problem' => true,
+            'instructor' => true,
+            'secondary_cta' => true,
+            'trust' => true,
+            'final_close' => true,
+            'compliance' => true,
+            'sticky_desktop' => true,
+            'sticky_mobile' => true,
+        ],
+        'registration' => [
+            'questions_section' => true,
+            'questions' => true,
+        ],
     ],
 
     'hero' => [
@@ -147,7 +158,6 @@ return [
         'questions_section' => [
             'enabled' => true,
             'title' => 'Help us tailor the class',
-            'body' => 'Choose the question or concern that matters most to you.',
         ],
         'questions' => [],
         'consents' => [

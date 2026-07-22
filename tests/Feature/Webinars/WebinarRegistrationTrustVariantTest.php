@@ -25,6 +25,13 @@ class WebinarRegistrationTrustVariantTest extends TestCase
     {
         Config::set('webinars.content', []);
         Config::set('webinars.register.content', [
+            'series_overrides' => [
+                'landing' => [
+                    'instructor' => true,
+                    'trust' => true,
+                ],
+                'registration' => [],
+            ],
             'instructor' => [
                 'body' => [
                     'Shared instructor paragraph one.',
@@ -104,6 +111,8 @@ class WebinarRegistrationTrustVariantTest extends TestCase
 
     public function test_story_variant_renders_enabled_configured_stories_and_series_instructor_content(): void
     {
+        $this->configureTrustOverridePolicy();
+
         $series = WebinarSeries::factory()->create([
             'status' => 'active',
             'slug' => 'configured-stories',
@@ -215,6 +224,8 @@ class WebinarRegistrationTrustVariantTest extends TestCase
 
     public function test_review_variant_preserves_configured_review_cards_and_review_link(): void
     {
+        $this->configureTrustOverridePolicy();
+
         $series = WebinarSeries::factory()->create([
             'status' => 'active',
             'slug' => 'configured-reviews',
@@ -263,5 +274,16 @@ class WebinarRegistrationTrustVariantTest extends TestCase
             ->assertSee('href="https://example.test/reviews"', false)
             ->assertSee('aria-label="4 out of 5 stars"', false)
             ->assertDontSee('Unused Story Title');
+    }
+
+    private function configureTrustOverridePolicy(): void
+    {
+        Config::set('webinars.register.content.series_overrides', [
+            'landing' => [
+                'instructor' => true,
+                'trust' => true,
+            ],
+            'registration' => [],
+        ]);
     }
 }

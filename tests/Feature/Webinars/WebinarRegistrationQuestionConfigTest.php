@@ -46,6 +46,13 @@ class WebinarRegistrationQuestionConfigTest extends TestCase
 
         Config::set('webinars.content', []);
         Config::set('webinars.register.content', [
+            'series_overrides' => [
+                'landing' => [],
+                'registration' => [
+                    'questions_section' => true,
+                    'questions' => true,
+                ],
+            ],
             'registration' => [
                 'questions' => [
                     $this->questionDefinition(
@@ -142,6 +149,13 @@ class WebinarRegistrationQuestionConfigTest extends TestCase
     {
         Config::set('webinars.content', []);
         Config::set('webinars.register.content', [
+            'series_overrides' => [
+                'landing' => [],
+                'registration' => [
+                    'questions_section' => true,
+                    'questions' => true,
+                ],
+            ],
             'registration' => [
                 'questions_section' => [
                     'enabled' => true,
@@ -205,6 +219,13 @@ class WebinarRegistrationQuestionConfigTest extends TestCase
     {
         Config::set('webinars.content', []);
         Config::set('webinars.register.content', [
+            'series_overrides' => [
+                'landing' => [],
+                'registration' => [
+                    'questions_section' => true,
+                    'questions' => true,
+                ],
+            ],
             'registration' => [
                 'questions' => [],
             ],

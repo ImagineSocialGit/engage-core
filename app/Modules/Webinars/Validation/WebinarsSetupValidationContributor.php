@@ -13,6 +13,8 @@ use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Modules\Webinars\Services\WebinarMessageAreaRegistry;
+use App\Modules\Webinars\Services\WebinarRegisterPageDefinitionValidator;
+use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\Urls\AbsoluteUrl;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
@@ -26,6 +28,7 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
     private const PUBLIC_URL_SOURCE = 'app';
     private const PROVIDER_SOURCE = 'webinars.providers';
     private const ZOOM_SERVICE_SOURCE = 'services.zoom';
+    private const REGISTER_PAGE_SOURCE = 'webinars.register';
     private const MODULE = 'webinars';
 
     private const ZOOM_REQUIRED_WEBHOOK_MAPPINGS = [
@@ -38,12 +41,15 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
         private readonly MessageDefinitionResolver $messageDefinitionResolver,
         private readonly MessageChannelAvailability $messageChannelAvailability,
         private readonly WebinarMessageAreaRegistry $messageAreaRegistry,
+        private readonly WebinarRegisterPageConfig $registerPageConfig,
+        private readonly WebinarRegisterPageDefinitionValidator $registerPageValidator,
     ) {}
 
     public function findings(): iterable
     {
         yield from $this->validatePublicUrl();
         yield from $this->validateProviderConfiguration();
+        yield from $this->validateRegisterPageConfiguration();
 
         try {
             $this->messageAreaRegistry->all();
@@ -382,6 +388,105 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
     /**
      * @return iterable<int, SetupValidationFinding>
      */
+    private function validateRegisterPageConfiguration(): iterable
+    {
+        $sharedContent = config('webinars.register.content', []);
+        $sharedContent = is_array($sharedContent) ? $sharedContent : [];
+        $policyPath = 'webinars.register.content.series_overrides';
+
+        foreach ($this->registerPageValidator->validateOverridePolicy(
+            $sharedContent['series_overrides'] ?? null,
+            $policyPath,
+        ) as $violation) {
+            yield $this->registerPageFinding($violation);
+        }
+
+        foreach ($this->registerPageValidator->validateResolvedDefinition(
+            $this->registerPageConfig->content(
+                page: 'register',
+                seriesSlug: '__setup_validation_shared__',
+            ),
+            'webinars.register.content',
+        ) as $violation) {
+            yield $this->registerPageFinding($violation);
+        }
+
+        $registerConfig = config('webinars.register', []);
+        $registerConfig = is_array($registerConfig) ? $registerConfig : [];
+
+        foreach ($registerConfig as $seriesSlug => $seriesDefinition) {
+            if (! is_string($seriesSlug)
+                || in_array($seriesSlug, ['content', 'style'], true)
+                || ! is_array($seriesDefinition)
+                || ! array_key_exists('content', $seriesDefinition)
+            ) {
+                continue;
+            }
+
+            $seriesContent = $seriesDefinition['content'];
+            $seriesPath = "webinars.register.{$seriesSlug}.content";
+
+            foreach ($this->registerPageValidator->validateSeriesDefinition(
+                $seriesContent,
+                $seriesPath,
+            ) as $violation) {
+                yield $this->registerPageFinding($violation);
+            }
+
+            foreach ($this->registerPageValidator->validateResolvedDefinition(
+                $this->registerPageConfig->content(
+                    page: 'register',
+                    seriesSlug: $seriesSlug,
+                ),
+                $seriesPath,
+            ) as $violation) {
+                yield $this->registerPageFinding($violation);
+            }
+        }
+
+        foreach (WebinarSeries::query()->get(['id', 'slug', 'meta']) as $series) {
+            $publicPage = data_get($series->meta, 'public_page');
+
+            if ($publicPage === null) {
+                continue;
+            }
+
+            $seriesPath = 'webinar_series.'.$series->getKey().'.meta.public_page';
+
+            foreach ($this->registerPageValidator->validateSeriesDefinition(
+                $publicPage,
+                $seriesPath,
+            ) as $violation) {
+                yield $this->registerPageFinding($violation);
+            }
+
+            foreach ($this->registerPageValidator->validateResolvedDefinition(
+                $this->registerPageConfig->content(
+                    page: 'register',
+                    seriesSlug: (string) $series->slug,
+                    seriesMeta: is_array($series->meta) ? $series->meta : [],
+                ),
+                $seriesPath,
+            ) as $violation) {
+                yield $this->registerPageFinding($violation);
+            }
+        }
+    }
+
+    /**
+     * @param array{code: string, message: string, path: string, context: array<string, mixed>} $violation
+     */
+    private function registerPageFinding(array $violation): SetupValidationFinding
+    {
+        return $this->error(
+            code: $violation['code'],
+            message: $violation['message'],
+            path: $violation['path'],
+            context: $violation['context'],
+            source: self::REGISTER_PAGE_SOURCE,
+        );
+    }
+
     private function validateConfigProfiles(): iterable
     {
         $profiles = config('webinars.schedule_profiles', []);
