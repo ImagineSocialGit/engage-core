@@ -8,6 +8,7 @@ use App\Modules\Webinars\Actions\CreateWebinarRegistrationAction;
 use App\Modules\Webinars\Actions\GetActiveWebinarSeriesAction;
 use App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction;
 use App\Modules\Webinars\Actions\ResolveWebinarRegistrationPublicStatusAction;
+use App\Modules\Webinars\Actions\ResolveWebinarRegistrationReplacementChainAction;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use App\Modules\Webinars\Requests\StoreWebinarRegistrationRequest;
@@ -165,6 +166,7 @@ class WebinarRegistrationController extends Controller
         string $seriesSlug,
         WebinarRegistration $registration,
         GetActiveWebinarSeriesAction $getActiveWebinarSeriesAction,
+        ResolveWebinarRegistrationReplacementChainAction $resolveReplacementChain,
         ResolveWebinarRegistrationPublicStatusAction $resolvePublicStatus,
         WebinarRegisterPageConfig $config,
     ): View {
@@ -172,7 +174,18 @@ class WebinarRegistrationController extends Controller
 
         abort_unless($series, 404);
 
-        $registration->loadMissing('webinar.webinarSeries');
+        $chain = $resolveReplacementChain->handle($registration);
+        $originalWebinar = $chain->original->webinar;
+
+        abort_unless(
+            $originalWebinar
+            && (int) $originalWebinar->webinar_series_id === (int) $series->getKey(),
+            404,
+        );
+
+        abort_unless($chain->safeForPublicLifecycle(), 404);
+
+        $registration = $chain->canonical;
         $webinar = $registration->webinar;
 
         abort_unless(
@@ -181,7 +194,7 @@ class WebinarRegistrationController extends Controller
             404,
         );
 
-        $registrationStatus = $resolvePublicStatus->handle($registration);
+        $registrationStatus = $resolvePublicStatus->handleChain($chain);
         $page = $config->content(
             'thank-you',
             $series->slug,

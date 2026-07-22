@@ -5,6 +5,7 @@ namespace App\Modules\Webinars\Actions;
 use App\Modules\Messaging\Actions\SkipScheduledMessagesAction;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 use Throwable;
 
 class CancelWebinarRegistrationAction
@@ -13,28 +14,47 @@ class CancelWebinarRegistrationAction
         private readonly SkipScheduledMessagesAction $skipScheduledMessagesAction,
         private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
         private readonly QueueWebinarProviderCancellationAction $queueProviderCancellation,
+        private readonly ResolveWebinarRegistrationReplacementChainAction $resolveReplacementChain,
     ) {}
 
-    public function handle(WebinarRegistration $registration, string $source = 'email_link'): WebinarRegistration
-    {
+    public function handle(
+        WebinarRegistration $registration,
+        string $source = 'email_link',
+    ): WebinarRegistration {
         $registration = DB::transaction(function () use ($registration, $source): WebinarRegistration {
-            $locked = WebinarRegistration::query()
-                ->lockForUpdate()
-                ->findOrFail($registration->getKey());
+            $chain = $this->resolveReplacementChain->handle(
+                registration: $registration,
+                lock: true,
+            );
 
-            $locked->loadMissing(['contact', 'webinar', 'webinar.webinarSeries']);
+            if (! $chain->safeForPublicLifecycle()) {
+                throw new LogicException(
+                    'Webinar registration cancellation cannot continue through an invalid replacement chain.',
+                );
+            }
 
-            if ($locked->status === 'cancelled') {
+            $locked = $chain->canonical;
+
+            if (
+                $locked->status === 'cancelled'
+                || $locked->cancelled_at !== null
+            ) {
                 return $locked;
             }
 
             $cancelledAt = now();
             $meta = is_array($locked->meta) ? $locked->meta : [];
+            $existingCancellation = is_array($meta['cancellation'] ?? null)
+                ? $meta['cancellation']
+                : [];
 
-            $meta['cancellation'] = [
+            $meta['cancellation'] = array_replace($existingCancellation, [
                 'source' => $source,
                 'cancelled_at' => $cancelledAt->toISOString(),
-            ];
+                'resolved_from_registration_id' => (int) $chain->original->getKey(),
+                'canonical_registration_id' => (int) $locked->getKey(),
+                'traversed_registration_ids' => $chain->traversedRegistrationIds,
+            ]);
 
             $locked->forceFill([
                 'status' => 'cancelled',
@@ -54,6 +74,9 @@ class CancelWebinarRegistrationAction
                 payload: [
                     'cancellation' => [
                         'source' => $source,
+                        'resolved_from_registration_id' => (int) $chain->original->getKey(),
+                        'canonical_registration_id' => (int) $locked->getKey(),
+                        'traversed_registration_ids' => $chain->traversedRegistrationIds,
                     ],
                 ],
             );

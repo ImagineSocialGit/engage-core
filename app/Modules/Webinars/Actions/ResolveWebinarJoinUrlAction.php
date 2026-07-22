@@ -4,17 +4,15 @@ namespace App\Modules\Webinars\Actions;
 
 use App\Modules\Messaging\Actions\SkipScheduledMessagesAction;
 use App\Modules\Webinars\Data\WebinarRegistrationFinalizationResult;
-use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Data\WebinarRegistrationReplacementChain;
 use App\Modules\Webinars\Models\WebinarRegistration;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 class ResolveWebinarJoinUrlAction
 {
-    private const MAX_REPLACEMENT_DEPTH = 50;
-
     public function __construct(
         private readonly SkipScheduledMessagesAction $skipScheduledMessagesAction,
+        private readonly ResolveWebinarRegistrationReplacementChainAction $resolveReplacementChain,
     ) {}
 
     /**
@@ -25,31 +23,37 @@ class ResolveWebinarJoinUrlAction
      */
     public function handle(WebinarRegistration $registration): ?string
     {
-        $chain = $this->resolveChain((int) $registration->getKey());
+        $chain = $this->resolveReplacementChain->handle($registration);
 
         if (! $this->chainIsJoinable($chain)) {
             return null;
         }
 
-        return $this->destinationFor($chain['canonical']);
+        return $this->destinationFor($chain->canonical);
     }
 
     public function canonicalRegistration(
         WebinarRegistration $registration,
     ): WebinarRegistration {
-        return $this->resolveChain((int) $registration->getKey())['canonical'];
+        return $this->resolveReplacementChain
+            ->handle($registration)
+            ->canonical;
     }
 
     public function requiresReplacementRecovery(
         WebinarRegistration $registration,
     ): bool {
-        $chain = $this->resolveChain((int) $registration->getKey());
+        $chain = $this->resolveReplacementChain->handle($registration);
 
-        if ($chain['cycle_detected'] || $chain['unresolved_replacement']) {
+        if (! $chain->safeForPublicLifecycle()) {
+            return false;
+        }
+
+        if ($chain->unresolvedReplacement) {
             return true;
         }
 
-        return ! $this->replacementFinalizationReady($chain['canonical']);
+        return ! $this->replacementFinalizationReady($chain->canonical);
     }
 
     /**
@@ -59,8 +63,8 @@ class ResolveWebinarJoinUrlAction
     public function execute(WebinarRegistration $registration): ?string
     {
         return DB::transaction(function () use ($registration): ?string {
-            $chain = $this->resolveChain(
-                registrationId: (int) $registration->getKey(),
+            $chain = $this->resolveReplacementChain->handle(
+                registration: $registration,
                 lock: true,
             );
 
@@ -68,118 +72,34 @@ class ResolveWebinarJoinUrlAction
                 return null;
             }
 
-            $destination = $this->destinationFor($chain['canonical']);
+            $destination = $this->destinationFor($chain->canonical);
 
             if (blank($destination)) {
                 return null;
             }
 
             $this->markTrustedJoinInteraction(
-                registration: $chain['canonical'],
-                resolvedFromRegistrationId: (int) $chain['original']->getKey(),
+                registration: $chain->canonical,
+                resolvedFromRegistrationId: (int) $chain->original->getKey(),
             );
-            $this->skipJoinClickedMessages($chain['canonical']);
+            $this->skipJoinClickedMessages($chain->canonical);
 
             return $destination;
         });
     }
 
-    /**
-     * @return array{
-     *     original: WebinarRegistration,
-     *     canonical: WebinarRegistration,
-     *     unresolved_replacement: bool,
-     *     cancelled: bool,
-     *     cycle_detected: bool
-     * }
-     */
-    private function resolveChain(
-        int $registrationId,
-        bool $lock = false,
-    ): array {
-        $original = $this->registrationQuery($lock)
-            ->findOrFail($registrationId);
-        $current = $original;
-        $visited = [];
-        $cancelled = false;
-        $cycleDetected = false;
-        $unresolvedReplacement = false;
-        $terminated = false;
-
-        for ($depth = 0; $depth < self::MAX_REPLACEMENT_DEPTH; $depth++) {
-            $currentId = (int) $current->getKey();
-
-            if (isset($visited[$currentId])) {
-                $cycleDetected = true;
-                $terminated = true;
-                break;
-            }
-
-            $visited[$currentId] = true;
-
-            if (
-                $current->status === 'cancelled'
-                || $current->cancelled_at !== null
-            ) {
-                $cancelled = true;
-                $terminated = true;
-                break;
-            }
-
-            $replacement = $this->registrationQuery($lock)
-                ->where('replacement_of_registration_id', $currentId)
-                ->first();
-
-            if ($replacement instanceof WebinarRegistration) {
-                $current = $replacement;
-
-                continue;
-            }
-
-            $unresolvedReplacement = Webinar::query()
-                ->where('replacement_of_webinar_id', $current->webinar_id)
-                ->exists();
-            $terminated = true;
-
-            break;
-        }
-
-        if (! $terminated) {
-            $cycleDetected = true;
-        }
-
-        return [
-            'original' => $original,
-            'canonical' => $current,
-            'unresolved_replacement' => $unresolvedReplacement,
-            'cancelled' => $cancelled,
-            'cycle_detected' => $cycleDetected,
-        ];
-    }
-
-    /** @return Builder<WebinarRegistration> */
-    private function registrationQuery(bool $lock): Builder
-    {
-        $query = WebinarRegistration::query()->with([
-            'webinar',
-            'webinar.webinarSeries',
-        ]);
-
-        return $lock ? $query->lockForUpdate() : $query;
-    }
-
-    /** @param array<string, mixed> $chain */
-    private function chainIsJoinable(array $chain): bool
-    {
+    private function chainIsJoinable(
+        WebinarRegistrationReplacementChain $chain,
+    ): bool {
         if (
-            $chain['cancelled']
-            || $chain['cycle_detected']
-            || $chain['unresolved_replacement']
+            ! $chain->safeForPublicLifecycle()
+            || $chain->cancelled
+            || $chain->unresolvedReplacement
         ) {
             return false;
         }
 
-        return $this->replacementFinalizationReady($chain['canonical']);
+        return $this->replacementFinalizationReady($chain->canonical);
     }
 
     private function replacementFinalizationReady(

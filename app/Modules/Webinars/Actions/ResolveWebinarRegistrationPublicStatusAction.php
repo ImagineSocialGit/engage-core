@@ -3,6 +3,7 @@
 namespace App\Modules\Webinars\Actions;
 
 use App\Modules\Webinars\Data\WebinarRegistrationFinalizationResult;
+use App\Modules\Webinars\Data\WebinarRegistrationReplacementChain;
 use App\Modules\Webinars\Models\WebinarRegistration;
 
 class ResolveWebinarRegistrationPublicStatusAction
@@ -12,8 +13,38 @@ class ResolveWebinarRegistrationPublicStatusAction
     public const STATUS_DELAYED = 'delayed';
     public const STATUS_CANCELLED = 'cancelled';
 
+    public function __construct(
+        private readonly ResolveWebinarRegistrationReplacementChainAction $resolveReplacementChain,
+    ) {}
+
     public function handle(WebinarRegistration $registration): string
     {
+        return $this->handleChain(
+            $this->resolveReplacementChain->handle($registration),
+        );
+    }
+
+    public function handleChain(
+        WebinarRegistrationReplacementChain $chain,
+    ): string {
+        if (! $chain->safeForPublicLifecycle()) {
+            return self::STATUS_DELAYED;
+        }
+
+        if ($chain->cancelled) {
+            return self::STATUS_CANCELLED;
+        }
+
+        if ($chain->unresolvedReplacement) {
+            return self::STATUS_DELAYED;
+        }
+
+        return $this->statusForRegistration($chain->canonical);
+    }
+
+    private function statusForRegistration(
+        WebinarRegistration $registration,
+    ): string {
         if ($registration->status === 'cancelled' || $registration->cancelled_at !== null) {
             return self::STATUS_CANCELLED;
         }

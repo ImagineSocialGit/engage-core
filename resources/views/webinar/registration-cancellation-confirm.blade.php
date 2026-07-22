@@ -26,14 +26,14 @@
                     @endif
                 </div>
 
-                @if($registration->webinar?->webinarSeries?->name)
+                @if($registration->webinar?->webinarSeries?->title)
                     <div class="rounded-2xl bg-slate-50 p-5 text-left">
                         <p class="text-sm font-semibold text-slate-500">
                             Webinar
                         </p>
 
                         <p class="mt-1 font-bold text-slate-900">
-                            {{ $registration->webinar->webinarSeries->name }}
+                            {{ $registration->webinar->webinarSeries->title }}
                         </p>
 
                         @if($registration->webinar?->starts_at)
