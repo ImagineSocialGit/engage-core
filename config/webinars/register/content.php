@@ -236,11 +236,13 @@ return [
 
     'trust' => [
         'enabled' => false,
+        'variant' => 'reviews',
         'headline' => null,
         'body' => null,
         'review_label' => null,
         'review_url' => null,
         'reviews' => [],
+        'stories' => [],
     ],
 
     'final_close' => [

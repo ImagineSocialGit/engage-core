@@ -99,6 +99,7 @@ return [
         'body' => 'space-y-4 text-base font-medium leading-7 text-ink',
         'credibility_list' => 'mt-6 grid gap-3',
         'credibility_item' => 'flex gap-3 text-base font-extrabold text-ink',
+        'credibility_icon' => 'mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-extrabold text-white',
     ],
 
     'registration' => [
@@ -130,12 +131,37 @@ return [
 
     'trust' => [
         'wrapper' => 'bg-white px-6 py-16 text-center text-ink sm:py-24',
+        'inner' => 'mx-auto max-w-6xl',
         'headline' => 'text-3xl font-extrabold tracking-[-0.03em] text-ink sm:text-5xl',
         'body' => 'mx-auto mt-5 max-w-2xl text-lg font-medium leading-8 text-ink/75',
+
+        // Flat review keys remain available for existing client style files.
         'review_card' => 'rounded-3xl border border-black/10 bg-soft p-6 text-left shadow-xl shadow-black/10',
         'stars' => 'text-lg font-extrabold tracking-[0.18em] text-primary',
         'review_name' => 'mt-4 text-base font-extrabold text-ink',
         'review_text' => 'mt-2 text-sm font-medium leading-6 text-ink/75',
+
+        'variants' => [
+            'reviews' => [
+                'grid' => 'mt-10 grid gap-5 md:grid-cols-3',
+                'card' => 'rounded-3xl border border-black/10 bg-soft p-6 text-left shadow-xl shadow-black/10',
+                'stars' => 'text-lg font-extrabold tracking-[0.18em] text-primary',
+                'name' => 'mt-4 text-base font-extrabold text-ink',
+                'text' => 'mt-2 text-sm font-medium leading-6 text-ink/75',
+            ],
+            'stories' => [
+                'list' => 'mx-auto mt-10 max-w-5xl divide-y divide-black/10 text-left',
+                'card' => 'py-8 first:pt-0 last:pb-0',
+                'label_row' => 'flex items-center gap-2',
+                'label_icon' => 'text-lg leading-none',
+                'label' => 'text-sm font-extrabold uppercase tracking-[0.16em] text-primary',
+                'title' => 'mt-3 text-2xl font-extrabold tracking-[-0.02em] text-ink sm:text-3xl',
+                'context' => 'mt-4 text-base font-medium leading-7 text-ink/75 sm:text-lg',
+                'outcome' => 'mt-5 text-base font-extrabold leading-7 text-ink sm:text-lg',
+                'rating' => 'mt-5 text-lg font-extrabold tracking-[0.18em] text-primary',
+                'quote' => 'mt-5 text-base italic leading-7 text-ink/75 sm:text-lg',
+            ],
+        ],
     ],
 
     'final_close' => [

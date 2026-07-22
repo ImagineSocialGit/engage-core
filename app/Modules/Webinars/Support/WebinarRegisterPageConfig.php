@@ -2,6 +2,8 @@
 
 namespace App\Modules\Webinars\Support;
 
+use Illuminate\Support\Arr;
+
 class WebinarRegisterPageConfig
 {
     /**
@@ -43,6 +45,20 @@ class WebinarRegisterPageConfig
     private const SHARED_STYLE_KEYS = [
         'tokens',
         'components',
+    ];
+
+    /**
+     * Numeric landing-page collections whose meaning is positional only inside
+     * one configuration layer. A later layer replaces the complete collection
+     * instead of merging items by numeric index.
+     *
+     * @var array<int, string>
+     */
+    private const ATOMIC_LANDING_LIST_PATHS = [
+        'instructor.body',
+        'instructor.credibility',
+        'trust.reviews',
+        'trust.stories',
     ];
 
     /**
@@ -109,7 +125,10 @@ class WebinarRegisterPageConfig
         $registration = [];
 
         foreach ($layers as $layer) {
-            $landing = array_replace_recursive($landing, $layer['landing']);
+            $landing = $this->mergeLandingLayer(
+                current: $landing,
+                incoming: $layer['landing'],
+            );
             $registration = $this->mergeRegistrationLayer(
                 current: $registration,
                 incoming: $layer['registration'],
@@ -120,6 +139,35 @@ class WebinarRegisterPageConfig
             'landing' => $landing,
             'registration' => $registration,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $current
+     * @param array<string, mixed> $incoming
+     * @return array<string, mixed>
+     */
+    private function mergeLandingLayer(
+        array $current,
+        array $incoming,
+    ): array {
+        $atomicValues = [];
+
+        foreach (self::ATOMIC_LANDING_LIST_PATHS as $path) {
+            if (! Arr::has($incoming, $path)) {
+                continue;
+            }
+
+            $atomicValues[$path] = Arr::get($incoming, $path);
+            Arr::forget($incoming, $path);
+        }
+
+        $merged = array_replace_recursive($current, $incoming);
+
+        foreach ($atomicValues as $path => $value) {
+            Arr::set($merged, $path, $value);
+        }
+
+        return $merged;
     }
 
     /**

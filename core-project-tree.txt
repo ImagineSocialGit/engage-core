@@ -1773,6 +1773,7 @@
 │   │   │   ├── WebinarRegistrationQuestionConfigTest.php
 │   │   │   ├── WebinarRegistrationQuestionTest.php
 │   │   │   ├── WebinarRegistrationThankYouTest.php
+│   │   │   ├── WebinarRegistrationTrustVariantTest.php
 │   │   │   ├── WebinarReplacementPublicLifecycleTest.php
 │   │   │   ├── WebinarResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── WebinarScheduleProfileDefinitionResolverMessageAreaTest.php
@@ -1793,4 +1794,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-496 directories, 1298 files
+496 directories, 1299 files

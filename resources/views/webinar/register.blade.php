@@ -1,4 +1,3 @@
-
 @php
     $landingPage = $page['landing'] ?? $page;
     $registrationPage = $page['registration'] ?? [];
@@ -31,6 +30,29 @@
 
     $heroTheme = $style['hero']['theme'] ?? 'dark';
     $heroCountdown = $style['countdown']['themes'][$heroTheme] ?? $style['countdown']['themes']['dark'];
+
+    $trust = is_array($page['trust'] ?? null)
+        ? $page['trust']
+        : [];
+    $configuredTrustVariant = $trust['variant'] ?? 'reviews';
+    $trustVariant = in_array($configuredTrustVariant, ['reviews', 'stories'], true)
+        ? $configuredTrustVariant
+        : 'reviews';
+    $trustVariantStyle = is_array($style['trust']['variants'][$trustVariant] ?? null)
+        ? $style['trust']['variants'][$trustVariant]
+        : [];
+    $trustReviews = collect($trust['reviews'] ?? [])
+        ->filter(fn (mixed $review): bool =>
+            is_array($review)
+            && ($review['is_enabled'] ?? true) !== false
+        )
+        ->values();
+    $trustStories = collect($trust['stories'] ?? [])
+        ->filter(fn (mixed $story): bool =>
+            is_array($story)
+            && ($story['is_enabled'] ?? true) !== false
+        )
+        ->values();
 @endphp
 
 <x-layouts.public
@@ -232,7 +254,7 @@
                                         <ul class="{{ $style['instructor']['credibility_list'] ?? 'mt-6 grid gap-3' }}">
                                             @foreach($page['instructor']['credibility'] as $item)
                                                 <li class="{{ $style['instructor']['credibility_item'] ?? 'flex gap-3 text-base font-extrabold text-ink' }}">
-                                                    <span class="{{ $style['problem']['icon'] ?? 'mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-extrabold text-white' }}">✓</span>
+                                                    <span class="{{ $style['instructor']['credibility_icon'] ?? $style['problem']['icon'] ?? 'mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-extrabold text-white' }}">✓</span>
                                                     <span>{{ $item }}</span>
                                                 </li>
                                             @endforeach
@@ -274,56 +296,145 @@
                 </div>
             @endif
 
-            @if($page['trust']['enabled'] ?? false)
+            @if($trust['enabled'] ?? false)
                 <div class="{{ $style['trust']['wrapper'] ?? 'bg-secondary px-6 py-16 text-center text-white sm:py-24' }}">
                     <div class="{{ $style['trust']['inner'] ?? 'mx-auto max-w-6xl' }}">
-                        @if(filled($page['trust']['headline'] ?? null))
+                        @if(filled($trust['headline'] ?? null))
                             <h2 class="{{ $style['trust']['headline'] ?? ($tokens['dark_section_title'] ?? 'text-4xl font-bold tracking-tight sm:text-5xl') }}">
-                                {{ $page['trust']['headline'] }}
+                                {{ $trust['headline'] }}
                             </h2>
                         @endif
 
-                        @if(filled($page['trust']['body'] ?? null))
+                        @if(filled($trust['body'] ?? null))
                             <p class="{{ $style['trust']['body'] ?? ($tokens['body'] ?? 'text-lg leading-8 text-slate-600') }}">
-                                {{ $page['trust']['body'] }}
+                                {{ $trust['body'] }}
                             </p>
                         @endif
 
-                        @if(filled($page['trust']['reviews'] ?? []))
-                            <div class="{{ $style['trust']['reviews_grid'] ?? 'mt-10 grid gap-5 md:grid-cols-3' }}">
-                                @foreach($page['trust']['reviews'] as $review)
-                                    <article class="{{ $style['trust']['review_card'] ?? 'rounded-3xl border border-white/10 bg-white/[0.06] p-6 text-left' }}">
-                                        @if(filled($review['stars'] ?? null))
-                                            <p class="{{ $style['trust']['stars'] ?? 'text-lg font-extrabold tracking-[0.18em] text-primary' }}">
-                                                {{ $review['stars'] }}
+                        @if($trustVariant === 'reviews' && $trustReviews->isNotEmpty())
+                            <div class="{{ $trustVariantStyle['grid'] ?? $style['trust']['reviews_grid'] ?? 'mt-10 grid gap-5 md:grid-cols-3' }}">
+                                @foreach($trustReviews as $review)
+                                    @php
+                                        $configuredReviewStars = filled($review['stars'] ?? null)
+                                            ? (string) $review['stars']
+                                            : null;
+                                        $reviewRating = max(
+                                            0,
+                                            min(
+                                                5,
+                                                isset($review['rating'])
+                                                    ? (int) $review['rating']
+                                                    : substr_count(
+                                                        $configuredReviewStars ?? '',
+                                                        '★',
+                                                    ),
+                                            ),
+                                        );
+                                        $reviewStars = $configuredReviewStars
+                                            ?? str_repeat('★', $reviewRating);
+                                    @endphp
+
+                                    <article class="{{ $trustVariantStyle['card'] ?? $style['trust']['review_card'] ?? 'rounded-3xl border border-white/10 bg-white/[0.06] p-6 text-left' }}">
+                                        @if($reviewStars !== '')
+                                            <p
+                                                class="{{ $trustVariantStyle['stars'] ?? $style['trust']['stars'] ?? 'text-lg font-extrabold tracking-[0.18em] text-primary' }}"
+                                                @if($reviewRating > 0) aria-label="{{ $reviewRating }} out of 5 stars" @endif
+                                            >
+                                                <span aria-hidden="true">{{ $reviewStars }}</span>
                                             </p>
                                         @endif
 
                                         @if(filled($review['name'] ?? null))
-                                            <h3 class="{{ $style['trust']['review_name'] ?? 'mt-4 text-base font-extrabold text-white' }}">
+                                            <h3 class="{{ $trustVariantStyle['name'] ?? $style['trust']['review_name'] ?? 'mt-4 text-base font-extrabold text-white' }}">
                                                 {{ $review['name'] }}
                                             </h3>
                                         @endif
 
                                         @if(filled($review['text'] ?? null))
-                                            <p class="{{ $style['trust']['review_text'] ?? 'mt-2 text-sm font-medium leading-6 text-white/75' }}">
+                                            <p class="{{ $trustVariantStyle['text'] ?? $style['trust']['review_text'] ?? 'mt-2 text-sm font-medium leading-6 text-white/75' }}">
                                                 {{ $review['text'] }}
                                             </p>
                                         @endif
                                     </article>
                                 @endforeach
                             </div>
+                        @elseif($trustVariant === 'stories' && $trustStories->isNotEmpty())
+                            <div class="{{ $trustVariantStyle['list'] ?? 'mx-auto mt-10 max-w-5xl divide-y divide-black/10 text-left' }}">
+                                @foreach($trustStories as $story)
+                                    @php
+                                        $storyRating = max(
+                                            0,
+                                            min(5, (int) ($story['rating'] ?? 0)),
+                                        );
+                                    @endphp
+
+                                    <article class="{{ $trustVariantStyle['card'] ?? 'py-8 first:pt-0 last:pb-0' }}">
+                                        @if(filled($story['label'] ?? null))
+                                            <div class="{{ $trustVariantStyle['label_row'] ?? 'flex items-center gap-2' }}">
+                                                @if(filled($story['icon'] ?? null))
+                                                    <span
+                                                        aria-hidden="true"
+                                                        class="{{ $trustVariantStyle['label_icon'] ?? 'text-lg leading-none' }}"
+                                                    >
+                                                        {{ $story['icon'] }}
+                                                    </span>
+                                                @endif
+
+                                                <p class="{{ $trustVariantStyle['label'] ?? 'text-sm font-extrabold uppercase tracking-[0.16em] text-primary' }}">
+                                                    {{ $story['label'] }}
+                                                </p>
+                                            </div>
+                                        @endif
+
+                                        @if(filled($story['title'] ?? null))
+                                            <h3 class="{{ $trustVariantStyle['title'] ?? 'mt-3 text-2xl font-extrabold tracking-[-0.02em] text-ink sm:text-3xl' }}">
+                                                {{ $story['title'] }}
+                                            </h3>
+                                        @endif
+
+                                        @if(filled($story['context'] ?? null))
+                                            <p class="{{ $trustVariantStyle['context'] ?? 'mt-4 text-base font-medium leading-7 text-ink/75 sm:text-lg' }}">
+                                                {{ $story['context'] }}
+                                            </p>
+                                        @endif
+
+                                        @if(filled($story['outcome'] ?? null))
+                                            <p class="{{ $trustVariantStyle['outcome'] ?? 'mt-5 text-base font-extrabold leading-7 text-ink sm:text-lg' }}">
+                                                {{ $story['outcome'] }}
+                                            </p>
+                                        @endif
+
+                                        @if($storyRating > 0)
+                                            <p
+                                                aria-label="{{ $storyRating }} out of 5 stars"
+                                                class="{{ $trustVariantStyle['rating'] ?? 'mt-5 text-lg font-extrabold tracking-[0.18em] text-primary' }}"
+                                            >
+                                                <span aria-hidden="true">{{ str_repeat('★', $storyRating) }}</span>
+                                            </p>
+                                        @endif
+
+                                        @if(filled($story['quote'] ?? null))
+                                            <blockquote class="{{ $trustVariantStyle['quote'] ?? 'mt-5 text-base italic leading-7 text-ink/75 sm:text-lg' }}">
+                                                “{{ $story['quote'] }}”
+                                            </blockquote>
+                                        @endif
+                                    </article>
+                                @endforeach
+                            </div>
                         @endif
 
-                        @if(filled($page['trust']['review_url'] ?? null))
+                        @if(
+                            $trustVariant === 'reviews'
+                            && filled($trust['review_url'] ?? null)
+                        )
                             <div class="mt-6">
                                 <a
-                                    href="{{ $page['trust']['review_url'] }}"
+                                    href="{{ $trust['review_url'] }}"
                                     target="_blank"
                                     rel="noopener"
                                     class="{{ $tokens['list_link'] ?? 'font-semibold underline underline-offset-4' }}"
                                 >
-                                    {{ $page['trust']['review_label'] ?? 'View Reviews' }}
+                                    {{ $trust['review_label'] ?? 'View Reviews' }}
                                 </a>
                             </div>
                         @endif
