@@ -8,6 +8,7 @@ use App\Modules\Webinars\Actions\GetActiveWebinarSeriesAction;
 use App\Modules\Webinars\Actions\ResolveRegisterableWebinarAction;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
+use App\Modules\Webinars\Services\WebinarRegistrationQuestionResolver;
 use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -56,7 +57,13 @@ class StoreWebinarRegistrationRequest extends FormRequest
     ];
 
     /** @var array<string, mixed>|null */
+    private ?array $registrationContent = null;
+
+    /** @var array<string, mixed>|null */
     private ?array $registrationConsentConfiguration = null;
+
+    /** @var array<int, array<string, mixed>>|null */
+    private ?array $registrationQuestions = null;
 
     private bool $registerableWebinarResolved = false;
 
@@ -88,12 +95,17 @@ class StoreWebinarRegistrationRequest extends FormRequest
                 ?? $this->boolean('marketing_email_consent'),
             'marketing_sms_consent' => $combinedMarketingConsent
                 ?? $this->boolean('marketing_sms_consent'),
+            'registration_questions' => app(
+                WebinarRegistrationQuestionResolver::class,
+            )->normalizeSubmittedAnswers(
+                $this->input('registration_questions'),
+            ),
         ]);
     }
 
     public function rules(): array
     {
-        return [
+        $rules = [
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['nullable', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:255'],
@@ -117,6 +129,14 @@ class StoreWebinarRegistrationRequest extends FormRequest
             self::READY_FIELD => ['nullable', 'string', 'max:20'],
             self::INTERACTION_FIELD => ['nullable', 'string', 'max:20'],
         ];
+
+        return array_replace(
+            $rules,
+            app(WebinarRegistrationQuestionResolver::class)->validationRules(
+                questions: $this->registrationQuestions(),
+                submittedAnswers: $this->input('registration_questions'),
+            ),
+        );
     }
 
     public function after(): array
@@ -141,10 +161,12 @@ class StoreWebinarRegistrationRequest extends FormRequest
 
     public function messages(): array
     {
-        return [
+        return array_replace([
             'phone.required' => 'Enter a mobile phone number when selecting SMS.',
             'phone.max' => 'Enter a phone number with no more than 30 characters.',
-        ];
+        ], app(WebinarRegistrationQuestionResolver::class)->validationMessages(
+            $this->registrationQuestions(),
+        ));
     }
 
     private function validPhoneNumberRule(): Closure
@@ -336,8 +358,45 @@ class StoreWebinarRegistrationRequest extends FormRequest
             return $this->registrationConsentConfiguration;
         }
 
-        $seriesSlug = (string) $this->route('seriesSlug');
+        $consents = data_get(
+            $this->registrationContent(),
+            'registration.consents',
+            [],
+        );
 
+        return $this->registrationConsentConfiguration = is_array($consents)
+            ? $consents
+            : [];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function registrationQuestions(): array
+    {
+        if ($this->registrationQuestions !== null) {
+            return $this->registrationQuestions;
+        }
+
+        return $this->registrationQuestions = app(
+            WebinarRegistrationQuestionResolver::class,
+        )->resolve(data_get(
+            $this->registrationContent(),
+            'registration.questions',
+            [],
+        ));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function registrationContent(): array
+    {
+        if ($this->registrationContent !== null) {
+            return $this->registrationContent;
+        }
+
+        $seriesSlug = (string) $this->route('seriesSlug');
         $series = $seriesSlug !== ''
             ? WebinarSeries::query()
                 ->where('slug', $seriesSlug)
@@ -345,17 +404,13 @@ class StoreWebinarRegistrationRequest extends FormRequest
                 ->first()
             : null;
 
-        $content = app(WebinarRegisterPageConfig::class)->content(
+        return $this->registrationContent = app(
+            WebinarRegisterPageConfig::class,
+        )->content(
             page: 'register',
             seriesSlug: $seriesSlug,
             seriesMeta: is_array($series?->meta) ? $series->meta : [],
         );
-
-        $consents = data_get($content, 'registration.consents', []);
-
-        return $this->registrationConsentConfiguration = is_array($consents)
-            ? $consents
-            : [];
     }
 
     private function channelAvailable(string $channel, string $purpose, string $scope): bool

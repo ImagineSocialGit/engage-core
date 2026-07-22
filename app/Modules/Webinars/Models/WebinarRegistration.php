@@ -8,6 +8,7 @@ use Database\Factories\WebinarRegistrationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
@@ -60,6 +61,14 @@ class WebinarRegistration extends Model
     public function replacementRegistration(): HasOne
     {
         return $this->hasOne(self::class, 'replacement_of_registration_id');
+    }
+
+    public function responses(): HasMany
+    {
+        return $this->hasMany(
+            WebinarRegistrationResponse::class,
+            'webinar_registration_id',
+        )->orderBy('sort_order')->orderBy('id');
     }
 
     public function scheduledMessages(): MorphMany

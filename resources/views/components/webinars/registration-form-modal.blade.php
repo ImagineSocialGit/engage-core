@@ -19,6 +19,17 @@
 
     $notificationSection = $page['sections']['notifications'] ?? [];
     $marketingSection = $page['sections']['marketing'] ?? [];
+    $questionSection = is_array($page['questions_section'] ?? null)
+        ? $page['questions_section']
+        : [];
+    $registrationQuestions = app(
+        \App\Modules\Webinars\Services\WebinarRegistrationQuestionResolver::class,
+    )->resolve($page['questions'] ?? []);
+    $questionInputClass = data_get(
+        $style,
+        'components.input.base',
+        'block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-ink shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20',
+    );
 
     $transactionalChannels = $webinarRegistrationChannels['transactional'] ?? ['email'];
     $marketingChannels = $webinarRegistrationChannels['marketing'] ?? ['email'];
@@ -397,6 +408,131 @@
                         @enderror
                     </div>
                 </div>
+
+                @if($registrationQuestions !== [] && ($questionSection['enabled'] ?? true))
+                    <fieldset class="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                        @if(filled($questionSection['title'] ?? null))
+                            <legend class="px-1 text-base font-semibold text-slate-900">
+                                {{ $questionSection['title'] }}
+                            </legend>
+                        @endif
+
+                        @if(filled($questionSection['body'] ?? null))
+                            <p class="text-sm font-medium leading-6 text-slate-600">
+                                {{ $questionSection['body'] }}
+                            </p>
+                        @endif
+
+                        <div class="space-y-5 {{ filled($questionSection['body'] ?? null) ? 'mt-4' : '' }}">
+                            @foreach($registrationQuestions as $question)
+                                @php
+                                    $questionKey = $question['key'];
+                                    $answerPath = "registration_questions.{$questionKey}.answer";
+                                    $otherPath = "registration_questions.{$questionKey}.other";
+                                    $selectedAnswer = old($answerPath);
+                                    $other = is_array($question['other'] ?? null)
+                                        ? $question['other']
+                                        : null;
+                                @endphp
+
+                                <div
+                                    x-data="{ selectedAnswer: @js($selectedAnswer) }"
+                                    class="space-y-2"
+                                >
+                                    <label
+                                        for="registration_question_{{ $questionKey }}"
+                                        class="block text-sm font-extrabold tracking-tight text-slate-900"
+                                    >
+                                        {{ $question['label'] }}
+                                        @if($question['required'])
+                                            <span aria-hidden="true" class="text-red-600">*</span>
+                                            <span class="sr-only">Required</span>
+                                        @endif
+                                    </label>
+
+                                    <select
+                                        id="registration_question_{{ $questionKey }}"
+                                        name="registration_questions[{{ $questionKey }}][answer]"
+                                        x-model="selectedAnswer"
+                                        class="{{ $questionInputClass }}"
+                                        @if($question['required'])
+                                            required
+                                            aria-required="true"
+                                        @endif
+                                        aria-invalid="{{ $errors->has($answerPath) ? 'true' : 'false' }}"
+                                    >
+                                        <option value="">{{ $question['placeholder'] }}</option>
+
+                                        @foreach($question['options'] as $option)
+                                            <option
+                                                value="{{ $option['key'] }}"
+                                                @selected($selectedAnswer === $option['key'])
+                                            >
+                                                {{ $option['label'] }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+
+                                    @if(filled($question['helper'] ?? null))
+                                        <p class="text-xs font-medium leading-5 text-slate-500">
+                                            {{ $question['helper'] }}
+                                        </p>
+                                    @endif
+
+                                    @error($answerPath)
+                                        <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                                            {{ $message }}
+                                        </p>
+                                    @enderror
+
+                                    @if($other !== null)
+                                        <div
+                                            x-cloak
+                                            x-show="selectedAnswer === @js($other['option_key'])"
+                                            x-transition.opacity
+                                            class="space-y-2 pt-2"
+                                        >
+                                            <label
+                                                for="registration_question_{{ $questionKey }}_other"
+                                                class="block text-sm font-bold text-slate-900"
+                                            >
+                                                {{ $other['label'] }}
+                                                @if($other['required'])
+                                                    <span aria-hidden="true" class="text-red-600">*</span>
+                                                    <span class="sr-only">Required</span>
+                                                @endif
+                                            </label>
+
+                                            <textarea
+                                                id="registration_question_{{ $questionKey }}_other"
+                                                name="registration_questions[{{ $questionKey }}][other]"
+                                                rows="3"
+                                                maxlength="{{ $other['max_length'] }}"
+                                                class="{{ $questionInputClass }} min-h-24 resize-y"
+                                                @if(filled($other['placeholder'] ?? null))
+                                                    placeholder="{{ $other['placeholder'] }}"
+                                                @endif
+                                                x-bind:required="selectedAnswer === @js($other['option_key']) && @js($other['required'])"
+                                                x-bind:aria-required="selectedAnswer === @js($other['option_key']) && @js($other['required']) ? 'true' : 'false'"
+                                                aria-invalid="{{ $errors->has($otherPath) ? 'true' : 'false' }}"
+                                            >{{ old($otherPath) }}</textarea>
+
+                                            <p class="text-xs font-medium leading-5 text-slate-500">
+                                                Up to {{ number_format($other['max_length']) }} characters.
+                                            </p>
+
+                                            @error($otherPath)
+                                                <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
+                                                    {{ $message }}
+                                                </p>
+                                            @enderror
+                                        </div>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </fieldset>
+                @endif
 
                 @if($page['consent_header']['enabled'] ?? true)
                     <div class="{{ $style['consent_header']['wrapper'] ?? 'rounded-2xl border border-primary/20 bg-primary/5 p-4' }}">

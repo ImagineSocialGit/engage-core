@@ -20,6 +20,8 @@ class WebinarRegisterPageConfig
         'fields',
         'submit',
         'legal_links',
+        'questions_section',
+        'questions',
     ];
 
     /**
@@ -108,13 +110,45 @@ class WebinarRegisterPageConfig
 
         foreach ($layers as $layer) {
             $landing = array_replace_recursive($landing, $layer['landing']);
-            $registration = array_replace_recursive($registration, $layer['registration']);
+            $registration = $this->mergeRegistrationLayer(
+                current: $registration,
+                incoming: $layer['registration'],
+            );
         }
 
         return [
             'landing' => $landing,
             'registration' => $registration,
         ];
+    }
+
+    /**
+     * Numeric question lists are atomic configuration. A later client,
+     * series-metadata, or series-file layer replaces the complete list rather
+     * than recursively merging questions and options by numeric position.
+     *
+     * @param array<string, mixed> $current
+     * @param array<string, mixed> $incoming
+     * @return array<string, mixed>
+     */
+    private function mergeRegistrationLayer(
+        array $current,
+        array $incoming,
+    ): array {
+        $replacesQuestions = array_key_exists('questions', $incoming);
+        $questions = $replacesQuestions ? $incoming['questions'] : null;
+
+        if ($replacesQuestions) {
+            unset($incoming['questions']);
+        }
+
+        $merged = array_replace_recursive($current, $incoming);
+
+        if ($replacesQuestions) {
+            $merged['questions'] = $questions;
+        }
+
+        return $merged;
     }
 
     /**

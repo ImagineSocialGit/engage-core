@@ -635,12 +635,14 @@
 │   │   │   │   ├── IssueBookableSlotOfferAction.php
 │   │   │   │   ├── MarkAppointmentNoShowAction.php
 │   │   │   │   ├── ReleaseBookingHoldAction.php
+│   │   │   │   ├── RescheduleAppointmentAction.php
 │   │   │   │   └── TransitionAppointmentStatusAction.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   ├── Data
 │   │   │   │   ├── AppointmentBookingData.php
 │   │   │   │   ├── AppointmentLifecycleContext.php
+│   │   │   │   ├── AppointmentRescheduleData.php
 │   │   │   │   ├── AvailabilityInterval.php
 │   │   │   │   ├── AvailabilitySearch.php
 │   │   │   │   └── BookableSlot.php
@@ -832,6 +834,7 @@
 │   │   │   ├── Models
 │   │   │   │   ├── Webinar.php
 │   │   │   │   ├── WebinarRegistration.php
+│   │   │   │   ├── WebinarRegistrationResponse.php
 │   │   │   │   ├── WebinarScheduleProfileItem.php
 │   │   │   │   ├── WebinarScheduleProfile.php
 │   │   │   │   ├── WebinarSeries.php
@@ -859,6 +862,7 @@
 │   │   │   │   ├── WebinarMessageReadinessService.php
 │   │   │   │   ├── WebinarProviderManager.php
 │   │   │   │   ├── WebinarRegistrationCsvReader.php
+│   │   │   │   ├── WebinarRegistrationQuestionResolver.php
 │   │   │   │   ├── WebinarScheduleProfileDefinitionResolver.php
 │   │   │   │   └── WebinarScheduleProfileResolver.php
 │   │   │   ├── Support
@@ -1255,6 +1259,7 @@
 │   │   ├── 2026_07_19_040000_create_webhook_inbox_receipts_table.php
 │   │   ├── 2026_07_21_180100_create_bookable_slot_offers_table.php
 │   │   ├── 2026_07_21_180101_create_booking_holds_table.php
+│   │   ├── 2026_07_22_160000_create_webinar_registration_responses_table.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -1683,6 +1688,7 @@
 │   │   │   ├── BookableSlotOfferAndBookingHoldActionTest.php
 │   │   │   ├── BookingHoldConversionAndReleaseActionTest.php
 │   │   │   ├── FindBookableAvailabilityActionTest.php
+│   │   │   ├── RescheduleAppointmentActionTest.php
 │   │   │   ├── RescheduleSlotOfferAndBookingHoldActionTest.php
 │   │   │   ├── SchedulingAvailabilityWindowFoundationTest.php
 │   │   │   ├── SchedulingFoundationTest.php
@@ -1758,6 +1764,7 @@
 │   │   │   ├── WebinarRegistrationOccurrenceResolutionTest.php
 │   │   │   ├── WebinarRegistrationOperatorRecoveryTest.php
 │   │   │   ├── WebinarRegistrationProviderSyncTest.php
+│   │   │   ├── WebinarRegistrationQuestionTest.php
 │   │   │   ├── WebinarRegistrationThankYouTest.php
 │   │   │   ├── WebinarReplacementPublicLifecycleTest.php
 │   │   │   ├── WebinarResolvedMessageDispatchOwnershipTest.php
@@ -1779,4 +1786,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-494 directories, 1286 files
+494 directories, 1293 files
