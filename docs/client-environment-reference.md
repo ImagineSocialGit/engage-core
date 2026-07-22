@@ -667,11 +667,23 @@ client/[CLIENT_KEY]/config/modules.php
     -> ModuleManager
 ```
 
-Webinar provider selection and Zoom credentials are client deployment values:
+`WEBINARS_ENABLED` is not part of the canonical runtime contract.
+
+The provider family is a selected-client deployment value:
 
 ```env
 WEBINAR_PROVIDER=zoom
+```
 
+Webinar versus Meeting is not selected through an environment variable. The default
+provider event type remains root config, while each `WebinarSeries` stores the operator's
+current event-type selection and each synchronized occurrence preserves its own type.
+Changing a series type affects future synchronization only.
+
+Zoom Server-to-Server OAuth credentials and webhook verification values are
+selected-client deployment values:
+
+```env
 ZOOM_ACCOUNT_ID=
 ZOOM_CLIENT_ID=
 ZOOM_CLIENT_SECRET=
@@ -688,9 +700,27 @@ ZOOM_WEBHOOK_MAX_TIMESTAMP_DRIFT_SECONDS=300
 WEBHOOK_INBOX_CLAIM_LEASE_SECONDS=300
 ```
 
-`WEBHOOK_INBOX_CLAIM_LEASE_SECONDS` is provider-neutral and controls when interrupted durable webhook work may be reclaimed for processing. It applies to Zoom and Resend receipts; it is not a cache replay TTL.
+`ZOOM_BASE_URL` and `ZOOM_OAUTH_URL` must be absolute HTTPS URLs without embedded
+credentials. The OAuth cache TTL must remain between 60 and 3600 seconds; the webhook
+timestamp drift must remain between 1 and 3600 seconds. Current defaults are 3500 and
+300 seconds respectively.
 
-`WEBINARS_ENABLED` is not part of the current canonical runtime contract. Module availability is decided through client module config.
+The Zoom Marketplace app must subscribe the environment-specific webhook endpoint to:
+
+```text
+webinar.ended
+meeting.ended
+recording.completed
+```
+
+The exact granular admin scopes required by current provider calls are documented in
+`client-third-party-services-checklist.md`. Scope grants and account Reports-role
+permissions cannot be proven by static environment validation; exercise the actual API
+calls in staging.
+
+`WEBHOOK_INBOX_CLAIM_LEASE_SECONDS` is provider-neutral and controls when interrupted
+durable webhook work may be reclaimed for processing. It applies to Zoom and Resend
+receipts; it is not a cache replay TTL.
 
 ---
 

@@ -6,6 +6,8 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\MessageDefinitionResolver;
+use App\Modules\Webinars\Contracts\WebinarProvider;
+use App\Modules\Webinars\Enums\WebinarProviderEventType;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
@@ -22,7 +24,15 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
     private const SOURCE = 'webinars.schedule_profiles';
     private const MESSAGE_AREA_SOURCE = 'webinars.message_areas';
     private const PUBLIC_URL_SOURCE = 'app';
+    private const PROVIDER_SOURCE = 'webinars.providers';
+    private const ZOOM_SERVICE_SOURCE = 'services.zoom';
     private const MODULE = 'webinars';
+
+    private const ZOOM_REQUIRED_WEBHOOK_MAPPINGS = [
+        'webinar.ended' => 'webinar.ended',
+        'meeting.ended' => 'webinar.ended',
+        'recording.completed' => 'webinar.recording_completed',
+    ];
 
     public function __construct(
         private readonly MessageDefinitionResolver $messageDefinitionResolver,
@@ -33,6 +43,7 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
     public function findings(): iterable
     {
         yield from $this->validatePublicUrl();
+        yield from $this->validateProviderConfiguration();
 
         try {
             $this->messageAreaRegistry->all();
@@ -80,6 +91,292 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
                 source: self::PUBLIC_URL_SOURCE,
             );
         }
+    }
+
+    /**
+     * @return iterable<int, SetupValidationFinding>
+     */
+    private function validateProviderConfiguration(): iterable
+    {
+        $providerValue = config('webinars.provider');
+
+        if (! $this->filledString($providerValue)) {
+            yield $this->error(
+                code: 'webinars.provider.missing',
+                message: 'A Webinar provider must be configured.',
+                path: 'webinars.provider',
+                source: self::PROVIDER_SOURCE,
+            );
+
+            return;
+        }
+
+        $provider = $this->normalizeSegment($providerValue);
+        $providerConfig = config("webinars.providers.{$provider}");
+
+        if (! is_array($providerConfig)) {
+            yield $this->error(
+                code: 'webinars.provider.config_missing',
+                message: "Webinar provider [{$provider}] does not have a provider configuration array.",
+                path: "webinars.providers.{$provider}",
+                context: [
+                    'provider' => $provider,
+                ],
+                source: self::PROVIDER_SOURCE,
+            );
+
+            return;
+        }
+
+        $defaultEventTypeValue = config('webinars.provider_event_type');
+        $defaultEventType = WebinarProviderEventType::fromMixed($defaultEventTypeValue);
+
+        if (! $defaultEventType instanceof WebinarProviderEventType) {
+            yield $this->error(
+                code: 'webinars.provider.default_event_type_invalid',
+                message: 'The default Webinar provider event type must be one of: '.implode(', ', WebinarProviderEventType::values()).'.',
+                path: 'webinars.provider_event_type',
+                context: [
+                    'configured_value' => $this->displayValue($defaultEventTypeValue),
+                ],
+                source: self::PROVIDER_SOURCE,
+            );
+        }
+
+        $requiredEventTypes = $provider === 'zoom'
+            ? WebinarProviderEventType::cases()
+            : array_values(array_filter([$defaultEventType]));
+
+        foreach ($requiredEventTypes as $eventType) {
+            yield from $this->validateProviderEventType(
+                provider: $provider,
+                providerConfig: $providerConfig,
+                eventType: $eventType,
+            );
+        }
+
+        if ($provider === 'zoom') {
+            yield from $this->validateZoomProviderConfiguration($providerConfig);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $providerConfig
+     * @return iterable<int, SetupValidationFinding>
+     */
+    private function validateProviderEventType(
+        string $provider,
+        array $providerConfig,
+        WebinarProviderEventType $eventType,
+    ): iterable {
+        $path = "webinars.providers.{$provider}.event_types.{$eventType->value}";
+        $definition = data_get($providerConfig, "event_types.{$eventType->value}");
+
+        if (! is_array($definition)) {
+            yield $this->error(
+                code: 'webinars.provider.event_type_missing',
+                message: "Webinar provider [{$provider}] must explicitly configure event type [{$eventType->value}].",
+                path: $path,
+                context: [
+                    'provider' => $provider,
+                    'provider_event_type' => $eventType->value,
+                ],
+                source: self::PROVIDER_SOURCE,
+            );
+
+            return;
+        }
+
+        $providerClass = $definition['provider'] ?? null;
+
+        if (! $this->filledString($providerClass)) {
+            yield $this->error(
+                code: 'webinars.provider.event_type_class_missing',
+                message: "Webinar provider [{$provider}:{$eventType->value}] is missing its adapter class.",
+                path: "{$path}.provider",
+                context: [
+                    'provider' => $provider,
+                    'provider_event_type' => $eventType->value,
+                ],
+                source: self::PROVIDER_SOURCE,
+            );
+
+            return;
+        }
+
+        $providerClass = trim($providerClass);
+
+        if (! class_exists($providerClass)) {
+            yield $this->error(
+                code: 'webinars.provider.event_type_class_missing',
+                message: "Webinar provider adapter class [{$providerClass}] does not exist.",
+                path: "{$path}.provider",
+                context: [
+                    'provider' => $provider,
+                    'provider_event_type' => $eventType->value,
+                    'provider_class' => $providerClass,
+                ],
+                source: self::PROVIDER_SOURCE,
+            );
+
+            return;
+        }
+
+        if (! is_subclass_of($providerClass, WebinarProvider::class)) {
+            yield $this->error(
+                code: 'webinars.provider.event_type_contract_invalid',
+                message: "Webinar provider adapter [{$providerClass}] must implement ".WebinarProvider::class.'.',
+                path: "{$path}.provider",
+                context: [
+                    'provider' => $provider,
+                    'provider_event_type' => $eventType->value,
+                    'provider_class' => $providerClass,
+                ],
+                source: self::PROVIDER_SOURCE,
+            );
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $providerConfig
+     * @return iterable<int, SetupValidationFinding>
+     */
+    private function validateZoomProviderConfiguration(array $providerConfig): iterable
+    {
+        foreach (['account_id', 'client_id', 'client_secret'] as $credential) {
+            $value = config("services.zoom.{$credential}");
+
+            if ($this->filledString($value)) {
+                continue;
+            }
+
+            yield $this->error(
+                code: 'webinars.zoom.oauth_credential_missing',
+                message: "Zoom Server-to-Server OAuth credential [{$credential}] is missing.",
+                path: "services.zoom.{$credential}",
+                context: [
+                    'credential' => $credential,
+                ],
+                source: self::ZOOM_SERVICE_SOURCE,
+            );
+        }
+
+        foreach (['base_url', 'oauth_url'] as $endpoint) {
+            $value = $providerConfig[$endpoint] ?? null;
+
+            if ($this->secureAbsoluteUrl($value)) {
+                continue;
+            }
+
+            yield $this->error(
+                code: 'webinars.zoom.endpoint_invalid',
+                message: "Zoom [{$endpoint}] must be an absolute HTTPS URL without embedded credentials.",
+                path: "webinars.providers.zoom.{$endpoint}",
+                context: [
+                    'endpoint' => $endpoint,
+                    'configured_value' => $this->displayValue($value),
+                ],
+                source: self::PROVIDER_SOURCE,
+            );
+        }
+
+        $oauthTokenTtl = $providerConfig['oauth_token_ttl_seconds'] ?? null;
+
+        if (! $this->integerBetween($oauthTokenTtl, 60, 3600)) {
+            yield $this->error(
+                code: 'webinars.zoom.oauth_token_ttl_invalid',
+                message: 'Zoom OAuth token cache TTL must be an integer between 60 and 3600 seconds.',
+                path: 'webinars.providers.zoom.oauth_token_ttl_seconds',
+                context: [
+                    'configured_value' => $this->displayValue($oauthTokenTtl),
+                ],
+                source: self::PROVIDER_SOURCE,
+            );
+        }
+
+        if (! $this->filledString(config('services.zoom.webhook_secret'))) {
+            yield $this->error(
+                code: 'webinars.zoom.webhook_secret_missing',
+                message: 'Zoom webhook signature verification requires a webhook secret.',
+                path: 'services.zoom.webhook_secret',
+                source: self::ZOOM_SERVICE_SOURCE,
+            );
+        }
+
+        $maxTimestampDrift = config('services.zoom.max_timestamp_drift_seconds');
+
+        if (! $this->integerBetween($maxTimestampDrift, 1, 3600)) {
+            yield $this->error(
+                code: 'webinars.zoom.webhook_timestamp_drift_invalid',
+                message: 'Zoom webhook timestamp drift must be an integer between 1 and 3600 seconds.',
+                path: 'services.zoom.max_timestamp_drift_seconds',
+                context: [
+                    'configured_value' => $this->displayValue($maxTimestampDrift),
+                ],
+                source: self::ZOOM_SERVICE_SOURCE,
+            );
+        }
+
+        $webhookMappings = $providerConfig['webhook_events'] ?? null;
+
+        foreach (self::ZOOM_REQUIRED_WEBHOOK_MAPPINGS as $nativeEvent => $normalizedEvent) {
+            $configuredMapping = is_array($webhookMappings)
+                ? ($webhookMappings[$nativeEvent] ?? null)
+                : null;
+
+            if ($configuredMapping === $normalizedEvent) {
+                continue;
+            }
+
+            yield $this->error(
+                code: 'webinars.zoom.webhook_event_mapping_invalid',
+                message: "Zoom webhook event [{$nativeEvent}] must map to [{$normalizedEvent}].",
+                path: "webinars.providers.zoom.webhook_events.{$nativeEvent}",
+                context: [
+                    'native_event' => $nativeEvent,
+                    'expected_mapping' => $normalizedEvent,
+                    'configured_mapping' => $this->displayValue($configuredMapping),
+                ],
+                source: self::PROVIDER_SOURCE,
+            );
+        }
+    }
+
+    private function secureAbsoluteUrl(mixed $value): bool
+    {
+        if (! $this->filledString($value)) {
+            return false;
+        }
+
+        $parts = parse_url(trim($value));
+
+        return is_array($parts)
+            && strtolower((string) ($parts['scheme'] ?? '')) === 'https'
+            && $this->filledString($parts['host'] ?? null)
+            && ! isset($parts['user'])
+            && ! isset($parts['pass']);
+    }
+
+    private function integerBetween(mixed $value, int $minimum, int $maximum): bool
+    {
+        if (is_int($value)) {
+            $integer = $value;
+        } elseif (is_string($value) && ctype_digit(trim($value))) {
+            $integer = (int) trim($value);
+        } else {
+            return false;
+        }
+
+        return $integer >= $minimum && $integer <= $maximum;
+    }
+
+    private function displayValue(mixed $value): string
+    {
+        if (is_scalar($value) || $value === null) {
+            return (string) $value;
+        }
+
+        return get_debug_type($value);
     }
 
     /**

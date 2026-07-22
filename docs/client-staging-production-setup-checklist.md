@@ -1,4 +1,3 @@
-
 # Engage Core — Client Staging & Production Setup Checklist
 
 ## Purpose
@@ -689,47 +688,76 @@ Do not infer SMS availability solely from provider credentials. Confirm Messagin
 
 ## 29. Verify Webinar setup when enabled
 
+Run `php artisan setup:validate` before provider smoke tests. The Webinar contributor
+must report no Zoom credential, endpoint, provider-adapter, webhook-mapping, token-TTL,
+or timestamp-drift findings.
+
 At minimum:
 
 ```text
-Zoom credentials work
-registration API works
-personalized join URL is stored
-registration confirmation planning works
-schedule profile is selected and active
-future reminders are scheduled correctly
-webhook endpoint receives and successfully verifies real signed provider delivery before a live event
-attendance-report capability works through the exact provider call used by runtime
-cloud-recording lookup/access works when replay follow-ups are enabled
-attendance retrieval works
-recording.completed can resolve playback
-post-event follow-ups wait for required playback conditions
-webinar.attended / webinar.missed automation events work
-selected Routes run
-Campaign enrollments occur when intended
+Zoom Server-to-Server OAuth credentials work.
+Both Webinar and Meeting adapters resolve for the configured Zoom provider.
+Webinar lookup works when Webinar event types are used.
+Meeting lookup works when Meeting event types are used.
+Registration API works for each event type in use.
+Personalized join URL is stored.
+Registration confirmation planning works.
+Schedule profile is selected and active.
+Future reminders are scheduled correctly.
+A real signed webinar.ended webhook is accepted when Webinars are used.
+A real signed meeting.ended webhook is accepted when Meetings are used.
+Attendance-report capability works through the exact provider call used by runtime.
+Cloud-recording lookup works when replay follow-ups are enabled.
+recording.completed can resolve playback.
+Post-event follow-ups wait for required playback conditions.
+webinar.attended / webinar.missed automation events work.
+Selected Routes run.
+Campaign enrollments occur when intended.
 ```
 
-Current Core post-event orchestration is materially split:
+Current Core post-event orchestration is split by normalized event identity:
 
 ```text
 webinar.ended
-    records provider attendance
+    Native source may be webinar.ended or meeting.ended.
+    Records provider attendance for the resolved occurrence.
 
 webinar.recording_completed
-    resolves playback
-    dispatches post-webinar follow-ups
+    Native source is recording.completed.
+    Resolves playback.
+    Dispatches post-event follow-ups.
 ```
 
-Do not assume `webinar.ended` alone sends replay follow-ups.
+Do not assume an ended event alone sends replay follow-ups.
 
-Use `client-third-party-services-checklist.md` for the current Zoom capability/scope checklist. The current provider implementation requires distinct capabilities for registration/lookup, attendance reports, and cloud recording lookup; do not assume one Zoom permission category implies the others. The first production run specifically required participant-report capability equivalent to `report:read:list_webinar_participants:admin` before attendance reconciliation could succeed.
+Use `client-third-party-services-checklist.md` for the exact current granular Zoom
+scope list. Registration/lookup, Meeting reports, Webinar reports, and cloud recording
+lookup are separate capabilities; do not assume one permission category implies the
+others.
 
-Do not treat route existence or webhook subscription configuration as proof of webhook readiness. Before relying on a live Webinar, verify that a real signed provider webhook reaches the intended environment, passes signature verification, dispatches to a consumed queue, and produces the expected domain action.
+Do not treat route existence or configured event subscriptions as proof of webhook
+readiness. Verify that a real signed provider webhook reaches the intended environment,
+passes signature verification, dispatches to a consumed queue, and produces the
+expected domain action.
+
+When Webinar-to-Meeting replacement is supported for the client, complete this staging
+smoke before launch:
+
+```text
+1. Preserve the original Webinar occurrence and historical registrations.
+2. Change the series type only for future synchronization.
+3. Sync the replacement Meeting occurrence.
+4. Confirm the explicit occurrence replacement in CRM.
+5. Verify per-registration reprovisioning totals and individual recovery controls.
+6. Verify old join, thank-you, and cancellation links follow the canonical registration.
+7. Verify consent acknowledgements and confirmations are not duplicated.
+8. Verify only future-valid reminders are scheduled for the replacement.
+```
 
 For production post-event handling, use this safe sequence:
 
 ```text
-1. Verify the Zoom app has the capabilities required by the current provider implementation.
+1. Verify the Zoom app has the capabilities required by the event types in use.
 2. Verify attendance state.
 3. Resolve duplicate/cancelled registration conflicts before follow-up dispatch when necessary.
 4. Retry only the failed post-event provider job.
@@ -743,7 +771,8 @@ For production post-event handling, use this safe sequence:
 12. Verify final message statuses.
 ```
 
-Do not use a broad queue reset, Redis flush, or indiscriminate message retry as normal recovery for a narrow post-event failure.
+Do not use a broad queue reset, Redis flush, or indiscriminate message retry as normal
+recovery for a narrow provider or post-event failure.
 
 ## 30. Use local/staging-only Webinar dev tools where available
 
@@ -918,18 +947,19 @@ Use production-safe recipients only.
 
 ## 42. Webinar smoke test
 
-Before relying on a live client webinar:
+Before relying on a live client Webinar or Meeting:
 
 ```text
 public registration
 → contact created/reused
 → registration created
+→ correct provider event-type adapter selected
 → provider registrant created
 → personalized join URL stored
 → confirmations planned
 → consent behavior correct
 → reminders scheduled
-→ webhook accepted
+→ native webinar.ended or meeting.ended webhook accepted
 → attendance recorded
 → attended/missed events emitted
 → selected Routes execute
@@ -937,6 +967,18 @@ public registration
 → Campaign enrollment occurs when intended
 → recording.completed resolves playback
 → post-event follow-ups dispatch only when conditions are satisfied
+```
+
+For a Webinar-to-Meeting replacement, additionally verify:
+
+```text
+original occurrence/history preserved
+replacement occurrence explicitly linked
+registrants reprovisioned independently and idempotently
+partial failures visible and retryable
+old join link reaches canonical Meeting
+old thank-you link shows canonical status/date
+old cancellation link cancels one canonical provider registrant
 ```
 
 Inspect actual database state; do not rely only on UI success messages.
@@ -1012,11 +1054,11 @@ Import rules:
 [ ] Initial CRM user exists
 [ ] Resend configured/tested when enabled
 [ ] Telnyx configured/tested when enabled
-[ ] Zoom configured/tested when enabled
+[ ] Zoom Webinar and Meeting capabilities configured/tested when enabled
 [ ] Provider webhook endpoints point to production
-[ ] Registration flow tested when Webinars enabled
+[ ] Registration flow tested for every Zoom event type in use
 [ ] Reminder schedule inspected when Webinars enabled
-[ ] Attendance and post-event flow tested when Webinars enabled
+[ ] Webinar/Meeting attendance and post-event flow tested when Webinars enabled
 [ ] Routes/status transitions verified when enabled
 [ ] Campaign enrollment verified when enabled
 [ ] Duplicate-registration conflicts checked

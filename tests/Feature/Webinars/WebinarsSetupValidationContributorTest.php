@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Webinars;
 
+use App\Integrations\Webinars\Zoom\ZoomMeetingProvider;
+use App\Integrations\Webinars\Zoom\ZoomWebinarProvider;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
@@ -27,10 +29,10 @@ class WebinarsSetupValidationContributorTest extends TestCase
         Config::set('messaging.email', []);
         Config::set('messaging.sms', []);
 
+        $this->configureValidZoomReadiness();
         $this->configureMessageAreas();
         $this->configureEmailAvailability();
     }
-
 
     public function test_it_reports_a_scheme_less_public_webinar_url(): void
     {
@@ -53,6 +55,127 @@ class WebinarsSetupValidationContributorTest extends TestCase
 
         $this->assertIsArray($finding);
         $this->assertSame('app.webinar_url', $finding['path']);
+    }
+
+    public function test_it_reports_missing_zoom_server_to_server_oauth_credentials(): void
+    {
+        Config::set('services.zoom.account_id', null);
+        Config::set('services.zoom.client_id', '');
+        Config::set('services.zoom.client_secret', null);
+
+        $paths = collect($this->findings())
+            ->where('code', 'webinars.zoom.oauth_credential_missing')
+            ->pluck('path')
+            ->sort()
+            ->values()
+            ->all();
+
+        $this->assertSame([
+            'services.zoom.account_id',
+            'services.zoom.client_id',
+            'services.zoom.client_secret',
+        ], $paths);
+    }
+
+    public function test_it_reports_insecure_or_malformed_zoom_endpoints(): void
+    {
+        Config::set('webinars.providers.zoom.base_url', 'http://api.zoom.us/v2');
+        Config::set('webinars.providers.zoom.oauth_url', 'zoom.us/oauth/token');
+
+        $paths = collect($this->findings())
+            ->where('code', 'webinars.zoom.endpoint_invalid')
+            ->pluck('path')
+            ->sort()
+            ->values()
+            ->all();
+
+        $this->assertSame([
+            'webinars.providers.zoom.base_url',
+            'webinars.providers.zoom.oauth_url',
+        ], $paths);
+    }
+
+    public function test_it_reports_a_missing_zoom_meeting_adapter_definition(): void
+    {
+        Config::set('webinars.providers.zoom.event_types.meeting', null);
+
+        $finding = collect($this->findings())
+            ->firstWhere('code', 'webinars.provider.event_type_missing');
+
+        $this->assertIsArray($finding);
+        $this->assertSame(
+            'webinars.providers.zoom.event_types.meeting',
+            $finding['path'],
+        );
+    }
+
+    public function test_it_reports_a_zoom_adapter_that_does_not_implement_the_provider_contract(): void
+    {
+        Config::set(
+            'webinars.providers.zoom.event_types.meeting.provider',
+            \stdClass::class,
+        );
+
+        $finding = collect($this->findings())
+            ->firstWhere('code', 'webinars.provider.event_type_contract_invalid');
+
+        $this->assertIsArray($finding);
+        $this->assertSame(
+            'webinars.providers.zoom.event_types.meeting.provider',
+            $finding['path'],
+        );
+    }
+
+    public function test_it_reports_a_missing_required_zoom_meeting_webhook_mapping(): void
+    {
+        $events = Config::get('webinars.providers.zoom.webhook_events', []);
+        unset($events['meeting.ended']);
+        Config::set('webinars.providers.zoom.webhook_events', $events);
+
+        $finding = collect($this->findings())
+            ->firstWhere('code', 'webinars.zoom.webhook_event_mapping_invalid');
+
+        $this->assertIsArray($finding);
+        $this->assertSame(
+            'webinars.providers.zoom.webhook_events.meeting.ended',
+            $finding['path'],
+        );
+        $this->assertSame(
+            'webinar.ended',
+            data_get($finding, 'context.expected_mapping'),
+        );
+    }
+
+    public function test_it_reports_missing_zoom_webhook_secret_and_invalid_timestamp_drift(): void
+    {
+        Config::set('services.zoom.webhook_secret', null);
+        Config::set('services.zoom.max_timestamp_drift_seconds', 0);
+        Config::set('webinars.providers.zoom.oauth_token_ttl_seconds', 3601);
+
+        $codes = array_column($this->findings(), 'code');
+
+        $this->assertContains('webinars.zoom.webhook_secret_missing', $codes);
+        $this->assertContains(
+            'webinars.zoom.webhook_timestamp_drift_invalid',
+            $codes,
+        );
+        $this->assertContains('webinars.zoom.oauth_token_ttl_invalid', $codes);
+    }
+
+    public function test_it_accepts_complete_zoom_webinar_and_meeting_readiness_configuration(): void
+    {
+        $providerFindings = array_values(array_filter(
+            $this->findings(),
+            fn (array $finding): bool => str_starts_with(
+                $finding['code'],
+                'webinars.provider.',
+            ) || str_starts_with(
+                $finding['code'],
+                'webinars.zoom.',
+            ),
+        ));
+
+        $this->assertSame([], $providerFindings);
     }
 
     public function test_it_reports_invalid_message_area_configuration_as_a_setup_finding(): void
@@ -421,6 +544,40 @@ class WebinarsSetupValidationContributorTest extends TestCase
                 $result->findings(),
             ),
         );
+    }
+
+    private function configureValidZoomReadiness(): void
+    {
+        Config::set('webinars.provider', 'zoom');
+        Config::set('webinars.provider_event_type', 'webinar');
+        Config::set('webinars.providers.zoom', [
+            'provider' => ZoomWebinarProvider::class,
+            'event_types' => [
+                'webinar' => [
+                    'label' => 'Webinar',
+                    'provider' => ZoomWebinarProvider::class,
+                ],
+                'meeting' => [
+                    'label' => 'Meeting',
+                    'provider' => ZoomMeetingProvider::class,
+                ],
+            ],
+            'base_url' => 'https://api.zoom.us/v2',
+            'oauth_url' => 'https://zoom.us/oauth/token',
+            'oauth_token_ttl_seconds' => 3500,
+            'webhook_events' => [
+                'webinar.ended' => 'webinar.ended',
+                'webinar.completed' => 'webinar.ended',
+                'meeting.ended' => 'webinar.ended',
+                'recording.completed' => 'webinar.recording_completed',
+            ],
+        ]);
+
+        Config::set('services.zoom.account_id', 'zoom-account');
+        Config::set('services.zoom.client_id', 'zoom-client');
+        Config::set('services.zoom.client_secret', 'zoom-secret');
+        Config::set('services.zoom.webhook_secret', 'zoom-webhook-secret');
+        Config::set('services.zoom.max_timestamp_drift_seconds', 300);
     }
 
     private function configureMessageAreas(): void

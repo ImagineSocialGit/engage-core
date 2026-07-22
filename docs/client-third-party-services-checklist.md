@@ -306,12 +306,14 @@ Do not populate these for a Telnyx-only client merely because the variables exis
 
 # 7. Zoom Server-to-Server OAuth
 
-Current Webinar provider path is Zoom.
+Webinars uses Zoom Meeting and Webinar API operations through one Server-to-Server OAuth app.
+The same provider family supports both Zoom Webinars and Zoom Meetings; each Webinar
+series selects its event type, while every synchronized occurrence preserves the remote
+type that created it.
 
 Core variables:
 
 ```env
-WEBINARS_ENABLED=true
 WEBINAR_PROVIDER=zoom
 ZOOM_ACCOUNT_ID=
 ZOOM_CLIENT_ID=
@@ -323,94 +325,187 @@ ZOOM_OAUTH_TOKEN_TTL_SECONDS=3500
 ZOOM_WEBHOOK_MAX_TIMESTAMP_DRIFT_SECONDS=300
 ```
 
+`WEBINARS_ENABLED` is not a canonical environment variable. Enable the module through
+the selected client module configuration.
+
 ## App type and activation
 
 - [ ] Server-to-Server OAuth app exists.
 - [ ] Correct Zoom account owns the app.
+- [ ] The Zoom account has the required Meeting plan.
+- [ ] The Zoom account has a Webinar add-on when Webinar event types are used.
 - [ ] Account ID recorded.
 - [ ] Client ID recorded.
 - [ ] Client secret recorded.
-- [ ] App activated after scope changes.
+- [ ] App activated after every scope change.
+- [ ] The app owner/role can access account Reports for attendance reconciliation.
 
-## Required capability scopes
+## Exact runtime API calls and granular admin scopes
 
-The exact Zoom scope names available in the dashboard can evolve, so verify against the current Zoom app UI. The production setup that informed this checklist required capabilities equivalent to:
+The following granular admin scope labels were verified against Zoom's official granular
+scope catalog on July 22, 2026. Re-check the current Zoom Marketplace UI whenever Zoom
+changes its scope catalog, but do not add broader capabilities merely because they are
+available.
 
-### Webinar registration and lookup
+### Meeting occurrence lookup and registration
 
 ```text
+meeting:read:list_meetings:admin
+meeting:write:registrant:admin
+meeting:delete:registrant:admin
+```
+
+These support:
+
+```text
+GET    /users/me/meetings
+POST   /meetings/{meetingId}/registrants
+DELETE /meetings/{meetingId}/registrants/{registrantId}
+```
+
+### Webinar occurrence lookup and registration
+
+```text
+webinar:read:list_webinars:admin
 webinar:write:registrant:admin
 webinar:delete:registrant:admin
-webinar:read:list_webinars:admin
-webinar:read:webinar:admin
-webinar:read:list_registrants:admin
 ```
 
-### Recording access
+These support:
 
 ```text
-cloud_recording:read:list_recording_files:admin
-cloud_recording:read:recording:admin
+GET    /users/me/webinars
+POST   /webinars/{webinarId}/registrants
+DELETE /webinars/{webinarId}/registrants/{registrantId}
 ```
 
-### Attendance reports
+### Attendance reconciliation
 
 ```text
+report:read:list_meeting_participants:admin
 report:read:list_webinar_participants:admin
 ```
 
-The attendance-report capability is independent of basic webinar lookup/registrant access. Test it explicitly.
+These support:
+
+```text
+GET /report/meetings/{meetingId}/participants
+GET /report/webinars/{webinarId}/participants
+```
+
+The Zoom account must satisfy the plan and Reports-role prerequisites for these
+endpoints. Basic Meeting or Webinar access does not imply participant-report access.
+
+### Cloud-recording lookup
+
+```text
+cloud_recording:read:list_recording_files:admin
+```
+
+This supports:
+
+```text
+GET /meetings/{meetingIdOrUuid}/recordings
+```
+
+Zoom uses the Meeting recording endpoint for both Meeting and Webinar recordings. The
+runtime prefers the provider UUID when one is available.
+
+The current runtime does not need broad meeting/webinar creation, event deletion,
+registrant-list, or single-event-read scopes. Add a scope only when a current provider
+call requires it.
+
+Official references:
+
+- [Zoom API authentication and access tokens](https://developers.zoom.us/docs/api/)
+- [Zoom granular scopes for internal apps](https://developers.zoom.us/docs/internal-apps/oauth-scopes-granular/)
+- [Zoom Meeting and Webinar API operations](https://developers.zoom.us/docs/api/meetings/)
+- [Zoom Meeting and Webinar webhook events](https://developers.zoom.us/docs/api/meetings/events/)
 
 ## Webhook subscriptions
 
-Current Core provider mapping handles:
+Subscribe the environment-specific Zoom app endpoint to these exact native events:
 
 ```text
 webinar.ended
-webinar.completed -> normalized to webinar.ended
-recording.completed -> normalized to webinar.recording_completed
+meeting.ended
+recording.completed
 ```
+
+Core normalizes them as follows:
+
+```text
+webinar.ended          -> webinar.ended
+meeting.ended          -> webinar.ended
+recording.completed    -> webinar.recording_completed
+```
+
+`webinar.completed` remains a compatibility alias in Core configuration. Current Zoom
+subscriptions must use `webinar.ended` for Webinar occurrences and `meeting.ended` for
+Meeting occurrences.
 
 Current post-event orchestration uses:
 
 ```text
 webinar.ended
-    RecordWebinarProviderAttendanceAction
+    Resolve the Webinar or Meeting occurrence by provider type plus ID/UUID.
+    Record provider attendance.
 
 webinar.recording_completed
-    ResolveWebinarPlaybackAction
-    DispatchPostWebinarFollowUpsAction
+    Resolve playback.
+    Dispatch post-event follow-ups when their conditions are satisfied.
 ```
 
 Checklist:
 
 - [ ] Correct environment webhook URL configured.
-- [ ] `ZOOM_WEBHOOK_SECRET` recorded.
-- [ ] `webinar.ended` subscribed.
+- [ ] `ZOOM_WEBHOOK_SECRET` recorded from the same app/environment.
+- [ ] `webinar.ended` subscribed when Zoom Webinars are used.
+- [ ] `meeting.ended` subscribed when Zoom Meetings are used.
 - [ ] `recording.completed` subscribed when replay follow-ups are used.
-- [ ] Any equivalent/required completion event intentionally subscribed.
-- [ ] Signature validation succeeds.
-- [ ] Timestamp validation succeeds.
+- [ ] Endpoint URL validation succeeds in the Zoom Marketplace.
+- [ ] Real signed delivery passes signature verification.
+- [ ] Timestamp verification succeeds with the configured drift limit.
 - [ ] A completed duplicate returns safely without dispatching twice.
 - [ ] A simulated processing failure leaves a retryable durable receipt and the provider retry completes it.
-- [ ] Real or simulated event reaches the intended queued job.
+- [ ] Each native event reaches the intended `webhooks` queue and Horizon worker.
 
 ## End-to-end Zoom verification
 
-Before a real client webinar:
+Before a real client event, verify each event type the client will operate:
 
 ```text
-webinar lookup succeeds
-registration creation succeeds
-personalized join URL stored
-attendance report retrieval succeeds
-webinar-ended webhook accepted
-recording-completed webhook accepted
-playback URL resolves
-post-event follow-ups dispatch only when playback condition is satisfied
+Webinar lookup succeeds when Webinar series are enabled.
+Meeting lookup succeeds when Meeting series are enabled.
+Registration creation returns and stores a personalized join URL.
+Provider cancellation removes the correct canonical registrant.
+Meeting participant-report retrieval succeeds.
+Webinar participant-report retrieval succeeds when used.
+webinar.ended is accepted and resolves the Webinar occurrence.
+meeting.ended is accepted and resolves the Meeting occurrence.
+recording.completed is accepted and resolves playback.
+Post-event follow-ups dispatch only when playback conditions are satisfied.
 ```
 
-Do not wait for the first live event to discover a missing report scope or webhook subscription.
+## Webinar-to-Meeting replacement smoke test
+
+Run this in staging before relying on an event-type switch:
+
+```text
+1. Sync a Webinar series and preserve its existing occurrence.
+2. Change the series provider event type to Meeting for future synchronization.
+3. Sync the replacement Meeting occurrence.
+4. Explicitly replace the obsolete Webinar occurrence with the Meeting occurrence.
+5. Verify created/adopted/queued/succeeded/failed/reconciliation totals.
+6. Verify successful registrants are not reprovisioned twice.
+7. Verify failed registrants remain individually retryable.
+8. Verify old join links resolve to the canonical Meeting registration.
+9. Verify old thank-you links show the canonical occurrence and status.
+10. Verify old cancellation links cancel only the canonical provider registrant.
+```
+
+Do not wait for the first live event to discover a missing scope, role permission,
+webhook subscription, or replacement-recovery problem.
 
 ---
 
@@ -432,9 +527,9 @@ Do not wait for the first live event to discover a missing report scope or webho
 [ ] Telnyx profile IDs correct when used
 [ ] Telnyx inbound webhook points to correct environment when used
 [ ] Zoom Server-to-Server app active when Webinars enabled
-[ ] Zoom webinar registration/lookup scopes sufficient
+[ ] Zoom Meeting and Webinar registration/lookup scopes sufficient
 [ ] Zoom recording scopes sufficient when replay used
-[ ] Zoom attendance-report scope sufficient
+[ ] Zoom Meeting and Webinar attendance-report scopes sufficient
 [ ] Zoom webhook subscriptions correct
 [ ] No production provider points to staging by accident
 [ ] Secrets stored only in approved locations
