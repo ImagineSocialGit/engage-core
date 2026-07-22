@@ -16,6 +16,7 @@ class BookableSlotOffer extends Model
         'offer_id',
         'bookable_service_id',
         'scheduling_host_id',
+        'reschedule_appointment_id',
         'starts_at',
         'ends_at',
         'display_timezone',
@@ -47,6 +48,7 @@ class BookableSlotOffer extends Model
         return [
             'bookable_service_id' => 'integer',
             'scheduling_host_id' => 'integer',
+            'reschedule_appointment_id' => 'integer',
             'starts_at' => 'immutable_datetime',
             'ends_at' => 'immutable_datetime',
             'capacity' => 'integer',
@@ -68,6 +70,14 @@ class BookableSlotOffer extends Model
     public function schedulingHost(): BelongsTo
     {
         return $this->belongsTo(SchedulingHost::class);
+    }
+
+    public function rescheduleAppointment(): BelongsTo
+    {
+        return $this->belongsTo(
+            Appointment::class,
+            'reschedule_appointment_id',
+        );
     }
 
     public function bookingHold(): HasOne
@@ -98,6 +108,19 @@ class BookableSlotOffer extends Model
     public function scopeConsumed(Builder $query): Builder
     {
         return $query->whereNotNull('consumed_at');
+    }
+
+    public function isRescheduleOffer(): bool
+    {
+        return $this->reschedule_appointment_id !== null;
+    }
+
+    public function isForRescheduleOf(Appointment $appointment): bool
+    {
+        return $appointment->exists
+            && $appointment->getKey() !== null
+            && $this->reschedule_appointment_id !== null
+            && (int) $this->reschedule_appointment_id === (int) $appointment->getKey();
     }
 
     public function isActiveAt(?CarbonInterface $at = null): bool

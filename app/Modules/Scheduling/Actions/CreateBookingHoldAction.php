@@ -21,6 +21,12 @@ use LogicException;
 
 class CreateBookingHoldAction
 {
+    private const RESCHEDULABLE_STATUSES = [
+        Appointment::STATUS_PENDING,
+        Appointment::STATUS_SCHEDULED,
+        Appointment::STATUS_CONFIRMED,
+    ];
+
     public function __construct(
         private readonly FindBookableAvailabilityAction $findAvailability,
         private readonly BookingOccupancyResolver $occupancy,
@@ -83,6 +89,10 @@ class CreateBookingHoldAction
                 }
 
                 $host = $this->lockedTarget($offer, $service);
+                $rescheduleAppointment = $this->lockedRescheduleAppointment(
+                    offer: $offer,
+                    service: $service,
+                );
                 $search = new AvailabilitySearch(
                     service: $service,
                     startsAt: $offer->starts_at,
@@ -90,6 +100,7 @@ class CreateBookingHoldAction
                     host: $host,
                     displayTimezone: $offer->display_timezone,
                     evaluatedAt: $now,
+                    rescheduleAppointment: $rescheduleAppointment,
                 );
 
                 $appointments = $this->occupancy
@@ -221,6 +232,49 @@ class CreateBookingHoldAction
         }
 
         return $host;
+    }
+
+    private function lockedRescheduleAppointment(
+        BookableSlotOffer $offer,
+        BookableService $service,
+    ): ?Appointment {
+        if ($offer->reschedule_appointment_id === null) {
+            return null;
+        }
+
+        $appointment = Appointment::withTrashed()
+            ->whereKey($offer->reschedule_appointment_id)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $appointment instanceof Appointment || $appointment->trashed()) {
+            throw new DomainException(
+                'The appointment selected for rescheduling could not be found.',
+            );
+        }
+
+        if ((int) $appointment->bookable_service_id !== (int) $service->getKey()) {
+            throw new DomainException(
+                'The appointment selected for rescheduling belongs to another service.',
+            );
+        }
+
+        if (! in_array($appointment->status, self::RESCHEDULABLE_STATUSES, true)) {
+            throw new DomainException(
+                "Appointment status [{$appointment->status}] cannot be rescheduled.",
+            );
+        }
+
+        if (Appointment::withTrashed()
+            ->where('rescheduled_from_id', $appointment->getKey())
+            ->exists()
+        ) {
+            throw new DomainException(
+                'The appointment has already been rescheduled.',
+            );
+        }
+
+        return $appointment;
     }
 
     private function exactCurrentSlot(

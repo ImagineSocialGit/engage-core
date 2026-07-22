@@ -39,6 +39,14 @@ class AppointmentOccupancyResolver
             ->where('ends_at', '>', $search->effectiveStartsAt
                 ->subMinutes($candidateBefore + $maximumAfter));
 
+        if ($search->rescheduleAppointment !== null) {
+            $query->where(
+                'id',
+                '!=',
+                $search->rescheduleAppointment->getKey(),
+            );
+        }
+
         if ($host !== null) {
             $query->where('scheduling_host_id', $host->getKey());
         } else {

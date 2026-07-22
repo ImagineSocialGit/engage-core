@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use Illuminate\Database\Migrations\Migration;
@@ -19,6 +20,10 @@ return new class extends Migration
             $table->foreignIdFor(SchedulingHost::class)
                 ->nullable()
                 ->constrained()
+                ->cascadeOnDelete();
+            $table->foreignIdFor(Appointment::class, 'reschedule_appointment_id')
+                ->nullable()
+                ->constrained('appointments')
                 ->cascadeOnDelete();
             $table->dateTime('starts_at');
             $table->dateTime('ends_at');

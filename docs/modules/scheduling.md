@@ -1,3 +1,4 @@
+
 # Scheduling Module
 
 Scheduling is a current universal module.
@@ -106,6 +107,7 @@ appointment-related source context
 opaque expiring slot offers and short-lived booking holds
 hold-aware availability, explicit hold release, and atomic hold-to-Appointment conversion
 transaction-time slot, occupancy, capacity, and idempotency revalidation
+reschedule-aware offer issuance with one trusted source-Appointment exclusion
 appointment lifecycle transitions and neutral automation event emission
 ```
 
@@ -359,7 +361,7 @@ BookingOccupancyResolver
 FindBookableAvailabilityAction
 ```
 
-`AvailabilitySearch` normalizes the requested UTC range, display timezone, optional host filter, evaluation time, service minimum notice, and booking horizon. Requests are bounded to prevent accidental unbounded rule expansion.
+`AvailabilitySearch` normalizes the requested UTC range, display timezone, optional host filter, evaluation time, service minimum notice, and booking horizon. It may also carry one persisted same-service Appointment as a trusted reschedule exclusion. Requests are bounded to prevent accidental unbounded rule expansion.
 
 `AvailabilityInterval` is an internal normalized UTC interval. It retains host identity, applicable capacity, rule scope, source-window identity, and timezone provenance.
 
@@ -447,7 +449,7 @@ completed
 no_show
 ```
 
-The candidate appointment's buffers and each existing appointment service's buffers are applied before testing overlap.
+The candidate appointment's buffers and each existing appointment service's buffers are applied before testing overlap. A reschedule search excludes only its explicitly supplied same-service source Appointment, including that Appointment's buffers. Every other Appointment and active hold continues to consume capacity normally.
 
 ### Host resolution
 
@@ -489,6 +491,7 @@ A slot offer is an opaque, server-issued, expiring identity for one exact slot. 
 offer_id
 bookable_service_id
 scheduling_host_id
+reschedule_appointment_id
 starts_at / ends_at
 display_timezone
 capacity / remaining_capacity
@@ -501,7 +504,7 @@ consumed_at
 
 The caller receives only the opaque `offer_id`. Public or CRM booking actions must not accept caller-authored service, host, start, end, capacity, timezone, or rule-provenance values as authoritative booking input.
 
-`IssueBookableSlotOfferAction` revalidates the supplied server-side `BookableSlot` before persisting the offer. An offer may be consumed only once and cannot create a hold after `expires_at`.
+`IssueBookableSlotOfferAction` revalidates the supplied server-side `BookableSlot` before persisting the offer. An ordinary offer stores no reschedule identity. A reschedule-scoped offer locks one persisted source Appointment, verifies that it belongs to the service, remains in a reschedulable state, and has no existing replacement, then stores that identity in `reschedule_appointment_id`. An offer may be consumed only once and cannot create a hold after `expires_at`.
 
 ### booking_holds
 
@@ -540,9 +543,22 @@ offer_id
 idempotency_key
 ```
 
-It locks the offer, service, optional host, optional assignment, relevant appointments, and overlapping active holds in a deterministic transaction. It reruns exact-slot availability, applies current buffers and capacity, rejects stale or consumed offers, and prevents separate offers from over-reserving one slot.
+It locks the offer, service, optional host, optional assignment, optional reschedule source Appointment, relevant blocking appointments, and overlapping active holds in a deterministic transaction. It reruns exact-slot availability, applies current buffers and capacity, rejects stale or consumed offers, and prevents separate offers from over-reserving one slot.
 
 The same idempotency key returns the original hold for the same offer and is rejected when reused for another offer.
+
+### Reschedule preparation boundary
+
+A reschedule-scoped offer is the only authority for which Appointment may be ignored during replacement-slot calculation. The caller still submits only:
+
+```text
+offer_id
+idempotency_key
+```
+
+The caller cannot nominate an Appointment to exclude. `CreateBookingHoldAction` resolves that identity from the locked offer, re-locks the source Appointment, verifies that it still belongs to the service, remains `pending`, `scheduled`, or `confirmed`, and has not already produced a replacement, then excludes exactly that Appointment from occupancy revalidation. Competing Appointments, active holds, host capacity, service capacity, assignment overrides, availability-window capacity, and all non-source buffers remain authoritative.
+
+This preparation slice does not create the replacement Appointment, cancel the original, enforce `reschedule_notice_minutes`, copy attendees, or emit `appointment.rescheduled`. Those behaviors belong to the later atomic hold-to-reschedule transaction.
 
 ### Expiration contract
 
@@ -640,7 +656,7 @@ appointment.completed
 appointment.no_show
 ```
 
-`appointment.rescheduled` remains deferred to the dedicated rescheduling transaction.
+`appointment.rescheduled` remains deferred to the atomic hold-to-reschedule transaction. Reschedule-aware offers and holds are implemented, but they do not mutate either Appointment.
 
 FlowRoutes listens through the generic automation-event seam. Scheduling does not depend on FlowRoutes.
 
@@ -710,7 +726,7 @@ Deferred after the booking transaction foundation:
 
 ```text
 non-hold CRM/manual appointment creation
-reschedule action
+atomic hold-to-reschedule action
 CRM Scheduling workspace
 public service selection and booking pages
 SCHEDULING_APP_URL routing and setup validation
