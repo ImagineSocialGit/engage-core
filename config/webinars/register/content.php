@@ -209,7 +209,6 @@ return [
             'consent_messages' => [
                 'email' => [
                     'label' => 'Email me my webinar confirmation, access link, reminders, replay, and webinar-related updates.',
-                    'helper' => 'You may unsubscribe at any time.',
                 ],
                 'sms' => [
                     'label' => 'Text me webinar reminders and access information.',

@@ -83,6 +83,8 @@
         || $marketingSmsAvailable;
     $smsAvailable = $transactionalSmsAvailable || $marketingSmsAvailable;
 
+    $marketingConsentAvailable = false;
+    
     $smsConsentModels = array_values(array_filter([
         $transactionalSmsAvailable ? 'transactionalSmsConsent' : null,
         $combinedMarketingAvailable
@@ -1114,6 +1116,18 @@
                     </fieldset>
                 @endif
 
+                <x-ui.button
+                    type="submit"
+                    x-bind:disabled="submitting || ! registrationFormReady"
+                    x-bind:aria-busy="submitting ? 'true' : 'false'"
+                    class="{{ $tokens['primary_button'] ?? 'w-full' }} disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                    <span x-show="! submitting">
+                        {{ $page['submit']['label'] ?? 'Reserve My Spot' }}
+                    </span>
+                    <span x-cloak x-show="submitting">Submitting…</span>
+                </x-ui.button>
+
                 @if(
                     (($page['legal_links']['enabled'] ?? false) && $legalLinks->isNotEmpty())
                     || $activeDisclosureItems->isNotEmpty()
@@ -1135,28 +1149,16 @@
                                 @endforeach
                             </p>
                         @endif
-
-                        @if($activeDisclosureItems->isNotEmpty())
-                            <x-ui.disclosures
-                                :items="$activeDisclosureItems->values()->all()"
-                                id-prefix="webinar-registration"
-                                :style="$style['disclosures'] ?? []"
-                            />
-                        @endif
                     </div>
                 @endif
 
-                <x-ui.button
-                    type="submit"
-                    x-bind:disabled="submitting || ! registrationFormReady"
-                    x-bind:aria-busy="submitting ? 'true' : 'false'"
-                    class="{{ $tokens['primary_button'] ?? 'w-full' }} disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                    <span x-show="! submitting">
-                        {{ $page['submit']['label'] ?? 'Reserve My Spot' }}
-                    </span>
-                    <span x-cloak x-show="submitting">Submitting…</span>
-                </x-ui.button>
+                @if($activeDisclosureItems->isNotEmpty())
+                    <x-ui.disclosures
+                        :items="$activeDisclosureItems->values()->all()"
+                        id-prefix="webinar-registration"
+                        :style="$style['disclosures'] ?? []"
+                    />
+                @endif
             </form>
         </x-ui.card>
     </div>
