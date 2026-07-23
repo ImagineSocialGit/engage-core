@@ -10,7 +10,6 @@ use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use App\Modules\Webinars\Services\WebinarProviderManager;
-use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -55,15 +54,10 @@ class SyncWebinarSeriesFromProviderAction
                 'webinar_series_id' => $series->id,
             ]);
 
-            $webinar->fill([
+            $attributes = [
                 'platform' => $provider,
                 'provider_event_type' => $providerEventType,
                 'title' => $fetchedWebinar->title,
-                'slug' => $this->makeSlug(
-                    title: $fetchedWebinar->title,
-                    startTime: $fetchedWebinar->startsAt,
-                    externalId: $fetchedWebinar->externalId,
-                ),
                 'join_url' => $fetchedWebinar->joinUrl,
                 'registration_url' => $fetchedWebinar->registrationUrl ?? $webinar->registration_url,
                 'starts_at' => $fetchedWebinar->startsAt,
@@ -75,12 +69,20 @@ class SyncWebinarSeriesFromProviderAction
                     provider: $provider,
                     providerMeta: $fetchedWebinar->meta,
                 ),
-            ]);
+            ];
 
             if (! $webinar->exists) {
+                $attributes['slug'] = $this->makeSlug(
+                    title: $fetchedWebinar->title,
+                    provider: $provider,
+                    providerEventType: $providerEventType,
+                    externalId: $fetchedWebinar->externalId,
+                );
+
                 $webinar->provider_settings = null;
             }
 
+            $webinar->fill($attributes);
             $webinar->save();
 
             if ($webinar->wasRecentlyCreated) {
@@ -204,12 +206,17 @@ class SyncWebinarSeriesFromProviderAction
             ->get();
     }
 
-    protected function makeSlug(string $title, ?CarbonInterface $startTime, string $externalId): string
-    {
-        if ($startTime) {
-            return Str::slug($title.'-'.$startTime->format('Y-m-d-gia'));
-        }
-
-        return Str::slug($title.'-'.$externalId);
+    protected function makeSlug(
+        string $title,
+        string $provider,
+        string $providerEventType,
+        string $externalId,
+    ): string {
+        return Str::slug(implode('-', [
+            $title,
+            $provider,
+            $providerEventType,
+            $externalId,
+        ]));
     }
 }

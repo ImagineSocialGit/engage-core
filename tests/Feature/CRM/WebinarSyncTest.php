@@ -19,6 +19,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Mockery;
 use Tests\TestCase;
 
@@ -93,6 +94,21 @@ class WebinarSyncTest extends TestCase
             'registration_url' => null,
             'description' => 'Second webinar',
         ]);
+
+        $this->assertSame(
+            Str::slug($series->title.'-zoom-webinar-zoom-1001'),
+            Webinar::query()
+                ->where('external_id', 'zoom-1001')
+                ->firstOrFail()
+                ->slug,
+        );
+        $this->assertSame(
+            Str::slug($series->title.'-zoom-webinar-zoom-1002'),
+            Webinar::query()
+                ->where('external_id', 'zoom-1002')
+                ->firstOrFail()
+                ->slug,
+        );
 
         $this->assertSame(
             [
@@ -187,6 +203,7 @@ class WebinarSyncTest extends TestCase
         $webinar->refresh();
 
         $this->assertSame('Home Buyer Game Plan', $webinar->title);
+        $this->assertSame('old-title', $webinar->slug);
         $this->assertSame('https://example.com/new-join', $webinar->join_url);
         $this->assertSame('https://example.com/old-register', $webinar->registration_url);
         $this->assertSame('America/Chicago', $webinar->timezone);

@@ -178,6 +178,7 @@ class WebinarRegistrationBoundaryContractTest extends TestCase
                     ) use ($registration): bool {
                         return $viewRegistration->is($registration);
                     })
+                    ->assertViewHas('cancellationState', 'cancellable')
                     ->assertViewHas('cancelUrl');
             }
         }
@@ -234,6 +235,16 @@ class WebinarRegistrationBoundaryContractTest extends TestCase
             $scheduledMessage->status,
         );
 
+        $this->get($this->signedCancellationUrl(
+            routeName: 'webinar.registration.cancellation.show',
+            registration: $registration,
+        ))
+            ->assertOk()
+            ->assertViewIs('webinar.registration-cancellation-confirm')
+            ->assertViewHas('cancellationState', 'already_cancelled')
+            ->assertViewHas('cancelUrl', null)
+            ->assertDontSee('Cancel registration');
+
         $this->post($url)
             ->assertOk()
             ->assertViewIs('webinar.registration-cancelled');
@@ -247,6 +258,57 @@ class WebinarRegistrationBoundaryContractTest extends TestCase
             ScheduledMessage::STATUS_SKIPPED,
             $scheduledMessage->status,
         );
+    }
+
+    public function test_terminal_registration_cancellation_links_render_unavailable_without_mutation(): void
+    {
+        foreach (['attended', 'missed'] as $status) {
+            $registration = WebinarRegistration::factory()->create([
+                'status' => $status,
+                'cancelled_at' => null,
+                'meta' => [
+                    'integrity_marker' => $status,
+                ],
+            ]);
+
+            $scheduledMessage = ScheduledMessage::factory()->create([
+                'context_type' => $registration->getMorphClass(),
+                'context_id' => $registration->getKey(),
+                'status' => ScheduledMessage::STATUS_PENDING,
+            ]);
+
+            foreach ([
+                ['get', 'webinar.registration.cancellation.show'],
+                ['post', 'webinar.registration.cancellation.store'],
+            ] as [$method, $routeName]) {
+                $this->{$method}($this->signedCancellationUrl(
+                    routeName: $routeName,
+                    registration: $registration,
+                ))
+                    ->assertOk()
+                    ->assertViewIs(
+                        'webinar.registration-cancellation-confirm',
+                    )
+                    ->assertViewHas('cancellationState', 'ineligible')
+                    ->assertViewHas('cancelUrl', null)
+                    ->assertSee('Cancellation is no longer available')
+                    ->assertDontSee('Cancel registration');
+            }
+
+            $registration->refresh();
+            $scheduledMessage->refresh();
+
+            $this->assertSame($status, $registration->status);
+            $this->assertNull($registration->cancelled_at);
+            $this->assertSame(
+                ['integrity_marker' => $status],
+                $registration->meta,
+            );
+            $this->assertSame(
+                ScheduledMessage::STATUS_PENDING,
+                $scheduledMessage->status,
+            );
+        }
     }
 
     public function test_join_get_head_and_repeated_get_only_show_confirmation_without_mutation(): void

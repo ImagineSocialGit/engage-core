@@ -4,6 +4,7 @@ namespace Tests\Feature\Webinars;
 
 use App\Models\User;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Webinars\Actions\CancelWebinarRegistrationAction;
 use App\Modules\Webinars\Actions\CancelWebinarRegistrationWithProviderAction;
 use App\Modules\Webinars\Contracts\WebinarProvider;
@@ -11,9 +12,12 @@ use App\Modules\Webinars\Data\WebinarProviderCancellationResult;
 use App\Modules\Webinars\Jobs\CancelWebinarRegistrationWithProviderJob;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Services\WebinarRegistrationCancellationPolicy;
 use App\Modules\Webinars\Services\WebinarProviderManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use LogicException;
 use Mockery;
 use RuntimeException;
 use Tests\TestCase;
@@ -21,6 +25,39 @@ use Tests\TestCase;
 class ProviderCancellationReconciliationTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_cancellation_policy_classifies_coherent_registration_states(): void
+    {
+        $policy = app(WebinarRegistrationCancellationPolicy::class);
+
+        foreach (['pending', 'registered'] as $status) {
+            $this->assertSame(
+                WebinarRegistrationCancellationPolicy::STATE_CANCELLABLE,
+                $policy->stateFor(new WebinarRegistration([
+                    'status' => $status,
+                    'cancelled_at' => null,
+                ])),
+            );
+        }
+
+        $this->assertSame(
+            WebinarRegistrationCancellationPolicy::STATE_ALREADY_CANCELLED,
+            $policy->stateFor(new WebinarRegistration([
+                'status' => 'cancelled',
+                'cancelled_at' => now(),
+            ])),
+        );
+
+        foreach (['attended', 'missed'] as $status) {
+            $this->assertSame(
+                WebinarRegistrationCancellationPolicy::STATE_INELIGIBLE,
+                $policy->stateFor(new WebinarRegistration([
+                    'status' => $status,
+                    'cancelled_at' => null,
+                ])),
+            );
+        }
+    }
 
     public function test_local_cancellation_queues_provider_work_once_without_calling_the_provider_inline(): void
     {
@@ -58,6 +95,131 @@ class ProviderCancellationReconciliationTest extends TestCase
                 $job->registrationId === $registration->getKey(),
         );
         Queue::assertPushed(CancelWebinarRegistrationWithProviderJob::class, 1);
+    }
+
+    public function test_coherent_existing_cancellation_is_a_complete_no_op(): void
+    {
+        Queue::fake();
+
+        $registration = WebinarRegistration::factory()->create([
+            'status' => 'cancelled',
+            'cancelled_at' => now(),
+            'meta' => [
+                'integrity_marker' => 'preserved',
+            ],
+        ]);
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'context_type' => $registration->getMorphClass(),
+            'context_id' => $registration->getKey(),
+            'status' => ScheduledMessage::STATUS_PENDING,
+        ]);
+
+        $cancelledAt = $registration->cancelled_at?->toISOString();
+        $outboxCount = DB::table('automation_event_outbox_events')->count();
+
+        $result = app(CancelWebinarRegistrationAction::class)
+            ->handle($registration);
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame('cancelled', $result->status);
+        $this->assertSame($cancelledAt, $result->cancelled_at?->toISOString());
+        $this->assertSame(
+            ['integrity_marker' => 'preserved'],
+            $result->meta,
+        );
+        $this->assertSame(
+            ScheduledMessage::STATUS_PENDING,
+            $scheduledMessage->status,
+        );
+        $this->assertSame(
+            $outboxCount,
+            DB::table('automation_event_outbox_events')->count(),
+        );
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_terminal_and_inconsistent_registration_states_reject_cancellation_without_side_effects(): void
+    {
+        Queue::fake();
+
+        $cases = [
+            [
+                'status' => 'attended',
+                'cancelled_at' => null,
+            ],
+            [
+                'status' => 'missed',
+                'cancelled_at' => null,
+            ],
+            [
+                'status' => 'registered',
+                'cancelled_at' => now(),
+            ],
+            [
+                'status' => 'cancelled',
+                'cancelled_at' => null,
+            ],
+        ];
+
+        foreach ($cases as $index => $case) {
+            $registration = WebinarRegistration::factory()->create([
+                ...$case,
+                'meta' => [
+                    'integrity_marker' => 'case-'.$index,
+                ],
+            ]);
+
+            $scheduledMessage = ScheduledMessage::factory()->create([
+                'context_type' => $registration->getMorphClass(),
+                'context_id' => $registration->getKey(),
+                'status' => ScheduledMessage::STATUS_PENDING,
+            ]);
+
+            $outboxCount = DB::table(
+                'automation_event_outbox_events',
+            )->count();
+            $expectedCancelledAt = $registration->cancelled_at?->toISOString();
+
+            try {
+                app(CancelWebinarRegistrationAction::class)
+                    ->handle($registration);
+
+                $this->fail(
+                    'Terminal and inconsistent registrations must reject cancellation.',
+                );
+            } catch (LogicException $exception) {
+                $this->assertSame(
+                    'Webinar registration cancellation is not permitted for its current state.',
+                    $exception->getMessage(),
+                );
+            }
+
+            $registration->refresh();
+            $scheduledMessage->refresh();
+
+            $this->assertSame($case['status'], $registration->status);
+            $this->assertSame(
+                $expectedCancelledAt,
+                $registration->cancelled_at?->toISOString(),
+            );
+            $this->assertSame(
+                ['integrity_marker' => 'case-'.$index],
+                $registration->meta,
+            );
+            $this->assertSame(
+                ScheduledMessage::STATUS_PENDING,
+                $scheduledMessage->status,
+            );
+            $this->assertSame(
+                $outboxCount,
+                DB::table('automation_event_outbox_events')->count(),
+            );
+        }
+
+        Queue::assertNothingPushed();
     }
 
     public function test_provider_failure_is_durable_and_a_later_retry_is_idempotent(): void

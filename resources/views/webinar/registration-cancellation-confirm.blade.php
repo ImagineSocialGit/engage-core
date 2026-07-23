@@ -7,13 +7,21 @@
                         Webinar registration
                     </p>
 
-                    @if($registration->status === 'cancelled')
+                    @if($cancellationState === 'already_cancelled')
                         <h1 class="text-3xl font-extrabold tracking-tight text-slate-950">
                             Your registration is already cancelled
                         </h1>
 
                         <p class="text-base leading-7 text-slate-600">
                             No further action is needed.
+                        </p>
+                    @elseif($cancellationState === 'ineligible')
+                        <h1 class="text-3xl font-extrabold tracking-tight text-slate-950">
+                            Cancellation is no longer available
+                        </h1>
+
+                        <p class="text-base leading-7 text-slate-600">
+                            This registration can no longer be cancelled.
                         </p>
                     @else
                         <h1 class="text-3xl font-extrabold tracking-tight text-slate-950">
@@ -44,22 +52,15 @@
                     </div>
                 @endif
 
-                <div class="grid gap-3 sm:grid-cols-2">
-                    <a
-                        href="{{ route('webinar.index') }}"
-                        class="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-200"
-                    >
-                        Keep my registration
-                    </a>
-
-                    @if($registration->status === 'cancelled')
+                @if($cancellationState === 'cancellable')
+                    <div class="grid gap-3 sm:grid-cols-2">
                         <a
                             href="{{ route('webinar.index') }}"
-                            class="inline-flex w-full items-center justify-center rounded-xl bg-slate-950 px-6 py-3 text-sm font-extrabold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-300"
+                            class="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-200"
                         >
-                            View upcoming webinars
+                            Keep my registration
                         </a>
-                    @else
+
                         <form method="POST" action="{{ $cancelUrl }}">
                             @csrf
 
@@ -70,8 +71,15 @@
                                 Cancel registration
                             </button>
                         </form>
-                    @endif
-                </div>
+                    </div>
+                @else
+                    <a
+                        href="{{ route('webinar.index') }}"
+                        class="inline-flex w-full items-center justify-center rounded-xl bg-slate-950 px-6 py-3 text-sm font-extrabold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-300"
+                    >
+                        View upcoming webinars
+                    </a>
+                @endif
             </div>
         </section>
     </main>

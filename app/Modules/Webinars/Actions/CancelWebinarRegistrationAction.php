@@ -4,6 +4,7 @@ namespace App\Modules\Webinars\Actions;
 
 use App\Modules\Messaging\Actions\SkipScheduledMessagesAction;
 use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Services\WebinarRegistrationCancellationPolicy;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 use Throwable;
@@ -15,13 +16,14 @@ class CancelWebinarRegistrationAction
         private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
         private readonly QueueWebinarProviderCancellationAction $queueProviderCancellation,
         private readonly ResolveWebinarRegistrationReplacementChainAction $resolveReplacementChain,
+        private readonly WebinarRegistrationCancellationPolicy $cancellationPolicy,
     ) {}
 
     public function handle(
         WebinarRegistration $registration,
         string $source = 'email_link',
     ): WebinarRegistration {
-        $registration = DB::transaction(function () use ($registration, $source): WebinarRegistration {
+        [$registration, $wasCancelled] = DB::transaction(function () use ($registration, $source): array {
             $chain = $this->resolveReplacementChain->handle(
                 registration: $registration,
                 lock: true,
@@ -34,12 +36,14 @@ class CancelWebinarRegistrationAction
             }
 
             $locked = $chain->canonical;
+            $cancellationState = $this->cancellationPolicy
+                ->assertCancellableOrAlreadyCancelled($locked);
 
             if (
-                $locked->status === 'cancelled'
-                || $locked->cancelled_at !== null
+                $cancellationState
+                === WebinarRegistrationCancellationPolicy::STATE_ALREADY_CANCELLED
             ) {
-                return $locked;
+                return [$locked, false];
             }
 
             $cancelledAt = now();
@@ -81,15 +85,17 @@ class CancelWebinarRegistrationAction
                 ],
             );
 
-            return $locked;
+            return [$locked, true];
         });
 
-        try {
-            $this->queueProviderCancellation->handle($registration);
-        } catch (Throwable $exception) {
-            // Provider reconciliation is downstream of the committed local
-            // cancellation and must not change the public cancellation result.
-            report($exception);
+        if ($wasCancelled) {
+            try {
+                $this->queueProviderCancellation->handle($registration);
+            } catch (Throwable $exception) {
+                // Provider reconciliation is downstream of the committed local
+                // cancellation and must not change the public cancellation result.
+                report($exception);
+            }
         }
 
         return $registration->fresh([
