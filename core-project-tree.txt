@@ -996,6 +996,8 @@
 │       │   ├── PresetCompositionResolver.php
 │       │   ├── PresetContributionRegistry.php
 │       │   └── PresetPackageResolver.php
+│       ├── Queues
+│       │   └── QueueContract.php
 │       ├── SetupValidation
 │       │   ├── Contracts
 │       │   │   └── SetupValidationContributor.php
@@ -1416,6 +1418,7 @@
 │       │   │   ├── data
 │       │   │   │   ├── empty-state.blade.php
 │       │   │   │   └── table.blade.php
+│       │   │   ├── disclosures.blade.php
 │       │   │   ├── feedback
 │       │   │   │   ├── alert.blade.php
 │       │   │   │   └── badge.blade.php
@@ -1513,6 +1516,7 @@
 │   └── web.php
 ├── scripts
 │   ├── add-client-modules.sh
+│   ├── audit-db-bloat.sh
 │   ├── build-image-manifest.php
 │   ├── create-client.sh
 │   ├── dump-client-files.sh
@@ -1659,6 +1663,7 @@
 │   │   │   ├── MessageTemplateTokenValidationControllerTest.php
 │   │   │   ├── MessageTemplateTokenValidatorTest.php
 │   │   │   ├── MessagingSetupValidationContributorTest.php
+│   │   │   ├── QueueContractTest.php
 │   │   │   ├── ResolvedMessageDispatchBuilderTest.php
 │   │   │   ├── ResolvedMessageDispatchIntegrationTest.php
 │   │   │   ├── ResolvedMessageDispatchSchemaTest.php
@@ -1766,6 +1771,7 @@
 │   │   │   ├── WebinarRegistrationConsentHeaderPresentationTest.php
 │   │   │   ├── WebinarRegistrationConsentPresentationTest.php
 │   │   │   ├── WebinarRegistrationControllerTest.php
+│   │   │   ├── WebinarRegistrationDisclosurePresentationTest.php
 │   │   │   ├── WebinarRegistrationFrontendContractTest.php
 │   │   │   ├── WebinarRegistrationMessageConsolidationTest.php
 │   │   │   ├── WebinarRegistrationOccurrenceResolutionTest.php
@@ -1795,4 +1801,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-496 directories, 1300 files
+497 directories, 1305 files

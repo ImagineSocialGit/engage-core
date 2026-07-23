@@ -121,6 +121,10 @@ return [
     'delivery' => [
         'claim_lease_seconds' => env('MESSAGING_DELIVERY_CLAIM_LEASE_SECONDS', 900),
         'stale_recovery_batch_size' => env('MESSAGING_DELIVERY_RECOVERY_BATCH_SIZE', 100),
+        'pending_message_overdue_grace_seconds' => env(
+            'MESSAGING_PENDING_MESSAGE_OVERDUE_GRACE_SECONDS',
+            300,
+        ),
         'retry_backoff_seconds' => [60, 300],
 
         'provider_idempotency' => [

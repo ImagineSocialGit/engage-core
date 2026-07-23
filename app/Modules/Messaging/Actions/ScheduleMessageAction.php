@@ -7,6 +7,7 @@ use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\PendingMessageDeliveryConsolidator;
+use App\Support\Queues\QueueContract;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
@@ -14,6 +15,7 @@ class ScheduleMessageAction
 {
     public function __construct(
         private readonly PendingMessageDeliveryConsolidator $pendingMessageDeliveryConsolidator,
+        private readonly QueueContract $queueContract,
     ) {}
 
     public function handle(
@@ -48,7 +50,9 @@ class ScheduleMessageAction
             ],
         ]);
 
-        $queue = $this->nullableString($meta['queue'] ?? null);
+        $queue = $this->queueContract->assertDispatchable(
+            $this->nullableString($meta['queue'] ?? null),
+        );
         $definitionConfigPath = $this->nullableString(
             $meta['definition_config_path'] ?? null,
         );
@@ -104,18 +108,17 @@ class ScheduleMessageAction
         }
 
         if ($wasRecentlyCreated) {
-            $dispatch = SendScheduledMessageJob::dispatch(
+            SendScheduledMessageJob::dispatch(
                 scheduledMessageId: $scheduledMessage->id,
                 horizon: $this->horizonPayload(
                     $scheduledMessage,
                     $sendAt,
                     $context,
                 ),
-            )->delay($sendAt)->afterCommit();
-
-            if ($queue !== null) {
-                $dispatch->onQueue($queue);
-            }
+            )
+                ->delay($sendAt)
+                ->afterCommit()
+                ->onQueue($queue);
         }
 
         return $scheduledMessage;

@@ -107,6 +107,10 @@ return [
             'description' => 'Default application queue.',
             'status' => 'active',
         ],
+        'notifications' => [
+            'description' => 'Internal/team notifications and shared notification work, including Webinar waitlist delivery.',
+            'status' => 'active',
+        ],
         'confirmation_messages' => [
             'description' => 'Registration confirmations and similar confirmation messages.',
             'status' => 'active',
@@ -127,12 +131,8 @@ return [
             'description' => 'Marketing campaign/nurture message scheduling.',
             'status' => 'active',
         ],
-        'waitlist' => [
-            'description' => 'Waitlist-related notices.',
-            'status' => 'active',
-        ],
-        'notifications' => [
-            'description' => 'Internal/team notifications and shared notification work.',
+        'emails' => [
+            'description' => 'Generic email and Broadcast delivery work.',
             'status' => 'active',
         ],
         'sms' => [
@@ -430,12 +430,10 @@ return [
             'If a client key becomes generally useful, promote it into this core registry later.',
         ],
         'example_prefixes' => [
-            'slam_dunk.va_buyer_follow_up',
-            'slam_dunk.credit_review_requested',
-            'acme.customer_reengagement',
+            '[CLIENT_KEY].follow_up',
+            '[CLIENT_KEY].review_requested',
+            '[CLIENT_KEY].customer_reengagement',
         ],
     ],
 
 ];
-
-

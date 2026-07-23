@@ -5,11 +5,13 @@ namespace App\Modules\Messaging\Services;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
+use App\Support\Queues\QueueContract;
 
 class MessageConfigValidator
 {
     public function __construct(
         private readonly MessageTemplateTokenValidator $messageTemplateTokenValidator,
+        private readonly QueueContract $queueContract,
     ) {}
 
     /**
@@ -276,6 +278,20 @@ class MessageConfigValidator
             if (array_key_exists($stringKey, $definition) && (! is_string($definition[$stringKey]) || trim($definition[$stringKey]) === '')) {
                 $issues[] = $this->issue('error', "{$path}.{$stringKey}", "Message definition has invalid [{$stringKey}].");
             }
+        }
+
+        $queue = $definition['queue'] ?? null;
+
+        if (
+            is_string($queue)
+            && trim($queue) !== ''
+            && ! $this->queueContract->isSupported($queue)
+        ) {
+            $issues[] = $this->issue(
+                'error',
+                "{$path}.queue",
+                "Message definition queue [{$queue}] is not registered in the executable queue contract.",
+            );
         }
 
         $payloadClass = $definition['payload_class'] ?? null;

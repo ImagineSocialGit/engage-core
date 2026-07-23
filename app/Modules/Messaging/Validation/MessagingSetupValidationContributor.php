@@ -6,9 +6,11 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
+use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ConsentDomainRegistry;
 use App\Modules\Messaging\Services\MessageConfigValidator;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
+use App\Support\Queues\QueueContract;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 use Illuminate\Support\Collection;
@@ -21,16 +23,35 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
     public function __construct(
         private readonly MessageConfigValidator $messageConfigValidator,
         private readonly ConsentDomainRegistry $consentDomainRegistry,
+        private readonly QueueContract $queueContract,
     ) {}
 
     public function findings(): iterable
     {
+        yield from $this->validateQueueContract();
         yield from $this->validateConsentDomains();
         yield from $this->validateConfigRoutes();
         yield from $this->validateCustomizedPresets();
         yield from $this->validateActiveAssignments();
+        yield from $this->validatePendingMessageQueues();
         yield from $this->validateAmbiguousStandardAssignments();
         yield from $this->validateExactAssignmentAmbiguity();
+    }
+
+    /**
+     * @return iterable<int, SetupValidationFinding>
+     */
+    private function validateQueueContract(): iterable
+    {
+        foreach ($this->queueContract->validationIssues() as $issue) {
+            yield $this->error(
+                code: 'messaging.queue_contract.'.$issue['code'],
+                message: $issue['message'],
+                source: 'queue_contract',
+                path: $issue['path'],
+                context: $issue['context'],
+            );
+        }
     }
 
     /**
@@ -293,6 +314,19 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
                 );
             }
 
+            if (! $this->queueContract->isSupported($preset->queue)) {
+                yield $this->error(
+                    code: 'messaging.assignment_preset_queue_unregistered',
+                    message: "Active MessageTemplatePresetAssignment [{$assignment->getKey()}] references preset [{$preset->key}] with unregistered queue [{$preset->queue}].",
+                    source: 'message_template_preset_assignments',
+                    path: "{$path}.message_template_preset_id",
+                    context: $context + [
+                        'message_template_preset_key' => $preset->key,
+                        'queue' => $preset->queue,
+                    ],
+                );
+            }
+
             foreach (['channel', 'purpose', 'scope', 'message_type'] as $field) {
                 if (! $this->filledString($assignment->{$field})) {
                     yield $this->error(
@@ -359,6 +393,66 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
         }
     }
 
+    /**
+     * @return iterable<int, SetupValidationFinding>
+     */
+    private function validatePendingMessageQueues(): iterable
+    {
+        $queueValues = ScheduledMessage::query()
+            ->where('status', ScheduledMessage::STATUS_PENDING)
+            ->distinct()
+            ->pluck('queue');
+
+        foreach ($queueValues as $storedQueue) {
+            $queue = $this->queueContract->resolve(
+                is_string($storedQueue) ? $storedQueue : null,
+            );
+
+            if (! $this->queueContract->isSupported($queue)) {
+                yield $this->error(
+                    code: 'messaging.pending_message_queue_unregistered',
+                    message: "Pending ScheduledMessages reference unregistered queue [{$queue}].",
+                    source: 'scheduled_messages',
+                    path: 'scheduled_messages.queue',
+                    context: [
+                        'queue' => $queue,
+                        'pending_count' => $this->pendingMessageCountForQueue($storedQueue),
+                    ],
+                );
+
+                continue;
+            }
+
+            if (
+                $this->queueContract->hasHorizonEnvironmentConfiguration()
+                && ! $this->queueContract->isConsumed($queue)
+            ) {
+                yield $this->error(
+                    code: 'messaging.pending_message_queue_unconsumed',
+                    message: "Pending ScheduledMessages reference queue [{$queue}], which Horizon does not consume in environment [{$this->queueContract->environment()}].",
+                    source: 'scheduled_messages',
+                    path: 'scheduled_messages.queue',
+                    context: [
+                        'environment' => $this->queueContract->environment(),
+                        'queue' => $queue,
+                        'pending_count' => $this->pendingMessageCountForQueue($storedQueue),
+                    ],
+                );
+            }
+        }
+    }
+
+    private function pendingMessageCountForQueue(mixed $queue): int
+    {
+        return ScheduledMessage::query()
+            ->where('status', ScheduledMessage::STATUS_PENDING)
+            ->when(
+                $queue === null,
+                fn ($query) => $query->whereNull('queue'),
+                fn ($query) => $query->where('queue', $queue),
+            )
+            ->count();
+    }
 
     /**
      * @return iterable<int, SetupValidationFinding>

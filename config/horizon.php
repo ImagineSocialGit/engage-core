@@ -1,6 +1,19 @@
 <?php
 
+use App\Support\Queues\QueueContract;
 use Illuminate\Support\Str;
+
+$configuredSupervisorQueues = env(
+    'HORIZON_SUPERVISOR_1_QUEUES',
+    implode(',', QueueContract::QUEUES),
+);
+
+$supervisorQueues = is_string($configuredSupervisorQueues)
+    ? array_values(array_unique(array_filter(array_map(
+        static fn (string $queue): string => trim($queue),
+        explode(',', $configuredSupervisorQueues),
+    ), static fn (string $queue): bool => $queue !== '')))
+    : QueueContract::QUEUES;
 
 return [
 
@@ -190,26 +203,16 @@ return [
     | Queue Worker Configuration
     |--------------------------------------------------------------------------
     |
-    | Here you may define the queue worker settings used by your application
-    | in all environments. These supervisors and settings handle all your
-    | queued jobs and will be provisioned by Horizon during deployment.
+    | QueueContract::QUEUES is the executable inventory. Environment overrides
+    | may tune the active list, but setup validation rejects drift from the
+    | registered queues before deployment.
     |
     */
-
-    // TODO: Later you’ll likely want queues like:
-
-    // default
-    // emails
-    // sms
-    // webhooks
-    // zoom
-
-    // Not yet required, but plan for it.
 
     'defaults' => [
         'supervisor-1' => [
             'connection' => 'redis',
-            'queue' => ['default'],
+            'queue' => QueueContract::QUEUES,
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
             'maxProcesses' => env('HORIZON_MAX_PROCESSES', 1),
@@ -228,30 +231,21 @@ return [
                 'maxProcesses' => env('HORIZON_PRODUCTION_MAX_PROCESSES', 10),
                 'balanceMaxShift' => env('HORIZON_BALANCE_MAX_SHIFT', 1),
                 'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 3),
-                'queue' => explode(',', env(
-                    'HORIZON_SUPERVISOR_1_QUEUES',
-                    'default,notifications,confirmation_messages,reminders,opt_in_messages,post_event,marketing'
-                )),
+                'queue' => $supervisorQueues,
             ],
         ],
 
         'staging' => [
             'supervisor-1' => [
                 'maxProcesses' => env('HORIZON_STAGING_MAX_PROCESSES', 3),
-                'queue' => explode(',', env(
-                    'HORIZON_SUPERVISOR_1_QUEUES',
-                    'default,notifications,confirmation_messages,reminders,opt_in_messages,post_event,marketing'
-                )),
+                'queue' => $supervisorQueues,
             ],
         ],
 
         'local' => [
             'supervisor-1' => [
                 'maxProcesses' => env('HORIZON_LOCAL_MAX_PROCESSES', 3),
-                'queue' => explode(',', env(
-                    'HORIZON_SUPERVISOR_1_QUEUES',
-                    'default,notifications,confirmation_messages,reminders,opt_in_messages,post_event,marketing'
-                )),
+                'queue' => $supervisorQueues,
             ],
         ],
     ],
