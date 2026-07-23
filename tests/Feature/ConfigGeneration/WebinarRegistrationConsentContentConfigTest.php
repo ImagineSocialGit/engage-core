@@ -269,29 +269,72 @@ class WebinarRegistrationConsentContentConfigTest extends TestCase
             );
         }
 
-        $copyRequirements = [
-            'transactional.email' => ['fields.consent_messages.email.label'],
-            'transactional.sms' => [
-                'fields.consent_messages.sms.label',
-                'fields.consent_messages.sms.disclosure',
-            ],
-            'marketing.email' => ['fields.marketing_consent_messages.email.label'],
-            'marketing.sms' => [
-                'fields.marketing_consent_messages.sms.label',
-                'fields.marketing_consent_messages.sms.disclosure',
-            ],
-        ];
-
-        foreach ($copyRequirements as $consentPath => $requiredPaths) {
+        foreach ([
+            'transactional.email' => 'fields.consent_messages.email.label',
+            'transactional.sms' => 'fields.consent_messages.sms.label',
+        ] as $consentPath => $requiredPath) {
             if (data_get($consents, $consentPath) !== true) {
                 continue;
             }
 
-            foreach ($requiredPaths as $requiredPath) {
+            $this->assertNonBlankString(
+                data_get($registration, $requiredPath),
+                $source,
+                $requiredPath,
+            );
+        }
+
+        if (data_get($consents, 'transactional.sms') === true) {
+            $this->assertDisclosureContract(
+                registration: $registration,
+                fieldPath: 'fields.consent_messages.sms',
+                source: $source,
+            );
+        }
+
+        $combinedMarketing = data_get($consents, 'marketing.combined') === true
+            && data_get($consents, 'marketing.email') === true
+            && data_get($consents, 'marketing.sms') === true;
+
+        if ($combinedMarketing) {
+            $this->assertNonBlankString(
+                data_get(
+                    $registration,
+                    'fields.marketing_consent_messages.combined.label',
+                ),
+                $source,
+                'fields.marketing_consent_messages.combined.label',
+            );
+            $this->assertDisclosureContract(
+                registration: $registration,
+                fieldPath: 'fields.marketing_consent_messages.combined',
+                source: $source,
+            );
+        } else {
+            if (data_get($consents, 'marketing.email') === true) {
                 $this->assertNonBlankString(
-                    data_get($registration, $requiredPath),
+                    data_get(
+                        $registration,
+                        'fields.marketing_consent_messages.email.label',
+                    ),
                     $source,
-                    $requiredPath,
+                    'fields.marketing_consent_messages.email.label',
+                );
+            }
+
+            if (data_get($consents, 'marketing.sms') === true) {
+                $this->assertNonBlankString(
+                    data_get(
+                        $registration,
+                        'fields.marketing_consent_messages.sms.label',
+                    ),
+                    $source,
+                    'fields.marketing_consent_messages.sms.label',
+                );
+                $this->assertDisclosureContract(
+                    registration: $registration,
+                    fieldPath: 'fields.marketing_consent_messages.sms',
+                    source: $source,
                 );
             }
         }
@@ -324,6 +367,72 @@ class WebinarRegistrationConsentContentConfigTest extends TestCase
     {
         return data_get($consents, "{$purpose}.email") === true
             || data_get($consents, "{$purpose}.sms") === true;
+    }
+
+    /**
+     * @param array<string, mixed> $registration
+     */
+    private function assertDisclosureContract(
+        array $registration,
+        string $fieldPath,
+        string $source,
+    ): void {
+        $inlinePath = "{$fieldPath}.disclosure";
+        $inlineDisclosure = data_get($registration, $inlinePath);
+
+        if (is_string($inlineDisclosure) && trim($inlineDisclosure) !== '') {
+            return;
+        }
+
+        $referencesPath = "{$fieldPath}.disclosure_refs";
+        $references = data_get($registration, $referencesPath);
+
+        $this->assertIsArray(
+            $references,
+            "{$source}: [{$fieldPath}] must configure inline disclosure text or disclosure_refs.",
+        );
+
+        if (! is_array($references)) {
+            return;
+        }
+
+        $this->assertTrue(
+            array_is_list($references),
+            "{$source}: [{$referencesPath}] must be a list.",
+        );
+        $this->assertNotEmpty(
+            $references,
+            "{$source}: [{$referencesPath}] must not be empty.",
+        );
+        $this->assertSame(
+            count($references),
+            count(array_unique($references, SORT_REGULAR)),
+            "{$source}: [{$referencesPath}] must not contain duplicate keys.",
+        );
+
+        foreach ($references as $index => $reference) {
+            $referencePath = "{$referencesPath}.{$index}";
+
+            $this->assertNonBlankString(
+                $reference,
+                $source,
+                $referencePath,
+            );
+
+            if (! is_string($reference) || trim($reference) === '') {
+                continue;
+            }
+
+            $definitionPath = 'disclosures.items.'
+                .trim($reference)
+                .'.text';
+
+            $this->assertNonBlankString(
+                data_get($registration, $definitionPath),
+                $source,
+                $definitionPath,
+            );
+        }
     }
 
     private function assertNonBlankString(mixed $value, string $source, string $path): void

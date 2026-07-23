@@ -123,6 +123,222 @@
                 && trim($url) !== '#';
         })
         ->values();
+
+
+    $disclosureReferenceMarkerClass = data_get(
+        $style,
+        'disclosures.reference_marker',
+        'ml-0.5 align-super text-[0.7em] font-semibold text-current',
+    );
+    $disclosureDefinitions = data_get($page, 'disclosures.items', []);
+    $disclosureDefinitions = collect(
+        is_array($disclosureDefinitions) ? $disclosureDefinitions : [],
+    )
+        ->mapWithKeys(function (mixed $definition, mixed $key): array {
+            if (! is_string($key)
+                || preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]*$/', $key) !== 1
+                || ! is_array($definition)
+                || ! is_string($definition['text'] ?? null)
+                || trim($definition['text']) === ''
+            ) {
+                return [];
+            }
+
+            $marker = $definition['marker'] ?? null;
+            $marker = is_scalar($marker) ? trim((string) $marker) : null;
+
+            $label = $definition['label'] ?? null;
+            $label = is_string($label) ? trim($label) : null;
+
+            return [
+                $key => [
+                    'key' => $key,
+                    'id' => 'webinar-registration-'
+                        .str_replace('_', '-', $key)
+                        .'-disclosure',
+                    'marker' => $marker !== '' ? $marker : null,
+                    'label' => $label !== '' ? $label : null,
+                    'text' => trim($definition['text']),
+                ],
+            ];
+        });
+
+    $resolveDisclosureReferences = static function (
+        mixed $references,
+    ) use ($disclosureDefinitions): array {
+        if (! is_array($references)) {
+            return [];
+        }
+
+        return collect($references)
+            ->filter(fn (mixed $reference): bool =>
+                is_string($reference)
+                && trim($reference) !== ''
+                && $disclosureDefinitions->has(trim($reference))
+            )
+            ->map(fn (string $reference): array =>
+                $disclosureDefinitions->get(trim($reference))
+            )
+            ->unique('key')
+            ->values()
+            ->all();
+    };
+
+    $descriptionIds = static function (
+        array $referenceItems,
+        ?string $helperId = null,
+        ?string $inlineDisclosureId = null,
+    ): string {
+        return collect([
+            $helperId,
+            ...array_column($referenceItems, 'id'),
+            $referenceItems === [] ? $inlineDisclosureId : null,
+        ])
+            ->filter(fn (mixed $id): bool =>
+                is_string($id) && trim($id) !== ''
+            )
+            ->unique()
+            ->implode(' ');
+    };
+
+    $transactionalEmailReferenceItems = $resolveDisclosureReferences(
+        data_get($page, 'fields.consent_messages.email.disclosure_refs', []),
+    );
+    $transactionalSmsReferenceItems = $resolveDisclosureReferences(
+        data_get($page, 'fields.consent_messages.sms.disclosure_refs', []),
+    );
+    $marketingCombinedReferenceItems = $resolveDisclosureReferences(
+        data_get(
+            $page,
+            'fields.marketing_consent_messages.combined.disclosure_refs',
+            [],
+        ),
+    );
+    $marketingEmailReferenceItems = $resolveDisclosureReferences(
+        data_get(
+            $page,
+            'fields.marketing_consent_messages.email.disclosure_refs',
+            [],
+        ),
+    );
+    $marketingSmsReferenceItems = $resolveDisclosureReferences(
+        data_get(
+            $page,
+            'fields.marketing_consent_messages.sms.disclosure_refs',
+            [],
+        ),
+    );
+
+    $transactionalEmailInlineDisclosure = data_get(
+        $page,
+        'fields.consent_messages.email.disclosure',
+    );
+    $transactionalSmsInlineDisclosure = data_get(
+        $page,
+        'fields.consent_messages.sms.disclosure',
+    );
+    $marketingCombinedInlineDisclosure = data_get(
+        $page,
+        'fields.marketing_consent_messages.combined.disclosure',
+    );
+    $marketingEmailInlineDisclosure = data_get(
+        $page,
+        'fields.marketing_consent_messages.email.disclosure',
+    );
+    $marketingSmsInlineDisclosure = data_get(
+        $page,
+        'fields.marketing_consent_messages.sms.disclosure',
+    );
+
+    $transactionalEmailDescribedBy = $descriptionIds(
+        referenceItems: $transactionalEmailReferenceItems,
+        helperId: filled(data_get(
+            $page,
+            'fields.consent_messages.email.helper',
+        ))
+            ? 'transactional_email_consent_helper'
+            : null,
+        inlineDisclosureId: filled($transactionalEmailInlineDisclosure)
+            ? 'transactional_email_consent_disclosure'
+            : null,
+    );
+    $transactionalSmsDescribedBy = $descriptionIds(
+        referenceItems: $transactionalSmsReferenceItems,
+        inlineDisclosureId: filled($transactionalSmsInlineDisclosure)
+            ? 'transactional_sms_consent_disclosure'
+            : null,
+    );
+    $marketingCombinedDescribedBy = $descriptionIds(
+        referenceItems: $marketingCombinedReferenceItems,
+        helperId: filled(data_get(
+            $page,
+            'fields.marketing_consent_messages.combined.helper',
+        ))
+            ? 'marketing_consent_helper'
+            : null,
+        inlineDisclosureId: filled($marketingCombinedInlineDisclosure)
+            ? 'marketing_consent_disclosure'
+            : null,
+    );
+    $marketingEmailDescribedBy = $descriptionIds(
+        referenceItems: $marketingEmailReferenceItems,
+        helperId: filled(data_get(
+            $page,
+            'fields.marketing_consent_messages.email.helper',
+        ))
+            ? 'marketing_email_consent_helper'
+            : null,
+        inlineDisclosureId: filled($marketingEmailInlineDisclosure)
+            ? 'marketing_email_consent_disclosure'
+            : null,
+    );
+    $marketingSmsDescribedBy = $descriptionIds(
+        referenceItems: $marketingSmsReferenceItems,
+        helperId: filled(data_get(
+            $page,
+            'fields.marketing_consent_messages.sms.helper',
+        ))
+            ? 'marketing_sms_consent_helper'
+            : null,
+        inlineDisclosureId: filled($marketingSmsInlineDisclosure)
+            ? 'marketing_sms_consent_disclosure'
+            : null,
+    );
+
+    $activeDisclosureKeys = collect();
+    $rememberDisclosureItems = static function (
+        array $items,
+    ) use ($activeDisclosureKeys): void {
+        foreach ($items as $item) {
+            $activeDisclosureKeys->push($item['key']);
+        }
+    };
+
+    if ($transactionalEmailAvailable && $transactionalEmailReferenceItems !== []) {
+        $rememberDisclosureItems($transactionalEmailReferenceItems);
+    }
+
+    if ($transactionalSmsAvailable && $transactionalSmsReferenceItems !== []) {
+        $rememberDisclosureItems($transactionalSmsReferenceItems);
+    }
+
+    if ($combinedMarketingAvailable) {
+        $rememberDisclosureItems($marketingCombinedReferenceItems);
+    } else {
+        if ($marketingEmailAvailable && $marketingEmailReferenceItems !== []) {
+            $rememberDisclosureItems($marketingEmailReferenceItems);
+        }
+
+        if ($marketingSmsAvailable && $marketingSmsReferenceItems !== []) {
+            $rememberDisclosureItems($marketingSmsReferenceItems);
+        }
+    }
+
+    $activeDisclosureKeys = $activeDisclosureKeys->unique()->values();
+    $activeDisclosureItems = $disclosureDefinitions
+        ->filter(fn (array $item, string $key): bool =>
+            $activeDisclosureKeys->contains($key)
+        );
 @endphp
 
 <div
@@ -579,23 +795,34 @@
                                                 required
                                                 aria-required="true"
                                             @endif
-                                            @if(filled($page['fields']['consent_messages']['sms']['disclosure'] ?? null))
-                                                aria-describedby="transactional_sms_consent_disclosure"
+                                            @if($transactionalSmsDescribedBy !== '')
+                                                aria-describedby="{{ $transactionalSmsDescribedBy }}"
                                             @endif
                                             class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
                                         >
 
                                         <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }} font-medium">
                                             {{ $page['fields']['consent_messages']['sms']['label'] ?? 'Text me webinar reminders and access information. (Optional)' }}
+                                            @foreach($transactionalSmsReferenceItems as $disclosureItem)
+                                                @if(filled($disclosureItem['marker']))
+                                                    <sup
+                                                        aria-hidden="true"
+                                                        class="{{ $disclosureReferenceMarkerClass }}"
+                                                    >{{ $disclosureItem['marker'] }}</sup>
+                                                @endif
+                                            @endforeach
                                         </span>
                                     </label>
 
-                                    @if(filled($page['fields']['consent_messages']['sms']['disclosure'] ?? null))
+                                    @if(
+                                        $transactionalSmsReferenceItems === []
+                                        && filled($transactionalSmsInlineDisclosure)
+                                    )
                                         <p
                                             id="transactional_sms_consent_disclosure"
                                             class="pl-7 text-xs leading-5 text-slate-500"
                                         >
-                                            {{ $page['fields']['consent_messages']['sms']['disclosure'] }}
+                                            {{ $transactionalSmsInlineDisclosure }}
                                         </p>
                                     @endif
 
@@ -622,14 +849,22 @@
                                                 required
                                                 aria-required="true"
                                             @endif
-                                            @if(filled($page['fields']['consent_messages']['email']['helper'] ?? null))
-                                                aria-describedby="transactional_email_consent_helper"
+                                            @if($transactionalEmailDescribedBy !== '')
+                                                aria-describedby="{{ $transactionalEmailDescribedBy }}"
                                             @endif
                                             class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
                                         >
 
                                         <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }} font-medium">
                                             {{ $page['fields']['consent_messages']['email']['label'] ?? 'Email me webinar information.' }}
+                                            @foreach($transactionalEmailReferenceItems as $disclosureItem)
+                                                @if(filled($disclosureItem['marker']))
+                                                    <sup
+                                                        aria-hidden="true"
+                                                        class="{{ $disclosureReferenceMarkerClass }}"
+                                                    >{{ $disclosureItem['marker'] }}</sup>
+                                                @endif
+                                            @endforeach
                                         </span>
                                     </label>
 
@@ -639,6 +874,18 @@
                                             class="pl-7 text-xs leading-5 text-slate-500"
                                         >
                                             {{ $page['fields']['consent_messages']['email']['helper'] }}
+                                        </p>
+                                    @endif
+
+                                    @if(
+                                        $transactionalEmailReferenceItems === []
+                                        && filled($transactionalEmailInlineDisclosure)
+                                    )
+                                        <p
+                                            id="transactional_email_consent_disclosure"
+                                            class="pl-7 text-xs leading-5 text-slate-500"
+                                        >
+                                            {{ $transactionalEmailInlineDisclosure }}
                                         </p>
                                     @endif
 
@@ -695,23 +942,43 @@
                                         value="1"
                                         x-model="marketingConsent"
                                         @checked(old('marketing_consent'))
-                                        @if(filled($page['fields']['marketing_consent_messages']['combined']['disclosure'] ?? null))
-                                            aria-describedby="marketing_consent_disclosure"
+                                        @if($marketingCombinedDescribedBy !== '')
+                                            aria-describedby="{{ $marketingCombinedDescribedBy }}"
                                         @endif
                                         class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
                                     >
 
                                     <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }} font-medium">
                                         {{ $page['fields']['marketing_consent_messages']['combined']['label'] ?? 'Keep learning. Send me future webinar and educational emails and text messages.' }}
+                                        @foreach($marketingCombinedReferenceItems as $disclosureItem)
+                                            @if(filled($disclosureItem['marker']))
+                                                <sup
+                                                    aria-hidden="true"
+                                                    class="{{ $disclosureReferenceMarkerClass }}"
+                                                >{{ $disclosureItem['marker'] }}</sup>
+                                            @endif
+                                        @endforeach
                                     </span>
                                 </label>
 
-                                @if(filled($page['fields']['marketing_consent_messages']['combined']['disclosure'] ?? null))
+                                @if(filled($page['fields']['marketing_consent_messages']['combined']['helper'] ?? null))
+                                    <p
+                                        id="marketing_consent_helper"
+                                        class="pl-7 text-xs leading-5 text-slate-500"
+                                    >
+                                        {{ $page['fields']['marketing_consent_messages']['combined']['helper'] }}
+                                    </p>
+                                @endif
+
+                                @if(
+                                    $marketingCombinedReferenceItems === []
+                                    && filled($marketingCombinedInlineDisclosure)
+                                )
                                     <p
                                         id="marketing_consent_disclosure"
                                         class="pl-7 text-xs leading-5 text-slate-500"
                                     >
-                                        {{ $page['fields']['marketing_consent_messages']['combined']['disclosure'] }}
+                                        {{ $marketingCombinedInlineDisclosure }}
                                     </p>
                                 @endif
 
@@ -734,13 +1001,45 @@
                                             type="checkbox"
                                             value="1"
                                             @checked(old('marketing_email_consent'))
+                                            @if($marketingEmailDescribedBy !== '')
+                                                aria-describedby="{{ $marketingEmailDescribedBy }}"
+                                            @endif
                                             class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
                                         >
 
                                         <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }} font-medium">
                                             {{ $page['fields']['marketing_consent_messages']['email']['label'] ?? 'Send me future webinar and educational emails.' }}
+                                            @foreach($marketingEmailReferenceItems as $disclosureItem)
+                                                @if(filled($disclosureItem['marker']))
+                                                    <sup
+                                                        aria-hidden="true"
+                                                        class="{{ $disclosureReferenceMarkerClass }}"
+                                                    >{{ $disclosureItem['marker'] }}</sup>
+                                                @endif
+                                            @endforeach
                                         </span>
                                     </label>
+
+                                    @if(filled($page['fields']['marketing_consent_messages']['email']['helper'] ?? null))
+                                        <p
+                                            id="marketing_email_consent_helper"
+                                            class="pl-7 text-xs leading-5 text-slate-500"
+                                        >
+                                            {{ $page['fields']['marketing_consent_messages']['email']['helper'] }}
+                                        </p>
+                                    @endif
+
+                                    @if(
+                                        $marketingEmailReferenceItems === []
+                                        && filled($marketingEmailInlineDisclosure)
+                                    )
+                                        <p
+                                            id="marketing_email_consent_disclosure"
+                                            class="pl-7 text-xs leading-5 text-slate-500"
+                                        >
+                                            {{ $marketingEmailInlineDisclosure }}
+                                        </p>
+                                    @endif
 
                                     @error('marketing_email_consent')
                                         <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
@@ -763,31 +1062,51 @@
                                             value="1"
                                             x-model="marketingSmsConsent"
                                             @checked(old('marketing_sms_consent'))
-                                            @if(filled($page['fields']['marketing_consent_messages']['sms']['disclosure'] ?? null))
-                                                aria-describedby="marketing_sms_consent_disclosure"
+                                            @if($marketingSmsDescribedBy !== '')
+                                                aria-describedby="{{ $marketingSmsDescribedBy }}"
                                             @endif
                                             class="{{ $checkbox['input'] ?? 'mt-1 rounded border-slate-300 text-primary focus:ring-primary' }}"
                                         >
 
                                         <span class="{{ $checkbox['label'] ?? 'text-sm leading-6 text-slate-700' }} font-medium">
                                             {{ $page['fields']['marketing_consent_messages']['sms']['label'] ?? 'Send me future webinar and educational texts.' }}
+                                            @foreach($marketingSmsReferenceItems as $disclosureItem)
+                                                @if(filled($disclosureItem['marker']))
+                                                    <sup
+                                                        aria-hidden="true"
+                                                        class="{{ $disclosureReferenceMarkerClass }}"
+                                                    >{{ $disclosureItem['marker'] }}</sup>
+                                                @endif
+                                            @endforeach
                                         </span>
                                     </label>
+
+                                    @if(filled($page['fields']['marketing_consent_messages']['sms']['helper'] ?? null))
+                                        <p
+                                            id="marketing_sms_consent_helper"
+                                            class="pl-7 text-xs leading-5 text-slate-500"
+                                        >
+                                            {{ $page['fields']['marketing_consent_messages']['sms']['helper'] }}
+                                        </p>
+                                    @endif
+
+                                    @if(
+                                        $marketingSmsReferenceItems === []
+                                        && filled($marketingSmsInlineDisclosure)
+                                    )
+                                        <p
+                                            id="marketing_sms_consent_disclosure"
+                                            class="pl-7 text-xs leading-5 text-slate-500"
+                                        >
+                                            {{ $marketingSmsInlineDisclosure }}
+                                        </p>
+                                    @endif
 
                                     @error('marketing_sms_consent')
                                         <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
                                             {{ $message }}
                                         </p>
                                     @enderror
-
-                                    @if(filled($page['fields']['marketing_consent_messages']['sms']['disclosure'] ?? null))
-                                        <p
-                                            id="marketing_sms_consent_disclosure"
-                                            class="pl-7 text-xs leading-5 text-slate-500"
-                                        >
-                                            {{ $page['fields']['marketing_consent_messages']['sms']['disclosure'] }}
-                                        </p>
-                                    @endif
                                 </div>
                             @endif
                         @endif
@@ -795,21 +1114,36 @@
                     </fieldset>
                 @endif
 
-                @if(($page['legal_links']['enabled'] ?? false) && $legalLinks->isNotEmpty())
-                    <p class="{{ $style['legal_links']['wrapper'] ?? 'text-xs leading-5 text-slate-600' }}">
-                        {{ $page['legal_links']['intro'] ?? 'By registering, you agree to our' }}
-                        @foreach($legalLinks as $link)
-                            @if(! $loop->first)
-                                {{ $loop->last ? ' and ' : ', ' }}
-                            @endif
-                            <a
-                                href="{{ trim($link['url']) }}"
-                                target="_blank"
-                                rel="noopener"
-                                class="{{ $style['legal_links']['link'] ?? 'font-semibold underline' }}"
-                            >{{ trim($link['label']) }}</a>@if($loop->last).@endif
-                        @endforeach
-                    </p>
+                @if(
+                    (($page['legal_links']['enabled'] ?? false) && $legalLinks->isNotEmpty())
+                    || $activeDisclosureItems->isNotEmpty()
+                )
+                    <div class="{{ data_get($style, 'disclosures.footer', 'space-y-2') }}">
+                        @if(($page['legal_links']['enabled'] ?? false) && $legalLinks->isNotEmpty())
+                            <p class="{{ $style['legal_links']['wrapper'] ?? 'text-xs leading-5 text-slate-600' }}">
+                                {{ $page['legal_links']['intro'] ?? 'By registering, you agree to our' }}
+                                @foreach($legalLinks as $link)
+                                    @if(! $loop->first)
+                                        {{ $loop->last ? ' and ' : ', ' }}
+                                    @endif
+                                    <a
+                                        href="{{ trim($link['url']) }}"
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="{{ $style['legal_links']['link'] ?? 'font-semibold underline' }}"
+                                    >{{ trim($link['label']) }}</a>@if($loop->last).@endif
+                                @endforeach
+                            </p>
+                        @endif
+
+                        @if($activeDisclosureItems->isNotEmpty())
+                            <x-ui.disclosures
+                                :items="$activeDisclosureItems->values()->all()"
+                                id-prefix="webinar-registration"
+                                :style="$style['disclosures'] ?? []"
+                            />
+                        @endif
+                    </div>
                 @endif
 
                 <x-ui.button

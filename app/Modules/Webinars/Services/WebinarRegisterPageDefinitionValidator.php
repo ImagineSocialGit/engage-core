@@ -187,6 +187,10 @@ class WebinarRegisterPageDefinitionValidator
 
         $violations = array_merge(
             $violations,
+            $this->validateDisclosures(
+                $registration,
+                "{$path}.registration",
+            ),
             $this->validateQuestions(
                 $registration['questions'] ?? null,
                 "{$path}.registration.questions",
@@ -207,6 +211,200 @@ class WebinarRegisterPageDefinitionValidator
     /**
      * @return array<int, array{code: string, message: string, path: string, context: array<string, mixed>}>
      */
+    /**
+     * @param array<string, mixed> $registration
+     * @return array<int, array{code: string, message: string, path: string, context: array<string, mixed>}>
+     */
+    private function validateDisclosures(
+        array $registration,
+        string $path,
+    ): array {
+        $definitions = $registration['disclosures'] ?? null;
+        $violations = [];
+        $knownKeys = [];
+
+        if ($definitions !== null) {
+            if (! is_array($definitions)) {
+                return [$this->violation(
+                    code: 'webinars.register_page.disclosure_definition_invalid',
+                    message: 'Webinar registration disclosures must be an array.',
+                    path: "{$path}.disclosures",
+                    context: [
+                        'received_type' => get_debug_type($definitions),
+                    ],
+                )];
+            }
+
+            $items = $definitions['items'] ?? [];
+
+            if (! is_array($items)) {
+                $violations[] = $this->violation(
+                    code: 'webinars.register_page.disclosure_definition_invalid',
+                    message: 'Webinar registration disclosure items must be an associative array.',
+                    path: "{$path}.disclosures.items",
+                    context: [
+                        'received_type' => get_debug_type($items),
+                    ],
+                );
+
+                $items = [];
+            }
+
+            foreach ($items as $key => $item) {
+                $displayKey = is_scalar($key) ? (string) $key : 'unknown';
+                $itemPath = "{$path}.disclosures.items.{$displayKey}";
+                $validKey = is_string($key)
+                    && preg_match('/^[a-z][a-z0-9_]{0,99}$/', $key) === 1;
+
+                if (! $validKey) {
+                    $violations[] = $this->violation(
+                        code: 'webinars.register_page.disclosure_definition_invalid',
+                        message: 'Webinar registration disclosure keys must be lower snake_case identifiers beginning with a letter.',
+                        path: $itemPath,
+                    );
+                } else {
+                    $knownKeys[$key] = true;
+                }
+
+                if (! is_array($item)) {
+                    $violations[] = $this->violation(
+                        code: 'webinars.register_page.disclosure_definition_invalid',
+                        message: 'Each Webinar registration disclosure item must be an array.',
+                        path: $itemPath,
+                        context: [
+                            'received_type' => get_debug_type($item),
+                        ],
+                    );
+
+                    continue;
+                }
+
+                if (! $this->filledString($item['text'] ?? null)) {
+                    $violations[] = $this->violation(
+                        code: 'webinars.register_page.disclosure_definition_invalid',
+                        message: 'Each Webinar registration disclosure item requires non-empty text.',
+                        path: "{$itemPath}.text",
+                    );
+                }
+
+                if (array_key_exists('marker', $item)
+                    && $item['marker'] !== null
+                ) {
+                    $marker = $item['marker'];
+
+                    if (! is_scalar($marker)
+                        || trim((string) $marker) === ''
+                        || strlen(trim((string) $marker)) > 10
+                    ) {
+                        $violations[] = $this->violation(
+                            code: 'webinars.register_page.disclosure_definition_invalid',
+                            message: 'Webinar registration disclosure markers must be non-empty scalar values no longer than 10 bytes.',
+                            path: "{$itemPath}.marker",
+                            context: [
+                                'received_type' => get_debug_type($marker),
+                            ],
+                        );
+                    }
+                }
+
+                if (array_key_exists('label', $item)
+                    && $item['label'] !== null
+                    && ! $this->filledString($item['label'])
+                ) {
+                    $violations[] = $this->violation(
+                        code: 'webinars.register_page.disclosure_definition_invalid',
+                        message: 'Webinar registration disclosure labels must be non-empty strings when configured.',
+                        path: "{$itemPath}.label",
+                        context: [
+                            'received_type' => get_debug_type($item['label']),
+                        ],
+                    );
+                }
+            }
+        }
+
+        foreach ([
+            'fields.consent_messages.email',
+            'fields.consent_messages.sms',
+            'fields.marketing_consent_messages.combined',
+            'fields.marketing_consent_messages.email',
+            'fields.marketing_consent_messages.sms',
+        ] as $fieldPath) {
+            $field = data_get($registration, $fieldPath);
+
+            if (! is_array($field)
+                || ! array_key_exists('disclosure_refs', $field)
+            ) {
+                continue;
+            }
+
+            $references = $field['disclosure_refs'];
+            $referencesPath = "{$path}.{$fieldPath}.disclosure_refs";
+
+            if (! is_array($references) || ! array_is_list($references)) {
+                $violations[] = $this->violation(
+                    code: 'webinars.register_page.disclosure_reference_invalid',
+                    message: 'Webinar registration disclosure_refs must be a list of disclosure keys.',
+                    path: $referencesPath,
+                    context: [
+                        'received_type' => get_debug_type($references),
+                    ],
+                );
+
+                continue;
+            }
+
+            $seenReferences = [];
+
+            foreach ($references as $index => $reference) {
+                $referencePath = "{$referencesPath}.{$index}";
+
+                if (! is_string($reference)
+                    || preg_match('/^[a-z][a-z0-9_]{0,99}$/', $reference) !== 1
+                ) {
+                    $violations[] = $this->violation(
+                        code: 'webinars.register_page.disclosure_reference_invalid',
+                        message: 'Webinar registration disclosure references must be lower snake_case keys.',
+                        path: $referencePath,
+                        context: [
+                            'received_type' => get_debug_type($reference),
+                        ],
+                    );
+
+                    continue;
+                }
+
+                if (isset($seenReferences[$reference])) {
+                    $violations[] = $this->violation(
+                        code: 'webinars.register_page.disclosure_reference_invalid',
+                        message: "Webinar registration disclosure reference [{$reference}] is duplicated.",
+                        path: $referencePath,
+                        context: [
+                            'disclosure_key' => $reference,
+                        ],
+                    );
+
+                    continue;
+                }
+
+                $seenReferences[$reference] = true;
+
+                if (! isset($knownKeys[$reference])) {
+                    $violations[] = $this->violation(
+                        code: 'webinars.register_page.disclosure_reference_invalid',
+                        message: "Webinar registration disclosure reference [{$reference}] does not resolve to a configured item.",
+                        path: $referencePath,
+                        context: [
+                            'disclosure_key' => $reference,
+                        ],
+                    );
+                }
+            }
+        }
+
+        return $violations;
+    }
+
     private function validateQuestions(mixed $questions, string $path): array
     {
         try {

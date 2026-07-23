@@ -17,6 +17,7 @@ class WebinarRegisterPageConfig
         'consent_header',
         'sections',
         'fields',
+        'disclosures',
         'submit',
         'legal_links',
         'questions_section',
@@ -60,6 +61,7 @@ class WebinarRegisterPageConfig
         'form_card',
         'consent_header',
         'legal_links',
+        'disclosures',
     ];
 
     /**
@@ -84,6 +86,21 @@ class WebinarRegisterPageConfig
         'instructor.credibility',
         'trust.reviews',
         'trust.stories',
+    ];
+
+    /**
+     * Numeric registration collections are atomic configuration. A later layer
+     * replaces the complete list instead of recursively merging list indexes.
+     *
+     * @var array<int, string>
+     */
+    private const ATOMIC_REGISTRATION_LIST_PATHS = [
+        'questions',
+        'fields.consent_messages.email.disclosure_refs',
+        'fields.consent_messages.sms.disclosure_refs',
+        'fields.marketing_consent_messages.combined.disclosure_refs',
+        'fields.marketing_consent_messages.email.disclosure_refs',
+        'fields.marketing_consent_messages.sms.disclosure_refs',
     ];
 
     /**
@@ -257,9 +274,9 @@ class WebinarRegisterPageConfig
     }
 
     /**
-     * Numeric question lists are atomic configuration. A later allowed layer
-     * replaces the complete list rather than recursively merging questions and
-     * options by numeric position.
+     * Numeric registration collections are atomic configuration. A later
+     * allowed layer replaces each complete list rather than recursively merging
+     * questions, options, or disclosure references by numeric position.
      *
      * @param array<string, mixed> $current
      * @param array<string, mixed> $incoming
@@ -269,17 +286,21 @@ class WebinarRegisterPageConfig
         array $current,
         array $incoming,
     ): array {
-        $replacesQuestions = array_key_exists('questions', $incoming);
-        $questions = $replacesQuestions ? $incoming['questions'] : null;
+        $atomicValues = [];
 
-        if ($replacesQuestions) {
-            unset($incoming['questions']);
+        foreach (self::ATOMIC_REGISTRATION_LIST_PATHS as $path) {
+            if (! Arr::has($incoming, $path)) {
+                continue;
+            }
+
+            $atomicValues[$path] = Arr::get($incoming, $path);
+            Arr::forget($incoming, $path);
         }
 
         $merged = array_replace_recursive($current, $incoming);
 
-        if ($replacesQuestions) {
-            $merged['questions'] = $questions;
+        foreach ($atomicValues as $path => $value) {
+            Arr::set($merged, $path, $value);
         }
 
         return $merged;
