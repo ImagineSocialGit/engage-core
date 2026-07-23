@@ -37,6 +37,7 @@ class WebinarWebhookController extends Controller
             signatureFingerprint: $event->signatureFingerprint,
             eventType: $event->nativeEvent ?? $event->event,
             payload: $event->payload,
+            storedPayload: $event->receiptPayload,
             processor: function () use (
                 $event,
                 $handleWebinarProviderWebhookEventAction,

@@ -50,18 +50,28 @@ class ZoomWebhookHandler
             abort(401);
         }
 
+        $providerEventType = $this->providerEventType($nativeEvent, $request);
+        $externalWebinarId = filled($request->input('payload.object.id'))
+            ? (string) $request->input('payload.object.id')
+            : null;
+        $externalWebinarUuid = filled($request->input('payload.object.uuid'))
+            ? (string) $request->input('payload.object.uuid')
+            : null;
+
         return new ProviderWebhookEvent(
             provider: self::PROVIDER,
             event: $this->normalizeEvent($nativeEvent),
-            providerEventType: $this->providerEventType($nativeEvent, $request),
-            externalWebinarId: filled($request->input('payload.object.id'))
-                ? (string) $request->input('payload.object.id')
-                : null,
-            externalWebinarUuid: filled($request->input('payload.object.uuid'))
-                ? (string) $request->input('payload.object.uuid')
-                : null,
+            providerEventType: $providerEventType,
+            externalWebinarId: $externalWebinarId,
+            externalWebinarUuid: $externalWebinarUuid,
             nativeEvent: $nativeEvent,
             payload: $request->all(),
+            receiptPayload: $this->receiptPayload(
+                nativeEvent: $nativeEvent,
+                providerEventType: $providerEventType,
+                externalWebinarId: $externalWebinarId,
+                externalWebinarUuid: $externalWebinarUuid,
+            ),
             signatureFingerprint: hash(
                 'sha256',
                 (string) $request->header('x-zm-signature'),
@@ -103,6 +113,36 @@ class ZoomWebhookHandler
         return $this->providerEventTypeFromZoomObjectType(
             $request->input('payload.object.type'),
         );
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function receiptPayload(
+        string $nativeEvent,
+        ?string $providerEventType,
+        ?string $externalWebinarId,
+        ?string $externalWebinarUuid,
+    ): array {
+        return array_filter([
+            'event' => $this->boundedString($nativeEvent, 191),
+            'provider_event_type' => $this->boundedString($providerEventType, 32),
+            'external_webinar_id' => $this->boundedString($externalWebinarId, 191),
+            'external_webinar_uuid' => $this->boundedString($externalWebinarUuid, 191),
+        ], fn (?string $value): bool => filled($value));
+    }
+
+    private function boundedString(?string $value, int $maximumLength): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value === ''
+            ? null
+            : mb_substr($value, 0, $maximumLength);
     }
 
     private function providerEventTypeFromZoomObjectType(mixed $value): ?string

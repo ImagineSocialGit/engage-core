@@ -14,6 +14,7 @@ class WebhookInbox
 {
     /**
      * @param array<string, mixed> $payload
+     * @param array<string, mixed>|null $storedPayload
      * @param Closure(): mixed $processor
      */
     public function process(
@@ -23,6 +24,7 @@ class WebhookInbox
         ?string $providerEventId = null,
         ?string $signatureFingerprint = null,
         ?string $eventType = null,
+        ?array $storedPayload = null,
     ): WebhookInboxReceipt {
         $provider = $this->requiredString($provider, 'provider');
         $providerEventId = $this->nullableString($providerEventId);
@@ -52,7 +54,7 @@ class WebhookInbox
                 'signature_fingerprint' => $signatureFingerprint,
                 'event_type' => $this->nullableString($eventType),
                 'payload_fingerprint' => $payloadFingerprint,
-                'payload' => $payload,
+                'payload' => $storedPayload ?? $payload,
                 'status' => WebhookInboxReceipt::STATUS_RECEIVED,
                 'attempts' => 0,
             ],

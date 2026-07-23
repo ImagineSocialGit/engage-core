@@ -115,6 +115,74 @@ class ZoomWebhookTest extends TestCase
         ]);
     }
 
+    public function test_it_persists_only_compact_allowlisted_receipt_evidence(): void
+    {
+        Queue::fake();
+
+        $requestPayload = [
+            'event' => 'recording.completed',
+            'event_ts' => time(),
+            'payload' => [
+                'account_id' => 'provider-account-id',
+                'download_token' => 'provider-download-token',
+                'object' => [
+                    'id' => '445566778',
+                    'uuid' => 'webinar-recording-uuid',
+                    'type' => 5,
+                    'topic' => str_repeat('Provider recording topic ', 100),
+                    'host_email' => 'host@example.test',
+                    'join_url' => 'https://provider.example.test/join',
+                    'start_url' => 'https://provider.example.test/host',
+                    'password' => 'provider-password',
+                    'recording_files' => [
+                        [
+                            'download_url' => 'https://provider.example.test/download',
+                            'play_url' => 'https://provider.example.test/play',
+                        ],
+                    ],
+                    'participant' => [
+                        'name' => 'Example Participant',
+                        'email' => 'participant@example.test',
+                    ],
+                ],
+            ],
+        ];
+
+        $this->signedZoomPost($requestPayload)->assertNoContent();
+
+        $receipt = WebhookInboxReceipt::query()->sole();
+
+        $this->assertSame('recording.completed', $receipt->event_type);
+        $this->assertSame(
+            $this->payloadFingerprint($requestPayload),
+            $receipt->payload_fingerprint,
+        );
+        $this->assertEquals([
+            'event' => 'recording.completed',
+            'provider_event_type' => 'webinar',
+            'external_webinar_id' => '445566778',
+            'external_webinar_uuid' => 'webinar-recording-uuid',
+        ], $receipt->payload);
+
+        $encodedPayload = json_encode(
+            $receipt->payload,
+            JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+        );
+
+        $this->assertLessThanOrEqual(256, strlen($encodedPayload));
+        $this->assertNoForbiddenReceiptKeys($receipt->payload);
+
+        Queue::assertPushed(
+            ProcessWebinarProviderEventJob::class,
+            fn (ProcessWebinarProviderEventJob $job): bool =>
+                $job->provider === 'zoom'
+                && $job->event === 'webinar.recording_completed'
+                && $job->providerEventType === 'webinar'
+                && $job->externalWebinarId === '445566778'
+                && $job->externalWebinarUuid === 'webinar-recording-uuid',
+        );
+    }
+
     public function test_it_ignores_supported_events_without_a_webinar_id_and_completes_receipt(): void
     {
         Queue::fake();
@@ -332,7 +400,7 @@ class ZoomWebhookTest extends TestCase
         $this->assertDatabaseCount('webhook_inbox_receipts', 0);
     }
 
-    public function test_completed_replay_returns_existing_outcome_without_dispatching_twice(): void
+    public function test_completed_legacy_receipt_replay_uses_the_original_request_fingerprint(): void
     {
         Queue::fake();
 
@@ -346,6 +414,11 @@ class ZoomWebhookTest extends TestCase
         ];
 
         $this->signedZoomPost($payload)->assertNoContent();
+
+        WebhookInboxReceipt::query()->sole()->forceFill([
+            'payload' => $payload,
+            'payload_fingerprint' => $this->payloadFingerprint($payload),
+        ])->save();
 
         $this
             ->signedZoomPost($payload, reuseTimestamp: true)
@@ -448,5 +521,51 @@ class ZoomWebhookTest extends TestCase
             ],
             content: $body
         );
+    }
+
+    private function payloadFingerprint(array $payload): string
+    {
+        $encoded = json_encode(
+            $payload,
+            JSON_PRESERVE_ZERO_FRACTION
+                | JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_THROW_ON_ERROR,
+        );
+
+        return hash('sha256', $encoded);
+    }
+
+    /**
+     * @param array<string|int, mixed> $payload
+     */
+    private function assertNoForbiddenReceiptKeys(array $payload): void
+    {
+        $forbidden = [
+            'account_id',
+            'download_token',
+            'download_url',
+            'email',
+            'host_email',
+            'join_url',
+            'name',
+            'participant',
+            'password',
+            'play_url',
+            'raw',
+            'recording_files',
+            'start_url',
+            'topic',
+        ];
+
+        foreach ($payload as $key => $value) {
+            if (is_string($key)) {
+                $this->assertNotContains($key, $forbidden);
+            }
+
+            if (is_array($value)) {
+                $this->assertNoForbiddenReceiptKeys($value);
+            }
+        }
     }
 }
