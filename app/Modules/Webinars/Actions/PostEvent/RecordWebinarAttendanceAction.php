@@ -6,6 +6,7 @@ use App\Modules\Webinars\Actions\EmitWebinarAutomationEventAction;
 use App\Modules\Webinars\Data\WebinarAttendanceRecord;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Services\WebinarStateCanonicalizer;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -15,6 +16,7 @@ class RecordWebinarAttendanceAction
 {
     public function __construct(
         private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
+        private readonly WebinarStateCanonicalizer $stateCanonicalizer,
     ) {}
 
     public function execute(
@@ -63,6 +65,11 @@ class RecordWebinarAttendanceAction
                 registration: $registration,
                 provider: $provider,
                 match: $match,
+                matchedBy: $this->matchMethod(
+                    registrationRegistrantId: $registrationRegistrantId,
+                    registrationEmail: $registrationEmail,
+                    attendanceRecord: $match,
+                ),
             );
         }
 
@@ -84,26 +91,30 @@ class RecordWebinarAttendanceAction
         WebinarRegistration $registration,
         string $provider,
         WebinarAttendanceRecord $match,
+        string $matchedBy,
     ): void {
         if ($registration->attended_at !== null && $registration->status === 'attended') {
             return;
         }
 
-        DB::transaction(function () use ($registration, $provider, $match): void {
+        DB::transaction(function () use ($registration, $provider, $match, $matchedBy): void {
             $recordedAt = now();
             $attendedAt = $this->attendedAt($match->joinTime);
 
-            $meta = $registration->meta ?? [];
+            $meta = is_array($registration->meta)
+                ? $registration->meta
+                : [];
 
-            $meta['attendance'] = [
+            $meta['attendance'] = $this->stateCanonicalizer->attendance([
                 'provider' => $provider,
                 'status' => $match->status ?: 'attended',
                 'duration' => $match->duration,
                 'join_time' => $this->dateTimeString($match->joinTime),
                 'leave_time' => $this->dateTimeString($match->leaveTime),
                 'recorded_at' => $recordedAt->toIso8601String(),
-                'raw' => $match->raw,
-            ];
+                'provider_registrant_id' => $match->registrantId,
+                'matched_by' => $matchedBy,
+            ]);
 
             $registration->forceFill([
                 'status' => 'attended',
@@ -143,13 +154,15 @@ class RecordWebinarAttendanceAction
         DB::transaction(function () use ($registration, $provider): void {
             $recordedAt = now();
 
-            $meta = $registration->meta ?? [];
+            $meta = is_array($registration->meta)
+                ? $registration->meta
+                : [];
 
-            $meta['attendance'] = [
+            $meta['attendance'] = $this->stateCanonicalizer->attendance([
                 'provider' => $provider,
                 'status' => 'missed',
                 'recorded_at' => $recordedAt->toIso8601String(),
-            ];
+            ]);
 
             $registration->forceFill([
                 'status' => 'missed',
@@ -175,15 +188,31 @@ class RecordWebinarAttendanceAction
         ?string $registrationEmail,
         WebinarAttendanceRecord $attendanceRecord,
     ): bool {
+        return $this->matchMethod(
+            registrationRegistrantId: $registrationRegistrantId,
+            registrationEmail: $registrationEmail,
+            attendanceRecord: $attendanceRecord,
+        ) !== null;
+    }
+
+    protected function matchMethod(
+        mixed $registrationRegistrantId,
+        ?string $registrationEmail,
+        WebinarAttendanceRecord $attendanceRecord,
+    ): ?string {
         if (filled($registrationRegistrantId) && filled($attendanceRecord->registrantId)) {
-            return (string) $registrationRegistrantId === (string) $attendanceRecord->registrantId;
+            return (string) $registrationRegistrantId === (string) $attendanceRecord->registrantId
+                ? 'provider_registrant_id'
+                : null;
         }
 
         if (filled($registrationEmail) && filled($attendanceRecord->email)) {
-            return mb_strtolower(trim($attendanceRecord->email)) === $registrationEmail;
+            return mb_strtolower(trim($attendanceRecord->email)) === $registrationEmail
+                ? 'email'
+                : null;
         }
 
-        return false;
+        return null;
     }
 
     protected function attendedAt(?CarbonInterface $joinTime): CarbonInterface

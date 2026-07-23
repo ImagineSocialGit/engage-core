@@ -5,12 +5,14 @@ namespace App\Modules\Webinars\Actions\PostEvent;
 use App\Modules\Webinars\Actions\EmitWebinarAutomationEventAction;
 use App\Modules\Webinars\Contracts\WebinarProvider;
 use App\Modules\Webinars\Models\Webinar;
+use App\Modules\Webinars\Services\WebinarStateCanonicalizer;
 use Illuminate\Support\Str;
 
 class ResolveWebinarPlaybackAction
 {
     public function __construct(
         private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
+        private readonly WebinarStateCanonicalizer $stateCanonicalizer,
     ) {}
 
     public function execute(
@@ -36,23 +38,18 @@ class ResolveWebinarPlaybackAction
             return false;
         }
 
+        $resolvedAt = now()->toIso8601String();
+
         $webinar->forceFill([
             'playback_token' => $webinar->playback_token ?: Str::random(48),
             'playback_url' => $recording->playbackUrl,
             'playback_passcode' => $recording->playbackPasscode,
             'meta' => array_replace_recursive($webinar->meta ?? [], [
-                'provider' => [
-                    $provider->key() => [
-                        'recording' => [
-                            'resolved_at' => now()->toIso8601String(),
-                            'raw' => $recording->raw,
-                        ],
-                    ],
-                ],
                 'normalized' => [
-                    'post_event' => [
-                        'playback_resolved_at' => now()->toIso8601String(),
-                    ],
+                    'post_event' => $this->stateCanonicalizer
+                        ->playbackResolution([
+                            'playback_resolved_at' => $resolvedAt,
+                        ]),
                 ],
             ]),
         ])->save();

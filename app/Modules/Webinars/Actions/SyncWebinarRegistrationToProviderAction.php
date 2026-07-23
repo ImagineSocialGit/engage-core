@@ -4,6 +4,7 @@ namespace App\Modules\Webinars\Actions;
 
 use App\Modules\Webinars\Data\WebinarProviderSyncResult;
 use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Services\WebinarStateCanonicalizer;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Carbon;
@@ -14,6 +15,7 @@ class SyncWebinarRegistrationToProviderAction
 {
     public function __construct(
         private readonly AddRegistrantToWebinarProviderAction $addRegistrantToProvider,
+        private readonly ?WebinarStateCanonicalizer $stateCanonicalizer = null,
     ) {}
 
     public function handle(WebinarRegistration $registration): WebinarProviderSyncResult
@@ -74,18 +76,22 @@ class SyncWebinarRegistrationToProviderAction
                 ? $meta['provider_sync']
                 : [];
 
-            $meta['provider'] = $providerRegistration->toMeta();
-            $meta['provider_sync'] = array_replace($sync, [
-                'status' => 'succeeded',
-                'provider' => $providerRegistration->provider,
-                'succeeded_at' => now()->toISOString(),
-                'claim_started_at' => null,
-                'submission_started_at' => null,
-                'failed_at' => null,
-                'failure_reason' => null,
-                'last_error_class' => null,
-                'last_error_code' => null,
-            ]);
+            $meta['provider'] = $this->canonicalizer()->registrationProvider(
+                $providerRegistration->toMeta(),
+            );
+            $meta['provider_sync'] = $this->canonicalizer()->providerSync(
+                array_replace($sync, [
+                    'status' => 'succeeded',
+                    'provider' => $providerRegistration->provider,
+                    'succeeded_at' => now()->toISOString(),
+                    'claim_started_at' => null,
+                    'submission_started_at' => null,
+                    'failed_at' => null,
+                    'failure_reason' => null,
+                    'last_error_class' => null,
+                    'last_error_code' => null,
+                ]),
+            );
 
             $locked->forceFill(['meta' => $meta])->save();
         });
@@ -147,14 +153,16 @@ class SyncWebinarRegistrationToProviderAction
                 }
 
                 $recordedAt = now()->toISOString();
-                $meta['provider_sync'] = array_replace($sync, [
-                    'status' => 'reconciliation_required',
-                    'reconciliation_required_at' => $recordedAt,
-                    'failed_at' => $recordedAt,
-                    'failure_reason' => 'stale_provider_submission_outcome_unknown',
-                    'last_error_class' => null,
-                    'last_error_code' => null,
-                ]);
+                $meta['provider_sync'] = $this->canonicalizer()->providerSync(
+                    array_replace($sync, [
+                        'status' => 'reconciliation_required',
+                        'reconciliation_required_at' => $recordedAt,
+                        'failed_at' => $recordedAt,
+                        'failure_reason' => 'stale_provider_submission_outcome_unknown',
+                        'last_error_class' => null,
+                        'last_error_code' => null,
+                    ]),
+                );
                 $locked->forceFill(['meta' => $meta])->save();
 
                 return new WebinarProviderSyncResult(
@@ -178,19 +186,21 @@ class SyncWebinarRegistrationToProviderAction
             }
 
             $attemptedAt = now()->toISOString();
-            $meta['provider_sync'] = array_replace($sync, [
-                'status' => 'claimed',
-                'provider' => $locked->webinar?->providerKey(),
-                'attempts' => ((int) ($sync['attempts'] ?? 0)) + 1,
-                'first_attempted_at' => $sync['first_attempted_at'] ?? $attemptedAt,
-                'last_attempted_at' => $attemptedAt,
-                'claim_started_at' => $attemptedAt,
-                'submission_started_at' => null,
-                'failed_at' => null,
-                'failure_reason' => null,
-                'last_error_class' => null,
-                'last_error_code' => null,
-            ]);
+            $meta['provider_sync'] = $this->canonicalizer()->providerSync(
+                array_replace($sync, [
+                    'status' => 'claimed',
+                    'provider' => $locked->webinar?->providerKey(),
+                    'attempts' => ((int) ($sync['attempts'] ?? 0)) + 1,
+                    'first_attempted_at' => $sync['first_attempted_at'] ?? $attemptedAt,
+                    'last_attempted_at' => $attemptedAt,
+                    'claim_started_at' => $attemptedAt,
+                    'submission_started_at' => null,
+                    'failed_at' => null,
+                    'failure_reason' => null,
+                    'last_error_class' => null,
+                    'last_error_code' => null,
+                ]),
+            );
 
             $locked->forceFill(['meta' => $meta])->save();
 
@@ -215,10 +225,12 @@ class SyncWebinarRegistrationToProviderAction
                 return false;
             }
 
-            $meta['provider_sync'] = array_replace($sync, [
-                'status' => 'submitting',
-                'submission_started_at' => now()->toISOString(),
-            ]);
+            $meta['provider_sync'] = $this->canonicalizer()->providerSync(
+                array_replace($sync, [
+                    'status' => 'submitting',
+                    'submission_started_at' => now()->toISOString(),
+                ]),
+            );
 
             $locked->forceFill(['meta' => $meta])->save();
 
@@ -296,16 +308,18 @@ class SyncWebinarRegistrationToProviderAction
                 : [];
             $failedAt = now()->toISOString();
 
-            $meta['provider_sync'] = array_replace($sync, [
-                'status' => $status,
-                'failed_at' => $failedAt,
-                'reconciliation_required_at' => $status === 'reconciliation_required'
-                    ? $failedAt
-                    : null,
-                'failure_reason' => $reason,
-                'last_error_class' => $exception::class,
-                'last_error_code' => (string) $exception->getCode(),
-            ]);
+            $meta['provider_sync'] = $this->canonicalizer()->providerSync(
+                array_replace($sync, [
+                    'status' => $status,
+                    'failed_at' => $failedAt,
+                    'reconciliation_required_at' => $status === 'reconciliation_required'
+                        ? $failedAt
+                        : null,
+                    'failure_reason' => $reason,
+                    'last_error_class' => $exception::class,
+                    'last_error_code' => (string) $exception->getCode(),
+                ]),
+            );
 
             $locked->forceFill(['meta' => $meta])->save();
         });
@@ -356,5 +370,11 @@ class SyncWebinarRegistrationToProviderAction
         $value = trim($value);
 
         return $value !== '' ? $value : null;
+    }
+
+    private function canonicalizer(): WebinarStateCanonicalizer
+    {
+        return $this->stateCanonicalizer
+            ?? app(WebinarStateCanonicalizer::class);
     }
 }

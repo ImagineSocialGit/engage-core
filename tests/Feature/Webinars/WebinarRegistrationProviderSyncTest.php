@@ -11,6 +11,7 @@ use App\Modules\Webinars\Actions\CreateWebinarRegistrationAction;
 use App\Modules\Webinars\Actions\DispatchWebinarRegistrationMessagesAction;
 use App\Modules\Webinars\Actions\FinalizeWebinarRegistrationAction;
 use App\Modules\Webinars\Actions\QueueWebinarRegistrationFinalizationAction;
+use App\Modules\Webinars\Actions\ResolveWebinarRegistrationReconciliationAction;
 use App\Modules\Webinars\Actions\SyncWebinarRegistrationToProviderAction;
 use App\Modules\Webinars\Data\ProviderRegistrationData;
 use App\Modules\Webinars\Data\WebinarProviderSyncResult;
@@ -354,7 +355,14 @@ class WebinarRegistrationProviderSyncTest extends TestCase
                 provider: 'zoom',
                 registrantId: 'registrant-123',
                 joinUrl: 'https://zoom.example.test/join',
-                raw: ['id' => 'registrant-123'],
+                raw: [
+                    'id' => 'registrant-123',
+                    'occurrence_id' => 'occurrence-456',
+                    'email' => 'registrant@example.test',
+                    'first_name' => 'Example',
+                    'access_token' => 'provider-secret',
+                    'duplicated_response' => str_repeat('provider-data-', 100),
+                ],
             ));
         app()->instance(AddRegistrantToWebinarProviderAction::class, $provider);
 
@@ -372,13 +380,81 @@ class WebinarRegistrationProviderSyncTest extends TestCase
             'succeeded',
             data_get($registration->meta, 'provider_sync.status'),
         );
-        $this->assertSame(
-            'registrant-123',
-            data_get($registration->meta, 'provider.registrant_id'),
+        $this->assertEquals([
+            'key' => 'zoom',
+            'registrant_id' => 'registrant-123',
+            'join_url' => 'https://zoom.example.test/join',
+            'occurrence_id' => 'occurrence-456',
+        ], data_get($registration->meta, 'provider'));
+        $this->assertStringNotContainsString(
+            'provider-secret',
+            json_encode($registration->meta, JSON_THROW_ON_ERROR),
         );
         $this->assertSame(
             'completed',
             data_get($registration->meta, 'registration_finalization.status'),
+        );
+    }
+
+    public function test_manual_reconciliation_records_only_canonical_provider_identity(): void
+    {
+        Queue::fake();
+
+        $registration = $this->providerBackedRegistration([
+            'provider' => [
+                'name' => 'zoom',
+                'raw' => [
+                    'email' => 'legacy@example.test',
+                    'response' => str_repeat('legacy-provider-response-', 100),
+                ],
+            ],
+            'provider_sync' => [
+                'status' => 'reconciliation_required',
+                'provider' => 'zoom',
+                'failure_reason' => 'provider_submission_outcome_unknown',
+            ],
+            WebinarRegistrationFinalizationResult::META_KEY => [
+                'status' => 'reconciliation_required',
+                'mode' => 'initial_registration',
+                'consent_transitions' => [],
+                'failure_reason' => 'provider_submission_outcome_unknown',
+            ],
+        ]);
+
+        app(ResolveWebinarRegistrationReconciliationAction::class)->handle(
+            registration: $registration,
+            data: [
+                'decision' => ResolveWebinarRegistrationReconciliationAction::DECISION_PROVIDER_EXISTS,
+                'provider_registrant_id' => 'reconciled-registrant',
+                'provider_join_url' => 'https://zoom.example.test/reconciled',
+                'notes' => 'Verified against the provider record.',
+            ],
+            operatorId: 17,
+        );
+
+        $registration->refresh();
+
+        $this->assertEquals([
+            'key' => 'zoom',
+            'registrant_id' => 'reconciled-registrant',
+            'join_url' => 'https://zoom.example.test/reconciled',
+        ], data_get($registration->meta, 'provider'));
+        $this->assertSame(
+            17,
+            data_get($registration->meta, 'provider_sync.reconciliation_resolution.resolved_by'),
+        );
+        $this->assertSame(
+            'queued',
+            data_get($registration->meta, 'registration_finalization.status'),
+        );
+        $this->assertStringNotContainsString(
+            'legacy-provider-response',
+            json_encode($registration->meta, JSON_THROW_ON_ERROR),
+        );
+        Queue::assertPushed(
+            SyncWebinarRegistrationToProviderJob::class,
+            fn (SyncWebinarRegistrationToProviderJob $job): bool =>
+                $job->registrationId === $registration->getKey(),
         );
     }
 

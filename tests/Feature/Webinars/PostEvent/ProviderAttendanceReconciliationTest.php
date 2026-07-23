@@ -74,6 +74,30 @@ class ProviderAttendanceReconciliationTest extends TestCase
         $this->assertSame('attended', $matchedRegistration->fresh()->status);
         $this->assertNotNull($matchedRegistration->fresh()->attended_at);
         $this->assertSame('registered', $unmatchedRegistration->fresh()->status);
+
+        $attendance = data_get(
+            $matchedRegistration->fresh()->meta,
+            'attendance',
+        );
+
+        $this->assertSame('zoom', $attendance['provider']);
+        $this->assertSame('attended', $attendance['status']);
+        $this->assertSame(3600, $attendance['duration']);
+        $this->assertSame('registrant-1', $attendance['provider_registrant_id']);
+        $this->assertSame('provider_registrant_id', $attendance['matched_by']);
+        $this->assertArrayNotHasKey('raw', $attendance);
+        $this->assertLessThanOrEqual(
+            512,
+            strlen(json_encode($attendance, JSON_THROW_ON_ERROR)),
+        );
+        $this->assertStringNotContainsString(
+            'attendance-provider-secret',
+            json_encode($attendance, JSON_THROW_ON_ERROR),
+        );
+        $this->assertStringNotContainsString(
+            'person@example.com',
+            json_encode($attendance, JSON_THROW_ON_ERROR),
+        );
         $this->assertSame(
             'invalid_provider_pagination_token',
             data_get($webinar->fresh()->meta, 'normalized.post_event.attendance_snapshot_reason'),
@@ -227,9 +251,8 @@ class ProviderAttendanceReconciliationTest extends TestCase
                 'attended_at' => null,
                 'meta' => [
                     'provider' => [
-                        'data' => [
-                            'registrant_id' => 'registrant-1',
-                        ],
+                        'key' => 'zoom',
+                        'registrant_id' => 'registrant-1',
                     ],
                 ],
             ]);
@@ -255,7 +278,12 @@ class ProviderAttendanceReconciliationTest extends TestCase
             duration: 3600,
             joinTime: now()->subMinutes(55),
             leaveTime: now()->subMinutes(5),
-            raw: ['provider_record' => true],
+            raw: [
+                'provider_record' => true,
+                'email' => 'person@example.com',
+                'access_token' => 'attendance-provider-secret',
+                'response' => str_repeat('participant-payload-', 100),
+            ],
         );
     }
 

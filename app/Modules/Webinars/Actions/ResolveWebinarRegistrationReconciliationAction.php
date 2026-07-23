@@ -2,9 +2,9 @@
 
 namespace App\Modules\Webinars\Actions;
 
-use App\Modules\Webinars\Data\ProviderRegistrationData;
 use App\Modules\Webinars\Data\WebinarRegistrationFinalizationResult;
 use App\Modules\Webinars\Models\WebinarRegistration;
+use App\Modules\Webinars\Services\WebinarStateCanonicalizer;
 use Illuminate\Support\Facades\DB;
 
 class ResolveWebinarRegistrationReconciliationAction
@@ -14,6 +14,7 @@ class ResolveWebinarRegistrationReconciliationAction
 
     public function __construct(
         private readonly QueueWebinarRegistrationFinalizationAction $queueFinalization,
+        private readonly WebinarStateCanonicalizer $stateCanonicalizer,
     ) {}
 
     /**
@@ -92,48 +93,44 @@ class ResolveWebinarRegistrationReconciliationAction
                     );
                 }
 
-                $providerRegistration = new ProviderRegistrationData(
-                    provider: $provider,
-                    registrantId: $registrantId,
-                    joinUrl: $joinUrl,
-                    raw: [
-                        'reconciled_manually' => true,
-                        'reconciled_at' => $resolvedAt,
-                        'reconciled_by' => $operatorId,
-                    ],
-                );
-
-                $meta['provider'] = $providerRegistration->toMeta();
-                $meta['provider_sync'] = array_replace($providerSync, [
-                    'status' => 'succeeded',
-                    'provider' => $provider,
-                    'succeeded_at' => $resolvedAt,
-                    'claim_started_at' => null,
-                    'submission_started_at' => null,
-                    'failed_at' => null,
-                    'reconciliation_required_at' => null,
-                    'failure_reason' => null,
-                    'last_error_class' => null,
-                    'last_error_code' => null,
-                    'reconciliation_resolution' => $resolution,
-                ]);
+                $meta['provider'] = $this->stateCanonicalizer
+                    ->registrationProvider([
+                        'key' => $provider,
+                        'registrant_id' => $registrantId,
+                        'join_url' => $joinUrl,
+                    ]);
+                $meta['provider_sync'] = $this->stateCanonicalizer
+                    ->providerSync(array_replace($providerSync, [
+                        'status' => 'succeeded',
+                        'provider' => $provider,
+                        'succeeded_at' => $resolvedAt,
+                        'claim_started_at' => null,
+                        'submission_started_at' => null,
+                        'failed_at' => null,
+                        'reconciliation_required_at' => null,
+                        'failure_reason' => null,
+                        'last_error_class' => null,
+                        'last_error_code' => null,
+                        'reconciliation_resolution' => $resolution,
+                    ]));
             } elseif ($decision === self::DECISION_PROVIDER_ABSENT) {
                 unset($meta['provider']);
 
-                $meta['provider_sync'] = array_replace($providerSync, [
-                    'status' => 'pending',
-                    'provider' => $provider,
-                    'claim_started_at' => null,
-                    'submission_started_at' => null,
-                    'failed_at' => null,
-                    'reconciliation_required_at' => null,
-                    'failure_reason' => null,
-                    'last_error_class' => null,
-                    'last_error_code' => null,
-                    'resubmission_authorized_at' => $resolvedAt,
-                    'resubmission_authorized_by' => $operatorId,
-                    'reconciliation_resolution' => $resolution,
-                ]);
+                $meta['provider_sync'] = $this->stateCanonicalizer
+                    ->providerSync(array_replace($providerSync, [
+                        'status' => 'pending',
+                        'provider' => $provider,
+                        'claim_started_at' => null,
+                        'submission_started_at' => null,
+                        'failed_at' => null,
+                        'reconciliation_required_at' => null,
+                        'failure_reason' => null,
+                        'last_error_class' => null,
+                        'last_error_code' => null,
+                        'resubmission_authorized_at' => $resolvedAt,
+                        'resubmission_authorized_by' => $operatorId,
+                        'reconciliation_resolution' => $resolution,
+                    ]));
             } else {
                 return new WebinarRegistrationFinalizationResult(
                     status: WebinarRegistrationFinalizationResult::STATUS_RECONCILIATION_REQUIRED,

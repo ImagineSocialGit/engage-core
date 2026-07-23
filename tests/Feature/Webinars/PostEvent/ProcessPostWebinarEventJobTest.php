@@ -93,6 +93,11 @@ class ProcessPostWebinarEventJobTest extends TestCase
         $this->assertNotNull($attendedRegistration->attended_at);
         $this->assertSame('attended', data_get($attendedRegistration->meta, 'attendance.status'));
         $this->assertSame('zoom', data_get($attendedRegistration->meta, 'attendance.provider'));
+        $this->assertSame(
+            'provider_registrant_id',
+            data_get($attendedRegistration->meta, 'attendance.matched_by'),
+        );
+        $this->assertNull(data_get($attendedRegistration->meta, 'attendance.raw'));
 
         $this->assertSame('missed', $missedRegistration->status);
         $this->assertNull($missedRegistration->attended_at);
@@ -149,7 +154,12 @@ class ProcessPostWebinarEventJobTest extends TestCase
                 ->andReturn(new ProviderRecordingData(
                     playbackUrl: 'https://zoom.example.test/rec/play/abc123',
                     playbackPasscode: 'pass123',
-                    raw: ['recording_id' => 'recording-1'],
+                    raw: [
+                        'recording_id' => 'recording-1',
+                        'download_access_token' => 'recording-secret',
+                        'download_url' => 'https://zoom.example.test/private/download',
+                        'recording_files' => str_repeat('recording-payload-', 100),
+                    ],
                 ));
         });
 
@@ -171,6 +181,19 @@ class ProcessPostWebinarEventJobTest extends TestCase
         $this->assertNotNull(data_get($webinar->meta, 'normalized.post_event.attendance_recorded_at'));
         $this->assertNotNull(data_get($webinar->meta, 'automation_events.webinar_replay_available_recorded_at'));
         $this->assertNotNull(data_get($webinar->meta, 'automation_events.webinar_ended_recorded_at'));
+        $this->assertNull(data_get($webinar->meta, 'provider.zoom.recording'));
+        $this->assertLessThanOrEqual(
+            2048,
+            strlen(json_encode($webinar->meta, JSON_THROW_ON_ERROR)),
+        );
+        $this->assertStringNotContainsString(
+            'recording-secret',
+            json_encode($webinar->meta, JSON_THROW_ON_ERROR),
+        );
+        $this->assertStringNotContainsString(
+            'recording-payload',
+            json_encode($webinar->meta, JSON_THROW_ON_ERROR),
+        );
 
         $attendedRegistration->refresh();
         $missedRegistration->refresh();
@@ -235,7 +258,10 @@ class ProcessPostWebinarEventJobTest extends TestCase
                 ->andReturn(new ProviderRecordingData(
                     playbackUrl: 'https://zoom.example.test/rec/play/abc123',
                     playbackPasscode: 'pass123',
-                    raw: ['recording_id' => 'recording-1'],
+                    raw: [
+                        'recording_id' => 'recording-1',
+                        'download_access_token' => 'recording-secret',
+                    ],
                 ));
         });
 
@@ -554,7 +580,12 @@ class ProcessPostWebinarEventJobTest extends TestCase
             duration: 3600,
             joinTime: now()->subMinutes(55),
             leaveTime: now()->subMinutes(5),
-            raw: ['provider_record' => true],
+            raw: [
+                'provider_record' => true,
+                'email' => 'person@example.com',
+                'access_token' => 'attendance-secret',
+                'participant' => str_repeat('participant-payload-', 100),
+            ],
         );
 
         return [$webinar, $attendedRegistration, $missedRegistration, $attendanceRecord];

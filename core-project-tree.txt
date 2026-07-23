@@ -867,7 +867,8 @@
 │   │   │   │   ├── WebinarRegistrationCsvReader.php
 │   │   │   │   ├── WebinarRegistrationQuestionResolver.php
 │   │   │   │   ├── WebinarScheduleProfileDefinitionResolver.php
-│   │   │   │   └── WebinarScheduleProfileResolver.php
+│   │   │   │   ├── WebinarScheduleProfileResolver.php
+│   │   │   │   └── WebinarStateCanonicalizer.php
 │   │   │   ├── Support
 │   │   │   │   ├── WebinarJoinBrowserProof.php
 │   │   │   │   ├── WebinarJoinLinkGenerator.php
@@ -1787,6 +1788,7 @@
 │   │   │   ├── WebinarScheduleProfileDefinitionResolverMessageAreaTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
+│   │   │   ├── WebinarStateCanonicalizerTest.php
 │   │   │   ├── WebinarTokenReferenceContractTest.php
 │   │   │   ├── WebinarWaitlistSignupControllerTest.php
 │   │   │   ├── ZoomMeetingProviderContractTest.php
@@ -1802,4 +1804,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-497 directories, 1306 files
+497 directories, 1308 files
