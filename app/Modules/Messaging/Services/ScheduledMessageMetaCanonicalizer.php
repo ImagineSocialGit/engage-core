@@ -195,18 +195,6 @@ class ScheduledMessageMetaCanonicalizer
             $canonical['task_ids'] = $taskIds;
         }
 
-        /*
-         * Delivery/recovery cleanup belongs to Batch 4B2. Preserve this
-         * existing contract while still applying the global structural bound.
-         */
-        if (is_array($meta['delivery'] ?? null)) {
-            $delivery = $this->sanitizeArray($meta['delivery'], 1);
-
-            if ($delivery !== []) {
-                $canonical['delivery'] = $delivery;
-            }
-        }
-
         $canonical = $this->sanitizeArray($canonical, 0);
         $this->assertEncodedSize($canonical);
 

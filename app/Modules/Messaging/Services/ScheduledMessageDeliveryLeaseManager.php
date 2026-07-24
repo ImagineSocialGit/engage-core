@@ -80,7 +80,6 @@ class ScheduledMessageDeliveryLeaseManager
                 'recovered_at' => null,
                 'provider' => $result->provider,
                 'provider_message_id' => $result->providerMessageId,
-                'meta' => $this->deliveryMeta($message, $result),
             ];
 
             if ($status === ScheduledMessage::STATUS_SENT) {
@@ -178,7 +177,6 @@ class ScheduledMessageDeliveryLeaseManager
                 'recovered_at' => null,
                 'failed_at' => null,
                 'failure_reason' => $exception->getMessage(),
-                'meta' => $this->deliveryMeta($message, $result),
             ])->save();
 
             $attempt->forceFill([
@@ -247,22 +245,5 @@ class ScheduledMessageDeliveryLeaseManager
         ScheduledMessage $persistedMessage,
     ): void {
         $claimedMessage->setRawAttributes($persistedMessage->getAttributes(), true);
-    }
-
-    private function deliveryMeta(
-        ScheduledMessage $message,
-        MessageSendResult $result,
-    ): array {
-        return array_replace_recursive(
-            is_array($message->meta) ? $message->meta : [],
-            [
-                'delivery' => [
-                    ...$result->toMeta(),
-                    'attempt' => (int) $message->send_attempts,
-                    'attempted_at' => ($message->last_attempted_at ?? now())->toISOString(),
-                    'provider_idempotency_key' => $message->provider_idempotency_key,
-                ],
-            ],
-        );
     }
 }

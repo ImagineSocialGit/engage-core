@@ -17,6 +17,7 @@ use App\Modules\Messaging\Models\ConsentRevocation;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Models\ScheduledMessageDeliveryAttempt;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
@@ -70,7 +71,13 @@ class SendScheduledMessageJobTest extends TestCase
             ->shouldReceive('send')
             ->once()
             ->with(Mockery::type(FakeJobEmailPayload::class))
-            ->andReturn(MessageSendResult::sent(provider: 'test_email'));
+            ->andReturn(MessageSendResult::sent(
+                provider: 'test_email',
+                providerMessageId: 'test-email-message-1',
+                meta: [
+                    'provider_request_id' => 'test-email-request-1',
+                ],
+            ));
 
         app()->instance(EmailMessagingService::class, $emailService);
 
@@ -82,7 +89,31 @@ class SendScheduledMessageJobTest extends TestCase
         $this->assertNotNull($scheduledMessage->sent_at);
         $this->assertSame(1, $scheduledMessage->send_attempts);
         $this->assertSame('test_email', $scheduledMessage->provider);
+        $this->assertSame(
+            'test-email-message-1',
+            $scheduledMessage->provider_message_id,
+        );
         $this->assertNull($scheduledMessage->sending_at);
+        $this->assertEquals([
+            'conditions' => [],
+        ], $scheduledMessage->meta);
+
+        $attempt = ScheduledMessageDeliveryAttempt::query()
+            ->where('scheduled_message_id', $scheduledMessage->getKey())
+            ->sole();
+
+        $this->assertSame(
+            ScheduledMessageDeliveryAttempt::STATUS_SENT,
+            $attempt->status,
+        );
+        $this->assertSame('test_email', $attempt->provider);
+        $this->assertSame(
+            'test-email-message-1',
+            $attempt->provider_message_id,
+        );
+        $this->assertEquals([
+            'provider_request_id' => 'test-email-request-1',
+        ], $attempt->meta);
 
         Event::assertDispatched(
             ScheduledMessageSent::class,
@@ -1127,7 +1158,7 @@ Thanks.",
         $invitation->refresh();
 
         $this->assertSame(ContactPermissionInvitation::STATUS_ACCEPTED, $invitation->status);
-        $this->assertSame(['email'], $invitation->accepted_channels);
+        $this->assertEquals(['email'], $invitation->accepted_channels);
 
         $this->assertDatabaseHas('message_consents', [
             'contact_id' => $contact->id,
@@ -1344,6 +1375,9 @@ Thanks.",
             ->andReturn(MessageSendResult::skipped(
                 reasonCode: 'sms_disabled',
                 reason: 'SMS delivery is disabled.',
+                meta: [
+                    'capability' => 'disabled',
+                ],
             ));
         app()->instance(SmsMessagingService::class, $smsService);
 
@@ -1353,9 +1387,26 @@ Thanks.",
 
         $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $scheduledMessage->status);
         $this->assertSame('SMS delivery is disabled.', $scheduledMessage->skip_reason);
-        $this->assertSame('sms_disabled', data_get($scheduledMessage->meta, 'delivery.reason_code'));
         $this->assertNull($scheduledMessage->sent_at);
         $this->assertNull($scheduledMessage->sending_at);
+        $this->assertEquals([
+            'conditions' => [],
+        ], $scheduledMessage->meta);
+
+        $attempt = ScheduledMessageDeliveryAttempt::query()
+            ->where('scheduled_message_id', $scheduledMessage->getKey())
+            ->sole();
+
+        $this->assertSame(
+            ScheduledMessageDeliveryAttempt::STATUS_SKIPPED,
+            $attempt->status,
+        );
+        $this->assertSame('sms_disabled', $attempt->reason_code);
+        $this->assertSame('SMS delivery is disabled.', $attempt->reason);
+        $this->assertEquals([
+            'capability' => 'disabled',
+        ], $attempt->meta);
+
         Event::assertNotDispatched(ScheduledMessageSent::class);
         Event::assertDispatched(ScheduledMessageSkipped::class);
     }
@@ -1400,7 +1451,25 @@ Thanks.",
         $this->assertNull($scheduledMessage->sending_at);
         $this->assertNull($scheduledMessage->failed_at);
         $this->assertSame('Temporary provider outage.', $scheduledMessage->failure_reason);
-        $this->assertTrue((bool) data_get($scheduledMessage->meta, 'delivery.retryable'));
+        $this->assertEquals([
+            'conditions' => [],
+        ], $scheduledMessage->meta);
+
+        $attempt = ScheduledMessageDeliveryAttempt::query()
+            ->where('scheduled_message_id', $scheduledMessage->getKey())
+            ->sole();
+
+        $this->assertSame(
+            ScheduledMessageDeliveryAttempt::STATUS_RELEASED,
+            $attempt->status,
+        );
+        $this->assertSame(
+            'message_delivery_retryable_exception',
+            $attempt->reason_code,
+        );
+        $this->assertSame('Temporary provider outage.', $attempt->reason);
+        $this->assertEquals([], $attempt->meta);
+
         Event::assertNotDispatched(ScheduledMessageFailed::class);
     }
 
@@ -1444,6 +1513,22 @@ Thanks.",
         $this->assertSame(3, $scheduledMessage->send_attempts);
         $this->assertNotNull($scheduledMessage->failed_at);
         $this->assertNull($scheduledMessage->sending_at);
+        $this->assertEquals([
+            'conditions' => [],
+        ], $scheduledMessage->meta);
+
+        $attempt = ScheduledMessageDeliveryAttempt::query()
+            ->where('scheduled_message_id', $scheduledMessage->getKey())
+            ->sole();
+
+        $this->assertSame(
+            ScheduledMessageDeliveryAttempt::STATUS_FAILED,
+            $attempt->status,
+        );
+        $this->assertSame('message_delivery_exception', $attempt->reason_code);
+        $this->assertSame('Provider still unavailable.', $attempt->reason);
+        $this->assertEquals([], $attempt->meta);
+
         Event::assertDispatched(ScheduledMessageFailed::class);
     }
 

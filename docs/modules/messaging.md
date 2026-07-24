@@ -101,7 +101,7 @@ Owning module resolves behavior
 
 `ResolvedMessageDispatch` is the normalized final dispatch contract. It contains the exact resolved `send_at`, optional polymorphic `behaviorOwner` provenance, optional stable `occurrenceKey` identity, and the generic information required for Messaging to apply delivery safety and persist a `ScheduledMessage`.
 
-`MessageSendTimeResolver` may return a timezone-aware client-local value because calendar behavior such as `next_day_at` belongs to the client's timezone. `ScheduleMessageAction` is the persistence boundary: it converts that instant to UTC before both database persistence and queue delay registration. It records the original timezone, source ISO-8601 timestamp, and normalized UTC timestamp under `ScheduledMessage.meta.message_scheduling`. Horizon `send_at` metadata is also an ISO-8601 UTC timestamp with an explicit offset; offset-free diagnostic timestamps are not allowed.
+`MessageSendTimeResolver` may return a timezone-aware client-local value because calendar behavior such as `next_day_at` belongs to the client's timezone. `ScheduleMessageAction` is the persistence boundary: it converts that instant to UTC before both database persistence and queue delay registration. The normalized instant is stored once in `scheduled_messages.send_at`; `ScheduledMessage.meta` does not duplicate source or normalized scheduling timestamps. Horizon `send_at` metadata is an ISO-8601 UTC timestamp with an explicit offset; offset-free diagnostic timestamps are not allowed.
 
 The builder accepts an optional polymorphic `behaviorOwner` model. When present, `ScheduledMessage` persists that provenance through `behavior_owner_type` / `behavior_owner_id`. Messaging stores the morph generically and does not import concrete feature-module models to understand their behavior.
 
@@ -693,7 +693,7 @@ skip or failure reason
 
 `payload` should contain provider-ready content plus only the minimal late-bound values required for deterministic delivery.
 
-`meta` should contain compact operational provenance such as:
+`meta` should contain compact scheduling and domain provenance such as:
 
 ```text
 resolved conditions
@@ -701,9 +701,10 @@ intent keys
 consent IDs
 delivery-consolidation coverage
 template/assignment identity
-behavior-owner occurrence identity
-provider attempt diagnostics
+Campaign, Webinar, FlowRoute, and automation provenance
 ```
+
+Delivery status, provider outcomes, retry facts, recovery facts, and provider evidence do not belong in `ScheduledMessage.meta`.
 
 Do not persist the same Contact, Webinar, registration, Campaign, Route, Task, or other model snapshot repeatedly under top-level payload fields, `tokens`, `context`, and metadata. Do not persist loaded relationship graphs merely because `toArray()` is convenient.
 
@@ -715,9 +716,34 @@ Raw provider payloads belong only in columns explicitly designed as raw provider
 
 Each claim creates a `scheduled_message_delivery_attempts` row. Attempt history is separate from the customer-visible terminal state on `scheduled_messages`; it records claim, provider-submission, release, recovery, and terminal outcome facts.
 
-The provider idempotency key identifies one logical ScheduledMessage delivery and remains stable across attempts. Providers with a verified idempotency contract may safely receive the same key after an ambiguous stale submission only inside the configured provider retention window. Resend receives this key through its supported idempotency header and uses a conservative retry window below its documented 24-hour retention. A provider without a verified idempotency guarantee, or a claim recovered after that guarantee expired, must not be retried automatically after submission began and the outcome became ambiguous; the ScheduledMessage becomes visibly failed for operator review instead of risking a duplicate.
+Current delivery state is owned by first-class `scheduled_messages` columns:
 
-Messaging schedules stale-claim recovery every minute. An expired pre-submission claim is returned to `pending`, marked for recovery dispatch, and repeatedly eligible for recovery dispatch until a new worker successfully claims it. Recovery never rewrites an existing terminal outcome.
+```text
+status
+sending_at
+claim_token
+claim_expires_at
+provider_submission_started_at
+recovered_at
+last_attempted_at
+send_attempts
+sent_at
+skipped_at
+failed_at
+provider
+provider_message_id
+skip_reason
+failure_reason
+provider_idempotency_key
+```
+
+Per-attempt diagnostics are owned by `scheduled_message_delivery_attempts`, including the claim token, attempt number, provider idempotency key, claim/submission/completion timestamps, attempt status, provider identity, provider message ID, reason code, reason, and provider-specific evidence in attempt `meta`.
+
+`ScheduledMessage.meta.delivery` is not a runtime persistence contract. Delivery completion, retry release, and stale-claim recovery must preserve the message's existing canonical metadata without adding delivery or recovery structures. Explicit import canonicalization discards legacy `meta.delivery` rather than promoting it.
+
+The provider idempotency key identifies one logical ScheduledMessage delivery and remains stable across attempts. `SendScheduledMessageJob` injects the column-backed key only into the in-memory provider payload; it is not persisted in `payload` or `meta`. Providers with a verified idempotency contract may safely receive the same key after an ambiguous stale submission only inside the configured provider retention window. Resend receives this key through its supported idempotency header and uses a conservative retry window below its documented 24-hour retention. A provider without a verified idempotency guarantee, or a claim recovered after that guarantee expired, must not be retried automatically after submission began and the outcome became ambiguous; the ScheduledMessage becomes visibly failed for operator review instead of risking a duplicate.
+
+Messaging schedules stale-claim recovery every minute. An expired pre-submission claim is returned to `pending`, marked for recovery dispatch, and repeatedly eligible for recovery dispatch until a new worker successfully claims it. Recovery facts are recorded on the message's recovery/state columns and the completed attempt row. Recovery never rewrites an existing terminal outcome or adds diagnostics to ScheduledMessage metadata.
 
 ## FlowRoutes-created scheduled message provenance
 

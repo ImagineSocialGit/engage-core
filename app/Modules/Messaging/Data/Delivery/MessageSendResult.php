@@ -83,18 +83,4 @@ final readonly class MessageSendResult
     {
         return $this->status === self::STATUS_FAILED;
     }
-
-    /** @return array<string, mixed> */
-    public function toMeta(): array
-    {
-        return array_filter([
-            'status' => $this->status,
-            'reason_code' => $this->reasonCode,
-            'reason' => $this->reason,
-            'provider' => $this->provider,
-            'provider_message_id' => $this->providerMessageId,
-            'retryable' => $this->retryable,
-            'meta' => $this->meta !== [] ? $this->meta : null,
-        ], static fn (mixed $value): bool => $value !== null);
-    }
 }

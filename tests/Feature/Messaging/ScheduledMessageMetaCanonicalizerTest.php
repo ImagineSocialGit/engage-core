@@ -279,85 +279,122 @@ class ScheduledMessageMetaCanonicalizerTest extends TestCase
         ], $canonical);
     }
 
-    public function test_delivery_metadata_remains_available_until_delivery_diagnostics_batch(): void
+    public function test_runtime_canonicalization_discards_delivery_metadata(): void
     {
-        $canonical = $this->canonicalizer()->canonicalize([
+        $meta = [
+            'source' => 'automation',
             'delivery' => [
                 'status' => 'failed',
                 'attempt' => 2,
                 'provider' => 'test_provider',
+                'provider_evidence' => str_repeat(
+                    'x',
+                    ScheduledMessageMetaCanonicalizer::MAX_ENCODED_BYTES,
+                ),
                 'recovery' => [
                     'count' => 1,
                     'recovered_at' => '2026-07-24T14:00:00+00:00',
+                ],
+            ],
+        ];
+        $expected = [
+            'source' => 'automation',
+        ];
+
+        $this->assertEquals(
+            $expected,
+            $this->canonicalizer()->forPersistence($meta),
+        );
+        $this->assertEquals(
+            $expected,
+            $this->canonicalizer()->canonicalize($meta),
+        );
+    }
+
+    public function test_import_canonicalization_discards_legacy_delivery_metadata(): void
+    {
+        $record = $this->canonicalizer()->canonicalizeImportedRecord([
+            'meta' => [
+                'campaign_id' => 41,
+                'delivery' => [
+                    'status' => 'sent',
+                    'provider' => 'legacy_provider',
+                    'provider_message_id' => 'legacy-message-id',
+                    'provider_idempotency_key' => 'legacy-idempotency-key',
+                    'recovery' => [
+                        'count' => 3,
+                    ],
                 ],
             ],
         ]);
 
         $this->assertEquals([
-            'delivery' => [
-                'status' => 'failed',
-                'attempt' => 2,
-                'provider' => 'test_provider',
-                'recovery' => [
-                    'count' => 1,
-                    'recovered_at' => '2026-07-24T14:00:00+00:00',
-                ],
-            ],
-        ], $canonical);
+            'campaign_id' => 41,
+        ], $record['meta']);
     }
 
-    public function test_oversized_preserved_metadata_is_rejected(): void
+    public function test_oversized_canonical_condition_metadata_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('maximum encoded size');
 
         $this->canonicalizer()->canonicalize([
-            'delivery' => [
-                'provider_evidence_1' => str_repeat('a', 4000),
-                'provider_evidence_2' => str_repeat('b', 4000),
-                'provider_evidence_3' => str_repeat('c', 4000),
-                'provider_evidence_4' => str_repeat('d', 4000),
-                'provider_evidence_5' => str_repeat('e', 4000),
-            ],
+            'conditions' => [[
+                'field' => 'message.delivery_state',
+                'operator' => 'equals',
+                'value' => [
+                    'evidence_1' => str_repeat('a', 4000),
+                    'evidence_2' => str_repeat('b', 4000),
+                    'evidence_3' => str_repeat('c', 4000),
+                    'evidence_4' => str_repeat('d', 4000),
+                    'evidence_5' => str_repeat('e', 4000),
+                ],
+            ]],
         ]);
     }
 
-    public function test_excessively_nested_preserved_metadata_is_rejected(): void
+    public function test_excessively_nested_canonical_condition_metadata_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('maximum nesting depth');
 
         $this->canonicalizer()->canonicalize([
-            'delivery' => [
-                'level_1' => [
-                    'level_2' => [
-                        'level_3' => [
-                            'level_4' => [
-                                'level_5' => [
-                                    'level_6' => [
-                                        'level_7' => 'too deep',
+            'conditions' => [[
+                'field' => 'message.delivery_state',
+                'operator' => 'equals',
+                'value' => [
+                    'level_1' => [
+                        'level_2' => [
+                            'level_3' => [
+                                'level_4' => [
+                                    'level_5' => [
+                                        'level_6' => [
+                                            'level_7' => 'too deep',
+                                        ],
                                     ],
                                 ],
                             ],
                         ],
                     ],
                 ],
-            ],
+            ]],
         ]);
     }
 
-    public function test_oversized_preserved_collection_is_rejected(): void
+    public function test_oversized_canonical_condition_collection_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('too many collection items');
 
         $this->canonicalizer()->canonicalize([
-            'delivery' => [
-                'provider_attempts' => range(
+            'conditions' => [[
+                'field' => 'message.delivery_state',
+                'operator' => 'in',
+                'value' => range(
                     1,
                     ScheduledMessageMetaCanonicalizer::MAX_LIST_ITEMS + 1,
                 ),
-            ],
+            ]],
         ]);
     }
 

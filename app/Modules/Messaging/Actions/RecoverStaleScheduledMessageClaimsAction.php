@@ -66,28 +66,9 @@ class RecoverStaleScheduledMessageClaimsAction
             $claimToken = $message->claim_token;
             $submissionIsAmbiguous = ! $this->deliveryPolicy
                 ->canSafelyRetryProviderSubmission($message);
-            $recoveryCount = ((int) data_get(
-                $message->meta,
-                'delivery.recovery.count',
-                0,
-            )) + 1;
             $reason = $submissionIsAmbiguous
                 ? 'Delivery outcome is unknown after a stale provider submission without a current idempotency guarantee; automatic retry was blocked.'
                 : 'Expired ScheduledMessage delivery claim was recovered for retry.';
-
-            $meta = array_replace_recursive(
-                is_array($message->meta) ? $message->meta : [],
-                [
-                    'delivery' => [
-                        'recovery' => [
-                            'count' => $recoveryCount,
-                            'recovered_at' => $recoveredAt->toISOString(),
-                            'reason' => $reason,
-                            'previous_claim_token' => $claimToken,
-                        ],
-                    ],
-                ],
-            );
 
             if ($submissionIsAmbiguous) {
                 $message->forceFill([
@@ -99,7 +80,6 @@ class RecoverStaleScheduledMessageClaimsAction
                     'failed_at' => $recoveredAt,
                     'failure_reason' => $reason,
                     'skip_reason' => null,
-                    'meta' => $meta,
                 ])->save();
 
                 $this->completeAttempt(
@@ -133,7 +113,6 @@ class RecoverStaleScheduledMessageClaimsAction
                 'failed_at' => null,
                 'failure_reason' => null,
                 'skip_reason' => null,
-                'meta' => $meta,
             ])->save();
 
             $this->completeAttempt(
