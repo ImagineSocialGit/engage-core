@@ -1064,12 +1064,16 @@ Global preset sync may force FlowRoutes, Tasks, Message Templates, and Webinar s
 Current Campaign sync behavior:
 
 ```text
-create/update non-customized Campaigns
+create Campaigns with the preset status as their installation default
+update non-customized Campaign definition fields without overwriting existing Campaign status
 create/update non-customized CampaignSteps
 create/update non-customized CampaignStepVariants
 remove stale non-customized steps/variants when the preset is authoritative
 preserve customized Campaigns, CampaignSteps, and CampaignStepVariants
+preserve Campaign lifecycle provenance stored under Campaign.meta.lifecycle
 ```
+
+Existing Campaign status is operational database state. Use the Campaign CRM lifecycle controls or `php artisan campaigns:deactivate {campaign_key}` to stop a live Campaign. Do not edit preset status and assume routine sync will cancel enrollments or pending messages.
 
 Do not document or use `--force-campaigns` unless a future branch deliberately implements destructive Campaign overwrite semantics.
 

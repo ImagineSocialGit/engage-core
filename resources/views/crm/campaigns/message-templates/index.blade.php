@@ -1,12 +1,18 @@
 <x-layouts.crm
-    title="Campaign Message Templates"
-    heading="Campaign Message Templates"
-    subheading="Choose which reusable Messaging template each campaign delivery option sends."
+    title="Campaigns"
+    heading="Campaigns"
+    subheading="Manage Campaign availability and reusable message selections."
 >
     <div class="space-y-6">
         @if(session('status'))
             <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
                 {{ session('status') }}
+            </div>
+        @endif
+
+        @if(session('error'))
+            <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-900">
+                {{ session('error') }}
             </div>
         @endif
 
@@ -17,10 +23,10 @@
                         Campaigns
                     </p>
                     <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-slate-950">
-                        Message selection
+                        Lifecycle and message selection
                     </h2>
                     <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                        Campaigns decide the journey, business moments, timing, and step order. Messaging owns reusable copy. Use this page to select the active template for each channel-specific delivery option.
+                        Campaign status controls whether new enrollments may begin. Deactivation also cancels active enrollments and skips pending Campaign messages. Messaging continues to own reusable copy.
                     </p>
                 </div>
 
@@ -50,7 +56,7 @@
                             Campaigns
                         </h2>
                         <p class="mt-1 text-sm text-slate-500">
-                            Choose a campaign to review its message steps.
+                            Choose a Campaign to review its status and message steps.
                         </p>
                     </div>
 
@@ -76,6 +82,9 @@
                                     <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
                                         {{ str_replace('_', ' ', $campaign->scope) }}
                                     </span>
+                                    <span class="rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide {{ $campaign->status === \App\Modules\Campaigns\Models\Campaign::STATUS_ACTIVE ? 'bg-emerald-100 text-emerald-800' : ($campaign->status === \App\Modules\Campaigns\Models\Campaign::STATUS_ARCHIVED ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-800') }}">
+                                        {{ $campaign->status }}
+                                    </span>
                                 </div>
                             </a>
                         @endforeach
@@ -85,33 +94,88 @@
                 <section class="rounded-3xl border border-slate-200 bg-white shadow-sm">
                     @if($selectedCampaign)
                         <div class="border-b border-slate-200 px-6 py-5">
-                            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                                 <div>
                                     <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">
-                                        Selected campaign
+                                        Selected Campaign
                                     </p>
                                     <h2 class="mt-2 text-xl font-extrabold tracking-tight text-slate-950">
                                         {{ $selectedCampaign->name }}
                                     </h2>
                                     <p class="mt-2 text-sm leading-6 text-slate-600">
-                                        {{ $selectedCampaign->description ?: 'Select the active Messaging template for each campaign delivery option.' }}
+                                        {{ $selectedCampaign->description ?: 'Select the active Messaging template for each Campaign delivery option.' }}
                                     </p>
+
+                                    <div class="mt-4 flex flex-wrap gap-2">
+                                        <span class="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide {{ $selectedCampaign->status === \App\Modules\Campaigns\Models\Campaign::STATUS_ACTIVE ? 'bg-emerald-100 text-emerald-800' : ($selectedCampaign->status === \App\Modules\Campaigns\Models\Campaign::STATUS_ARCHIVED ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-800') }}">
+                                            {{ $selectedCampaign->status }}
+                                        </span>
+                                        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-slate-600">
+                                            {{ $selectedCampaign->channel }} default
+                                        </span>
+                                        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                                            {{ str_replace('_', ' ', $selectedCampaign->purpose) }}
+                                        </span>
+                                        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                                            {{ str_replace('_', ' ', $selectedCampaign->scope) }}
+                                        </span>
+                                    </div>
                                 </div>
 
-                                <div class="flex flex-wrap gap-2">
-                                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-slate-600">
-                                        {{ $selectedCampaign->channel }} default
-                                    </span>
-                                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-                                        {{ str_replace('_', ' ', $selectedCampaign->purpose) }}
-                                    </span>
-                                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-                                        {{ str_replace('_', ' ', $selectedCampaign->scope) }}
-                                    </span>
+                                <div class="w-full max-w-sm rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:w-auto">
+                                    <dl class="grid grid-cols-2 gap-3 text-sm">
+                                        <div>
+                                            <dt class="text-xs font-bold uppercase tracking-wide text-slate-500">Active enrollments</dt>
+                                            <dd class="mt-1 text-lg font-extrabold text-slate-950">{{ $activeEnrollmentCount }}</dd>
+                                        </div>
+                                        <div>
+                                            <dt class="text-xs font-bold uppercase tracking-wide text-slate-500">Pending messages</dt>
+                                            <dd class="mt-1 text-lg font-extrabold text-slate-950">{{ $pendingScheduledMessageCount }}</dd>
+                                        </div>
+                                    </dl>
+
+                                    @if($selectedCampaign->status === \App\Modules\Campaigns\Models\Campaign::STATUS_ACTIVE)
+                                        <form
+                                            method="POST"
+                                            action="{{ route('crm.campaigns.message-templates.deactivate', $selectedCampaign) }}"
+                                            class="mt-4"
+                                            onsubmit="return confirm('Deactivate this Campaign, cancel active enrollments, and skip pending Campaign messages?');"
+                                        >
+                                            @csrf
+                                            @method('PATCH')
+                                            <button
+                                                type="submit"
+                                                class="inline-flex min-h-10 w-full items-center justify-center rounded-full bg-red-700 px-4 text-sm font-extrabold text-white transition hover:bg-red-800"
+                                            >
+                                                Deactivate Campaign
+                                            </button>
+                                        </form>
+                                    @elseif($selectedCampaign->status === \App\Modules\Campaigns\Models\Campaign::STATUS_INACTIVE)
+                                        <form
+                                            method="POST"
+                                            action="{{ route('crm.campaigns.message-templates.activate', $selectedCampaign) }}"
+                                            class="mt-4"
+                                        >
+                                            @csrf
+                                            @method('PATCH')
+                                            <button
+                                                type="submit"
+                                                class="inline-flex min-h-10 w-full items-center justify-center rounded-full bg-emerald-700 px-4 text-sm font-extrabold text-white transition hover:bg-emerald-800"
+                                            >
+                                                Activate Campaign
+                                            </button>
+                                        </form>
+                                        <p class="mt-3 text-xs leading-5 text-slate-500">
+                                            Activation allows new enrollments. It does not restart cancelled enrollments or skipped messages.
+                                        </p>
+                                    @else
+                                        <p class="mt-4 text-xs font-semibold leading-5 text-slate-600">
+                                            Archived Campaigns cannot be activated from this surface.
+                                        </p>
+                                    @endif
                                 </div>
                             </div>
                         </div>
-
                         <div class="divide-y divide-slate-100">
                             @foreach($selectedCampaign->steps as $step)
                                 <div id="step-{{ $step->id }}" class="p-6 {{ $selectedStep && $selectedStep->is($step) ? 'bg-indigo-50/40' : '' }}">

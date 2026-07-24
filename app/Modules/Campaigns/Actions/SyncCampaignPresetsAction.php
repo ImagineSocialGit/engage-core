@@ -108,9 +108,11 @@ class SyncCampaignPresetsAction
             'channel' => $this->normalizeSegment($definition->channel),
             'purpose' => $this->normalizeSegment($definition->purpose),
             'scope' => $this->normalizeSegment($definition->scope),
-            'status' => $this->normalizeSegment($definition->status),
             'source_version' => $definition->sourceVersion,
-            'meta' => $definition->meta,
+            'meta' => $this->campaignMeta(
+                campaign: $campaign,
+                presetMeta: $definition->meta,
+            ),
         ])->save();
 
         $result->recordCampaignUpdated();
@@ -341,6 +343,25 @@ class SyncCampaignPresetsAction
             'purpose' => $this->normalizeSegment($definition->purpose ?? $campaign->purpose),
             'scope' => $this->normalizeSegment($definition->scope ?? $campaign->scope),
         ];
+    }
+
+
+    /**
+     * Preset status is an installation default. Existing Campaign status is
+     * operational state and must not be overwritten by routine preset sync.
+     *
+     * @param array<string, mixed> $presetMeta
+     * @return array<string, mixed>
+     */
+    private function campaignMeta(Campaign $campaign, array $presetMeta): array
+    {
+        $lifecycle = data_get($campaign->meta, 'lifecycle');
+
+        if (is_array($lifecycle) && $lifecycle !== []) {
+            $presetMeta['lifecycle'] = $lifecycle;
+        }
+
+        return $presetMeta;
     }
 
     private function normalizeSegment(string $value): string

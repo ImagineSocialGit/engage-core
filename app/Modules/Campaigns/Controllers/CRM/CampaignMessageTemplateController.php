@@ -3,17 +3,22 @@
 namespace App\Modules\Campaigns\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Campaigns\Actions\ActivateCampaignAction;
+use App\Modules\Campaigns\Actions\DeactivateCampaignAction;
 use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Campaigns\Models\CampaignStepVariant;
 use App\Modules\Campaigns\Requests\UpdateCampaignStepMessageTemplateRequest;
 use App\Modules\Messaging\Actions\AssignMessageTemplatePresetAction;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
+use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use InvalidArgumentException;
 
 class CampaignMessageTemplateController extends Controller
 {
@@ -25,7 +30,6 @@ class CampaignMessageTemplateController extends Controller
                     'variants' => fn ($query) => $query->active()->orderBy('sort_order')->orderBy('id'),
                 ])->orderBy('step_number'),
             ])
-            ->active()
             ->orderBy('name')
             ->get();
 
@@ -50,6 +54,12 @@ class CampaignMessageTemplateController extends Controller
             'templateOptionsByVariant' => $selectedCampaign instanceof Campaign
                 ? $this->templateOptionsByVariant($selectedCampaign)
                 : collect(),
+            'activeEnrollmentCount' => $selectedCampaign instanceof Campaign
+                ? $this->activeEnrollmentCount($selectedCampaign)
+                : 0,
+            'pendingScheduledMessageCount' => $selectedCampaign instanceof Campaign
+                ? $this->pendingScheduledMessageCount($selectedCampaign)
+                : 0,
         ]);
     }
 
@@ -95,6 +105,86 @@ class CampaignMessageTemplateController extends Controller
                 'variant' => $variant->id,
             ]))
             ->with('status', 'Campaign message template updated.');
+    }
+
+    public function deactivate(
+        Request $request,
+        Campaign $campaign,
+        DeactivateCampaignAction $deactivateCampaign,
+    ): RedirectResponse {
+        $result = $deactivateCampaign->handle(
+            campaign: $campaign,
+            actor: $request->user(),
+            source: 'crm',
+        );
+
+        return redirect()
+            ->route('crm.campaigns.message-templates.index', [
+                'campaign' => $campaign->getKey(),
+            ])
+            ->with('status', sprintf(
+                'Campaign deactivated. %d enrollment(s) cancelled and %d pending message(s) skipped.',
+                $result['enrollments_cancelled'],
+                $result['scheduled_messages_skipped'],
+            ));
+    }
+
+    public function activate(
+        Request $request,
+        Campaign $campaign,
+        ActivateCampaignAction $activateCampaign,
+    ): RedirectResponse {
+        try {
+            $result = $activateCampaign->handle(
+                campaign: $campaign,
+                actor: $request->user(),
+                source: 'crm',
+            );
+        } catch (InvalidArgumentException $exception) {
+            return redirect()
+                ->route('crm.campaigns.message-templates.index', [
+                    'campaign' => $campaign->getKey(),
+                ])
+                ->with('error', $exception->getMessage());
+        }
+
+        return redirect()
+            ->route('crm.campaigns.message-templates.index', [
+                'campaign' => $campaign->getKey(),
+            ])
+            ->with(
+                'status',
+                $result['status_changed']
+                    ? 'Campaign activated. Cancelled enrollments and skipped messages remain historical and were not restarted.'
+                    : 'Campaign was already active.',
+            );
+    }
+
+    private function activeEnrollmentCount(Campaign $campaign): int
+    {
+        return CampaignEnrollment::query()
+            ->where(function ($query) use ($campaign): void {
+                $query
+                    ->where('campaign_id', $campaign->getKey())
+                    ->orWhere('campaign_key', $campaign->key);
+            })
+            ->whereIn('status', [
+                CampaignEnrollment::STATUS_ACTIVE,
+                CampaignEnrollment::STATUS_PAUSED,
+            ])
+            ->count();
+    }
+
+    private function pendingScheduledMessageCount(Campaign $campaign): int
+    {
+        return ScheduledMessage::query()
+            ->where('status', ScheduledMessage::STATUS_PENDING)
+            ->where(function ($query) use ($campaign): void {
+                $query
+                    ->where('meta->campaign_id', $campaign->getKey())
+                    ->orWhere('meta->campaign_key', $campaign->key);
+            })
+            ->count();
     }
 
     /**

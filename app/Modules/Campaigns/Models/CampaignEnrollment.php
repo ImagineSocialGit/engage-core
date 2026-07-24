@@ -20,6 +20,7 @@ class CampaignEnrollment extends Model
 
     public const EXIT_REASON_CONDITION_MATCHED = 'condition_matched';
     public const EXIT_REASON_NO_NEXT_STEP = 'no_next_step';
+    public const EXIT_REASON_CAMPAIGN_DEACTIVATED = 'campaign_deactivated';
 
     protected $fillable = [
         'contact_id',

@@ -30,8 +30,11 @@ return [
     | - message template references through variants
     |
     | Campaign `status` is the sole top-level lifecycle control. Use `active`,
-    | `inactive`, or `archived`. Step and variant `is_active` fields remain
-    | independent child-level controls.
+    | `inactive`, or `archived`. The preset value is the installation default;
+    | routine sync does not overwrite status on an existing Campaign. Use the
+    | Campaign CRM lifecycle control or campaigns:deactivate for operational
+    | shutdown. Step and variant `is_active` fields remain independent child-level
+    | controls.
     |
     | Messaging configs own:
     | - reusable message copy

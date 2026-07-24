@@ -5,11 +5,14 @@ namespace Tests\Feature\Campaigns;
 use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
 use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Campaigns\Models\CampaignStepVariant;
+use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
+use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Services\MessageDefinitionResolver;
@@ -216,6 +219,84 @@ class CampaignMessageTemplateControllerTest extends TestCase
             ->assertSee('Email follow-up')
             ->assertSee('Active template')
             ->assertSee($preset->name);
+    }
+
+    public function test_index_includes_inactive_campaigns_and_lifecycle_controls(): void
+    {
+        config()->set('modules.enabled', [
+            'campaigns',
+            'messaging',
+        ]);
+
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->create([
+            'status' => Campaign::STATUS_INACTIVE,
+        ]);
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->get('http://crm.'.config('app.root_domain').'/campaigns/message-templates?campaign='.$campaign->getKey())
+            ->assertOk()
+            ->assertSee($campaign->name)
+            ->assertSee('inactive')
+            ->assertSee('Activate Campaign')
+            ->assertDontSee('Deactivate Campaign');
+    }
+
+    public function test_deactivate_and_activate_routes_use_campaign_lifecycle_actions(): void
+    {
+        config()->set('modules.enabled', [
+            'campaigns',
+            'messaging',
+        ]);
+
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->create([
+            'key' => 'controller_campaign',
+            'status' => Campaign::STATUS_ACTIVE,
+        ]);
+        $contact = Contact::factory()->create();
+        $enrollment = CampaignEnrollment::query()->create([
+            'contact_id' => $contact->id,
+            'campaign_id' => $campaign->id,
+            'campaign_key' => $campaign->key,
+            'status' => CampaignEnrollment::STATUS_ACTIVE,
+            'current_step' => 1,
+            'started_at' => now(),
+            'meta' => [],
+        ]);
+        $message = ScheduledMessage::factory()
+            ->forContact($contact)
+            ->create([
+                'meta' => [
+                    'campaign_id' => $campaign->id,
+                    'campaign_key' => $campaign->key,
+                    'campaign_enrollment_id' => $enrollment->id,
+                ],
+            ]);
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->patch('http://crm.'.config('app.root_domain').'/campaigns/message-templates/'.$campaign->getKey().'/deactivate')
+            ->assertRedirect(route('crm.campaigns.message-templates.index', [
+                'campaign' => $campaign->getKey(),
+            ]));
+
+        $this->assertSame(Campaign::STATUS_INACTIVE, $campaign->refresh()->status);
+        $this->assertSame(CampaignEnrollment::STATUS_CANCELLED, $enrollment->refresh()->status);
+        $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $message->refresh()->status);
+
+        $this->actingAs($user)
+            ->patch('http://crm.'.config('app.root_domain').'/campaigns/message-templates/'.$campaign->getKey().'/activate')
+            ->assertRedirect(route('crm.campaigns.message-templates.index', [
+                'campaign' => $campaign->getKey(),
+            ]));
+
+        $this->assertSame(Campaign::STATUS_ACTIVE, $campaign->refresh()->status);
+        $this->assertSame(CampaignEnrollment::STATUS_CANCELLED, $enrollment->refresh()->status);
+        $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $message->refresh()->status);
     }
 
     /**

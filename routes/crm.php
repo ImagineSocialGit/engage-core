@@ -131,6 +131,12 @@ Route::middleware('auth')->group(function () {
             Route::get('/', [CampaignMessageTemplateController::class, 'index'])
                 ->name('index');
 
+            Route::patch('/{campaign}/deactivate', [CampaignMessageTemplateController::class, 'deactivate'])
+                ->name('deactivate');
+
+            Route::patch('/{campaign}/activate', [CampaignMessageTemplateController::class, 'activate'])
+                ->name('activate');
+
             Route::patch('/steps/{campaignStep}', [CampaignMessageTemplateController::class, 'update'])
                 ->name('update');
         });

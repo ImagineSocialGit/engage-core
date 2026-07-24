@@ -74,7 +74,9 @@
 │   │   │   └── Support
 │   │   ├── Campaigns
 │   │   │   ├── Actions
+│   │   │   │   ├── ActivateCampaignAction.php
 │   │   │   │   ├── CancelCampaignEnrollmentAction.php
+│   │   │   │   ├── DeactivateCampaignAction.php
 │   │   │   │   ├── EnrollContactInCampaignAction.php
 │   │   │   │   ├── ScheduleCampaignStepMessagesAction.php
 │   │   │   │   ├── ScheduleNextCampaignStepAction.php
@@ -91,6 +93,7 @@
 │   │   │   │   └── CampaignPresetDefinitionConfigContract.php
 │   │   │   ├── Console
 │   │   │   │   └── Commands
+│   │   │   │       ├── DeactivateCampaignCommand.php
 │   │   │   │       └── SyncCampaignPresetsCommand.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
@@ -104,6 +107,8 @@
 │   │   │   │   ├── CampaignPresetSyncResult.php
 │   │   │   │   ├── CampaignStepPresetDefinition.php
 │   │   │   │   └── CampaignStepVariantPresetDefinition.php
+│   │   │   ├── Exceptions
+│   │   │   │   └── CampaignUnavailableForEnrollmentException.php
 │   │   │   ├── Listeners
 │   │   │   │   └── ScheduleNextCampaignStepAfterScheduledMessageSent.php
 │   │   │   ├── Models
@@ -1559,6 +1564,9 @@
 │   │   │   ├── CampaignVariantDependencyAwareTest.php
 │   │   │   ├── CampaignVariantPresetSyncSpecificityTest.php
 │   │   │   ├── CampaignVariantSchedulingDurabilityTest.php
+│   │   │   ├── DeactivateCampaignActionTest.php
+│   │   │   ├── DeactivateCampaignCommandTest.php
+│   │   │   ├── EnrollCampaignAutomationActionHandlerTest.php
 │   │   │   ├── EnrollContactInCampaignActionTest.php
 │   │   │   ├── ScheduledMessageEventReplayTest.php
 │   │   │   ├── ScheduleNextCampaignStepActionTest.php
@@ -1804,4 +1812,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-497 directories, 1308 files
+498 directories, 1315 files

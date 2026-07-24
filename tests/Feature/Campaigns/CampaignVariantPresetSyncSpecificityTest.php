@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Campaigns;
 
+use App\Modules\Campaigns\Actions\DeactivateCampaignAction;
 use App\Modules\Campaigns\Actions\SyncCampaignPresetsAction;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignStep;
@@ -96,6 +97,52 @@ class CampaignVariantPresetSyncSpecificityTest extends TestCase
             'name' => 'Customized SMS variant',
             'is_customized' => true,
         ]);
+    }
+
+    public function test_preset_sync_preserves_existing_operational_status_and_lifecycle_meta(): void
+    {
+        $this->configurePreset(['email']);
+
+        app(SyncCampaignPresetsAction::class)->handle(
+            app(PresetCompositionResolver::class)->resolve(
+                'test_client',
+                PresetDomain::Campaigns,
+            ),
+        );
+
+        $campaign = Campaign::query()
+            ->where('key', 'webinar_attended_nurture')
+            ->firstOrFail();
+
+        app(DeactivateCampaignAction::class)->handle(
+            campaign: $campaign,
+            source: 'test',
+        );
+
+        Config::set(
+            'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.name',
+            'Updated Webinar Attended Nurture',
+        );
+        Config::set(
+            'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.status',
+            Campaign::STATUS_ACTIVE,
+        );
+
+        app(SyncCampaignPresetsAction::class)->handle(
+            app(PresetCompositionResolver::class)->resolve(
+                'test_client',
+                PresetDomain::Campaigns,
+            ),
+        );
+
+        $campaign->refresh();
+
+        $this->assertSame(Campaign::STATUS_INACTIVE, $campaign->status);
+        $this->assertSame('Updated Webinar Attended Nurture', $campaign->name);
+        $this->assertSame(
+            DeactivateCampaignAction::REASON,
+            data_get($campaign->meta, 'lifecycle.last_status_change.reason'),
+        );
     }
 
     public function test_customized_campaign_does_not_receive_new_preset_steps_or_variants(): void
@@ -213,7 +260,6 @@ class CampaignVariantPresetSyncSpecificityTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => 'active',
-            'is_active' => true,
             'source_version' => 1,
             'steps' => $steps,
         ]);

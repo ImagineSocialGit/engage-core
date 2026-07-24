@@ -10,6 +10,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class EnrollContactInCampaignAction
 {
@@ -36,55 +37,69 @@ class EnrollContactInCampaignAction
         ?string $scope = null,
         ?string $dispatchKey = null,
     ): CampaignEnrollment {
-        $campaign = $this->resolveCampaign(
-            campaignKey: $campaignKey,
-            channel: $channel,
-            purpose: $purpose,
-            scope: $scope,
-        );
-
-        $enrollment = $this->existingEnrollment(
-            contact: $contact,
-            campaign: $campaign,
-            campaignKey: $campaignKey,
-        );
-
-        if ($enrollment instanceof CampaignEnrollment) {
-            return $enrollment;
-        }
-
-        $enrollment = CampaignEnrollment::create([
-            'contact_id' => $contact->id,
-            'campaign_id' => $campaign->id,
-            'source_type' => $source?->getMorphClass(),
-            'source_id' => $source?->getKey(),
-            'campaign_key' => $campaign->key,
-            'status' => CampaignEnrollment::STATUS_ACTIVE,
-            'current_step' => 0,
-            'start_context' => $this->startContextWithPayload($startContext, $payload),
-            'exit_conditions' => $exitConditions,
-            'started_at' => Carbon::now(),
-            'meta' => $meta,
-        ]);
-
-        $scheduledMessage = $this->scheduleNextSchedulableStep(
-            enrollment: $enrollment,
-            campaign: $campaign,
-            contact: $contact,
-            source: $source,
-            payload: $payload,
-            meta: $meta,
-            dispatchKey: $dispatchKey,
-        );
-
-        if (! $scheduledMessage instanceof ScheduledMessage) {
-            $this->completeEnrollment(
-                enrollment: $enrollment,
-                reason: CampaignEnrollment::EXIT_REASON_NO_NEXT_STEP,
+        return DB::transaction(function () use (
+            $contact,
+            $campaignKey,
+            $source,
+            $payload,
+            $meta,
+            $startContext,
+            $exitConditions,
+            $channel,
+            $purpose,
+            $scope,
+            $dispatchKey,
+        ): CampaignEnrollment {
+            $campaign = $this->resolveCampaign(
+                campaignKey: $campaignKey,
+                channel: $channel,
+                purpose: $purpose,
+                scope: $scope,
             );
-        }
 
-        return $enrollment->refresh();
+            $enrollment = $this->existingEnrollment(
+                contact: $contact,
+                campaign: $campaign,
+                campaignKey: $campaignKey,
+            );
+
+            if ($enrollment instanceof CampaignEnrollment) {
+                return $enrollment;
+            }
+
+            $enrollment = CampaignEnrollment::create([
+                'contact_id' => $contact->id,
+                'campaign_id' => $campaign->id,
+                'source_type' => $source?->getMorphClass(),
+                'source_id' => $source?->getKey(),
+                'campaign_key' => $campaign->key,
+                'status' => CampaignEnrollment::STATUS_ACTIVE,
+                'current_step' => 0,
+                'start_context' => $this->startContextWithPayload($startContext, $payload),
+                'exit_conditions' => $exitConditions,
+                'started_at' => Carbon::now(),
+                'meta' => $meta,
+            ]);
+
+            $scheduledMessage = $this->scheduleNextSchedulableStep(
+                enrollment: $enrollment,
+                campaign: $campaign,
+                contact: $contact,
+                source: $source,
+                payload: $payload,
+                meta: $meta,
+                dispatchKey: $dispatchKey,
+            );
+
+            if (! $scheduledMessage instanceof ScheduledMessage) {
+                $this->completeEnrollment(
+                    enrollment: $enrollment,
+                    reason: CampaignEnrollment::EXIT_REASON_NO_NEXT_STEP,
+                );
+            }
+
+            return $enrollment->refresh();
+        });
     }
 
     private function resolveCampaign(
@@ -108,7 +123,9 @@ class EnrollContactInCampaignAction
             $query->where('scope', $this->normalizeSegment($scope));
         }
 
-        $campaign = $query->first();
+        $campaign = $query
+            ->lockForUpdate()
+            ->first();
 
         if (! $campaign instanceof Campaign) {
             throw CampaignUnavailableForEnrollmentException::missing($campaignKey);

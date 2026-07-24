@@ -24,22 +24,11 @@ class WebinarRegistrationCombinedConsentTest extends TestCase
 
         Queue::fake();
 
-        $clientContent = require base_path(
-            'client/slam-dunk-crm/config/webinars/register/content.php',
-        );
-
-        Config::set(
-            'webinars.register.content',
-            array_replace_recursive(
-                config('webinars.register.content', []),
-                $clientContent,
-            ),
-        );
-
+        $this->configureCombinedConsentContract();
         $this->configureChannelAvailability();
     }
 
-    public function test_client_form_renders_sms_first_required_email_and_one_combined_marketing_choice(): void
+    public function test_configured_form_renders_sms_first_required_email_and_one_combined_marketing_choice(): void
     {
         [$series] = $this->webinarFixture();
 
@@ -213,6 +202,55 @@ class WebinarRegistrationCombinedConsentTest extends TestCase
         );
 
         return $origin.$this->registrationPath($series, $webinar);
+    }
+
+    private function configureCombinedConsentContract(): void
+    {
+        Config::set('webinars.register.content.registration.consents', [
+            'transactional' => [
+                'email' => true,
+                'sms' => true,
+                'order' => [
+                    'sms',
+                    'email',
+                ],
+                'required_channels' => [
+                    'email',
+                ],
+            ],
+            'marketing' => [
+                'email' => true,
+                'sms' => true,
+                'combined' => true,
+            ],
+        ]);
+
+        Config::set(
+            'webinars.register.content.registration.fields.consent_messages',
+            [
+                'email' => [
+                    'label' => 'Send the registration details by email.',
+                ],
+                'sms' => [
+                    'label' => 'Send the registration details by text message.',
+                ],
+            ],
+        );
+
+        Config::set(
+            'webinars.register.content.registration.fields.marketing_consent_messages',
+            [
+                'combined' => [
+                    'label' => 'Send optional marketing by email and text message.',
+                ],
+                'email' => [
+                    'label' => 'Send optional marketing by email.',
+                ],
+                'sms' => [
+                    'label' => 'Send optional marketing by text message.',
+                ],
+            ],
+        );
     }
 
     private function configureChannelAvailability(): void

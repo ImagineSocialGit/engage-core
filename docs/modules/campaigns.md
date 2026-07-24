@@ -30,7 +30,23 @@ An enrollment attempt against an existing non-active Campaign must stop safely w
 
 Campaign Steps and Campaign Step Variants retain their own `is_active` fields because those are independent child-level availability controls. Do not restore a Campaign-level `is_active` field in config, Eloquent, tokens, or persistence.
 
-Changing Campaign status does not, by itself, cancel existing enrollments or skip already-pending scheduled messages. That operational shutdown behavior belongs to the dedicated Campaign deactivation workflow.
+Campaign preset `status` is an installation default. Routine preset sync updates non-customized Campaign definitions, Steps, and Variants, but it does not overwrite the status of an existing Campaign. Existing Campaign status is operational database state.
+
+Use the dedicated Campaign deactivation workflow to stop a Campaign. Deactivation:
+
+```text
+sets an active Campaign to inactive
+blocks new enrollments through the Campaign status gate
+cancels active and paused enrollments with campaign_deactivated provenance
+skips pending ScheduledMessages carrying that Campaign identity
+leaves sending, sent, failed, and previously skipped messages unchanged
+leaves referring FlowRoutes configured and dormant
+preserves Campaign, enrollment, and message history
+```
+
+The deactivation action is the single implementation used by the CRM and `php artisan campaigns:deactivate {campaign_key}`. Enrollment creation locks the Campaign row while confirming active status so deactivation and enrollment cannot cross without one operation observing the other's result.
+
+Reactivation permits future enrollments only. It never resumes cancelled enrollments or requeues skipped messages. Archived Campaigns require an explicit archival recovery decision and cannot be reactivated from the normal CRM lifecycle control.
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
 

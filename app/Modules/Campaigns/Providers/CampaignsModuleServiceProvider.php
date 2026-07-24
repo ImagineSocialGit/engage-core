@@ -9,6 +9,7 @@ use App\Modules\Campaigns\Automation\EnrollCampaignAutomationActionHandler;
 use App\Modules\Campaigns\Capabilities\CampaignsAutomationCapabilityContributor;
 use App\Modules\Campaigns\ConfigContracts\CampaignPresetConfigContractTargetProvider;
 use App\Modules\Campaigns\ConfigContracts\CampaignPresetDefinitionConfigContract;
+use App\Modules\Campaigns\Console\Commands\DeactivateCampaignCommand;
 use App\Modules\Campaigns\Console\Commands\SyncCampaignPresetsCommand;
 use App\Modules\Campaigns\Listeners\ScheduleNextCampaignStepAfterScheduledMessageSent;
 use App\Modules\Campaigns\Services\ContactShow\ContactCampaignsVisibilityDataProvider;
@@ -75,6 +76,7 @@ class CampaignsModuleServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
+                DeactivateCampaignCommand::class,
                 SyncCampaignPresetsCommand::class,
             ]);
         }
