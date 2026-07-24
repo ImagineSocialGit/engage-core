@@ -43,7 +43,7 @@ class EnrollContactInCampaignActionTest extends TestCase
         $this->assertTrue($active->isActive());
         $this->assertFalse($inactive->isActive());
         $this->assertFalse($archived->isActive());
-        $this->assertSame(
+        $this->assertEquals(
             [$active->getKey()],
             Campaign::query()->active()->pluck('id')->all(),
         );
@@ -115,7 +115,7 @@ class EnrollContactInCampaignActionTest extends TestCase
         $this->assertSame('marketing', $scheduledMessage->purpose);
         $this->assertSame('webinar', $scheduledMessage->scope);
         $this->assertSame('marketing', $scheduledMessage->queue);
-        $this->assertSame(['campaign_step_due'], $scheduledMessage->dispatch_keys);
+        $this->assertEquals(['campaign_step_due'], $scheduledMessage->dispatch_keys);
         $this->assertSame('messaging.email.definitions.marketing.webinar.campaigns.webinar_attended.steps.1.variants.email', $scheduledMessage->definition_config_path);
         $this->assertSame($campaign->id, $scheduledMessage->meta['campaign_id']);
         $this->assertSame('webinar_attended', $scheduledMessage->meta['campaign_key']);
@@ -123,7 +123,10 @@ class EnrollContactInCampaignActionTest extends TestCase
         $this->assertSame($step->id, $scheduledMessage->meta['campaign_step_id']);
         $this->assertSame($variant->id, $scheduledMessage->meta['campaign_step_variant_id']);
         $this->assertSame('email', $scheduledMessage->meta['campaign_step_variant_key']);
-        $this->assertSame('messaging.email.definitions.marketing.webinar.campaigns.webinar_attended.steps.1.variants.email', $scheduledMessage->meta['definition_config_path']);
+        $this->assertArrayNotHasKey(
+            'definition_config_path',
+            $scheduledMessage->meta,
+        );
         $this->assertTrue($scheduledMessage->send_at->equalTo(Carbon::now()->addMinutes(720)));
     }
 

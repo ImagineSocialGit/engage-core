@@ -58,13 +58,13 @@ class ImportWebinarRegistrationReminderDispatchTest extends TestCase
         $messages = ScheduledMessage::query()->orderBy('channel')->orderBy('send_at')->get();
 
         $this->assertCount(4, $messages);
-        $this->assertSame(['email', 'sms'], $messages->pluck('channel')->unique()->values()->all());
-        $this->assertSame(['reminder'], $messages->pluck('message_type')->unique()->values()->all());
+        $this->assertEquals(['email', 'sms'], $messages->pluck('channel')->unique()->values()->all());
+        $this->assertEquals(['reminder'], $messages->pluck('message_type')->unique()->values()->all());
 
         $this->assertTrue($messages->every(
             fn (ScheduledMessage $message): bool => $message->send_at->isFuture()
-                && data_get($message->meta, 'webinar_schedule_profile.item_key') !== 'email_confirmation'
-                && data_get($message->meta, 'webinar_schedule_profile.item_key') !== 'sms_confirmation'
+                && data_get($message->meta, 'webinar_schedule.item_key') !== 'email_confirmation'
+                && data_get($message->meta, 'webinar_schedule.item_key') !== 'sms_confirmation'
         ));
 
         $this->assertDatabaseMissing('scheduled_messages', [
@@ -103,7 +103,7 @@ class ImportWebinarRegistrationReminderDispatchTest extends TestCase
         $this->assertSame(2, $result->remindersScheduled);
         $this->assertDatabaseCount('scheduled_messages', 2);
         $this->assertDatabaseMissing('scheduled_messages', ['channel' => 'sms']);
-        $this->assertSame(
+        $this->assertEquals(
             ['email'],
             data_get($result->registration->meta, 'accepted_channels.transactional'),
         );

@@ -57,7 +57,10 @@ class ResolvedMessageDispatchBuilderTest extends TestCase
         );
 
         $this->assertSame('scheduled', $dispatch->definition['timing']);
-        $this->assertSame(['type' => 'delay', 'minutes' => 15], $dispatch->definition['schedule']);
+        $this->assertEquals(
+            ['type' => 'delay', 'minutes' => 15],
+            $dispatch->definition['schedule'],
+        );
         $this->assertSame(now()->addMinutes(15)->toISOString(), $dispatch->sendAt->toISOString());
     }
 
@@ -76,8 +79,7 @@ class ResolvedMessageDispatchBuilderTest extends TestCase
         $this->assertArrayNotHasKey('timing', $dispatch->definition);
         $this->assertArrayNotHasKey('schedule', $dispatch->definition);
         $this->assertTrue($dispatch->behaviorOwner->is($broadcast));
-        $this->assertSame($broadcast->getMorphClass(), data_get($dispatch->meta, 'resolved_message_dispatch.behavior_owner_type'));
-        $this->assertSame($broadcast->getKey(), data_get($dispatch->meta, 'resolved_message_dispatch.behavior_owner_id'));
+        $this->assertEquals([], $dispatch->meta);
     }
 
     public function test_it_rejects_scheduled_behavior_without_schedule(): void

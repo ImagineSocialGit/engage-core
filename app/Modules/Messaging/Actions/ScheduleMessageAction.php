@@ -7,6 +7,7 @@ use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\PendingMessageDeliveryConsolidator;
+use App\Modules\Messaging\Services\ScheduledMessageMetaCanonicalizer;
 use App\Modules\Messaging\Services\ScheduledMessagePayloadCanonicalizer;
 use App\Support\Queues\QueueContract;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,7 @@ class ScheduleMessageAction
     public function __construct(
         private readonly PendingMessageDeliveryConsolidator $pendingMessageDeliveryConsolidator,
         private readonly QueueContract $queueContract,
+        private readonly ScheduledMessageMetaCanonicalizer $metaCanonicalizer,
         private readonly ScheduledMessagePayloadCanonicalizer $payloadCanonicalizer,
     ) {}
 
@@ -33,6 +35,9 @@ class ScheduleMessageAction
         ?Model $behaviorOwner = null,
         ?string $dedupeKey = null,
         ?array $meta = null,
+        ?string $queue = null,
+        array $dispatchKeys = [],
+        ?string $definitionConfigPath = null,
     ): ScheduledMessage {
         $channel = $this->normalizeEnumValue($channel);
         $purpose = $this->normalizeEnumValue($purpose);
@@ -40,26 +45,21 @@ class ScheduleMessageAction
         $messageType = $this->normalizeSegment($messageType);
 
         $sourceSendAt = $sendAt ? Carbon::parse($sendAt) : now();
-        $sourceTimezone = $sourceSendAt->getTimezone()->getName();
         $sendAt = $sourceSendAt->copy()->utc();
 
         $meta ??= [];
-        $meta = array_replace_recursive($meta, [
-            'message_scheduling' => [
-                'source_timezone' => $sourceTimezone,
-                'source_send_at' => $sourceSendAt->toIso8601String(),
-                'utc_send_at' => $sendAt->toIso8601String(),
-            ],
-        ]);
-
-        $queue = $this->queueContract->assertDispatchable(
-            $this->nullableString($meta['queue'] ?? null),
-        );
+        $queue = $this->queueContract->assertDispatchable($this->nullableString(
+            $queue ?? $meta['queue'] ?? null,
+        ));
         $definitionConfigPath = $this->nullableString(
-            $meta['definition_config_path'] ?? null,
+            $definitionConfigPath
+                ?? $meta['definition_config_path']
+                ?? null,
         );
         $dispatchKeys = $this->normalizeDispatchKeys(
-            $meta['dispatch_keys'] ?? [],
+            $dispatchKeys !== []
+                ? $dispatchKeys
+                : ($meta['dispatch_keys'] ?? []),
         );
         $payload = $this->payloadCanonicalizer->forPersistence(
             payloadClass: $payloadClass,
@@ -72,6 +72,7 @@ class ScheduleMessageAction
                 ? $meta['conditions']
                 : [],
         );
+        $meta = $this->metaCanonicalizer->forPersistence($meta);
 
         $attributes = [
             'recipient_type' => $recipient->getMorphClass(),

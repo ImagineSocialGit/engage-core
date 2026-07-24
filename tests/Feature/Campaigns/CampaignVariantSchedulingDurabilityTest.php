@@ -54,12 +54,12 @@ class CampaignVariantSchedulingDurabilityTest extends TestCase
             ->orderBy('id')
             ->get();
 
-        $this->assertSame(
+        $this->assertEquals(
             ['Primary subject', 'Alternate subject'],
             $messages->pluck('payload.subject')->all(),
         );
 
-        $this->assertSame(
+        $this->assertEquals(
             ['email_primary', 'email_alternate'],
             $messages->pluck('meta.campaign_step_variant_key')->all(),
         );
@@ -71,15 +71,22 @@ class CampaignVariantSchedulingDurabilityTest extends TestCase
             );
         }
 
-        $this->assertSame(
+        $this->assertEquals(
             [$primaryAssignment->getKey(), $alternateAssignment->getKey()],
-            $messages->pluck('meta.message_template_preset.assignment_id')->all(),
+            $messages->pluck('meta.message_template.assignment_id')->all(),
         );
 
-        $this->assertSame(
+        $this->assertEquals(
             [$primaryPreset->getKey(), $alternatePreset->getKey()],
-            $messages->pluck('meta.message_template_preset.id')->all(),
+            $messages->pluck('meta.message_template.preset_id')->all(),
         );
+
+        foreach ($messages as $message) {
+            $this->assertArrayNotHasKey('campaign_template', $message->meta);
+            $this->assertArrayNotHasKey('message_template_preset', $message->meta);
+            $this->assertArrayNotHasKey('message_template_assignment', $message->meta);
+            $this->assertArrayNotHasKey('definition_config_path', $message->meta);
+        }
     }
 
     public function test_campaign_variant_scheduled_payload_stays_compact_while_meta_keeps_variant_identity(): void
@@ -132,7 +139,13 @@ class CampaignVariantSchedulingDurabilityTest extends TestCase
             'campaign_step_variant_source_config_path',
             $message->meta,
         );
-        $this->assertSame($assignment->getKey(), data_get($message->meta, 'message_template_preset.assignment_id'));
+        $this->assertSame(
+            $assignment->getKey(),
+            data_get($message->meta, 'message_template.assignment_id'),
+        );
+        $this->assertArrayNotHasKey('campaign_template', $message->meta);
+        $this->assertArrayNotHasKey('message_template_preset', $message->meta);
+        $this->assertArrayNotHasKey('message_template_assignment', $message->meta);
     }
 
     private function configureEmailCampaignAvailability(): void

@@ -93,7 +93,10 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame('DB confirmation for {first_name}', $confirmation->payload['subject']);
-        $this->assertSame($preset->getKey(), data_get($confirmation->meta, 'message_template_preset.id'));
+        $this->assertSame(
+            $preset->getKey(),
+            data_get($confirmation->meta, 'message_template.preset_id'),
+        );
 
         $this->assertDatabaseHas('scheduled_messages', [
             'recipient_type' => Contact::class,

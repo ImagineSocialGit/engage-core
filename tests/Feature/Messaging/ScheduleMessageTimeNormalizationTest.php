@@ -17,7 +17,7 @@ class ScheduleMessageTimeNormalizationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_client_time_is_normalized_to_utc_for_storage_queueing_and_diagnostics(): void
+    public function test_client_time_is_normalized_to_utc_without_duplicate_scheduling_metadata(): void
     {
         config()->set('client.timezone', 'America/Chicago');
 
@@ -84,29 +84,8 @@ class ScheduleMessageTimeNormalizationTest extends TestCase
                 ->value('send_at'),
         );
 
-        $this->assertSame(
-            'America/Chicago',
-            data_get(
-                $message->meta,
-                'message_scheduling.source_timezone',
-            ),
-        );
-
-        $this->assertSame(
-            '2026-07-20T09:30:00-05:00',
-            data_get(
-                $message->meta,
-                'message_scheduling.source_send_at',
-            ),
-        );
-
-        $this->assertSame(
-            '2026-07-20T14:30:00+00:00',
-            data_get(
-                $message->meta,
-                'message_scheduling.utc_send_at',
-            ),
-        );
+        $this->assertEquals(['source' => 'test'], $message->meta);
+        $this->assertArrayNotHasKey('message_scheduling', $message->meta);
 
         Queue::assertPushed(
             SendScheduledMessageJob::class,

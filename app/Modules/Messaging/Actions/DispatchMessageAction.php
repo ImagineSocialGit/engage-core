@@ -186,9 +186,6 @@ class DispatchMessageAction
         $messageMeta = array_replace_recursive(
             is_array($definition['meta'] ?? null) ? $definition['meta'] : [],
             [
-                'queue' => $definition['queue'] ?? null,
-                'definition_config_path' => $definition['config_path'] ?? null,
-                'dispatch_keys' => $definition['dispatch_keys'],
                 'campaign_key' => $definition['campaign_key'] ?? null,
                 'campaign_step' => $definition['step'] ?? null,
                 'conditions' => is_array($definition['conditions'] ?? null)
@@ -213,6 +210,15 @@ class DispatchMessageAction
             behaviorOwner: $dispatch->behaviorOwner,
             dedupeKey: $dedupeKey,
             meta: $messageMeta,
+            queue: is_string($definition['queue'] ?? null)
+                ? $definition['queue']
+                : null,
+            dispatchKeys: is_array($definition['dispatch_keys'] ?? null)
+                ? $definition['dispatch_keys']
+                : [],
+            definitionConfigPath: is_string($definition['config_path'] ?? null)
+                ? $definition['config_path']
+                : null,
         );
     }
 

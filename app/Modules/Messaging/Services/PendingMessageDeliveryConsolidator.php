@@ -9,6 +9,7 @@ use RuntimeException;
 class PendingMessageDeliveryConsolidator
 {
     public function __construct(
+        private readonly ScheduledMessageMetaCanonicalizer $metaCanonicalizer,
         private readonly ScheduledMessagePayloadCanonicalizer $payloadCanonicalizer,
     ) {}
 
@@ -20,7 +21,9 @@ class PendingMessageDeliveryConsolidator
         array $incomingAttributes,
     ): ScheduledMessage {
         $incomingMeta = is_array($incomingAttributes['meta'] ?? null)
-            ? $incomingAttributes['meta']
+            ? $this->metaCanonicalizer->canonicalize(
+                $incomingAttributes['meta'],
+            )
             : [];
 
         $incomingConsolidation = data_get(
@@ -55,6 +58,9 @@ class PendingMessageDeliveryConsolidator
             }
 
             $existingMeta = is_array($locked->meta) ? $locked->meta : [];
+            $existingMeta = $this->metaCanonicalizer->canonicalize(
+                $existingMeta,
+            );
             $existingConsolidation = data_get(
                 $existingMeta,
                 'delivery_consolidation',
@@ -99,6 +105,9 @@ class PendingMessageDeliveryConsolidator
                 $mergedMeta,
                 'delivery_consolidation',
                 $mergedConsolidation,
+            );
+            $mergedMeta = $this->metaCanonicalizer->canonicalize(
+                $mergedMeta,
             );
 
             $mergedPayload = $this->payloadCanonicalizer->canonicalize(

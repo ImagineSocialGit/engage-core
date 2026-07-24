@@ -58,17 +58,7 @@ class ResolvedMessageDispatchBuilder
             sendAt: $resolvedSendAt,
             behaviorOwner: $behaviorOwner,
             occurrenceKey: $occurrenceKey,
-            meta: array_replace_recursive(
-                [
-                    'resolved_message_dispatch' => array_filter([
-                        'behavior_owner_type' => $behaviorOwner?->getMorphClass(),
-                        'behavior_owner_id' => $behaviorOwner?->getKey(),
-                        'occurrence_key' => $occurrenceKey,
-                        'resolved_send_at' => $resolvedSendAt->toISOString(),
-                    ], fn (mixed $value): bool => $value !== null),
-                ],
-                $meta,
-            ),
+            meta: $meta,
         );
     }
 

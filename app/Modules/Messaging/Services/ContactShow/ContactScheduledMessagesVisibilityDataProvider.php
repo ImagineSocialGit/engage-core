@@ -101,7 +101,7 @@ class ContactScheduledMessagesVisibilityDataProvider implements ContactShowDataP
     {
         $meta = [
             'Message ID' => '#'.$message->id,
-            'Queue' => $this->label(data_get($message->meta, 'queue')),
+            'Queue' => $this->label($message->queue),
         ];
 
         return match ($message->status) {

@@ -8,6 +8,7 @@ use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
+use App\Modules\Messaging\Services\ScheduledMessageMetaCanonicalizer;
 use App\Modules\Webinars\Actions\CreateWebinarRegistrationAction;
 use App\Modules\Webinars\Actions\FinalizeWebinarRegistrationAction;
 use App\Modules\Webinars\Jobs\SyncWebinarRegistrationToProviderJob;
@@ -99,12 +100,12 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
             (string) $email->payload['body'],
         );
 
-        $this->assertEqualsCanonicalizing([
+        $this->assertEquals([
             'label' => 'Original CTA',
             'url' => '{webinar_join_url}',
         ], $email->payload['cta']);
 
-        $this->assertEqualsCanonicalizing([
+        $this->assertEquals([
             'label' => 'Original secondary link',
             'url' => '{cancel_registration_url}',
         ], $email->payload['secondary_link']);
@@ -301,6 +302,26 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
             2,
             data_get($after->meta, 'delivery_consolidation.consent_ids'),
         );
+        $this->assertLessThanOrEqual(
+            ScheduledMessageMetaCanonicalizer::MAX_ENCODED_BYTES,
+            strlen(json_encode($after->meta, JSON_THROW_ON_ERROR)),
+        );
+
+        foreach ([
+            'queue',
+            'dispatch_keys',
+            'definition_config_path',
+            'message_scheduling',
+            'resolved_message_dispatch',
+            'delivery_intent',
+            'resolver_context',
+            'webinar_schedule_profile',
+            'webinar_message_area',
+            'message_template_preset',
+            'message_template_assignment',
+        ] as $forbiddenKey) {
+            $this->assertArrayNotHasKey($forbiddenKey, $after->meta);
+        }
 
         Queue::assertPushed(SendScheduledMessageJob::class, 1);
     }
@@ -510,24 +531,24 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
             'The acknowledgement should follow the CRM-selected primary body.',
         );
 
-        $this->assertEqualsCanonicalizing([
+        $this->assertEquals([
             'label' => 'CRM-selected CTA',
             'url' => '{webinar_join_url}',
         ], $message->payload['cta']);
 
-        $this->assertEqualsCanonicalizing([
+        $this->assertEquals([
             'label' => 'CRM-selected secondary link',
             'url' => '{cancel_registration_url}',
         ], $message->payload['secondary_link']);
 
         $this->assertSame(
             $preset->getKey(),
-            data_get($message->meta, 'message_template_preset.id'),
+            data_get($message->meta, 'message_template.preset_id'),
         );
 
         $this->assertSame(
             $assignment->getKey(),
-            data_get($message->meta, 'message_template_assignment.id'),
+            data_get($message->meta, 'message_template.assignment_id'),
         );
 
         $this->assertSame(

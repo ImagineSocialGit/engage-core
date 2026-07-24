@@ -121,7 +121,7 @@ class WebinarScheduleProfileTest extends TestCase
         $this->configureChannelAvailability();
 
         $profile = WebinarScheduleProfile::factory()->create(['key' => 'fast', 'name' => 'Fast', 'is_default' => false]);
-        WebinarScheduleProfileItem::factory()->create([
+        $profileItem = WebinarScheduleProfileItem::factory()->create([
             'webinar_schedule_profile_id' => $profile->getKey(),
             'key' => 'email_confirmation_fast',
             'channel' => 'email',
@@ -162,7 +162,25 @@ class WebinarScheduleProfileTest extends TestCase
         $confirmation = ScheduledMessage::query()->where('message_type', 'confirmation')->firstOrFail();
 
         $this->assertTrue($confirmation->send_at->equalTo(now()->addMinutes(2)));
-        $this->assertSame('fast', data_get($confirmation->meta, 'webinar_schedule_profile.key'));
+        $this->assertEquals([
+            'profile_id' => $profile->getKey(),
+            'profile_key' => 'fast',
+            'item_id' => $profileItem->getKey(),
+            'item_key' => 'email_confirmation_fast',
+            'area_key' => 'confirmation',
+        ], data_get($confirmation->meta, 'webinar_schedule'));
+        $this->assertArrayNotHasKey(
+            'webinar_schedule_profile',
+            $confirmation->meta,
+        );
+        $this->assertArrayNotHasKey(
+            'webinar_message_area',
+            $confirmation->meta,
+        );
+        $this->assertArrayNotHasKey(
+            'message_scheduling',
+            $confirmation->meta,
+        );
         $this->assertSame(
             $webinar->title,
             data_get($confirmation->payload, 'tokens.webinar.title'),

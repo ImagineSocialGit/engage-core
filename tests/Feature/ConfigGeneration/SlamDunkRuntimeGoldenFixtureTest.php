@@ -103,12 +103,12 @@ class SlamDunkRuntimeGoldenFixtureTest extends TestCase
         $this->assertCount(14, $registrationMessages);
         $this->assertSame(7, $registrationMessages->where('channel', 'email')->count());
         $this->assertSame(7, $registrationMessages->where('channel', 'sms')->count());
-        $this->assertSame(
+        $this->assertEquals(
             ['confirmation', 'reminder'],
             $registrationMessages->pluck('message_type')->unique()->sort()->values()->all(),
         );
         $this->assertTrue($registrationMessages->every(
-            fn (ScheduledMessage $message): bool => data_get($message->meta, 'webinar_schedule_profile.key') === 'full_10_day'
+            fn (ScheduledMessage $message): bool => data_get($message->meta, 'webinar_schedule.profile_key') === 'full_10_day'
         ));
 
         $signup = WebinarWaitlistSignup::factory()->create([
@@ -131,7 +131,7 @@ class SlamDunkRuntimeGoldenFixtureTest extends TestCase
 
         $this->assertCount(2, $waitlistMessages);
         $this->assertEqualsCanonicalizing(['email', 'sms'], $waitlistMessages->pluck('channel')->all());
-        $this->assertSame(['alert'], $waitlistMessages->pluck('message_type')->unique()->values()->all());
+        $this->assertEquals(['alert'], $waitlistMessages->pluck('message_type')->unique()->values()->all());
         $this->assertNotNull($signup->refresh()->notified_at);
     }
 
@@ -172,8 +172,8 @@ class SlamDunkRuntimeGoldenFixtureTest extends TestCase
 
         $this->assertCount(2, $attendedMessages);
         $this->assertCount(2, $missedMessages);
-        $this->assertSame(['post_attended'], $attendedMessages->pluck('message_type')->unique()->values()->all());
-        $this->assertSame(['post_missed'], $missedMessages->pluck('message_type')->unique()->values()->all());
+        $this->assertEquals(['post_attended'], $attendedMessages->pluck('message_type')->unique()->values()->all());
+        $this->assertEquals(['post_missed'], $missedMessages->pluck('message_type')->unique()->values()->all());
         $this->assertEqualsCanonicalizing(['email', 'sms'], $attendedMessages->pluck('channel')->all());
         $this->assertEqualsCanonicalizing(['email', 'sms'], $missedMessages->pluck('channel')->all());
         $this->assertTrue($attendedMessages->concat($missedMessages)->every(

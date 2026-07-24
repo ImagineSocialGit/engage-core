@@ -148,7 +148,7 @@ class DispatchMessageActionTest extends TestCase
         );
 
         $this->assertSame('person@example.com', $message->payload['to']);
-        $this->assertSame(
+        $this->assertEquals(
             ['first_name' => 'Jeff'],
             $message->payload['tokens'],
         );
@@ -159,8 +159,14 @@ class DispatchMessageActionTest extends TestCase
 
         $this->assertSame(
             'messaging.email.definitions.transactional.webinar.confirmation',
-            $message->meta['definition_config_path'],
+            $message->definition_config_path,
         );
+        $this->assertSame('notifications', $message->queue);
+        $this->assertEquals(
+            ['registration_created'],
+            $message->dispatch_keys,
+        );
+        $this->assertEquals([], $message->meta);
     }
 
     public function test_it_hydrates_sms_payload_with_contact_phone_and_message_context(): void
@@ -309,7 +315,7 @@ class DispatchMessageActionTest extends TestCase
             ],
         );
 
-        $this->assertSame([], $messages);
+        $this->assertEquals([], $messages);
         $this->assertDatabaseCount('scheduled_messages', 0);
 
         Queue::assertNothingPushed();
@@ -411,7 +417,7 @@ class DispatchMessageActionTest extends TestCase
             ],
         );
 
-        $this->assertSame([], $messages);
+        $this->assertEquals([], $messages);
         $this->assertDatabaseCount('scheduled_messages', 0);
     }
 
@@ -540,10 +546,17 @@ class DispatchMessageActionTest extends TestCase
         $this->assertNotNull($message);
         $this->assertSame('DB subject', $message->payload['subject']);
         $this->assertNull($message->definition_config_path);
-        $this->assertNull($message->meta['definition_config_path']);
-        $this->assertSame($preset->getKey(), data_get($message->meta, 'message_template_preset.id'));
-        $this->assertSame($assignment->getKey(), data_get($message->meta, 'message_template_preset.assignment_id'));
-        $this->assertSame('messaging.email.definitions.transactional.webinar.confirmation', data_get($message->meta, 'message_template_preset.source_config_path'));
+        $this->assertEquals([
+            'message_template' => [
+                'preset_id' => $preset->getKey(),
+                'preset_key' => 'webinar_registration_confirmation.db',
+                'assignment_id' => $assignment->getKey(),
+                'definition_key' => 'confirmation',
+            ],
+        ], $message->meta);
+        $this->assertArrayNotHasKey('definition_config_path', $message->meta);
+        $this->assertArrayNotHasKey('message_template_preset', $message->meta);
+        $this->assertArrayNotHasKey('message_template_assignment', $message->meta);
     }
 
 

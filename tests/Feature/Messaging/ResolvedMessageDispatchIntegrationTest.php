@@ -69,7 +69,8 @@ class ResolvedMessageDispatchIntegrationTest extends TestCase
         $this->assertSame($broadcast->getMorphClass(), $message->behavior_owner_type);
         $this->assertSame($broadcast->getKey(), $message->behavior_owner_id);
         $this->assertTrue($message->behaviorOwner->is($broadcast));
-        $this->assertSame($sendAt->toISOString(), data_get($message->meta, 'resolved_message_dispatch.resolved_send_at'));
+        $this->assertEquals([], $message->meta);
+        $this->assertArrayNotHasKey('resolved_message_dispatch', $message->meta);
 
         Queue::assertPushed(SendScheduledMessageJob::class);
     }
