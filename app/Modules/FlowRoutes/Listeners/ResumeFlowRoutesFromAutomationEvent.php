@@ -48,11 +48,9 @@ class ResumeFlowRoutesFromAutomationEvent
             subjectType: $automationEvent->subjectType,
             subjectId: $automationEvent->subjectId,
             occurredAt: $automationEvent->occurredAt,
-            payload: [
-                ...$automationEvent->payload,
-                'automation_event' => $automationEvent->toArray(),
-                'automation_event_meta' => $automationEvent->meta,
-            ],
+            payload: $automationEvent->payload,
+            meta: $automationEvent->meta,
+            eventId: $automationEvent->eventId,
         );
 
         if ($automationEvent->contactId !== null) {

@@ -80,7 +80,7 @@ class StartFlowRoutesFromAutomationEventAction
                 'status' => ContactFlowRouteProgress::STATUS_ACTIVE,
                 'started_at' => $event->occurredAt ?? now(),
                 'meta' => [
-                    'started_from_automation_event' => $event->toMetaPayload(),
+                    'started_from_automation_event' => $event->persistenceReference(),
                 ],
             ]);
 

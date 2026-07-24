@@ -4,6 +4,7 @@ namespace Tests\Feature\FlowRoutes;
 
 use App\Modules\FlowRoutes\Actions\ResumeFlowRouteProgressFromEventAction;
 use App\Modules\FlowRoutes\Actions\StartFlowRoutesFromAutomationEventAction;
+use App\Modules\FlowRoutes\Data\Events\FlowRouteExternalEvent;
 use App\Modules\FlowRoutes\Data\Events\FlowRouteExternalEventResumeResult;
 use App\Modules\FlowRoutes\Listeners\ResumeFlowRoutesFromAutomationEvent;
 use App\Support\AutomationEvents\Data\AutomationEventData;
@@ -19,26 +20,73 @@ class AutomationEventReceiptTest extends TestCase
 
     public function test_replaying_the_same_durable_event_runs_flow_routes_once(): void
     {
+        $eventId = (string) Str::uuid();
+        $occurredAt = now();
+        $payload = [
+            'webinar_registration' => [
+                'id' => 99,
+                'contact' => [
+                    'id' => 42,
+                    'first_name' => 'Jeff',
+                ],
+            ],
+        ];
+        $meta = [
+            'source_module' => 'webinars',
+            'provider' => [
+                'name' => 'zoom',
+                'event' => 'participant_joined',
+            ],
+        ];
+        $assertEnvelope = function (FlowRouteExternalEvent $externalEvent) use (
+            $eventId,
+            $occurredAt,
+            $payload,
+            $meta,
+        ): bool {
+            $this->assertSame($eventId, $externalEvent->eventId);
+            $this->assertSame('webinar.attended', $externalEvent->name);
+            $this->assertSame(42, $externalEvent->contactId);
+            $this->assertSame('webinar_registration', $externalEvent->subjectType);
+            $this->assertSame(99, $externalEvent->subjectId);
+            $this->assertEquals($payload, $externalEvent->payload);
+            $this->assertEquals($meta, $externalEvent->meta);
+            $this->assertArrayNotHasKey('automation_event', $externalEvent->payload);
+            $this->assertArrayNotHasKey('automation_event_meta', $externalEvent->payload);
+            $this->assertEquals([
+                'name' => 'webinar.attended',
+                'event_id' => $eventId,
+                'contact_id' => 42,
+                'subject_type' => 'webinar_registration',
+                'subject_id' => 99,
+                'occurred_at' => $occurredAt->toISOString(),
+            ], $externalEvent->persistenceReference());
+
+            return true;
+        };
+
         $start = Mockery::mock(StartFlowRoutesFromAutomationEventAction::class);
-        $start->shouldReceive('handle')->once();
+        $start->shouldReceive('handle')
+            ->once()
+            ->withArgs($assertEnvelope);
 
         $resume = Mockery::mock(ResumeFlowRouteProgressFromEventAction::class);
         $resume->shouldReceive('handle')
             ->once()
+            ->withArgs($assertEnvelope)
             ->andReturn(new FlowRouteExternalEventResumeResult());
 
         app()->instance(StartFlowRoutesFromAutomationEventAction::class, $start);
         app()->instance(ResumeFlowRouteProgressFromEventAction::class, $resume);
 
-        $eventId = (string) Str::uuid();
         $event = new AutomationEventRecorded(new AutomationEventData(
             eventKey: 'webinar.attended',
             contactId: 42,
             subjectType: 'webinar_registration',
             subjectId: 99,
-            occurredAt: now(),
-            payload: [],
-            meta: ['source_module' => 'webinars'],
+            occurredAt: $occurredAt,
+            payload: $payload,
+            meta: $meta,
             eventId: $eventId,
         ));
 

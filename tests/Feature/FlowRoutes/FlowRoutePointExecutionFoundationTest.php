@@ -422,7 +422,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertSame($message->getMorphClass(), $progressItem->created_subject_type);
         $this->assertSame($message->getKey(), $progressItem->created_subject_id);
         $this->assertSame('scheduled_message', $progressItem->correlation_type);
-        $this->assertSame(
+        $this->assertEquals(
             [$message->getKey()],
             data_get($progressItem->correlation, 'scheduled_message_ids'),
         );
@@ -753,17 +753,26 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             ],
         ]);
 
+        $occurredAt = now();
+
         app(StartFlowRoutesFromAutomationEventAction::class)->handle(
             FlowRouteExternalEvent::make(
                 name: 'webinar.attended',
                 contactId: $contact->getKey(),
                 subjectType: 'webinar_registration',
                 subjectId: 123,
-                occurredAt: now(),
+                occurredAt: $occurredAt,
                 payload: [
                     'webinar_registration' => [
                         'id' => 123,
+                        'contact' => [
+                            'id' => $contact->getKey(),
+                            'first_name' => 'FlowRoute',
+                        ],
                     ],
+                ],
+                meta: [
+                    'source_module' => 'webinars',
                 ],
             ),
         );
@@ -778,7 +787,13 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertNotNull($progress);
         $this->assertSame($contact->getKey(), $progress->contact_id);
         $this->assertSame($flowRoute->getKey(), $progress->flow_route_id);
-        $this->assertSame('webinar.attended', $progress->meta['started_from_automation_event']['name'] ?? null);
+        $this->assertEquals([
+            'name' => 'webinar.attended',
+            'contact_id' => $contact->getKey(),
+            'subject_type' => 'webinar_registration',
+            'subject_id' => 123,
+            'occurred_at' => $occurredAt->toISOString(),
+        ], $progress->meta['started_from_automation_event'] ?? null);
 
         $this->assertDatabaseHas('automation_event_outbox_events', [
             'event_key' => ContactWorkflowStatusChanged::AUTOMATION_EVENT_KEY,
@@ -862,6 +877,8 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertNull($progress->current_flow_route_point_id);
         $this->assertNull($progress->resume_at);
         $this->assertNull($progress->waiting_event_key);
+        $this->assertArrayNotHasKey('event_resume_attempts', $progress->meta ?? []);
+        $this->assertArrayNotHasKey('last_event_resume_attempt', $progress->meta ?? []);
     }
 
     public function test_task_completed_event_can_resume_real_non_contact_subject_scoped_route_without_contact_only_matching(): void
@@ -1212,10 +1229,10 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
                         ->all(),
                     'meta' => $task->meta ?? [],
                 ],
-                'automation_event_meta' => [
-                    'source_module' => 'tasks',
-                    'task_id' => $task->getKey(),
-                ],
+            ],
+            meta: [
+                'source_module' => 'tasks',
+                'task_id' => $task->getKey(),
             ],
         );
     }

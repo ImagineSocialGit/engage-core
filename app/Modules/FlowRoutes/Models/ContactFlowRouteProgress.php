@@ -7,6 +7,7 @@ use App\Modules\Core\Models\ContactStatus;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Database\Factories\ContactFlowRouteProgressFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +20,11 @@ use Throwable;
 class ContactFlowRouteProgress extends Model
 {
     use HasFactory;
+
+    protected static function newFactory(): ContactFlowRouteProgressFactory
+    {
+        return ContactFlowRouteProgressFactory::new();
+    }
 
     public const STATUS_ACTIVE = 'active';
     public const STATUS_WAITING = 'waiting';

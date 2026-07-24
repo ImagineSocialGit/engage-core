@@ -97,15 +97,16 @@ class ResumeFlowRouteProgressFromEventAction
             if (! $this->matches($progress, $event)) {
                 return PointExecutionResult::blocked('flow_route_external_event_no_longer_matches', [
                     'progress_id' => $progress->getKey(),
-                    'event' => $event->toMetaPayload(),
+                    'event' => $event->persistenceReference(),
                 ]);
             }
 
             $now = now();
             $meta = $progress->meta ?? [];
             $waiting = $progress->waitingState();
+            $eventReference = $event->persistenceReference();
 
-            $waiting['matched_event'] = $event->toMetaPayload();
+            $waiting['matched_event'] = $eventReference;
             $waiting['matched_at'] = $now->toISOString();
 
             $waitingPlanItemId = $this->nullableInt($waiting['flow_route_plan_item_id'] ?? null);
@@ -119,7 +120,7 @@ class ResumeFlowRouteProgressFromEventAction
                     ->update([
                         'status' => ContactFlowRoutePlanItem::STATUS_ACTIVE,
                         'result_payload' => [
-                            'matched_event' => $event->toMetaPayload(),
+                            'matched_event' => $eventReference,
                         ],
                     ]);
             }
@@ -136,24 +137,16 @@ class ResumeFlowRouteProgressFromEventAction
                         'waiting_event_key' => null,
                         'result_reason' => 'event_wait_matched',
                         'result_payload' => [
-                            'matched_event' => $event->toMetaPayload(),
+                            'matched_event' => $eventReference,
                         ],
                     ]);
             }
 
-            $resumeAttempts = is_array($meta['event_resume_attempts'] ?? null)
-                ? $meta['event_resume_attempts']
-                : [];
-
-            $resumeAttempts[] = [
-                'attempted_at' => $now->toISOString(),
-                'waiting' => $waiting,
-                'event' => $event->toMetaPayload(),
-            ];
-
             $meta['waiting'] = $waiting;
-            $meta['event_resume_attempts'] = array_slice($resumeAttempts, -50);
-            $meta['last_event_resume_attempt'] = end($meta['event_resume_attempts']) ?: null;
+            unset(
+                $meta['event_resume_attempts'],
+                $meta['last_event_resume_attempt'],
+            );
 
             $progress->forceFill([
                 'status' => ContactFlowRouteProgress::STATUS_ACTIVE,
@@ -339,11 +332,11 @@ class ResumeFlowRouteProgressFromEventAction
         }
 
         if (str_starts_with($key, 'meta.')) {
-            return data_get($event->payload['automation_event_meta'] ?? [], substr($key, 5));
+            return data_get($event->meta, substr($key, 5));
         }
 
         if (str_starts_with($key, 'automation_event_meta.')) {
-            return data_get($event->payload['automation_event_meta'] ?? [], substr($key, 22));
+            return data_get($event->meta, substr($key, 22));
         }
 
         return $event->value($key);

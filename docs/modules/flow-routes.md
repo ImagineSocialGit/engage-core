@@ -255,6 +255,49 @@ Examples:
     webinar.missed -> FlowRoutes event-triggered route -> enroll_campaign(webinar_missed_nurture)
     task.completed -> FlowRoutes event_wait resume, if configured
 
+## Automation-event persistence ownership
+
+`automation_event_outbox_events` is the single durable owner of the complete automation-event
+payload and metadata graph. FlowRoutes may use those graphs in memory while selecting, matching,
+starting, and resuming Routes, but it must not copy them into FlowRoutes persistence.
+
+The internal `FlowRouteExternalEvent` keeps these concerns separate:
+
+```text
+payload
+    in-memory event facts used by event-wait correlation
+
+meta
+    in-memory producer/provider metadata used by event-wait correlation
+
+persistence reference
+    scalar event identity and envelope provenance only
+```
+
+A compact persisted event reference may contain:
+
+```text
+name
+event_id when the event has durable outbox identity
+contact_id when present
+subject_type / subject_id when present
+occurred_at when present
+```
+
+It must not contain `payload`, `meta`, a nested `AutomationEventData` serialization, producer
+models, or domain-object snapshots. Its encoded JSON size is capped at 1,024 bytes.
+
+Durable events use `automation_event_consumer_receipts` for exactly-once FlowRoutes consumption.
+The persisted event UUID points back to the outbox-owned event. A non-durable internal event may
+still execute FlowRoutes behavior, but its compact reference omits `event_id`; its payload and
+metadata remain ephemeral.
+
+Event-wait matching may read payload and metadata only from the in-memory event. The waiting state
+temporarily stores a compact `matched_event` reference so the waiting Point can finish. The
+corresponding `ContactFlowRouteProgressItem` is the audit record for the match outcome. Do not
+maintain rolling event-resume histories in `ContactFlowRouteProgress.meta`, and do not persist the
+full event graph in progress metadata, plan-item results, or progress-item results.
+
 Current tables/models:
 
     flow_routes
