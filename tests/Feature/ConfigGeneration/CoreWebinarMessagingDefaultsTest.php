@@ -84,10 +84,12 @@ class CoreWebinarMessagingDefaultsTest extends TestCase
         }
     }
 
-    public function test_core_webinar_campaign_defaults_are_one_step_email_follow_ups_after_seven_days(): void
+    public function test_core_webinar_campaign_defaults_are_one_step_dependency_aware_follow_ups_after_seven_days(): void
     {
         $campaigns = require base_path('config/presets/modules/webinars/campaigns.php');
-        $emailTemplates = require base_path('config/messaging/email/definitions/marketing/webinar_nurture.php');
+        $emailTemplates = require base_path(
+            'config/messaging/email/definitions/marketing/webinar_nurture.php',
+        );
 
         foreach ([
             'webinar_attended_nurture',
@@ -96,11 +98,13 @@ class CoreWebinarMessagingDefaultsTest extends TestCase
             $definition = $campaigns['definitions'][$campaignKey] ?? null;
 
             $this->assertIsArray($definition);
+            $this->assertSame('marketing', $definition['purpose']);
+            $this->assertSame('webinar_nurture', $definition['scope']);
+            $this->assertSame('dependency_aware', $definition['variant_strategy']);
             $this->assertCount(1, $definition['steps']);
 
             $step = $definition['steps'][0];
 
-            $this->assertSame(1, $step['step_number']);
             $this->assertSame(
                 [
                     'type' => 'delay',
@@ -113,7 +117,7 @@ class CoreWebinarMessagingDefaultsTest extends TestCase
 
             $this->assertSame(
                 ['sms', 'email'],
-                array_column($step['variants'], 'key'),
+                array_keys($step['variants']),
             );
 
             $this->assertSame(
@@ -121,15 +125,11 @@ class CoreWebinarMessagingDefaultsTest extends TestCase
                 array_column($step['variants'], 'channel'),
             );
 
-            foreach ($step['variants'] as $variant) {
-                $this->assertSame('marketing', $variant['purpose']);
-                $this->assertSame('webinar_nurture', $variant['scope']);
-            }
-
-            $this->assertSame('dependency_aware', $step['variant_strategy']);
-
             $this->assertIsArray(
-                data_get($emailTemplates, "campaigns.{$campaignKey}.steps.1.variants.email"),
+                data_get(
+                    $emailTemplates,
+                    "campaigns.{$campaignKey}.steps.1.variants.email",
+                ),
                 "Core campaign [{$campaignKey}] is missing its matching Messaging template.",
             );
         }
