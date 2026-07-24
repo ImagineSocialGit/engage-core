@@ -369,6 +369,7 @@
                                     @endphp
 
                                     <article class="{{ $trustVariantStyle['card'] ?? 'py-8 first:pt-0 last:pb-0' }}">
+
                                         @if(filled($story['label'] ?? null))
                                             <div class="{{ $trustVariantStyle['label_row'] ?? 'flex items-center gap-2' }}">
                                                 @if(filled($story['icon'] ?? null))
@@ -392,6 +393,15 @@
                                             </h3>
                                         @endif
 
+                                        @if($storyRating > 0)
+                                            <p
+                                                aria-label="{{ $storyRating }} out of 5 stars"
+                                                class="{{ $trustVariantStyle['rating'] ?? 'mt-5 text-lg font-extrabold tracking-[0.18em] text-primary' }}"
+                                            >
+                                                <span aria-hidden="true">{{ str_repeat('★', $storyRating) }}</span>
+                                            </p>
+                                        @endif
+
                                         @if(filled($story['context'] ?? null))
                                             <p class="{{ $trustVariantStyle['context'] ?? 'mt-4 text-base font-medium leading-7 text-ink/75 sm:text-lg' }}">
                                                 {{ $story['context'] }}
@@ -401,15 +411,6 @@
                                         @if(filled($story['outcome'] ?? null))
                                             <p class="{{ $trustVariantStyle['outcome'] ?? 'mt-5 text-base font-extrabold leading-7 text-ink sm:text-lg' }}">
                                                 {{ $story['outcome'] }}
-                                            </p>
-                                        @endif
-
-                                        @if($storyRating > 0)
-                                            <p
-                                                aria-label="{{ $storyRating }} out of 5 stars"
-                                                class="{{ $trustVariantStyle['rating'] ?? 'mt-5 text-lg font-extrabold tracking-[0.18em] text-primary' }}"
-                                            >
-                                                <span aria-hidden="true">{{ str_repeat('★', $storyRating) }}</span>
                                             </p>
                                         @endif
 

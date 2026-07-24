@@ -8,6 +8,19 @@
     'heroCountdown',
 ])
 
+@php
+    $heroClosingCopy = is_string($page['hero']['closing_copy'] ?? null)
+        ? $page['hero']['closing_copy']
+        : null;
+    $heroClosingCopyHighlight = is_string($page['hero']['closing_copy_highlight'] ?? null)
+        ? $page['hero']['closing_copy_highlight']
+        : null;
+    $heroClosingCopyHighlightPosition = filled($heroClosingCopy)
+        && filled($heroClosingCopyHighlight)
+            ? mb_strpos($heroClosingCopy, $heroClosingCopyHighlight)
+            : false;
+@endphp
+
 @if($page['hero']['enabled'] ?? true)
 <div
     x-ref="heroSection" 
@@ -39,25 +52,82 @@
 
             </h2>
 
-            @if(filled($page['hero']['body'] ?? null))
-                <p class="{{ $tokens['body'] ?? 'text-lg leading-8 text-slate-600' }} {{ $style['hero']['body'] ?? 'mt-6' }}">
-                    {{ $page['hero']['body'] }}
-                </p>
-            @endif
-
-            @if(filled($page['hero']['supporting_copy'] ?? null))
-                @foreach ($page['hero']['supporting_copy'] as $item)
-                <p class="{{ $style['hero']['supporting_copy'] ?? 'mt-4' }}{{ $loop->last ? ' text-lg font-semibold' : ' text-base' }}">
-                    {{ $item }}
-                </p>                                
+            @if(filled($page['hero']['body']))
+                @if (is_array($page['hero']['body']))                    
+                @foreach(($page['hero']['body'] ?? []) as $paragraph)
+                <div class="{{ $style['hero']['body'] ?? 'text-lg leading-8 text-white' }}">
+                    @if(is_array($paragraph))
+                        <p class="space-x-1">
+                        @foreach($paragraph as $part)
+                            @if($part['emphasis'] ?? false)
+                                <strong class="text-primary">
+                                    {{ $part['text'] ?? '' }}
+                                </strong>
+                            @else
+                                <span>{{ $part['text'] ?? '' }}</span>
+                            @endif
+                        @endforeach
+                        </p>
+                    @else
+                        {{ $paragraph }}
+                    @endif
+                </div>
                 @endforeach
-
+                @else
+                    {{ $page['hero']['body'] }}
+                @endif
             @endif
 
-            @if(filled($page['hero']['closing_copy'] ?? null))
-                <p class="hidden lg:block {{ $tokens['emphasize'] ?? 'text-lg leading-8 text-slate-600' }} mt-5">
-                    {{ $page['hero']['closing_copy'] }}
-                </p>
+            @if(filled($page['hero']['supporting_copy']))
+                @if (is_array($page['hero']['supporting_copy']))                    
+                @foreach(($page['hero']['supporting_copy'] ?? []) as $paragraph)
+                <div class="{{ $style['hero']['supporting_copy'] ?? 'text-lg leading-8 text-white' }}">
+                    @if(is_array($paragraph))
+                        <p>
+                        @foreach($paragraph as $part)
+                            @if($part['emphasis'] ?? false)
+                                <strong class="text-primary">
+                                    {{ $part['text'] ?? '' }}
+                                </strong>
+                            @else
+                                <span>{{ $part['text'] ?? '' }}</span>
+                            @endif
+                        @endforeach
+                        </p>
+                    @else
+                        {{ $paragraph }}
+                    @endif
+                </div>
+                @endforeach
+                @else
+                    {{ $page['hero']['supporting_copy'] }}
+                @endif
+            @endif
+
+            @if(filled($page['hero']['closing_copy']))
+                @if (is_array($page['hero']['closing_copy']))                    
+                @foreach(($page['hero']['closing_copy'] ?? []) as $paragraph)
+                <div class="{{ $style['hero']['closing_copy'] ?? 'text-lg leading-8 text-white' }}">
+                    @if(is_array($paragraph))
+                        <p>
+                        @foreach($paragraph as $part)
+                            @if($part['emphasis'] ?? false)
+                                <strong class="text-primary">
+                                    {{ $part['text'] ?? '' }}
+                                </strong>
+                            @else
+                                <span>{{ $part['text'] ?? '' }}</span>
+                            @endif
+                        @endforeach
+                        </p>
+                    @else
+                        {{ $paragraph }}
+                    @endif
+                </div>
+                @endforeach
+                @else
+                <p>{{ $page['hero']['closing_copy'] }}</p>
+                @endif
             @endif
 
             @if(filled($page['hero']['authority_line'] ?? null))
@@ -108,9 +178,13 @@
                 </div>
             @endif
 
-            @if(filled($page['hero']['closing_copy'] ?? null))
-                <p class="block lg:hidden {{ $tokens['emphasize'] ?? 'text-lg leading-8 text-slate-600' }} mt-8">
-                    {{ $page['hero']['closing_copy'] }}
+            @if(filled($heroClosingCopy))
+                <p class="block lg:hidden {{ $style['hero']['closing_copy'] ?? ($tokens['emphasize'] ?? 'text-lg leading-8 text-slate-600') }} mt-8">
+                    @if($heroClosingCopyHighlightPosition !== false)
+                        {{ mb_substr($heroClosingCopy, 0, $heroClosingCopyHighlightPosition) }}<strong class="{{ $style['hero']['closing_copy_highlight'] ?? 'text-primary' }}">{{ $heroClosingCopyHighlight }}</strong>{{ mb_substr($heroClosingCopy, $heroClosingCopyHighlightPosition + mb_strlen($heroClosingCopyHighlight)) }}
+                    @else
+                        {{ $heroClosingCopy }}
+                    @endif
                 </p>
             @endif
         </div>
