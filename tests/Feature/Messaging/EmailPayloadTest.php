@@ -107,7 +107,7 @@ class EmailPayloadTest extends TestCase
         );
     }
 
-    public function test_it_merges_runtime_context_context_and_tokens(): void
+    public function test_it_reads_only_canonical_tokens(): void
     {
         $payload = EmailPayload::fromArray([
             'email' => 'test@example.com',
@@ -129,6 +129,7 @@ class EmailPayloadTest extends TestCase
             'Tokens',
             $payload->tokens['first_name']
         );
+        $this->assertCount(1, $payload->tokens);
     }
 
     public function test_it_uses_default_view(): void

@@ -169,21 +169,9 @@ class SmsPayload implements SmsMessage
 
     private static function resolveTokens(array $payload): array
     {
-        $tokens = [];
-
-        if (is_array($payload['runtime_context'] ?? null)) {
-            $tokens = array_replace_recursive($tokens, $payload['runtime_context']);
-        }
-
-        if (is_array($payload['context'] ?? null)) {
-            $tokens = array_replace_recursive($tokens, $payload['context']);
-        }
-
-        if (is_array($payload['tokens'] ?? null)) {
-            $tokens = array_replace_recursive($tokens, $payload['tokens']);
-        }
-
-        return $tokens;
+        return is_array($payload['tokens'] ?? null)
+            ? $payload['tokens']
+            : [];
     }
 
     private static function isStringableValue(mixed $value): bool

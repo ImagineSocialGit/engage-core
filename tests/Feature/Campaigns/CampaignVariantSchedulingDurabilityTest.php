@@ -112,10 +112,21 @@ class CampaignVariantSchedulingDurabilityTest extends TestCase
 
         $this->assertNotNull($message);
         $this->assertSame('Primary subject', $message->payload['subject']);
-        $this->assertSame('Jeff', $message->payload['first_name']);
+        $this->assertSame(
+            'Body for Primary subject.',
+            $message->payload['body'],
+        );
+        $this->assertEqualsCanonicalizing([
+            'to',
+            'contact_id',
+            'subject',
+            'body',
+        ], array_keys($message->payload));
+        $this->assertArrayNotHasKey('first_name', $message->payload);
+        $this->assertArrayNotHasKey('contact', $message->payload);
+        $this->assertArrayNotHasKey('tokens', $message->payload);
         $this->assertArrayNotHasKey('context', $message->payload);
-        $this->assertArrayNotHasKey('created_at', $message->payload['tokens']['contact'] ?? []);
-        $this->assertArrayNotHasKey('updated_at', $message->payload['tokens']['contact'] ?? []);
+        $this->assertArrayNotHasKey('runtime_context', $message->payload);
         $this->assertSame('email_primary', $message->meta['campaign_step_variant_key']);
         $this->assertArrayNotHasKey(
             'campaign_step_variant_source_config_path',

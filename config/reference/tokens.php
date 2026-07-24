@@ -19,9 +19,9 @@ return [
     | - Client configs may extend this reference in client/{client-key}/config/reference/tokens.php.
     |
     | Runtime note:
-    | EmailPayload and SmsPayload resolve tokens from runtime_context, context,
-    | and tokens arrays. That means token replacement is dynamic, but configs
-    | should only use tokens documented for the current message context.
+    | EmailPayload and SmsPayload resolve replacements only from the canonical
+    | tokens array. Configs should only use tokens documented for the current
+    | message context.
     */
 
     'syntax' => [
@@ -29,7 +29,7 @@ return [
         'dot_notation' => '{contact.first_name}',
         'colon_alias' => ':token_name',
         'notes' => [
-            'Dot notation is generated from nested runtime_context/context/tokens arrays.',
+            'Dot notation is generated from nested tokens arrays.',
             'Use brace syntax in client-facing config copy.',
             'Colon aliases are supported by payload classes but should not be preferred in authored configs.',
         ],

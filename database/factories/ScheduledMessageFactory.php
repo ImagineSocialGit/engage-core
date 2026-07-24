@@ -38,8 +38,8 @@ class ScheduledMessageFactory extends Factory
 
             'payload' => [
                 'to' => $this->faker->safeEmail(),
-                'tokens' => [],
-                'context' => [],
+                'subject' => 'Scheduled message',
+                'body' => 'Scheduled message body.',
             ],
 
             'send_at' => now(),

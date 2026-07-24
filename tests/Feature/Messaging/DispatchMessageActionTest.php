@@ -114,7 +114,7 @@ class DispatchMessageActionTest extends TestCase
 
                 'payload' => [
                     'subject' => 'Registered',
-                    'body' => 'Hello',
+                    'body' => 'Hello {first_name}',
                 ],
             ],
         ]);
@@ -148,6 +148,14 @@ class DispatchMessageActionTest extends TestCase
         );
 
         $this->assertSame('person@example.com', $message->payload['to']);
+        $this->assertSame(
+            ['first_name' => 'Jeff'],
+            $message->payload['tokens'],
+        );
+        $this->assertArrayNotHasKey('first_name', $message->payload);
+        $this->assertArrayNotHasKey('contact', $message->payload);
+        $this->assertArrayNotHasKey('context', $message->payload);
+        $this->assertArrayNotHasKey('runtime_context', $message->payload);
 
         $this->assertSame(
             'messaging.email.definitions.transactional.webinar.confirmation',
@@ -207,13 +215,11 @@ class DispatchMessageActionTest extends TestCase
         $this->assertSame('marketing', $message->queue);
 
         $this->assertSame('+15555550123', $message->payload['to']);
-        $this->assertSame('sms', $message->payload['channel']);
-        $this->assertSame('marketing', $message->payload['purpose']);
-        $this->assertSame('broadcast', $message->payload['scope']);
-        $this->assertSame('broadcast', $message->payload['message_type']);
         $this->assertSame('Runtime SMS broadcast.', $message->payload['message']);
-        $this->assertSame(Contact::class, $message->payload['recipient_type']);
-        $this->assertSame($contact->id, $message->payload['recipient_id']);
+        $this->assertEqualsCanonicalizing(
+            ['to', 'message'],
+            array_keys($message->payload),
+        );
 
         Queue::assertPushed(SendScheduledMessageJob::class);
     }
@@ -577,15 +583,19 @@ class DispatchMessageActionTest extends TestCase
 
         $this->assertNotNull($message);
         $this->assertSame('Registered', $message->payload['subject']);
-        $this->assertSame('Jeff', $message->payload['first_name']);
         $this->assertSame('person@example.com', $message->payload['to']);
+        $this->assertSame($contact->getKey(), $message->payload['contact_id']);
+        $this->assertSame('Jeff', $message->payload['tokens']['first_name']);
+        $this->assertArrayNotHasKey('first_name', $message->payload);
+        $this->assertArrayNotHasKey('contact', $message->payload);
         $this->assertArrayNotHasKey('context', $message->payload);
-        $this->assertArrayNotHasKey('created_at', $message->payload['tokens']['contact'] ?? []);
-        $this->assertArrayNotHasKey('updated_at', $message->payload['tokens']['contact'] ?? []);
-        $this->assertSame('webinar', $message->payload['tokens']['contact']['source'] ?? null);
+        $this->assertArrayNotHasKey('runtime_context', $message->payload);
+        $this->assertArrayNotHasKey('email', $message->payload['tokens']);
+        $this->assertArrayNotHasKey('phone', $message->payload['tokens']);
+        $this->assertArrayNotHasKey('contact', $message->payload['tokens']);
     }
 
-    public function test_it_preserves_explicit_compact_runtime_context_in_scheduled_payload(): void
+    public function test_it_preserves_explicit_compact_tokens_in_scheduled_payload(): void
     {
         Queue::fake();
 
@@ -596,7 +606,7 @@ class DispatchMessageActionTest extends TestCase
                 'queue' => 'notifications',
                 'payload' => [
                     'subject' => 'Follow up',
-                    'body' => 'Thanks for attending.',
+                    'body' => 'Thanks for attending webinar {webinar.id} with outcome {webinar.outcome}.',
                 ],
             ],
         ]);
@@ -611,7 +621,7 @@ class DispatchMessageActionTest extends TestCase
                 'timing' => 'immediate',
             ],
             payload: [
-                'runtime_context' => [
+                'tokens' => [
                     'webinar' => [
                         'outcome' => 'attended',
                         'id' => 123,
@@ -624,8 +634,10 @@ class DispatchMessageActionTest extends TestCase
 
         $this->assertNotNull($message);
         $this->assertSame('Follow up', $message->payload['subject']);
-        $this->assertSame('attended', data_get($message->payload, 'runtime_context.webinar.outcome'));
-        $this->assertSame(123, data_get($message->payload, 'runtime_context.webinar.id'));
+        $this->assertSame('attended', data_get($message->payload, 'tokens.webinar.outcome'));
+        $this->assertSame(123, data_get($message->payload, 'tokens.webinar.id'));
+        $this->assertArrayNotHasKey('runtime_context', $message->payload);
+        $this->assertArrayNotHasKey('context', $message->payload);
     }
 
     public function test_it_persists_resolved_conditions_for_send_time_revalidation(): void
@@ -682,6 +694,10 @@ class DispatchMessageActionTest extends TestCase
         $this->assertSame('contact.source', $message->meta['conditions'][0]['field']);
         $this->assertSame('eq', $message->meta['conditions'][0]['operator']);
         $this->assertSame('webinar', $message->meta['conditions'][0]['value']);
+        $this->assertSame(
+            'webinar',
+            data_get($message->payload, 'tokens.contact.source'),
+        );
     }
 
     private function contactWithConsent(

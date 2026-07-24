@@ -5,6 +5,7 @@ namespace Tests\Feature\Messaging;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Messaging\Actions\ClaimScheduledMessageForSendingAction;
+use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Contracts\Email\EmailMessage;
 use App\Modules\Messaging\Contracts\Sms\SmsMessage;
 use App\Modules\Messaging\Data\Delivery\MessageSendResult;
@@ -24,7 +25,9 @@ use App\Modules\Messaging\Services\ScheduledMessageGate;
 use App\Modules\Messaging\Services\Sms\SmsMessagingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Mail\Mailable;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use InvalidArgumentException;
 use Mockery;
 use RuntimeException;
@@ -201,6 +204,159 @@ class SendScheduledMessageJobTest extends TestCase
         Event::assertDispatched(
             ScheduledMessageSent::class,
             fn (ScheduledMessageSent $event): bool => $event->scheduledMessage->is($scheduledMessage),
+        );
+    }
+
+    public function test_it_does_not_resolve_legacy_token_containers_at_send_time(): void
+    {
+        Event::fake([
+            ScheduledMessageSent::class,
+            ScheduledMessageSkipped::class,
+        ]);
+
+        $contact = Contact::factory()->create([
+            'phone' => '+15555550123',
+        ]);
+
+        $this->grantConsent($contact, 'sms', 'transactional');
+
+        $scheduledMessage = ScheduledMessage::factory()->create([
+            'recipient_type' => Contact::class,
+            'recipient_id' => $contact->id,
+            'channel' => 'sms',
+            'purpose' => 'transactional',
+            'scope' => 'webinar',
+            'message_type' => 'confirmation',
+            'payload_class' => SmsPayload::class,
+            'payload' => [
+                'to' => '+15555550123',
+                'message' => 'Hi {first_name}, {webinar.title} starts at {webinar_start_time}.',
+                'runtime_context' => [
+                    'first_name' => 'Runtime',
+                ],
+                'context' => [
+                    'webinar' => [
+                        'title' => 'Legacy Webinar',
+                    ],
+                    'webinar_start_time' => '7:00 PM CDT',
+                ],
+                'tokens' => [
+                    'first_name' => 'Jeff',
+                ],
+            ],
+            'status' => ScheduledMessage::STATUS_PENDING,
+            'meta' => [
+                'conditions' => [],
+            ],
+        ]);
+
+        $smsService = Mockery::mock(SmsMessagingService::class);
+        $smsService->shouldNotReceive('send');
+
+        app()->instance(SmsMessagingService::class, $smsService);
+
+        $this->handleScheduledMessage($scheduledMessage);
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame(
+            ScheduledMessage::STATUS_SKIPPED,
+            $scheduledMessage->status,
+        );
+        $this->assertStringContainsString(
+            '{webinar.title}',
+            (string) $scheduledMessage->skip_reason,
+        );
+        Event::assertDispatched(
+            ScheduledMessageSkipped::class,
+            fn (ScheduledMessageSkipped $event): bool => $event->scheduledMessage->is($scheduledMessage),
+        );
+        Event::assertNotDispatched(ScheduledMessageSent::class);
+    }
+
+    public function test_pending_destination_and_content_do_not_change_with_contact_or_config(): void
+    {
+        Queue::fake();
+        Event::fake([ScheduledMessageSent::class]);
+
+        Config::set('messaging.email.definitions.transactional.webinar', [
+            'confirmation' => [
+                'dispatch_key' => 'registration_created',
+                'payload_class' => EmailPayload::class,
+                'queue' => 'confirmation_messages',
+                'payload' => [
+                    'subject' => 'Original subject for {first_name}',
+                    'body' => 'Original body for {first_name}.',
+                ],
+            ],
+        ]);
+
+        $contact = Contact::factory()->create([
+            'first_name' => 'Jeff',
+            'email' => 'original@example.com',
+        ]);
+
+        $this->grantConsent($contact, 'email', 'transactional');
+
+        $messages = app(DispatchMessageAction::class)->handle(
+            recipient: $contact,
+            channel: 'email',
+            purpose: 'transactional',
+            scope: 'webinar',
+            dispatchKeys: 'registration_created',
+            behavior: [
+                'timing' => 'immediate',
+            ],
+        );
+
+        $this->assertCount(1, $messages);
+
+        $scheduledMessage = $messages[0];
+
+        $contact->forceFill([
+            'first_name' => 'Changed',
+            'email' => 'changed@example.com',
+        ])->save();
+
+        Config::set(
+            'messaging.email.definitions.transactional.webinar.confirmation.payload.subject',
+            'Changed subject for {first_name}',
+        );
+        Config::set(
+            'messaging.email.definitions.transactional.webinar.confirmation.payload.body',
+            'Changed body for {first_name}.',
+        );
+
+        $emailService = Mockery::mock(EmailMessagingService::class);
+        $emailService
+            ->shouldReceive('send')
+            ->once()
+            ->with(Mockery::on(
+                fn (EmailMessage $payload): bool =>
+                    $payload instanceof EmailPayload
+                    && $payload->to() === 'original@example.com'
+                    && $payload->subject() === 'Original subject for Jeff'
+                    && $payload->text() === 'Original body for Jeff.',
+            ))
+            ->andReturn(MessageSendResult::sent(provider: 'test_email'));
+
+        app()->instance(EmailMessagingService::class, $emailService);
+
+        $this->handleScheduledMessage($scheduledMessage);
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame(
+            ScheduledMessage::STATUS_SENT,
+            $scheduledMessage->status,
+        );
+        $this->assertSame(
+            'original@example.com',
+            $scheduledMessage->payload['to'],
+        );
+        $this->assertSame(
+            'Jeff',
+            $scheduledMessage->payload['tokens']['first_name'],
         );
     }
 

@@ -8,6 +8,10 @@ use RuntimeException;
 
 class PendingMessageDeliveryConsolidator
 {
+    public function __construct(
+        private readonly ScheduledMessagePayloadCanonicalizer $payloadCanonicalizer,
+    ) {}
+
     /**
      * @param array<string, mixed> $incomingAttributes
      */
@@ -95,6 +99,14 @@ class PendingMessageDeliveryConsolidator
                 $mergedMeta,
                 'delivery_consolidation',
                 $mergedConsolidation,
+            );
+
+            $mergedPayload = $this->payloadCanonicalizer->canonicalize(
+                payloadClass: (string) $locked->payload_class,
+                payload: $mergedPayload,
+                conditions: is_array($mergedMeta['conditions'] ?? null)
+                    ? $mergedMeta['conditions']
+                    : [],
             );
 
             $locked->forceFill([

@@ -31,7 +31,7 @@ class MessageRecipientPayloadResolver
     ): ?array {
         $channel = $this->normalizeChannel($channel);
 
-        $mergedPayload = $this->withRecipientTokens(
+        $mergedPayload = $this->withCanonicalTokens(
             payload: array_replace_recursive(
                 $definitionPayload,
                 $payload,
@@ -48,15 +48,7 @@ class MessageRecipientPayloadResolver
 
         return $this->sanitizeSendPayload(array_replace_recursive(
             $mergedPayload,
-            [
-                'to' => trim($destination),
-                'recipient_type' => $recipient->getMorphClass(),
-                'recipient_id' => $recipient->getKey(),
-                'channel' => $channel,
-                'purpose' => $purpose,
-                'scope' => $scope,
-                'message_type' => $messageType,
-            ],
+            ['to' => trim($destination)],
         ));
     }
 
@@ -75,10 +67,8 @@ class MessageRecipientPayloadResolver
         }
 
         return array_replace_recursive(
-            $conditionContext,
-            is_array($payload['runtime_context'] ?? null) ? $payload['runtime_context'] : [],
-            is_array($payload['context'] ?? null) ? $payload['context'] : [],
             is_array($payload['tokens'] ?? null) ? $payload['tokens'] : [],
+            $conditionContext,
         );
     }
 
@@ -97,27 +87,26 @@ class MessageRecipientPayloadResolver
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
-    private function withRecipientTokens(array $payload, Model $recipient): array
+    private function withCanonicalTokens(array $payload, Model $recipient): array
     {
-        $tokens = $this->recipientTokens($recipient);
+        $tokens = array_replace_recursive(
+            $this->recipientTokens($recipient),
+            is_array($payload['tokens'] ?? null)
+                ? $payload['tokens']
+                : [],
+        );
 
-        if ($tokens === []) {
-            return $payload;
+        unset($payload['tokens']);
+
+        if ($recipient instanceof Contact) {
+            $payload['contact_id'] = $recipient->getKey();
         }
 
-        return array_replace_recursive(
-            [
-                'contact_id' => $tokens['contact_id'] ?? null,
-                'contact' => $tokens['contact'] ?? [],
-                'first_name' => $tokens['first_name'] ?? '',
-                'last_name' => $tokens['last_name'] ?? '',
-                'name' => $tokens['name'] ?? '',
-                'email' => $tokens['email'] ?? '',
-                'phone' => $tokens['phone'] ?? '',
-                'tokens' => $tokens,
-            ],
-            $payload,
-        );
+        if ($tokens !== []) {
+            $payload['tokens'] = $tokens;
+        }
+
+        return $payload;
     }
 
     /**

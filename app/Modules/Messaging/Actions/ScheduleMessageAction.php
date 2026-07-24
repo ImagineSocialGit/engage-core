@@ -7,6 +7,7 @@ use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\PendingMessageDeliveryConsolidator;
+use App\Modules\Messaging\Services\ScheduledMessagePayloadCanonicalizer;
 use App\Support\Queues\QueueContract;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -16,6 +17,7 @@ class ScheduleMessageAction
     public function __construct(
         private readonly PendingMessageDeliveryConsolidator $pendingMessageDeliveryConsolidator,
         private readonly QueueContract $queueContract,
+        private readonly ScheduledMessagePayloadCanonicalizer $payloadCanonicalizer,
     ) {}
 
     public function handle(
@@ -58,6 +60,17 @@ class ScheduleMessageAction
         );
         $dispatchKeys = $this->normalizeDispatchKeys(
             $meta['dispatch_keys'] ?? [],
+        );
+        $payload = $this->payloadCanonicalizer->forPersistence(
+            payloadClass: $payloadClass,
+            payload: $payload,
+            channel: $channel,
+            purpose: $purpose,
+            scope: $scope,
+            messageType: $messageType,
+            conditions: is_array($meta['conditions'] ?? null)
+                ? $meta['conditions']
+                : [],
         );
 
         $attributes = [

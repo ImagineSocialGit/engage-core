@@ -582,6 +582,7 @@
 │   │   │   │   ├── ScheduledMessageDeliveryPolicy.php
 │   │   │   │   ├── ScheduledMessageEventOutbox.php
 │   │   │   │   ├── ScheduledMessageGate.php
+│   │   │   │   ├── ScheduledMessagePayloadCanonicalizer.php
 │   │   │   │   └── Sms
 │   │   │   │       ├── SmsMessagingService.php
 │   │   │   │       ├── SmsProviderManager.php
@@ -1687,6 +1688,7 @@
 │   │   │   ├── ScheduledMessageDeliveryLeaseTest.php
 │   │   │   ├── ScheduledMessageEventOutboxTest.php
 │   │   │   ├── ScheduledMessageFlowRoutesBoundaryTest.php
+│   │   │   ├── ScheduledMessagePayloadCanonicalizerTest.php
 │   │   │   ├── ScheduleInternalNotificationActionTest.php
 │   │   │   ├── ScheduleMessageTimeNormalizationTest.php
 │   │   │   ├── SemanticCampaignVariantIdentityResolutionTest.php
@@ -1818,4 +1820,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-498 directories, 1321 files
+498 directories, 1323 files

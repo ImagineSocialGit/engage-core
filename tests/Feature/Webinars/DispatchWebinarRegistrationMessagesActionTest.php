@@ -138,6 +138,8 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
 
         $this->assertSame(4, ScheduledMessage::query()->count());
 
+        $this->assertCompactScheduledPayloads();
+
         Queue::assertPushed(SendScheduledMessageJob::class, 4);
     }
 
@@ -221,8 +223,16 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
                 'payload_class' => EmailPayload::class,
                 'queue' => 'confirmation_messages',
                 'payload' => [
-                    'subject' => 'Registered',
-                    'body' => 'You are registered.',
+                    'subject' => 'You are registered for {webinar.title}',
+                    'body' => 'Hi {first_name}, your webinar starts {webinar_start_datetime}. {cta}',
+                    'cta' => [
+                        'label' => 'Join webinar',
+                        'url' => '{webinar_join_url}',
+                    ],
+                    'secondary_link' => [
+                        'label' => 'Cancel registration',
+                        'url' => '{cancel_registration_url}',
+                    ],
                 ],
             ],
 
@@ -232,8 +242,12 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
                 'payload_class' => EmailPayload::class,
                 'queue' => 'reminders',
                 'payload' => [
-                    'subject' => 'Reminder',
-                    'body' => 'Starts soon.',
+                    'subject' => '{webinar.title} starts soon',
+                    'body' => 'Hi {first_name}, join at {webinar_start_datetime}. {cta}',
+                    'cta' => [
+                        'label' => 'Join webinar',
+                        'url' => '{webinar_join_url}',
+                    ],
                 ],
             ],
         ]);
@@ -245,7 +259,7 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
                 'payload_class' => SmsPayload::class,
                 'queue' => 'confirmation_messages',
                 'payload' => [
-                    'message' => 'You are registered.',
+                    'message' => 'Hi {first_name}, you are registered for {webinar.title} at {webinar_start_datetime}. Join: {webinar_join_url}',
                 ],
             ],
 
@@ -255,7 +269,7 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
                 'payload_class' => SmsPayload::class,
                 'queue' => 'reminders',
                 'payload' => [
-                    'message' => 'Starts soon.',
+                    'message' => 'Hi {first_name}, {webinar.title} starts at {webinar_start_datetime}. Join: {webinar_join_url}',
                 ],
             ],
         ]);
@@ -319,6 +333,8 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
     private function contactWithTransactionalConsent(array $channels): Contact
     {
         $contact = Contact::factory()->create([
+            'first_name' => 'Jeff',
+            'last_name' => 'Yarnall',
             'email' => 'jeff@example.com',
             'phone' => '+15555550123',
         ]);
@@ -404,6 +420,58 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
     {
         Config::set('messaging.channel_availability.sms.surfaces.webinar_registrations', true);
     }
+
+    private function assertCompactScheduledPayloads(): void
+    {
+        foreach (ScheduledMessage::query()->get() as $message) {
+            $payload = $message->payload;
+            $encoded = json_encode(
+                $payload,
+                JSON_THROW_ON_ERROR
+                    | JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE,
+            );
+
+            $this->assertLessThanOrEqual(
+                $message->channel === MessageChannel::Email->value
+                    ? 2500
+                    : 1400,
+                strlen($encoded),
+            );
+
+            foreach ([
+                'context',
+                'runtime_context',
+                'contact',
+                'webinar',
+                'webinar_series',
+                'webinar_registration',
+                'recipient_type',
+                'recipient_id',
+                'channel',
+                'purpose',
+                'scope',
+                'message_type',
+            ] as $forbiddenKey) {
+                $this->assertArrayNotHasKey($forbiddenKey, $payload);
+            }
+
+            $this->assertArrayNotHasKey(
+                'contact',
+                $payload['tokens'] ?? [],
+            );
+            $this->assertArrayNotHasKey(
+                'webinar_series',
+                $payload['tokens'] ?? [],
+            );
+            $this->assertArrayNotHasKey(
+                'webinar_registration',
+                $payload['tokens'] ?? [],
+            );
+            $this->assertEqualsCanonicalizing(
+                ['title'],
+                array_keys($payload['tokens']['webinar'] ?? []),
+            );
+        }
+    }
 }
-
-

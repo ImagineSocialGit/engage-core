@@ -132,7 +132,7 @@ class SendMessageAutomationActionHandler implements AutomationActionHandler
         }
 
         return array_replace_recursive($definition->payload, [
-            'runtime_context' => $context->runtimeContext,
+            'tokens' => $context->runtimeContext,
         ]);
     }
 

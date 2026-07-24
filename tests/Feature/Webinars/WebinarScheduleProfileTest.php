@@ -163,11 +163,28 @@ class WebinarScheduleProfileTest extends TestCase
 
         $this->assertTrue($confirmation->send_at->equalTo(now()->addMinutes(2)));
         $this->assertSame('fast', data_get($confirmation->meta, 'webinar_schedule_profile.key'));
-        $this->assertArrayHasKey('webinar', $confirmation->payload['tokens']);
-        $this->assertArrayHasKey('webinar_series', $confirmation->payload['tokens']);
-        $this->assertArrayNotHasKey('items', $confirmation->payload['tokens']['webinar_series']);
-        $this->assertArrayNotHasKey('webinar_schedule_profile', $confirmation->payload['tokens']['webinar_series']);
-        $this->assertArrayNotHasKey('webinar_schedule_profile', $confirmation->payload['context']['webinar_series']);
+        $this->assertSame(
+            $webinar->title,
+            data_get($confirmation->payload, 'tokens.webinar.title'),
+        );
+        $this->assertSame(
+            $series->title,
+            data_get($confirmation->payload, 'tokens.webinar_series.title'),
+        );
+        $this->assertEqualsCanonicalizing(
+            ['webinar', 'webinar_series'],
+            array_keys($confirmation->payload['tokens']),
+        );
+        $this->assertEqualsCanonicalizing(
+            ['title'],
+            array_keys($confirmation->payload['tokens']['webinar']),
+        );
+        $this->assertEqualsCanonicalizing(
+            ['title'],
+            array_keys($confirmation->payload['tokens']['webinar_series']),
+        );
+        $this->assertArrayNotHasKey('context', $confirmation->payload);
+        $this->assertArrayNotHasKey('runtime_context', $confirmation->payload);
         $this->assertDatabaseMissing('scheduled_messages', ['message_type' => 'reminder']);
         Queue::assertPushed(SendScheduledMessageJob::class, 1);
     }
@@ -204,7 +221,7 @@ class WebinarScheduleProfileTest extends TestCase
                 'queue' => 'confirmation_messages',
                 'payload' => [
                     'subject' => 'Registered',
-                    'body' => 'Registered.',
+                    'body' => 'Registered for {webinar.title} in {webinar_series.title}.',
                 ],
             ],
             'reminder' => [
@@ -265,5 +282,3 @@ class WebinarScheduleProfileTest extends TestCase
         parent::tearDown();
     }
 }
-
-

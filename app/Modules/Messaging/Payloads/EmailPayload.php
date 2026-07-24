@@ -395,11 +395,9 @@ class EmailPayload implements EmailMessage
 
     private static function resolveTokens(array $payload): array
     {
-        return array_replace_recursive(
-            is_array($payload['runtime_context'] ?? null) ? $payload['runtime_context'] : [],
-            is_array($payload['context'] ?? null) ? $payload['context'] : [],
-            is_array($payload['tokens'] ?? null) ? $payload['tokens'] : [],
-        );
+        return is_array($payload['tokens'] ?? null)
+            ? $payload['tokens']
+            : [];
     }
 
     private static function isStringableValue(mixed $value): bool

@@ -118,7 +118,7 @@ class SmsPayloadTest extends TestCase
         );
     }
 
-    public function test_it_merges_runtime_context_context_and_tokens(): void
+    public function test_it_reads_only_canonical_tokens(): void
     {
         $payload = SmsPayload::fromArray([
             'phone' => '+15555555555',
@@ -143,6 +143,7 @@ class SmsPayloadTest extends TestCase
             'Tokens',
             $payload->tokens['first_name']
         );
+        $this->assertCount(1, $payload->tokens);
     }
 
     public function test_it_supports_brand_prefix(): void
