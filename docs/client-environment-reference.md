@@ -115,7 +115,7 @@ client/[CLIENT_KEY]/config/modules.php
     -> enabled module providers and runtime availability
 ```
 
-Preset packages may still declare `modules.enabled`, but that list is a package requirement contract: every declared module must be runtime-enabled for the selected package to be valid. It is not a second runtime module source of truth.
+Preset packages do not declare module availability or module requirements. They select contributed definition groups only. Runtime module authority belongs exclusively to the selected client's `config/modules.php`.
 
 Core keeps a generic default enabled-module list for the no-client/default application state and test fallback. A selected client's `config/modules.php` replaces that list.
 

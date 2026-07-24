@@ -30,70 +30,8 @@ class ModuleDependenciesSetupValidationContributorTest extends TestCase
         $this->assertContains('app.modules.dependency_cycle', $codes);
     }
 
-    public function test_it_reports_selected_preset_required_module_unavailable(): void
+    public function test_dependency_loaded_modules_are_available_from_runtime_module_configuration(): void
     {
-        Config::set('client.preset', 'module_validation_test');
-        Config::set('modules.enabled', ['core']);
-        Config::set('modules.modules', [
-            'core' => [
-                'always_on' => true,
-                'depends_on' => [],
-                'providers' => [self::class],
-            ],
-            'tasks' => [
-                'depends_on' => ['core'],
-                'providers' => [self::class],
-            ],
-        ]);
-
-        Config::set('presets.packages.module_validation_test', [
-            'modules' => [
-                'enabled' => ['tasks'],
-            ],
-            'groups' => [],
-        ]);
-
-        $this->assertContains(
-            'app.modules.preset_required_module_unavailable',
-            array_column($this->findings(), 'code'),
-        );
-    }
-
-    public function test_it_uses_shared_preset_key_resolution_when_client_and_default_are_missing(): void
-    {
-        Config::set('client.preset', null);
-        Config::set('presets.default_package', null);
-        Config::set('modules.enabled', ['core']);
-        Config::set('modules.modules', [
-            'core' => [
-                'always_on' => true,
-                'depends_on' => [],
-                'providers' => [self::class],
-            ],
-            'tasks' => [
-                'depends_on' => ['core'],
-                'providers' => [self::class],
-            ],
-        ]);
-
-        Config::set('presets.packages', [
-            'first_package' => [
-                'modules' => [
-                    'enabled' => ['tasks'],
-                ],
-                'groups' => [],
-            ],
-        ]);
-
-        $this->assertContains(
-            'app.modules.preset_required_module_unavailable',
-            array_column($this->findings(), 'code'),
-        );
-    }
-
-    public function test_dependency_loaded_module_satisfies_selected_preset_requirement_without_being_explicitly_enabled(): void
-    {
-        Config::set('client.preset', 'dependency_loaded_validation_test');
         Config::set('modules.enabled', ['flow_routes']);
         Config::set('modules.modules', [
             'core' => [
@@ -111,17 +49,11 @@ class ModuleDependenciesSetupValidationContributorTest extends TestCase
             ],
         ]);
 
-        Config::set('presets.packages.dependency_loaded_validation_test', [
-            'modules' => [
-                'enabled' => ['workflow'],
-            ],
-            'groups' => [],
-        ]);
+        $codes = array_column($this->findings(), 'code');
 
-        $this->assertNotContains(
-            'app.modules.preset_required_module_unavailable',
-            array_column($this->findings(), 'code'),
-        );
+        $this->assertNotContains('app.modules.enabled_unknown', $codes);
+        $this->assertNotContains('app.modules.provider_missing', $codes);
+        $this->assertNotContains('app.modules.provider_class_missing', $codes);
     }
 
     public function test_providerless_available_module_does_not_report_missing_provider_when_explicitly_allowed(): void

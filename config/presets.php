@@ -11,7 +11,8 @@ return [
     | Rich vertical/client packages belong in client config.
     |
     | Runtime systems read DB-owned definitions. Preset packages select starter
-    | definitions that are materialized by preset sync.
+    | definitions that are materialized by preset sync. Runtime module
+    | availability belongs exclusively to config('modules.enabled').
     |
     */
 
@@ -20,13 +21,6 @@ return [
     'packages' => [
 
         'basic' => [
-            'modules' => [
-                'enabled' => [
-                    'tasks',
-                    'workflow',
-                ],
-            ],
-
             'contacts' => [
                 'labels' => [
                     'singular' => 'contact',
@@ -51,17 +45,6 @@ return [
         ],
 
         'messaging' => [
-            'modules' => [
-                'enabled' => [
-                    'tasks',
-                    'workflow',
-                    'messaging',
-                    'inbound_messaging',
-                    'internal_notifications',
-                    'broadcasts',
-                ],
-            ],
-
             'contacts' => [
                 'labels' => [
                     'singular' => 'contact',
@@ -86,18 +69,6 @@ return [
         ],
 
         'automated_messaging' => [
-            'modules' => [
-                'enabled' => [
-                    'tasks',
-                    'workflow',
-                    'flow_routes',
-                    'messaging',
-                    'inbound_messaging',
-                    'internal_notifications',
-                    'broadcasts',
-                ],
-            ],
-
             'contacts' => [
                 'labels' => [
                     'singular' => 'contact',

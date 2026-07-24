@@ -111,6 +111,18 @@ class ConfigContractRegistryTest extends TestCase
             'invented_behavior' => true,
         ], 'modules.modules.tasks');
 
+        $packageViolations = $registry->get('app.preset_package')->schema()->validate([
+            'modules' => [
+                'enabled' => ['tasks'],
+            ],
+            'groups' => [
+                'contact_statuses' => ['default'],
+                'tasks' => ['default'],
+                'campaigns' => [],
+                'flow_routes' => [],
+            ],
+        ], 'presets.packages.basic');
+
         $taskViolations = $registry->get('tasks.preset_definition')->schema()->validate([
             'title' => 'Follow up',
             'responsible_party' => 'somebody_else',
@@ -122,6 +134,7 @@ class ConfigContractRegistryTest extends TestCase
         ], 'presets.modules.tasks.tasks.definitions.follow_up');
 
         $this->assertContains('unknown_field', $this->codes($moduleViolations));
+        $this->assertContains('unknown_field', $this->codes($packageViolations));
         $this->assertSame([
             'value_not_allowed',
             'value_not_allowed',

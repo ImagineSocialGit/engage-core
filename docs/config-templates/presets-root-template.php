@@ -22,6 +22,9 @@ return [
     | Do not add vertical-rich packages to Core merely to silence a missing-package
     | setup-validation error.
     |
+    | Preset packages never declare or override runtime module availability.
+    | The selected client's `config/modules.php` is the sole module authority.
+    |
     | Global preset sync remains dependency-safe across the actual synced domains
     | and supporting catalogs:
     |
@@ -65,7 +68,7 @@ return [
     |     -> all available contributed groups/definitions by domain
     |
     | PresetPackageResolver
-    |     -> selected package, selected groups, and package module composition/requirements
+    |     -> selected package and selected groups
     |
     | PresetCompositionResolver
     |     -> ResolvedPresetDomain for one selected package/domain
@@ -111,29 +114,10 @@ return [
     |
     */
 
-    /*
-    |--------------------------------------------------------------------------
-    | Package module requirements
-    |--------------------------------------------------------------------------
-    |
-    | packages.*.modules.enabled declares modules that must be runtime-enabled
-    | for that package to be valid. It is not the runtime module source of truth.
-    |
-    | Runtime module authority belongs to config('modules.enabled'), normally
-    | supplied by client/{client-key}/config/modules.php.
-    |
-    */
-
     'packages' => [
         'basic' => [
             'name' => 'Basic',
-            'description' => 'Core CRM, Tasks, and Workflow.',
-            'modules' => [
-                'enabled' => [
-                    'tasks',
-                    'workflow',
-                ],
-            ],
+            'description' => 'Generic contact and task starter definitions.',
             'groups' => [
                 'contact_statuses' => [
                     'default',
@@ -148,17 +132,7 @@ return [
 
         'messaging' => [
             'name' => 'Messaging',
-            'description' => 'Basic plus Messaging, Inbound Messaging, Internal Notifications, and Broadcasts.',
-            'modules' => [
-                'enabled' => [
-                    'tasks',
-                    'workflow',
-                    'messaging',
-                    'inbound_messaging',
-                    'internal_notifications',
-                    'broadcasts',
-                ],
-            ],
+            'description' => 'Compatibility package key using the generic starter definitions.',
             'groups' => [
                 'contact_statuses' => [
                     'default',
@@ -173,18 +147,7 @@ return [
 
         'automated_messaging' => [
             'name' => 'Automated Messaging',
-            'description' => 'Messaging plus FlowRoutes. Campaigns remain opt-in.',
-            'modules' => [
-                'enabled' => [
-                    'tasks',
-                    'workflow',
-                    'messaging',
-                    'inbound_messaging',
-                    'internal_notifications',
-                    'broadcasts',
-                    'flow_routes',
-                ],
-            ],
+            'description' => 'Compatibility package key using the generic starter definitions.',
             'groups' => [
                 'contact_statuses' => [
                     'default',

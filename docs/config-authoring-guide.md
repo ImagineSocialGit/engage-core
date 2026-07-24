@@ -1,4 +1,3 @@
-
 # Engage Core Config Authoring Guide
 
 This guide is for creating or reviewing Engage Core default configs and client-specific configs.
@@ -782,7 +781,6 @@ PresetContributionRegistry
 PresetPackageResolver
     package selection
     selected groups
-    package module composition/requirements
 
 PresetCompositionResolver
     selected normalized definitions for one package/domain
@@ -803,6 +801,7 @@ preset contribution availability
 
 client package selection
     selected groups determine what is installed/synced
+    packages do not declare or override runtime modules
 
 runtime activation/binding
     DB-owned selections decide what actually runs

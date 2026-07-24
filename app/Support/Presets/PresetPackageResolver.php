@@ -2,16 +2,11 @@
 
 namespace App\Support\Presets;
 
-use App\Support\Modules\ModuleManager;
 use App\Support\Presets\Enums\PresetDomain;
 use InvalidArgumentException;
 
 final class PresetPackageResolver
 {
-    public function __construct(
-        private readonly ModuleManager $moduleManager,
-    ) {}
-
     public function resolvePresetKey(?string $presetKey = null): ?string
     {
         foreach ([
@@ -64,43 +59,6 @@ final class PresetPackageResolver
         }
 
         return $this->normalizeStringList($groups);
-    }
-
-    /**
-     * Effective package modules plus client add/remove overrides.
-     *
-     * This describes preset-package composition. It is not the runtime module
-     * source of truth; runtime availability belongs to ModuleManager.
-     *
-     * @return array<int, string>
-     */
-    public function effectiveModules(string $presetKey): array
-    {
-        $package = $this->package($presetKey);
-
-        $packageModules = $this->normalizeStringList(
-            data_get($package, 'modules.enabled', [])
-        );
-
-        $addedModules = $this->normalizeStringList(
-            config('client.modules.add', [])
-        );
-
-        $removedModules = $this->normalizeStringList(
-            config('client.modules.remove', [])
-        );
-
-        $modules = array_values(array_unique([
-            ...array_keys(array_filter(
-                $this->moduleManager->definitions(),
-                fn (mixed $definition): bool => is_array($definition)
-                    && (bool) ($definition['always_on'] ?? false),
-            )),
-            ...$packageModules,
-            ...$addedModules,
-        ]));
-
-        return array_values(array_diff($modules, $removedModules));
     }
 
     /**

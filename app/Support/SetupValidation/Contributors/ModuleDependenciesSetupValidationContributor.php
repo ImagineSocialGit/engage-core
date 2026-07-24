@@ -3,10 +3,8 @@
 namespace App\Support\SetupValidation\Contributors;
 
 use App\Support\Modules\ModuleManager;
-use App\Support\Presets\PresetPackageResolver;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
-use Throwable;
 
 class ModuleDependenciesSetupValidationContributor implements SetupValidationContributor
 {
@@ -15,7 +13,6 @@ class ModuleDependenciesSetupValidationContributor implements SetupValidationCon
 
     public function __construct(
         private readonly ModuleManager $moduleManager,
-        private readonly PresetPackageResolver $packageResolver,
     ) {}
 
     public function findings(): iterable
@@ -167,83 +164,6 @@ class ModuleDependenciesSetupValidationContributor implements SetupValidationCon
                     context: [
                         'module_key' => $moduleKey,
                         'provider' => $provider,
-                    ],
-                );
-            }
-        }
-
-        yield from $this->validateSelectedPresetModuleRequirements();
-    }
-
-    /**
-     * @return iterable<int, SetupValidationFinding>
-     */
-    private function validateSelectedPresetModuleRequirements(): iterable
-    {
-        $presetKey = $this->packageResolver->resolvePresetKey();
-
-        if ($presetKey === null) {
-            return;
-        }
-
-        try {
-            $package = $this->packageResolver->package($presetKey);
-        } catch (Throwable) {
-            return;
-        }
-
-        $required = data_get($package, 'modules.enabled', []);
-
-        if (! is_array($required)) {
-            yield $this->error(
-                code: 'app.modules.preset_requirements_invalid',
-                message: "Selected preset package [{$presetKey}] modules.enabled must be an array.",
-                path: "presets.packages.{$presetKey}.modules.enabled",
-                context: ['preset_key' => $presetKey],
-            );
-
-            return;
-        }
-
-        $runtimeEnabled = $this->moduleManager->enabledKeysWithDependencies();
-
-        foreach ($required as $index => $moduleKey) {
-            if (! is_string($moduleKey) || trim($moduleKey) === '') {
-                yield $this->error(
-                    code: 'app.modules.preset_required_key_invalid',
-                    message: "Selected preset package [{$presetKey}] contains an invalid required module key.",
-                    path: "presets.packages.{$presetKey}.modules.enabled.{$index}",
-                    context: ['preset_key' => $presetKey],
-                );
-
-                continue;
-            }
-
-            $moduleKey = trim($moduleKey);
-
-            if (! $this->moduleManager->known($moduleKey)) {
-                yield $this->error(
-                    code: 'app.modules.preset_required_module_unknown',
-                    message: "Selected preset package [{$presetKey}] requires unknown module [{$moduleKey}].",
-                    path: "presets.packages.{$presetKey}.modules.enabled.{$index}",
-                    context: [
-                        'preset_key' => $presetKey,
-                        'module_key' => $moduleKey,
-                    ],
-                );
-
-                continue;
-            }
-
-            if (! in_array($moduleKey, $runtimeEnabled, true)) {
-                yield $this->error(
-                    code: 'app.modules.preset_required_module_unavailable',
-                    message: "Selected preset package [{$presetKey}] requires module [{$moduleKey}], but it is not runtime-enabled.",
-                    path: "presets.packages.{$presetKey}.modules.enabled.{$index}",
-                    context: [
-                        'preset_key' => $presetKey,
-                        'module_key' => $moduleKey,
-                        'runtime_enabled_modules' => $runtimeEnabled,
                     ],
                 );
             }

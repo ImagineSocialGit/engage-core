@@ -29,9 +29,6 @@ class PresetPackageConfigContract implements ConfigContract
         return ConfigSchema::object([
             'name' => ConfigField::optional(ConfigSchema::string()),
             'description' => ConfigField::optional(ConfigSchema::string()),
-            'modules' => ConfigField::required(ConfigSchema::object([
-                'enabled' => ConfigField::required($stringList, referenceTarget: 'app.module_definition'),
-            ])),
             'contacts' => ConfigField::optional(ConfigSchema::object([
                 'labels' => ConfigField::optional(ConfigSchema::object([
                     'singular' => ConfigField::required(ConfigSchema::string()),
@@ -57,9 +54,6 @@ class PresetPackageConfigContract implements ConfigContract
     {
         return [
             'name' => 'Basic',
-            'modules' => [
-                'enabled' => ['tasks', 'workflow'],
-            ],
             'groups' => [
                 'contact_statuses' => ['default'],
                 'tasks' => ['default'],

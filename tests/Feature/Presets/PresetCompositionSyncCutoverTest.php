@@ -45,6 +45,27 @@ class PresetCompositionSyncCutoverTest extends TestCase
         $this->assertSame(0, $flowRouteResult->created['flow_routes'] ?? 0);
     }
 
+    public function test_global_sync_uses_runtime_module_configuration_independently_of_package_selection(): void
+    {
+        config()->set('modules.enabled', []);
+        config()->set('presets.packages.runtime_module_test', [
+            'groups' => [
+                'contact_statuses' => [],
+                'tasks' => [],
+                'campaigns' => [],
+                'flow_routes' => [],
+            ],
+        ]);
+
+        $this->artisan('presets:sync', ['preset' => 'runtime_module_test'])
+            ->expectsOutputToContain('Runtime modules: dashboard, core')
+            ->expectsOutputToContain('Task templates: module disabled or no groups configured; skipped.')
+            ->expectsOutputToContain('Messaging template presets: module disabled; skipped.')
+            ->expectsOutputToContain('Campaigns: module disabled or no groups configured; skipped.')
+            ->expectsOutputToContain('FlowRoute capabilities: module disabled; skipped.')
+            ->assertExitCode(0);
+    }
+
     public function test_missing_preset_reports_available_packages_and_missing_client_preset_config(): void
     {
         $clientRoot = storage_path('framework/testing/preset-diagnostics/missing-client-config');

@@ -14,7 +14,6 @@ use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
 use App\Modules\Webinars\Support\WebinarRegisterPageConfig;
 use App\Support\ConfigContracts\ConfigContractRegistry;
-use App\Support\Presets\PresetPackageResolver;
 use App\Support\SetupValidation\SetupValidationManager;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -79,26 +78,7 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
             'campaigns' => ['webinar_default'],
         ], $package['groups'] ?? null);
 
-        $this->assertSame([
-            'tasks',
-            'workflow',
-            'flow_routes',
-            'messaging',
-            'inbound_messaging',
-            'internal_notifications',
-            'campaigns',
-            'broadcasts',
-            'webinars',
-            'integrations',
-            'reporting',
-            'mortgage',
-        ], $package['modules']['enabled'] ?? null);
-
-        $this->assertSame([
-            'dashboard',
-            'core',
-            ...$package['modules']['enabled'],
-        ], app(PresetPackageResolver::class)->effectiveModules('mortgage'));
+        $this->assertArrayNotHasKey('modules', $package);
 
         $attendedSteps = config(
             'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps'

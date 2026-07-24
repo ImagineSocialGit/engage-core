@@ -9,6 +9,7 @@ use App\Modules\FlowRoutes\Actions\SyncFlowRoutePresetsAction;
 use App\Modules\Messaging\Actions\SyncMessageTemplatePresetsAction;
 use App\Modules\Tasks\Actions\SyncTaskPresetsAction;
 use App\Modules\Webinars\Actions\SyncWebinarScheduleProfilesAction;
+use App\Support\Modules\ModuleManager;
 use App\Support\Presets\Enums\PresetDomain;
 use App\Support\Presets\PresetCompositionResolver;
 use App\Support\Presets\PresetPackageResolver;
@@ -37,6 +38,7 @@ class SyncPresetsCommand extends Command
         SyncFlowRoutePresetsAction $syncFlowRoutePresets,
         PresetCompositionResolver $compositionResolver,
         PresetPackageResolver $packageResolver,
+        ModuleManager $moduleManager,
     ): int {
         $argumentPreset = $this->argument('preset');
         $presetKey = $packageResolver->resolvePresetKey(
@@ -50,7 +52,8 @@ class SyncPresetsCommand extends Command
         }
 
         try {
-            $enabledModules = $packageResolver->effectiveModules($presetKey);
+            $packageResolver->package($presetKey);
+            $runtimeModules = $moduleManager->enabledKeysWithDependencies();
         } catch (Throwable $exception) {
             $this->renderPresetResolutionFailure(
                 presetKey: $presetKey,
@@ -61,7 +64,7 @@ class SyncPresetsCommand extends Command
         }
 
         $this->info("Syncing preset package [{$presetKey}]...");
-        $this->line('Enabled modules: '.implode(', ', $enabledModules));
+        $this->line('Runtime modules: '.implode(', ', $runtimeModules));
 
         try {
             if ($this->hasConfiguredGroups($packageResolver, $presetKey, PresetDomain::ContactStatuses)) {
@@ -81,7 +84,7 @@ class SyncPresetsCommand extends Command
                 presetKey: $presetKey,
                 domain: PresetDomain::Tasks,
                 module: 'tasks',
-                enabledModules: $enabledModules,
+                runtimeModules: $runtimeModules,
             )) {
                 $this->renderTaskResult(
                     $syncTaskPresets->handle(
@@ -94,7 +97,7 @@ class SyncPresetsCommand extends Command
                 $this->warn('Task templates: module disabled or no groups configured; skipped.');
             }
 
-            if (in_array('messaging', $enabledModules, true)) {
+            if (in_array('messaging', $runtimeModules, true)) {
                 $this->renderMessageTemplateResult(
                     $syncMessageTemplatePresets->handle(
                         force: (bool) $this->option('force-message-templates'),
@@ -105,7 +108,7 @@ class SyncPresetsCommand extends Command
                 $this->warn('Messaging template presets: module disabled; skipped.');
             }
 
-            if (in_array('webinars', $enabledModules, true)) {
+            if (in_array('webinars', $runtimeModules, true)) {
                 $this->renderWebinarScheduleProfileResult(
                     $syncWebinarScheduleProfiles->handle(
                         force: (bool) $this->option('force-webinar-schedule-profiles'),
@@ -121,7 +124,7 @@ class SyncPresetsCommand extends Command
                 presetKey: $presetKey,
                 domain: PresetDomain::Campaigns,
                 module: 'campaigns',
-                enabledModules: $enabledModules,
+                runtimeModules: $runtimeModules,
             )) {
                 $this->renderCampaignResult(
                     $syncCampaignPresets->handle(
@@ -133,7 +136,7 @@ class SyncPresetsCommand extends Command
                 $this->warn('Campaigns: module disabled or no groups configured; skipped.');
             }
 
-            if (in_array('flow_routes', $enabledModules, true)) {
+            if (in_array('flow_routes', $runtimeModules, true)) {
                 $this->renderFlowRouteCapabilityResult(
                     $syncFlowRouteCapabilities->handle(),
                 );
@@ -147,7 +150,7 @@ class SyncPresetsCommand extends Command
                 presetKey: $presetKey,
                 domain: PresetDomain::FlowRoutes,
                 module: 'flow_routes',
-                enabledModules: $enabledModules,
+                runtimeModules: $runtimeModules,
             )) {
                 $this->renderFlowRouteResult(
                     $syncFlowRoutePresets->handle(
@@ -172,16 +175,16 @@ class SyncPresetsCommand extends Command
     }
 
     /**
-     * @param array<int, string> $enabledModules
+     * @param array<int, string> $runtimeModules
      */
     private function shouldSyncDomain(
         PresetPackageResolver $packageResolver,
         string $presetKey,
         PresetDomain $domain,
         string $module,
-        array $enabledModules,
+        array $runtimeModules,
     ): bool {
-        return in_array($module, $enabledModules, true)
+        return in_array($module, $runtimeModules, true)
             && $this->hasConfiguredGroups($packageResolver, $presetKey, $domain);
     }
 

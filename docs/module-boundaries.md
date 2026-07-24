@@ -1,4 +1,3 @@
-
 # Engage Core Module Boundaries
 
 ## Executable config and token contract ownership
@@ -341,7 +340,7 @@ PresetContributionRegistry
     aggregates explicitly registered contributor groups/definitions by preset domain
 
 PresetPackageResolver
-    resolves selected package, selected groups, and package module composition/requirements
+    resolves selected package and selected groups
 
 PresetCompositionResolver
     produces ResolvedPresetDomain for one selected package/domain
@@ -351,6 +350,8 @@ Domain sync actions
 ```
 
 Keep separate:
+
+Preset packages never declare or override runtime module availability. The selected client's `config/modules.php` is the sole authority.
 
 ```text
 module availability

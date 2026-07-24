@@ -250,7 +250,7 @@ class PresetCompositionSetupValidationContributor implements SetupValidationCont
             }
         }
 
-        $effectiveModules = $this->presetPackageResolver->effectiveModules($presetKey);
+        $runtimeModules = $this->moduleManager->enabledKeysWithDependencies();
         $reportedDisabledContributors = [];
 
         foreach ($selectedGroups as $groupIndex => $groupKey) {
@@ -299,7 +299,7 @@ class PresetCompositionSetupValidationContributor implements SetupValidationCont
 
             if (
                 $this->moduleManager->known($contributor)
-                && ! in_array($contributor, $effectiveModules, true)
+                && ! in_array($contributor, $runtimeModules, true)
                 && ! isset($reportedDisabledContributors[$contributor])
             ) {
                 $reportedDisabledContributors[$contributor] = true;

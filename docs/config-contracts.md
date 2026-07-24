@@ -32,7 +32,7 @@ app/Modules/{Owner}/TokenContracts
 | Key | Owner | Purpose |
 | --- | --- | --- |
 | `app.module_definition` | App/module infrastructure | Module registration and dependencies |
-| `app.preset_package` | Shared Presets infrastructure | Package module/group selection |
+| `app.preset_package` | Shared Presets infrastructure | Package metadata and definition-group selection |
 | `core.contact_status_definition` | Core | ContactStatus preset definitions |
 | `tasks.preset_definition` | Tasks | Task-template preset definitions |
 | `messaging.email_definition` | Messaging | Reusable email definitions |

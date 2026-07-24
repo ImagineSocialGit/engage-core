@@ -126,10 +126,9 @@ class PresetCompositionSetupValidationContributorTest extends TestCase
             'providers' => [],
         ]);
 
+        Config::set('modules.enabled', ['tasks']);
+
         $this->package([
-            'modules' => [
-                'enabled' => ['tasks'],
-            ],
             'groups' => [
                 'tasks' => ['webinar_default'],
             ],
@@ -162,9 +161,6 @@ class PresetCompositionSetupValidationContributorTest extends TestCase
         Config::set('client.preset', null);
         Config::set('presets.default_package', 'test');
         Config::set('presets.packages.test', array_replace_recursive([
-            'modules' => [
-                'enabled' => [],
-            ],
             'groups' => [
                 'contact_statuses' => [],
                 'tasks' => [],
@@ -201,7 +197,7 @@ class PresetCompositionSetupValidationContributorTest extends TestCase
 
         $contributor = new PresetCompositionSetupValidationContributor(
             presetContributionRegistry: $registry,
-            presetPackageResolver: new PresetPackageResolver($moduleManager),
+            presetPackageResolver: new PresetPackageResolver(),
             moduleManager: $moduleManager,
         );
 
