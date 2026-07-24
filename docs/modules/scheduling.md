@@ -317,6 +317,7 @@ location_reference_type / location_reference_id
 primary_attendee_type / primary_attendee_id
 source_context_type / source_context_id
 rescheduled_from_id
+idempotency_key
 status
 title
 description
@@ -651,6 +652,29 @@ Services with `requires_confirmation = false` create a `scheduled` Appointment, 
 
 Conversion copies the held start/end interval plus current service-owned host identity, location snapshot, and operational timezone from authoritative Scheduling records. Caller-provided service, host, time, capacity, or location values are never authoritative conversion inputs.
 
+### Non-hold appointment creation
+
+`AppointmentCreationData` and `CreateAppointmentAction` provide the authoritative path for CRM, imports, provider adapters, FlowRoutes, and other trusted callers that need to create an Appointment without first creating a public booking hold.
+
+The caller supplies:
+
+```text
+persisted BookableService
+optional explicit SchedulingHost
+starts_at
+AppointmentBookingData
+idempotency_key
+AppointmentLifecycleContext
+```
+
+The action reloads and locks the service, then requires an explicit active host assignment whenever the service has any assignment rows. A service with no assignment rows may be created unhosted. Host selection is never silently delegated to the public surface's deterministic first-slot behavior.
+
+The server derives the end time from the current service duration and revalidates the exact slot through the executable availability engine. It locks the selected service, explicit host and assignment, relevant blocking Appointments, and active BookingHolds before creation. This preserves service capacity, assignment capacity, availability-window capacity, buffers, minimum notice, booking horizon, and host capacity shared across different services.
+
+Direct creation snapshots the current service location and timezone, creates one primary attendee snapshot, applies the same `requires_confirmation` policy as hold conversion, and records the initial lifecycle plus neutral automation event in the same transaction.
+
+`appointments.idempotency_key` is nullable and unique. Repeating a matching key returns the original Appointment, including a soft-deleted historical row, without creating another attendee or event. Reusing the key for another service, host, start time, Contact, or polymorphic primary subject is rejected. Nullable keys preserve imported, provider-originated, and legacy records that do not participate in this direct-creation replay contract.
+
 ## Appointment lifecycle state machine
 
 The implemented lifecycle layer consists of:
@@ -766,6 +790,8 @@ CreatePublicBookingHoldAction
 CompletePublicBookingAction
 ReleaseBookingHoldAction
 ConvertBookingHoldToAppointmentAction
+AppointmentCreationData
+CreateAppointmentAction
 RescheduleAppointmentAction
 ConfirmAppointmentAction
 CancelAppointmentAction
@@ -777,7 +803,6 @@ TransitionAppointmentStatusAction
 Planned:
 
 ```text
-CreateAppointmentAction for non-hold CRM/manual creation
 SchedulingReadService
 AppointmentReminderScheduler
 ```
@@ -797,7 +822,6 @@ Do not add `flow_route_*` foreign keys to Scheduling artifacts merely for proven
 Deferred after the booking transaction foundation:
 
 ```text
-non-hold CRM/manual appointment creation
 CRM Scheduling workspace
 SCHEDULING_APP_URL setup validation
 calendar views

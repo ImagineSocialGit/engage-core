@@ -40,6 +40,7 @@ class Appointment extends Model
         'source_context_type',
         'source_context_id',
         'rescheduled_from_id',
+        'idempotency_key',
         'status',
         'title',
         'description',

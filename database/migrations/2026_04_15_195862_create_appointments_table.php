@@ -43,6 +43,12 @@ return new class extends Migration
                 'appointments_rescheduled_from_unique',
             );
 
+            $table->string('idempotency_key', 191)->nullable();
+            $table->unique(
+                'idempotency_key',
+                'appointments_idempotency_key_unique',
+            );
+
             $table->string('status')->default('scheduled')->index();
 
             $table->string('title')->nullable();
