@@ -3,12 +3,15 @@
 namespace App\Modules\Scheduling\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Scheduling\Actions\CompletePublicBookingAction;
 use App\Modules\Scheduling\Actions\CreatePublicBookingHoldAction;
 use App\Modules\Scheduling\Actions\FindBookableAvailabilityAction;
 use App\Modules\Scheduling\Data\AvailabilitySearch;
 use App\Modules\Scheduling\Data\BookableSlot;
+use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookingHold;
+use App\Modules\Scheduling\Requests\CompletePublicBookingRequest;
 use App\Modules\Scheduling\Requests\CreatePublicBookingHoldRequest;
 use Carbon\CarbonImmutable;
 use DomainException;
@@ -79,27 +82,15 @@ class PublicBookingController extends Controller
             ]);
         }
 
-        return redirect(route(
+        return redirect()->route(
             'scheduling.public.holds.show',
             ['holdId' => $hold->hold_id],
-            false,
-        ));
+        );
     }
 
     public function review(string $holdId): View
     {
-        $holdId = trim($holdId);
-
-        if ($holdId === '') {
-            abort(404);
-        }
-
-        $hold = BookingHold::query()
-            ->where('hold_id', $holdId)
-            ->first();
-
-        abort_unless($hold instanceof BookingHold, 404);
-
+        $hold = $this->publicHold($holdId);
         $service = BookableService::withTrashed()
             ->whereKey($hold->bookable_service_id)
             ->first();
@@ -109,6 +100,32 @@ class PublicBookingController extends Controller
         return view('scheduling.public.index', $this->pageData([
             'holdSummary' => $this->holdSummary($hold, $service),
         ]));
+    }
+
+    public function complete(
+        CompletePublicBookingRequest $request,
+        string $holdId,
+        CompletePublicBookingAction $completePublicBooking,
+    ): RedirectResponse {
+        $hold = $this->publicHold($holdId);
+
+        try {
+            $completePublicBooking->handle(
+                holdId: $hold->hold_id,
+                name: $request->attendeeName(),
+                email: $request->attendeeEmail(),
+                phone: $request->attendeePhone(),
+            );
+        } catch (DomainException) {
+            throw ValidationException::withMessages([
+                'booking' => 'This reservation can no longer be completed. Choose another appointment time.',
+            ]);
+        }
+
+        return redirect()->route(
+            'scheduling.public.holds.show',
+            ['holdId' => $hold->hold_id],
+        );
     }
 
     /**
@@ -159,6 +176,24 @@ class PublicBookingController extends Controller
         abort_unless($service instanceof BookableService, 404);
 
         return $service;
+    }
+
+    private function publicHold(string $holdId): BookingHold
+    {
+        $holdId = trim($holdId);
+
+        if ($holdId === '') {
+            abort(404);
+        }
+
+        $hold = BookingHold::query()
+            ->with('appointment')
+            ->where('hold_id', $holdId)
+            ->first();
+
+        abort_unless($hold instanceof BookingHold, 404);
+
+        return $hold;
     }
 
     private function serviceTimezone(BookableService $service): string
@@ -278,6 +313,11 @@ class PublicBookingController extends Controller
             $status = BookingHold::STATUS_EXPIRED;
         }
 
+        $appointment = $hold->appointment;
+        $appointmentStatus = $appointment instanceof Appointment
+            ? (string) $appointment->status
+            : null;
+
         return [
             'hold_id' => $hold->hold_id,
             'status' => $status,
@@ -289,6 +329,8 @@ class PublicBookingController extends Controller
             'date_label' => $startsAt->format('l, F j, Y'),
             'time_label' => $startsAt->format('g:i A').'–'.$endsAt->format('g:i A'),
             'timezone' => $timezone,
+            'appointment_status' => $appointmentStatus,
+            'confirmation_pending' => $appointmentStatus === Appointment::STATUS_PENDING,
         ];
     }
 }

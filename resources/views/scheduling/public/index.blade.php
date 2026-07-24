@@ -257,6 +257,58 @@
             font-weight: 800;
         }
 
+        .booking-form {
+            display: grid;
+            gap: 1rem;
+            margin-top: 1.4rem;
+            border-top: 1px solid #e6edef;
+            padding-top: 1.4rem;
+        }
+
+        .booking-fields {
+            display: grid;
+            gap: .9rem;
+        }
+
+        .booking-field {
+            display: grid;
+            gap: .4rem;
+            color: #455166;
+            font-size: .84rem;
+            font-weight: 750;
+        }
+
+        .booking-field input {
+            width: 100%;
+            min-height: 2.9rem;
+            border: 1px solid #bdcbd0;
+            border-radius: .7rem;
+            padding: .65rem .75rem;
+            background: #fff;
+            color: #172033;
+            font: inherit;
+            font-weight: 500;
+        }
+
+        .booking-field input:focus {
+            outline: 3px solid rgba(13, 148, 136, .16);
+            border-color: #0f766e;
+        }
+
+        .booking-form button {
+            justify-self: start;
+        }
+
+        @media (min-width: 620px) {
+            .booking-fields {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .booking-field:first-child {
+                grid-column: 1 / -1;
+            }
+        }
+
         @media (min-width: 840px) {
             .layout {
                 grid-template-columns: minmax(250px, .78fr) minmax(0, 1.55fr);
@@ -270,17 +322,24 @@
     <p class="eyebrow">{{ config('app.name') }}</p>
 
     @if($holdSummary)
-        <h1>Review your reserved time</h1>
-        <p class="intro">
-            This time is held temporarily while the booking is completed.
-        </p>
+        @if($holdSummary['status'] === 'converted')
+            <h1>Your booking is complete</h1>
+            <p class="intro">
+                Your reserved time has been converted into an appointment.
+            </p>
+        @else
+            <h1>Review your reserved time</h1>
+            <p class="intro">
+                This time is held temporarily while the booking is completed.
+            </p>
+        @endif
 
         <section class="card hold-card" aria-live="polite">
             @if($holdSummary['status'] === 'active')
                 <span class="hold-status">Time reserved</span>
                 <h2>{{ $holdSummary['service_name'] }}</h2>
                 <p class="muted">
-                    Your selected appointment time is currently reserved.
+                    Enter your details before the reservation expires.
                 </p>
             @elseif($holdSummary['status'] === 'expired')
                 <span class="hold-status">Reservation expired</span>
@@ -288,15 +347,28 @@
                 <p class="muted">
                     Return to the service availability page to choose another time.
                 </p>
+            @elseif($holdSummary['status'] === 'converted' && $holdSummary['confirmation_pending'])
+                <span class="hold-status">Request received</span>
+                <h2>Your appointment request was received.</h2>
+                <p class="muted">
+                    This service requires confirmation. The appointment is reserved in a pending state until it is confirmed.
+                </p>
             @elseif($holdSummary['status'] === 'converted')
-                <span class="hold-status">Booking completed</span>
-                <h2>This reservation has already been completed.</h2>
+                <span class="hold-status">Appointment booked</span>
+                <h2>Your appointment is booked.</h2>
+                <p class="muted">
+                    The appointment has been added to the schedule.
+                </p>
             @else
                 <span class="hold-status">Reservation inactive</span>
                 <h2>This reservation is no longer active.</h2>
             @endif
 
             <dl class="hold-details">
+                <div>
+                    <dt>Service</dt>
+                    <dd>{{ $holdSummary['service_name'] }}</dd>
+                </div>
                 <div>
                     <dt>Date</dt>
                     <dd>{{ $holdSummary['date_label'] }}</dd>
@@ -311,6 +383,10 @@
                 </div>
             </dl>
 
+            @error('booking')
+                <p class="error">{{ $message }}</p>
+            @enderror
+
             @if($holdSummary['status'] === 'active')
                 <p
                     class="countdown"
@@ -320,24 +396,80 @@
                 >
                     Reserved for {{ max(1, (int) ceil($holdSummary['remaining_seconds'] / 60)) }} more minute(s).
                 </p>
-            @else
-                <p
-                    class="countdown"
-                    data-remaining-seconds="0"
+
+                <form
+                    class="booking-form"
+                    method="POST"
+                    action="{{ route('scheduling.public.holds.complete', ['holdId' => $holdSummary['hold_id']], false) }}"
                 >
+                    @csrf
+
+                    <div class="booking-fields">
+                        <label class="booking-field" for="name">
+                            Name
+                            <input
+                                id="name"
+                                name="name"
+                                type="text"
+                                value="{{ old('name') }}"
+                                autocomplete="name"
+                                maxlength="255"
+                                required
+                            >
+                            @error('name')
+                                <span class="error">{{ $message }}</span>
+                            @enderror
+                        </label>
+
+                        <label class="booking-field" for="email">
+                            Email
+                            <input
+                                id="email"
+                                name="email"
+                                type="email"
+                                value="{{ old('email') }}"
+                                autocomplete="email"
+                                maxlength="255"
+                                required
+                            >
+                            @error('email')
+                                <span class="error">{{ $message }}</span>
+                            @enderror
+                        </label>
+
+                        <label class="booking-field" for="phone">
+                            Phone <span class="muted">(optional)</span>
+                            <input
+                                id="phone"
+                                name="phone"
+                                type="tel"
+                                value="{{ old('phone') }}"
+                                autocomplete="tel"
+                                maxlength="255"
+                            >
+                            @error('phone')
+                                <span class="error">{{ $message }}</span>
+                            @enderror
+                        </label>
+                    </div>
+
+                    <button type="submit">Complete booking</button>
+                </form>
+            @else
+                <p class="countdown" data-remaining-seconds="0">
                     No reservation time remains.
                 </p>
-            @endif
 
-            <a
-                class="button-link"
-                href="{{ route('scheduling.public.services.show', [
-                    'serviceKey' => $holdSummary['service_key'],
-                    'date' => $holdSummary['date'],
-                ], false) }}"
-            >
-                View available times
-            </a>
+                <a
+                    class="button-link"
+                    href="{{ route('scheduling.public.services.show', [
+                        'serviceKey' => $holdSummary['service_key'],
+                        'date' => $holdSummary['date'],
+                    ], false) }}"
+                >
+                    View available times
+                </a>
+            @endif
         </section>
     @else
         <h1>Schedule an appointment</h1>

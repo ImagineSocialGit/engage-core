@@ -11,6 +11,7 @@ use App\Modules\Scheduling\Models\BookableSlotOffer;
 use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use Carbon\CarbonImmutable;
+use Closure;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -24,7 +25,7 @@ class ConvertBookingHoldToAppointmentAction
 
     public function handle(
         string $holdId,
-        AppointmentBookingData $booking,
+        AppointmentBookingData|Closure $booking,
     ): Appointment {
         $holdId = $this->requiredHoldId($holdId);
 
@@ -123,6 +124,8 @@ class ConvertBookingHoldToAppointmentAction
                 );
             }
 
+            $booking = $this->resolvedBookingData($booking);
+
             $status = $service->requires_confirmation
                 ? Appointment::STATUS_PENDING
                 : Appointment::STATUS_SCHEDULED;
@@ -213,6 +216,25 @@ class ConvertBookingHoldToAppointmentAction
         }
 
         return $result;
+    }
+
+
+    private function resolvedBookingData(
+        AppointmentBookingData|Closure $booking,
+    ): AppointmentBookingData {
+        if ($booking instanceof AppointmentBookingData) {
+            return $booking;
+        }
+
+        $resolved = $booking();
+
+        if (! $resolved instanceof AppointmentBookingData) {
+            throw new LogicException(
+                'Booking data resolvers must return AppointmentBookingData.',
+            );
+        }
+
+        return $resolved;
     }
 
     private function convertedAppointment(BookingHold $hold): Appointment

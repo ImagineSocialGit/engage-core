@@ -28,3 +28,8 @@ Route::get('/book/{holdId}', [PublicBookingController::class, 'review'])
     ->whereUuid('holdId')
     ->middleware("throttle:{$holdReviewLimit},1")
     ->name('scheduling.public.holds.show');
+
+Route::post('/book/{holdId}', [PublicBookingController::class, 'complete'])
+    ->whereUuid('holdId')
+    ->middleware("throttle:{$reservationLimit},1")
+    ->name('scheduling.public.holds.complete');

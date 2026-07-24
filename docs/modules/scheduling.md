@@ -38,7 +38,7 @@ Scheduling should not become a generic calendar-builder product for clients to m
 
 ## Universal public booking surface
 
-Scheduling provides every client with an optional generic public booking surface where visitors can discover public services, review current availability, and reserve one time through an authoritative short-lived hold. Attendee capture and final Appointment creation remain a separate completion step.
+Scheduling provides every client with an optional generic public booking surface where visitors can discover public services, reserve one time through an authoritative short-lived hold, enter attendee details, and complete the hold into an Appointment.
 
 The public host is selected-client deployment configuration. It must not be derived from a fixed subdomain prefix.
 
@@ -66,11 +66,14 @@ GET  /
 GET  /services/{serviceKey}
 POST /services/{serviceKey}/reserve
 GET  /book/{holdId}
+POST /book/{holdId}
 ```
 
 They are registered only on the configured host while the Scheduling module is enabled. The catalog returns active services with `is_public = true`. Service pages accept one bounded local date, calculate live availability through `FindBookableAvailabilityAction`, show times in the service timezone, and omit host identity, capacity, occupancy, availability-window identity, and other trusted booking details. Identical times produced by multiple eligible hosts are presented once.
 
-A displayed time submits only its UTC `starts_at` value plus a UUID idempotency key. `CreatePublicBookingHoldAction` recalculates availability, selects the first eligible slot in the existing deterministic ordering, issues an opaque offer, and creates the hold inside one outer transaction. The visitor cannot nominate a host, end time, duration, capacity, offer, or rule provenance. Reservation and hold-review routes are separately rate limited through `config/scheduling.php`.
+A displayed time submits only its UTC `starts_at` value plus a UUID idempotency key. `CreatePublicBookingHoldAction` recalculates availability, selects the first eligible slot in the existing deterministic ordering, issues an opaque offer, and creates the hold inside one outer transaction. The visitor cannot nominate a host, end time, duration, capacity, offer, or rule provenance.
+
+The opaque hold page accepts attendee name, email, and optional phone only while the hold remains effective. `CompletePublicBookingAction` resolves the Contact through the Core-owned `ResolveContactByEmailAction`, supplies immutable attendee snapshots, and converts the hold through `ConvertBookingHoldToAppointmentAction`. An existing Contact is returned unchanged; public input never overwrites established Contact fields or metadata. Reservation, completion, and hold-review routes are rate limited through `config/scheduling.php`.
 
 All public booking, cancellation, and reschedule URLs should resolve from the configured base URL.
 
@@ -126,6 +129,7 @@ atomic hold-to-reschedule replacement with attendee and vertical-subject preserv
 appointment lifecycle transitions and neutral automation event emission
 configured-host public service discovery and bounded availability presentation
 public slot reservation with deterministic hidden-host selection and authoritative hold review
+public attendee capture, safe Contact resolution, and replay-safe hold-to-Appointment completion
 ```
 
 Scheduling does not own message delivery, consent, task lifecycle, portal accounts, form definitions, commerce records, geocoding, or provider adapter internals.
@@ -496,6 +500,7 @@ BookingHold
 IssueBookableSlotOfferAction
 CreateBookingHoldAction
 CreatePublicBookingHoldAction
+CompletePublicBookingAction
 ReleaseBookingHoldAction
 ConvertBookingHoldToAppointmentAction
 ExpireBookingHoldsJob
@@ -582,6 +587,24 @@ Public replay keys are UUIDs. Repeating the same service, start time, and replay
 
 The public hold page is capability-addressed by the opaque `hold_id`, marked `noindex`, and renders only service name, local date/time, timezone, effective status, absolute expiration, and authoritative remaining seconds. It does not expose host, capacity, offer, occupancy, or availability-rule details.
 
+### Public booking completion
+
+The active hold page submits only:
+
+```text
+name
+email
+phone
+```
+
+`CompletePublicBookingRequest` rejects caller-authored Contact, Appointment, service, host, timing, status, confirmation, capacity, offer, and source fields. `CompletePublicBookingAction` normalizes the attendee snapshot and passes a lazy booking-data resolver into `ConvertBookingHoldToAppointmentAction`.
+
+The resolver runs only after the ordinary offer, service, host, hold, terminal-state, and expiration checks succeed under the conversion transaction. A converted replay returns the existing Appointment before the resolver runs, so a retry cannot create or resolve another Contact. Released, expired, missing, reschedule-scoped, or otherwise invalid holds cannot create Contacts.
+
+`ResolveContactByEmailAction` belongs to Core. It lowercases and validates the email, returns an existing Contact without changing its name, phone, source, subsource, or metadata, and creates a new Contact only when no normalized email match exists. The contacts email unique constraint remains the final concurrency authority; duplicate-insert races reload the winning Contact. Submitted attendee values are stored on `appointment_attendees` as the booking-time snapshot even when an established Contact is reused.
+
+For services not requiring confirmation, completion creates a `scheduled` Appointment and accepted primary attendee. For services requiring confirmation, completion creates a `pending` Appointment and invited primary attendee. The same opaque `GET /book/{holdId}` capability renders the resulting visitor confirmation without exposing Contact IDs, Appointment IDs, host identity, capacity, or attendee PII. Scheduling remains functional without Messaging.
+
 ### Reschedule transaction
 
 A reschedule-scoped offer is the only authority for which Appointment may be ignored during replacement-slot calculation. The caller still submits only:
@@ -620,7 +643,7 @@ The public hold review renders the absolute server-provided expiration and deriv
 
 `ReleaseBookingHoldAction` releases an active hold explicitly, treats repeated release requests idempotently, marks an elapsed active hold expired, and rejects release after conversion.
 
-`ConvertBookingHoldToAppointmentAction` uses the hold itself as the conversion identity for ordinary bookings. It locks the hold and authoritative service/host records, creates the Appointment, one primary attendee snapshot, and the initial lifecycle plus neutral automation event in one transaction, then marks the hold converted and links the Appointment. A retry returns the already-created Appointment. Reschedule-scoped holds are rejected and must be completed through `RescheduleAppointmentAction`, preventing an accidental unrelated second Appointment.
+`ConvertBookingHoldToAppointmentAction` uses the hold itself as the conversion identity for ordinary bookings. It locks the offer, hold, and authoritative service/host records, validates conversion eligibility, then resolves either directly supplied or lazy `AppointmentBookingData`. It creates the Appointment, one primary attendee snapshot, and the initial lifecycle plus neutral automation event in one transaction, then marks the hold converted and links the Appointment. A retry returns the already-created Appointment before lazy booking data is resolved. Reschedule-scoped holds are rejected and must be completed through `RescheduleAppointmentAction`, preventing an accidental unrelated second Appointment.
 
 The caller may provide a Core Contact and a separate polymorphic primary attendee. This preserves the common one-on-one path while supporting vertical-owned subjects such as pets without adding a Scheduling dependency on the vertical module. The existing one-to-many attendee relationship remains available for future additional participants.
 
@@ -734,11 +757,13 @@ Provider persistence should separately represent connections, remote event ident
 Implemented:
 
 ```text
-PublicBookingController catalog, availability, reservation, and hold-review surface
+PublicBookingController catalog, availability, reservation, attendee completion, and hold-confirmation surface
+ResolveContactByEmailAction
 FindBookableAvailabilityAction
 IssueBookableSlotOfferAction
 CreateBookingHoldAction
 CreatePublicBookingHoldAction
+CompletePublicBookingAction
 ReleaseBookingHoldAction
 ConvertBookingHoldToAppointmentAction
 RescheduleAppointmentAction
@@ -774,7 +799,6 @@ Deferred after the booking transaction foundation:
 ```text
 non-hold CRM/manual appointment creation
 CRM Scheduling workspace
-public attendee capture, safe Contact resolution, and hold-to-Appointment completion
 SCHEDULING_APP_URL setup validation
 calendar views
 provider connection and synchronization persistence
