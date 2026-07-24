@@ -696,7 +696,13 @@ The browser submits only Contact, service, optional host, selected start instant
 
 Contact selection uses the existing Core Contact lookup endpoint. The workspace does not create or update Contacts, and it does not silently assign a host. A service with exactly one active eligible host may be preselected for convenience, but that explicit host identity is still submitted and revalidated by `CreateAppointmentAction`.
 
-This first workspace slice intentionally omits Appointment detail pages, lifecycle mutation controls, rescheduling UI, calendar visualization, provider synchronization, and reminder management.
+The workspace links each operational row to an authenticated Appointment detail page. `SchedulingReadService::appointmentDetail()` composes the service, host, Contact, attendee snapshots, creator, reschedule lineage, and chronological lifecycle history so the controller and Blade view do not rebuild Scheduling queries.
+
+The detail surface exposes only semantic lifecycle actions that are meaningful for the currently displayed state. Confirmation, cancellation, completion, and no-show submissions invoke the existing lock-backed actions with the authenticated CRM user as actor and `crm` as source. UI visibility is presentation only; stale or forged requests are still rejected by `TransitionAppointmentStatusAction`.
+
+Cancellation requires a human-entered reason. When the service cancellation-notice deadline has passed, the form requires an explicit override checkbox; the controller converts that authorization to `AppointmentLifecycleContext::force` and records the CRM surface and action in lifecycle provenance. Completion and no-show controls appear only after the appointment starts.
+
+This workspace slice still omits rescheduling UI, Contact-page appointment panels, calendar visualization, provider synchronization, and reminder management.
 
 ## Appointment lifecycle state machine
 
@@ -823,13 +829,15 @@ MarkAppointmentNoShowAction
 TransitionAppointmentStatusAction
 ```
 
-Implemented CRM read and creation seams:
+Implemented CRM workspace seams:
 
 ```text
 SchedulingReadService
 SchedulingController
+AppointmentController
 StoreAppointmentRequest
-CRM Scheduling workspace
+CancelAppointmentRequest
+CRM Scheduling creation, detail, and lifecycle workspace
 ```
 
 Planned:
@@ -850,10 +858,9 @@ Do not add `flow_route_*` foreign keys to Scheduling artifacts merely for proven
 
 ## Deferred work
 
-Deferred after the initial CRM Scheduling workspace:
+Deferred after the CRM Appointment detail and lifecycle workspace:
 
 ```text
-Appointment detail and lifecycle action workspace
 Contact-page appointment panel
 CRM reschedule workflow
 SCHEDULING_APP_URL setup validation

@@ -45,6 +45,26 @@ class SchedulingReadService
             ->get();
     }
 
+    public function appointmentDetail(Appointment $appointment): Appointment
+    {
+        return Appointment::query()
+            ->with([
+                'bookableService',
+                'schedulingHost',
+                'contact',
+                'createdBy',
+                'attendees' => fn ($query) => $query
+                    ->with('contact')
+                    ->orderByRaw("case when role = 'primary' then 0 else 1 end")
+                    ->orderBy('id'),
+                'lifecycleEvents.actor',
+                'rescheduledFrom',
+                'rescheduledAppointments' => fn ($query) => $query
+                    ->orderBy('id'),
+            ])
+            ->findOrFail($appointment->getKey());
+    }
+
     /**
      * @return Collection<int, BookableService>
      */

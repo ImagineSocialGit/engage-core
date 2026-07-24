@@ -12,6 +12,7 @@ use App\Modules\FlowRoutes\Controllers\CRM\FlowRouteController;
 use App\Modules\FlowRoutes\Controllers\CRM\FlowRouteEditorController;
 use App\Modules\Messaging\Controllers\ContactImportBatchPermissionInvitationController;
 use App\Modules\Messaging\Controllers\CRM\MessageTemplatePresetController;
+use App\Modules\Scheduling\Controllers\CRM\AppointmentController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingController;
 use App\Modules\Tasks\Controllers\TaskController;
 use App\Modules\Webinars\Controllers\CRM\WebinarController;
@@ -224,6 +225,21 @@ Route::middleware('auth')->group(function () {
 
             Route::post('/appointments', [SchedulingController::class, 'store'])
                 ->name('appointments.store');
+
+            Route::get('/appointments/{appointment}', [AppointmentController::class, 'show'])
+                ->name('appointments.show');
+
+            Route::patch('/appointments/{appointment}/confirm', [AppointmentController::class, 'confirm'])
+                ->name('appointments.confirm');
+
+            Route::patch('/appointments/{appointment}/cancel', [AppointmentController::class, 'cancel'])
+                ->name('appointments.cancel');
+
+            Route::patch('/appointments/{appointment}/complete', [AppointmentController::class, 'complete'])
+                ->name('appointments.complete');
+
+            Route::patch('/appointments/{appointment}/no-show', [AppointmentController::class, 'noShow'])
+                ->name('appointments.no-show');
         });
 
     Route::middleware('module:tasks')

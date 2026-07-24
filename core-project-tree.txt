@@ -652,6 +652,7 @@
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
+│   │   │   │   │   ├── AppointmentController.php
 │   │   │   │   │   └── SchedulingController.php
 │   │   │   │   └── PublicBookingController.php
 │   │   │   ├── Data
@@ -679,6 +680,7 @@
 │   │   │   ├── Providers
 │   │   │   │   └── SchedulingModuleServiceProvider.php
 │   │   │   ├── Requests
+│   │   │   │   ├── CancelAppointmentRequest.php
 │   │   │   │   ├── CompletePublicBookingRequest.php
 │   │   │   │   ├── CreatePublicBookingHoldRequest.php
 │   │   │   │   └── StoreAppointmentRequest.php
@@ -1493,7 +1495,8 @@
 │       │   │   └── message-templates
 │       │   │       └── index.blade.php
 │       │   ├── scheduling
-│       │   │   └── index.blade.php
+│       │   │   ├── index.blade.php
+│       │   │   └── show.blade.php
 │       │   ├── tasks
 │       │   │   ├── index.blade.php
 │       │   │   └── show.blade.php
@@ -1738,6 +1741,7 @@
 │   │   │   ├── PublicSchedulingSurfaceTest.php
 │   │   │   ├── RescheduleAppointmentActionTest.php
 │   │   │   ├── RescheduleSlotOfferAndBookingHoldActionTest.php
+│   │   │   ├── SchedulingAppointmentWorkspaceTest.php
 │   │   │   ├── SchedulingAvailabilityWindowFoundationTest.php
 │   │   │   ├── SchedulingFoundationTest.php
 │   │   │   ├── SchedulingHostAndServiceFoundationTest.php
@@ -1839,4 +1843,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-500 directories, 1340 files
+500 directories, 1344 files

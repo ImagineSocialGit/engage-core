@@ -102,9 +102,12 @@
                             <article class="p-4 sm:p-5">
                                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                     <div class="min-w-0">
-                                        <p class="font-semibold text-slate-900">
+                                        <a
+                                            href="{{ route('crm.scheduling.appointments.show', $appointment) }}"
+                                            class="font-semibold text-slate-900 hover:text-teal-700 hover:underline"
+                                        >
                                             {{ $appointment->title ?: $appointment->bookableService?->name ?: 'Appointment' }}
-                                        </p>
+                                        </a>
 
                                         <p class="mt-1 text-sm text-slate-600">
                                             {{ $contactLabel }}
