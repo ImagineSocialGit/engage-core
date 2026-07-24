@@ -2,8 +2,8 @@
 
 /*
 | The executable definition shape is owned by the registered
-| `campaigns.preset_definition` config contract. Keep this example aligned with that
-| contract and with CampaignPresetDefinition; unsupported fields must fail validation.
+| `campaigns.preset_definition` config contract and CampaignPresetDefinition.
+| Unsupported fields must fail validation instead of becoming compatibility aliases.
 */
 
 return [
@@ -13,78 +13,41 @@ return [
     | Campaign Presets Template
     |--------------------------------------------------------------------------
     |
-    | Example module-first file paths:
+    | Example module-first paths:
     | config/presets/modules/webinars/campaigns.php
     | config/presets/modules/{contributor-module}/campaigns.php
     | client/{client-key}/config/presets/modules/{contributor-module}/campaigns.php
     |
-    | Campaign = enrolled multi-step journey.
+    | Canonical compact authoring rules:
+    | - the definitions map key is the Campaign key
+    | - steps are a sequential list; list position derives step_number
+    | - variants are a keyed map; map key derives the variant key
+    | - variant map order derives sort_order in increments of 10
+    | - Campaign purpose, scope, and source_version cascade to children
+    | - campaign_step_due is the fixed dispatch key for every step and variant
+    | - Campaign variant_strategy cascades unless a step explicitly overrides it
+    | - Campaign and step channel summaries are derived from their variants
+    | - omit child is_active when true; include it only to disable that child
+    | - omit empty criteria, dependency_rules, and meta objects
     |
-    | Campaign presets own:
-    | - campaign identity
-    | - step order
-    | - step/variant timing
-    | - step/variant conditions
-    | - variant strategy
-    | - variant dependencies and enablement
-    | - message template references through variants
+    | Do not author derived fields such as Campaign key/channel/dispatch_key, step_number,
+    | step dispatch/channel/purpose/scope, or variant key/sort_order/dispatch/purpose/scope.
     |
-    | Campaign `status` is the sole top-level lifecycle control. Use `active`,
-    | `inactive`, or `archived`. The preset value is the installation default;
-    | routine sync does not overwrite status on an existing Campaign. Use the
-    | Campaign CRM lifecycle control or campaigns:deactivate for operational
-    | shutdown. Step and variant `is_active` fields remain independent child-level
-    | controls.
+    | Campaign `status` is the sole top-level lifecycle control. The preset value
+    | is only the installation default; routine sync does not overwrite existing
+    | operational status. Use the Campaign CRM lifecycle controls or
+    | campaigns:deactivate for operational shutdown.
     |
-    | Messaging configs own:
-    | - reusable message copy
-    | - subject/body/CTA payloads
-    | - payload_class
-    | - delivery queue
+    | Campaign presets own journey order, timing, strategy, dependency behavior,
+    | and references to Messaging-owned templates. They must not own reusable
+    | subject/body/CTA copy or payload overrides.
     |
-    | Campaigns resolves Campaign-owned behavior first. The shared
-    | ResolvedMessageDispatchBuilder combines that behavior with the selected
-    | reusable Messaging template into the normalized dispatch contract.
-    |
-    | Campaign presets must not own reusable subject/body copy.
-    | Campaign presets must not define or override payloads.
-    |
-    | Preset sync has no Campaign force mode right now. Normal Campaign sync
-    | updates non-customized Campaigns/Steps/Variants, removes stale
-    | non-customized steps/variants, and preserves customized records.
-    | Do not rely on presets:sync as a destructive Campaign reset.
-    |
-    | Campaign preset variants reference Messaging templates with first-class:
-    | - key
-    | - dispatch_key
-    | - channel
-    | - purpose
-    | - scope
-    |
-    | Do not use meta.message for new Campaign preset step message references.
-    |
-    | Campaign message templates resolve by:
-    |
+    | Messaging campaign templates resolve through:
     | messaging.{channel}.definitions.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
-    */
-
-    /*
-    |--------------------------------------------------------------------------
-    | Validation expectations
-    |--------------------------------------------------------------------------
     |
-    | Shared preset-composition validation owns package/group/definition structure,
-    | including missing selected groups and duplicate contributed group/definition
-    | keys.
-    |
-    | Campaigns owns semantic validation of selected Campaign/Step/Variant
-    | definitions: shape, strategy, timing, dependency rules, stable variant
-    | identity, and Messaging template context references.
-    |
-    | Missing required templates or impossible dependency references are hard
-    | errors when they make intended runtime behavior unsafe or impossible.
-    | Dormant or unused definitions may be warnings when runtime remains safe.
-    |
+    | source_config_path remains optional provenance/fallback metadata. Semantic
+    | identity is Campaign key + derived step number + variant key + channel +
+    | inherited purpose/scope.
     */
 
     'groups' => [
@@ -101,145 +64,104 @@ return [
     ],
 
     'definitions' => [
-
         'webinar_attended_nurture' => [
-            'key' => 'webinar_attended_nurture',
             'name' => 'Webinar Attended Nurture',
             'description' => 'Follow-up sequence for contacts who attended a webinar.',
-            'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
-            'status' => 'active',
+            'variant_strategy' => 'dependency_aware',
             'source_version' => 1,
             'meta' => [
                 'domain' => 'webinar',
-                'strategy' => 'email_primary',
+                'strategy' => 'sms_preferred_email_fallback',
             ],
             'steps' => [
                 [
-                    'step_number' => 1,
                     'name' => 'Attended one-week follow-up',
-                    'is_active' => true,
-                    'variant_strategy' => 'first_available',
-
                     'criteria' => [
                         'timing' => [
                             'type' => 'delay',
                             'days' => 7,
                         ],
                     ],
-
                     'variants' => [
-                        [
-                            'key' => 'email',
-                            'name' => 'Email follow-up',
-                            'sort_order' => 0,
-                            'dispatch_key' => 'campaign_step_due',
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
+                        'sms' => [
+                            'name' => 'SMS follow-up',
+                            'channel' => 'sms',
+                            'source_config_path' => 'messaging.sms.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.sms',
                         ],
-                    ],
-
-                    'meta' => [
-                        'type' => 'message',
+                        'email' => [
+                            'name' => 'Email fallback',
+                            'channel' => 'email',
+                            'dependency_rules' => [
+                                'requires_variant_states' => [
+                                    'sms' => ['sent', 'unavailable'],
+                                ],
+                            ],
+                            'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
+                        ],
                     ],
                 ],
             ],
         ],
 
         'webinar_missed_nurture' => [
-            'key' => 'webinar_missed_nurture',
             'name' => 'Webinar Missed Nurture',
             'description' => 'Follow-up sequence for contacts who registered for a webinar but missed it.',
-            'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
-            'status' => 'active',
-            'source_version' => 1,
-            'meta' => [
-                'domain' => 'webinar',
-                'strategy' => 'email_primary',
-            ],
             'steps' => [
                 [
-                    'step_number' => 1,
                     'name' => 'Missed one-week follow-up',
-                    'is_active' => true,
-                    'variant_strategy' => 'first_available',
-
                     'criteria' => [
                         'timing' => [
                             'type' => 'delay',
                             'days' => 7,
                         ],
                     ],
-
                     'variants' => [
-                        [
-                            'key' => 'email',
+                        'email' => [
                             'name' => 'Email follow-up',
-                            'sort_order' => 0,
-                            'dispatch_key' => 'campaign_step_due',
                             'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
                         ],
-                    ],
-
-                    'meta' => [
-                        'type' => 'message',
                     ],
                 ],
             ],
         ],
 
         'mortgage_homebuyer_nurture' => [
-            'key' => 'mortgage_homebuyer_nurture',
             'name' => 'Mortgage Homebuyer Nurture',
             'description' => 'Mortgage-specific long-term homebuyer nurture sequence.',
-            'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'mortgage_homebuyer_nurture',
-            'status' => 'active',
+            'status' => 'inactive',
+            'variant_strategy' => 'send_all_eligible',
             'source_version' => 1,
             'meta' => [
                 'domain' => 'mortgage',
-                'strategy' => 'email_primary_sms_supplemental',
             ],
             'steps' => [
                 [
-                    'step_number' => 1,
                     'name' => 'Preparation basics',
-                    'is_active' => true,
-                    'variant_strategy' => 'first_available',
-
                     'criteria' => [
                         'timing' => [
                             'type' => 'delay',
                             'days' => 14,
                         ],
                     ],
-
                     'variants' => [
-                        [
-                            'key' => 'email',
+                        'email' => [
                             'name' => 'Email follow-up',
-                            'sort_order' => 0,
-                            'dispatch_key' => 'campaign_step_due',
                             'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'mortgage_homebuyer_nurture',
                         ],
-                    ],
-
-                    'meta' => [
-                        'type' => 'message',
+                        'sms' => [
+                            'name' => 'SMS follow-up',
+                            'channel' => 'sms',
+                            'is_active' => false,
+                        ],
                     ],
                 ],
             ],
         ],
-
     ],
-
 ];

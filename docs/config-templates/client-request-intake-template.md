@@ -1,4 +1,3 @@
-
 # Client Request Intake Template
 
 Use this prompt when asking a new thread to convert a client request into Engage Core config files.
@@ -26,7 +25,7 @@ Rules:
 - Module-owned dispatch paths should use stable logical `occurrenceKey` identity for retry/idempotency rather than treating `send_at` as occurrence identity.
 - Campaign presets own journey/order/timing/template references.
 - Campaign presets do not own payload/copy and do not override payload/copy.
-- Campaign preset variants reference Messaging templates with first-class key, dispatch_key, channel, purpose, and scope keys.
+- Campaign definitions use map keys for Campaign and variant identity, list order for step identity, explicit variant channel, and inherited purpose/scope with fixed campaign_step_due dispatch.
 - Do not use meta.message for new Campaign preset step message references.
 - Campaign messages resolve by:
   messaging.{channel}.definitions.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}

@@ -15,9 +15,9 @@ class CampaignStepPresetDefinition
         public readonly int $stepNumber,
         public readonly ?string $name,
         public readonly string $dispatchKey,
-        public readonly ?string $channel,
-        public readonly ?string $purpose,
-        public readonly ?string $scope,
+        public readonly string $channel,
+        public readonly string $purpose,
+        public readonly string $scope,
         public readonly string $variantStrategy,
         public readonly bool $isActive,
         public readonly array $criteria,
@@ -29,81 +29,115 @@ class CampaignStepPresetDefinition
     /**
      * @param array<string, mixed> $data
      */
-    public static function fromArray(array $data): self
-    {
-        $stepNumber = (int) ($data['step_number'] ?? 0);
-
+    public static function fromArray(
+        array $data,
+        int $stepNumber,
+        string $fallbackDispatchKey,
+        string $fallbackPurpose,
+        string $fallbackScope,
+        string $fallbackVariantStrategy,
+        ?string $fallbackSourceVersion = null,
+    ): self {
         if ($stepNumber < 1) {
-            throw new InvalidArgumentException('Campaign preset steps require a positive step_number.');
+            throw new InvalidArgumentException(
+                'Campaign preset steps require a positive derived position.'
+            );
         }
 
-        $dispatchKey = self::optionalString($data['dispatch_key'] ?? null) ?? 'campaign_step_due';
-        $channel = self::optionalString($data['channel'] ?? null);
-        $purpose = self::optionalString($data['purpose'] ?? null);
-        $scope = self::optionalString($data['scope'] ?? null);
+        self::rejectRemovedFields($data, [
+            'step_number',
+            'dispatch_key',
+            'channel',
+            'purpose',
+            'scope',
+        ], 'Campaign step ['.$stepNumber.']');
 
-        $variants = is_array($data['variants'] ?? null) ? $data['variants'] : [];
+        $variants = $data['variants'] ?? null;
 
-        if ($variants === []) {
-            throw new InvalidArgumentException('Campaign message steps must define at least one variant.');
+        if (! is_array($variants) || array_is_list($variants) || $variants === []) {
+            throw new InvalidArgumentException(
+                'Campaign step ['.$stepNumber.'] variants must be a non-empty map keyed by variant key.'
+            );
         }
 
-        $variantDefinitions = array_map(
-            fn (array $variant): CampaignStepVariantPresetDefinition => CampaignStepVariantPresetDefinition::fromArray(
-                data: $variant,
-                stepNumber: $stepNumber,
-                fallbackDispatchKey: $dispatchKey,
-                fallbackChannel: $channel,
-                fallbackPurpose: $purpose,
-                fallbackScope: $scope,
-                fallbackSourceVersion: self::optionalString($data['source_version'] ?? null),
-            ),
-            array_values(array_filter($variants, 'is_array')),
-        );
+        $variantDefinitions = [];
+        $normalizedKeys = [];
 
-        if ($variantDefinitions === []) {
-            throw new InvalidArgumentException('Campaign message steps must define at least one valid variant.');
-        }
-
-        $variantKeys = [];
-
-        foreach ($variantDefinitions as $variantDefinition) {
-            if (in_array($variantDefinition->key, $variantKeys, true)) {
+        foreach ($variants as $variantKey => $variantData) {
+            if (! is_string($variantKey) || trim($variantKey) === '') {
                 throw new InvalidArgumentException(
-                    'Campaign step ['.$stepNumber.'] has duplicate variant key ['.$variantDefinition->key.'].'
+                    'Campaign step ['.$stepNumber.'] variant map keys must be non-empty strings.'
                 );
             }
 
-            $variantKeys[] = $variantDefinition->key;
+            if (! is_array($variantData)) {
+                throw new InvalidArgumentException(
+                    'Campaign step ['.$stepNumber.'] variant ['.$variantKey.'] must be an object.'
+                );
+            }
+
+            $variantDefinition = CampaignStepVariantPresetDefinition::fromArray(
+                data: $variantData,
+                variantKey: $variantKey,
+                sortOrder: (count($variantDefinitions) + 1) * 10,
+                stepNumber: $stepNumber,
+                fallbackDispatchKey: $fallbackDispatchKey,
+                fallbackPurpose: $fallbackPurpose,
+                fallbackScope: $fallbackScope,
+                fallbackSourceVersion: self::optionalString(
+                    $data['source_version'] ?? $fallbackSourceVersion,
+                ),
+            );
+
+            if (isset($normalizedKeys[$variantDefinition->key])) {
+                throw new InvalidArgumentException(
+                    'Campaign step ['.$stepNumber.'] has duplicate normalized variant key ['.$variantDefinition->key.'].'
+                );
+            }
+
+            $normalizedKeys[$variantDefinition->key] = true;
+            $variantDefinitions[] = $variantDefinition;
         }
 
         return new self(
             stepNumber: $stepNumber,
             name: self::optionalString($data['name'] ?? null),
-            dispatchKey: self::normalizeSegment($dispatchKey),
-            channel: $channel !== null ? self::normalizeSegment($channel) : null,
-            purpose: $purpose !== null ? self::normalizeSegment($purpose) : null,
-            scope: $scope !== null ? self::normalizeSegment($scope) : null,
-            variantStrategy: self::variantStrategy($data['variant_strategy'] ?? 'first_available'),
+            dispatchKey: self::normalizeSegment($fallbackDispatchKey),
+            channel: CampaignPresetDefinition::aggregateSegment(array_map(
+                fn (CampaignStepVariantPresetDefinition $variant): string => $variant->channel,
+                $variantDefinitions,
+            )),
+            purpose: self::normalizeSegment($fallbackPurpose),
+            scope: self::normalizeSegment($fallbackScope),
+            variantStrategy: CampaignPresetDefinition::variantStrategy(
+                $data['variant_strategy'] ?? $fallbackVariantStrategy,
+            ),
             isActive: (bool) ($data['is_active'] ?? true),
             criteria: is_array($data['criteria'] ?? null) ? $data['criteria'] : [],
-            sourceVersion: self::optionalString($data['source_version'] ?? null),
+            sourceVersion: self::optionalString(
+                $data['source_version'] ?? $fallbackSourceVersion,
+            ),
             meta: is_array($data['meta'] ?? null) ? $data['meta'] : [],
             variants: $variantDefinitions,
         );
     }
 
-    private static function variantStrategy(mixed $value): string
-    {
-        $strategy = is_string($value) && trim($value) !== ''
-            ? self::normalizeSegment($value)
-            : 'first_available';
-
-        if (! in_array($strategy, ['first_available', 'send_all_eligible', 'dependency_aware'], true)) {
-            throw new InvalidArgumentException('Unsupported Campaign variant strategy ['.$strategy.'].');
+    /**
+     * @param array<string, mixed> $data
+     * @param array<int, string> $fields
+     */
+    private static function rejectRemovedFields(
+        array $data,
+        array $fields,
+        string $context,
+    ): void {
+        foreach ($fields as $field) {
+            if (array_key_exists($field, $data)) {
+                throw new InvalidArgumentException(
+                    "{$context} must not define removed field [{$field}]."
+                );
+            }
         }
-
-        return $strategy;
     }
 
     private static function optionalString(mixed $value): ?string

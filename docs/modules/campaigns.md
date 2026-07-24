@@ -121,6 +121,36 @@ Campaigns may schedule messages through Messaging public actions.
 
 Campaign presets define journeys: campaign identity, step order, step timing, channel strategy, and message template references through variants.
 
+## Compact Campaign preset authoring
+
+Campaign preset config has one canonical author-facing shape. Runtime/database rows remain explicit, but config authors do not repeat values that are already determined by structure or parent identity.
+
+```text
+definitions map key -> Campaign key
+steps list position -> step_number
+variants map key -> CampaignStepVariant key
+variants map order -> sort_order values 10, 20, 30, ...
+Campaign purpose/scope/source_version -> child defaults
+canonical campaign_step_due dispatch -> every step and variant
+Campaign variant_strategy -> step default
+variant channels -> Campaign and step channel summaries
+```
+
+Campaign dispatch is fixed at `campaign_step_due`; `status` defaults to `active` for initial installation; and `variant_strategy` defaults to `first_available`.
+
+Do not author the following derived fields:
+
+```text
+Campaign key, Campaign channel, or Campaign dispatch_key
+step_number
+step dispatch_key, channel, purpose, or scope
+variant key, sort_order, order, dispatch_key, purpose, or scope
+```
+
+A variant must declare its channel. Include child `is_active` only when setting it to `false`. Include step or variant `source_version` only when overriding the Campaign version. Omit empty `criteria`, `dependency_rules`, and `meta` objects.
+
+Legacy verbose fields and dependency aliases are rejected rather than normalized through permanent compatibility branches. Preset sync expands the compact DTO into the existing explicit Campaign, CampaignStep, and CampaignStepVariant persistence model.
+
 ## Campaign steps and channel variants
 
 The current campaign/channel architecture is:
@@ -151,7 +181,7 @@ They should not embed reusable subject/body/message copy.
 
 ### Channel strategies
 
-Each campaign step should explicitly define how channel variants interact.
+Each Campaign defines how channel variants interact; a step may override that strategy when needed.
 
 Initial strategies:
 
@@ -227,6 +257,7 @@ pending or sending sibling variant exists
 every scheduled sibling variant is sent, skipped, or failed
     record the failed-message outcome and policy on CampaignEnrollment.meta
     continue to the next schedulable Campaign step
+```
 
 Dependency checks should be scoped to:
 
@@ -294,23 +325,13 @@ The matching Messaging config path is:
 
 Campaign preset steps should define the business moment and strategy.
 
-Campaign preset variants should reference the message template context through first-class variant fields:
-
-    key
-    dispatch_key
-    channel
-    purpose
-    scope
+Campaign preset variants reference the message template context through their variant map key, explicit `channel`, and inherited Campaign `purpose` and `scope`, plus the fixed `campaign_step_due` dispatch key.
 
 Do not use `meta.message` as the canonical CampaignStep or CampaignStepVariant message reference.
 
-`campaign_step_variants.channel`, `campaign_step_variants.purpose`, and `campaign_step_variants.scope` are first-class template-reference fields. Step-level channel/purpose/scope fields may remain as summary/debug defaults, but campaign delivery references belong on variants.
+Persisted `campaign_step_variants.channel`, `purpose`, and `scope` remain explicit runtime fields. Preset sync derives and writes them from the compact definition. Persisted step channel/purpose/scope remain summary/debug fields and are derived the same way.
 
-`campaign_steps.meta` may keep non-routing/debug metadata such as:
-
-    type = message
-
-The campaign key and step number come from the Campaign/CampaignStep definition. The variant key comes from CampaignStepVariant.
+The Campaign key comes from the definitions map key. Step number comes from list position. Variant key comes from the variants map key.
 
 Do not require authors to invent per-step `message_type` names for campaign journey steps.
 
@@ -355,10 +376,10 @@ Shared preset-composition validation owns package/group/definition structure, in
 At minimum, Campaigns validates:
 
 ```text
-campaign definition keys match stable definition identity
-step numbers are valid and unique within a Campaign
-variant keys are valid and unique within a step
-variant_strategy is supported
+definition map keys normalize to stable Campaign identity
+steps are a non-empty sequential list whose positions derive unique step numbers
+variants are non-empty keyed maps whose keys normalize uniquely within a step
+variant_strategy is supported and inherited deliberately
 variant dependency rules reference real sibling variant keys
 variant dependency states are supported
 variant channel/purpose/scope/template context is resolvable through Messaging-owned seams

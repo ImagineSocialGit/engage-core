@@ -89,8 +89,16 @@ class SlamDunkConfigGoldenFixtureTest extends TestCase
 
         $this->assertIsArray($attendedSteps);
         $this->assertIsArray($missedSteps);
-        $this->assertSame(range(1, 9), array_column($attendedSteps, 'step_number'));
-        $this->assertSame(range(1, 19), array_column($missedSteps, 'step_number'));
+        $this->assertTrue(array_is_list($attendedSteps));
+        $this->assertTrue(array_is_list($missedSteps));
+        $this->assertCount(9, $attendedSteps);
+        $this->assertCount(19, $missedSteps);
+
+        foreach ([...$attendedSteps, ...$missedSteps] as $step) {
+            $this->assertArrayNotHasKey('step_number', $step);
+            $this->assertIsArray($step['variants'] ?? null);
+            $this->assertFalse(array_is_list($step['variants']));
+        }
 
         $this->assertCount(6, config('messaging.email.definitions.transactional.webinar.reminders'));
         $this->assertCount(6, config('messaging.sms.definitions.transactional.webinar.reminders'));

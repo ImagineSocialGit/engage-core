@@ -36,20 +36,17 @@ class SyncCampaignPresetsAction
 
         $result = new CampaignPresetSyncResult();
 
-        $definitions = [];
-
-        foreach ($resolved->definitions as $campaignKey => $definition) {
-            $definitions[] = array_replace(['key' => $campaignKey], $definition);
-        }
-
-        foreach ($definitions as $definitionData) {
+        foreach ($resolved->definitions as $campaignKey => $definitionData) {
             try {
-                $definition = CampaignPresetDefinition::fromArray($definitionData);
+                $definition = CampaignPresetDefinition::fromArray(
+                    data: $definitionData,
+                    definitionKey: $campaignKey,
+                );
             } catch (Throwable $exception) {
                 throw new InvalidArgumentException(
                     sprintf(
                         'Campaign preset definition [%s] is invalid: %s',
-                        $definitionData['key'] ?? 'unknown',
+                        $campaignKey,
                         $exception->getMessage(),
                     ),
                     previous: $exception,
@@ -177,20 +174,15 @@ class SyncCampaignPresetsAction
             ->where('step_number', $definition->stepNumber)
             ->first();
 
-        $message = $this->messageReference(
-            campaign: $campaign,
-            definition: $definition,
-        );
-
         if (! $step instanceof CampaignStep) {
             $step = CampaignStep::query()->create([
                 'campaign_id' => $campaign->id,
                 'step_number' => $definition->stepNumber,
                 'name' => $definition->name,
                 'dispatch_key' => $this->normalizeSegment($definition->dispatchKey),
-                'channel' => $message['channel'],
-                'purpose' => $message['purpose'],
-                'scope' => $message['scope'],
+                'channel' => $this->normalizeSegment($definition->channel),
+                'purpose' => $this->normalizeSegment($definition->purpose),
+                'scope' => $this->normalizeSegment($definition->scope),
                 'variant_strategy' => $this->normalizeSegment($definition->variantStrategy),
                 'is_active' => $definition->isActive,
                 'criteria' => $definition->criteria,
@@ -214,9 +206,9 @@ class SyncCampaignPresetsAction
         $step->forceFill([
             'name' => $definition->name,
             'dispatch_key' => $this->normalizeSegment($definition->dispatchKey),
-            'channel' => $message['channel'],
-            'purpose' => $message['purpose'],
-            'scope' => $message['scope'],
+            'channel' => $this->normalizeSegment($definition->channel),
+            'purpose' => $this->normalizeSegment($definition->purpose),
+            'scope' => $this->normalizeSegment($definition->scope),
             'variant_strategy' => $this->normalizeSegment($definition->variantStrategy),
             'is_active' => $definition->isActive,
             'criteria' => $definition->criteria,
@@ -330,21 +322,6 @@ class SyncCampaignPresetsAction
             'meta' => $definition->meta,
         ];
     }
-
-    /**
-     * @return array{channel: string, purpose: string, scope: string}
-     */
-    private function messageReference(
-        Campaign $campaign,
-        CampaignStepPresetDefinition $definition,
-    ): array {
-        return [
-            'channel' => $this->normalizeSegment($definition->channel ?? $campaign->channel),
-            'purpose' => $this->normalizeSegment($definition->purpose ?? $campaign->purpose),
-            'scope' => $this->normalizeSegment($definition->scope ?? $campaign->scope),
-        ];
-    }
-
 
     /**
      * Preset status is an installation default. Existing Campaign status is

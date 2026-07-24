@@ -32,21 +32,41 @@ class CampaignStepVariantPresetDefinition
      */
     public static function fromArray(
         array $data,
-        ?int $stepNumber = null,
-        ?string $fallbackDispatchKey = null,
-        ?string $fallbackChannel = null,
-        ?string $fallbackPurpose = null,
-        ?string $fallbackScope = null,
+        string $variantKey,
+        int $sortOrder,
+        int $stepNumber,
+        string $fallbackDispatchKey,
+        string $fallbackPurpose,
+        string $fallbackScope,
         ?string $fallbackSourceVersion = null,
     ): self {
+        self::rejectRemovedFields($data, [
+            'key',
+            'sort_order',
+            'order',
+            'dispatch_key',
+            'purpose',
+            'scope',
+        ], 'Campaign step ['.$stepNumber.'] variant ['.$variantKey.']');
+
+        if ($sortOrder < 1) {
+            throw new InvalidArgumentException(
+                'Campaign step variant sort order must be derived from a positive position.'
+            );
+        }
+
         return new self(
-            key: self::normalizeSegment(self::requiredString($data['key'] ?? null, 'campaign step variant key')),
+            key: self::normalizeSegment(
+                self::requiredString($variantKey, 'campaign step variant map key'),
+            ),
             name: self::nullableString($data['name'] ?? null),
-            sortOrder: (int) ($data['sort_order'] ?? $data['order'] ?? 0),
-            dispatchKey: self::normalizeSegment(self::requiredString($data['dispatch_key'] ?? $fallbackDispatchKey, 'campaign step variant dispatch_key')),
-            channel: self::normalizeSegment(self::requiredString($data['channel'] ?? $fallbackChannel, 'campaign step variant channel')),
-            purpose: self::normalizeSegment(self::requiredString($data['purpose'] ?? $fallbackPurpose, 'campaign step variant purpose')),
-            scope: self::normalizeSegment(self::requiredString($data['scope'] ?? $fallbackScope, 'campaign step variant scope')),
+            sortOrder: $sortOrder,
+            dispatchKey: self::normalizeSegment($fallbackDispatchKey),
+            channel: self::normalizeSegment(
+                self::requiredString($data['channel'] ?? null, 'campaign step variant channel'),
+            ),
+            purpose: self::normalizeSegment($fallbackPurpose),
+            scope: self::normalizeSegment($fallbackScope),
             isActive: (bool) ($data['is_active'] ?? true),
             criteria: self::criteria($data),
             dependencyRules: self::dependencyRules($data['dependency_rules'] ?? []),
@@ -54,7 +74,7 @@ class CampaignStepVariantPresetDefinition
             sourceVersion: self::nullableString($data['source_version'] ?? $fallbackSourceVersion),
             meta: array_replace_recursive(
                 is_array($data['meta'] ?? null) ? $data['meta'] : [],
-                $stepNumber !== null ? ['campaign_step' => $stepNumber] : [],
+                ['campaign_step' => $stepNumber],
             ),
         );
     }
@@ -65,15 +85,9 @@ class CampaignStepVariantPresetDefinition
      */
     private static function criteria(array $data): array
     {
-        $criteria = is_array($data['criteria'] ?? null) ? $data['criteria'] : [];
-
-        foreach (['timing', 'schedule', 'conditions'] as $key) {
-            if (array_key_exists($key, $data) && is_array($data[$key])) {
-                $criteria[$key] = $data[$key];
-            }
-        }
-
-        return $criteria;
+        return is_array($data['criteria'] ?? null)
+            ? $data['criteria']
+            : [];
     }
 
     /**
@@ -81,77 +95,48 @@ class CampaignStepVariantPresetDefinition
      */
     private static function dependencyRules(mixed $rules): array
     {
-        if (! is_array($rules)) {
+        if ($rules === null || $rules === []) {
             return [];
         }
 
-        $normalized = [];
+        if (! is_array($rules)) {
+            throw new InvalidArgumentException(
+                'Campaign step variant dependency_rules must be an object.'
+            );
+        }
 
-        $legacyRequiredScheduled = self::stringList($rules['requires_scheduled_variant_keys'] ?? []);
+        $unknown = array_values(array_diff(
+            array_keys($rules),
+            ['requires_variant_states'],
+        ));
 
-        if ($legacyRequiredScheduled !== []) {
-            $normalized['requires_scheduled_variant_keys'] = $legacyRequiredScheduled;
+        if ($unknown !== []) {
+            throw new InvalidArgumentException(
+                'Campaign step variant dependency_rules contains unsupported field(s): ['.
+                implode(', ', $unknown).'].'
+            );
         }
 
         $variantStates = $rules['requires_variant_states'] ?? [];
 
-        if (is_array($variantStates)) {
-            foreach ($variantStates as $variantKey => $states) {
-                if (is_int($variantKey)) {
-                    continue;
-                }
-
-                $normalizedVariantKey = self::nullableNormalizedSegment($variantKey);
-
-                if ($normalizedVariantKey === null) {
-                    continue;
-                }
-
-                $normalized['requires_variant_states'][$normalizedVariantKey] = self::dependencyStates($states);
-            }
+        if (! is_array($variantStates) || array_is_list($variantStates)) {
+            throw new InvalidArgumentException(
+                'Campaign step variant requires_variant_states must be a map keyed by sibling variant.'
+            );
         }
 
-        $requires = $rules['requires'] ?? [];
+        $normalized = [];
 
-        if (is_array($requires)) {
-            foreach ($requires as $requirement) {
-                if (! is_array($requirement)) {
-                    continue;
-                }
+        foreach ($variantStates as $variantKey => $states) {
+            $normalizedVariantKey = self::nullableNormalizedSegment($variantKey);
 
-                $variantKey = self::nullableNormalizedSegment(
-                    $requirement['variant_key']
-                        ?? $requirement['variant']
-                        ?? $requirement['key']
-                        ?? null,
+            if ($normalizedVariantKey === null) {
+                throw new InvalidArgumentException(
+                    'Campaign step variant dependency keys must be non-empty strings.'
                 );
-
-                if ($variantKey === null) {
-                    continue;
-                }
-
-                $normalized['requires'][] = [
-                    'variant_key' => $variantKey,
-                    'states' => self::dependencyStates(
-                        $requirement['states']
-                            ?? $requirement['state']
-                            ?? $requirement['status']
-                            ?? 'scheduled',
-                    ),
-                ];
-            }
-        }
-
-        foreach ($rules as $key => $value) {
-            if (! is_string($key) || array_key_exists($key, $normalized)) {
-                continue;
             }
 
-            if (in_array($key, ['requires_scheduled_variant_keys', 'requires_variant_states', 'requires'], true)) {
-                continue;
-            }
-
-            $normalized[$key] = $value;
+            $normalized['requires_variant_states'][$normalizedVariantKey] = self::dependencyStates($states);
         }
 
         return $normalized;
@@ -183,7 +168,8 @@ class CampaignStepVariantPresetDefinition
 
         if ($unsupportedStates !== []) {
             throw new InvalidArgumentException(
-                'Unsupported Campaign step variant dependency state(s): ['.implode(', ', $unsupportedStates).'].'
+                'Unsupported Campaign step variant dependency state(s): ['.
+                implode(', ', $unsupportedStates).'].'
             );
         }
 
@@ -207,6 +193,24 @@ class CampaignStepVariantPresetDefinition
             fn (mixed $value): ?string => self::nullableNormalizedSegment($value),
             $values,
         ))));
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<int, string> $fields
+     */
+    private static function rejectRemovedFields(
+        array $data,
+        array $fields,
+        string $context,
+    ): void {
+        foreach ($fields as $field) {
+            if (array_key_exists($field, $data)) {
+                throw new InvalidArgumentException(
+                    "{$context} must not define removed field [{$field}]."
+                );
+            }
+        }
     }
 
     private static function requiredString(mixed $value, string $field): string

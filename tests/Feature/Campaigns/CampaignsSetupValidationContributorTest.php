@@ -29,80 +29,22 @@ class CampaignsSetupValidationContributorTest extends TestCase
         $this->configureEmailAvailability();
     }
 
-    public function test_it_accepts_valid_selected_campaign_preset(): void
+    public function test_it_accepts_valid_selected_compact_campaign_preset(): void
     {
-        $this->setPresetPackage(['default']);
-
-        Config::set('presets.modules.webinars.campaigns.groups.default', [
-            'test_campaign',
-        ]);
-
-        Config::set('presets.modules.webinars.campaigns.definitions.test_campaign', [
-            'key' => 'test_campaign',
-            'name' => 'Test Campaign',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar_nurture',
-            'status' => 'active',
-            'steps' => [
-                [
-                    'step_number' => 1,
-                    'name' => 'Initial follow-up',
-                    'variant_strategy' => 'first_available',
-                    'criteria' => [
-                        'timing' => [
-                            'type' => 'delay',
-                            'hours' => 2,
-                        ],
-                    ],
-                    'variants' => [
-                        [
-                            'key' => 'email',
-                            'dispatch_key' => 'campaign_step_due',
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
-                    ],
-                ],
-            ],
-        ]);
+        $this->configureSelectedCampaign(
+            campaignKey: 'test_campaign',
+            definition: $this->compactCampaignDefinition(),
+        );
 
         $this->assertSame([], $this->findings());
     }
 
     public function test_it_warns_when_selected_campaign_has_orphaned_messaging_template_variant(): void
     {
-        $this->setPresetPackage(['default']);
-
-        Config::set('presets.modules.webinars.campaigns.groups.default', [
-            'test_campaign',
-        ]);
-
-        Config::set('presets.modules.webinars.campaigns.definitions.test_campaign', [
-            'key' => 'test_campaign',
-            'name' => 'Test Campaign',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar_nurture',
-            'status' => 'active',
-            'steps' => [
-                [
-                    'step_number' => 1,
-                    'name' => 'Initial follow-up',
-                    'variant_strategy' => 'first_available',
-                    'variants' => [
-                        [
-                            'key' => 'email',
-                            'dispatch_key' => 'campaign_step_due',
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
-                    ],
-                ],
-            ],
-        ]);
+        $this->configureSelectedCampaign(
+            campaignKey: 'test_campaign',
+            definition: $this->compactCampaignDefinition(),
+        );
 
         Config::set('messaging.email.definitions.marketing.webinar_nurture.campaigns.test_campaign.steps', [
             1 => [
@@ -145,165 +87,113 @@ class CampaignsSetupValidationContributorTest extends TestCase
         $this->assertSame('email', data_get($warnings[0], 'context.variant_key'));
     }
 
-    public function test_it_reports_invalid_strategy_duplicate_identity_and_reusable_copy(): void
+    public function test_it_rejects_removed_verbose_campaign_authoring_fields(): void
     {
-        $this->setPresetPackage(['default']);
+        $definition = $this->compactCampaignDefinition();
+        $definition['key'] = 'test_campaign';
 
-        Config::set('presets.modules.webinars.campaigns.groups.default', [
-            'invalid_campaign',
-        ]);
+        $this->configureSelectedCampaign(
+            campaignKey: 'test_campaign',
+            definition: $definition,
+        );
 
-        Config::set('presets.modules.webinars.campaigns.definitions.invalid_campaign', [
-            'key' => 'invalid_campaign',
-            'name' => 'Invalid Campaign',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar_nurture',
-            'payload' => [
-                'subject' => 'Wrong owner',
-            ],
-            'steps' => [
-                [
-                    'step_number' => 1,
-                    'variant_strategy' => 'round_robin',
-                    'payload' => [
-                        'body' => 'Wrong owner',
-                    ],
-                    'variants' => [
-                        [
-                            'key' => 'email',
-                            'dispatch_key' => 'campaign_step_due',
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
-                        [
-                            'key' => 'email',
-                            'dispatch_key' => 'campaign_step_due',
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
-                    ],
-                ],
-                [
-                    'step_number' => 1,
-                    'variants' => [
-                        [
-                            'key' => 'sms',
-                            'dispatch_key' => 'campaign_step_due',
-                            'channel' => 'sms',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
-                    ],
-                ],
-            ],
-        ]);
+        $findings = $this->findings();
+
+        $this->assertSame(['campaigns.definition_invalid'], array_column($findings, 'code'));
+        $this->assertStringContainsString(
+            'removed field [key]',
+            $findings[0]['message'],
+        );
+    }
+
+    public function test_it_reports_reusable_copy_owned_by_campaign_step_and_variant(): void
+    {
+        $definition = $this->compactCampaignDefinition();
+        $definition['payload'] = ['subject' => 'Wrong owner'];
+        $definition['steps'][0]['payload'] = ['body' => 'Wrong owner'];
+        $definition['steps'][0]['variants']['email']['payload'] = ['body' => 'Wrong owner'];
+
+        $this->configureSelectedCampaign(
+            campaignKey: 'test_campaign',
+            definition: $definition,
+        );
 
         $codes = array_column($this->findings(), 'code');
 
-        $this->assertContains('campaigns.definition_invalid', $codes);
-        $this->assertContains('campaigns.variant_strategy_invalid', $codes);
-        $this->assertContains('campaigns.duplicate_step_number', $codes);
-        $this->assertContains('campaigns.duplicate_variant_key', $codes);
         $this->assertContains('campaigns.reusable_copy_owned_by_campaign', $codes);
         $this->assertContains('campaigns.reusable_copy_owned_by_step', $codes);
+        $this->assertContains('campaigns.reusable_copy_owned_by_variant', $codes);
     }
 
-    public function test_it_reports_invalid_dependency_sibling_state_and_self_reference(): void
+    public function test_it_reports_dependency_self_reference_and_missing_sibling(): void
     {
-        $this->setPresetPackage(['default']);
-
-        Config::set('presets.modules.webinars.campaigns.groups.default', [
-            'dependency_campaign',
-        ]);
-
-        Config::set('presets.modules.webinars.campaigns.definitions.dependency_campaign', [
-            'key' => 'dependency_campaign',
-            'name' => 'Dependency Campaign',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar_nurture',
-            'steps' => [
-                [
-                    'step_number' => 1,
-                    'variant_strategy' => 'dependency_aware',
-                    'variants' => [
-                        [
-                            'key' => 'email',
-                            'dispatch_key' => 'campaign_step_due',
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
-                        [
-                            'key' => 'sms',
-                            'dispatch_key' => 'campaign_step_due',
-                            'channel' => 'sms',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                            'dependency_rules' => [
-                                'requires_variant_states' => [
-                                    'sms' => ['scheduled'],
-                                    'push' => ['teleported'],
-                                ],
-                            ],
-                        ],
-                    ],
+        $definition = $this->compactCampaignDefinition();
+        $definition['variant_strategy'] = 'dependency_aware';
+        $definition['steps'][0]['variants']['sms'] = [
+            'channel' => 'sms',
+            'dependency_rules' => [
+                'requires_variant_states' => [
+                    'sms' => ['scheduled'],
+                    'push' => ['unavailable'],
                 ],
             ],
-        ]);
+        ];
+
+        $this->configureSelectedCampaign(
+            campaignKey: 'dependency_campaign',
+            definition: $definition,
+        );
 
         $codes = array_column($this->findings(), 'code');
 
         $this->assertContains('campaigns.dependency_self_reference', $codes);
         $this->assertContains('campaigns.dependency_sibling_missing', $codes);
-        $this->assertContains('campaigns.dependency_state_invalid', $codes);
+    }
+
+    public function test_it_rejects_unsupported_dependency_state_during_definition_parsing(): void
+    {
+        $definition = $this->compactCampaignDefinition();
+        $definition['variant_strategy'] = 'dependency_aware';
+        $definition['steps'][0]['variants']['sms'] = [
+            'channel' => 'sms',
+            'dependency_rules' => [
+                'requires_variant_states' => [
+                    'email' => ['teleported'],
+                ],
+            ],
+        ];
+
+        $this->configureSelectedCampaign(
+            campaignKey: 'dependency_campaign',
+            definition: $definition,
+        );
+
+        $findings = $this->findings();
+
+        $this->assertSame(['campaigns.definition_invalid'], array_column($findings, 'code'));
+        $this->assertStringContainsString(
+            'unsupported campaign step variant dependency state',
+            strtolower($findings[0]['message']),
+        );
     }
 
     public function test_it_warns_when_dependency_rules_are_dormant_under_non_dependency_strategy(): void
     {
-        $this->setPresetPackage(['default']);
-
-        Config::set('presets.modules.webinars.campaigns.groups.default', [
-            'dormant_dependency_campaign',
-        ]);
-
-        Config::set('presets.modules.webinars.campaigns.definitions.dormant_dependency_campaign', [
-            'key' => 'dormant_dependency_campaign',
-            'name' => 'Dormant Dependency Campaign',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar_nurture',
-            'steps' => [
-                [
-                    'step_number' => 1,
-                    'variant_strategy' => 'send_all_eligible',
-                    'variants' => [
-                        [
-                            'key' => 'email',
-                            'dispatch_key' => 'campaign_step_due',
-                            'channel' => 'email',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                        ],
-                        [
-                            'key' => 'sms',
-                            'dispatch_key' => 'campaign_step_due',
-                            'channel' => 'sms',
-                            'purpose' => 'marketing',
-                            'scope' => 'webinar_nurture',
-                            'dependency_rules' => [
-                                'requires_variant_states' => [
-                                    'email' => ['scheduled'],
-                                ],
-                            ],
-                        ],
-                    ],
+        $definition = $this->compactCampaignDefinition();
+        $definition['variant_strategy'] = 'send_all_eligible';
+        $definition['steps'][0]['variants']['sms'] = [
+            'channel' => 'sms',
+            'dependency_rules' => [
+                'requires_variant_states' => [
+                    'email' => ['scheduled'],
                 ],
             ],
-        ]);
+        ];
+
+        $this->configureSelectedCampaign(
+            campaignKey: 'dormant_dependency_campaign',
+            definition: $definition,
+        );
 
         $warnings = array_values(array_filter(
             $this->findings(),
@@ -425,6 +315,50 @@ class CampaignsSetupValidationContributorTest extends TestCase
                 $result->findings(),
             ),
         );
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     */
+    private function configureSelectedCampaign(
+        string $campaignKey,
+        array $definition,
+    ): void {
+        $this->setPresetPackage(['default']);
+
+        Config::set('presets.modules.webinars.campaigns.groups.default', [
+            $campaignKey,
+        ]);
+        Config::set(
+            'presets.modules.webinars.campaigns.definitions.'.$campaignKey,
+            $definition,
+        );
+    }
+
+    /** @return array<string, mixed> */
+    private function compactCampaignDefinition(): array
+    {
+        return [
+            'name' => 'Test Campaign',
+            'purpose' => 'marketing',
+            'scope' => 'webinar_nurture',
+            'steps' => [
+                [
+                    'name' => 'Initial follow-up',
+                    'criteria' => [
+                        'timing' => [
+                            'type' => 'delay',
+                            'hours' => 2,
+                        ],
+                    ],
+                    'variants' => [
+                        'email' => [
+                            'channel' => 'email',
+                        ],
+                    ],
+                ],
+            ],
+        ];
     }
 
     private function configureCampaignMessagingDefinition(): void

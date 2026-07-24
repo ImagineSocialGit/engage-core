@@ -325,6 +325,7 @@
 │   │   │   │   ├── FlowRoutePointAuthoringService.php
 │   │   │   │   ├── FlowRoutePointPlacementPolicy.php
 │   │   │   │   ├── FlowRoutePresentationResolver.php
+│   │   │   │   ├── FlowRoutePresetDefinitionFactory.php
 │   │   │   │   ├── FlowRouteTriggerBindingResolver.php
 │   │   │   │   └── PointHandlerRegistry.php
 │   │   │   ├── Support
@@ -1526,6 +1527,7 @@
 │   ├── audit-db-bloat.sh
 │   ├── build-image-manifest.php
 │   ├── create-client.sh
+│   ├── dump-all-config.sh
 │   ├── dump-client-files.sh
 │   ├── make-module-dependency-cone-dump.sh
 │   ├── operations
@@ -1564,6 +1566,7 @@
 │   │   │   ├── CampaignVariantDependencyAwareTest.php
 │   │   │   ├── CampaignVariantPresetSyncSpecificityTest.php
 │   │   │   ├── CampaignVariantSchedulingDurabilityTest.php
+│   │   │   ├── CompactCampaignPresetAuthoringTest.php
 │   │   │   ├── DeactivateCampaignActionTest.php
 │   │   │   ├── DeactivateCampaignCommandTest.php
 │   │   │   ├── EnrollCampaignAutomationActionHandlerTest.php
@@ -1611,6 +1614,7 @@
 │   │   │   ├── AutomationEventReceiptTest.php
 │   │   │   ├── AutomationPointAuthoringRegistryTest.php
 │   │   │   ├── AutomationPointExtensionRegistryTest.php
+│   │   │   ├── CompactFlowRoutePresetAuthoringTest.php
 │   │   │   ├── ContactStatusAutomationImpactResolverTest.php
 │   │   │   ├── FlowRouteBindingControllerTest.php
 │   │   │   ├── FlowRouteConditionBranchPointTest.php
@@ -1812,4 +1816,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-498 directories, 1315 files
+498 directories, 1319 files

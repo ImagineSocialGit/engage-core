@@ -1,4 +1,3 @@
-
 # Engage Core Config Templates
 
 This directory contains safe starting templates for Engage Core default configs and client-specific overrides.
@@ -263,17 +262,15 @@ Campaign presets should look like this conceptually:
 
 ```text
 Campaign preset
-  campaign identity
-  step order
+  definitions map key = campaign identity
+  steps list order = step number
   step timing
-  variant_strategy
-  variants
-    key
-    dispatch_key
+  campaign-level variant_strategy with optional step override
+  variants map key = variant identity and order
     channel
-    purpose
-    scope
     dependency_rules, when needed
+  inherited purpose/scope/source_version
+  fixed campaign_step_due dispatch
 ```
 
 Messaging templates should hold reusable content and delivery-template metadata:
@@ -355,7 +352,7 @@ Before accepting a config change, confirm:
 - Every authorable token resolves through `TokenContractRegistry` for the exact producer context and passes `MessageTemplateTokenValidator`.
 - Campaign presets are free of reusable copy and payload overrides.
 - Messaging templates are free of module-owned timing, lifecycle conditions, sequencing, dependencies, enablement, and module-specific skip behavior.
-- Campaign variants use first-class `key`, `dispatch_key`, `channel`, `purpose`, and `scope` fields.
+- Campaign definitions derive Campaign/step/variant identity from map/list structure; variants declare channel and inherit purpose/scope with fixed dispatch.
 - Campaign Messaging templates are under `steps.{step_number}.variants.{variant_key}`.
 - Runtime-only URLs are not guessed in static config.
 - Purpose/scope pairs are correct.
@@ -390,7 +387,7 @@ Rules:
 - Campaign presets own journeys, timing, conditions, strategies, dependencies, enablement, and template references.
 - Campaign presets must not own or override payloads.
 - Campaign preset steps define business moments, timing, and variant_strategy.
-- Campaign preset variants reference Messaging templates with first-class key/dispatch_key/channel/purpose/scope keys.
+- Campaign variant map keys define identity; variants declare channel and inherit purpose/scope with fixed campaign_step_due dispatch.
 - Campaign dependency-aware variants must use explicit sibling variant dependency rules.
 - Do not use meta.message for new Campaign preset step or variant message references.
 - Campaign message templates resolve by channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key.

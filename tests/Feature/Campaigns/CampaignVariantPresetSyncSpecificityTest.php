@@ -37,7 +37,7 @@ class CampaignVariantPresetSyncSpecificityTest extends TestCase
         $this->assertSame('1', $emailVariant->source_version);
 
         $this->assertSame(
-            'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps.1.variants.email',
+            'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
             $emailVariant->source_config_path,
         );
 
@@ -204,64 +204,49 @@ class CampaignVariantPresetSyncSpecificityTest extends TestCase
         Config::set('presets.packages.test_client.groups.campaigns', ['webinar_default']);
         Config::set('presets.modules.webinars.campaigns.groups.webinar_default', ['webinar_attended_nurture']);
 
+        $variants = [];
+
+        foreach ($variantKeys as $variantKey) {
+            $variants[$variantKey] = [
+                'name' => strtoupper($variantKey).' follow-up',
+                'channel' => $variantKey === 'sms' ? 'sms' : 'email',
+                'source_config_path' => 'messaging.'.($variantKey === 'sms' ? 'sms' : 'email').'.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.'.$variantKey,
+            ];
+        }
+
         $steps = [
             [
-                'step_number' => 1,
                 'name' => 'Initial follow-up',
-                'dispatch_key' => 'campaign_step_due',
-                'variant_strategy' => 'send_all_eligible',
-                'is_active' => true,
-                'source_version' => 1,
                 'criteria' => ['timing' => ['type' => 'delay', 'minutes' => 30]],
-                'meta' => ['type' => 'message'],
-                'variants' => array_values(array_map(
-                    fn (string $variantKey): array => [
-                        'key' => $variantKey,
-                        'name' => strtoupper($variantKey).' follow-up',
-                        'sort_order' => $variantKey === 'email' ? 0 : 1,
-                        'dispatch_key' => 'campaign_step_due',
-                        'channel' => $variantKey === 'sms' ? 'sms' : 'email',
-                        'purpose' => 'marketing',
-                        'scope' => 'webinar_nurture',
-                        'source_config_path' => 'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps.1.variants.'.$variantKey,
-                    ],
-                    $variantKeys,
-                )),
+                'variants' => $variants,
             ],
         ];
 
         if ($includeSecondStep) {
             $steps[] = [
-                'step_number' => 2,
                 'name' => 'Second follow-up',
-                'dispatch_key' => 'campaign_step_due',
                 'variant_strategy' => 'first_available',
-                'is_active' => true,
-                'source_version' => 1,
                 'criteria' => ['timing' => ['type' => 'delay', 'days' => 1]],
-                'meta' => ['type' => 'message'],
-                'variants' => [[
-                    'key' => 'email',
-                    'name' => 'Email follow-up',
-                    'dispatch_key' => 'campaign_step_due',
-                    'channel' => 'email',
-                    'purpose' => 'marketing',
-                    'scope' => 'webinar_nurture',
-                    'source_config_path' => 'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps.2.variants.email',
-                ]],
+                'variants' => [
+                    'email' => [
+                        'name' => 'Email follow-up',
+                        'channel' => 'email',
+                        'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.2.variants.email',
+                    ],
+                ],
             ];
         }
 
         Config::set('presets.modules.webinars.campaigns.definitions.webinar_attended_nurture', [
-            'key' => 'webinar_attended_nurture',
             'name' => 'Webinar Attended Nurture',
             'description' => 'Follow-up sequence for webinar attendees.',
-            'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => 'active',
+            'variant_strategy' => 'send_all_eligible',
             'source_version' => 1,
             'steps' => $steps,
         ]);
     }
+
 }

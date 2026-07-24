@@ -43,6 +43,46 @@ class DomainConfigContractTest extends TestCase
         );
     }
 
+    public function test_campaign_contract_rejects_verbose_derived_identity_and_order_fields(): void
+    {
+        $contract = app(ConfigContractRegistry::class)
+            ->get('campaigns.preset_definition');
+        $definition = $contract->example();
+
+        $definition['key'] = 'follow_up';
+        $definition['channel'] = 'email';
+        $definition['dispatch_key'] = 'campaign_step_due';
+        $definition['steps'][0]['step_number'] = 1;
+        $definition['steps'][0]['dispatch_key'] = 'campaign_step_due';
+        $definition['steps'][0]['variants']['email']['key'] = 'email';
+        $definition['steps'][0]['variants']['email']['sort_order'] = 10;
+        $definition['steps'][0]['variants']['email']['purpose'] = 'marketing';
+        $definition['steps'][0]['variants']['email']['scope'] = 'nurture';
+
+        $violations = $contract->schema()->validate($definition, 'campaign');
+        $unknownPaths = array_values(array_map(
+            fn ($violation): string => $violation->path,
+            array_filter(
+                $violations,
+                fn ($violation): bool => $violation->code === 'unknown_field',
+            ),
+        ));
+
+        foreach ([
+            'campaign.key',
+            'campaign.channel',
+            'campaign.dispatch_key',
+            'campaign.steps.0.step_number',
+            'campaign.steps.0.dispatch_key',
+            'campaign.steps.0.variants.email.key',
+            'campaign.steps.0.variants.email.sort_order',
+            'campaign.steps.0.variants.email.purpose',
+            'campaign.steps.0.variants.email.scope',
+        ] as $path) {
+            $this->assertContains($path, $unknownPaths);
+        }
+    }
+
     public function test_current_webinar_orchestration_matches_closed_contracts(): void
     {
         $registry = app(ConfigContractRegistry::class);

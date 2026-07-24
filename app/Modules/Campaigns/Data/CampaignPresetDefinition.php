@@ -7,6 +7,8 @@ use InvalidArgumentException;
 
 class CampaignPresetDefinition
 {
+    public const CHANNEL_MULTI = 'multi';
+
     /**
      * @param array<int, CampaignStepPresetDefinition> $steps
      * @param array<string, mixed> $meta
@@ -19,6 +21,8 @@ class CampaignPresetDefinition
         public readonly string $purpose,
         public readonly string $scope,
         public readonly string $status,
+        public readonly string $dispatchKey,
+        public readonly string $variantStrategy,
         public readonly ?string $sourceVersion,
         public readonly array $steps,
         public readonly array $meta = [],
@@ -27,48 +31,120 @@ class CampaignPresetDefinition
     /**
      * @param array<string, mixed> $data
      */
-    public static function fromArray(array $data, ?string $definitionKey = null): self
+    public static function fromArray(array $data, string $definitionKey): self
     {
-        $key = self::normalizeSegment(self::requiredString($data['key'] ?? null, 'campaign key'));
+        self::rejectRemovedFields($data, [
+            'key',
+            'channel',
+            'dispatch_key',
+        ], 'Campaign preset ['.$definitionKey.']');
 
-        if ($definitionKey !== null && self::normalizeSegment($definitionKey) !== $key) {
+        $key = self::normalizeSegment(
+            self::requiredString($definitionKey, 'campaign definition key'),
+        );
+        $purpose = self::normalizeSegment(
+            self::requiredString($data['purpose'] ?? null, 'campaign purpose'),
+        );
+        $scope = self::normalizeSegment(
+            self::requiredString($data['scope'] ?? null, 'campaign scope'),
+        );
+        $dispatchKey = 'campaign_step_due';
+        $variantStrategy = self::variantStrategy(
+            $data['variant_strategy'] ?? 'first_available',
+        );
+        $sourceVersion = self::nullableString($data['source_version'] ?? null);
+        $stepData = $data['steps'] ?? null;
+
+        if (! is_array($stepData) || ! array_is_list($stepData) || $stepData === []) {
             throw new InvalidArgumentException(
-                'Campaign preset definition ['.$definitionKey.'] key must match its definition key ['.$key.'].'
+                'Campaign preset ['.$key.'] steps must be a non-empty list.'
             );
         }
 
         $steps = [];
-        $stepNumbers = [];
 
-        foreach (($data['steps'] ?? []) as $step) {
+        foreach ($stepData as $index => $step) {
             if (! is_array($step)) {
-                continue;
-            }
-
-            $stepDefinition = CampaignStepPresetDefinition::fromArray($step);
-
-            if (in_array($stepDefinition->stepNumber, $stepNumbers, true)) {
                 throw new InvalidArgumentException(
-                    'Campaign preset ['.$key.'] has duplicate step number ['.$stepDefinition->stepNumber.'].'
+                    'Campaign preset ['.$key.'] step ['.($index + 1).'] must be an object.'
                 );
             }
 
-            $stepNumbers[] = $stepDefinition->stepNumber;
-            $steps[] = $stepDefinition;
+            $steps[] = CampaignStepPresetDefinition::fromArray(
+                data: $step,
+                stepNumber: $index + 1,
+                fallbackDispatchKey: $dispatchKey,
+                fallbackPurpose: $purpose,
+                fallbackScope: $scope,
+                fallbackVariantStrategy: $variantStrategy,
+                fallbackSourceVersion: $sourceVersion,
+            );
         }
 
         return new self(
             key: $key,
             name: self::requiredString($data['name'] ?? null, 'campaign name'),
             description: self::nullableString($data['description'] ?? null),
-            channel: self::requiredString($data['channel'] ?? null, 'campaign channel'),
-            purpose: self::requiredString($data['purpose'] ?? null, 'campaign purpose'),
-            scope: self::requiredString($data['scope'] ?? null, 'campaign scope'),
+            channel: self::aggregateSegment(
+                array_merge(...array_map(
+                    fn (CampaignStepPresetDefinition $step): array => array_map(
+                        fn (CampaignStepVariantPresetDefinition $variant): string => $variant->channel,
+                        $step->variants,
+                    ),
+                    $steps,
+                )),
+            ),
+            purpose: $purpose,
+            scope: $scope,
             status: self::campaignStatus($data['status'] ?? null),
-            sourceVersion: self::nullableString($data['source_version'] ?? null),
+            dispatchKey: $dispatchKey,
+            variantStrategy: $variantStrategy,
+            sourceVersion: $sourceVersion,
             steps: $steps,
             meta: is_array($data['meta'] ?? null) ? $data['meta'] : [],
         );
+    }
+
+    /**
+     * @param array<int, string> $segments
+     */
+    public static function aggregateSegment(array $segments): string
+    {
+        $segments = array_values(array_unique(array_filter(array_map(
+            fn (mixed $segment): ?string => is_string($segment) && trim($segment) !== ''
+                ? self::normalizeSegment($segment)
+                : null,
+            $segments,
+        ))));
+
+        if ($segments === []) {
+            throw new InvalidArgumentException(
+                'Campaign message identity requires at least one non-empty segment.'
+            );
+        }
+
+        return count($segments) === 1
+            ? $segments[0]
+            : self::CHANNEL_MULTI;
+    }
+
+    public static function variantStrategy(mixed $value): string
+    {
+        $strategy = self::normalizeSegment(
+            self::nullableString($value) ?? 'first_available',
+        );
+
+        if (! in_array($strategy, [
+            'first_available',
+            'send_all_eligible',
+            'dependency_aware',
+        ], true)) {
+            throw new InvalidArgumentException(
+                'Unsupported Campaign variant strategy ['.$strategy.'].'
+            );
+        }
+
+        return $strategy;
     }
 
     private static function campaignStatus(mixed $value): string
@@ -86,6 +162,24 @@ class CampaignPresetDefinition
         }
 
         return $status;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<int, string> $fields
+     */
+    private static function rejectRemovedFields(
+        array $data,
+        array $fields,
+        string $context,
+    ): void {
+        foreach ($fields as $field) {
+            if (array_key_exists($field, $data)) {
+                throw new InvalidArgumentException(
+                    "{$context} must not define removed field [{$field}]."
+                );
+            }
+        }
     }
 
     private static function requiredString(mixed $value, string $field): string

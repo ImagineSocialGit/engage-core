@@ -171,21 +171,14 @@ class CampaignStepVariantsTest extends TestCase
         Config::set('presets.packages.test_client.groups.campaigns', ['webinar_default']);
         Config::set('presets.modules.webinars.campaigns.groups.webinar_default', ['webinar_attended_nurture']);
         Config::set('presets.modules.webinars.campaigns.definitions.webinar_attended_nurture', [
-            'key' => 'webinar_attended_nurture',
             'name' => 'Webinar Attended Nurture',
             'description' => 'Follow-up sequence for webinar attendees.',
-            'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => 'active',
+            'variant_strategy' => 'send_all_eligible',
             'steps' => [[
-                'step_number' => 1,
                 'name' => 'Initial follow-up',
-                'dispatch_key' => 'campaign_step_due',
-                'channel' => 'email',
-                'purpose' => 'marketing',
-                'scope' => 'webinar_nurture',
-                'variant_strategy' => 'send_all_eligible',
                 'criteria' => [
                     'timing' => [
                         'type' => 'delay',
@@ -193,21 +186,13 @@ class CampaignStepVariantsTest extends TestCase
                     ],
                 ],
                 'variants' => [
-                    [
-                        'key' => 'email',
+                    'email' => [
                         'name' => 'Email follow-up',
-                        'sort_order' => 0,
                         'channel' => 'email',
-                        'purpose' => 'marketing',
-                        'scope' => 'webinar_nurture',
                     ],
-                    [
-                        'key' => 'sms',
+                    'sms' => [
                         'name' => 'SMS follow-up',
-                        'sort_order' => 1,
                         'channel' => 'sms',
-                        'purpose' => 'marketing',
-                        'scope' => 'webinar_nurture',
                     ],
                 ],
             ]],

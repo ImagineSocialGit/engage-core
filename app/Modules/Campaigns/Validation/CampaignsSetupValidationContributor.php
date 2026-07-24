@@ -4,6 +4,8 @@ namespace App\Modules\Campaigns\Validation;
 
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Modules\Campaigns\Data\CampaignPresetDefinition;
+use App\Modules\Campaigns\Data\CampaignStepPresetDefinition;
+use App\Modules\Campaigns\Data\CampaignStepVariantPresetDefinition;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Campaigns\Models\CampaignStepVariant;
@@ -31,16 +33,6 @@ class CampaignsSetupValidationContributor implements SetupValidationContributor
         'dependency_aware',
     ];
 
-    private const DEPENDENCY_STATES = [
-        'scheduled',
-        'pending',
-        'sent',
-        'skipped',
-        'failed',
-        'terminal',
-        'unavailable',
-    ];
-
     public function __construct(
         private readonly CampaignMessageDefinitionResolver $campaignMessageDefinitionResolver,
         private readonly MessageChannelAvailability $messageChannelAvailability,
@@ -57,7 +49,7 @@ class CampaignsSetupValidationContributor implements SetupValidationContributor
     /**
      * @return iterable<int, SetupValidationFinding>
      */
-private function validateSelectedPresetDefinitions(): iterable
+    private function validateSelectedPresetDefinitions(): iterable
     {
         $presetKey = $this->packageResolver->resolvePresetKey();
 
@@ -216,53 +208,26 @@ private function validateSelectedPresetDefinitions(): iterable
         string $campaignKey,
         array $definition,
     ): array {
-        $identities = [];
-        $steps = $definition['steps'] ?? null;
-
-        if (! is_array($steps)) {
-            return $identities;
+        try {
+            $preset = CampaignPresetDefinition::fromArray(
+                data: $definition,
+                definitionKey: $campaignKey,
+            );
+        } catch (InvalidArgumentException) {
+            return [];
         }
 
-        foreach ($steps as $step) {
-            if (! is_array($step)) {
-                continue;
-            }
+        $identities = [];
 
-            $stepNumber = filter_var($step['step_number'] ?? null, FILTER_VALIDATE_INT);
-
-            if (! is_int($stepNumber) || $stepNumber < 1) {
-                continue;
-            }
-
-            $variants = $step['variants'] ?? null;
-
-            if (! is_array($variants)) {
-                continue;
-            }
-
-            foreach ($variants as $variant) {
-                if (! is_array($variant) || ! $this->filledString($variant['key'] ?? null)) {
-                    continue;
-                }
-
-                $channel = $variant['channel'] ?? $step['channel'] ?? $definition['channel'] ?? null;
-                $purpose = $variant['purpose'] ?? $step['purpose'] ?? $definition['purpose'] ?? null;
-                $scope = $variant['scope'] ?? $step['scope'] ?? $definition['scope'] ?? null;
-
-                if (! $this->filledString($channel)
-                    || ! $this->filledString($purpose)
-                    || ! $this->filledString($scope)
-                ) {
-                    continue;
-                }
-
+        foreach ($preset->steps as $step) {
+            foreach ($step->variants as $variant) {
                 $identity = $this->campaignMessagingTemplateIdentity(
-                    channel: $channel,
-                    purpose: $purpose,
-                    scope: $scope,
-                    campaignKey: $campaignKey,
-                    stepNumber: $stepNumber,
-                    variantKey: $variant['key'],
+                    channel: $variant->channel,
+                    purpose: $variant->purpose,
+                    scope: $variant->scope,
+                    campaignKey: $preset->key,
+                    stepNumber: $step->stepNumber,
+                    variantKey: $variant->key,
                 );
 
                 $identities[$identity] = true;
@@ -308,7 +273,7 @@ private function validateSelectedPresetDefinitions(): iterable
         ];
 
         try {
-            CampaignPresetDefinition::fromArray(
+            $preset = CampaignPresetDefinition::fromArray(
                 data: $definition,
                 definitionKey: $campaignKey,
             );
@@ -319,6 +284,8 @@ private function validateSelectedPresetDefinitions(): iterable
                 path: $path,
                 context: $context,
             );
+
+            return;
         }
 
         if (array_key_exists('payload', $definition)) {
@@ -330,64 +297,14 @@ private function validateSelectedPresetDefinitions(): iterable
             );
         }
 
-        if (! is_array($definition['steps'] ?? null)) {
-            yield $this->error(
-                code: 'campaigns.steps_invalid',
-                message: "Campaign preset [{$campaignKey}] [steps] must be an array.",
-                path: "{$path}.steps",
-                context: $context,
-            );
-
-            return;
-        }
-
-        $seenStepNumbers = [];
-
-        foreach ($definition['steps'] as $stepIndex => $step) {
-            $stepPath = "{$path}.steps.{$stepIndex}";
-
-            if (! is_array($step)) {
-                yield $this->error(
-                    code: 'campaigns.step_invalid',
-                    message: "Campaign preset [{$campaignKey}] contains a non-array step.",
-                    path: $stepPath,
-                    context: $context,
-                );
-
-                continue;
-            }
-
-            $stepNumber = filter_var($step['step_number'] ?? null, FILTER_VALIDATE_INT);
-
-            if (! is_int($stepNumber) || $stepNumber < 1) {
-                yield $this->error(
-                    code: 'campaigns.step_number_invalid',
-                    message: "Campaign preset [{$campaignKey}] contains a step with invalid [step_number].",
-                    path: "{$stepPath}.step_number",
-                    context: $context,
-                );
-
-                continue;
-            }
-
-            if (isset($seenStepNumbers[$stepNumber])) {
-                yield $this->error(
-                    code: 'campaigns.duplicate_step_number',
-                    message: "Campaign preset [{$campaignKey}] contains duplicate step number [{$stepNumber}].",
-                    path: "{$stepPath}.step_number",
-                    context: $context + [
-                        'step_number' => $stepNumber,
-                    ],
-                );
-            } else {
-                $seenStepNumbers[$stepNumber] = true;
-            }
+        foreach ($preset->steps as $index => $stepDefinition) {
+            $step = $definition['steps'][$index] ?? [];
 
             yield from $this->validatePresetStep(
                 campaignKey: $campaignKey,
-                stepNumber: $stepNumber,
-                step: $step,
-                path: $stepPath,
+                definition: $stepDefinition,
+                step: is_array($step) ? $step : [],
+                path: "{$path}.steps.{$index}",
                 context: $context,
             );
         }
@@ -400,37 +317,12 @@ private function validateSelectedPresetDefinitions(): iterable
      */
     private function validatePresetStep(
         string $campaignKey,
-        int $stepNumber,
+        CampaignStepPresetDefinition $definition,
         array $step,
         string $path,
         array $context,
     ): iterable {
-        $strategy = $this->normalizeSegment((string) ($step['variant_strategy'] ?? 'first_available'));
-
-        if (! in_array($strategy, self::VARIANT_STRATEGIES, true)) {
-            yield $this->error(
-                code: 'campaigns.variant_strategy_invalid',
-                message: "Campaign [{$campaignKey}] step [{$stepNumber}] has unsupported variant strategy [{$strategy}].",
-                path: "{$path}.variant_strategy",
-                context: $context + [
-                    'step_number' => $stepNumber,
-                ],
-            );
-        }
-
-        $dispatchKey = $this->normalizeSegment((string) ($step['dispatch_key'] ?? 'campaign_step_due'));
-
-        if ($dispatchKey !== 'campaign_step_due') {
-            yield $this->error(
-                code: 'campaigns.dispatch_key_noncanonical',
-                message: "Campaign [{$campaignKey}] step [{$stepNumber}] must use canonical dispatch key [campaign_step_due].",
-                path: "{$path}.dispatch_key",
-                context: $context + [
-                    'step_number' => $stepNumber,
-                    'dispatch_key' => $dispatchKey,
-                ],
-            );
-        }
+        $stepNumber = $definition->stepNumber;
 
         if (array_key_exists('payload', $step)) {
             yield $this->error(
@@ -446,88 +338,43 @@ private function validateSelectedPresetDefinitions(): iterable
         yield from $this->validateTiming(
             campaignKey: $campaignKey,
             stepNumber: $stepNumber,
-            criteria: $step['criteria'] ?? [],
+            criteria: $definition->criteria,
             path: "{$path}.criteria",
             context: $context,
         );
 
-        $variants = $step['variants'] ?? null;
+        $siblingVariantKeys = array_map(
+            fn (CampaignStepVariantPresetDefinition $variant): string => $variant->key,
+            $definition->variants,
+        );
+        $rawVariants = is_array($step['variants'] ?? null)
+            ? $step['variants']
+            : [];
 
-        if (! is_array($variants) || $variants === []) {
-            yield $this->error(
-                code: 'campaigns.variants_missing',
-                message: "Campaign [{$campaignKey}] step [{$stepNumber}] must define at least one variant.",
-                path: "{$path}.variants",
-                context: $context + [
-                    'step_number' => $stepNumber,
-                ],
-            );
+        foreach ($definition->variants as $variantDefinition) {
+            $rawVariant = [];
 
-            return;
-        }
+            foreach ($rawVariants as $rawVariantKey => $candidate) {
+                if (! is_string($rawVariantKey)
+                    || $this->normalizeSegment($rawVariantKey) !== $variantDefinition->key
+                    || ! is_array($candidate)
+                ) {
+                    continue;
+                }
 
-        $variantKeys = [];
+                $rawVariant = $candidate;
 
-        foreach ($variants as $variantIndex => $variant) {
-            $variantPath = "{$path}.variants.{$variantIndex}";
-
-            if (! is_array($variant)) {
-                yield $this->error(
-                    code: 'campaigns.variant_invalid',
-                    message: "Campaign [{$campaignKey}] step [{$stepNumber}] contains a non-array variant.",
-                    path: $variantPath,
-                    context: $context + [
-                        'step_number' => $stepNumber,
-                    ],
-                );
-
-                continue;
-            }
-
-            $variantKey = $variant['key'] ?? null;
-
-            if (! $this->filledString($variantKey)) {
-                yield $this->error(
-                    code: 'campaigns.variant_key_missing',
-                    message: "Campaign [{$campaignKey}] step [{$stepNumber}] contains a variant without a non-empty key.",
-                    path: "{$variantPath}.key",
-                    context: $context + [
-                        'step_number' => $stepNumber,
-                    ],
-                );
-
-                continue;
-            }
-
-            $variantKey = $this->normalizeSegment($variantKey);
-
-            if (isset($variantKeys[$variantKey])) {
-                yield $this->error(
-                    code: 'campaigns.duplicate_variant_key',
-                    message: "Campaign [{$campaignKey}] step [{$stepNumber}] contains duplicate variant key [{$variantKey}].",
-                    path: "{$variantPath}.key",
-                    context: $context + [
-                        'step_number' => $stepNumber,
-                        'variant_key' => $variantKey,
-                    ],
-                );
-            } else {
-                $variantKeys[$variantKey] = true;
+                break;
             }
 
             yield from $this->validatePresetVariant(
                 campaignKey: $campaignKey,
                 stepNumber: $stepNumber,
-                variantKey: $variantKey,
-                variant: $variant,
-                strategy: $strategy,
-                siblingVariantKeys: array_values(array_unique(array_filter(array_map(
-                    fn (mixed $candidate): ?string => is_array($candidate) && $this->filledString($candidate['key'] ?? null)
-                        ? $this->normalizeSegment($candidate['key'])
-                        : null,
-                    $variants,
-                )))),
-                path: $variantPath,
+                definition: $variantDefinition,
+                variant: $rawVariant,
+                strategy: $definition->variantStrategy,
+                siblingVariantKeys: $siblingVariantKeys,
+                path: "{$path}.variants.{$variantDefinition->key}",
                 context: $context,
             );
         }
@@ -542,41 +389,14 @@ private function validateSelectedPresetDefinitions(): iterable
     private function validatePresetVariant(
         string $campaignKey,
         int $stepNumber,
-        string $variantKey,
+        CampaignStepVariantPresetDefinition $definition,
         array $variant,
         string $strategy,
         array $siblingVariantKeys,
         string $path,
         array $context,
     ): iterable {
-        foreach (['dispatch_key', 'channel', 'purpose', 'scope'] as $field) {
-            if (! $this->filledString($variant[$field] ?? null)) {
-                yield $this->error(
-                    code: 'campaigns.variant_identity_missing',
-                    message: "Campaign [{$campaignKey}] step [{$stepNumber}] variant [{$variantKey}] is missing [{$field}].",
-                    path: "{$path}.{$field}",
-                    context: $context + [
-                        'step_number' => $stepNumber,
-                        'variant_key' => $variantKey,
-                        'field' => $field,
-                    ],
-                );
-            }
-        }
-
-        if ($this->filledString($variant['dispatch_key'] ?? null)
-            && $this->normalizeSegment($variant['dispatch_key']) !== 'campaign_step_due'
-        ) {
-            yield $this->error(
-                code: 'campaigns.variant_dispatch_key_noncanonical',
-                message: "Campaign [{$campaignKey}] step [{$stepNumber}] variant [{$variantKey}] must use [campaign_step_due].",
-                path: "{$path}.dispatch_key",
-                context: $context + [
-                    'step_number' => $stepNumber,
-                    'variant_key' => $variantKey,
-                ],
-            );
-        }
+        $variantKey = $definition->key;
 
         if (array_key_exists('payload', $variant)) {
             yield $this->error(
@@ -590,23 +410,9 @@ private function validateSelectedPresetDefinitions(): iterable
             );
         }
 
-        $rules = $variant['dependency_rules'] ?? [];
+        $rules = $definition->dependencyRules;
 
-        if ($rules !== [] && ! is_array($rules)) {
-            yield $this->error(
-                code: 'campaigns.dependency_rules_invalid',
-                message: "Campaign [{$campaignKey}] step [{$stepNumber}] variant [{$variantKey}] dependency_rules must be an array.",
-                path: "{$path}.dependency_rules",
-                context: $context + [
-                    'step_number' => $stepNumber,
-                    'variant_key' => $variantKey,
-                ],
-            );
-
-            return;
-        }
-
-        if ($strategy !== 'dependency_aware' && is_array($rules) && $rules !== []) {
+        if ($strategy !== 'dependency_aware' && $rules !== []) {
             yield $this->warning(
                 code: 'campaigns.dependency_rules_dormant',
                 message: "Campaign [{$campaignKey}] step [{$stepNumber}] variant [{$variantKey}] defines dependency rules but strategy [{$strategy}] does not evaluate them.",
@@ -619,17 +425,15 @@ private function validateSelectedPresetDefinitions(): iterable
             );
         }
 
-        if (is_array($rules)) {
-            yield from $this->validateDependencyRules(
-                campaignKey: $campaignKey,
-                stepNumber: $stepNumber,
-                variantKey: $variantKey,
-                rules: $rules,
-                siblingVariantKeys: $siblingVariantKeys,
-                path: "{$path}.dependency_rules",
-                context: $context,
-            );
-        }
+        yield from $this->validateDependencyRules(
+            campaignKey: $campaignKey,
+            stepNumber: $stepNumber,
+            variantKey: $variantKey,
+            rules: $rules,
+            siblingVariantKeys: $siblingVariantKeys,
+            path: "{$path}.dependency_rules",
+            context: $context,
+        );
     }
 
     /**
@@ -647,64 +451,18 @@ private function validateSelectedPresetDefinitions(): iterable
         string $path,
         array $context,
     ): iterable {
-        $requirements = [];
-
-        foreach (($rules['requires_scheduled_variant_keys'] ?? []) as $requiredKey) {
-            if ($this->filledString($requiredKey)) {
-                $requirements[] = [
-                    'variant_key' => $this->normalizeSegment($requiredKey),
-                    'states' => ['scheduled'],
-                ];
-            }
-        }
-
         $variantStates = $rules['requires_variant_states'] ?? [];
 
-        if (is_array($variantStates)) {
-            foreach ($variantStates as $requiredKey => $states) {
-                if (! $this->filledString($requiredKey)) {
-                    continue;
-                }
-
-                $requirements[] = [
-                    'variant_key' => $this->normalizeSegment($requiredKey),
-                    'states' => $this->normalizeStringList($states),
-                ];
-            }
+        if (! is_array($variantStates)) {
+            return;
         }
 
-        $requires = $rules['requires'] ?? [];
-
-        if (is_array($requires)) {
-            foreach ($requires as $requirement) {
-                if (! is_array($requirement)) {
-                    continue;
-                }
-
-                $requiredKey = $requirement['variant_key']
-                    ?? $requirement['variant']
-                    ?? $requirement['key']
-                    ?? null;
-
-                if (! $this->filledString($requiredKey)) {
-                    continue;
-                }
-
-                $requirements[] = [
-                    'variant_key' => $this->normalizeSegment($requiredKey),
-                    'states' => $this->normalizeStringList(
-                        $requirement['states']
-                            ?? $requirement['state']
-                            ?? $requirement['status']
-                            ?? 'scheduled',
-                    ),
-                ];
+        foreach (array_keys($variantStates) as $requiredKey) {
+            if (! $this->filledString($requiredKey)) {
+                continue;
             }
-        }
 
-        foreach ($requirements as $requirement) {
-            $requiredKey = $requirement['variant_key'];
-
+            $requiredKey = $this->normalizeSegment($requiredKey);
             if ($requiredKey === $variantKey) {
                 yield $this->error(
                     code: 'campaigns.dependency_self_reference',
@@ -728,36 +486,6 @@ private function validateSelectedPresetDefinitions(): iterable
                 );
             }
 
-            if ($requirement['states'] === []) {
-                yield $this->error(
-                    code: 'campaigns.dependency_states_missing',
-                    message: "Campaign [{$campaignKey}] step [{$stepNumber}] variant [{$variantKey}] dependency [{$requiredKey}] requires at least one state.",
-                    path: $path,
-                    context: $context + [
-                        'step_number' => $stepNumber,
-                        'variant_key' => $variantKey,
-                        'required_variant_key' => $requiredKey,
-                    ],
-                );
-
-                continue;
-            }
-
-            foreach ($requirement['states'] as $state) {
-                if (! in_array($state, self::DEPENDENCY_STATES, true)) {
-                    yield $this->error(
-                        code: 'campaigns.dependency_state_invalid',
-                        message: "Campaign [{$campaignKey}] step [{$stepNumber}] variant [{$variantKey}] uses unsupported dependency state [{$state}].",
-                        path: $path,
-                        context: $context + [
-                            'step_number' => $stepNumber,
-                            'variant_key' => $variantKey,
-                            'required_variant_key' => $requiredKey,
-                            'state' => $state,
-                        ],
-                    );
-                }
-            }
         }
     }
 
@@ -786,7 +514,7 @@ private function validateSelectedPresetDefinitions(): iterable
             return;
         }
 
-        $timing = $criteria['timing'] ?? $criteria['schedule'] ?? null;
+        $timing = $criteria['timing'] ?? null;
 
         if ($timing === null) {
             return;
@@ -1128,27 +856,6 @@ private function validateSelectedPresetDefinitions(): iterable
                 context: $context,
             );
         }
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function normalizeStringList(mixed $values): array
-    {
-        if (is_string($values)) {
-            $values = [$values];
-        }
-
-        if (! is_array($values)) {
-            return [];
-        }
-
-        return array_values(array_unique(array_filter(array_map(
-            fn (mixed $value): ?string => $this->filledString($value)
-                ? $this->normalizeSegment($value)
-                : null,
-            $values,
-        ))));
     }
 
     private function filledString(mixed $value): bool

@@ -929,27 +929,39 @@ schedule
 
 ## Campaign channel variants
 
-Campaign presets define step groups and channel variants.
+A Campaign step is one business moment. Its `variants` value is a map of channel-specific delivery options:
 
-A step group is a business moment.
-
-A variant is a channel-specific delivery option for that moment.
-
-Variants should include:
-
-```text
-channel
-purpose
-scope
-timing
-message template reference or assignment key
-dependency rules, when needed
-strategy participation
+```php
+'variants' => [
+    'sms' => [
+        'channel' => 'sms',
+    ],
+    'email' => [
+        'channel' => 'email',
+    ],
+],
 ```
 
-Variants must not include reusable subject/body/message copy.
+The map keys are the stable variant keys. Their map order derives persisted `sort_order` values in increments of 10. Do not repeat `key`, `sort_order`, or `order` inside a variant.
 
-Initial strategies:
+Campaign-level `purpose`, `scope`, and `source_version` cascade through every step and variant. The runtime dispatch key is fixed at `campaign_step_due`. Do not repeat them on children. Campaign and step channel summaries are derived from the configured variant channels and become either the single channel or `multi`.
+
+Variants may define:
+
+```text
+name
+channel
+is_active = false, only when intentionally disabled
+criteria, only when variant-specific behavior is needed
+dependency_rules
+source_config_path
+source_version, only when overriding the Campaign version
+meta, only when non-empty
+```
+
+Variants must not include reusable subject/body/message copy or payload overrides.
+
+Supported strategies are:
 
 ```text
 first_available
@@ -957,11 +969,21 @@ send_all_eligible
 dependency_aware
 ```
 
-Use `first_available` when email/SMS are alternatives.
+Set `variant_strategy` once on the Campaign when all steps use the same strategy. A step may override it only when that business moment genuinely behaves differently.
 
-Use `send_all_eligible` when each eligible channel should send.
+Use `first_available` when email and SMS are alternatives. Use `send_all_eligible` when each eligible channel should send. Use `dependency_aware` when one sibling variant depends on another sibling variant reaching an allowed state.
 
-Use `dependency_aware` when one sibling variant depends on another sibling variant reaching an allowed state. Supported dependency states are:
+The canonical dependency shape is:
+
+```php
+'dependency_rules' => [
+    'requires_variant_states' => [
+        'sms' => ['sent', 'unavailable'],
+    ],
+],
+```
+
+Supported dependency states are:
 
 ```text
 scheduled
@@ -973,9 +995,11 @@ terminal
 unavailable
 ```
 
-`unavailable` means the required sibling variant's channel is unavailable for the current client/runtime configuration. It is not a `ScheduledMessage` delivery status and does not mean that one specific contact merely lacks consent.
+`unavailable` means the required sibling variant's channel is unavailable for the current client/runtime configuration. It is not a `ScheduledMessage` delivery status and does not mean one contact merely lacks consent.
 
-Dependency checks must remain scoped to the same campaign enrollment, same campaign step, and required sibling variant key. Another contact's message state must never satisfy the dependency.
+Dependency checks remain scoped to the same Campaign enrollment, same derived step number, and required sibling variant key. Another contact's message state must never satisfy the dependency.
+
+Legacy dependency aliases are not supported. Do not use `requires_scheduled_variant_keys`, `requires`, or other parallel dependency formats.
 
 ## Campaign preset shape
 
@@ -987,73 +1011,76 @@ config/presets/modules/{contributor-module}/campaigns.php
 client/{client-key}/config/presets/modules/{contributor-module}/campaigns.php
 ```
 
-Campaign presets define the journey and reference the Messaging template context.
+Campaign definitions use one compact canonical shape:
 
-Campaign presets must not define reusable message copy.
+- the `definitions` map key is the Campaign key;
+- `steps` is a sequential list, and list position derives `step_number`;
+- `variants` is a keyed map, and each map key derives the variant key;
+- variant map order derives persisted `sort_order`;
+- the dispatch key is fixed at `campaign_step_due` and is not authorable;
+- `status` defaults to `active` for initial installation;
+- `variant_strategy` defaults to `first_available`;
+- child `is_active` defaults to `true` and should be omitted unless disabling a child;
+- empty `criteria`, `dependency_rules`, and `meta` arrays should be omitted.
 
-Campaign presets must not define or override payloads.
-
-Campaign preset variants reference Messaging templates with first-class variant keys:
+Do not author derived fields:
 
 ```text
-key
-dispatch_key
-channel
-purpose
-scope
+Campaign key
+Campaign channel
+step_number
+Campaign dispatch_key
+step dispatch_key/channel/purpose/scope
+variant key/sort_order/order/dispatch_key/purpose/scope
 ```
 
-Do not use `meta.message` for new Campaign preset step or variant message references.
+Campaign presets define the journey and reference the Messaging template context. They must not define reusable message copy or payloads.
 
 Campaign messages resolve by:
 
 ```text
-channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key
+channel + purpose + scope + campaign_key + derived step_number + campaign_step_variant_key
 ```
 
 Example:
 
 ```php
-[
-    'step_number' => 1,
-    'name' => 'Attended thank-you and next step',
-    'variant_strategy' => 'first_available',
-    'is_active' => true,
-
-    'criteria' => [
-        'timing' => [
-            'type' => 'delay',
-            'hours' => 2,
-        ],
-    ],
-
-    'variants' => [
+'webinar_attended_nurture' => [
+    'name' => 'Webinar Attended Nurture',
+    'purpose' => 'marketing',
+    'scope' => 'webinar_nurture',
+    'variant_strategy' => 'dependency_aware',
+    'source_version' => 3,
+    'steps' => [
         [
-            'key' => 'email',
-            'name' => 'Email follow-up',
-            'dispatch_key' => 'campaign_step_due',
-            'channel' => 'email',
-            'purpose' => 'marketing',
-            'scope' => 'webinar_nurture',
+            'name' => 'Attended follow-up',
+            'criteria' => [
+                'timing' => [
+                    'type' => 'delay',
+                    'days' => 7,
+                ],
+            ],
+            'variants' => [
+                'sms' => [
+                    'channel' => 'sms',
+                ],
+                'email' => [
+                    'channel' => 'email',
+                    'dependency_rules' => [
+                        'requires_variant_states' => [
+                            'sms' => ['sent', 'unavailable'],
+                        ],
+                    ],
+                ],
+            ],
         ],
     ],
-
-    'meta' => [
-        'type' => 'message',
-    ],
-]
+],
 ```
 
-Do not require authors to invent per-step `message_type` values for campaign journey steps.
+Do not use `meta.message` as a CampaignStep or CampaignStepVariant message reference. Do not require authors to invent per-step `message_type` values. The runtime may derive debug message types such as `webinar_attended_nurture_step_1`; that value is not an author-facing lookup key.
 
-The runtime may derive debug message types such as:
-
-```text
-webinar_attended_nurture_step_1
-```
-
-That derived value is not the author-facing lookup key.
-
+`source_config_path` remains optional provenance/fallback metadata during the semantic identity transition. It is not the primary Campaign variant identity.
 
 ## Campaign preset sync force behavior
 
@@ -1755,7 +1782,7 @@ Line breaks count toward the encoded SMS length and may increase message segment
 - [ ] Are Campaign presets free of reusable subject/body/CTA copy?
 - [ ] Do campaign variants reference Messaging-owned template presets/assignments rather than owning copy?
 - [ ] Are Campaign presets free of payload overrides?
-- [ ] Are Campaign preset variant message references first-class `key`, `dispatch_key`, `channel`, `purpose`, and `scope` keys?
+- [ ] Do Campaign variants use map keys for identity and inherit dispatch/purpose/scope from the Campaign?
 - [ ] Are new Campaign preset steps free of `meta.message` references?
 - [ ] Are Campaign Messaging templates under `campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}`?
 - [ ] Are normal message configs using the canonical definition shape?
@@ -1795,7 +1822,7 @@ Rules:
 - Messaging configs own reusable message copy.
 - Campaign presets own journeys/timing/template references.
 - Campaign presets must not own or override payloads.
-- Campaign preset variants reference Messaging templates with first-class key/dispatch_key/channel/purpose/scope keys.
+- Campaign variant map keys define variant identity; channel is explicit and dispatch/purpose/scope inherit from the Campaign.
 - Do not use meta.message for new Campaign preset step message references.
 - Campaign message templates resolve by channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key.
 - FlowRoute presets own automation/control flow.
