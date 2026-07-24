@@ -456,6 +456,11 @@ return [
             'ui' => [
                 'tone' => 'teal',
             ],
+            'nav' => [
+                'label' => 'Scheduling',
+                'route' => 'crm.scheduling.index',
+                'priority' => 30,
+            ],
             'depends_on' => ['core'],
             'providers' => [
                 SchedulingModuleServiceProvider::class,

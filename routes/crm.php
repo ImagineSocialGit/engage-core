@@ -12,6 +12,7 @@ use App\Modules\FlowRoutes\Controllers\CRM\FlowRouteController;
 use App\Modules\FlowRoutes\Controllers\CRM\FlowRouteEditorController;
 use App\Modules\Messaging\Controllers\ContactImportBatchPermissionInvitationController;
 use App\Modules\Messaging\Controllers\CRM\MessageTemplatePresetController;
+use App\Modules\Scheduling\Controllers\CRM\SchedulingController;
 use App\Modules\Tasks\Controllers\TaskController;
 use App\Modules\Webinars\Controllers\CRM\WebinarController;
 use App\Modules\Webinars\Controllers\CRM\WebinarDevController;
@@ -211,6 +212,18 @@ Route::middleware('auth')->group(function () {
 
             Route::patch('/{broadcast}/cancel', [BroadcastController::class, 'cancel'])
                 ->name('cancel');
+        });
+
+
+    Route::middleware('module:scheduling')
+        ->prefix('scheduling')
+        ->name('crm.scheduling.')
+        ->group(function () {
+            Route::get('/', [SchedulingController::class, 'index'])
+                ->name('index');
+
+            Route::post('/appointments', [SchedulingController::class, 'store'])
+                ->name('appointments.store');
         });
 
     Route::middleware('module:tasks')

@@ -675,6 +675,29 @@ Direct creation snapshots the current service location and timezone, creates one
 
 `appointments.idempotency_key` is nullable and unique. Repeating a matching key returns the original Appointment, including a soft-deleted historical row, without creating another attendee or event. Reusing the key for another service, host, start time, Contact, or polymorphic primary subject is rejected. Nullable keys preserve imported, provider-originated, and legacy records that do not participate in this direct-creation replay contract.
 
+### CRM Scheduling workspace
+
+`SchedulingReadService` provides the first read-side boundary for CRM Scheduling. It returns active services, active assigned hosts, bounded date availability, and upcoming operational Appointments without placing Scheduling query rules in the controller or Blade view.
+
+The authenticated `/scheduling` workspace is guarded by `module:scheduling` and appears through the module-driven CRM navigation registry. It presents upcoming `pending`, `scheduled`, and `confirmed` Appointments, highlights the pending-confirmation count, and provides a quick creation flow for an existing Contact.
+
+The creation flow is:
+
+```text
+choose Contact
+choose active service
+choose explicit active assigned host when the service has assignments
+choose a date
+choose a currently available start time
+create through CreateAppointmentAction
+```
+
+The browser submits only Contact, service, optional host, selected start instant, and a UUID idempotency key. Duration, end time, location, capacity, status, source, attendee state, and lifecycle output remain server-owned. The controller converts domain conflicts into validation feedback and never writes Scheduling records directly.
+
+Contact selection uses the existing Core Contact lookup endpoint. The workspace does not create or update Contacts, and it does not silently assign a host. A service with exactly one active eligible host may be preselected for convenience, but that explicit host identity is still submitted and revalidated by `CreateAppointmentAction`.
+
+This first workspace slice intentionally omits Appointment detail pages, lifecycle mutation controls, rescheduling UI, calendar visualization, provider synchronization, and reminder management.
+
 ## Appointment lifecycle state machine
 
 The implemented lifecycle layer consists of:
@@ -800,10 +823,18 @@ MarkAppointmentNoShowAction
 TransitionAppointmentStatusAction
 ```
 
-Planned:
+Implemented CRM read and creation seams:
 
 ```text
 SchedulingReadService
+SchedulingController
+StoreAppointmentRequest
+CRM Scheduling workspace
+```
+
+Planned:
+
+```text
 AppointmentReminderScheduler
 ```
 
@@ -819,10 +850,12 @@ Do not add `flow_route_*` foreign keys to Scheduling artifacts merely for proven
 
 ## Deferred work
 
-Deferred after the booking transaction foundation:
+Deferred after the initial CRM Scheduling workspace:
 
 ```text
-CRM Scheduling workspace
+Appointment detail and lifecycle action workspace
+Contact-page appointment panel
+CRM reschedule workflow
 SCHEDULING_APP_URL setup validation
 calendar views
 provider connection and synchronization persistence

@@ -651,6 +651,8 @@
 │   │   │   │   └── TransitionAppointmentStatusAction.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
+│   │   │   │   ├── CRM
+│   │   │   │   │   └── SchedulingController.php
 │   │   │   │   └── PublicBookingController.php
 │   │   │   ├── Data
 │   │   │   │   ├── AppointmentBookingData.php
@@ -678,12 +680,14 @@
 │   │   │   │   └── SchedulingModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   │   ├── CompletePublicBookingRequest.php
-│   │   │   │   └── CreatePublicBookingHoldRequest.php
+│   │   │   │   ├── CreatePublicBookingHoldRequest.php
+│   │   │   │   └── StoreAppointmentRequest.php
 │   │   │   ├── Services
-│   │   │   │   └── Availability
-│   │   │   │       ├── AppointmentOccupancyResolver.php
-│   │   │   │       ├── AvailabilityRuleResolver.php
-│   │   │   │       └── BookingOccupancyResolver.php
+│   │   │   │   ├── Availability
+│   │   │   │   │   ├── AppointmentOccupancyResolver.php
+│   │   │   │   │   ├── AvailabilityRuleResolver.php
+│   │   │   │   │   └── BookingOccupancyResolver.php
+│   │   │   │   └── SchedulingReadService.php
 │   │   │   └── Support
 │   │   ├── Tasks
 │   │   │   ├── Actions
@@ -1488,6 +1492,8 @@
 │       │   ├── messaging
 │       │   │   └── message-templates
 │       │   │       └── index.blade.php
+│       │   ├── scheduling
+│       │   │   └── index.blade.php
 │       │   ├── tasks
 │       │   │   ├── index.blade.php
 │       │   │   └── show.blade.php
@@ -1734,7 +1740,8 @@
 │   │   │   ├── RescheduleSlotOfferAndBookingHoldActionTest.php
 │   │   │   ├── SchedulingAvailabilityWindowFoundationTest.php
 │   │   │   ├── SchedulingFoundationTest.php
-│   │   │   └── SchedulingHostAndServiceFoundationTest.php
+│   │   │   ├── SchedulingHostAndServiceFoundationTest.php
+│   │   │   └── SchedulingWorkspaceTest.php
 │   │   ├── SetupValidation
 │   │   │   ├── ConfigContractsSetupValidationContributorTest.php
 │   │   │   ├── MessageConfigValidatorTest.php
@@ -1832,4 +1839,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-498 directories, 1335 files
+500 directories, 1340 files
