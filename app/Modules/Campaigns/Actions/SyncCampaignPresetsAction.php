@@ -317,7 +317,7 @@ class SyncCampaignPresetsAction
             'is_active' => $definition->isActive,
             'criteria' => $definition->criteria,
             'dependency_rules' => $definition->dependencyRules,
-            'source_config_path' => $definition->sourceConfigPath,
+            'source_config_path' => null,
             'source_version' => $definition->sourceVersion,
             'meta' => $definition->meta,
         ];

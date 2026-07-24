@@ -49,7 +49,6 @@ class MessagePlanningGate
                 purpose: $purpose,
                 scope: $scope,
                 messageKey: $definition['message_type'] ?? null,
-                definitionConfigPath: $definition['config_path'] ?? null,
                 context: $this->eligibilityContext($definition),
             );
         }

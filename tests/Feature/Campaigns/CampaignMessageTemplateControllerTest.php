@@ -106,6 +106,7 @@ class CampaignMessageTemplateControllerTest extends TestCase
                 'variant' => $emailVariant->getKey(),
             ]));
 
+        $this->assertDatabaseCount('message_template_preset_assignments', 1);
         $this->assertDatabaseHas('message_template_preset_assignments', [
             'message_template_preset_id' => $newPreset->getKey(),
             'channel' => 'email',
@@ -115,7 +116,7 @@ class CampaignMessageTemplateControllerTest extends TestCase
             'campaign_key' => 'webinar_attended_nurture',
             'campaign_step' => 1,
             'campaign_step_variant_key' => 'email',
-            'source_config_path' => 'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps.1.variants.email',
+            'source_config_path' => null,
             'is_active' => true,
         ]);
 
@@ -127,7 +128,6 @@ class CampaignMessageTemplateControllerTest extends TestCase
             stepNumber: 1,
             dispatchKey: 'campaign_step_due',
             variantKey: 'email',
-            variantSourceConfigPath: $emailVariant->source_config_path,
         );
 
         $this->assertIsArray($definition);

@@ -718,7 +718,7 @@ surface
 message_type
 campaign_key
 campaign_step
-source_config_path
+campaign_step_variant_key
 ```
 
 Assignments should be structured by stable runtime dimensions such as:
@@ -732,7 +732,7 @@ message_type
 campaign_key
 campaign_step
 campaign_step_variant_key
-source_config_path
+definition_key, for non-Campaign definitions
 context_type / context_id
 ```
 
@@ -954,7 +954,6 @@ channel
 is_active = false, only when intentionally disabled
 criteria, only when variant-specific behavior is needed
 dependency_rules
-source_config_path
 source_version, only when overriding the Campaign version
 meta, only when non-empty
 ```
@@ -1080,7 +1079,7 @@ Example:
 
 Do not use `meta.message` as a CampaignStep or CampaignStepVariant message reference. Do not require authors to invent per-step `message_type` values. The runtime may derive debug message types such as `webinar_attended_nurture_step_1`; that value is not an author-facing lookup key.
 
-`source_config_path` remains optional provenance/fallback metadata during the semantic identity transition. It is not the primary Campaign variant identity.
+`source_config_path` is not part of Campaign preset authoring. Campaign variants resolve through the semantic tuple of channel, purpose, scope, Campaign key, step number, and variant key. Messaging may retain a source path on synced template records only as diagnostics/provenance.
 
 ## Campaign preset sync force behavior
 

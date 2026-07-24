@@ -72,22 +72,22 @@ class MessageDispatchDefinitionMatcher
                 continue;
             }
 
+            if (in_array($key, [
+                'source_config_path',
+                'config_path',
+                'campaign_step_variant_source_config_path',
+            ], true)) {
+                throw new InvalidArgumentException(
+                    "Dispatch criteria [{$key}] is not supported; use stable semantic identity fields."
+                );
+            }
+
             if ($key === 'step') {
                 if (! is_int($value) || $value < 1) {
                     throw new InvalidArgumentException('Dispatch criteria [step] must be an integer greater than zero.');
                 }
 
                 $normalized['step'] = $value;
-
-                continue;
-            }
-
-            if ($key === 'source_config_path') {
-                if (! is_string($value) || trim($value) === '') {
-                    throw new InvalidArgumentException('Dispatch criteria [source_config_path] must be a non-empty string.');
-                }
-
-                $normalized['source_config_path'] = trim($value);
 
                 continue;
             }
@@ -135,16 +135,18 @@ class MessageDispatchDefinitionMatcher
         foreach ($criteria as $key => $expected) {
             $actual = $this->definitionCriteriaValue($definition, $key);
 
-            if ($key === 'step') {
-                if (! is_int($actual) || $actual !== $expected) {
-                    return false;
-                }
-
-                continue;
+            if (in_array($key, [
+                'source_config_path',
+                'config_path',
+                'campaign_step_variant_source_config_path',
+            ], true)) {
+                throw new InvalidArgumentException(
+                    "Dispatch criteria [{$key}] is not supported; use stable semantic identity fields."
+                );
             }
 
-            if ($key === 'source_config_path') {
-                if (! is_string($actual) || trim($actual) !== $expected) {
+            if ($key === 'step') {
+                if (! is_int($actual) || $actual !== $expected) {
                     return false;
                 }
 
@@ -202,13 +204,6 @@ class MessageDispatchDefinitionMatcher
                 ?? $definition['variant']
                 ?? data_get($definition, 'meta.campaign_template.campaign_step_variant_key')
                 ?? data_get($definition, 'meta.message_template_assignment.campaign_step_variant_key'),
-            'source_config_path' => $definition['campaign_step_variant_source_config_path']
-                ?? $definition['source_config_path']
-                ?? data_get($definition, 'meta.campaign_template.campaign_step_variant_source_config_path')
-                ?? $definition['config_path']
-                ?? data_get($definition, 'meta.message_template_assignment.source_config_path')
-                ?? data_get($definition, 'meta.message_template_preset.source_config_path')
-                ?? data_get($definition, 'meta.seed.config_path'),
             default => data_get($definition, $key),
         };
     }

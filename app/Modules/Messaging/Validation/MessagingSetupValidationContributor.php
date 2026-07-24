@@ -532,19 +532,6 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
             return $definitionKey;
         }
 
-        $sourceConfigPath = $this->nullableString($assignment->source_config_path);
-
-        if ($sourceConfigPath !== null) {
-            $definition = config($sourceConfigPath);
-            $configuredKey = is_array($definition)
-                ? $this->normalizedNullableString($definition['key'] ?? null)
-                : '';
-
-            if ($configuredKey !== '') {
-                return $configuredKey;
-            }
-        }
-
         return null;
     }
 
@@ -657,9 +644,6 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
     private function assignmentIdentityKey(MessageTemplatePresetAssignment $assignment): string
     {
         $definitionKey = $this->assignmentDefinitionKey($assignment);
-        $sourceConfigPath = $definitionKey === null
-            ? $this->assignmentSourceConfigPath($assignment)
-            : null;
 
         return implode('|', [
             $this->normalizedNullableString($assignment->channel),
@@ -667,7 +651,6 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
             $this->normalizedNullableString($assignment->scope),
             $this->normalizedNullableString($assignment->message_type),
             $definitionKey ?? '',
-            $sourceConfigPath ?? '',
             $this->normalizedNullableString($assignment->campaign_key),
             (string) ($assignment->campaign_step ?? ''),
             $this->normalizedNullableString($assignment->campaign_step_variant_key),

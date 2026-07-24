@@ -56,7 +56,6 @@ class CampaignMessageDefinitionResolver
             'step' => $step->step_number,
             'variant' => $reference['variant_key'],
             'campaign_step_variant_key' => $reference['variant_key'],
-            'campaign_step_variant_source_config_path' => $reference['variant_source_config_path'],
             'behavior_owner' => $variant,
             'meta' => array_replace_recursive(
                 $definition['meta'] ?? [],
@@ -68,7 +67,6 @@ class CampaignMessageDefinitionResolver
                         'campaign_step' => $step->step_number,
                         'campaign_step_variant_id' => $variant?->exists ? $variant->id : null,
                         'campaign_step_variant_key' => $reference['variant_key'],
-                        'campaign_step_variant_source_config_path' => $reference['variant_source_config_path'],
                         'campaign_step_variant_source_version' => $variant?->source_version,
                     ], fn (mixed $value): bool => $value !== null),
                 ],
@@ -115,8 +113,7 @@ class CampaignMessageDefinitionResolver
      *     dispatch_key: string,
      *     campaign_key: string,
      *     step_number: int,
-     *     variant_key: string|null,
-     *     variant_source_config_path: string|null,
+     *     variant_key: string,
      *     channel: string,
      *     purpose: string,
      *     scope: string
@@ -132,8 +129,7 @@ class CampaignMessageDefinitionResolver
             'dispatch_key' => $this->normalizeSegment($variant?->dispatch_key ?? $step->dispatch_key),
             'campaign_key' => $this->normalizeSegment($campaign->key),
             'step_number' => (int) $step->step_number,
-            'variant_key' => $variant instanceof CampaignStepVariant ? $this->normalizeSegment($variant->key) : null,
-            'variant_source_config_path' => $this->nullableString($variant?->source_config_path),
+            'variant_key' => $this->normalizeSegment($variant->key),
             'channel' => $this->normalizeSegment($variant?->channel ?? $step->channel),
             'purpose' => $this->normalizeSegment($variant?->purpose ?? $step->purpose),
             'scope' => $this->normalizeSegment($variant?->scope ?? $step->scope),
@@ -145,8 +141,7 @@ class CampaignMessageDefinitionResolver
      *     dispatch_key: string,
      *     campaign_key: string,
      *     step_number: int,
-     *     variant_key: string|null,
-     *     variant_source_config_path: string|null,
+     *     variant_key: string,
      *     channel: string,
      *     purpose: string,
      *     scope: string
@@ -163,8 +158,7 @@ class CampaignMessageDefinitionResolver
             stepNumber: $reference['step_number'],
             dispatchKey: $reference['dispatch_key'],
             variantKey: $reference['variant_key'],
-            variantSourceConfigPath: $reference['variant_source_config_path'],
-            context: $variant instanceof CampaignStepVariant && $variant->exists ? $variant : null,
+            context: $variant->exists ? $variant : null,
         );
 
         if (is_array($definition)) {
@@ -179,8 +173,7 @@ class CampaignMessageDefinitionResolver
                 $reference['scope'],
                 $reference['campaign_key'],
                 'step_'.$reference['step_number'],
-                $reference['variant_key'] ? 'variant_'.$reference['variant_key'] : null,
-                $reference['variant_source_config_path'],
+                'variant_'.$reference['variant_key'],
                 $reference['dispatch_key'],
             ])).
             '].'
@@ -192,8 +185,7 @@ class CampaignMessageDefinitionResolver
      *     dispatch_key: string,
      *     campaign_key: string,
      *     step_number: int,
-     *     variant_key: string|null,
-     *     variant_source_config_path: string|null,
+     *     variant_key: string,
      *     channel: string,
      *     purpose: string,
      *     scope: string
@@ -216,7 +208,6 @@ class CampaignMessageDefinitionResolver
             'step' => $step->step_number,
             'variant' => $reference['variant_key'],
             'campaign_step_variant_key' => $reference['variant_key'],
-            'campaign_step_variant_source_config_path' => $reference['variant_source_config_path'],
             'behavior_owner' => $variant,
             'resolved_behavior' => [
                 'timing' => 'immediate',
@@ -233,7 +224,6 @@ class CampaignMessageDefinitionResolver
                     'campaign_step' => $step->step_number,
                     'campaign_step_variant_id' => $variant?->exists ? $variant->id : null,
                     'campaign_step_variant_key' => $reference['variant_key'],
-                    'campaign_step_variant_source_config_path' => $reference['variant_source_config_path'],
                     'campaign_step_variant_source_version' => $variant?->source_version,
                 ], fn (mixed $value): bool => $value !== null),
                 'campaign_skip_reason' => 'campaign_channel_unavailable',
@@ -367,16 +357,5 @@ class CampaignMessageDefinitionResolver
     private function normalizeSegment(string $value): string
     {
         return str_replace('-', '_', strtolower(trim($value)));
-    }
-
-    private function nullableString(mixed $value): ?string
-    {
-        if (! is_string($value)) {
-            return null;
-        }
-
-        $value = trim($value);
-
-        return $value !== '' ? $value : null;
     }
 }

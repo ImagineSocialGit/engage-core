@@ -1574,6 +1574,7 @@
 │   │   │   ├── ScheduledMessageEventReplayTest.php
 │   │   │   ├── ScheduleNextCampaignStepActionTest.php
 │   │   │   ├── ScheduleNextCampaignStepAfterScheduledMessageSentTest.php
+│   │   │   ├── WebinarCampaignLifecycleEndToEndTest.php
 │   │   │   └── WebinarNurtureFirstAvailableVariantTest.php
 │   │   ├── Clients
 │   │   │   ├── ClientConfigFallbackTest.php
@@ -1676,6 +1677,7 @@
 │   │   │   ├── MessageTemplatePresetTokenValidationSyncTest.php
 │   │   │   ├── MessageTemplateTokenValidationControllerTest.php
 │   │   │   ├── MessageTemplateTokenValidatorTest.php
+│   │   │   ├── MessageTemplateUsageResolverTest.php
 │   │   │   ├── MessagingSetupValidationContributorTest.php
 │   │   │   ├── QueueContractTest.php
 │   │   │   ├── ResolvedMessageDispatchBuilderTest.php
@@ -1816,4 +1818,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-498 directories, 1319 files
+498 directories, 1321 files

@@ -78,9 +78,26 @@ class SyncMessageTemplatePresetsAction
                 ) {
                     $assignment->forceFill([
                         'definition_key' => $assignmentAttributes['definition_key'],
+                        'source_config_path' => $assignmentAttributes['source_config_path'],
                         'meta' => array_replace_recursive(
                             is_array($assignment->meta) ? $assignment->meta : [],
-                            ['definition_key' => $assignmentAttributes['definition_key']],
+                            [
+                                'source_config_path' => $assignmentAttributes['source_config_path'],
+                                'definition_key' => $assignmentAttributes['definition_key'],
+                            ],
+                        ),
+                    ])->save();
+
+                    $result['assignments_updated']++;
+                } elseif (
+                    $assignment->source_config_path !== $assignmentAttributes['source_config_path']
+                    || data_get($assignment->meta, 'source_config_path') !== $assignmentAttributes['source_config_path']
+                ) {
+                    $assignment->forceFill([
+                        'source_config_path' => $assignmentAttributes['source_config_path'],
+                        'meta' => array_replace_recursive(
+                            is_array($assignment->meta) ? $assignment->meta : [],
+                            ['source_config_path' => $assignmentAttributes['source_config_path']],
                         ),
                     ])->save();
 
@@ -178,7 +195,6 @@ class SyncMessageTemplatePresetsAction
             'campaign_key',
             'campaign_step',
             'campaign_step_variant_key',
-            'source_config_path',
         ];
 
         if ($includeDefinitionKey) {
@@ -412,6 +428,9 @@ class SyncMessageTemplatePresetsAction
             purpose: $purpose,
             scope: $scope,
             definitionKey: $definitionKey,
+            campaignKey: $campaignKey,
+            campaignStep: $campaignStep,
+            campaignStepVariantKey: $campaignStepVariantKey,
             configPath: $configPath,
         );
         $now = now();
@@ -807,8 +826,30 @@ class SyncMessageTemplatePresetsAction
         string $purpose,
         string $scope,
         ?string $definitionKey,
+        ?string $campaignKey,
+        ?int $campaignStep,
+        ?string $campaignStepVariantKey,
         string $configPath,
     ): string {
+        if (
+            $campaignKey !== null
+            && $campaignStep !== null
+            && $campaignStep > 0
+            && $campaignStepVariantKey !== null
+        ) {
+            return implode('.', [
+                $this->normalizeSegment($channel),
+                $this->normalizeSegment($purpose),
+                $this->normalizeSegment($scope),
+                'campaigns',
+                $this->normalizeSegment($campaignKey),
+                'steps',
+                (string) $campaignStep,
+                'variants',
+                $this->normalizeSegment($campaignStepVariantKey),
+            ]);
+        }
+
         if ($definitionKey !== null) {
             return implode('.', [
                 $this->normalizeSegment($channel),
@@ -818,10 +859,9 @@ class SyncMessageTemplatePresetsAction
             ]);
         }
 
-        $relativePath = preg_replace('/^messaging\./', '', $configPath) ?? $configPath;
-        $relativePath = preg_replace('/^([^.]+)\.definitions\./', '$1.', $relativePath) ?? $relativePath;
-
-        return str_replace('-', '_', strtolower($relativePath));
+        throw new InvalidArgumentException(
+            "Message template preset source [{$configPath}] is missing stable semantic identity."
+        );
     }
 
     private function headline(string $value): string

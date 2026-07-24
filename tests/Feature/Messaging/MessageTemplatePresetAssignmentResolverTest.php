@@ -114,7 +114,6 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
             stepNumber: 1,
             dispatchKey: 'campaign_step_due',
             variantKey: 'email',
-            variantSourceConfigPath: $preset->source_config_path,
         );
 
         $this->assertIsArray($definition);
@@ -259,7 +258,7 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
         $this->assertSame('messaging.email.definitions.transactional.webinar.confirmation', $definitions[0]['config_path']);
     }
 
-    public function test_standard_resolution_uses_source_specific_synced_assignment_before_config(): void
+    public function test_standard_resolution_uses_semantically_keyed_synced_assignment_before_config(): void
     {
         $sourceConfigPath = 'messaging.email.definitions.transactional.webinar.confirmation';
 
@@ -320,7 +319,7 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
         $this->assertSame($preset->getKey(), data_get($confirmationDefinitions[0], 'meta.message_template_preset.id'));
     }
 
-    public function test_manual_standard_assignment_overrides_source_specific_seed_assignment_for_same_message_type(): void
+    public function test_manual_standard_assignment_overrides_seed_assignment_for_same_semantic_definition(): void
     {
         $sourceConfigPath = 'messaging.email.definitions.transactional.webinar.confirmation';
 
@@ -404,7 +403,7 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
         ));
     }
 
-    public function test_source_specific_standard_assignments_preserve_multiple_list_definitions_and_semantic_keys(): void
+    public function test_standard_assignments_preserve_multiple_list_definitions_by_semantic_key(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
             'reminders' => [

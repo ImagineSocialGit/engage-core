@@ -126,7 +126,6 @@ class MessageDefinitionResolver
         int $stepNumber,
         string $dispatchKey,
         ?string $variantKey = null,
-        ?string $variantSourceConfigPath = null,
         ?Model $context = null,
     ): ?array {
         $channel = $this->normalizeChannel($channel);
@@ -135,7 +134,6 @@ class MessageDefinitionResolver
         $campaignKey = $this->normalizeSegment($campaignKey);
         $dispatchKey = $this->normalizeSegment($dispatchKey);
         $variantKey = $this->normalizeNullableSegment($variantKey);
-        $variantSourceConfigPath = $this->nullableString($variantSourceConfigPath);
 
         if ($channel === '' || $purpose === '' || $scope === '' || $campaignKey === '' || $stepNumber < 1 || $dispatchKey === '' || $variantKey === null) {
             return null;
@@ -148,7 +146,6 @@ class MessageDefinitionResolver
             campaignKey: $campaignKey,
             stepNumber: $stepNumber,
             variantKey: $variantKey,
-            sourceConfigPath: $variantSourceConfigPath,
             context: $context,
         );
 
@@ -158,7 +155,6 @@ class MessageDefinitionResolver
                 campaignKey: $campaignKey,
                 stepNumber: $stepNumber,
                 variantKey: $variantKey,
-                variantSourceConfigPath: $variantSourceConfigPath,
             );
         }
 
@@ -194,7 +190,6 @@ class MessageDefinitionResolver
             campaignKey: $campaignKey,
             stepNumber: $stepNumber,
             variantKey: $variantKey,
-            variantSourceConfigPath: $variantSourceConfigPath,
         ));
     }
 
@@ -206,21 +201,18 @@ class MessageDefinitionResolver
         array $definition,
         string $campaignKey,
         int $stepNumber,
-        ?string $variantKey,
-        ?string $variantSourceConfigPath,
+        string $variantKey,
     ): array {
         return array_replace_recursive($definition, [
             'campaign_key' => $campaignKey,
             'step' => $stepNumber,
             'variant' => $variantKey,
             'campaign_step_variant_key' => $variantKey,
-            'campaign_step_variant_source_config_path' => $variantSourceConfigPath,
             'meta' => [
                 'campaign_template' => array_filter([
                     'campaign_key' => $campaignKey,
                     'step_number' => $stepNumber,
                     'campaign_step_variant_key' => $variantKey,
-                    'campaign_step_variant_source_config_path' => $variantSourceConfigPath,
                 ], fn (mixed $value): bool => $value !== null),
             ],
         ]);
@@ -401,23 +393,6 @@ class MessageDefinitionResolver
                 ?? data_get($definition, 'meta.message_template_assignment.definition_key')
                 ?? data_get($definition, 'meta.seed.definition_key'),
         );
-    }
-
-    /**
-     * @param array<string, mixed> $definition
-     */
-    private function definitionSourceConfigPath(array $definition): ?string
-    {
-        $sourceConfigPath = $definition['source_config_path']
-            ?? data_get($definition, 'meta.seed.config_path')
-            ?? data_get($definition, 'meta.message_template_assignment.source_config_path')
-            ?? data_get($definition, 'meta.message_template_preset.source_config_path')
-            ?? $definition['config_path']
-            ?? null;
-
-        return is_string($sourceConfigPath) && trim($sourceConfigPath) !== ''
-            ? trim($sourceConfigPath)
-            : null;
     }
 
     private function normalizeChannel(MessageChannel|string $channel): string

@@ -16,13 +16,11 @@ class MessageDispatchDefinitionMatcherTest extends TestCase
                 'key' => 'reminder_1_day',
                 'definition_key' => 'reminder_1_day',
                 'message_type' => 'reminder',
-                'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.0',
             ]),
             $this->definition([
                 'key' => 'reminder_30_minute',
                 'definition_key' => 'reminder_30_minute',
                 'message_type' => 'reminder',
-                'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.1',
             ]),
         ];
 
@@ -32,7 +30,6 @@ class MessageDispatchDefinitionMatcherTest extends TestCase
             criteria: $matcher->normalizeCriteria([
                 'message_type' => 'Reminder',
                 'definition_key' => 'reminder-30-minute',
-                'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.1',
             ]),
         );
 
@@ -48,7 +45,6 @@ class MessageDispatchDefinitionMatcherTest extends TestCase
                 'campaign_key' => 'webinar_attended_nurture',
                 'step' => 1,
                 'variant' => 'email_primary',
-                'campaign_step_variant_source_config_path' => 'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps.1.variants.email_primary',
                 'meta' => [
                     'campaign_template' => [
                         'campaign_key' => 'webinar_attended_nurture',
@@ -61,7 +57,6 @@ class MessageDispatchDefinitionMatcherTest extends TestCase
                 'campaign_key' => 'webinar_attended_nurture',
                 'step' => 1,
                 'variant' => 'email_alternate',
-                'campaign_step_variant_source_config_path' => 'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps.1.variants.email_alternate',
                 'meta' => [
                     'campaign_template' => [
                         'campaign_key' => 'webinar_attended_nurture',
@@ -79,12 +74,24 @@ class MessageDispatchDefinitionMatcherTest extends TestCase
                 'campaign_key' => 'webinar-attended-nurture',
                 'campaign_step' => 1,
                 'variant' => 'email-alternate',
-                'source_config_path' => 'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps.1.variants.email_alternate',
             ]),
         );
 
         $this->assertCount(1, $matches);
         $this->assertSame('email_alternate', $matches[0]['variant']);
+    }
+
+    public function test_it_rejects_physical_config_path_criteria(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'Dispatch criteria [source_config_path] is not supported',
+        );
+
+        app(MessageDispatchDefinitionMatcher::class)->normalizeCriteria([
+            'source_config_path' =>
+                'messaging.email.definitions.transactional.webinar.reminders.0',
+        ]);
     }
 
     public function test_custom_scalar_criteria_are_matched_instead_of_silently_ignored(): void

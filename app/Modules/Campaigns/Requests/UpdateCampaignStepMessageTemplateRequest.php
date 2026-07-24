@@ -101,14 +101,7 @@ class UpdateCampaignStepMessageTemplateRequest extends FormRequest
             ->where('scope', $this->normalizeSegment($variant->scope))
             ->where('meta->campaign_key', $this->normalizeSegment($step->campaign->key))
             ->where('meta->campaign_step', (int) $step->step_number)
-            ->where(function ($query) use ($variant): void {
-                $query->where('meta->campaign_step_variant_key', $this->normalizeSegment($variant->key));
-
-                if (is_string($variant->source_config_path) && trim($variant->source_config_path) !== '') {
-                    $query->orWhere('source_config_path', trim($variant->source_config_path))
-                        ->orWhere('meta->campaign_step_variant_source_config_path', trim($variant->source_config_path));
-                }
-            })
+            ->where('meta->campaign_step_variant_key', $this->normalizeSegment($variant->key))
             ->exists();
     }
 

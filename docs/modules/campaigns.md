@@ -7,10 +7,10 @@ Campaign token providers expose real Campaign and CampaignEnrollment columns and
 they do not make `meta` or arbitrary start context globally selectable. Start-context fields become
 authorable only when the enrolling producer declares a compatible payload contract.
 
-Campaign step variants use semantic identity—campaign key, step number, variant key, channel,
-purpose, and scope. `source_config_path` remains migration/legacy fallback metadata, not the primary
-identity. The Slam Dunk golden runtime fixture proves variant resolution and enrollment through
-this path.
+Campaign step variants use semantic identity—Campaign key, step number, variant key, channel,
+purpose, and scope. Campaign preset authoring does not accept `source_config_path`, and runtime
+selection never falls back to a physical config path. Synced Messaging records may retain their
+own source path only as diagnostics/provenance.
 
 ## Campaign lifecycle authority
 

@@ -125,21 +125,6 @@ class UpdateWebinarMessageTemplateRequest extends FormRequest
             return $definitionKey;
         }
 
-        foreach ([$entry->source_config_path, $entry->messageTemplatePreset?->source_config_path] as $sourceConfigPath) {
-            if (! is_string($sourceConfigPath) || trim($sourceConfigPath) === '') {
-                continue;
-            }
-
-            $definition = config(trim($sourceConfigPath));
-            $definitionKey = is_array($definition)
-                ? $this->normalizeNullableSegment($definition['key'] ?? null)
-                : null;
-
-            if ($definitionKey !== null) {
-                return $definitionKey;
-            }
-        }
-
         return null;
     }
 

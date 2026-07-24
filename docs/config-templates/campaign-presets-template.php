@@ -45,9 +45,10 @@ return [
     | Messaging campaign templates resolve through:
     | messaging.{channel}.definitions.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
     |
-    | source_config_path remains optional provenance/fallback metadata. Semantic
+    | Campaign preset variants do not author source_config_path. Their durable
     | identity is Campaign key + derived step number + variant key + channel +
-    | inherited purpose/scope.
+    | inherited purpose/scope. Messaging-owned template rows may retain their
+    | own physical source path only as diagnostics/provenance.
     */
 
     'groups' => [
@@ -88,7 +89,6 @@ return [
                         'sms' => [
                             'name' => 'SMS follow-up',
                             'channel' => 'sms',
-                            'source_config_path' => 'messaging.sms.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.sms',
                         ],
                         'email' => [
                             'name' => 'Email fallback',
@@ -98,7 +98,6 @@ return [
                                     'sms' => ['sent', 'unavailable'],
                                 ],
                             ],
-                            'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
                         ],
                     ],
                 ],

@@ -34,7 +34,7 @@ class SendScheduledMessageJobTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_sends_pending_email_message(): void
+    public function test_it_sends_a_planned_email_even_when_its_provenance_path_has_moved(): void
     {
         Event::fake([ScheduledMessageSent::class]);
 
@@ -52,6 +52,7 @@ class SendScheduledMessageJobTest extends TestCase
             'scope' => 'webinar',
             'message_type' => 'confirmation',
             'payload_class' => FakeJobEmailPayload::class,
+            'definition_config_path' => 'messaging.email.definitions.moved.confirmation',
             'payload' => [
                 'to' => 'test@example.com',
             ],

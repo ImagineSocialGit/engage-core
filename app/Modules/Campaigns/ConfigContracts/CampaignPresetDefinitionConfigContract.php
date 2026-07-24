@@ -90,9 +90,6 @@ class CampaignPresetDefinitionConfigContract implements ConfigContract
             ),
             'criteria' => ConfigField::defaulted($criteria, []),
             'dependency_rules' => ConfigField::defaulted($dependencies, []),
-            'source_config_path' => ConfigField::optional(
-                ConfigSchema::string(nullable: true),
-            ),
             'source_version' => ConfigField::optional($version),
             'meta' => ConfigField::defaulted(
                 ConfigSchema::object([], allowUnknown: true),

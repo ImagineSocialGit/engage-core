@@ -135,7 +135,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         app(SyncMessageTemplatePresetsAction::class)->handle();
     }
 
-    public function test_it_keeps_list_based_message_types_generic_and_distinguishes_by_source_config_path(): void
+    public function test_it_keeps_list_based_message_types_generic_and_distinguishes_by_definition_key(): void
     {
         Config::set('messaging.sms', []);
         Config::set('messaging.email.definitions', [
@@ -486,7 +486,120 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         $this->assertSame($preset->getKey(), data_get($definitions[0], 'meta.message_template_preset.id'));
     }
 
-    public function test_normal_sync_backfills_definition_key_on_legacy_source_specific_assignment(): void
+    public function test_normal_sync_updates_source_provenance_without_creating_a_second_semantic_assignment(): void
+    {
+        Config::set('messaging.sms', []);
+        Config::set('messaging.email.definitions', [
+            'transactional' => [
+                'webinar' => [
+                    'confirmation' => [
+                        'key' => 'confirmation',
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'confirmation_messages',
+                        'payload' => [
+                            'subject' => 'Config subject',
+                            'body' => 'Config body.',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        app(SyncMessageTemplatePresetsAction::class)->handle();
+
+        $preset = MessageTemplatePreset::query()
+            ->where('key', 'email.transactional.webinar.confirmation')
+            ->firstOrFail();
+        $assignment = $preset->assignments()->firstOrFail();
+
+        $assignment->forceFill([
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.old_confirmation',
+            'meta' => array_replace($assignment->meta ?? [], [
+                'source_config_path' => 'messaging.email.definitions.transactional.webinar.old_confirmation',
+            ]),
+        ])->save();
+
+        $result = app(SyncMessageTemplatePresetsAction::class)->handle();
+
+        $this->assertSame(1, $result['assignments_updated']);
+        $this->assertDatabaseCount('message_template_preset_assignments', 1);
+        $this->assertSame(
+            'messaging.email.definitions.transactional.webinar.confirmation',
+            $assignment->refresh()->source_config_path,
+        );
+        $this->assertSame(
+            'messaging.email.definitions.transactional.webinar.confirmation',
+            data_get($assignment->meta, 'source_config_path'),
+        );
+    }
+
+    public function test_campaign_sync_updates_source_provenance_without_duplicating_the_semantic_variant_assignment(): void
+    {
+        Config::set('messaging.sms', []);
+        Config::set('messaging.email.definitions', [
+            'marketing' => [
+                'webinar_nurture' => [
+                    'campaigns' => [
+                        'webinar_attended_nurture' => [
+                            'steps' => [
+                                1 => [
+                                    'variants' => [
+                                        'email' => [
+                                            'dispatch_key' => 'campaign_step_due',
+                                            'payload_class' => EmailPayload::class,
+                                            'queue' => 'marketing',
+                                            'payload' => [
+                                                'subject' => 'Thanks for joining',
+                                                'body' => 'Hi {first_name}, thanks for joining.',
+                                            ],
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        app(SyncMessageTemplatePresetsAction::class)->handle();
+
+        $preset = MessageTemplatePreset::query()
+            ->where(
+                'key',
+                'email.marketing.webinar_nurture.campaigns.'
+                    .'webinar_attended_nurture.steps.1.variants.email',
+            )
+            ->firstOrFail();
+        $assignment = $preset->assignments()->firstOrFail();
+        $assignmentId = $assignment->getKey();
+
+        $assignment->forceFill([
+            'source_config_path' => 'messaging.email.definitions.marketing.'
+                .'legacy_location.webinar_attended_nurture.email',
+            'meta' => array_replace($assignment->meta ?? [], [
+                'source_config_path' => 'messaging.email.definitions.marketing.'
+                    .'legacy_location.webinar_attended_nurture.email',
+            ]),
+        ])->save();
+
+        $result = app(SyncMessageTemplatePresetsAction::class)->handle();
+
+        $canonicalPath = 'messaging.email.definitions.marketing.webinar_nurture.'
+            .'campaigns.webinar_attended_nurture.steps.1.variants.email';
+
+        $this->assertSame(1, $result['assignments_updated']);
+        $this->assertDatabaseCount('message_template_preset_assignments', 1);
+        $this->assertSame($assignmentId, $assignment->refresh()->getKey());
+        $this->assertSame($canonicalPath, $assignment->source_config_path);
+        $this->assertSame(
+            $canonicalPath,
+            data_get($assignment->meta, 'source_config_path'),
+        );
+    }
+
+    public function test_normal_sync_backfills_definition_key_on_assignment_missing_semantic_identity(): void
     {
         Config::set('messaging.sms', []);
         Config::set('messaging.email.definitions', [

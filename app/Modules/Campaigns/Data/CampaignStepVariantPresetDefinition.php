@@ -22,7 +22,6 @@ class CampaignStepVariantPresetDefinition
         public readonly bool $isActive = true,
         public readonly array $criteria = [],
         public readonly array $dependencyRules = [],
-        public readonly ?string $sourceConfigPath = null,
         public readonly ?string $sourceVersion = null,
         public readonly array $meta = [],
     ) {}
@@ -47,6 +46,7 @@ class CampaignStepVariantPresetDefinition
             'dispatch_key',
             'purpose',
             'scope',
+            'source_config_path',
         ], 'Campaign step ['.$stepNumber.'] variant ['.$variantKey.']');
 
         if ($sortOrder < 1) {
@@ -70,7 +70,6 @@ class CampaignStepVariantPresetDefinition
             isActive: (bool) ($data['is_active'] ?? true),
             criteria: self::criteria($data),
             dependencyRules: self::dependencyRules($data['dependency_rules'] ?? []),
-            sourceConfigPath: self::nullableString($data['source_config_path'] ?? null),
             sourceVersion: self::nullableString($data['source_version'] ?? $fallbackSourceVersion),
             meta: array_replace_recursive(
                 is_array($data['meta'] ?? null) ? $data['meta'] : [],

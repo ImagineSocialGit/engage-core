@@ -38,7 +38,6 @@ class SemanticCampaignVariantIdentityResolutionTest extends TestCase
             stepNumber: 1,
             dispatchKey: 'campaign_step_due',
             variantKey: 'email_alternate',
-            variantSourceConfigPath: $primary->source_config_path,
         );
 
         $this->assertIsArray($definition);
@@ -50,7 +49,7 @@ class SemanticCampaignVariantIdentityResolutionTest extends TestCase
         );
     }
 
-    public function test_source_config_path_remains_a_legacy_fallback(): void
+    public function test_stale_source_config_path_cannot_retarget_an_unknown_semantic_variant(): void
     {
         $legacy = $this->preset(
             key: 'webinar_attended_nurture.step_1.email_legacy',
@@ -58,7 +57,7 @@ class SemanticCampaignVariantIdentityResolutionTest extends TestCase
             subject: 'Legacy subject',
         );
 
-        $legacyAssignment = $this->assign($legacy, 'email_legacy');
+        $this->assign($legacy, 'email_legacy');
 
         $definition = app(MessageDefinitionResolver::class)->resolveCampaignStep(
             channel: 'email',
@@ -68,16 +67,9 @@ class SemanticCampaignVariantIdentityResolutionTest extends TestCase
             stepNumber: 1,
             dispatchKey: 'campaign_step_due',
             variantKey: 'email_renamed',
-            variantSourceConfigPath: $legacy->source_config_path,
         );
 
-        $this->assertIsArray($definition);
-        $this->assertSame('Legacy subject', $definition['payload']['subject']);
-        $this->assertSame('email_renamed', $definition['variant']);
-        $this->assertSame(
-            $legacyAssignment->getKey(),
-            data_get($definition, 'meta.message_template_preset.assignment_id'),
-        );
+        $this->assertNull($definition);
     }
 
     private function preset(

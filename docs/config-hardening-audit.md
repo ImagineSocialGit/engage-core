@@ -70,15 +70,18 @@ Golden text or array snapshots are useful drift detectors, but the primary proof
 
 ## Semantic identity correction
 
-Campaign-step template assignment previously leaned too heavily on `source_config_path`. That path is useful provenance, but it is not durable business identity.
+Campaign-step template assignment previously leaned too heavily on `source_config_path`. Physical source location is now diagnostics/provenance only and is excluded from runtime identity.
 
 The hardened resolution order is:
 
 1. exact context-specific semantic Campaign/step/variant assignment;
 2. global semantic Campaign/step/variant assignment;
-3. legacy source-config-path fallback.
+3. canonical Messaging definition resolved from the semantic Campaign/step/variant tuple.
 
-Variant-specific resolution does not fall back to a broad step assignment. This prevents one variant from accidentally selecting another variant's copy.
+There is no source-config-path fallback. Variant-specific resolution also does not fall back to a broad step assignment. This prevents a moved config file or another variant's copy from retargeting a Campaign step.
+
+
+The same rule applies after planning: `definition_config_path` remains ScheduledMessage provenance, not a send-time enablement lookup. Planning evaluates the resolved definition before persistence, while send-time gates use persisted conditions and current consent/suppression state.
 
 ## Phase 2A–2B — Shared and foundational contracts
 

@@ -22,10 +22,6 @@ class ScheduledMessageGate
             return 'Recipient not found.';
         }
 
-        if (! $this->definitionStillEnabled($scheduledMessage)) {
-            return 'Message definition is disabled or missing.';
-        }
-
         $payload = $scheduledMessage->payload ?? [];
 
         if (! $this->hasDestination($payload)) {
@@ -50,7 +46,6 @@ class ScheduledMessageGate
                 purpose: $scheduledMessage->purpose,
                 scope: $scheduledMessage->scope,
                 messageKey: $scheduledMessage->message_type,
-                definitionConfigPath: $scheduledMessage->definition_config_path,
                 context: $this->eligibilityContext($scheduledMessage),
             )) {
                 return 'Message eligibility gate denied send.';
@@ -72,23 +67,6 @@ class ScheduledMessageGate
                 'scheduled_message' => $scheduledMessage,
             ],
         );
-    }
-
-    private function definitionStillEnabled(ScheduledMessage $scheduledMessage): bool
-    {
-        $configPath = $scheduledMessage->definition_config_path;
-
-        if (! is_string($configPath) || trim($configPath) === '') {
-            return true;
-        }
-
-        $definition = config($configPath);
-
-        if (! is_array($definition)) {
-            return false;
-        }
-
-        return (bool) ($definition['enabled'] ?? true);
     }
 
     /**

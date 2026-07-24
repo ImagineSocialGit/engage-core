@@ -13,9 +13,10 @@ context.
 
 MessageTemplatePreset assignment resolution uses semantic message/variant identity. A
 variant-specific request does not silently fall back to a broad step assignment, and a
-context-specific active assignment outranks a global assignment. `source_config_path` is retained
-only for legacy lookup/migration compatibility. Field pickers and strict validation must query the
-token registry rather than infer availability from template text.
+context-specific active assignment outranks a global assignment. `source_config_path` may be
+retained on synced rows as diagnostics/provenance, but it is excluded from assignment identity,
+definition-key inference, dispatch criteria, and Campaign template selection. Field pickers and
+strict validation must query the token registry rather than infer availability from template text.
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
 
@@ -312,16 +313,12 @@ surface = campaigns
 campaign_key
 campaign_step
 campaign_step_variant_key
-source_config_path
 ```
 
-`source_config_path` should point at the concrete template source, such as:
-
-```text
-messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email
-```
-
-This keeps variant-specific assignments distinct even when variants share the same campaign key, step number, dispatch key, and broad message type.
+The semantic tuple keeps variant-specific assignments distinct even when variants share the same
+Campaign key, step number, dispatch key, and broad message type. A synced assignment may record
+`source_config_path` for diagnostics, but moving the template source must update provenance rather
+than create a second runtime assignment.
 
 Assignment changes should happen from the consuming module's setup surface, not primarily from the Messaging template copy editor.
 
@@ -358,12 +355,15 @@ Messaging resolvers should eventually resolve message definitions in this order:
 1. Most specific active MessageTemplatePresetAssignment for the runtime context.
 2. Less-specific active assignment for the same channel/purpose/scope/message context.
 3. Synced default MessageTemplatePreset.
-4. Variant-specific config seed/source fallback only where explicitly supported by the resolver.
+4. Canonical config definition resolved from stable semantic identity only where explicitly supported by the resolver.
 ```
 
 Long-term runtime should be DB-first. Config should seed/update available presets and catalog entries; it should not remain the only runtime source of reusable message copy.
 
 DB-first template resolution does not make Messaging the owner of consuming-module behavior. After the reusable template is selected, the consuming module remains authoritative for its own timing, conditions, sequencing, dependencies, enablement, and skip behavior before `ResolvedMessageDispatchBuilder` assembles the final runtime contract.
+
+A resolved definition's `config_path` and a ScheduledMessage's `definition_config_path` are provenance only. Planning evaluates the resolved definition's enabled state before persistence. Send-time gating uses the persisted plan, conditions, consent, destination, and suppression state; it must not re-open a physical config path, because moving a source file must not invalidate already planned delivery.
+ Disabling future planning does not silently rewrite pending work; an owning module that must stop existing deliveries uses an explicit cancellation or skip operation, such as Campaign deactivation.
 
 
 For Campaign runtime contexts, assignment and fallback resolution must include the variant key when variants are involved:

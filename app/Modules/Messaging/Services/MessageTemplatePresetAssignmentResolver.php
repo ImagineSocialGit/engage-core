@@ -73,11 +73,9 @@ class MessageTemplatePresetAssignmentResolver
         string $campaignKey,
         int $stepNumber,
         ?string $variantKey = null,
-        ?string $sourceConfigPath = null,
         ?Model $context = null,
     ): ?array {
         $variantKey = $this->normalizeNullableSegment($variantKey);
-        $sourceConfigPath = $this->nullableString($sourceConfigPath);
 
         if ($context instanceof Model && $variantKey !== null) {
             $assignment = $this->campaignStepQuery($channel, $purpose, $scope, $campaignKey, $stepNumber)
@@ -97,21 +95,6 @@ class MessageTemplatePresetAssignmentResolver
         if ($variantKey !== null) {
             $assignment = $this->campaignStepQuery($channel, $purpose, $scope, $campaignKey, $stepNumber)
                 ->where('campaign_step_variant_key', $variantKey)
-                ->whereNull('context_type')
-                ->whereNull('context_id')
-                ->with('messageTemplatePreset')
-                ->orderByDesc('id')
-                ->get()
-                ->first(fn (MessageTemplatePresetAssignment $assignment): bool => (bool) $assignment->messageTemplatePreset?->isActive());
-
-            if ($assignment instanceof MessageTemplatePresetAssignment) {
-                return $this->definitionForAssignment($assignment);
-            }
-        }
-
-        if ($sourceConfigPath !== null) {
-            $assignment = $this->campaignStepQuery($channel, $purpose, $scope, $campaignKey, $stepNumber)
-                ->where('source_config_path', $sourceConfigPath)
                 ->whereNull('context_type')
                 ->whereNull('context_id')
                 ->with('messageTemplatePreset')
@@ -206,19 +189,6 @@ class MessageTemplatePresetAssignmentResolver
             return $definitionKey;
         }
 
-        $assignmentSourceConfigPath = $this->nullableString($assignment->source_config_path);
-
-        if ($assignmentSourceConfigPath !== null) {
-            $configuredDefinition = config($assignmentSourceConfigPath);
-            $configuredKey = is_array($configuredDefinition)
-                ? $this->normalizeNullableSegment($configuredDefinition['key'] ?? null)
-                : null;
-
-            if ($configuredKey !== null) {
-                return $configuredKey;
-            }
-        }
-
         $presetSeedKey = $this->normalizeNullableSegment(
             data_get($assignment->messageTemplatePreset?->meta, 'seed.definition_key'),
         );
@@ -228,6 +198,13 @@ class MessageTemplatePresetAssignmentResolver
         }
 
         $configuredKeys = array_values(array_unique(array_filter($configuredKeys)));
+        $presetSemanticKey = $this->presetSemanticKey($assignment);
+
+        if ($presetSemanticKey !== null
+            && ($configuredKeys === [] || in_array($presetSemanticKey, $configuredKeys, true))
+        ) {
+            return $presetSemanticKey;
+        }
 
         if (count($configuredKeys) === 1) {
             return $configuredKeys[0];
@@ -237,22 +214,26 @@ class MessageTemplatePresetAssignmentResolver
             return null;
         }
 
-        $presetKey = $this->nullableString($assignment->messageTemplatePreset?->key);
+        return $this->normalizeNullableSegment($assignment->message_type);
+    }
 
-        if ($presetKey !== null) {
-            $lastSeparatorPosition = strrpos($presetKey, '.');
-            $semanticKey = $lastSeparatorPosition === false
-                ? $presetKey
-                : substr($presetKey, $lastSeparatorPosition + 1);
+    private function presetSemanticKey(
+        MessageTemplatePresetAssignment $assignment,
+    ): ?string {
+        $presetKey = $this->nullableString(
+            $assignment->messageTemplatePreset?->key,
+        );
 
-            $semanticKey = $this->normalizeNullableSegment($semanticKey);
-
-            if ($semanticKey !== null) {
-                return $semanticKey;
-            }
+        if ($presetKey === null) {
+            return null;
         }
 
-        return $this->normalizeNullableSegment($assignment->message_type);
+        $lastSeparatorPosition = strrpos($presetKey, '.');
+        $semanticKey = $lastSeparatorPosition === false
+            ? $presetKey
+            : substr($presetKey, $lastSeparatorPosition + 1);
+
+        return $this->normalizeNullableSegment($semanticKey);
     }
 
     /**

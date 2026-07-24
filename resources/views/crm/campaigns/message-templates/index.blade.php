@@ -245,7 +245,6 @@
                                                     $variant->scope,
                                                     $step->step_number,
                                                     $variant->key,
-                                                    $variant->source_config_path ?? '',
                                                 ]);
                                                 $options = $templateOptionsByVariant->get($variantKey, collect());
                                                 $assignment = $currentAssignments->get($variantKey);

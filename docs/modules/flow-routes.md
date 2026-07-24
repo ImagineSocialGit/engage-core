@@ -31,6 +31,11 @@ finding usually indicates preserved customized database state rather than permis
 contract; reconcile the customized route or deliberately resync it. Capability availability and
 handler registration remain semantic checks in setup validation.
 
+A FlowRoute that points to an inactive Campaign remains valid and active. The `enroll_campaign`
+Point completes as skipped with `campaign_inactive`; it does not disable or invalidate the Route.
+Campaign reactivation permits later events to create new enrollments, while previously cancelled
+enrollments and skipped ScheduledMessages remain terminal.
+
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
 
 FlowRoutes is optional and depends on Workflow.

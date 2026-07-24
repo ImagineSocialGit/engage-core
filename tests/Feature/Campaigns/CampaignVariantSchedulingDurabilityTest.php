@@ -64,10 +64,12 @@ class CampaignVariantSchedulingDurabilityTest extends TestCase
             $messages->pluck('meta.campaign_step_variant_key')->all(),
         );
 
-        $this->assertSame(
-            [$primaryVariant->source_config_path, $alternateVariant->source_config_path],
-            $messages->pluck('meta.campaign_step_variant_source_config_path')->all(),
-        );
+        foreach ($messages as $message) {
+            $this->assertArrayNotHasKey(
+                'campaign_step_variant_source_config_path',
+                $message->meta,
+            );
+        }
 
         $this->assertSame(
             [$primaryAssignment->getKey(), $alternateAssignment->getKey()],
@@ -115,7 +117,10 @@ class CampaignVariantSchedulingDurabilityTest extends TestCase
         $this->assertArrayNotHasKey('created_at', $message->payload['tokens']['contact'] ?? []);
         $this->assertArrayNotHasKey('updated_at', $message->payload['tokens']['contact'] ?? []);
         $this->assertSame('email_primary', $message->meta['campaign_step_variant_key']);
-        $this->assertSame($primaryVariant->source_config_path, $message->meta['campaign_step_variant_source_config_path']);
+        $this->assertArrayNotHasKey(
+            'campaign_step_variant_source_config_path',
+            $message->meta,
+        );
         $this->assertSame($assignment->getKey(), data_get($message->meta, 'message_template_preset.assignment_id'));
     }
 
@@ -183,7 +188,7 @@ class CampaignVariantSchedulingDurabilityTest extends TestCase
                 'is_active' => true,
                 'criteria' => [],
                 'dependency_rules' => [],
-                'source_config_path' => 'presets.modules.webinars.campaigns.definitions.webinar_attended_nurture.steps.1.variants.'.$variant['key'],
+                'source_config_path' => 'stale.diagnostic.path.'.$variant['key'],
                 'source_version' => 'test',
                 'meta' => [],
             ]);

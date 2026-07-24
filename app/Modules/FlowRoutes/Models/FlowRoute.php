@@ -3,6 +3,7 @@
 namespace App\Modules\FlowRoutes\Models;
 
 use App\Modules\Core\Models\ContactStatus;
+use Database\Factories\FlowRouteFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,11 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 class FlowRoute extends Model
 {
     use HasFactory;
+
+    protected static function newFactory(): FlowRouteFactory
+    {
+        return FlowRouteFactory::new();
+    }
 
     public const TRIGGER_MANUAL = 'manual';
     public const TRIGGER_CONTACT_STATUS = 'contact_status';

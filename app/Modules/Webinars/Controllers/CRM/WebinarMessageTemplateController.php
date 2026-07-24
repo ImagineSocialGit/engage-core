@@ -348,22 +348,6 @@ class WebinarMessageTemplateController extends Controller
             return $definitionKey;
         }
 
-        $sourceConfigPath = is_string($assignment->source_config_path)
-            ? trim($assignment->source_config_path)
-            : '';
-
-        if ($sourceConfigPath !== '') {
-            $definition = config($sourceConfigPath);
-
-            if (is_array($definition)) {
-                $definitionKey = $this->normalizeNullableSegment($definition['key'] ?? null);
-
-                if ($definitionKey !== null) {
-                    return $definitionKey;
-                }
-            }
-        }
-
         $configuredKeys = $this->configuredDefinitionKeysForMessageType(
             channel: (string) $assignment->channel,
             purpose: (string) $assignment->purpose,
@@ -432,21 +416,6 @@ class WebinarMessageTemplateController extends Controller
 
         if ($definitionKey !== null) {
             return $definitionKey;
-        }
-
-        foreach ([$entry->source_config_path, $entry->messageTemplatePreset?->source_config_path] as $sourceConfigPath) {
-            if (! is_string($sourceConfigPath) || trim($sourceConfigPath) === '') {
-                continue;
-            }
-
-            $definition = config(trim($sourceConfigPath));
-            $definitionKey = is_array($definition)
-                ? $this->normalizeNullableSegment($definition['key'] ?? null)
-                : null;
-
-            if ($definitionKey !== null) {
-                return $definitionKey;
-            }
         }
 
         return null;

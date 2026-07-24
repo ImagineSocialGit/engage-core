@@ -386,6 +386,54 @@ class WebinarMessageTemplateControllerTest extends TestCase
             ->assertSessionHasErrors(['message_template_preset_id']);
     }
 
+    public function test_physical_source_path_cannot_replace_missing_semantic_definition_identity(): void
+    {
+        config()->set('modules.enabled', [
+            'webinars',
+            'messaging',
+        ]);
+
+        $user = User::factory()->create();
+        $preset = $this->webinarTemplate([
+            'message_type' => 'confirmation',
+            'usage_type' => 'webinar_confirmation',
+            'source_config_path' =>
+                'messaging.email.definitions.transactional.webinar.confirmations.0',
+        ]);
+        $catalogEntry = $preset->catalogEntries()->firstOrFail();
+
+        $preset->forceFill([
+            'meta' => [
+                'seed' => [
+                    'definition_key' => null,
+                ],
+            ],
+        ])->save();
+
+        $catalogEntry->forceFill([
+            'source_config_path' => $preset->source_config_path,
+            'meta' => [
+                'message_type' => 'confirmation',
+                'definition_key' => null,
+            ],
+        ])->save();
+
+        $this->withoutMiddleware(ForceStagingAccess::class);
+
+        $this->actingAs($user)
+            ->patch('http://crm.'.config('app.root_domain').'/webinars/message-templates', [
+                'context_key' => 'confirmation',
+                'catalog_entry_id' => $catalogEntry->getKey(),
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+                'surface' => 'webinar_registrations',
+                'message_type' => 'confirmation',
+                'message_template_preset_id' => $preset->getKey(),
+            ])
+            ->assertSessionHasErrors(['message_template_preset_id']);
+    }
+
     public function test_index_displays_delay_timing_from_the_active_webinar_schedule_profile(): void
     {
         config()->set('modules.enabled', [

@@ -17,7 +17,7 @@ class CampaignVariantPresetSyncSpecificityTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_preset_sync_persists_variant_source_config_paths_and_removes_stale_non_customized_variants(): void
+    public function test_preset_sync_uses_semantic_variant_identity_and_removes_stale_non_customized_variants(): void
     {
         $this->configurePreset(['email', 'sms']);
 
@@ -36,10 +36,7 @@ class CampaignVariantPresetSyncSpecificityTest extends TestCase
         $this->assertSame('1', $step->source_version);
         $this->assertSame('1', $emailVariant->source_version);
 
-        $this->assertSame(
-            'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
-            $emailVariant->source_config_path,
-        );
+        $this->assertNull($emailVariant->source_config_path);
 
         $this->configurePreset(['email']);
 
@@ -210,7 +207,6 @@ class CampaignVariantPresetSyncSpecificityTest extends TestCase
             $variants[$variantKey] = [
                 'name' => strtoupper($variantKey).' follow-up',
                 'channel' => $variantKey === 'sms' ? 'sms' : 'email',
-                'source_config_path' => 'messaging.'.($variantKey === 'sms' ? 'sms' : 'email').'.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.'.$variantKey,
             ];
         }
 
@@ -231,7 +227,6 @@ class CampaignVariantPresetSyncSpecificityTest extends TestCase
                     'email' => [
                         'name' => 'Email follow-up',
                         'channel' => 'email',
-                        'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.2.variants.email',
                     ],
                 ],
             ];

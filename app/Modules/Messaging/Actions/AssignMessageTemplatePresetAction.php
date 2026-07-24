@@ -50,6 +50,7 @@ class AssignMessageTemplatePresetAction
 
         $assignment->forceFill([
             'message_template_preset_id' => $preset->getKey(),
+            'source_config_path' => $attributes['source_config_path'],
             'is_active' => true,
             'starts_at' => null,
             'ends_at' => null,
@@ -76,7 +77,6 @@ class AssignMessageTemplatePresetAction
             'campaign_key',
             'campaign_step',
             'campaign_step_variant_key',
-            'source_config_path',
             'context_type',
             'context_id',
         ] as $column) {

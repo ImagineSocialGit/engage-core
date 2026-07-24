@@ -143,7 +143,7 @@ class MessagingSetupValidationContributorTest extends TestCase
         $this->assertContains('messaging.assignment_campaign_context_incomplete', $codes);
     }
 
-    public function test_it_reports_exact_active_assignment_ambiguity_using_runtime_identity_dimensions(): void
+    public function test_physical_source_paths_do_not_distinguish_exact_runtime_assignment_identity(): void
     {
         $firstPreset = $this->preset([
             'key' => 'confirmation.first',
@@ -152,7 +152,7 @@ class MessagingSetupValidationContributorTest extends TestCase
 
         $secondPreset = $this->preset([
             'key' => 'confirmation.second',
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmations.0',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmations.1',
         ]);
 
         MessageTemplatePresetAssignment::query()->create(

@@ -58,38 +58,40 @@ class MessageTemplateUsageResolver
         MessageTemplatePreset $preset,
         MessageTemplatePresetAssignment $assignment,
     ): ?MessageTemplateCatalogEntry {
-        $sourceConfigPath = data_get($assignment->meta, 'source_config_path');
-
         $query = $preset->catalogEntries()
             ->active()
             ->where('channel', $assignment->channel)
             ->where('purpose', $assignment->purpose)
             ->where('scope', $assignment->scope);
 
-        if (is_string($sourceConfigPath) && trim($sourceConfigPath) !== '') {
-            $match = (clone $query)->where('source_config_path', $sourceConfigPath)->first();
-
-            if ($match instanceof MessageTemplateCatalogEntry) {
-                return $match;
+        if (
+            $assignment->campaign_key !== null
+            || $assignment->campaign_step !== null
+            || $assignment->campaign_step_variant_key !== null
+        ) {
+            if (
+                $assignment->campaign_key === null
+                || $assignment->campaign_step === null
+                || $assignment->campaign_step_variant_key === null
+            ) {
+                return null;
             }
+
+            return (clone $query)
+                ->where('usage_type', 'campaign_step')
+                ->where('meta->campaign_key', $assignment->campaign_key)
+                ->where('meta->campaign_step', $assignment->campaign_step)
+                ->where(
+                    'meta->campaign_step_variant_key',
+                    $assignment->campaign_step_variant_key,
+                )
+                ->first();
         }
 
         $itemKey = data_get($assignment->meta, 'catalog.item_key');
 
         if (is_string($itemKey) && trim($itemKey) !== '') {
             $match = (clone $query)->where('item_key', $itemKey)->first();
-
-            if ($match instanceof MessageTemplateCatalogEntry) {
-                return $match;
-            }
-        }
-
-        if ($assignment->campaign_key !== null && $assignment->campaign_step !== null) {
-            $match = (clone $query)
-                ->where('usage_type', 'campaign_step')
-                ->where('meta->campaign_key', $assignment->campaign_key)
-                ->where('meta->campaign_step', $assignment->campaign_step)
-                ->first();
 
             if ($match instanceof MessageTemplateCatalogEntry) {
                 return $match;
@@ -166,5 +168,3 @@ class MessageTemplateUsageResolver
         return $parts === [] ? null : implode(' · ', $parts);
     }
 }
-
-

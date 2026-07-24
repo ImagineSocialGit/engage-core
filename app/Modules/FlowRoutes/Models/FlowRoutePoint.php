@@ -2,6 +2,7 @@
 
 namespace App\Modules\FlowRoutes\Models;
 
+use Database\Factories\FlowRoutePointFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class FlowRoutePoint extends Model
 {
     use HasFactory;
+
+    protected static function newFactory(): FlowRoutePointFactory
+    {
+        return FlowRoutePointFactory::new();
+    }
 
     protected $fillable = [
         'flow_route_id',

@@ -83,7 +83,6 @@ class CampaignMessageTemplateController extends Controller
             campaignKey: $campaignStep->campaign?->key,
             campaignStep: (int) $campaignStep->step_number,
             campaignStepVariantKey: $variant->key,
-            sourceConfigPath: $variant->source_config_path,
             meta: [
                 'source' => 'crm_campaign_message_template_assignment',
                 'campaign' => [
@@ -93,7 +92,6 @@ class CampaignMessageTemplateController extends Controller
                     'campaign_step' => (int) $campaignStep->step_number,
                     'campaign_step_variant_id' => $variant->id,
                     'campaign_step_variant_key' => $variant->key,
-                    'campaign_step_variant_source_config_path' => $variant->source_config_path,
                 ],
             ],
         );
@@ -261,7 +259,6 @@ class CampaignMessageTemplateController extends Controller
                 $assignment->scope,
                 $assignment->campaign_step,
                 $assignment->campaign_step_variant_key ?? '',
-                $assignment->source_config_path ?? '',
             ]))
             ->keyBy(fn (MessageTemplatePresetAssignment $assignment): string => $this->assignmentKey(
                 channel: $assignment->channel,
@@ -269,7 +266,6 @@ class CampaignMessageTemplateController extends Controller
                 scope: $assignment->scope,
                 stepNumber: (int) $assignment->campaign_step,
                 variantKey: $assignment->campaign_step_variant_key,
-                sourceConfigPath: $assignment->source_config_path,
             ));
     }
 
@@ -303,14 +299,7 @@ class CampaignMessageTemplateController extends Controller
                     ->where('scope', $variant->scope)
                     ->where('meta->campaign_key', $campaign->key)
                     ->where('meta->campaign_step', (int) $step->step_number)
-                    ->where(function ($query) use ($variant): void {
-                        $query->where('meta->campaign_step_variant_key', $variant->key);
-
-                        if (is_string($variant->source_config_path) && trim($variant->source_config_path) !== '') {
-                            $query->orWhere('source_config_path', $variant->source_config_path)
-                                ->orWhere('meta->campaign_step_variant_source_config_path', $variant->source_config_path);
-                        }
-                    })
+                    ->where('meta->campaign_step_variant_key', $variant->key)
                     ->orderBy('item_order')
                     ->orderBy('item_label')
                     ->get()
@@ -332,7 +321,6 @@ class CampaignMessageTemplateController extends Controller
             scope: $variant->scope,
             stepNumber: (int) $step->step_number,
             variantKey: $variant->key,
-            sourceConfigPath: $variant->source_config_path,
         );
     }
 
@@ -342,7 +330,6 @@ class CampaignMessageTemplateController extends Controller
         string $scope,
         int $stepNumber,
         ?string $variantKey,
-        ?string $sourceConfigPath,
     ): string {
         return implode(':', [
             $this->normalizeSegment($channel),
@@ -350,7 +337,6 @@ class CampaignMessageTemplateController extends Controller
             $this->normalizeSegment($scope),
             $stepNumber,
             $variantKey !== null ? $this->normalizeSegment($variantKey) : '',
-            is_string($sourceConfigPath) ? trim($sourceConfigPath) : '',
         ]);
     }
 

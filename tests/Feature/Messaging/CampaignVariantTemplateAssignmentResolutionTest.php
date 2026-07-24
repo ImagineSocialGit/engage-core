@@ -78,7 +78,6 @@ class CampaignVariantTemplateAssignmentResolutionTest extends TestCase
             stepNumber: 1,
             dispatchKey: 'campaign_step_due',
             variantKey: 'email_primary',
-            variantSourceConfigPath: $primaryPreset->source_config_path,
         );
 
         $alternateDefinition = $resolver->resolveCampaignStep(
@@ -89,7 +88,6 @@ class CampaignVariantTemplateAssignmentResolutionTest extends TestCase
             stepNumber: 1,
             dispatchKey: 'campaign_step_due',
             variantKey: 'email_alternate',
-            variantSourceConfigPath: $alternatePreset->source_config_path,
         );
 
         $this->assertIsArray($primaryDefinition);
@@ -152,19 +150,19 @@ class CampaignVariantTemplateAssignmentResolutionTest extends TestCase
         $this->assertNull($definition);
     }
 
-    public function test_context_specific_campaign_step_variant_assignment_beats_global_source_assignment(): void
+    public function test_context_specific_campaign_step_variant_assignment_beats_global_semantic_assignment(): void
     {
         $sourceConfigPath = 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email_primary';
 
         $globalPreset = $this->campaignVariantPreset(
             key: 'webinar_attended_nurture.step_1.email_primary.global',
-            subject: 'Global source subject',
+            subject: 'Global semantic subject',
             sourceConfigPath: $sourceConfigPath,
         );
 
         $contextPreset = $this->campaignVariantPreset(
             key: 'webinar_attended_nurture.step_1.email_primary.context',
-            subject: 'Context source subject',
+            subject: 'Context semantic subject',
             sourceConfigPath: $sourceConfigPath,
         );
 
@@ -207,12 +205,11 @@ class CampaignVariantTemplateAssignmentResolutionTest extends TestCase
             stepNumber: 1,
             dispatchKey: 'campaign_step_due',
             variantKey: 'email_primary',
-            variantSourceConfigPath: $sourceConfigPath,
             context: $context,
         );
 
         $this->assertIsArray($definition);
-        $this->assertSame('Context source subject', $definition['payload']['subject']);
+        $this->assertSame('Context semantic subject', $definition['payload']['subject']);
         $this->assertSame($contextAssignment->getKey(), data_get($definition, 'meta.message_template_preset.assignment_id'));
         $this->assertSame($contextAssignment->getKey(), data_get($definition, 'meta.message_template_assignment.id'));
     }

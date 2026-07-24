@@ -26,7 +26,6 @@ class MessageGate
         MessagePurpose|string $purpose,
         string $scope,
         ?string $messageKey = null,
-        ?string $definitionConfigPath = null,
         ?array $context = null,
     ): bool {
         $channel = $this->normalizeChannel($channel);
@@ -36,10 +35,6 @@ class MessageGate
         $context ??= [];
 
         if ($scope === '') {
-            return false;
-        }
-
-        if (! $this->messageIsEnabled($definitionConfigPath)) {
             return false;
         }
 
@@ -68,21 +63,6 @@ class MessageGate
         string $scope,
     ): bool {
         return $this->allows($contact, $channel, $purpose, $scope);
-    }
-
-    private function messageIsEnabled(?string $definitionConfigPath): bool
-    {
-        if (! is_string($definitionConfigPath) || trim($definitionConfigPath) === '') {
-            return true;
-        }
-
-        $config = config($definitionConfigPath);
-
-        if (! is_array($config)) {
-            return false;
-        }
-
-        return (bool) ($config['enabled'] ?? true);
     }
 
     /**

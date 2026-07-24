@@ -156,7 +156,6 @@ class ScheduleCampaignStepMessagesAction
                 'schedule' => $definition['schedule'] ?? null,
                 'conditions' => $definition['conditions'] ?? [],
                 'campaign_step_variant_key' => $definition['campaign_step_variant_key'] ?? null,
-                'campaign_step_variant_source_config_path' => $definition['campaign_step_variant_source_config_path'] ?? null,
             ],
         ];
 
@@ -176,13 +175,6 @@ class ScheduleCampaignStepMessagesAction
             'step' => $step->step_number,
             'variant' => $variant->key,
         ];
-
-        if (
-            is_string($variant->source_config_path)
-            && trim($variant->source_config_path) !== ''
-        ) {
-            $criteria['source_config_path'] = trim($variant->source_config_path);
-        }
 
         $scheduledMessages = $this->dispatchMessageAction->handle(
             recipient: $contact,
@@ -249,7 +241,6 @@ class ScheduleCampaignStepMessagesAction
                 'campaign_step' => $step->step_number,
                 'campaign_step_variant_id' => $variant->exists ? $variant->id : null,
                 'campaign_step_variant_key' => $variant->key,
-                'campaign_step_variant_source_config_path' => $variant->source_config_path,
                 'campaign_step_variant_source_version' => $variant->source_version,
                 'campaign_variant_strategy' => $strategy,
                 'campaign_step_waits_for_all_scheduled_variants' => in_array(
@@ -524,7 +515,6 @@ class ScheduleCampaignStepMessagesAction
             'step' => $step->step_number,
             'campaign_step_variant_id' => null,
             'variant_key' => null,
-            'variant_source_config_path' => null,
         ];
     }
 
@@ -541,7 +531,6 @@ class ScheduleCampaignStepMessagesAction
             'step' => $step->step_number,
             'campaign_step_variant_id' => $variant->exists ? $variant->id : null,
             'variant_key' => $variant->key,
-            'variant_source_config_path' => $variant->source_config_path,
         ];
     }
 

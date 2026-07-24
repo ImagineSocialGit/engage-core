@@ -110,6 +110,10 @@ class CompactCampaignPresetAuthoringTest extends TestCase
             ['campaign_step_due'],
             $firstStepVariants->pluck('dispatch_key')->unique()->values()->all(),
         );
+        $this->assertSame(
+            [null],
+            $firstStepVariants->pluck('source_config_path')->unique()->values()->all(),
+        );
     }
 
     public function test_removed_verbose_fields_and_dependency_aliases_are_rejected(): void
@@ -174,6 +178,15 @@ class CompactCampaignPresetAuthoringTest extends TestCase
                     return $definition;
                 },
                 'removed field [sort_order]',
+            ],
+            'variant source config path' => [
+                function (array $definition): array {
+                    $definition['steps'][0]['variants']['sms']['source_config_path'] =
+                        'messaging.sms.definitions.marketing.webinar_nurture.campaigns.homebuyer_nurture.steps.1.variants.sms';
+
+                    return $definition;
+                },
+                'removed field [source_config_path]',
             ],
             'variant purpose' => [
                 function (array $definition): array {

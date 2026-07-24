@@ -34,7 +34,6 @@ return [
                         'sms' => [
                             'name' => 'SMS follow-up',
                             'channel' => 'sms',
-                            'source_config_path' => 'messaging.sms.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.sms',
                         ],
                         'email' => [
                             'name' => 'Email fallback',
@@ -44,7 +43,6 @@ return [
                                     'sms' => ['sent', 'unavailable'],
                                 ],
                             ],
-                            'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email',
                         ],
                     ],
                 ],
@@ -76,7 +74,6 @@ return [
                         'sms' => [
                             'name' => 'SMS follow-up',
                             'channel' => 'sms',
-                            'source_config_path' => 'messaging.sms.definitions.marketing.webinar_nurture.campaigns.webinar_missed_nurture.steps.1.variants.sms',
                         ],
                         'email' => [
                             'name' => 'Email fallback',
@@ -86,7 +83,6 @@ return [
                                     'sms' => ['sent', 'unavailable'],
                                 ],
                             ],
-                            'source_config_path' => 'messaging.email.definitions.marketing.webinar_nurture.campaigns.webinar_missed_nurture.steps.1.variants.email',
                         ],
                     ],
                 ],
