@@ -38,7 +38,7 @@ Scheduling should not become a generic calendar-builder product for clients to m
 
 ## Universal public booking surface
 
-Scheduling provides every client with an optional generic public booking surface where visitors can discover public services and current availability. Booking submission is layered onto the same surface in the next implementation slice.
+Scheduling provides every client with an optional generic public booking surface where visitors can discover public services, review current availability, and reserve one time through an authoritative short-lived hold. Attendee capture and final Appointment creation remain a separate completion step.
 
 The public host is selected-client deployment configuration. It must not be derived from a fixed subdomain prefix.
 
@@ -59,14 +59,18 @@ SCHEDULING_APP_URL=https://booking.[ROOT_DOMAIN]
 
 `config/scheduling.php` validates that value as a root-level HTTP or HTTPS origin, derives the route host, and disables only the public surface when the value is missing or malformed. `ClientEnvironmentLoader` treats `SCHEDULING_APP_URL` as selected-client deployment configuration.
 
-The currently implemented read-only public routes are:
+The currently implemented public routes are:
 
 ```text
-GET /
-GET /services/{serviceKey}
+GET  /
+GET  /services/{serviceKey}
+POST /services/{serviceKey}/reserve
+GET  /book/{holdId}
 ```
 
 They are registered only on the configured host while the Scheduling module is enabled. The catalog returns active services with `is_public = true`. Service pages accept one bounded local date, calculate live availability through `FindBookableAvailabilityAction`, show times in the service timezone, and omit host identity, capacity, occupancy, availability-window identity, and other trusted booking details. Identical times produced by multiple eligible hosts are presented once.
+
+A displayed time submits only its UTC `starts_at` value plus a UUID idempotency key. `CreatePublicBookingHoldAction` recalculates availability, selects the first eligible slot in the existing deterministic ordering, issues an opaque offer, and creates the hold inside one outer transaction. The visitor cannot nominate a host, end time, duration, capacity, offer, or rule provenance. Reservation and hold-review routes are separately rate limited through `config/scheduling.php`.
 
 All public booking, cancellation, and reschedule URLs should resolve from the configured base URL.
 
@@ -121,6 +125,7 @@ reschedule-aware offer issuance with one trusted source-Appointment exclusion
 atomic hold-to-reschedule replacement with attendee and vertical-subject preservation
 appointment lifecycle transitions and neutral automation event emission
 configured-host public service discovery and bounded availability presentation
+public slot reservation with deterministic hidden-host selection and authoritative hold review
 ```
 
 Scheduling does not own message delivery, consent, task lifecycle, portal accounts, form definitions, commerce records, geocoding, or provider adapter internals.
@@ -490,6 +495,7 @@ BookableSlotOffer
 BookingHold
 IssueBookableSlotOfferAction
 CreateBookingHoldAction
+CreatePublicBookingHoldAction
 ReleaseBookingHoldAction
 ConvertBookingHoldToAppointmentAction
 ExpireBookingHoldsJob
@@ -559,6 +565,23 @@ It locks the offer, service, optional host, optional assignment, optional resche
 
 The same idempotency key returns the original hold for the same offer and is rejected when reused for another offer.
 
+### Public reservation transaction
+
+The public browser does not receive an offer ID. Each displayed time posts only:
+
+```text
+starts_at
+idempotency_key
+```
+
+`CreatePublicBookingHoldAction` accepts the already-resolved public `BookableService`, parses the requested instant as UTC, checks for an idempotent existing hold, and recalculates exact current availability for one service-duration interval. It selects the first matching `BookableSlot` in the engine's deterministic order, then calls `IssueBookableSlotOfferAction` and `CreateBookingHoldAction` inside one outer database transaction.
+
+This preserves the opaque-offer trust boundary while allowing a simple public form. The server remains authoritative for service identity, eligible host, duration, end time, capacity, availability provenance, offer identity, and hold expiration. When multiple hosts expose the same visitor-facing time, the lowest current deterministic slot ordering wins; round-robin and weighted allocation remain deferred.
+
+Public replay keys are UUIDs. Repeating the same service, start time, and replay key returns the original hold without issuing another offer. Reusing the key for another service, time, or reschedule-scoped hold is rejected. A concurrency loser reloads the matching committed hold after its speculative offer transaction rolls back.
+
+The public hold page is capability-addressed by the opaque `hold_id`, marked `noindex`, and renders only service name, local date/time, timezone, effective status, absolute expiration, and authoritative remaining seconds. It does not expose host, capacity, offer, occupancy, or availability-rule details.
+
 ### Reschedule transaction
 
 A reschedule-scoped offer is the only authority for which Appointment may be ignored during replacement-slot calculation. The caller still submits only:
@@ -591,7 +614,7 @@ expires_at > now()
 
 Correctness never depends on cleanup timing. `ExpireBookingHoldsJob` runs every minute and marks due active rows as `expired` for housekeeping and reporting, but new hold attempts immediately ignore an elapsed hold even before that job runs.
 
-A future browser countdown should render the absolute server-provided expiration. Refreshing or reopening the page must not restart or extend the hold.
+The public hold review renders the absolute server-provided expiration and derives its countdown from that timestamp. Refreshing or reopening the page does not restart or extend the hold. An elapsed active row is presented as expired immediately even before the cleanup job changes its stored status.
 
 ### Hold release and conversion
 
@@ -711,10 +734,11 @@ Provider persistence should separately represent connections, remote event ident
 Implemented:
 
 ```text
-PublicBookingController read-only catalog and availability surface
+PublicBookingController catalog, availability, reservation, and hold-review surface
 FindBookableAvailabilityAction
 IssueBookableSlotOfferAction
 CreateBookingHoldAction
+CreatePublicBookingHoldAction
 ReleaseBookingHoldAction
 ConvertBookingHoldToAppointmentAction
 RescheduleAppointmentAction
@@ -750,7 +774,7 @@ Deferred after the booking transaction foundation:
 ```text
 non-hold CRM/manual appointment creation
 CRM Scheduling workspace
-public booking submission, attendee capture, opaque offer issuance, and hold conversion
+public attendee capture, safe Contact resolution, and hold-to-Appointment completion
 SCHEDULING_APP_URL setup validation
 calendar views
 provider connection and synchronization persistence

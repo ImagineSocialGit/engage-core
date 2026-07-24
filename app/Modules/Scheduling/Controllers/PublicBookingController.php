@@ -3,13 +3,19 @@
 namespace App\Modules\Scheduling\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Scheduling\Actions\CreatePublicBookingHoldAction;
 use App\Modules\Scheduling\Actions\FindBookableAvailabilityAction;
 use App\Modules\Scheduling\Data\AvailabilitySearch;
 use App\Modules\Scheduling\Data\BookableSlot;
 use App\Modules\Scheduling\Models\BookableService;
+use App\Modules\Scheduling\Models\BookingHold;
+use App\Modules\Scheduling\Requests\CreatePublicBookingHoldRequest;
 use Carbon\CarbonImmutable;
+use DomainException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Throwable;
@@ -18,14 +24,7 @@ class PublicBookingController extends Controller
 {
     public function index(): View
     {
-        return view('scheduling.public.index', [
-            'services' => $this->publicServices(),
-            'selectedService' => null,
-            'selectedDate' => null,
-            'displayTimezone' => null,
-            'availableTimes' => [],
-            'maximumDate' => null,
-        ]);
+        return view('scheduling.public.index', $this->pageData());
     }
 
     public function show(
@@ -52,14 +51,81 @@ class PublicBookingController extends Controller
             evaluatedAt: CarbonImmutable::now('UTC'),
         ));
 
-        return view('scheduling.public.index', [
-            'services' => $this->publicServices(),
+        return view('scheduling.public.index', $this->pageData([
             'selectedService' => $service,
             'selectedDate' => $selectedDate,
             'displayTimezone' => $displayTimezone,
             'availableTimes' => $this->publicTimes($slots, $displayTimezone),
             'maximumDate' => $maximumDate,
-        ]);
+        ]));
+    }
+
+    public function reserve(
+        CreatePublicBookingHoldRequest $request,
+        string $serviceKey,
+        CreatePublicBookingHoldAction $createPublicBookingHold,
+    ): RedirectResponse {
+        $service = $this->publicService($serviceKey);
+
+        try {
+            $hold = $createPublicBookingHold->handle(
+                service: $service,
+                startsAt: $request->startsAt(),
+                idempotencyKey: $request->idempotencyKey(),
+            );
+        } catch (DomainException) {
+            throw ValidationException::withMessages([
+                'starts_at' => 'That appointment time is no longer available. Choose another time.',
+            ]);
+        }
+
+        return redirect(route(
+            'scheduling.public.holds.show',
+            ['holdId' => $hold->hold_id],
+            false,
+        ));
+    }
+
+    public function review(string $holdId): View
+    {
+        $holdId = trim($holdId);
+
+        if ($holdId === '') {
+            abort(404);
+        }
+
+        $hold = BookingHold::query()
+            ->where('hold_id', $holdId)
+            ->first();
+
+        abort_unless($hold instanceof BookingHold, 404);
+
+        $service = BookableService::withTrashed()
+            ->whereKey($hold->bookable_service_id)
+            ->first();
+
+        abort_unless($service instanceof BookableService, 404);
+
+        return view('scheduling.public.index', $this->pageData([
+            'holdSummary' => $this->holdSummary($hold, $service),
+        ]));
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
+    private function pageData(array $overrides = []): array
+    {
+        return array_replace([
+            'services' => $this->publicServices(),
+            'selectedService' => null,
+            'selectedDate' => null,
+            'displayTimezone' => null,
+            'availableTimes' => [],
+            'maximumDate' => null,
+            'holdSummary' => null,
+        ], $overrides);
     }
 
     /**
@@ -168,7 +234,7 @@ class PublicBookingController extends Controller
 
     /**
      * @param array<int, BookableSlot> $slots
-     * @return array<int, array{starts_at: string, ends_at: string, label: string}>
+     * @return array<int, array{starts_at: string, label: string, idempotency_key: string}>
      */
     private function publicTimes(array $slots, string $displayTimezone): array
     {
@@ -177,15 +243,52 @@ class PublicBookingController extends Controller
         foreach ($slots as $slot) {
             $startsAt = $slot->startsAt->setTimezone($displayTimezone);
             $endsAt = $slot->endsAt->setTimezone($displayTimezone);
-            $key = $startsAt->toISOString().'|'.$endsAt->toISOString();
+            $key = $slot->startsAt->toISOString().'|'.$slot->endsAt->toISOString();
+
+            if (array_key_exists($key, $times)) {
+                continue;
+            }
 
             $times[$key] = [
-                'starts_at' => $startsAt->toISOString(),
-                'ends_at' => $endsAt->toISOString(),
+                'starts_at' => $slot->startsAt->toISOString(),
                 'label' => $startsAt->format('g:i A').'–'.$endsAt->format('g:i A'),
+                'idempotency_key' => (string) Str::uuid(),
             ];
         }
 
         return array_values($times);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function holdSummary(
+        BookingHold $hold,
+        BookableService $service,
+    ): array {
+        $now = CarbonImmutable::now('UTC');
+        $timezone = $this->serviceTimezone($service);
+        $startsAt = CarbonImmutable::instance($hold->starts_at)->setTimezone($timezone);
+        $endsAt = CarbonImmutable::instance($hold->ends_at)->setTimezone($timezone);
+        $status = $hold->status;
+
+        if ($status === BookingHold::STATUS_ACTIVE
+            && ! $hold->isEffectivelyActive($now)
+        ) {
+            $status = BookingHold::STATUS_EXPIRED;
+        }
+
+        return [
+            'hold_id' => $hold->hold_id,
+            'status' => $status,
+            'remaining_seconds' => $hold->remainingSeconds($now),
+            'expires_at' => $hold->expires_at?->toISOString(),
+            'service_key' => $service->key,
+            'service_name' => $service->name,
+            'date' => $startsAt->format('Y-m-d'),
+            'date_label' => $startsAt->format('l, F j, Y'),
+            'time_label' => $startsAt->format('g:i A').'–'.$endsAt->format('g:i A'),
+            'timezone' => $timezone,
+        ];
     }
 }

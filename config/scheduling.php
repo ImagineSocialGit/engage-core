@@ -49,6 +49,8 @@ return [
         'host' => $publicHost,
         'scheme' => $publicScheme,
         'availability_max_days' => 31,
+        'reservation_rate_limit_per_minute' => 12,
+        'hold_review_rate_limit_per_minute' => 60,
     ],
 
     'slot_offers' => [
