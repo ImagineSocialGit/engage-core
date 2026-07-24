@@ -139,7 +139,6 @@ class FlowRouteEditorControllerTest extends TestCase
             'key' => 'welcome',
             'name' => 'Welcome',
             'status' => Campaign::STATUS_ACTIVE,
-            'is_active' => true,
         ]);
 
         $this->createCapability(
@@ -502,7 +501,6 @@ class FlowRouteEditorControllerTest extends TestCase
         $this->assertSame($changeStatus->getKey(), $ordered[0]->next_flow_route_point_id);
         $this->assertNull($ordered[1]->next_flow_route_point_id);
     }
-
 
     public function test_editor_marks_terminal_status_as_not_draggable_and_disables_invalid_removal_in_the_ui(): void
     {

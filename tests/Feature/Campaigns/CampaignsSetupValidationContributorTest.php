@@ -44,7 +44,6 @@ class CampaignsSetupValidationContributorTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => 'active',
-            'is_active' => true,
             'steps' => [
                 [
                     'step_number' => 1,
@@ -87,7 +86,6 @@ class CampaignsSetupValidationContributorTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => 'active',
-            'is_active' => true,
             'steps' => [
                 [
                     'step_number' => 1,
@@ -146,7 +144,6 @@ class CampaignsSetupValidationContributorTest extends TestCase
         $this->assertSame(2, data_get($warnings[0], 'context.step_number'));
         $this->assertSame('email', data_get($warnings[0], 'context.variant_key'));
     }
-
 
     public function test_it_reports_invalid_strategy_duplicate_identity_and_reusable_copy(): void
     {
@@ -478,7 +475,6 @@ class CampaignsSetupValidationContributorTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => Campaign::STATUS_ACTIVE,
-            'is_active' => true,
             'source_version' => '1',
             'is_customized' => false,
             'meta' => [],

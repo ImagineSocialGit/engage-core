@@ -21,7 +21,6 @@ return new class extends Migration
             $table->string('scope', 120)->index();
 
             $table->string('status', 32)->default('active')->index();
-            $table->boolean('is_active')->default(true)->index();
 
             $table->string('source_version')->nullable();
 
@@ -33,7 +32,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['channel', 'purpose', 'scope', 'status']);
-            $table->index(['key', 'status', 'is_active']);
+            $table->index(['key', 'status']);
             $table->index(['key', 'source_version']);
         });
     }

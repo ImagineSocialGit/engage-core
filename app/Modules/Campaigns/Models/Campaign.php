@@ -29,7 +29,6 @@ class Campaign extends Model
         'purpose',
         'scope',
         'status',
-        'is_active',
         'source_version',
         'is_customized',
         'customized_at',
@@ -39,7 +38,6 @@ class Campaign extends Model
     protected function casts(): array
     {
         return [
-            'is_active' => 'boolean',
             'is_customized' => 'boolean',
             'customized_at' => 'datetime',
             'meta' => 'array',
@@ -63,9 +61,7 @@ class Campaign extends Model
 
     public function scopeActive(Builder $query): Builder
     {
-        return $query
-            ->where('is_active', true)
-            ->where('status', self::STATUS_ACTIVE);
+        return $query->where('status', self::STATUS_ACTIVE);
     }
 
     public function scopeForKey(Builder $query, string $key): Builder
@@ -85,7 +81,6 @@ class Campaign extends Model
 
     public function isActive(): bool
     {
-        return $this->is_active && $this->status === self::STATUS_ACTIVE;
+        return $this->status === self::STATUS_ACTIVE;
     }
 }
-

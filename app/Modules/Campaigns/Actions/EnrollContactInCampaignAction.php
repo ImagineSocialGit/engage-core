@@ -2,6 +2,7 @@
 
 namespace App\Modules\Campaigns\Actions;
 
+use App\Modules\Campaigns\Exceptions\CampaignUnavailableForEnrollmentException;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Models\CampaignStep;
@@ -9,7 +10,6 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
-use InvalidArgumentException;
 
 class EnrollContactInCampaignAction
 {
@@ -94,7 +94,6 @@ class EnrollContactInCampaignAction
         ?string $scope = null,
     ): Campaign {
         $query = Campaign::query()
-            ->active()
             ->where('key', $campaignKey);
 
         if ($channel !== null) {
@@ -112,7 +111,14 @@ class EnrollContactInCampaignAction
         $campaign = $query->first();
 
         if (! $campaign instanceof Campaign) {
-            throw new InvalidArgumentException('Active campaign not found for key ['.$campaignKey.'].');
+            throw CampaignUnavailableForEnrollmentException::missing($campaignKey);
+        }
+
+        if (! $campaign->isActive()) {
+            throw CampaignUnavailableForEnrollmentException::inactive(
+                campaignKey: $campaign->key,
+                campaignStatus: $campaign->status,
+            );
         }
 
         return $campaign;

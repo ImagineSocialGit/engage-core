@@ -4,6 +4,7 @@ namespace App\Modules\Campaigns\Automation;
 
 use App\Modules\Campaigns\Actions\EnrollContactInCampaignAction;
 use App\Modules\Campaigns\Data\Automation\EnrollCampaignAutomationDefinition;
+use App\Modules\Campaigns\Exceptions\CampaignUnavailableForEnrollmentException;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Core\Models\Contact;
@@ -44,15 +45,28 @@ class EnrollCampaignAutomationActionHandler implements AutomationActionHandler
         }
 
         $campaign = Campaign::query()
-            ->active()
             ->where('key', $definition->campaignKey)
             ->first();
 
         if (! $campaign instanceof Campaign) {
-            return AutomationActionResult::skipped('campaign_not_active_or_missing', output: [
-                'campaign_key' => $definition->campaignKey,
-                'enroll_campaign_definition' => $definition->toMetaPayload(),
-            ]);
+            return AutomationActionResult::skipped(
+                reason: CampaignUnavailableForEnrollmentException::REASON_MISSING,
+                output: [
+                    'campaign_key' => $definition->campaignKey,
+                    'enroll_campaign_definition' => $definition->toMetaPayload(),
+                ],
+            );
+        }
+
+        if (! $campaign->isActive()) {
+            return AutomationActionResult::skipped(
+                reason: CampaignUnavailableForEnrollmentException::REASON_INACTIVE,
+                output: [
+                    'campaign_key' => $campaign->key,
+                    'campaign_status' => $campaign->status,
+                    'enroll_campaign_definition' => $definition->toMetaPayload(),
+                ],
+            );
         }
 
         $existingEnrollment = CampaignEnrollment::query()
@@ -86,6 +100,16 @@ class EnrollCampaignAutomationActionHandler implements AutomationActionHandler
                         $definition->startContext,
                     ),
                 exitConditions: $definition->exitConditions,
+            );
+        } catch (CampaignUnavailableForEnrollmentException $exception) {
+            return AutomationActionResult::skipped(
+                reason: $exception->reason,
+                output: [
+                    'campaign_key' => $exception->campaignKey,
+                    'campaign_status' => $exception->campaignStatus,
+                    'error' => $exception->getMessage(),
+                    'enroll_campaign_definition' => $definition->toMetaPayload(),
+                ],
             );
         } catch (InvalidArgumentException $exception) {
             return AutomationActionResult::skipped(

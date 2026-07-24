@@ -296,7 +296,6 @@ class CampaignVariantDependencyAwareTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => Campaign::STATUS_ACTIVE,
-            'is_active' => true,
             'meta' => [],
         ]);
 

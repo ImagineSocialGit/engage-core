@@ -83,8 +83,6 @@
         || $marketingSmsAvailable;
     $smsAvailable = $transactionalSmsAvailable || $marketingSmsAvailable;
 
-    $marketingConsentAvailable = false;
-    
     $smsConsentModels = array_values(array_filter([
         $transactionalSmsAvailable ? 'transactionalSmsConsent' : null,
         $combinedMarketingAvailable
@@ -189,12 +187,10 @@
     $descriptionIds = static function (
         array $referenceItems,
         ?string $helperId = null,
-        ?string $inlineDisclosureId = null,
     ): string {
         return collect([
             $helperId,
             ...array_column($referenceItems, 'id'),
-            $referenceItems === [] ? $inlineDisclosureId : null,
         ])
             ->filter(fn (mixed $id): bool =>
                 is_string($id) && trim($id) !== ''
@@ -231,26 +227,6 @@
         ),
     );
 
-    $transactionalEmailInlineDisclosure = data_get(
-        $page,
-        'fields.consent_messages.email.disclosure',
-    );
-    $transactionalSmsInlineDisclosure = data_get(
-        $page,
-        'fields.consent_messages.sms.disclosure',
-    );
-    $marketingCombinedInlineDisclosure = data_get(
-        $page,
-        'fields.marketing_consent_messages.combined.disclosure',
-    );
-    $marketingEmailInlineDisclosure = data_get(
-        $page,
-        'fields.marketing_consent_messages.email.disclosure',
-    );
-    $marketingSmsInlineDisclosure = data_get(
-        $page,
-        'fields.marketing_consent_messages.sms.disclosure',
-    );
 
     $transactionalEmailDescribedBy = $descriptionIds(
         referenceItems: $transactionalEmailReferenceItems,
@@ -260,15 +236,9 @@
         ))
             ? 'transactional_email_consent_helper'
             : null,
-        inlineDisclosureId: filled($transactionalEmailInlineDisclosure)
-            ? 'transactional_email_consent_disclosure'
-            : null,
     );
     $transactionalSmsDescribedBy = $descriptionIds(
         referenceItems: $transactionalSmsReferenceItems,
-        inlineDisclosureId: filled($transactionalSmsInlineDisclosure)
-            ? 'transactional_sms_consent_disclosure'
-            : null,
     );
     $marketingCombinedDescribedBy = $descriptionIds(
         referenceItems: $marketingCombinedReferenceItems,
@@ -277,9 +247,6 @@
             'fields.marketing_consent_messages.combined.helper',
         ))
             ? 'marketing_consent_helper'
-            : null,
-        inlineDisclosureId: filled($marketingCombinedInlineDisclosure)
-            ? 'marketing_consent_disclosure'
             : null,
     );
     $marketingEmailDescribedBy = $descriptionIds(
@@ -290,9 +257,6 @@
         ))
             ? 'marketing_email_consent_helper'
             : null,
-        inlineDisclosureId: filled($marketingEmailInlineDisclosure)
-            ? 'marketing_email_consent_disclosure'
-            : null,
     );
     $marketingSmsDescribedBy = $descriptionIds(
         referenceItems: $marketingSmsReferenceItems,
@@ -301,9 +265,6 @@
             'fields.marketing_consent_messages.sms.helper',
         ))
             ? 'marketing_sms_consent_helper'
-            : null,
-        inlineDisclosureId: filled($marketingSmsInlineDisclosure)
-            ? 'marketing_sms_consent_disclosure'
             : null,
     );
 
@@ -816,18 +777,6 @@
                                         </span>
                                     </label>
 
-                                    @if(
-                                        $transactionalSmsReferenceItems === []
-                                        && filled($transactionalSmsInlineDisclosure)
-                                    )
-                                        <p
-                                            id="transactional_sms_consent_disclosure"
-                                            class="pl-7 text-xs leading-5 text-slate-500"
-                                        >
-                                            {{ $transactionalSmsInlineDisclosure }}
-                                        </p>
-                                    @endif
-
                                     @error('transactional_sms_consent')
                                         <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
                                             {{ $message }}
@@ -876,18 +825,6 @@
                                             class="pl-7 text-xs leading-5 text-slate-500"
                                         >
                                             {{ $page['fields']['consent_messages']['email']['helper'] }}
-                                        </p>
-                                    @endif
-
-                                    @if(
-                                        $transactionalEmailReferenceItems === []
-                                        && filled($transactionalEmailInlineDisclosure)
-                                    )
-                                        <p
-                                            id="transactional_email_consent_disclosure"
-                                            class="pl-7 text-xs leading-5 text-slate-500"
-                                        >
-                                            {{ $transactionalEmailInlineDisclosure }}
                                         </p>
                                     @endif
 
@@ -972,18 +909,6 @@
                                     </p>
                                 @endif
 
-                                @if(
-                                    $marketingCombinedReferenceItems === []
-                                    && filled($marketingCombinedInlineDisclosure)
-                                )
-                                    <p
-                                        id="marketing_consent_disclosure"
-                                        class="pl-7 text-xs leading-5 text-slate-500"
-                                    >
-                                        {{ $marketingCombinedInlineDisclosure }}
-                                    </p>
-                                @endif
-
                                 @error('marketing_consent')
                                     <p class="{{ $tokens['field_error'] ?? 'mt-1 text-sm text-red-600' }}">
                                         {{ $message }}
@@ -1028,18 +953,6 @@
                                             class="pl-7 text-xs leading-5 text-slate-500"
                                         >
                                             {{ $page['fields']['marketing_consent_messages']['email']['helper'] }}
-                                        </p>
-                                    @endif
-
-                                    @if(
-                                        $marketingEmailReferenceItems === []
-                                        && filled($marketingEmailInlineDisclosure)
-                                    )
-                                        <p
-                                            id="marketing_email_consent_disclosure"
-                                            class="pl-7 text-xs leading-5 text-slate-500"
-                                        >
-                                            {{ $marketingEmailInlineDisclosure }}
                                         </p>
                                     @endif
 
@@ -1089,18 +1002,6 @@
                                             class="pl-7 text-xs leading-5 text-slate-500"
                                         >
                                             {{ $page['fields']['marketing_consent_messages']['sms']['helper'] }}
-                                        </p>
-                                    @endif
-
-                                    @if(
-                                        $marketingSmsReferenceItems === []
-                                        && filled($marketingSmsInlineDisclosure)
-                                    )
-                                        <p
-                                            id="marketing_sms_consent_disclosure"
-                                            class="pl-7 text-xs leading-5 text-slate-500"
-                                        >
-                                            {{ $marketingSmsInlineDisclosure }}
                                         </p>
                                     @endif
 

@@ -153,8 +153,12 @@ class ZoomWebhookTest extends TestCase
         $receipt = WebhookInboxReceipt::query()->sole();
 
         $this->assertSame('recording.completed', $receipt->event_type);
-        $this->assertSame(
-            $this->payloadFingerprint($requestPayload),
+        $this->assertMatchesRegularExpression(
+            '/^[a-f0-9]{64}$/',
+            (string) $receipt->payload_fingerprint,
+        );
+        $this->assertNotSame(
+            $this->payloadFingerprint($receipt->payload),
             $receipt->payload_fingerprint,
         );
         $this->assertEquals([

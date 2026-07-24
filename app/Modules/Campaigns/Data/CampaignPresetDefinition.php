@@ -2,6 +2,7 @@
 
 namespace App\Modules\Campaigns\Data;
 
+use App\Modules\Campaigns\Models\Campaign;
 use InvalidArgumentException;
 
 class CampaignPresetDefinition
@@ -18,7 +19,6 @@ class CampaignPresetDefinition
         public readonly string $purpose,
         public readonly string $scope,
         public readonly string $status,
-        public readonly bool $isActive,
         public readonly ?string $sourceVersion,
         public readonly array $steps,
         public readonly array $meta = [],
@@ -64,12 +64,28 @@ class CampaignPresetDefinition
             channel: self::requiredString($data['channel'] ?? null, 'campaign channel'),
             purpose: self::requiredString($data['purpose'] ?? null, 'campaign purpose'),
             scope: self::requiredString($data['scope'] ?? null, 'campaign scope'),
-            status: self::nullableString($data['status'] ?? null) ?? 'active',
-            isActive: (bool) ($data['is_active'] ?? true),
+            status: self::campaignStatus($data['status'] ?? null),
             sourceVersion: self::nullableString($data['source_version'] ?? null),
             steps: $steps,
             meta: is_array($data['meta'] ?? null) ? $data['meta'] : [],
         );
+    }
+
+    private static function campaignStatus(mixed $value): string
+    {
+        $status = self::normalizeSegment(
+            self::nullableString($value) ?? Campaign::STATUS_ACTIVE,
+        );
+
+        if (! in_array($status, [
+            Campaign::STATUS_ACTIVE,
+            Campaign::STATUS_INACTIVE,
+            Campaign::STATUS_ARCHIVED,
+        ], true)) {
+            throw new InvalidArgumentException("Unsupported campaign status [{$status}].");
+        }
+
+        return $status;
     }
 
     private static function requiredString(mixed $value, string $field): string

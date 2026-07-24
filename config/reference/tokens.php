@@ -263,7 +263,6 @@ return [
                 'purpose',
                 'scope',
                 'status',
-                'is_active',
                 'source_version',
                 'created_at',
                 'updated_at',

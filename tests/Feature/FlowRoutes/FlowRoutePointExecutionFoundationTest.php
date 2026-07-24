@@ -573,7 +573,6 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'webinar',
             'status' => Campaign::STATUS_ACTIVE,
-            'is_active' => true,
             'meta' => [],
         ]);
 

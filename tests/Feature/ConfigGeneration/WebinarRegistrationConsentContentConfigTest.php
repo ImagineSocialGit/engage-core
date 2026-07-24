@@ -377,19 +377,12 @@ class WebinarRegistrationConsentContentConfigTest extends TestCase
         string $fieldPath,
         string $source,
     ): void {
-        $inlinePath = "{$fieldPath}.disclosure";
-        $inlineDisclosure = data_get($registration, $inlinePath);
-
-        if (is_string($inlineDisclosure) && trim($inlineDisclosure) !== '') {
-            return;
-        }
-
         $referencesPath = "{$fieldPath}.disclosure_refs";
         $references = data_get($registration, $referencesPath);
 
         $this->assertIsArray(
             $references,
-            "{$source}: [{$fieldPath}] must configure inline disclosure text or disclosure_refs.",
+            "{$source}: [{$fieldPath}] must configure disclosure_refs.",
         );
 
         if (! is_array($references)) {

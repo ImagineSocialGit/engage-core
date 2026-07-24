@@ -31,10 +31,9 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
             'Configured transactional email label.',
             'Configured transactional email helper.',
             'Configured transactional SMS label.',
-            'Configured transactional SMS disclosure.',
+            'Configured shared SMS disclosure.',
             'Configured marketing email label.',
             'Configured marketing SMS label.',
-            'Configured marketing SMS disclosure.',
         ] as $configuredText) {
             $this->assertStringContainsString($configuredText, $html);
         }
@@ -45,14 +44,20 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
             'name="marketing_email_consent"',
             'name="marketing_sms_consent"',
             'id="transactional_email_consent_helper"',
-            'id="transactional_sms_consent_disclosure"',
-            'id="marketing_sms_consent_disclosure"',
+            'id="webinar-registration-sms-terms-disclosure"',
             'aria-describedby="transactional_email_consent_helper"',
-            'aria-describedby="transactional_sms_consent_disclosure"',
-            'aria-describedby="marketing_sms_consent_disclosure"',
+            'aria-describedby="webinar-registration-sms-terms-disclosure"',
         ] as $contractFragment) {
             $this->assertStringContainsString($contractFragment, $html);
         }
+
+        $this->assertSame(
+            2,
+            substr_count(
+                $html,
+                'aria-describedby="webinar-registration-sms-terms-disclosure"',
+            ),
+        );
 
         $this->assertStringContainsString('x-model="transactionalSmsConsent"', $html);
         $this->assertStringContainsString('x-model="marketingSmsConsent"', $html);
@@ -119,8 +124,7 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
         $this->assertStringContainsString('Configured marketing email label.', $html);
         $this->assertStringNotContainsString('name="transactional_sms_consent"', $html);
         $this->assertStringNotContainsString('name="marketing_sms_consent"', $html);
-        $this->assertStringNotContainsString('transactional_sms_consent_disclosure', $html);
-        $this->assertStringNotContainsString('marketing_sms_consent_disclosure', $html);
+        $this->assertStringNotContainsString('webinar-registration-sms-terms-disclosure', $html);
         $this->assertStringNotContainsString('phone_sms_helper', $html);
         $this->assertStringNotContainsString('x-bind:required=', $html);
     }
@@ -176,6 +180,14 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
                     'title' => 'Configured optional marketing section',
                 ],
             ],
+            'disclosures' => [
+                'items' => [
+                    'sms_terms' => [
+                        'marker' => '1',
+                        'text' => 'Configured shared SMS disclosure.',
+                    ],
+                ],
+            ],
             'fields' => [
                 'first_name' => ['label' => 'Configured first-name label'],
                 'last_name' => ['label' => 'Configured last-name label'],
@@ -191,7 +203,9 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
                     ],
                     'sms' => [
                         'label' => 'Configured transactional SMS label.',
-                        'disclosure' => 'Configured transactional SMS disclosure.',
+                        'disclosure_refs' => [
+                            'sms_terms',
+                        ],
                     ],
                 ],
                 'marketing_consent_messages' => [
@@ -200,7 +214,9 @@ class WebinarRegistrationConsentPresentationTest extends TestCase
                     ],
                     'sms' => [
                         'label' => 'Configured marketing SMS label.',
-                        'disclosure' => 'Configured marketing SMS disclosure.',
+                        'disclosure_refs' => [
+                            'sms_terms',
+                        ],
                     ],
                 ],
             ],

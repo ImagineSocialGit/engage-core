@@ -44,7 +44,7 @@ FlowRoutes owns:
 - trigger binding selection behavior
 - route owner morph metadata
 
-FlowRoute preset sync assumes required Campaign definitions already exist when a route uses campaign points.
+FlowRoute preset sync requires referenced Campaign definitions to exist by stable key. An inactive or archived Campaign is a valid dormant reference; runtime enrollment skips it as `campaign_inactive` until the Campaign returns to `active`.
 
 Status-triggered FlowRoutes also assume required ContactStatus definitions already exist.
 

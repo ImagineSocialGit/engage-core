@@ -155,6 +155,14 @@ return [
     ],
 
     'registration' => [
+        'disclosures' => [
+            'items' => [
+                'sms_terms' => [
+                    'marker' => '1',
+                    'text' => 'Message frequency varies. Msg & data rates may apply. Reply STOP to opt out or HELP for help.',
+                ],
+            ],
+        ],
         'questions_section' => [
             'enabled' => true,
             'title' => 'Help us tailor the class',
@@ -212,7 +220,9 @@ return [
                 ],
                 'sms' => [
                     'label' => 'Text me webinar reminders and access information.',
-                    'disclosure' => 'By checking this box, you agree to receive automated text messages related to this webinar. Message frequency varies. Msg & data rates may apply. Reply STOP to opt out.',
+                    'disclosure_refs' => [
+                        'sms_terms',
+                    ],
                 ],
             ],
             'marketing_consent_messages' => [
@@ -221,7 +231,9 @@ return [
                 ],
                 'sms' => [
                     'label' => 'Send me marketing texts for future webinars, educational content, and related updates.',
-                    'disclosure' => 'Message frequency varies. Msg & data rates may apply. Reply STOP to opt out.',
+                    'disclosure_refs' => [
+                        'sms_terms',
+                    ],
                 ],
             ],
         ],

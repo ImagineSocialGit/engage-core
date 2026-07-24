@@ -178,7 +178,6 @@ class CampaignStepVariantsTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => 'active',
-            'is_active' => true,
             'steps' => [[
                 'step_number' => 1,
                 'name' => 'Initial follow-up',
@@ -273,7 +272,6 @@ class CampaignStepVariantsTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => Campaign::STATUS_ACTIVE,
-            'is_active' => true,
             'meta' => [],
         ]);
 
@@ -365,4 +363,3 @@ class CampaignStepVariantsTest extends TestCase
         return $contact;
     }
 }
-

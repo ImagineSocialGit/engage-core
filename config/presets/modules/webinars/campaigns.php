@@ -17,7 +17,6 @@ return [
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => 'active',
-            'is_active' => true,
             'source_version' => 3,
             'meta' => [
                 'domain' => 'webinar',
@@ -81,7 +80,6 @@ return [
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => 'active',
-            'is_active' => true,
             'source_version' => 3,
             'meta' => [
                 'domain' => 'webinar',

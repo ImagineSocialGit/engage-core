@@ -27,7 +27,6 @@ class ScheduledMessageEventReplayTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'campaign',
             'status' => Campaign::STATUS_ACTIVE,
-            'is_active' => true,
             'meta' => [],
         ]);
 

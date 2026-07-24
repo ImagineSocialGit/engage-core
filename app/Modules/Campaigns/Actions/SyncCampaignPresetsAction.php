@@ -85,7 +85,6 @@ class SyncCampaignPresetsAction
                 'purpose' => $this->normalizeSegment($definition->purpose),
                 'scope' => $this->normalizeSegment($definition->scope),
                 'status' => $this->normalizeSegment($definition->status),
-                'is_active' => $definition->isActive,
                 'source_version' => $definition->sourceVersion,
                 'is_customized' => false,
                 'customized_at' => null,
@@ -110,7 +109,6 @@ class SyncCampaignPresetsAction
             'purpose' => $this->normalizeSegment($definition->purpose),
             'scope' => $this->normalizeSegment($definition->scope),
             'status' => $this->normalizeSegment($definition->status),
-            'is_active' => $definition->isActive,
             'source_version' => $definition->sourceVersion,
             'meta' => $definition->meta,
         ])->save();

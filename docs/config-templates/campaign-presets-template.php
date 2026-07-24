@@ -29,6 +29,10 @@ return [
     | - variant dependencies and enablement
     | - message template references through variants
     |
+    | Campaign `status` is the sole top-level lifecycle control. Use `active`,
+    | `inactive`, or `archived`. Step and variant `is_active` fields remain
+    | independent child-level controls.
+    |
     | Messaging configs own:
     | - reusable message copy
     | - subject/body/CTA payloads
@@ -103,7 +107,6 @@ return [
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => 'active',
-            'is_active' => true,
             'source_version' => 1,
             'meta' => [
                 'domain' => 'webinar',
@@ -150,7 +153,6 @@ return [
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => 'active',
-            'is_active' => true,
             'source_version' => 1,
             'meta' => [
                 'domain' => 'webinar',
@@ -197,7 +199,6 @@ return [
             'purpose' => 'marketing',
             'scope' => 'mortgage_homebuyer_nurture',
             'status' => 'active',
-            'is_active' => true,
             'source_version' => 1,
             'meta' => [
                 'domain' => 'mortgage',

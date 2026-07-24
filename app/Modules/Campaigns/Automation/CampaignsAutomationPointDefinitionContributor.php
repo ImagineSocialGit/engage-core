@@ -100,12 +100,11 @@ class CampaignsAutomationPointDefinitionContributor implements AutomationPointDe
         if ($parsed->campaignKey !== null
             && ! Campaign::query()
                 ->where('key', $parsed->campaignKey)
-                ->active()
                 ->exists()
         ) {
             yield $context->error(
                 code: 'flow_routes.campaign_missing',
-                message: "FlowRoute [{$context->containerKey}] point [{$context->pointKey}] references unavailable Campaign [{$parsed->campaignKey}].",
+                message: "FlowRoute [{$context->containerKey}] point [{$context->pointKey}] references missing Campaign [{$parsed->campaignKey}].",
                 path: "{$context->path}.definition.campaign_key",
                 context: [
                     'point_key' => $context->pointKey,

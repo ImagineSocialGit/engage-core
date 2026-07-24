@@ -19,7 +19,6 @@ class CampaignFactory extends Factory
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => Campaign::STATUS_ACTIVE,
-            'is_active' => true,
             'source_version' => null,
             'is_customized' => false,
             'customized_at' => null,
@@ -27,5 +26,3 @@ class CampaignFactory extends Factory
         ];
     }
 }
-
-

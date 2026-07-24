@@ -80,7 +80,6 @@ class CampaignVariantSchedulingDurabilityTest extends TestCase
         );
     }
 
-
     public function test_campaign_variant_scheduled_payload_stays_compact_while_meta_keeps_variant_identity(): void
     {
         Queue::fake();
@@ -144,7 +143,6 @@ class CampaignVariantSchedulingDurabilityTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => Campaign::STATUS_ACTIVE,
-            'is_active' => true,
             'meta' => [],
         ]);
 
@@ -260,4 +258,3 @@ class CampaignVariantSchedulingDurabilityTest extends TestCase
         parent::tearDown();
     }
 }
-

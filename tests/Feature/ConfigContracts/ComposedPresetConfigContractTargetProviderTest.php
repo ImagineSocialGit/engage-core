@@ -4,7 +4,6 @@ namespace Tests\Feature\ConfigContracts;
 
 use App\Support\ConfigContracts\Data\ConfigContractTargetContext;
 use App\Support\ConfigContracts\TargetProviders\ComposedPresetConfigContractTargetProvider;
-use App\Support\Modules\ModuleManager;
 use App\Support\Presets\Contracts\PresetContributor;
 use App\Support\Presets\Data\PresetContribution;
 use App\Support\Presets\Enums\PresetDomain;
@@ -44,9 +43,7 @@ class ComposedPresetConfigContractTargetProviderTest extends TestCase
             ]),
         ]);
 
-        $packageResolver = new PresetPackageResolver(
-            moduleManager: app(ModuleManager::class),
-        );
+        $packageResolver = new PresetPackageResolver();
 
         $provider = new class (
             new PresetCompositionResolver(
@@ -86,9 +83,7 @@ class ComposedPresetConfigContractTargetProviderTest extends TestCase
 
     public function test_it_refuses_to_silently_validate_proposed_state_through_the_current_composition_resolver(): void
     {
-        $packageResolver = new PresetPackageResolver(
-            moduleManager: app(ModuleManager::class),
-        );
+        $packageResolver = new PresetPackageResolver();
 
         $provider = new class (
             new PresetCompositionResolver(

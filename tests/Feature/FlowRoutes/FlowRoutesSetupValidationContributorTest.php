@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\FlowRoutes;
 
+use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Core\Models\ContactStatus;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
@@ -36,7 +37,6 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
         Config::set('presets.modules.webinars.flow-routes.groups', []);
         Config::set('presets.modules.webinars.flow-routes.definitions', []);
     }
-
 
     public function test_it_reports_invalid_graph_and_key_mismatch_through_existing_preset_dto(): void
     {
@@ -121,6 +121,36 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
         $this->assertContains('flow_routes.campaign_missing', $codes);
     }
 
+    public function test_it_accepts_inactive_campaign_reference_as_dormant_but_valid(): void
+    {
+        Config::set('modules.enabled', ['workflow', 'flow_routes', 'campaigns', 'messaging']);
+        Config::set('presets.packages.flow_routes_validation_test.groups.flow_routes', ['test_group']);
+        Config::set('presets.modules.webinars.flow-routes.groups.test_group', ['campaign_route']);
+
+        $campaign = Campaign::factory()->create([
+            'key' => 'dormant_campaign',
+            'status' => Campaign::STATUS_INACTIVE,
+        ]);
+
+        Config::set('presets.modules.webinars.flow-routes.definitions.campaign_route', $this->routeDefinition(
+            key: 'campaign_route',
+            point: [
+                'key' => 'enroll',
+                'type' => 'enroll_campaign',
+                'capability_key' => 'campaigns.enroll_contact',
+                'is_start' => true,
+                'definition' => [
+                    'campaign_key' => $campaign->key,
+                ],
+            ],
+        ));
+
+        $this->assertNotContains(
+            'flow_routes.campaign_missing',
+            array_column($this->findings(), 'code'),
+        );
+    }
+
     public function test_it_reports_runtime_active_route_without_registered_handler(): void
     {
         $route = FlowRoute::query()->create([
@@ -159,7 +189,6 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
             array_column($this->findings(), 'code'),
         );
     }
-
 
     public function test_it_accepts_valid_selected_noop_route_without_runtime_findings(): void
     {

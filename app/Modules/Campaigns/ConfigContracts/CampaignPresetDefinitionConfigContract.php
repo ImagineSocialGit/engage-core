@@ -79,7 +79,6 @@ class CampaignPresetDefinitionConfigContract implements ConfigContract
             'purpose' => ConfigField::required(ConfigSchema::string()),
             'scope' => ConfigField::required(ConfigSchema::string()),
             'status' => ConfigField::defaulted(ConfigSchema::string(allowedValues: [Campaign::STATUS_ACTIVE, Campaign::STATUS_INACTIVE, Campaign::STATUS_ARCHIVED]), Campaign::STATUS_ACTIVE),
-            'is_active' => ConfigField::defaulted(ConfigSchema::boolean(), true),
             'source_version' => ConfigField::optional($version),
             'steps' => ConfigField::required(ConfigSchema::listOf($step)),
             'meta' => ConfigField::defaulted(ConfigSchema::object([], allowUnknown: true), []),

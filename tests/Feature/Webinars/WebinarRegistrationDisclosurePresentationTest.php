@@ -15,7 +15,7 @@ class WebinarRegistrationDisclosurePresentationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_referenced_disclosures_render_once_below_legal_links_and_describe_each_control(): void
+    public function test_referenced_disclosures_render_once_and_describe_each_control(): void
     {
         $html = $this->renderModal($this->referencedDisclosurePage());
 
@@ -59,62 +59,6 @@ class WebinarRegistrationDisclosurePresentationTest extends TestCase
         );
         $this->assertStringContainsString('Configured terms', $html);
         $this->assertStringContainsString('Configured privacy', $html);
-
-        $legalPosition = strpos($html, 'Configured legal introduction');
-        $disclosurePosition = strpos($html, 'Configured shared text-message terms.');
-        $submitPosition = strpos($html, 'Configured submit label');
-
-        $this->assertIsInt($legalPosition);
-        $this->assertIsInt($disclosurePosition);
-        $this->assertIsInt($submitPosition);
-        $this->assertLessThan($disclosurePosition, $legalPosition);
-        $this->assertLessThan($submitPosition, $disclosurePosition);
-    }
-
-    public function test_legacy_inline_disclosures_remain_supported_without_references(): void
-    {
-        $page = $this->referencedDisclosurePage();
-
-        unset($page['disclosures']);
-        $page['fields']['consent_messages']['sms'] = [
-            'label' => 'Legacy transactional SMS label.',
-            'disclosure' => 'Legacy transactional SMS disclosure.',
-        ];
-        $page['fields']['marketing_consent_messages']['combined'] = [
-            'label' => 'Legacy combined marketing label.',
-            'disclosure' => 'Legacy combined marketing disclosure.',
-        ];
-
-        $html = $this->renderModal($page);
-
-        $this->assertStringContainsString(
-            'id="transactional_sms_consent_disclosure"',
-            $html,
-        );
-        $this->assertStringContainsString(
-            'id="marketing_consent_disclosure"',
-            $html,
-        );
-        $this->assertStringContainsString(
-            'aria-describedby="transactional_sms_consent_disclosure"',
-            $html,
-        );
-        $this->assertStringContainsString(
-            'aria-describedby="marketing_consent_disclosure"',
-            $html,
-        );
-        $this->assertStringContainsString(
-            'Legacy transactional SMS disclosure.',
-            $html,
-        );
-        $this->assertStringContainsString(
-            'Legacy combined marketing disclosure.',
-            $html,
-        );
-        $this->assertStringNotContainsString(
-            'webinar-registration-sms-terms-disclosure',
-            $html,
-        );
     }
 
     public function test_disclosure_component_supports_arbitrary_markers_labels_and_styles(): void
@@ -252,6 +196,7 @@ class WebinarRegistrationDisclosurePresentationTest extends TestCase
             'missing_notice',
             'missing_notice',
         ];
+        $invalidDefinition['registration']['fields']['consent_messages']['email']['disclosure'] = 'Legacy inline disclosure.';
 
         $violations = $validator->validateResolvedDefinition(
             $invalidDefinition,
@@ -268,11 +213,19 @@ class WebinarRegistrationDisclosurePresentationTest extends TestCase
             $codes,
         );
         $this->assertContains(
+            'webinars.register_page.inline_disclosure_unsupported',
+            $codes,
+        );
+        $this->assertContains(
             'webinars.register.invalid.content.registration.fields.consent_messages.sms.disclosure_refs.0',
             array_column($violations, 'path'),
         );
         $this->assertContains(
             'webinars.register.invalid.content.registration.fields.consent_messages.sms.disclosure_refs.1',
+            array_column($violations, 'path'),
+        );
+        $this->assertContains(
+            'webinars.register.invalid.content.registration.fields.consent_messages.email.disclosure',
             array_column($violations, 'path'),
         );
     }

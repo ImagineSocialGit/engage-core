@@ -3,6 +3,7 @@
 namespace Tests\Feature\Campaigns;
 
 use App\Modules\Campaigns\Actions\EnrollContactInCampaignAction;
+use App\Modules\Campaigns\Exceptions\CampaignUnavailableForEnrollmentException;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Models\CampaignStep;
@@ -17,11 +18,63 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class EnrollContactInCampaignActionTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_campaign_status_is_the_single_lifecycle_authority(): void
+    {
+        $active = Campaign::factory()->create([
+            'status' => Campaign::STATUS_ACTIVE,
+        ]);
+
+        $inactive = Campaign::factory()->create([
+            'status' => Campaign::STATUS_INACTIVE,
+        ]);
+
+        $archived = Campaign::factory()->create([
+            'status' => Campaign::STATUS_ARCHIVED,
+        ]);
+
+        $this->assertFalse(Schema::hasColumn('campaigns', 'is_active'));
+        $this->assertTrue($active->isActive());
+        $this->assertFalse($inactive->isActive());
+        $this->assertFalse($archived->isActive());
+        $this->assertSame(
+            [$active->getKey()],
+            Campaign::query()->active()->pluck('id')->all(),
+        );
+    }
+
+    public function test_it_rejects_inactive_campaign_with_explicit_reason(): void
+    {
+        $campaign = Campaign::factory()->create([
+            'key' => 'inactive_campaign',
+            'status' => Campaign::STATUS_INACTIVE,
+        ]);
+
+        try {
+            app(EnrollContactInCampaignAction::class)->handle(
+                contact: Contact::factory()->create(),
+                campaignKey: $campaign->key,
+            );
+        } catch (CampaignUnavailableForEnrollmentException $exception) {
+            $this->assertSame(
+                CampaignUnavailableForEnrollmentException::REASON_INACTIVE,
+                $exception->reason,
+            );
+            $this->assertSame($campaign->key, $exception->campaignKey);
+            $this->assertSame(Campaign::STATUS_INACTIVE, $exception->campaignStatus);
+            $this->assertDatabaseCount('campaign_enrollments', 0);
+
+            return;
+        }
+
+        $this->fail('Expected inactive Campaign enrollment to be rejected.');
+    }
 
     public function test_it_enrolls_contact_and_schedules_first_campaign_step_variant(): void
     {
@@ -143,7 +196,6 @@ class EnrollContactInCampaignActionTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'webinar',
             'status' => Campaign::STATUS_ACTIVE,
-            'is_active' => true,
             'meta' => [],
         ]);
 
@@ -171,7 +223,6 @@ class EnrollContactInCampaignActionTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'webinar',
             'status' => Campaign::STATUS_ACTIVE,
-            'is_active' => true,
             'meta' => [],
         ]);
 
@@ -221,7 +272,6 @@ class EnrollContactInCampaignActionTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'webinar',
             'status' => Campaign::STATUS_ACTIVE,
-            'is_active' => true,
             'meta' => [],
         ]);
 
@@ -329,7 +379,6 @@ class EnrollContactInCampaignActionTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'webinar',
             'status' => Campaign::STATUS_ACTIVE,
-            'is_active' => true,
             'meta' => [],
         ]);
 

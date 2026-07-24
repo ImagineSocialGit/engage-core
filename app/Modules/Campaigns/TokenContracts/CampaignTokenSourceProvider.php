@@ -11,7 +11,7 @@ class CampaignTokenSourceProvider implements TokenSourceProvider
 {
     public function sources(): iterable
     {
-        foreach (['id', 'key', 'name', 'description', 'channel', 'purpose', 'scope', 'status', 'is_active', 'source_version', 'created_at', 'updated_at'] as $column) {
+        foreach (['id', 'key', 'name', 'description', 'channel', 'purpose', 'scope', 'status', 'source_version', 'created_at', 'updated_at'] as $column) {
             yield TokenSourceDefinition::modelColumn("campaign.{$column}", 'campaigns', "Campaign {$column}", "Value stored in campaigns.{$column}.", Campaign::class, $column);
         }
 

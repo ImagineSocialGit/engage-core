@@ -332,9 +332,19 @@ class WebinarRegisterPageDefinitionValidator
         ] as $fieldPath) {
             $field = data_get($registration, $fieldPath);
 
-            if (! is_array($field)
-                || ! array_key_exists('disclosure_refs', $field)
-            ) {
+            if (! is_array($field)) {
+                continue;
+            }
+
+            if (array_key_exists('disclosure', $field)) {
+                $violations[] = $this->violation(
+                    code: 'webinars.register_page.inline_disclosure_unsupported',
+                    message: 'Webinar registration consent disclosures must use disclosure_refs and shared disclosure definitions.',
+                    path: "{$path}.{$fieldPath}.disclosure",
+                );
+            }
+
+            if (! array_key_exists('disclosure_refs', $field)) {
                 continue;
             }
 

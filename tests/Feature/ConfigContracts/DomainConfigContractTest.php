@@ -24,6 +24,25 @@ class DomainConfigContractTest extends TestCase
         }
     }
 
+    public function test_campaign_contract_rejects_legacy_is_active_lifecycle_field(): void
+    {
+        $definition = app(ConfigContractRegistry::class)
+            ->get('campaigns.preset_definition')
+            ->example();
+
+        $definition['is_active'] = false;
+
+        $violations = app(ConfigContractRegistry::class)
+            ->get('campaigns.preset_definition')
+            ->schema()
+            ->validate($definition, 'campaign');
+
+        $this->assertContains(
+            'unknown_field',
+            array_map(fn ($violation) => $violation->code, $violations),
+        );
+    }
+
     public function test_current_webinar_orchestration_matches_closed_contracts(): void
     {
         $registry = app(ConfigContractRegistry::class);

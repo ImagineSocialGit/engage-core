@@ -104,7 +104,6 @@ class WebinarNurtureFirstAvailableVariantTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'status' => 'active',
-            'is_active' => true,
         ]);
 
         $step = CampaignStep::factory()

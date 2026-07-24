@@ -12,6 +12,26 @@ purpose, and scope. `source_config_path` remains migration/legacy fallback metad
 identity. The Slam Dunk golden runtime fixture proves variant resolution and enrollment through
 this path.
 
+## Campaign lifecycle authority
+
+`Campaign.status` is the sole top-level Campaign lifecycle authority.
+
+Supported states are:
+
+```text
+active
+inactive
+archived
+```
+
+Only `active` Campaigns may accept new enrollments or appear in active Campaign authoring choices. `inactive` and `archived` Campaign definitions remain installed and referenceable by stable key so FlowRoutes can stay configured while Campaign execution is paused.
+
+An enrollment attempt against an existing non-active Campaign must stop safely with the explicit reason `campaign_inactive`. A missing Campaign uses the distinct reason `campaign_missing`.
+
+Campaign Steps and Campaign Step Variants retain their own `is_active` fields because those are independent child-level availability controls. Do not restore a Campaign-level `is_active` field in config, Eloquent, tokens, or persistence.
+
+Changing Campaign status does not, by itself, cancel existing enrollments or skip already-pending scheduled messages. That operational shutdown behavior belongs to the dedicated Campaign deactivation workflow.
+
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
 
 Campaigns is optional.
@@ -622,7 +642,3 @@ source event or route point, when available
 ```
 
 Do not persist summary text unless a concrete reporting/audit reason appears. Prefer deriving it from the canonical step/variant timing definition.
-
-
-
-
