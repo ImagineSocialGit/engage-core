@@ -1430,14 +1430,58 @@ The config/runtime contract may retain deliberate optional overrides where suppo
 
 ## FlowRoute config shape
 
-FlowRoutes should reference public actions/capabilities through point definitions.
+FlowRoute presets use a compact keyed-map contract. The `definitions` map key is the durable logical `FlowRoute.key`, and each `points` map key is the durable `FlowRoutePoint.key`.
 
-Examples:
+Author trigger intent with at most one top-level key:
+
+```text
+contact_status_key
+    contact-status trigger
+
+event_key
+    automation-event trigger
+
+neither
+    manual Route
+```
+
+Point map order is authoritative. Normalization derives:
+
+```text
+sort_order
+first active Point as is_start
+next active Point as next_point_key
+capability_key from Point type
+Point source_version from the Route
+registered Point-definition defaults
+empty settings
+```
+
+Disabled Points remain persisted for definition history but are omitted from the active execution chain. Do not author the old route `key`, nested `trigger`, or route `meta` fields. Do not author Point `key`, `capability_key`, `sort_order`, `is_start`, `next_point_key`, `settings`, `source_version`, or Point `meta` fields.
+
+Keep module-owned executable values inside the Point's `definition` object:
+
+```php
+'webinar_attended_follow_up' => [
+    'event_key' => 'webinar.attended',
+    'name' => 'Webinar Attended Follow-Up',
+    'points' => [
+        'enroll_attended_campaign' => [
+            'type' => 'enroll_campaign',
+            'definition' => [
+                'campaign_key' => 'webinar_attended_nurture',
+            ],
+        ],
+    ],
+],
+```
+
+FlowRoutes should reference public actions through those Point definitions. Examples:
 
 ```text
 webinar.attended -> enroll_campaign(webinar_attended_nurture)
 webinar.missed -> enroll_campaign(webinar_missed_nurture)
-task.completed -> resume event_wait point, when configured
+task.completed -> resume event_wait Point, when configured
 ```
 
 Do not make producer modules import FlowRoutes.
@@ -2119,39 +2163,33 @@ Use the contributor-based validation manager/service as the reusable source of t
 
 ## FlowRoutes capability reference rule
 
-FlowRoute presets should reference durable capabilities when a point represents an authorable action, wait, event, condition, branch, or module/vertical behavior.
+FlowRoute runtime records should reference durable capabilities when a Point represents an authorable action, wait, event, condition, branch, or module/vertical behavior. Preset authors do not repeat the capability key: the compact preset normalizer derives the one canonical active capability from the Point type.
 
-The preferred preset authoring shape is:
+The authorable relationship is:
 
 ```text
-capability_key
-point type
-handler key
-public action/service contract
-module key
-optional task template key
-optional message/campaign/template reference
-optional supported subject type
+Point type
+    -> one registered active capability
+    -> handler/public action or service contract
+    -> required module and supported inputs
 ```
 
-Capability records describe what is available, how it should be labeled, what inputs are required, what subject types are supported, and what output context/fields become available. Point definitions still carry the route-specific configuration.
+More than one active capability for the same Point type is ambiguous and must fail preset normalization rather than requiring an author to choose an infrastructure key. Capability records still describe labels, required modules, supported subjects, inputs, output context, and availability. Point definitions carry only Route-specific business configuration.
 
 Avoid route preset shapes that require FlowRoutes to know vertical private model/table details.
 
 Good:
 
 ```text
-capability_key: tasks.create_task
-point: create_task
-task_template_key: pet_services.final_behavior_check
+point type: create_task
+definition.task_template_key: pet_services.final_behavior_check
 ```
 
 Good:
 
 ```text
-capability_key: campaigns.enroll
-point: enroll_campaign
-campaign_key: webinar_attended_nurture
+point type: enroll_campaign
+definition.campaign_key: webinar_attended_nurture
 ```
 
 Bad:

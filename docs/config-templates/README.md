@@ -207,7 +207,7 @@ Preset groups are composition-only. Durable preset ownership belongs to contribu
 | `campaign-presets-template.php` | Campaign journeys, step order, step timing, variant strategy, and variant delivery references. Campaign presets must not own reusable message copy or payloads. |
 | `messaging-email-template.php` | Reusable email content/template definitions. Module-owned lifecycle timing, conditions, sequencing, dependencies, and skip behavior do not belong here. |
 | `messaging-sms-template.php` | Reusable SMS content/template definitions. Module-owned lifecycle behavior does not belong here; SMS remains explicit and surface-controlled. |
-| `flow-routes-template.php` | FlowRoute definitions, route points, waits, event waits, and automation/control-flow presets. |
+| `flow-routes-template.php` | Compact keyed FlowRoute definitions. Route/Point identity, capability, order, start, and next-point graph are derived. |
 | `task-presets-template.php` | DB-owned task template/default definitions. Task preset sync creates task templates only, not live tasks. |
 | `webinar-schedule-profiles-template.php` | DB-owned Webinar behavior profiles/items. These exclusively own Webinar lifecycle timing, conditions, enablement, and Webinar-specific skip behavior, not reusable copy. |
 | `webinar-post-event-template.php` | Webinar post-event provider orchestration such as attendance recording, playback resolution, follow-up dispatch, and automation events. |
@@ -239,7 +239,7 @@ messaging.{channel}.definitions.{purpose}.{scope}.campaigns.{campaign_key}.steps
 
 - Campaign message templates resolve by channel, purpose, scope, campaign key, step number, and variant key, not author-created per-step message names.
 - Campaign step variants must reference Messaging-owned templates/assignments and must not own reusable copy.
-- FlowRoute presets own automation/control-flow routing and concrete `FlowRoutePoint` definitions. `FlowRoutePoint` directly owns its type/configuration; there is no global reusable `Point` model/template layer.
+- FlowRoute presets own automation/control-flow routing and concrete `FlowRoutePoint` definitions. Definitions and Points use keyed maps; Point order derives sort/start/next behavior, and Point type derives the canonical capability. `FlowRoutePoint` directly owns its normalized configuration; there is no global reusable `Point` model/template layer.
 - Webinar post-event config owns provider orchestration, not reusable message copy.
 - Task presets create DB-owned task template definitions only. They do not create live tasks.
 - Use documented keys and tokens only.

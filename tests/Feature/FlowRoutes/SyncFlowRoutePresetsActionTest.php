@@ -8,6 +8,7 @@ use App\Modules\FlowRoutes\Actions\SyncFlowRoutePresetsAction;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
+use App\Support\Presets\Data\ResolvedPresetDomain;
 use App\Support\Presets\Enums\PresetDomain;
 use App\Support\Presets\PresetCompositionResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -70,6 +71,25 @@ class SyncFlowRoutePresetsActionTest extends TestCase
 
         $this->assertSame('attended_webinar', $attendedPoint->definition['contact_status_key'] ?? null);
         $this->assertSame('missed_webinar', $missedPoint->definition['contact_status_key'] ?? null);
+
+        $this->assertSame(10, $attendedPoint->sort_order);
+        $this->assertTrue($attendedPoint->is_start);
+        $this->assertNull($attendedPoint->next_flow_route_point_id);
+        $this->assertSame([], $attendedPoint->settings);
+        $this->assertSame('flow_routes.change_status', $attendedPoint->capability?->key);
+        $this->assertSame('webinar_attended_event', $attendedPoint->definition['reason'] ?? null);
+        $this->assertFalse($attendedPoint->definition['force'] ?? true);
+        $this->assertSame('skipped', $attendedPoint->definition['on_same_status'] ?? null);
+        $this->assertEquals([
+            'source' => 'flow_route',
+            'trigger_type' => 'automation_event',
+            'event_key' => 'webinar.attended',
+        ], $attendedPoint->definition['meta'] ?? null);
+        $this->assertSame([
+            'category' => 'webinar',
+            'default_role' => 'status_transition',
+        ], data_get($attendedRoute->meta, 'definition'));
+        $this->assertNull(data_get($attendedPoint->meta, 'definition'));
     }
 
     public function test_it_syncs_default_webinar_campaign_enrollment_routes(): void
@@ -96,12 +116,93 @@ class SyncFlowRoutePresetsActionTest extends TestCase
         $this->assertNull($missedRoute->contact_status_id);
 
         $this->assertTrue($attendedEnrollmentPoint->is_start);
+        $this->assertSame(10, $attendedEnrollmentPoint->sort_order);
+        $this->assertSame('campaigns.enroll_contact', $attendedEnrollmentPoint->capability?->key);
         $this->assertSame('webinar_attended_nurture', $attendedEnrollmentPoint->definition['campaign_key'] ?? null);
+        $this->assertSame('skipped', $attendedEnrollmentPoint->definition['on_already_enrolled'] ?? null);
+        $this->assertSame([], $attendedEnrollmentPoint->definition['payload'] ?? null);
+        $this->assertEquals([
+            'source' => 'flow_route',
+            'reason' => 'webinar_attended_event',
+        ], $attendedEnrollmentPoint->definition['meta'] ?? null);
+        $this->assertEquals([
+            'source' => 'flow_route',
+            'trigger_type' => 'automation_event',
+            'event_key' => 'webinar.attended',
+        ], $attendedEnrollmentPoint->definition['start_context'] ?? null);
+        $this->assertSame([], $attendedEnrollmentPoint->definition['exit_conditions'] ?? null);
         $this->assertNull($attendedEnrollmentPoint->next_flow_route_point_id);
 
         $this->assertTrue($missedEnrollmentPoint->is_start);
         $this->assertSame('webinar_missed_nurture', $missedEnrollmentPoint->definition['campaign_key'] ?? null);
         $this->assertNull($missedEnrollmentPoint->next_flow_route_point_id);
+    }
+
+    public function test_preset_sync_materializes_the_ordered_point_map_as_an_explicit_runtime_graph(): void
+    {
+        app(SyncFlowRouteCapabilitiesAction::class)->handle();
+
+        app(SyncFlowRoutePresetsAction::class)->handle(new ResolvedPresetDomain(
+            presetKey: 'test',
+            domain: PresetDomain::FlowRoutes,
+            selectedGroups: ['test_group'],
+            selectedContributors: ['test'],
+            definitionKeys: ['ordered_route'],
+            definitions: [
+                'ordered_route' => [
+                    'name' => 'Ordered Route',
+                    'source_version' => 'v1',
+                    'points' => [
+                        'start' => [
+                            'type' => 'noop',
+                        ],
+                        'disabled_placeholder' => [
+                            'type' => 'noop',
+                            'is_active' => false,
+                        ],
+                        'wait_one_day' => [
+                            'type' => 'wait',
+                            'definition' => [
+                                'days' => 1,
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            provenance: [
+                'ordered_route' => [
+                    'contributor' => 'test',
+                    'source' => 'test.flow-routes',
+                ],
+            ],
+            definitionGroups: [
+                'ordered_route' => ['test_group'],
+            ],
+        ));
+
+        $route = FlowRoute::query()
+            ->where('key', 'ordered_route')
+            ->firstOrFail();
+        $start = $this->flowRoutePoint($route, 'start');
+        $disabled = $this->flowRoutePoint($route, 'disabled_placeholder');
+        $wait = $this->flowRoutePoint($route, 'wait_one_day');
+
+        $this->assertSame(10, $start->sort_order);
+        $this->assertTrue($start->is_start);
+        $this->assertSame($wait->getKey(), $start->next_flow_route_point_id);
+        $this->assertSame('flow_routes.noop', $start->capability?->key);
+
+        $this->assertSame(20, $disabled->sort_order);
+        $this->assertFalse($disabled->is_active);
+        $this->assertFalse($disabled->is_start);
+        $this->assertNull($disabled->next_flow_route_point_id);
+
+        $this->assertSame(30, $wait->sort_order);
+        $this->assertFalse($wait->is_start);
+        $this->assertNull($wait->next_flow_route_point_id);
+        $this->assertSame('flow_routes.wait', $wait->capability?->key);
+        $this->assertSame(['days' => 1], $wait->definition);
+        $this->assertSame('v1', $wait->source_version);
     }
 
     public function test_preset_sync_creates_all_default_active_bindings_for_shared_automation_trigger(): void

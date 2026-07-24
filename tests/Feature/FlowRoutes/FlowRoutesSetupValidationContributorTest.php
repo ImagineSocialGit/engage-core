@@ -3,11 +3,10 @@
 namespace Tests\Feature\FlowRoutes;
 
 use App\Modules\Campaigns\Models\Campaign;
-use App\Modules\Core\Models\ContactStatus;
+use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
-use App\Modules\FlowRoutes\Enums\FlowRoutePointType;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Modules\FlowRoutes\Validation\FlowRoutesSetupValidationContributor;
 use App\Modules\Tasks\Models\TaskTemplate;
@@ -38,81 +37,80 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
         Config::set('presets.modules.webinars.flow-routes.definitions', []);
     }
 
-    public function test_it_reports_invalid_graph_and_key_mismatch_through_existing_preset_dto(): void
+    public function test_it_reports_an_active_compact_route_without_an_active_point(): void
     {
-        Config::set('presets.packages.flow_routes_validation_test.groups.flow_routes', ['test_group']);
-        Config::set('presets.modules.webinars.flow-routes.groups.test_group', ['route_one']);
-        Config::set('presets.modules.webinars.flow-routes.definitions.route_one', [
-            'key' => 'different_key',
-            'name' => 'Route One',
-            'trigger' => [
-                'type' => 'manual',
-            ],
-            'is_active' => true,
-            'points' => [
-                [
-                    'key' => 'start',
-                    'type' => 'noop',
-                    'is_start' => true,
-                    'next_point_key' => 'missing',
+        $this->selectDefinitions(['route_one']);
+
+        Config::set(
+            'presets.modules.webinars.flow-routes.definitions.route_one',
+            $this->routeDefinition(
+                pointKey: 'start',
+                point: [
+                    'type' => FlowRoutePointType::Noop->value,
+                    'is_active' => false,
                 ],
-            ],
-        ]);
+            ),
+        );
 
-        $codes = array_column($this->findings(), 'code');
-
-        $this->assertContains('flow_routes.definition_key_mismatch', $codes);
-        $this->assertContains('flow_routes.definition_invalid', $codes);
+        $this->assertContains(
+            'flow_routes.definition_invalid',
+            array_column($this->findings(), 'code'),
+        );
     }
 
     public function test_it_reports_missing_task_template_contact_status_and_campaign_references(): void
     {
-        Config::set('modules.enabled', ['workflow', 'flow_routes', 'tasks', 'campaigns', 'messaging']);
-        Config::set('presets.packages.flow_routes_validation_test.groups.flow_routes', ['test_group']);
-        Config::set('presets.modules.webinars.flow-routes.groups.test_group', [
+        Config::set('modules.enabled', [
+            'workflow',
+            'flow_routes',
+            'tasks',
+            'campaigns',
+            'messaging',
+        ]);
+        $this->selectDefinitions([
             'create_task_route',
             'change_status_route',
             'campaign_route',
         ]);
 
-        Config::set('presets.modules.webinars.flow-routes.definitions.create_task_route', $this->routeDefinition(
-            key: 'create_task_route',
-            point: [
-                'key' => 'create_task',
-                'type' => 'create_task',
-                'capability_key' => 'tasks.create_task',
-                'is_start' => true,
-                'definition' => [
-                    'task_template_key' => '__missing_task_template__',
+        Config::set(
+            'presets.modules.webinars.flow-routes.definitions.create_task_route',
+            $this->routeDefinition(
+                pointKey: 'create_task',
+                point: [
+                    'type' => FlowRoutePointType::CreateTask->value,
+                    'definition' => [
+                        'task_template_key' => '__missing_task_template__',
+                    ],
                 ],
-            ],
-        ));
+            ),
+        );
 
-        Config::set('presets.modules.webinars.flow-routes.definitions.change_status_route', $this->routeDefinition(
-            key: 'change_status_route',
-            point: [
-                'key' => 'change_status',
-                'type' => 'change_status',
-                'capability_key' => 'flow_routes.change_status',
-                'is_start' => true,
-                'definition' => [
-                    'contact_status_key' => '__missing_status__',
+        Config::set(
+            'presets.modules.webinars.flow-routes.definitions.change_status_route',
+            $this->routeDefinition(
+                pointKey: 'change_status',
+                point: [
+                    'type' => FlowRoutePointType::ChangeStatus->value,
+                    'definition' => [
+                        'contact_status_key' => '__missing_status__',
+                    ],
                 ],
-            ],
-        ));
+            ),
+        );
 
-        Config::set('presets.modules.webinars.flow-routes.definitions.campaign_route', $this->routeDefinition(
-            key: 'campaign_route',
-            point: [
-                'key' => 'enroll',
-                'type' => 'enroll_campaign',
-                'capability_key' => 'campaigns.enroll_contact',
-                'is_start' => true,
-                'definition' => [
-                    'campaign_key' => '__missing_campaign__',
+        Config::set(
+            'presets.modules.webinars.flow-routes.definitions.campaign_route',
+            $this->routeDefinition(
+                pointKey: 'enroll',
+                point: [
+                    'type' => FlowRoutePointType::EnrollCampaign->value,
+                    'definition' => [
+                        'campaign_key' => '__missing_campaign__',
+                    ],
                 ],
-            ],
-        ));
+            ),
+        );
 
         $codes = array_column($this->findings(), 'code');
 
@@ -123,27 +121,31 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
 
     public function test_it_accepts_inactive_campaign_reference_as_dormant_but_valid(): void
     {
-        Config::set('modules.enabled', ['workflow', 'flow_routes', 'campaigns', 'messaging']);
-        Config::set('presets.packages.flow_routes_validation_test.groups.flow_routes', ['test_group']);
-        Config::set('presets.modules.webinars.flow-routes.groups.test_group', ['campaign_route']);
+        Config::set('modules.enabled', [
+            'workflow',
+            'flow_routes',
+            'campaigns',
+            'messaging',
+        ]);
+        $this->selectDefinitions(['campaign_route']);
 
         $campaign = Campaign::factory()->create([
             'key' => 'dormant_campaign',
             'status' => Campaign::STATUS_INACTIVE,
         ]);
 
-        Config::set('presets.modules.webinars.flow-routes.definitions.campaign_route', $this->routeDefinition(
-            key: 'campaign_route',
-            point: [
-                'key' => 'enroll',
-                'type' => 'enroll_campaign',
-                'capability_key' => 'campaigns.enroll_contact',
-                'is_start' => true,
-                'definition' => [
-                    'campaign_key' => $campaign->key,
+        Config::set(
+            'presets.modules.webinars.flow-routes.definitions.campaign_route',
+            $this->routeDefinition(
+                pointKey: 'enroll',
+                point: [
+                    'type' => FlowRoutePointType::EnrollCampaign->value,
+                    'definition' => [
+                        'campaign_key' => $campaign->key,
+                    ],
                 ],
-            ],
-        ));
+            ),
+        );
 
         $this->assertNotContains(
             'flow_routes.campaign_missing',
@@ -180,8 +182,8 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
         ]);
 
         $this->app->instance(
-            \App\Modules\FlowRoutes\Services\PointHandlerRegistry::class,
-            new \App\Modules\FlowRoutes\Services\PointHandlerRegistry([]),
+            PointHandlerRegistry::class,
+            new PointHandlerRegistry([]),
         );
 
         $this->assertContains(
@@ -192,17 +194,18 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
 
     public function test_it_accepts_valid_selected_noop_route_without_runtime_findings(): void
     {
-        Config::set('presets.packages.flow_routes_validation_test.groups.flow_routes', ['test_group']);
-        Config::set('presets.modules.webinars.flow-routes.groups.test_group', ['noop_route']);
+        Config::set('modules.enabled', ['workflow', 'flow_routes']);
+        $this->selectDefinitions(['noop_route']);
 
-        Config::set('presets.modules.webinars.flow-routes.definitions.noop_route', $this->routeDefinition(
-            key: 'noop_route',
-            point: [
-                'key' => 'start',
-                'type' => FlowRoutePointType::Noop->value,
-                'is_start' => true,
-            ],
-        ));
+        Config::set(
+            'presets.modules.webinars.flow-routes.definitions.noop_route',
+            $this->routeDefinition(
+                pointKey: 'start',
+                point: [
+                    'type' => FlowRoutePointType::Noop->value,
+                ],
+            ),
+        );
 
         $this->assertSame([], $this->findings());
     }
@@ -210,26 +213,25 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
     public function test_it_distinguishes_declared_capability_from_missing_executable_handler(): void
     {
         Config::set('modules.enabled', ['workflow', 'flow_routes', 'tasks']);
-        Config::set('presets.packages.flow_routes_validation_test.groups.flow_routes', ['test_group']);
-        Config::set('presets.modules.webinars.flow-routes.groups.test_group', ['create_task_route']);
+        $this->selectDefinitions(['create_task_route']);
 
         $template = TaskTemplate::factory()->create([
             'key' => 'route.follow_up',
             'title' => 'Follow up with contact',
         ]);
 
-        Config::set('presets.modules.webinars.flow-routes.definitions.create_task_route', $this->routeDefinition(
-            key: 'create_task_route',
-            point: [
-                'key' => 'create_task',
-                'type' => FlowRoutePointType::CreateTask->value,
-                'capability_key' => 'tasks.create_task',
-                'is_start' => true,
-                'definition' => [
-                    'task_template_key' => $template->key,
+        Config::set(
+            'presets.modules.webinars.flow-routes.definitions.create_task_route',
+            $this->routeDefinition(
+                pointKey: 'create_task',
+                point: [
+                    'type' => FlowRoutePointType::CreateTask->value,
+                    'definition' => [
+                        'task_template_key' => $template->key,
+                    ],
                 ],
-            ],
-        ));
+            ),
+        );
 
         $this->app->instance(
             PointHandlerRegistry::class,
@@ -303,15 +305,27 @@ class FlowRoutesSetupValidationContributorTest extends TestCase
      * @param array<string, mixed> $point
      * @return array<string, mixed>
      */
-    private function routeDefinition(string $key, array $point): array
+    private function routeDefinition(string $pointKey, array $point): array
     {
         return [
-            'key' => $key,
-            'name' => str($key)->headline()->toString(),
-            'trigger' => ['type' => 'manual'],
-            'is_active' => true,
-            'points' => [$point],
+            'name' => 'Validation Route',
+            'points' => [
+                $pointKey => $point,
+            ],
         ];
+    }
+
+    /** @param array<int, string> $definitionKeys */
+    private function selectDefinitions(array $definitionKeys): void
+    {
+        Config::set(
+            'presets.packages.flow_routes_validation_test.groups.flow_routes',
+            ['test_group'],
+        );
+        Config::set(
+            'presets.modules.webinars.flow-routes.groups.test_group',
+            $definitionKeys,
+        );
     }
 
     /**

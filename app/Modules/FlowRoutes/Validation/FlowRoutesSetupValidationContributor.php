@@ -3,26 +3,26 @@
 namespace App\Modules\FlowRoutes\Validation;
 
 use App\Modules\Core\Models\ContactStatus;
-use App\Modules\FlowRoutes\Data\Presets\FlowRoutePresetDefinition;
 use App\Modules\FlowRoutes\Models\ContactFlowRoutePlan;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRouteCapability;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\FlowRoutes\Models\FlowRouteTriggerBinding;
+use App\Modules\FlowRoutes\Services\FlowRoutePresetDefinitionFactory;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use App\Support\AutomationCapabilities\AutomationCapabilityRegistry;
 use App\Support\AutomationCapabilities\AutomationPointDefinitionRegistry;
-use App\Support\AutomationCapabilities\Data\AutomationPointValidationContext;
 use App\Support\AutomationCapabilities\Data\AutomationCapabilityDefinition;
+use App\Support\AutomationCapabilities\Data\AutomationPointValidationContext;
 use App\Support\Modules\ModuleManager;
+use App\Support\Presets\Enums\PresetDomain;
+use App\Support\Presets\PresetCompositionResolver;
+use App\Support\Presets\PresetPackageResolver;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 use Illuminate\Support\Collection;
 use Throwable;
-use App\Support\Presets\Enums\PresetDomain;
-use App\Support\Presets\PresetCompositionResolver;
-use App\Support\Presets\PresetPackageResolver;
 
 class FlowRoutesSetupValidationContributor implements SetupValidationContributor
 {
@@ -33,6 +33,7 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
         private readonly AutomationCapabilityRegistry $capabilityRegistry,
         private readonly AutomationPointDefinitionRegistry $pointDefinitionRegistry,
         private readonly PointHandlerRegistry $pointHandlerRegistry,
+        private readonly FlowRoutePresetDefinitionFactory $definitionFactory,
         private readonly ModuleManager $moduleManager,
         private readonly PresetCompositionResolver $compositionResolver,
         private readonly PresetPackageResolver $packageResolver,
@@ -99,26 +100,12 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
             'route_key' => $routeKey,
         ];
 
-        $internalKey = $definition['key'] ?? null;
-
-        if (! $this->filledString($internalKey)) {
-            yield $this->error(
-                code: 'flow_routes.definition_key_missing',
-                message: "FlowRoute preset definition [{$routeKey}] is missing a non-empty [key].",
-                path: "{$path}.key",
-                context: $context,
-            );
-        } elseif (trim($internalKey) !== $routeKey) {
-            yield $this->error(
-                code: 'flow_routes.definition_key_mismatch',
-                message: "FlowRoute preset definition [{$routeKey}] key must match its config key.",
-                path: "{$path}.key",
-                context: $context + ['definition_key' => trim($internalKey)],
-            );
-        }
-
         try {
-            $preset = FlowRoutePresetDefinition::fromArray($presetKey, $definition);
+            $preset = $this->definitionFactory->fromArray(
+                presetKey: $presetKey,
+                definitionKey: $routeKey,
+                data: $definition,
+            );
         } catch (Throwable $exception) {
             yield $this->error(
                 code: 'flow_routes.definition_invalid',
@@ -142,8 +129,8 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
             );
         }
 
-        foreach ($preset->points as $index => $point) {
-            $pointPath = "{$path}.points.{$index}";
+        foreach ($preset->points as $point) {
+            $pointPath = "{$path}.points.{$point->key}";
 
             if (! $point->isActive) {
                 continue;
@@ -167,7 +154,7 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
                     pointKey: $point->key,
                     pointType: $point->type,
                     capabilityKey: $point->capabilityKey,
-                    path: "{$pointPath}.capability_key",
+                    path: "{$pointPath}.type",
                     context: $context,
                 );
             }
@@ -177,7 +164,7 @@ class FlowRoutesSetupValidationContributor implements SetupValidationContributor
                 pointKey: $point->key,
                 pointType: $point->type,
                 definition: $point->definition,
-                settings: $point->settings,
+                settings: [],
                 routePointKeys: array_map(
                     fn ($candidate): string => $candidate->key,
                     $preset->points,

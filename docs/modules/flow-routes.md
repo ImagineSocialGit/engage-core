@@ -4,9 +4,27 @@
 
 FlowRoute preset definitions are closed by the registered `flow_routes.preset_definition`
 contract plus Point-specific schemas contributed through `AutomationPointDefinitionRegistry`.
-The canonical authoring template no longer advertises route-level `status`, top-level Point
-`conditions`, or event-wait `timeout`, because those fields are not consumed. `enroll_campaign`
-points reference the public capability `campaigns.enroll_contact`.
+Preset authoring uses one compact keyed-map shape:
+
+```text
+definitions map key -> FlowRoute.key
+points map key -> FlowRoutePoint.key
+points map order -> sort_order, active start Point, and active next-Point chain
+Point type -> one canonical active FlowRouteCapability
+Route source_version -> Point source_version
+```
+
+A top-level `contact_status_key` creates a contact-status trigger. A top-level `event_key` creates
+an automation-event trigger. Omitting both creates a manual Route. They are mutually exclusive.
+
+The removed verbose route fields `key`, `trigger`, and `meta` are invalid. The removed Point fields
+`key`, `capability_key`, `sort_order`, `is_start`, `next_point_key`, `settings`, `source_version`,
+and `meta` are also invalid. There is no compatibility authoring path for those fields.
+Point-specific executable values remain inside the module-owned `definition` object.
+
+Normalization keeps runtime/database records explicit: capabilities, order, start state, next IDs,
+settings, source versions, and registered Point-definition defaults are materialized during preset
+sync. Disabled Points remain persisted but are omitted from the derived active chain.
 
 Active runtime routes must resolve to exactly one executable start point. A zero-start validation
 finding usually indicates preserved customized database state rather than permission to weaken the
@@ -825,6 +843,8 @@ FlowRouteCapability
 
 Capabilities describe what is available to a route, including actions, waits, events, conditions, branches, labels, help text, supported subject types, required modules, input schema, output context, and available fields.
 
+Compact presets do not author `capability_key`. `FlowRoutePresetDefinitionFactory` resolves the one active registered capability whose `point_type` matches the authored Point type. Zero matches means the Point type is unavailable; multiple matches are ambiguous and fail normalization. The derived capability is then stored explicitly on the normalized `FlowRoutePoint`.
+
 Capability bindings decide which capabilities are enabled, visible, or customized for a client/module/context/owner group/vertical.
 
 Capabilities do not give FlowRoutes permission to mutate another module's private tables. Every module-owned effect still goes through that module's public action/service/contract.
@@ -850,14 +870,13 @@ Shared preset-composition validation owns package/group/definition structure, in
 FlowRoutes itself validates at least:
 
 ```text
-route definition keys match stable definition identity
-trigger type and trigger key shape are supported
-route point keys are unique within the Route
-point types have registered executable handlers for the current installation/context
-required capability references exist and match the Point type
+definition and Point map keys are valid durable identities
+contact-status and automation-event trigger references are mutually exclusive and supported
+Point types have registered definition schemas and executable handlers for the current installation/context
+one canonical active capability can be derived for each Point type
 required capability modules are available
 supported subject types match Route/capability assumptions
-next-point references resolve safely
+ordered active Points normalize to one start Point and a safe next-Point chain
 route graph integrity
 route-instance plan/snapshot assumptions are supported
 runtime capability/catalog consistency
