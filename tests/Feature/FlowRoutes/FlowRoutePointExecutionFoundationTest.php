@@ -97,6 +97,24 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertNull($setup['progress']->resume_at);
         $this->assertNull($setup['progress']->waiting_event_key);
         $this->assertNotNull($setup['progress']->completed_at);
+        $this->assertArrayNotHasKey('completed', $setup['progress']->meta ?? []);
+        $this->assertArrayNotHasKey('last_point_execution', $setup['progress']->meta ?? []);
+        $this->assertArrayNotHasKey('point_execution_history', $setup['progress']->meta ?? []);
+        $this->assertArrayNotHasKey('last_advanced', $setup['progress']->meta ?? []);
+        $this->assertArrayNotHasKey('advancement_history', $setup['progress']->meta ?? []);
+
+        $planItem = ContactFlowRoutePlanItem::query()
+            ->where('contact_flow_route_progress_id', $setup['progress']->getKey())
+            ->firstOrFail();
+        $progressItem = ContactFlowRouteProgressItem::query()
+            ->where('contact_flow_route_progress_id', $setup['progress']->getKey())
+            ->firstOrFail();
+
+        $this->assertNull($planItem->result_payload);
+        $this->assertSame(
+            PointExecutionResult::STATUS_COMPLETED,
+            data_get($progressItem->result_payload, 'status'),
+        );
     }
 
     public function test_wait_point_returns_waiting_and_does_not_advance(): void
@@ -126,6 +144,23 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
         $this->assertNotNull($setup['progress']->resume_at);
         $this->assertNotNull($setup['progress']->waitingResumeAt());
         $this->assertNull($setup['progress']->waiting_event_key);
+        $this->assertArrayNotHasKey('last_point_execution', $setup['progress']->meta ?? []);
+        $this->assertArrayNotHasKey('point_execution_history', $setup['progress']->meta ?? []);
+
+        $waitingPlanItem = ContactFlowRoutePlanItem::query()
+            ->where('contact_flow_route_progress_id', $setup['progress']->getKey())
+            ->where('flow_route_point_id', $setup['flow_route_points'][0]->getKey())
+            ->firstOrFail();
+        $waitingProgressItem = ContactFlowRouteProgressItem::query()
+            ->where('contact_flow_route_progress_id', $setup['progress']->getKey())
+            ->where('flow_route_point_id', $setup['flow_route_points'][0]->getKey())
+            ->firstOrFail();
+
+        $this->assertNull($waitingPlanItem->result_payload);
+        $this->assertSame(
+            PointExecutionResult::STATUS_WAITING,
+            data_get($waitingProgressItem->result_payload, 'status'),
+        );
 
         Queue::assertPushed(ResumeFlowRouteProgressJob::class);
     }
@@ -258,6 +293,7 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             $this->assertSame(\App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem::STATUS_COMPLETED, $waitPlanItem->status);
             $this->assertNull($waitPlanItem->resume_at);
             $this->assertNull($waitPlanItem->waiting_event_key);
+            $this->assertNull($waitPlanItem->result_payload);
 
             $waitProgressItem = \App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem::query()
                 ->where('contact_flow_route_progress_id', $progress->getKey())
@@ -268,9 +304,17 @@ class FlowRoutePointExecutionFoundationTest extends TestCase
             $this->assertSame(\App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem::STATUS_COMPLETED, $waitProgressItem->status);
             $this->assertNull($waitProgressItem->resume_at);
             $this->assertNull($waitProgressItem->waiting_event_key);
+            $this->assertSame(
+                PointExecutionResult::STATUS_COMPLETED,
+                data_get($waitProgressItem->result_payload, 'status'),
+            );
+            $this->assertSame(
+                'wait_point_due',
+                data_get($waitProgressItem->result_payload, 'reason'),
+            );
 
-            $this->assertIsArray($progress->meta['resume_attempts'] ?? null);
-            $this->assertIsArray($progress->meta['last_resume_attempt'] ?? null);
+            $this->assertArrayNotHasKey('resume_attempts', $progress->meta ?? []);
+            $this->assertArrayNotHasKey('last_resume_attempt', $progress->meta ?? []);
         } finally {
             $this->travelBack();
         }

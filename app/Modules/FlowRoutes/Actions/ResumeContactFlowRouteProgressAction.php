@@ -6,6 +6,7 @@ use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem;
+use App\Modules\FlowRoutes\Services\FlowRouteProgressMetaCanonicalizer;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,7 @@ class ResumeContactFlowRouteProgressAction
 {
     public function __construct(
         private readonly ExecuteCurrentFlowRoutePointAction $executeCurrentFlowRoutePoint,
+        private readonly FlowRouteProgressMetaCanonicalizer $progressMetaCanonicalizer,
     ) {}
 
     public function handle(
@@ -81,23 +83,11 @@ class ResumeContactFlowRouteProgressAction
                     ]);
             }
 
-            $meta = $progress->meta ?? [];
-            $waitingState = $progress->waitingState();
-            $resumeAttempts = is_array($meta['resume_attempts'] ?? null) ? $meta['resume_attempts'] : [];
-            $resumeAttempts[] = [
-                'attempted_at' => $now->toISOString(),
-                'resume_at' => $progress->resume_at?->toISOString(),
-                'waiting' => $waitingState,
-            ];
-
-            $meta['resume_attempts'] = array_slice($resumeAttempts, -50);
-            $meta['last_resume_attempt'] = end($meta['resume_attempts']) ?: null;
-
             $progress->forceFill([
                 'status' => ContactFlowRouteProgress::STATUS_ACTIVE,
-                'resume_at' => null,
-                'waiting_event_key' => null,
-                'meta' => $meta,
+                'meta' => $this->progressMetaCanonicalizer->forPersistence(
+                    $progress->meta ?? [],
+                ),
             ])->save();
 
             return $progress->refresh();

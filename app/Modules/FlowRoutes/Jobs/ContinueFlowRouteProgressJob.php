@@ -4,6 +4,7 @@ namespace App\Modules\FlowRoutes\Jobs;
 
 use App\Modules\FlowRoutes\Actions\ExecuteFlowRouteProgressUntilIdleAction;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
+use App\Modules\FlowRoutes\Services\FlowRouteProgressMetaCanonicalizer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -74,20 +75,34 @@ class ContinueFlowRouteProgressJob implements ShouldBeUniqueUntilProcessing, Sho
             return;
         }
 
-        $meta = $progress->meta ?? [];
+        $canonicalizer = app(FlowRouteProgressMetaCanonicalizer::class);
+        $meta = $canonicalizer->forPersistence($progress->meta ?? []);
         $continuation = $meta['immediate_execution_continuation'] ?? null;
 
         if (! is_array($continuation) || ($continuation['status'] ?? null) !== 'scheduled') {
             return;
         }
 
+        $exceptionMessage = $exception?->getMessage();
+
+        if (is_string($exceptionMessage)) {
+            $exceptionMessage = mb_strcut(
+                $exceptionMessage,
+                0,
+                FlowRouteProgressMetaCanonicalizer::MAX_STRING_BYTES,
+                'UTF-8',
+            );
+        }
+
         $meta['immediate_execution_continuation'] = array_replace($continuation, [
             'status' => 'failed',
             'failed_at' => Carbon::now()->toISOString(),
             'exception_class' => $exception ? get_class($exception) : null,
-            'exception_message' => $exception?->getMessage(),
+            'exception_message' => $exceptionMessage,
         ]);
 
-        $progress->forceFill(['meta' => $meta])->save();
+        $progress->forceFill([
+            'meta' => $canonicalizer->forPersistence($meta),
+        ])->save();
     }
 }

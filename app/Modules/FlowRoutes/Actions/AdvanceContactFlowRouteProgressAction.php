@@ -6,12 +6,14 @@ use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
+use App\Modules\FlowRoutes\Services\FlowRouteProgressMetaCanonicalizer;
 use Illuminate\Support\Carbon;
 
 class AdvanceContactFlowRouteProgressAction
 {
     public function __construct(
         private readonly CompleteContactFlowRouteProgressAction $completeContactFlowRouteProgress,
+        private readonly FlowRouteProgressMetaCanonicalizer $progressMetaCanonicalizer,
     ) {}
 
     public function handle(
@@ -45,13 +47,7 @@ class AdvanceContactFlowRouteProgressAction
             'current_flow_route_point_id' => $nextFlowRoutePoint?->getKey(),
             'resume_at' => null,
             'waiting_event_key' => null,
-            'meta' => $this->mergedMeta(
-                progress: $progress,
-                fromPlanItem: $fromPlanItem,
-                nextPlanItem: $nextPlanItem,
-                result: $result,
-                advancedAt: $advancedAt,
-            ),
+            'meta' => $this->metaWithoutWaiting($progress),
         ])->save();
 
         return $progress->refresh();
@@ -131,35 +127,13 @@ class AdvanceContactFlowRouteProgressAction
     /**
      * @return array<string, mixed>
      */
-    private function mergedMeta(
+    private function metaWithoutWaiting(
         ContactFlowRouteProgress $progress,
-        ContactFlowRoutePlanItem $fromPlanItem,
-        ContactFlowRoutePlanItem $nextPlanItem,
-        ?PointExecutionResult $result,
-        Carbon $advancedAt,
     ): array {
-        $meta = $progress->meta ?? [];
+        $meta = $this->progressMetaCanonicalizer->forPersistence(
+            $progress->meta ?? [],
+        );
         unset($meta['waiting']);
-
-        $meta['last_advanced'] = [
-            'advanced_at' => $advancedAt->toISOString(),
-            'from_flow_route_plan_item_id' => $fromPlanItem->getKey(),
-            'from_flow_route_point_id' => $fromPlanItem->flow_route_point_id,
-            'from_flow_route_point_key' => $fromPlanItem->key,
-            'to_flow_route_plan_item_id' => $nextPlanItem->getKey(),
-            'to_flow_route_point_id' => $nextPlanItem->flow_route_point_id,
-            'to_flow_route_point_key' => $nextPlanItem->key,
-            'result' => $result?->toMetaPayload(),
-        ];
-
-        $history = $meta['advancement_history'] ?? [];
-
-        if (! is_array($history)) {
-            $history = [];
-        }
-
-        $history[] = $meta['last_advanced'];
-        $meta['advancement_history'] = array_slice($history, -50);
 
         return $meta;
     }

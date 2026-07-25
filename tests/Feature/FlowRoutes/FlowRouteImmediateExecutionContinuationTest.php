@@ -10,10 +10,12 @@ use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
+use App\Modules\FlowRoutes\Services\FlowRouteProgressMetaCanonicalizer;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use RuntimeException;
 use Tests\TestCase;
 
 class FlowRouteImmediateExecutionContinuationTest extends TestCase
@@ -43,9 +45,22 @@ class FlowRouteImmediateExecutionContinuationTest extends TestCase
         $this->assertSame($setup['flow_route_points'][2]->getKey(), $progress->current_flow_route_point_id);
         $this->assertSame('scheduled', data_get($progress->meta, 'immediate_execution_continuation.status'));
         $this->assertSame(1, data_get($progress->meta, 'immediate_execution_continuation.sequence'));
-        $this->assertSame(2, data_get($progress->meta, 'immediate_execution_continuation.execution_budget'));
-        $this->assertSame(2, data_get($progress->meta, 'immediate_execution_continuation.executions_in_slice'));
-        $this->assertSame('test_entry_point', data_get($progress->meta, 'immediate_execution_continuation.source'));
+        $this->assertSame(
+            $setup['flow_route_points'][2]->getKey(),
+            data_get($progress->meta, 'immediate_execution_continuation.flow_route_point_id'),
+        );
+        $this->assertNotNull(data_get(
+            $progress->meta,
+            'immediate_execution_continuation.scheduled_at',
+        ));
+        $this->assertArrayNotHasKey(
+            'immediate_execution_continuation_history',
+            $progress->meta ?? [],
+        );
+        $this->assertArrayNotHasKey(
+            'last_result',
+            data_get($progress->meta, 'immediate_execution_continuation', []),
+        );
         $this->assertSame(2, ContactFlowRouteProgressItem::query()
             ->where('contact_flow_route_progress_id', $progress->getKey())
             ->count());
@@ -66,14 +81,65 @@ class FlowRouteImmediateExecutionContinuationTest extends TestCase
 
         $this->assertSame(ContactFlowRouteProgress::STATUS_COMPLETED, $progress->status);
         $this->assertNull($progress->current_flow_route_point_id);
-        $this->assertSame('settled', data_get($progress->meta, 'immediate_execution_continuation.status'));
-        $this->assertSame('continuation_job', data_get($progress->meta, 'immediate_execution_continuation.settled_by'));
-        $this->assertSame(2, data_get($progress->meta, 'immediate_execution_continuation.executions_in_final_slice'));
+        $this->assertArrayNotHasKey(
+            'immediate_execution_continuation',
+            $progress->meta ?? [],
+        );
         $this->assertSame(4, ContactFlowRouteProgressItem::query()
             ->where('contact_flow_route_progress_id', $progress->getKey())
             ->count());
 
         Queue::assertPushedTimes(ContinueFlowRouteProgressJob::class, 1);
+    }
+
+    public function test_failed_continuation_persists_only_bounded_handoff_diagnostics(): void
+    {
+        config()->set('flow_routes.execution.immediate_execution_budget', 1);
+
+        Queue::fake();
+
+        $setup = $this->createProgressWithNoopPoints(2);
+        $action = app(ExecuteFlowRouteProgressUntilIdleAction::class);
+
+        $action->handle(
+            progress: $setup['progress'],
+            source: 'test_entry_point',
+        );
+
+        $progress = $setup['progress']->refresh();
+        $job = Queue::pushed(ContinueFlowRouteProgressJob::class)->first();
+
+        $this->assertInstanceOf(ContinueFlowRouteProgressJob::class, $job);
+
+        $job->failed(new RuntimeException(str_repeat(
+            'x',
+            FlowRouteProgressMetaCanonicalizer::MAX_STRING_BYTES * 2,
+        )));
+
+        $progress->refresh();
+
+        $continuation = data_get(
+            $progress->meta,
+            'immediate_execution_continuation',
+            [],
+        );
+
+        $this->assertSame('failed', $continuation['status'] ?? null);
+        $this->assertSame(1, $continuation['sequence'] ?? null);
+        $this->assertSame(
+            $setup['flow_route_points'][1]->getKey(),
+            $continuation['flow_route_point_id'] ?? null,
+        );
+        $this->assertSame(RuntimeException::class, $continuation['exception_class'] ?? null);
+        $this->assertLessThanOrEqual(
+            FlowRouteProgressMetaCanonicalizer::MAX_STRING_BYTES,
+            strlen((string) ($continuation['exception_message'] ?? '')),
+        );
+        $this->assertArrayNotHasKey('last_result', $continuation);
+        $this->assertArrayNotHasKey(
+            'immediate_execution_continuation_history',
+            $progress->meta ?? [],
+        );
     }
 
     /**

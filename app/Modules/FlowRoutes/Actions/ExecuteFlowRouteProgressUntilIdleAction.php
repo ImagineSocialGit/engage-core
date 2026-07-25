@@ -5,6 +5,7 @@ namespace App\Modules\FlowRoutes\Actions;
 use App\Modules\FlowRoutes\Data\Points\PointExecutionResult;
 use App\Modules\FlowRoutes\Jobs\ContinueFlowRouteProgressJob;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
+use App\Modules\FlowRoutes\Services\FlowRouteProgressMetaCanonicalizer;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -12,10 +13,9 @@ class ExecuteFlowRouteProgressUntilIdleAction
 {
     private const CONTINUATION_META_KEY = 'immediate_execution_continuation';
 
-    private const CONTINUATION_HISTORY_META_KEY = 'immediate_execution_continuation_history';
-
     public function __construct(
         private readonly ExecuteCurrentFlowRoutePointAction $executeCurrentFlowRoutePoint,
+        private readonly FlowRouteProgressMetaCanonicalizer $progressMetaCanonicalizer,
     ) {}
 
     public function handle(
@@ -43,10 +43,6 @@ class ExecuteFlowRouteProgressUntilIdleAction
         if ($attempts >= $budget && $result->shouldAdvance() && $progress->isActive()) {
             $this->persistAndScheduleContinuation(
                 progress: $progress,
-                result: $result,
-                source: $source,
-                budget: $budget,
-                attempts: $attempts,
             );
 
             return $result;
@@ -54,10 +50,6 @@ class ExecuteFlowRouteProgressUntilIdleAction
 
         $this->settleContinuation(
             progress: $progress,
-            result: $result,
-            source: $source,
-            budget: $budget,
-            attempts: $attempts,
             expectedSequence: $continuationSequence,
         );
 
@@ -66,14 +58,10 @@ class ExecuteFlowRouteProgressUntilIdleAction
 
     private function persistAndScheduleContinuation(
         ContactFlowRouteProgress $progress,
-        PointExecutionResult $result,
-        string $source,
-        int $budget,
-        int $attempts,
     ): void {
         $expectedPointId = $this->nullableInt($progress->current_flow_route_point_id);
 
-        DB::transaction(function () use ($progress, $result, $source, $budget, $attempts, $expectedPointId) {
+        DB::transaction(function () use ($progress, $expectedPointId) {
             $lockedProgress = ContactFlowRouteProgress::query()
                 ->lockForUpdate()
                 ->find($progress->getKey());
@@ -97,18 +85,12 @@ class ExecuteFlowRouteProgressUntilIdleAction
                 'status' => 'scheduled',
                 'sequence' => max(0, (int) ($previous['sequence'] ?? 0)) + 1,
                 'scheduled_at' => $recordedAt->toISOString(),
-                'source' => $source,
-                'execution_budget' => $budget,
-                'executions_in_slice' => $attempts,
                 'flow_route_point_id' => $lockedProgress->current_flow_route_point_id,
-                'progress_status' => $lockedProgress->status,
-                'last_result' => $result->toMetaPayload(),
             ];
 
             $meta[self::CONTINUATION_META_KEY] = $payload;
-            $meta[self::CONTINUATION_HISTORY_META_KEY] = $this->appendHistory(
-                $meta[self::CONTINUATION_HISTORY_META_KEY] ?? [],
-                $payload,
+            $meta = $this->progressMetaCanonicalizer->forPersistence(
+                $meta,
             );
 
             $lockedProgress->forceFill(['meta' => $meta])->save();
@@ -120,17 +102,13 @@ class ExecuteFlowRouteProgressUntilIdleAction
 
     private function settleContinuation(
         ContactFlowRouteProgress $progress,
-        PointExecutionResult $result,
-        string $source,
-        int $budget,
-        int $attempts,
         ?int $expectedSequence,
     ): void {
         if ($expectedSequence === null) {
             return;
         }
 
-        DB::transaction(function () use ($progress, $result, $source, $budget, $attempts, $expectedSequence) {
+        DB::transaction(function () use ($progress, $expectedSequence) {
             $lockedProgress = ContactFlowRouteProgress::query()
                 ->lockForUpdate()
                 ->find($progress->getKey());
@@ -146,21 +124,10 @@ class ExecuteFlowRouteProgressUntilIdleAction
                 return;
             }
 
-            $payload = array_replace($current, [
-                'status' => 'settled',
-                'settled_at' => Carbon::now()->toISOString(),
-                'settled_by' => $source,
-                'execution_budget' => $budget,
-                'executions_in_final_slice' => $attempts,
-                'flow_route_point_id' => $lockedProgress->current_flow_route_point_id,
-                'progress_status' => $lockedProgress->status,
-                'last_result' => $result->toMetaPayload(),
-            ]);
+            unset($meta[self::CONTINUATION_META_KEY]);
 
-            $meta[self::CONTINUATION_META_KEY] = $payload;
-            $meta[self::CONTINUATION_HISTORY_META_KEY] = $this->appendHistory(
-                $meta[self::CONTINUATION_HISTORY_META_KEY] ?? [],
-                $payload,
+            $meta = $this->progressMetaCanonicalizer->forPersistence(
+                $meta,
             );
 
             $lockedProgress->forceFill(['meta' => $meta])->save();
@@ -184,22 +151,6 @@ class ExecuteFlowRouteProgressUntilIdleAction
         $sequence = is_array($continuation) ? ($continuation['sequence'] ?? null) : null;
 
         return is_numeric($sequence) ? (int) $sequence : null;
-    }
-
-    /**
-     * @param mixed $history
-     * @param array<string, mixed> $payload
-     * @return array<int, array<string, mixed>>
-     */
-    private function appendHistory(mixed $history, array $payload): array
-    {
-        if (! is_array($history)) {
-            $history = [];
-        }
-
-        $history[] = $payload;
-
-        return array_slice($history, -50);
     }
 
     private function nullableInt(mixed $value): ?int

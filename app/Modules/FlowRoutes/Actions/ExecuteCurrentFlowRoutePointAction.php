@@ -9,6 +9,7 @@ use App\Modules\FlowRoutes\Models\ContactFlowRoutePlanItem;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgressItem;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
+use App\Modules\FlowRoutes\Services\FlowRouteProgressMetaCanonicalizer;
 use App\Modules\FlowRoutes\Services\PointHandlerRegistry;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,7 @@ class ExecuteCurrentFlowRoutePointAction
         private readonly AdvanceContactFlowRouteProgressAction $advanceContactFlowRouteProgress,
         private readonly MarkFlowRouteProgressWaitingAction $markFlowRouteProgressWaiting,
         private readonly CreateContactFlowRoutePlanAction $createContactFlowRoutePlan,
+        private readonly FlowRouteProgressMetaCanonicalizer $progressMetaCanonicalizer,
     ) {}
 
     public function handle(ContactFlowRouteProgress $progress): PointExecutionResult
@@ -101,7 +103,6 @@ class ExecuteCurrentFlowRoutePointAction
                 );
 
                 $this->finishProgressItem($progressItem, $planItem, $result);
-                $this->recordExecutionResult($progress, $plan, $planItem, $progressItem, $flowRoutePoint, $result);
                 $this->advanceContactFlowRouteProgress->handle($progress, $planItem, $flowRoutePoint, $result);
 
                 return $result;
@@ -159,7 +160,6 @@ class ExecuteCurrentFlowRoutePointAction
             }
 
             $this->finishProgressItem($progressItem, $planItem, $result);
-            $this->recordExecutionResult($progress, $plan, $planItem, $progressItem, $flowRoutePoint, $result);
 
             if ($result->isWaiting()) {
                 $this->markFlowRouteProgressWaiting->handle(
@@ -316,8 +316,9 @@ class ExecuteCurrentFlowRoutePointAction
             'completed_at' => $planItemStatus === ContactFlowRoutePlanItem::STATUS_COMPLETED ? $now : null,
             'skipped_at' => $planItemStatus === ContactFlowRoutePlanItem::STATUS_SKIPPED ? $now : null,
             'failed_at' => $planItemStatus === ContactFlowRoutePlanItem::STATUS_FAILED ? $now : null,
-            'result_payload' => $result->toMetaPayload(),
-        ], fn (mixed $value): bool => $value !== null))->save();
+        ], fn (mixed $value): bool => $value !== null) + [
+            'result_payload' => null,
+        ])->save();
     }
 
     private function completeProgressWithoutCurrentPoint(ContactFlowRouteProgress $progress, ContactFlowRoutePlan $plan): void
@@ -329,54 +330,21 @@ class ExecuteCurrentFlowRoutePointAction
             'completed_at' => $completedAt,
         ])->save();
 
+        $meta = $this->progressMetaCanonicalizer->forPersistence(
+            $progress->meta ?? [],
+        );
+        unset(
+            $meta['waiting'],
+            $meta['immediate_execution_continuation'],
+        );
+
         $progress->forceFill([
             'status' => ContactFlowRouteProgress::STATUS_COMPLETED,
             'completed_at' => $completedAt,
             'resume_at' => null,
             'waiting_event_key' => null,
-            'meta' => array_replace_recursive($progress->meta ?? [], [
-                'waiting' => null,
-                'completed' => [
-                    'completed_at' => $completedAt->toISOString(),
-                    'reason' => 'no_current_flow_route_plan_item',
-                ],
-            ]),
+            'meta' => $meta,
         ])->save();
-    }
-
-    private function recordExecutionResult(
-        ContactFlowRouteProgress $progress,
-        ContactFlowRoutePlan $plan,
-        ContactFlowRoutePlanItem $planItem,
-        ContactFlowRouteProgressItem $progressItem,
-        FlowRoutePoint $flowRoutePoint,
-        PointExecutionResult $result,
-    ): void {
-        $executedAt = Carbon::now();
-        $meta = $progress->meta ?? [];
-
-        $payload = [
-            'executed_at' => $executedAt->toISOString(),
-            'flow_route_plan_id' => $plan->getKey(),
-            'flow_route_plan_item_id' => $planItem->getKey(),
-            'flow_route_progress_item_id' => $progressItem->getKey(),
-            'flow_route_point_id' => $flowRoutePoint->getKey(),
-            'flow_route_point_key' => $flowRoutePoint->key,
-            'point_type' => $flowRoutePoint->type,
-            'result' => $result->toMetaPayload(),
-        ];
-
-        $meta['last_point_execution'] = $payload;
-        $history = $meta['point_execution_history'] ?? [];
-
-        if (! is_array($history)) {
-            $history = [];
-        }
-
-        $history[] = $payload;
-        $meta['point_execution_history'] = array_slice($history, -50);
-
-        $progress->forceFill(['meta' => $meta])->save();
     }
 
     private function failProgress(
@@ -398,22 +366,21 @@ class ExecuteCurrentFlowRoutePointAction
             'failure_reason' => $result->reason,
         ])->save();
 
+        $meta = $this->progressMetaCanonicalizer->forPersistence(
+            $progress->meta ?? [],
+        );
+        unset(
+            $meta['waiting'],
+            $meta['immediate_execution_continuation'],
+        );
+
         $progress->forceFill([
             'status' => ContactFlowRouteProgress::STATUS_FAILED,
             'failed_at' => $failedAt,
             'resume_at' => null,
             'waiting_event_key' => null,
             'failure_reason' => $result->reason,
-            'meta' => array_replace_recursive($progress->meta ?? [], [
-                'waiting' => null,
-                'failed' => [
-                    'failed_at' => $failedAt->toISOString(),
-                    'flow_route_plan_id' => $plan->getKey(),
-                    'flow_route_plan_item_id' => $planItem?->getKey(),
-                    'flow_route_progress_item_id' => $progressItem?->getKey(),
-                    'result' => $result->toMetaPayload(),
-                ],
-            ]),
+            'meta' => $meta,
         ])->save();
     }
 }
