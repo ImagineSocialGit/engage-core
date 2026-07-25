@@ -20,6 +20,9 @@
         && now('UTC')->greaterThan($cancellationDeadline);
     $primaryAttendee = $appointment->attendees->first();
     $replacement = $appointment->rescheduledAppointments->first();
+    $canReschedule = $isActive
+        && ! $replacement
+        && $appointment->bookableService?->status === \App\Modules\Scheduling\Models\BookableService::STATUS_ACTIVE;
     $statusClasses = match($appointment->status) {
         \App\Modules\Scheduling\Models\Appointment::STATUS_PENDING => 'bg-amber-100 text-amber-800',
         \App\Modules\Scheduling\Models\Appointment::STATUS_CONFIRMED => 'bg-emerald-100 text-emerald-800',
@@ -240,6 +243,15 @@
                             Actions are revalidated against current appointment state when submitted.
                         </p>
                     </div>
+
+                    @if($canReschedule)
+                        <a
+                            href="{{ route('crm.scheduling.appointments.reschedule', $appointment) }}"
+                            class="inline-flex w-full items-center justify-center rounded-xl border border-teal-600 bg-white px-4 py-2 text-sm font-semibold text-teal-700 shadow-sm transition hover:bg-teal-50"
+                        >
+                            Reschedule Appointment
+                        </a>
+                    @endif
 
                     @if($canConfirm)
                         <form method="POST" action="{{ route('crm.scheduling.appointments.confirm', $appointment) }}">

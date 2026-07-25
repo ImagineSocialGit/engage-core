@@ -118,6 +118,58 @@ class SchedulingReadService
         CarbonInterface $date,
         ?SchedulingHost $host = null,
     ): array {
+        return $this->dateAvailability(
+            service: $service,
+            date: $date,
+            host: $host,
+        );
+    }
+
+    /**
+     * @return array<int, BookableSlot>
+     */
+    public function rescheduleAvailabilityForDate(
+        Appointment $appointment,
+        CarbonInterface $date,
+        ?SchedulingHost $host = null,
+    ): array {
+        $appointment = Appointment::query()
+            ->with('bookableService')
+            ->findOrFail($appointment->getKey());
+        $service = $appointment->bookableService;
+
+        if (! $service instanceof BookableService
+            || $service->status !== BookableService::STATUS_ACTIVE
+        ) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $this->dateAvailability(
+                service: $service,
+                date: $date,
+                host: $host,
+                rescheduleAppointment: $appointment,
+            ),
+            fn (BookableSlot $slot): bool => ! (
+                $appointment->starts_at?->equalTo($slot->startsAt)
+                && $this->sameHost(
+                    $appointment->scheduling_host_id,
+                    $slot->schedulingHostId,
+                )
+            ),
+        ));
+    }
+
+    /**
+     * @return array<int, BookableSlot>
+     */
+    private function dateAvailability(
+        BookableService $service,
+        CarbonInterface $date,
+        ?SchedulingHost $host = null,
+        ?Appointment $rescheduleAppointment = null,
+    ): array {
         if ($this->serviceRequiresHost($service) && $host === null) {
             return [];
         }
@@ -135,7 +187,17 @@ class SchedulingReadService
             host: $host,
             displayTimezone: $timezone,
             evaluatedAt: CarbonImmutable::now('UTC'),
+            rescheduleAppointment: $rescheduleAppointment,
         ));
+    }
+
+    private function sameHost(mixed $left, mixed $right): bool
+    {
+        if ($left === null || $right === null) {
+            return $left === null && $right === null;
+        }
+
+        return (int) $left === (int) $right;
     }
 
     private function validTimezone(?string $timezone): string

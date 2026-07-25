@@ -226,6 +226,12 @@ Route::middleware('auth')->group(function () {
             Route::post('/appointments', [SchedulingController::class, 'store'])
                 ->name('appointments.store');
 
+            Route::get('/appointments/{appointment}/reschedule', [AppointmentController::class, 'reschedule'])
+                ->name('appointments.reschedule');
+
+            Route::post('/appointments/{appointment}/reschedule', [AppointmentController::class, 'storeReschedule'])
+                ->name('appointments.reschedule.store');
+
             Route::get('/appointments/{appointment}', [AppointmentController::class, 'show'])
                 ->name('appointments.show');
 

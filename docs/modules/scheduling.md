@@ -702,7 +702,26 @@ The detail surface exposes only semantic lifecycle actions that are meaningful f
 
 Cancellation requires a human-entered reason. When the service cancellation-notice deadline has passed, the form requires an explicit override checkbox; the controller converts that authorization to `AppointmentLifecycleContext::force` and records the CRM surface and action in lifecycle provenance. Completion and no-show controls appear only after the appointment starts.
 
-This workspace slice still omits rescheduling UI, Contact-page appointment panels, calendar visualization, provider synchronization, and reminder management.
+The detail surface also links eligible `pending`, `scheduled`, and `confirmed` Appointments into the authenticated CRM reschedule workspace. The workspace keeps the original service authoritative, requires an explicit active assigned host when the service has assignments, and calculates date availability with the source Appointment excluded from occupancy. Every other Appointment, active hold, buffer, capacity limit, blackout, minimum-notice rule, and booking horizon remains enforced.
+
+`RescheduleAppointmentToSlotAction` is the trusted exact-slot coordinator for CRM and future internal surfaces. It accepts the source Appointment, selected start instant, optional explicit host, UUID replay key, lifecycle context, and explicit confirmation-preservation choice. It resolves matching replay keys before issuing another offer, then coordinates reschedule-aware availability, `IssueBookableSlotOfferAction`, `CreateBookingHoldAction`, and `RescheduleAppointmentAction` inside one outer transaction.
+
+The browser submits only:
+
+```text
+scheduling_host_id
+starts_at
+idempotency_key
+reschedule_reason
+preserve_confirmation
+override_reschedule_notice
+```
+
+Service identity, duration, end time, offer and hold identities, replacement status, attendee copying, original cancellation, lifecycle events, automation events, and lineage remain server-owned. The reason is required. Confirmation preservation is offered only when the original is confirmed and the service requires confirmation. Rescheduling after the configured notice deadline requires an explicit override, which is preserved in lifecycle and automation provenance.
+
+A successful reschedule redirects to the replacement Appointment. Matching replay submissions return that same replacement without creating another offer, hold, attendee set, lifecycle event, or automation event. Reusing the replay key for another source Appointment, host, or start time is rejected.
+
+This workspace still omits Contact-page appointment panels, calendar visualization, provider synchronization, and reminder management.
 
 ## Appointment lifecycle state machine
 
@@ -821,6 +840,7 @@ ReleaseBookingHoldAction
 ConvertBookingHoldToAppointmentAction
 AppointmentCreationData
 CreateAppointmentAction
+RescheduleAppointmentToSlotAction
 RescheduleAppointmentAction
 ConfirmAppointmentAction
 CancelAppointmentAction
@@ -837,7 +857,8 @@ SchedulingController
 AppointmentController
 StoreAppointmentRequest
 CancelAppointmentRequest
-CRM Scheduling creation, detail, and lifecycle workspace
+RescheduleAppointmentRequest
+CRM Scheduling creation, detail, lifecycle, and reschedule workspace
 ```
 
 Planned:
@@ -858,11 +879,10 @@ Do not add `flow_route_*` foreign keys to Scheduling artifacts merely for proven
 
 ## Deferred work
 
-Deferred after the CRM Appointment detail and lifecycle workspace:
+Deferred after the CRM Appointment reschedule workspace:
 
 ```text
 Contact-page appointment panel
-CRM reschedule workflow
 SCHEDULING_APP_URL setup validation
 calendar views
 provider connection and synchronization persistence
