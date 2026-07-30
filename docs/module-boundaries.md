@@ -253,52 +253,93 @@ FlowRoute logical identity is versioned by stable `key` plus `version`.
 
 New starts use the current active revision. Active/waiting instances on older revisions reconcile to a newly current revision by durable FlowRoutePoint key, creating a new route-plan revision and preserving historical plans. Unmappable current/waiting points are hard reconciliation conflicts; runtime must not guess, silently skip, restart, or cancel them.
 
-### Messaging template presets and resolved dispatch ownership
+### Versioned Messaging templates, chains, and compact execution
 
-Messaging should store reusable synced/editable message copy as DB-owned template presets.
-
-Message template catalog entries should organize synced/editable templates for browsing and copy review. Catalog entries are read-organization records only; they do not own campaign timing, webinar schedules, FlowRoute trigger behavior, skip rules, lifecycle conditions, sequencing, dependencies, or runtime selection.
-
-Message template assignments should choose which preset is active for a channel/purpose/scope/surface/message context.
-
-Campaigns, Webinars, FlowRoutes, Broadcasts, Tasks, InternalNotifications, and future consuming modules may reference Messaging template keys or assignments. They should not embed reusable subject/body/message copy in their own presets or records.
-
-The inverse ownership rule is equally important:
+Messaging's approved target separates stable identity, immutable authored behavior, runtime progression, and provider execution.
 
 ```text
-Messaging template/preset
-    owns reusable content and delivery-template metadata
+MessageTemplate
+    stable editable identity
 
-Consuming module
-    owns whether the message should exist, when it should send, lifecycle conditions,
-    sequencing, dependencies, enablement, and module-specific skip behavior
+MessageTemplateVersion
+    immutable tokenized content and renderer identity
+
+MessageChain
+    stable reusable sequence identity
+
+MessageChainVersion
+    immutable timing/condition/exit behavior
+
+MessageChainStep / MessageChainStepVariant
+    ordered moments and channel-specific template-version references
+
+MessageChainEnrollment
+    one recipient progressing through one immutable chain version
+
+ScheduledMessage
+    one compact delivery execution
+
+ScheduledMessageRenderContext
+    lazily frozen token values only when rendering begins
+
+ScheduledMessageDeliveryAttempt
+    one provider claim/submission/outcome attempt
 ```
 
-Reusable Messaging templates must not become hidden workflow engines. For module-owned flows, they must not own competing `timing`, `schedule`, `conditions`, lifecycle enablement, sequencing, dependencies, or module-specific skip rules.
+Config sync may seed templates and chains, but runtime selection is DB-owned through current versions and module-owned bindings.
 
-The shared runtime assembly seam is:
+Existing scheduled work never references mutable current definitions without pinning an immutable version.
+
+A chain does not own its business trigger.
+
+Examples:
 
 ```text
-Owning module resolves its behavior
-    -> ResolvedMessageDispatchBuilder
-    -> ResolvedMessageDispatch
-    -> Messaging scheduling/delivery infrastructure
+Webinars
+    owns registration/waitlist/attended/missed -> MessageChain bindings
+
+Campaigns
+    owns Campaign identity and references a MessageChain
+
+FlowRoutes
+    may send one template or start one MessageChain
+
+Broadcasts
+    owns recipient selection and pins one private/reusable MessageTemplateVersion
 ```
 
-`ResolvedMessageDispatchBuilder` is Messaging-owned and universal. It may combine reusable template content with caller-resolved behavior, normalize the final dispatch contract, and attach generic provenance. It must not query or interpret Webinar, Campaign, Broadcast, FlowRoute, Task, InternalNotifications, or vertical-module tables.
+Do not preserve the current preset/assignment/catalog/profile/step tables as parallel permanent engines merely because they exist today.
 
-`ResolvedMessageDispatch` carries the exact resolved `send_at`, optional polymorphic behavior-owner provenance, optional stable logical occurrence identity, and the other generic delivery inputs Messaging requires. Messaging must not infer Webinar schedules, Campaign cadence, Broadcast timing, FlowRoute waits, Task digest cadence, or other module lifecycle rules from reusable template definitions.
+Target ownership:
 
-`ScheduledMessage` supports optional polymorphic behavior provenance through a `behavior_owner` morph. When a caller supplies a concrete behavior owner, Messaging persists `behavior_owner_type` / `behavior_owner_id` generically. The concrete owner remains module-owned, for example a `WebinarScheduleProfileItem`, `CampaignStepVariant`, `Broadcast`, or `FlowRoutePoint`. Messaging must not import those concrete feature-module models to interpret behavior.
+```text
+template copy
+    Messaging template versions
 
-Missing module-owned behavior must never silently fall back to hidden timing, conditions, or skip behavior from a reusable Messaging template. Setup validation and runtime behavior should make missing ownership explicit.
+sequence/timing/variant dependency
+    Messaging chain versions
 
-There is no implicit immediate fallback at the resolved-dispatch boundary. The caller must provide either an exact `sendAt` or explicit caller-owned behavior.
+business trigger/binding
+    consuming module or FlowRoutes
 
-Logical occurrence identity is separate from scheduled time. Module-owned dispatch paths should provide stable `occurrenceKey` values for retry/idempotency identity. The same logical occurrence should retain the same key even if `send_at` changes; dedupe must not treat timestamp changes alone as a new occurrence.
+recipient progression
+    Messaging chain enrollment
 
-Reusable templates are content-only at the builder boundary. Behavior fields such as `timing`, `schedule`, `conditions`, and module-specific skip behavior must arrive through explicit caller-owned behavior, not through the reusable template.
+provider delivery
+    Messaging scheduled message and attempts
+```
 
+High-volume runtime rows must be narrow.
+
+The target `scheduled_messages` table has no payload or generic metadata JSON. It pins immutable template content by FK and stores small operational routing/status columns needed for hot queries.
+
+Do not over-normalize small hot-path values merely to remove every repeated string. Channel, purpose, scope, message type, queue, and status may remain first-class on ScheduledMessage because gate/claim/queue queries use them directly.
+
+Do not under-normalize large reusable content, conditions, labels, or provenance into every delivery row.
+
+Logical occurrence identity remains separate from scheduled time. Retrying or recalculating one occurrence must not create a second delivery solely because `send_at` changed.
+
+The complete target and anti-shuffling rules are defined in `docs/model-persistence-bloat-audit.md`.
 
 ### FlowRoute ownership
 
@@ -1206,88 +1247,75 @@ Core `ContactController` must not directly import module-specific models/service
 
 Messaging is a reusable capability module.
 
-Messaging owns outbound and scheduled message infrastructure.
-
 Messaging owns:
 
-- scheduled messages
-- message consents
-- consent revocations
-- message suppressions
-- contact permission invitations
-- imported-contact one-time opt-in invitation records
-- public preference confirmation pages for Messaging consent
-- email/SMS provider contracts
-- provider managers
-- message payloads
-- message gates
-- eligibility checks
-- send guards
-- dispatch actions
-- schedule actions
-- scheduled message jobs
-- public opt-out/unsubscribe controllers
-- message-related events
-- recipient gate extension points
-- recipient payload extension points
+- MessageTemplates and immutable MessageTemplateVersions;
+- MessageChains and immutable MessageChainVersions;
+- chain steps, variants, and enrollment progression;
+- compact ScheduledMessages;
+- lazy render contexts and optional composed-content relationships;
+- delivery attempts and terminal outbox events;
+- message consent, consent domains, revocations, and suppressions;
+- contact permission invitations;
+- provider contracts/managers, renderers, gates, and send actions;
+- recipient/destination extension points;
+- Messaging setup validation and authoring registries.
 
 Messaging does not own:
 
-- inbound webhook normalization/routing
-- TeamMember models
-- internal notification preferences
-- webinar registrations
-- campaigns
-- FlowRoutes
-- task assignment
+- the business event that starts a chain;
+- Webinar registration/attendance;
+- Campaign audience or Campaign reporting;
+- Broadcast recipient selection;
+- FlowRoute progression;
+- task assignment;
+- inbound webhook normalization/routing;
+- TeamMember preferences.
 
-Other modules may use Messaging through public actions/services/contracts.
+Other modules use Messaging through public actions/services/contracts.
 
-Messaging reusable templates should use a consistent canonical content/delivery-template shape across config files and DB-backed presets.
-
-Canonical reusable template shape:
-
-    key / template identity
-    dispatch_key or dispatch_keys
-    message_type
-    channel
-    purpose
-    scope
-    queue
-    payload_class
-    payload
-    token metadata
-    template provenance/meta
-
-For module-owned flows, `timing`, `schedule`, `conditions`, lifecycle enablement, sequencing, dependencies, and module-specific skip rules belong to the consuming module rather than the reusable Messaging template. The consuming module resolves that behavior before `ResolvedMessageDispatchBuilder` assembles the final `ResolvedMessageDispatch`.
-
-
-Resolved lifecycle conditions are checked during planning and must also survive to send time. `DispatchMessageAction` persists resolved conditions into `ScheduledMessage.meta.conditions`, and `ScheduledMessageGate` rechecks them immediately before provider delivery.
-
-Messaging template presets are DB-owned reusable message definitions created from config and optionally edited through CRM/admin UI.
-
-Messaging owns:
+Target persistence rules:
 
 ```text
-message_template_presets
-message_template_catalog_entries
-message_template_preset_assignments
+templates/chains
+    versioned and immutable after publication
+
+chain enrollments
+    narrow progression state
+    no copied chain definition or start-context object graph
+
+scheduled messages
+    immutable template-version FK
+    recipient/context/origin relationships
+    small routing/status columns
+    no payload JSON
+    no generic meta JSON
+
+render contexts
+    created lazily
+    contain only referenced runtime token values
+    separate retention policy
+
+delivery attempts
+    own claim/provider attempt state
+    not duplicated on ScheduledMessage
 ```
 
-`MessageTemplatePreset` owns the reusable payload/copy.
+Current `message_template_presets`, assignments, catalog entries, Campaign steps/variants, Webinar schedule profiles/items, and payload-bearing ScheduledMessages are transitional implementation details.
 
-`MessageTemplateCatalogEntry` owns Messaging template catalog/read organization for browsing grouped templates by channel, purpose, module/surface, group, and item. It does not own runtime behavior.
+Do not add new features that deepen dependence on those overlapping shapes while the cutover is in progress.
 
-`MessageTemplatePresetAssignment` owns which preset is selected for a runtime message context, such as:
+A separate table is justified only when it changes cardinality, ownership, query integrity, or retention. Do not move the current full ScheduledMessage payload/meta into always-created one-to-one tables.
 
-```text
-channel + purpose + scope + surface + message_type
-channel + purpose + scope + campaign_key + campaign_step + campaign_step_variant_key
-channel + purpose + scope + webinar schedule/reminder type
-```
+Messaging templates own reusable content only.
 
-Runtime resolvers may read config during a transition period, but the target architecture is DB-first resolution from selected Messaging template assignments.
+Messaging chains own deliberate reusable sequencing/timing.
 
+Consuming modules own trigger bindings and domain cancellation/outcome meaning.
+
+A direct message may schedule without a chain, but it still pins an immutable MessageTemplateVersion.
+
+A chain normally materializes only the next actionable step wave rather than all future messages at enrollment time.
 
 ### Messaging channel availability
 
@@ -1530,48 +1558,49 @@ Other modules may request this flow through Messaging public services/actions, b
 
 InboundMessaging is a reusable capability module.
 
-InboundMessaging owns inbound webhooks and inbound message recording/routing.
-
 InboundMessaging owns:
 
-- inbound messages
-- inbound SMS webhook controller/action
-- inbound email webhook controller/action
-- inbound payload normalization
-- inbound message classification
-- inbound purpose resolution
-- inbound sender resolution
-- inbound handler routing
-- inbound webhook handler resolver bindings
-- `InboundMessageReceived` event
+- inbound SMS/email webhook entry points;
+- provider handler resolution and verification;
+- normalized inbound-message recording;
+- sender resolution;
+- classification and purpose/scope resolution;
+- inbound handler routing;
+- `InboundMessageReceived`;
+- compact neutral automation events for supported inbound outcomes.
 
-InboundMessaging may depend on:
+InboundMessaging may depend on Core, Messaging, and shared webhook-inbox infrastructure.
 
-- Core, for resolving contacts as senders
-- Messaging, for STOP/HELP consent-related behavior
+Raw provider payload ownership:
 
-InboundMessaging does not own:
+```text
+WebhookInboxReceipt
+    one canonical raw provider request
+    provider identity/fingerprints
+    claim/retry/completion state
+    bounded processing outcome
+```
 
-- internal notification routing
-- TeamMember recipients
-- internal notification preferences
-- internal notification scheduling
+Normalized ownership:
 
-InboundMessaging should not directly notify internal users.
+```text
+InboundMessage
+    references WebhookInboxReceipt when applicable
+    normalized provider/message identity
+    normalized sender/from/to/body/classification/purpose/scope
+    no copied raw request
+    no generic meta
+```
 
-Instead:
+The current `inbound_message_receipts` identity/state table is transitional. The target uses unique provider event/message hash keys on `inbound_messages` plus the canonical webhook receipt.
 
-1. InboundMessaging records the inbound message.
-2. InboundMessaging emits `InboundMessageReceived`.
-3. InternalNotifications may conditionally listen to that event and schedule internal alerts.
+Do not copy one email/SMS provider event into InboundMessage metadata, suppression metadata, revocation metadata, and automation-event payloads.
 
-InboundMessaging must not import InternalNotifications.
+Suppression and revocation rows retain normalized provider/source-event evidence and policy-required facts only.
 
-InboundMessaging may use Messaging-owned channel and purpose concepts when classifying inbound messages.
+InboundMessaging does not own TeamMember notification preferences or internal-notification routing.
 
-That dependency is acceptable because InboundMessaging depends on Messaging.
-
-Inbound message records should remain generic and should not store internal notification routing state.
+It records the inbound message and emits the event; InternalNotifications may listen through module-safe seams.
 
 ## InternalNotifications Module
 
@@ -2242,472 +2271,91 @@ Capability records do not replace executable handlers or public module actions. 
 
 Campaigns is optional.
 
-Campaigns owns enrolled, multi-step campaign journeys.
-
-Campaigns are outbound conversion, nurture, and re-engagement message journeys.
-
-Campaigns are not general workflows.
-
-Campaigns should not model every business process, task dependency, status transition, or automation decision.
-
-Use FlowRoutes for automation/control flow.
-
-Use Tasks for manual human actions/dependencies.
-
-Use Messaging for delivery.
-
-Use Broadcasts for one-time or batch recipient sends.
-
 Campaigns owns:
 
-- campaigns
-- campaign steps
-- campaign enrollments
-- campaign enrollment lifecycle
-- campaign progression
-- campaign cancellation/exit behavior
-- campaign preset sync
-- campaign step scheduling behavior
-- campaign listeners
-- campaign-specific metadata
-- campaign conditions/segments later
+- Campaign identity and business meaning;
+- Campaign active/inactive/archived lifecycle;
+- Campaign audience/enrollment intent;
+- Campaign-specific source context;
+- Campaign-specific reporting and outcome interpretation;
+- Campaign preset sync and CRM presentation.
 
-Campaigns does not own:
+Campaigns does not own a second generic message-sequence engine.
 
-- broadcasts
-- broadcast recipients
-- one-time/batch sends
-- outbound delivery infrastructure
-- scheduled message infrastructure
-- webinar registrations
-- FlowRoutes
-- Workflow status/profile state
-
-Broadcasts belong to the Broadcasts module.
-
-Messaging owns scheduled/outbound message infrastructure.
-
-Campaigns may depend on:
-
-- Core
-- Messaging
-
-Campaigns may schedule messages through Messaging public actions.
-
-Campaign presets define journeys: campaign identity, step order, timing, channel/purpose/scope, and message template references.
-
-Campaign step variants are the planned shape for multi-channel campaign coordination.
-
-A Campaign enrollment is the lifecycle.
-
-A Campaign step is the business moment.
-
-A Campaign step variant is a channel-specific delivery option for that moment.
-
-Campaign step variants may use strategies such as:
+Target relationship:
 
 ```text
-first_available
-send_all_eligible
-dependency_aware
+Campaign.message_chain_id
+    selects the reusable MessageChain for future enrollments
+
+CampaignEnrollment
+    thin Campaign-specific wrapper/correlation record
+
+MessageChainEnrollment
+    owns progression, current step, next action, exit result, and scheduled deliveries
 ```
 
-Variants must reference Messaging-owned template presets or message template assignments. Variants must not own reusable payload copy.
+Current CampaignStep and CampaignStepVariant persistence is transitional and should migrate into generic immutable MessageChainVersion step/variant records.
 
+Campaigns must not copy:
 
-Messaging definitions define message copy and delivery templates.
+```text
+chain steps
+template payloads
+exit conditions
+start-context object graphs
+scheduled-message IDs/history
+delivery attempt summaries
+```
 
-Campaign presets must not be the primary home for reusable email/SMS copy.
+Campaign deactivation remains Campaign-owned business intent. It cancels linked active chain enrollments and asks Messaging to skip eligible pending deliveries through public actions.
 
-Campaign presets must not define or override message payloads.
+FlowRoutes starts/stops Campaigns through Campaign-owned actions.
 
-Campaign message templates are resolved from Messaging by:
+Webinars does not create CampaignEnrollment rows directly.
 
-    channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key
-
-The matching Messaging config path is:
-
-    messaging.{channel}.definitions.{purpose}.{scope}.campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
-
-Campaign preset step variants should reference the message template context only through first-class variant fields:
-
-    key
-    dispatch_key
-    channel
-    purpose
-    scope
-
-Do not use `meta.message` as the canonical CampaignStep message reference.
-
-`campaign_steps.channel`, `campaign_steps.purpose`, and `campaign_steps.scope` are first-class template-reference fields.
-
-`campaign_steps.meta` may keep non-routing/debug metadata such as:
-
-    type = message
-
-The campaign key and step number come from the Campaign/CampaignStep definition.
-
-Do not require authors to invent per-step `message_type` names for campaign journey steps.
-
-Messaging may derive runtime `message_type` values such as:
-
-    webinar_attended_nurture_step_1
-
-Those derived values are runtime/debug identifiers, not author-facing lookup keys.
-
-Campaign step timing may be author-friendly:
-
-    minutes
-    hours
-    days
-
-Before calling Messaging runtime actions, Campaigns should resolve its author-friendly timing into the exact send time used by `ResolvedMessageDispatch`.
-
-Example:
-
-    criteria.timing.days = 3
-
-resolves from the Campaign-owned step context to:
-
-    send_at = exact timestamp
-
-The reusable Messaging template must not carry a competing Campaign schedule fallback.
-
-If a referenced Messaging template is missing, fail loudly because the config is broken.
-
-If a referenced Messaging template exists but has no usable payload, skip scheduling safely with debug metadata instead of crashing runtime delivery.
-
-Preset sync is authoritative for non-customized Campaign definitions.
-
-If a client preset replaces a default campaign with fewer steps, stale non-customized DB steps should be removed rather than inherited accidentally.
-
-
-Campaigns should not directly depend on Workflow status, Webinar outcomes, FlowRoute progress, Mortgage stages, or Broadcast behavior unless those relationships are introduced through explicit public APIs/events/resolvers.
-
-Runtime Campaign behavior should read DB-owned Campaign and CampaignStep definitions.
-
-Preset config may create/update DB-owned Campaign definitions, but runtime Campaign execution should not depend directly on config definitions.
-
-Current tables/models:
-
-    campaigns
-    campaign_steps
-    campaign_step_variants
-    campaign_enrollments
-
-Current models:
-
-    Campaign
-    CampaignStep
-    CampaignStepVariant
-    CampaignEnrollment
-
-Use generic lifecycle fields such as:
-
-    start_context
-    exit_conditions
-    exited_at
-    exit_reason
-    meta
-
-Example start context:
-
-    {
-      "workflow": {
-        "contact_status_id": 3
-      }
-    }
-
-Example exit condition:
-
-    {
-      "stop_when_contact_leaves_workflow_status": true
-    }
-
-Future condition checks should move behind a resolver such as:
-
-    CampaignExitConditionResolver
-
-Good:
-
-    DispatchMessageAction
-    ScheduleMessageAction
-    SkipScheduledMessagesAction
-
-Avoid direct ScheduledMessage creation from Campaigns unless explicitly documented.
-
-Good:
-
-    Campaigns owns CancelCampaignEnrollmentAction
-    FlowRoutes calls CancelCampaignEnrollmentAction
-
-Bad:
-
-    FlowRoutes mutates CampaignEnrollment internals directly
-    Webinars creates CampaignEnrollment records directly
-
-Campaign enrollments may reference Messaging-owned `scheduled_messages` through `last_scheduled_message_id`.
-
-That reference is acceptable because Campaigns depends on Messaging.
-
-Campaigns still should schedule/skip delivery through Messaging public actions instead of directly mutating scheduled message lifecycle internals.
-
-`campaign_enrollments.source_type` / `source_id` may point to another module as enrollment context.
-
-That does not make Campaigns depend on the source module.
-
-Campaigns should treat source morphs as context unless an explicit public integration is introduced.
+Campaign preset definitions should eventually reference `message_chain_key` rather than own nested message copy or a permanent second step schema.
 
 ## Broadcasts Module
 
 Broadcasts is optional.
 
-Broadcasts owns one-time and batch recipient sends.
-
 Broadcasts owns:
 
-- broadcasts
-- broadcast recipients
-- broadcast recipient filter metadata
-- broadcast recipient state
-- ad hoc one-time message payload/copy
-- broadcast scheduling/orchestration behavior
-- broadcast-specific metadata
-- broadcast delivery bookkeeping
-
-Broadcasts does not own:
-
-- enrolled multi-step campaign journeys
-- campaign definitions
-- campaign steps
-- campaign enrollments
-- reusable message templates
-- scheduled message delivery infrastructure
-- message consent/suppression infrastructure
-- message gates
-- send jobs
-
-Campaigns and Broadcasts are separate concepts.
-
-Campaigns are enrolled, multi-step journeys with lifecycle/progression.
-
-Broadcasts are one-time or batch sends to recipients.
-
-Broadcasts may store ad hoc payload/copy because broadcasts are not reusable Campaign journeys.
-
-Messaging owns reusable delivery infrastructure, scheduled messages, consent, suppression, gates, payload classes, queues, and send jobs.
-
-Broadcasts may depend on:
-
-- Core
-- Messaging
-
-Broadcast recipient selection should use recipient-oriented terminology.
-
-Use:
-
-    recipient_filter
-    BroadcastRecipientResolver
-    BroadcastRecipient
-    recipients
-
-Avoid:
-
-    audience
-    audience_filter
-    BroadcastAudienceResolver
-
-`broadcasts.recipient_filter` is the canonical storage for recipient selection metadata.
-
-Current supported recipient filter shapes include:
-
-    {
-      "type": "all"
-    }
-
-    {
-      "type": "tag",
-      "tags": ["homebuyer"]
-    }
-
-    {
-      "type": "contact_ids",
-      "contact_ids": [1, 2, 3]
-    }
-
-    {
-      "type": "imported"
-    }
-
-    {
-      "type": "import_batch",
-      "import_batch_ids": [1, 2, 3]
-    }
-
-`imported` is a Core-owned contact filter for contacts imported from another system. Current imported detection includes `source = import`, `meta.imported = true`, `meta.imported_at`, or a present `contact_import_batch_id`.
-
-`import_batch` is a Core-owned contact filter for contacts from specific first-class `contact_import_batches` records. Use it when the operator needs to target one exact import file/run instead of all imported contacts.
-
-Recipient filters may also include Broadcast-owned exclusions:
-
-    {
-      "type": "all",
-      "exclude": {
-        "broadcast_ids": [12, 13],
-        "statuses": ["scheduled", "sent"]
-      }
-    }
-
-`exclude.broadcast_ids` removes contacts that already have matching `BroadcastRecipient` rows for those prior Broadcasts.
-
-`exclude.statuses` currently supports:
-
-    scheduled
-    sent
-
-This is Broadcast-owned duplicate-send protection. It lets operators send separate single-channel Broadcasts, such as SMS first and email second, without hitting the same contact twice.
-
-Core does not own prior-Broadcast exclusion logic.
-
-Messaging does not own prior-Broadcast exclusion logic.
-
-Broadcasts owns this because it is based on BroadcastRecipient bookkeeping.
-
-Broadcasts may store recipient filter definitions, but Core owns generic contact lookup and generic contact filter resolution.
-
-Broadcasts should not become the app-wide contact query engine.
-
-Broadcasts may use Core-owned contact lookup/picker functionality for individual contact selection.
-
-Good:
-
-    route('crm.contacts.lookup')
-    <x-crm.contact-picker />
-    BroadcastRecipientResolver
-
-Bad:
-
-    BroadcastRecipientContactSearchController
-    Broadcast-specific contact picker components
-    duplicated contact lookup logic inside Broadcasts
-
-Broadcast delivery metadata should be first-class on `broadcasts`:
-
-    dispatch_key
-    message_type
-    payload_class
-    queue
-
-Broadcasts should use Messaging public actions/services to schedule or send messages.
-
-Good:
-
-    DispatchMessageAction
-    ScheduleMessageAction
-
-Bad:
-
-    ScheduledMessage::query()->create(...)
-
-Broadcasts should not depend on Campaigns.
-
-Campaigns should not depend on Broadcasts.
-
-Broadcasts may reference Messaging-owned scheduled messages for bookkeeping and visibility.
-
-That reference is acceptable because Broadcasts depends on Messaging.
-
-Broadcasts should still send or schedule through Messaging public actions/services.
-
-`broadcast_recipients.scheduled_message_ids` is broadcast bookkeeping, not ownership of scheduled delivery infrastructure.
-
-BroadcastRecipient records are Broadcast bookkeeping.
-
-BroadcastRecipient records may store scheduled message IDs for visibility/audit, but they do not own the scheduled delivery lifecycle.
-
-Current runtime direction:
-
-    Broadcast UI/action creates or edits draft Broadcast
-    Broadcast stores recipient_filter metadata
-    Broadcast recipient resolver resolves Contacts from recipient_filter
-    Broadcast schedule action creates BroadcastRecipients
-    Broadcast schedule action calls Messaging public action/service
-    Messaging creates ScheduledMessages
-    BroadcastRecipient stores resulting scheduled_message_ids/status bookkeeping
-    Broadcast listeners record sent/skipped/failed Messaging lifecycle events
-    Broadcast completes when every BroadcastRecipient is terminal
-
-
-### Broadcast opt-in invitations
-
-Broadcasts may provide a UI entry point for the imported-contact opt-in invitation, but the permission-invitation rules are Messaging-owned.
-
-A permission invitation Broadcast should:
-
-- use `channel = email`
-- use `purpose = transactional`
-- use `scope = permission_invitation`
-- use `dispatch_key = imported_contact_permission_invitation`
-- use `message_type = imported_contact_permission_invitation`
-- use `recipient_filter = {"type":"imported"}` or a narrower Core-owned imported-contact filter such as `{"type":"import_batch","import_batch_ids":[...]}`
-
-A normal Broadcast must not receive the imported-contact bypass.
-
-Normal Broadcasts remain consent-gated by Messaging.
-
-Broadcast cancellation should use Messaging-owned skip behavior for pending scheduled messages rather than mutating Messaging internals directly.
-
-Good:
-
-    CancelBroadcastAction -> SkipScheduledMessagesAction
-
-Broadcasts should remain simpler than Campaigns.
-
-Broadcasts are single-channel sends.
-
-A single Broadcast should represent one channel and one payload shape.
-
-Examples:
-
-    Email Broadcast -> channel=email, payload.subject, payload.body
-    SMS Broadcast -> channel=sms, payload.message
-
-Do not make a normal Broadcast default to both email and SMS.
-
-Multi-channel fallback or “use SMS if available, otherwise email” is future channel-strategy work and should be modeled deliberately if needed.
-
-For now, operators should create separate single-channel Broadcasts and use prior-Broadcast recipient exclusions to avoid duplicate outreach across channels.
-
-Broadcast detail visibility should expose operator-useful recipient outcomes without making Broadcasts own delivery infrastructure:
+- one-time single-channel send identity;
+- schedule and status;
+- recipient-filter definition and resolution;
+- prior-Broadcast exclusion behavior;
+- BroadcastRecipient bookkeeping;
+- Broadcast counts/completion/cancellation;
+- guided CRM authoring.
+
+Messaging owns immutable template versions and delivery.
+
+Target content relationship:
 
 ```text
-recipient_count
-scheduled_count
-sent_recipients_count
-skipped_recipients_count
-failed_recipients_count
-broadcast_recipients.status
-broadcast_recipients.skip_reason
-broadcast_recipients.meta.delivery.failure_reason
-scheduled_messages attached through context
+Broadcast.message_template_id
+    editable private/reusable template identity
+
+Broadcast.message_template_version_id
+    immutable version pinned when scheduled
+
+BroadcastRecipient.scheduled_message_id
+    one nullable delivery relationship for the single-channel contract
 ```
 
-Common skipped states include:
+Remove the target Broadcast payload JSON and recipient ScheduledMessage ID array.
 
-```text
-broadcast_channel_unavailable
-not_scheduled_by_messaging
-```
+`recipient_filter` may remain bounded Broadcast definition JSON because it is stored once per Broadcast and is not copied per recipient.
 
-`broadcast_channel_unavailable` means the channel is not visible/allowed for the Broadcast surface at schedule time.
+BroadcastRecipient should use direct status/reason fields and no generic metadata. Provider attempt detail remains Messaging-owned.
 
-`not_scheduled_by_messaging` means Messaging declined to schedule a recipient, such as when an SMS Broadcast recipient has no usable phone destination or Messaging planning gates reject the recipient.
+Normal Broadcasts remain consent-gated.
 
-Broadcasts may display these outcomes for operator troubleshooting, but Messaging still owns the scheduled delivery lifecycle and final send-time gates.
+Imported-contact permission invitations remain a distinct Messaging-owned one-time email flow even when a Broadcasts page exposes an entry point.
 
-Do not add multi-step progression, enrollment lifecycle, or journey logic to Broadcasts.
-
-If a send needs multiple sequenced steps, it belongs in Campaigns, not Broadcasts.
+Broadcasts must not gain multi-step progression. Use a MessageChain/Campaign for sequenced delivery.
 
 ## Webinars Module
 
@@ -2715,158 +2363,54 @@ Webinars is optional.
 
 Webinars owns:
 
-- webinar series
-- webinars
-- webinar registrations
-- webinar waitlist signups
-- webinar provider behavior
-- webinar reminders
-- webinar follow-ups
-- webinar attendance recording
-- webinar post-event behavior
-- webinar contact panels
+- WebinarSeries, Webinar, registration, waitlist, attendance, provider, and post-event domain state;
+- public registration presentation/config;
+- business events that start Webinar-related message chains;
+- series/occurrence/default MessageChain bindings;
+- Webinar-specific readiness and outcome interpretation.
 
-Zoom is not a module.
+Messaging owns reusable template/chain definitions and runtime execution.
 
-Zoom is an adapter used by Webinars.
-
-Webinars may depend on:
-
-- Core
-- Messaging
-
-Webinars may use Messaging to send registration confirmations, reminders, waitlist notices, and post-webinar transactional follow-ups. Webinar surfaces may collect consent, but consent-domain storage and acknowledgement resolution remain Messaging-owned.
-
-The public Webinar registration experience is configuration-driven. Registration-modal content/style is a distinct ownership bucket from landing-page content/style. Client wording may differ; executable tests should validate structure, accessibility, legal-link validity, channel/consent behavior, and runtime safety rather than identical prose or exact CSS utility counts.
-
-Registration consent fields use explicit booleans under `registration.consents` for transactional/marketing email/SMS. Effective fields are those enabled by the resolved Core/client/series config and exposed by Messaging channel availability for `webinar_registrations`. Disabled or unavailable fields must not render and must be rejected when posted manually.
-
-Core supplies vertical-neutral shared defaults. A client shared register config owns reusable form, consent, legal, review, instructor, event-detail, and common CTA defaults. Series-specific register configs own topic positioning, proof, urgency, problem framing, CTA copy, and genuine compliance exceptions. Topic-specific style files should normally inherit the shared registration style.
-
-Webinar reminder, confirmation, and post-event timing is selectable through DB-owned schedule profiles and profile items.
-
-Webinars owns when webinar lifecycle messages are scheduled.
-
-Messaging owns what those messages say through Messaging template presets and assignments.
-
-A webinar series or webinar may select a schedule profile, with webinar selection taking precedence over series selection and active-default fallback.
-
-Schedule profile items identify timing/slot identity and must not embed reusable copy.
-
-
-Supported generic schedule shapes are:
+Target bindings:
 
 ```text
-delay
-    minutes: integer
-
-anchored
-    minutes: integer
-
-next_day_at
-    time: HH:MM
+registration created -> selected registration MessageChain
+waitlist availability -> selected waitlist MessageChain
+attendance attended -> selected attended follow-up MessageChain
+attendance missed -> selected missed follow-up MessageChain
 ```
 
-`next_day_at` uses `config('client.timezone')` with application timezone fallback. Webinar post-event follow-ups may pass `webinar.ends_at` as the anchor so next-morning scheduling is based on the webinar's actual ending calendar day rather than delayed webhook processing time.
+A chain does not own the Webinar trigger.
 
-Core's generic Webinar reminder baseline should stay vertical-neutral and small:
+Current WebinarScheduleProfile and WebinarScheduleProfileItem persistence is transitional and should migrate into MessageChain/Version/Step/Variant records.
+
+Current selection precedence should remain:
 
 ```text
-7 days
-24 hours
-30 minutes
-live
+occurrence binding
+    overrides series binding
+
+series binding
+    overrides default binding
 ```
 
-Richer client-specific cadences belong in client config. Numeric/list arrays replace defaults when present, so client reminder/profile-item lists do not append duplicate Core slots.
+A successful registration normally creates one MessageChainEnrollment and only the next actionable delivery wave.
 
-Webinars also owns computed message readiness for:
+Do not create every future reminder at registration time.
+
+Do not copy Webinar/registration/profile/template/condition snapshots into ScheduledMessage payload/meta.
+
+Chain duplication for a Webinar series uses copy-on-write:
 
 ```text
-registration confirmations
-registration consent acknowledgement/readiness
-reminders
-waitlist availability messages
-waitlist consent acknowledgement/readiness
-post-attended transactional follow-up
-post-missed transactional follow-up
+copy small chain version/step/variant rows
+reuse existing immutable template versions
+create new template versions only when copy changes
 ```
 
-Readiness is derived from runtime Messaging resolution, channel availability, active Webinar schedule profiles and explicit disablement, selected-profile validity, active-default conflicts, post-event outcome-message enablement, and Messaging-owned acknowledgement consolidation/standalone fallback coverage.
+Transactional Webinar follow-up chains remain distinct from marketing nurture Campaigns.
 
-Readiness is not persisted.
-
-Consent-event acknowledgements are Messaging-owned consent-domain messages. They are not per-scope Webinar `opt_ins` templates and are not separate Webinar schedule-profile items. A standalone acknowledgement follows Messaging-owned behavior; an acknowledgement consolidated into a Webinar lifecycle message inherits that primary message's resolved Webinar schedule-profile behavior.
-
-Post-webinar transactional follow-ups are not campaign nurture.
-
-They may contain replay/recording links and should use:
-
-    purpose = transactional
-    scope = webinar
-    dispatch_key = webinar_ended
-
-Post-webinar nurture campaigns are marketing journeys and should be handled through Campaigns after FlowRoutes enrollment.
-
-They should use:
-
-    purpose = marketing
-    scope = webinar_nurture
-
-
-Webinars should not directly own Campaign enrollment routing.
-
-Webinars should not directly create CampaignEnrollment records.
-
-Webinars should not transition Workflow status solely to trigger Campaign enrollment.
-
-
-Current outcome direction:
-
-1. Webinars records webinar registration/attendance/outcome state.
-2. Webinars uses Messaging for webinar-owned transactional messages such as confirmations, reminders, and replay follow-ups.
-3. Webinars emits `AutomationEventRecorded` for automation-worthy outcomes.
-4. FlowRoutes listens to the generic automation event seam.
-5. FlowRoutes maps generic automation events into `FlowRouteExternalEvent` internally.
-6. FlowRoutes starts matching event-triggered routes or resumes matching `event_wait` points.
-7. FlowRoutes decides whether to create tasks, change status, enroll Campaigns, cancel Campaigns, or send messages.
-8. Campaigns owns Campaign enrollment/progression.
-9. Messaging owns delivery/scheduling.
-
-Current webinar automation events:
-
-    webinar.registered
-    webinar.cancelled
-    webinar.attended
-    webinar.missed
-    webinar.ended
-
-`webinar.ended` may be contactless.
-
-Contactless automation events should not force contact FlowRoute progress to resume unless a contact context exists.
-
-Good:
-
-    DispatchMessageAction
-    ScheduleMessageAction
-    AutomationEventRecorded
-    AutomationEventData
-
-Bad:
-
-    CampaignEnrollment::create(...)
-    ScheduledMessage::create(...)
-    Webinars directly deciding Campaign route orchestration
-
-Webinar registration records should store webinar participation state, registration source, join token, and webinar-specific metadata.
-
-Consent audit details such as IP address, user agent, opt-in language, and opt-in timestamp belong to Messaging consent records, not Webinar registration records.
-
-Webinar outcome fields such as `registered_at`, `attended_at`, and `cancelled_at` belong to Webinars.
-
-Those outcome fields are emitted through `AutomationEventRecorded`, then FlowRoutes maps them into `FlowRouteExternalEvent` internally when needed.
-
-Webinars should not decide Campaign, Workflow, task, or FlowRoute orchestration directly.
+Webinar message readiness is computed from effective bindings, current chain/template versions, channel availability, token context, and acknowledgement composition/fallback. Readiness is not persisted.
 
 ## Reporting Module
 

@@ -1,317 +1,402 @@
 # Broadcasts Module
 
-This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
+## Status
 
 Broadcasts is optional.
 
-Broadcasts owns one-time and batch recipient sends.
+The current Broadcast payload JSON and `broadcast_recipients.scheduled_message_ids` JSON array are transitional.
+
+The approved target stores one authored message version per Broadcast and one compact ScheduledMessage relationship per recipient.
+
+## Responsibility
+
+Broadcasts owns one-time and batch sends.
+
+Campaigns and Broadcasts remain separate:
+
+```text
+Campaign
+    enrolled multi-step journey with progression
+
+Broadcast
+    one-time single-channel send to a resolved recipient set
+```
 
 Broadcasts owns:
 
-- broadcasts
-- broadcast recipients
-- broadcast recipient filter metadata
-- broadcast recipient state
-- ad hoc one-time message payload/copy
-- broadcast scheduling/orchestration behavior
-- broadcast-specific metadata
-- broadcast delivery bookkeeping
+- Broadcast identity, name, schedule, status, and channel choice;
+- recipient-filter definition;
+- recipient resolution;
+- prior-Broadcast exclusion behavior;
+- BroadcastRecipient bookkeeping;
+- Broadcast-level counts and completion;
+- cancellation orchestration;
+- CRM authoring and delivery visibility.
 
 Broadcasts does not own:
 
-- enrolled multi-step campaign journeys
-- campaign definitions
-- campaign steps
-- campaign enrollments
-- reusable message templates
-- scheduled message delivery infrastructure
-- message consent/suppression infrastructure
-- message gates
-- send jobs
-
-Campaigns and Broadcasts are separate concepts.
-
-Campaigns are enrolled, multi-step journeys with lifecycle/progression.
-
-Broadcasts are one-time or batch sends to recipients.
-
-Broadcasts may store ad hoc payload/copy because broadcasts are not reusable Campaign journeys.
-
-Messaging owns reusable delivery infrastructure, scheduled messages, consent, suppression, gates, payload classes, queues, and send jobs.
-
-Broadcasts may depend on:
-
-- Core
-- Messaging
-
-Broadcast recipient selection should use recipient-oriented terminology.
-
-Use:
-
-    recipient_filter
-    BroadcastRecipientResolver
-    BroadcastRecipient
-    recipients
-
-Avoid:
-
-    audience
-    audience_filter
-    BroadcastAudienceResolver
-
-`broadcasts.recipient_filter` is the canonical storage for recipient selection metadata.
-
-Current supported recipient filter shapes include:
-
-    {
-      "type": "all"
-    }
-
-    {
-      "type": "tag",
-      "tags": ["homebuyer"]
-    }
-
-    {
-      "type": "contact_ids",
-      "contact_ids": [1, 2, 3]
-    }
-
-    {
-      "type": "imported"
-    }
-
-    {
-      "type": "import_batch",
-      "import_batch_ids": [1, 2, 3]
-    }
-
-`imported` is a Core-owned contact filter for contacts imported from another system. Current imported detection includes `source = import`, `meta.imported = true`, `meta.imported_at`, or a present `contact_import_batch_id`.
-
-`import_batch` is a Core-owned contact filter for contacts from specific first-class `contact_import_batches` records. Use it when the operator needs to target one exact import file/run instead of all imported contacts.
-
-Recipient filters may also include Broadcast-owned exclusions:
-
-    {
-      "type": "all",
-      "exclude": {
-        "broadcast_ids": [12, 13],
-        "statuses": ["scheduled", "sent"]
-      }
-    }
-
-`exclude.broadcast_ids` removes contacts that already have matching `BroadcastRecipient` rows for those prior Broadcasts.
-
-`exclude.statuses` currently supports:
-
-    scheduled
-    sent
-
-This is Broadcast-owned duplicate-send protection. It lets operators send separate single-channel Broadcasts, such as SMS first and email second, without hitting the same contact twice.
-
-Core does not own prior-Broadcast exclusion logic.
-
-Messaging does not own prior-Broadcast exclusion logic.
-
-Broadcasts owns this because it is based on BroadcastRecipient bookkeeping.
-
-Broadcasts may store recipient filter definitions, but Core owns generic contact lookup and generic contact filter resolution.
-
-Broadcasts should not become the app-wide contact query engine.
-
-Broadcasts may use Core-owned contact lookup/picker functionality for individual contact selection.
-
-Good:
-
-    route('crm.contacts.lookup')
-    <x-crm.contact-picker />
-    BroadcastRecipientResolver
-
-Bad:
-
-    BroadcastRecipientContactSearchController
-    Broadcast-specific contact picker components
-    duplicated contact lookup logic inside Broadcasts
-
-Broadcast delivery metadata should be first-class on `broadcasts`:
-
-    dispatch_key
-    message_type
-    payload_class
-    queue
-
-Broadcasts should use Messaging public actions/services to schedule or send messages.
-
-Broadcasts owns the exact Broadcast send time and batch behavior. A Broadcast should not manufacture a fake zero-delay Messaging schedule merely to satisfy a generic template contract.
-
-The durable dispatch shape is:
-
-```text
-Broadcast
-    owns send_at, audience/filter, channel choice, batch intent, and Broadcast-specific behavior
-
-Messaging template or Broadcast payload
-    owns reusable/sendable content and delivery-template metadata
-
-ResolvedMessageDispatchBuilder
-    assembles the exact Broadcast-owned send_at with the message content
-
-ScheduledMessage
-    persists behavior_owner = Broadcast when Broadcast owns the dispatch timing
-```
-
-Messaging must not reinterpret Broadcast timing from reusable template fields.
-
-Broadcast scheduling should also provide stable logical occurrence identity for each Broadcast-recipient dispatch. Retry/dedupe identity should be based on that logical occurrence rather than `send_at`, so recalculating or retrying the same Broadcast occurrence does not accidentally create a distinct message solely because the timestamp changed.
-
-
-Good:
-
-    DispatchMessageAction
-    ScheduleMessageAction
-
-Bad:
-
-    ScheduledMessage::query()->create(...)
-
-Broadcasts should not depend on Campaigns.
-
-Campaigns should not depend on Broadcasts.
-
-Broadcasts may reference Messaging-owned scheduled messages for bookkeeping and visibility.
-
-That reference is acceptable because Broadcasts depends on Messaging.
-
-Broadcasts should still send or schedule through Messaging public actions/services.
-
-`broadcast_recipients.scheduled_message_ids` is broadcast bookkeeping, not ownership of scheduled delivery infrastructure.
-
-BroadcastRecipient records are Broadcast bookkeeping.
-
-BroadcastRecipient records may store scheduled message IDs for visibility/audit, but they do not own the scheduled delivery lifecycle.
-
-Current runtime direction:
-
-    Broadcast UI/action creates or edits draft Broadcast
-    Broadcast stores recipient_filter metadata
-    Broadcast recipient resolver resolves Contacts from recipient_filter
-    Broadcast schedule action creates BroadcastRecipients
-    Broadcast schedule action calls Messaging public action/service
-    Messaging creates ScheduledMessages
-    BroadcastRecipient stores resulting scheduled_message_ids/status bookkeeping
-    Broadcast listeners record sent/skipped/failed Messaging lifecycle events
-    Broadcast completes when every BroadcastRecipient is terminal
-
-Scheduling also has an immediate terminal path. `ScheduleBroadcastAction` records eligible, scheduled, and skipped recipient counts in `broadcasts.meta.scheduling`. When the scheduled recipient count is zero, the Broadcast completes in the scheduling transaction with either `no_eligible_recipients` or `no_messages_scheduled`; it must not remain `scheduled` waiting for a Messaging lifecycle event that cannot occur. A mixed result remains `scheduled` while any recipient has a ScheduledMessage still capable of reaching a terminal delivery outcome.
-
-### Imported-contact permission invitations
-
-Current imported-contact permission invitation scheduling is Messaging-owned and exposed from Core import batch detail pages when Messaging is enabled.
-
-Broadcasts do not own the current import-batch permission invitation scheduling path.
-
-If a future Broadcast entry point is reintroduced, the permission-invitation rules remain Messaging-owned.
-
-A normal Broadcast must not receive the imported-contact bypass.
-
-Normal Broadcasts remain consent-gated by Messaging.
-
-Broadcast cancellation should use Messaging-owned skip behavior for pending scheduled messages rather than mutating Messaging internals directly.
-
-Good:
-
-    CancelBroadcastAction -> SkipScheduledMessagesAction
-
-Permission-invitation Broadcast lifecycle bookkeeping should follow these rules:
-
-```text
-Cancelled before invitation claim
-    Broadcast = cancelled
-    pending ScheduledMessage = skipped
-    BroadcastRecipient = cancelled
-    no ContactPermissionInvitation row exists
-
-Skipped by Messaging before claim
-    BroadcastRecipient = skipped
-    ScheduledMessage = skipped
-    no ContactPermissionInvitation row exists
-
-Skipped after claim
-    BroadcastRecipient mirrors the ScheduledMessageSkipped outcome
-    ScheduledMessage = skipped
-    matching claimed ContactPermissionInvitation = failed
-
-Provider/runtime failure after claim
-    BroadcastRecipient = failed
-    ScheduledMessage = failed
-    ContactPermissionInvitation = failed
-```
-
-Broadcasts should not rewrite invitation state directly. Messaging owns invitation reconciliation and final delivery lifecycle. Already sent invitation messages and invitation rows remain untouched when a Broadcast is later cancelled.
-
-Broadcasts should remain simpler than Campaigns.
-
-Broadcasts are single-channel sends.
-
-A single Broadcast should represent one channel and one payload shape.
-
-Examples:
-
-    Email Broadcast -> channel=email, payload.subject, payload.body
-    SMS Broadcast -> channel=sms, payload.message
-
-Do not make a normal Broadcast default to both email and SMS.
-
-Multi-channel fallback or “use SMS if available, otherwise email” is future channel-strategy work and should be modeled deliberately if needed.
-
-For now, operators should create separate single-channel Broadcasts and use prior-Broadcast recipient exclusions to avoid duplicate outreach across channels.
-
-Do not add multi-step progression, enrollment lifecycle, or journey logic to Broadcasts.
-
-If a send needs multiple sequenced steps, it belongs in Campaigns, not Broadcasts.
-
-## CRM authoring UX direction
-
-Broadcasts should stay simpler than Campaigns.
-
-The authoring UI should guide one clear one-time send.
-
-Recommended flow:
-
-```text
-1. Choose channel.
-2. Write the channel-specific payload.
-3. Choose recipients.
-4. Review duplicate-send protection and schedule/send.
-```
-
-The selected channel should shape the payload:
+- reusable general template infrastructure;
+- immutable template rendering/version semantics;
+- message-chain progression;
+- Campaigns;
+- consent or suppression;
+- scheduled-message claims/jobs/provider delivery;
+- imported-contact permission-invitation policy.
+
+Broadcasts may depend on Core and Messaging.
+
+## Single-channel contract
+
+A normal Broadcast represents one channel and one content shape.
 
 ```text
 Email Broadcast
-    subject
-    body
+    subject + body/structured email content
 
 SMS Broadcast
     message
 ```
 
-Imported-contact opt-in invitations should not receive equal visual weight with normal Broadcast authoring.
+Do not make a Broadcast implicitly multi-channel.
 
-They are a distinct Messaging-owned one-time permission flow. Expose them as a secondary action such as:
+Operators create separate Broadcasts for separate channels and may use exclusion rules to avoid duplicate outreach.
+
+Future fallback/channel-strategy work must be modeled deliberately rather than hidden inside one Broadcast.
+
+## Target content ownership
+
+Every Broadcast should use a Messaging-owned `MessageTemplate`.
+
+A normal one-off Broadcast may create a private template owned by the Broadcast authoring workflow.
+
+Target relationship:
 
 ```text
-Send opt-in invitation to imported contacts
+Broadcast.message_template_id
+    stable editable draft identity
+
+Broadcast.message_template_version_id nullable
+    immutable version pinned when scheduled/published
 ```
 
-When no contacts are eligible for the opt-in invitation, the UI should not show the full option/import-batch selection area. It should instead show a calm explanation that no imported contacts are eligible for invitation.
+The draft editor may create new private template versions as the operator edits.
 
-`Avoid Duplicate Sends` is useful but secondary. Prefer a collapsed section with a short summary unless the operator is actively changing exclusions.
+Scheduling pins exactly one immutable version.
 
-A future action such as:
+Existing recipient deliveries never change when the draft is edited later.
+
+The private template may remain hidden from the general reusable-template browser unless an operator explicitly promotes or duplicates it into reusable library content.
+
+Remove the target `broadcasts.payload` JSON column.
+
+Do not move the same content into `broadcasts.meta` or a one-to-one Broadcast payload table.
+
+## Target Broadcast schema
+
+Conceptual fields:
 
 ```text
-Make a new broadcast from this
+id
+user_id nullable
+message_template_id
+message_template_version_id nullable
+name
+channel
+purpose
+scope
+status
+send_at nullable
+recipient_filter json nullable
+recipient_count
+scheduled_count
+sent_count
+skipped_count
+failed_count
+cancelled_at nullable
+completed_at nullable
+completion_reason_code nullable
+timestamps
 ```
 
-is useful for repeating a prior Broadcast to a different channel or audience. This can likely be a clone action without schema. Add lineage such as `cloned_from_broadcast_id` only if audit/debug/reporting needs prove lineage should be persisted.
+Rules:
+
+- `message_template_version_id` is required before scheduling;
+- channel must match the pinned template;
+- purpose/scope remain first-class because they classify the one-time send and drive consent/gating;
+- recipient counts are small operational summaries justified by frequent list/detail queries;
+- `recipient_filter` remains bounded low-volume definition data;
+- no generic `meta` column is planned;
+- dispatch key, payload class, and queue should not be copied onto Broadcast when Messaging can derive renderer behavior and the scheduling action supplies the queue/classification contract.
+
+## Recipient filters
+
+Use recipient-oriented terminology:
+
+```text
+recipient_filter
+BroadcastRecipientResolver
+BroadcastRecipient
+recipients
+```
+
+Avoid `audience` terminology in Broadcast internals.
+
+Current supported filter concepts may remain:
+
+```json
+{"type":"all"}
+```
+
+```json
+{"type":"tag","tags":["homebuyer"]}
+```
+
+```json
+{"type":"contact_ids","contact_ids":[1,2,3]}
+```
+
+```json
+{"type":"imported"}
+```
+
+```json
+{"type":"import_batch","import_batch_ids":[1,2,3]}
+```
+
+Broadcast-owned exclusions may remain:
+
+```json
+{
+  "type":"all",
+  "exclude":{
+    "broadcast_ids":[12,13],
+    "statuses":["scheduled","sent"]
+  }
+}
+```
+
+`recipient_filter` is acceptable JSON because:
+
+- one definition is stored per Broadcast;
+- it is not copied per recipient;
+- its schema is closed and validated;
+- Core still owns generic Contact filter resolution;
+- Broadcasts owns prior-Broadcast exclusion semantics.
+
+Do not copy the resolved Contact ID list into the Broadcast row after BroadcastRecipient rows are created.
+
+## Target BroadcastRecipient schema
+
+Conceptual fields:
+
+```text
+id
+broadcast_id
+contact_id
+scheduled_message_id nullable
+status
+sent_at nullable
+skip_reason_code nullable
+failure_reason_code nullable
+timestamps
+```
+
+Rules:
+
+- one Broadcast is single-channel, so one nullable `scheduled_message_id` is sufficient;
+- remove `scheduled_message_ids` JSON;
+- remove generic `meta`;
+- use direct reason-code columns;
+- provider failure detail remains on Messaging delivery attempts;
+- BroadcastRecipient is Broadcast bookkeeping, not delivery ownership.
+
+`broadcast_id + contact_id` remains unique.
+
+## Scheduling flow
+
+```text
+operator schedules Broadcast
+    lock/validate draft
+    pin MessageTemplateVersion
+    resolve Contacts from recipient_filter
+    create BroadcastRecipients
+    call Messaging public scheduling action per recipient
+    create compact ScheduledMessage with:
+        recipient = Contact
+        context = Broadcast
+        origin = BroadcastRecipient
+        message_template_version_id = pinned Broadcast version
+```
+
+BroadcastRecipient stores the returned ScheduledMessage FK.
+
+Messaging owns consent, destination, suppression, gates, rendering, claims, retries, provider delivery, and terminal events.
+
+Broadcasts does not create ScheduledMessages directly.
+
+## Immediate terminal behavior
+
+The scheduling transaction must handle zero-message outcomes.
+
+```text
+no eligible recipients
+    Broadcast completes with no_eligible_recipients
+
+eligible recipients but Messaging schedules nothing
+    Broadcast completes with no_messages_scheduled
+
+at least one ScheduledMessage remains capable of terminal delivery
+    Broadcast remains scheduled
+```
+
+Do not leave a Broadcast waiting for an event that cannot occur.
+
+The existing `broadcasts.meta.scheduling` summary should move to first-class count and completion-reason columns.
+
+## Delivery reconciliation
+
+Messaging terminal events update BroadcastRecipient status.
+
+Target recipient states may include:
+
+```text
+pending
+scheduled
+sent
+skipped
+failed
+cancelled
+```
+
+Broadcast completes when every recipient is terminal.
+
+Broadcast-level sent/skipped/failed counts may be maintained transactionally because they are frequent operational summaries and are tiny compared with copied payload/history objects.
+
+Do not copy:
+
+```text
+provider response
+provider message ID
+delivery attempt history
+ScheduledMessage failure text
+full terminal event payload
+```
+
+into BroadcastRecipient metadata.
+
+The scheduled-message and attempt relationships remain the authoritative delivery history.
+
+## Cancellation
+
+Broadcast cancellation should:
+
+```text
+set Broadcast cancelled
+use Messaging public skip action for pending ScheduledMessages
+mark recipients cancelled or mirror resulting skipped outcomes
+leave sending/sent/failed/previously skipped deliveries unchanged
+```
+
+Broadcasts must not mutate Messaging claim/provider fields directly.
+
+## Imported-contact permission invitations
+
+Permission invitations remain Messaging-owned.
+
+Broadcasts may expose a secondary entry point, but the action is not a normal Broadcast and must not inherit normal Broadcast bypass semantics.
+
+Rules remain:
+
+```text
+one-time
+email-only
+imported Contact only
+Messaging-owned eligibility and invitation record
+normal Broadcasts remain consent-gated
+```
+
+No private Broadcast template/payload path should reimplement invitation token generation, acceptance URLs, one-time enforcement, or consent creation.
+
+## CRM authoring UX
+
+Recommended normal flow:
+
+```text
+1. choose channel
+2. write the message
+3. choose recipients
+4. review exclusions and count
+5. schedule/send
+```
+
+The Broadcast page may create/edit its private Messaging template behind this guided UI.
+
+Operators should not need to understand template-version IDs.
+
+Use business-facing content fields:
+
+```text
+Email
+    subject
+    body
+
+SMS
+    message
+```
+
+Keep duplicate-send protection secondary and collapsible.
+
+A future “Make a new Broadcast from this” action can:
+
+```text
+create a new Broadcast
+create or reuse a private template identity according to copy-edit intent
+start with a new draft version
+```
+
+Do not persist clone lineage unless audit/reporting needs prove it useful.
+
+## Setup validation
+
+Broadcast validation should verify:
+
+```text
+channel is available for Broadcast authoring
+purpose/scope are valid
+recipient_filter shape is valid
+pinned template version exists before scheduling
+template channel matches Broadcast channel
+Broadcast is not scheduled twice
+recipient counts and terminal state remain coherent
+normal Broadcast does not use permission-invitation bypass
+```
+
+Hard errors represent unsafe/impossible scheduling.
+
+Warnings may represent empty or currently ineligible recipient sets before final scheduling.
+
+## Reporting and retention
+
+Broadcasts owns aggregate/recipient bookkeeping.
+
+Messaging owns delivery history.
+
+Old terminal BroadcastRecipient rows are small and may remain for reporting.
+
+Large content is stored once in immutable template versions.
+
+Do not retain copied rendered bodies per recipient unless Messaging's separate render-context retention contract requires exact reconstruction.
+
+## Migration boundary
+
+The next migrations/models batch should:
+
+- replace Broadcast payload storage with template/template-version FKs;
+- replace recipient ScheduledMessage ID arrays with one nullable FK;
+- replace scheduling/delivery metadata with first-class count/reason columns;
+- remove generic Broadcast/BroadcastRecipient metadata from the target schema;
+- add model relationships and schema tests;
+- keep current scheduling actions/listeners operational until later runtime batches;
+- use pre-production migration replacement rather than compatibility alter migrations.
+
+The runtime cutover should then migrate draft editing, scheduling, result reconciliation, cancellation, and CRM presentation in focused Broadcast batches.

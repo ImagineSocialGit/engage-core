@@ -424,49 +424,106 @@ FlowRoutePoint is one concrete configured action inside one Route version.
 A Route editor may allow copying an existing `FlowRoutePoint` from another current Route, but cloning creates a new independent `FlowRoutePoint`. Later edits must not propagate back to the source Route.
 
 
-## Send-message point behavior ownership
+## Messaging point behavior ownership
 
-A FlowRoute `send_message` point is reached because FlowRoutes execution has already progressed through the Route's prior Points. Reusable Messaging templates must not inject a hidden second workflow layer.
-
-Durable rule:
+FlowRoutes may use Messaging in two distinct ways:
 
 ```text
-FlowRoutes
-    owns when execution reaches the send_message Point
-    owns Route waits and Point-specific behavior
-
-Messaging template
-    owns reusable content and delivery-template metadata
-
-ResolvedMessageDispatchBuilder
-    assembles the selected template with the FlowRoute-resolved dispatch behavior
+send one message template
+start one message chain
 ```
 
-By default, reaching a `send_message` Point means the message is eligible to send at the Point's resolved execution time. Any additional delay or condition must be explicitly owned by the FlowRoute Point/Route definition, not inherited from reusable template timing.
+FlowRoutes owns when Route execution reaches the Point.
 
-The resulting `ResolvedMessageDispatch` may preserve the `FlowRoutePoint` as polymorphic behavior provenance. Messaging should not import FlowRoutes internals to interpret the Point.
+Messaging owns immutable template/chain versions, chain progression, scheduled delivery, rendering, gates, and provider attempts.
 
-Direct Route authoring must not expose every active Messaging template. A template is eligible for direct Route use only through the explicit Messaging-owned eligibility seam:
+### Direct template send
+
+A direct send Point stores stable `message_template_id` authoring identity.
+
+When the Point executes:
 
 ```text
-MessageTemplatePreset.meta.route_authoring.eligible = true
-
-or
-
-active MessageTemplateCatalogEntry.meta.route_authoring.eligible = true
+resolve the template's current immutable MessageTemplateVersion
+pin that version on a compact ScheduledMessage
+recipient = Route Contact or explicitly supported subject recipient
+context = Route subject/Contact according to Point definition
+origin = ContactFlowRouteProgressItem
+send_at = current Point execution time unless the Point owns an explicit delay
 ```
 
-Additional rules:
+Existing ScheduledMessages do not change when the template is edited.
+
+A later Point execution may use the newly current template version.
+
+### Start message chain
+
+A chain-start Point stores stable `message_chain_id` authoring identity.
+
+When the Point executes:
 
 ```text
-template must be active
-template must have at least one dispatch key
-internal-purpose templates are never eligible for direct Route authoring
+resolve the chain's current immutable MessageChainVersion
+create MessageChainEnrollment
+recipient/context from Route execution
+origin = ContactFlowRouteProgressItem
+record created enrollment identity on FlowRoutes progress state
 ```
 
-This explicit opt-in prevents lifecycle-owned templates such as webinar confirmations, webinar reminders, Campaign-step messages, permission invitations, and internal notifications from leaking into the generic Route message picker merely because they exist.
+FlowRoutes does not create chain steps or ScheduledMessages directly.
 
-The Route editor should hide `Send message` entirely when no direct-Route-eligible Messaging template exists. Server-side authoring must validate the same eligibility rule and reject an ineligible template even when a request bypasses the UI.
+The MessageChain runner owns progression after enrollment.
+
+### No hidden workflow in templates
+
+Reusable templates own copy only.
+
+A direct template must not inject hidden timing, conditions, sequencing, or module lifecycle rules.
+
+A chain deliberately owns message sequencing/timing, but it still does not own the FlowRoute trigger that started it.
+
+### Authoring eligibility
+
+Direct template and chain eligibility should become first-class Messaging authoring/capability relationships.
+
+Do not preserve eligibility forever inside generic `meta.route_authoring` or catalog metadata.
+
+Direct Route authoring must exclude lifecycle-owned definitions unless deliberately exposed.
+
+Examples normally excluded from the generic picker:
+
+```text
+Webinar confirmations/reminders
+Campaign-owned chain content
+permission invitations
+internal notifications
+consent acknowledgements
+module-private Broadcast templates
+```
+
+The Route editor should hide unavailable Messaging actions when no eligible template/chain exists.
+
+Server-side validation must enforce the same rule.
+
+### Persistence boundary
+
+Messaging ScheduledMessages use only the generic origin relationship for direct Route sends.
+
+Messaging MessageChainEnrollments use the generic origin relationship for chain starts.
+
+Do not add or preserve a repeated bundle of `flow_route_*` foreign keys on every Messaging runtime row.
+
+FlowRoutes already owns:
+
+```text
+route progress
+plan item
+progress item
+created_subject_type/id
+correlation
+```
+
+That is sufficient provenance and resume identity.
 
 ## Manual contact-status automation impact preview
 
@@ -1129,7 +1186,7 @@ Route-created artifacts should be correlated through FlowRoutes-owned created-su
 
 FlowRoutes owns route provenance, created-artifact references, correlation, and resume matching.
 
-Do not interpret that ownership as a requirement for every artifact-owning module to import FlowRoutes models or add the same `flow_route_*` foreign keys.
+Do not require every artifact-owning module to import FlowRoutes models or add identical `flow_route_*` columns.
 
 Preferred shape:
 
@@ -1144,25 +1201,33 @@ Owning module artifact
     remains independent from FlowRoutes internals
 ```
 
-For Tasks specifically, the current implementation is:
+Examples:
 
 ```text
-FlowRoute create_task point
-    -> Tasks public action
-    -> template-backed Task
-    -> FlowRoutes records created Task identity
-    -> Task lifecycle proceeds independently
-    -> Task emits neutral automation event
-    -> FlowRoutes matches/resumes through FlowRoutes-owned correlation state
+create_task
+    Tasks action creates Task
+    FlowRoutes records Task identity
+
+send one message
+    Messaging creates ScheduledMessage
+    ScheduledMessage.origin = ContactFlowRouteProgressItem
+    FlowRoutes records ScheduledMessage identity
+
+start message chain
+    Messaging creates MessageChainEnrollment
+    MessageChainEnrollment.origin = ContactFlowRouteProgressItem
+    FlowRoutes records MessageChainEnrollment identity
+
+start Campaign
+    Campaigns creates CampaignEnrollment and linked MessageChainEnrollment
+    FlowRoutes records returned Campaign artifact identity
 ```
 
-Tasks should not store FlowRoutes-specific foreign keys or import FlowRoutes-owned models merely to preserve route provenance.
+Tasks, Messaging, Campaigns, Scheduling, Documents, Forms, Commerce, and vertical modules should not add FlowRoutes-specific foreign keys merely for provenance symmetry.
 
-The same ownership test should be applied to future route-created Appointments, DocumentRequests, Forms, Portal records, Commerce records, and vertical-owned records.
+Uniformity is useful only when it preserves ownership.
 
-Uniformity is useful only when it preserves module ownership. Do not add provenance columns merely for schema symmetry.
-
-Some existing artifact families may retain established provenance fields where independently justified. That does not make those columns a universal requirement for future modules.
+Some existing artifact families may retain established provenance fields temporarily during migration. That does not make those columns part of the target cross-module contract.
 
 ## Event-wait and task-completed resume behavior
 

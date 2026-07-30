@@ -454,65 +454,147 @@ runtime rendering safety
 
 Tests should not require identical prose across clients, count exact Tailwind utility strings, or make one client's presentation the canonical copy for another client.
 
-## Webinar message/template/schedule setup
+## Webinar message chains and bindings
 
-Webinars provides the owning setup surface for webinar-owned message contexts.
+Webinars owns the business events that start Webinar-related message chains.
 
-Messaging template presets decide what those messages say.
-
-Webinars decide when those messages are sent and which webinar context they apply to.
-
-The Webinars setup surface supports these lifecycle/template and consent-readiness contexts:
+Messaging owns:
 
 ```text
-registration confirmation
-registration consent acknowledgement/readiness
-reminders
-waitlist availability messages
-waitlist consent acknowledgement/readiness
-post-attended transactional follow-up
-post-missed transactional follow-up
+MessageTemplates and immutable versions
+MessageChains and immutable versions
+chain steps/variants
+chain enrollments
+compact ScheduledMessages
+delivery attempts
 ```
 
-For reusable Webinar lifecycle message contexts, the surface shows the current selected Messaging template, allows choosing a compatible `MessageTemplatePreset`, saves the selected `MessageTemplatePresetAssignment`, and links back to Message Templates for copy editing.
+Webinars owns module-specific bindings such as:
 
-Consent acknowledgement contexts are different: they resolve through Messaging's consent-domain, opt-in-definition, and delivery-consolidation services. Do not create or select scope-specific `opt_ins` templates merely to represent registration or waitlist consent acknowledgements.
+```text
+registration created -> registration message chain
+waitlist availability -> waitlist message chain
+attendance recorded as attended -> attended follow-up chain
+attendance recorded as missed -> missed follow-up chain
+```
 
-A consent acknowledgement may be delivered standalone or consolidated into a compatible Webinar lifecycle message. Webinars may show whether the acknowledgement is covered, but it does not own the acknowledgement definition or delivery policy. Schedule selection remains Webinars-owned and separate from acknowledgement copy editing.
+A message chain is reusable and does not own the Webinar trigger.
+
+### Target binding persistence
+
+Webinar chain selection should use a small Webinars-owned binding record or equivalent first-class relationships.
+
+The migration/model batch should support:
+
+```text
+WebinarSeries or Webinar occurrence
+trigger key
+MessageChain
+active/default precedence
+timestamps
+```
+
+Exact series-versus-occurrence columns should preserve current behavior:
+
+```text
+occurrence-specific selection
+    overrides series selection
+
+series selection
+    overrides module/client default
+
+default
+    used only when no explicit valid selection exists
+```
+
+Do not store chain/profile/template labels, config paths, or definition snapshots in the binding.
+
+### Registration and waitlist
+
+A successful registration should create a `MessageChainEnrollment` for the selected registration chain.
+
+Target enrollment identity:
+
+```text
+recipient = Contact
+context = WebinarRegistration
+origin = WebinarRegistration
+```
+
+A waitlist availability outcome starts the selected waitlist chain using the waitlist signup or resulting registration as context according to the final runtime contract.
+
+Webinars should not materialize the entire reminder cadence as ScheduledMessages during registration.
+
+Normal progression should create only the next actionable chain wave.
+
+### Attendance outcomes
+
+Attended and missed follow-up chains are separate business-trigger bindings.
+
+This keeps the generic MessageChain engine from becoming a Webinar attendance classifier.
+
+Webinars records attendance first, then starts the chain selected for that outcome.
+
+Transactional replay/follow-up chains remain distinct from marketing nurture Campaigns.
+
+### Copy ownership
+
+Webinar setup may open Messaging template/chain editors in Webinar context.
+
+Webinars does not duplicate reusable copy editing in Webinar-owned tables.
+
+Editing copy creates a new immutable `MessageTemplateVersion`.
+
+Editing cadence/conditions creates a new immutable `MessageChainVersion`.
+
+Existing registrations/enrollments remain pinned to their prior versions.
+
+### Chain duplication for a series
+
+The CRM action discussed for Webinar series should duplicate the selected MessageChain using copy-on-write:
+
+```text
+create new MessageChain identity
+create one MessageChainVersion
+copy small step/variant definitions
+reuse existing MessageTemplateVersion IDs
+assign the new chain to the target series/trigger binding
+create new template versions only when the operator customizes copy
+```
+
+Do not clone scheduled messages, render contexts, delivery attempts, catalog snapshots, or full payloads.
 
 ## Webinar message readiness
 
-Webinars owns a computed readiness service for webinar-owned message setup.
+Webinars owns computed readiness for its chain bindings and required trigger contexts.
 
 Readiness is not persisted.
 
-Current readiness areas are:
+Target readiness areas:
 
 ```text
-registration confirmations
-registration consent acknowledgement/readiness
-reminders
-waitlist availability messages
-waitlist consent acknowledgement/readiness
-post-attended transactional follow-up
-post-missed transactional follow-up
+registration chain
+registration consent-acknowledgement delivery path
+waitlist chain
+waitlist consent-acknowledgement delivery path
+attended follow-up chain
+missed follow-up chain
 ```
 
-Readiness uses current runtime truth:
+Readiness uses current truth:
 
 ```text
-Messaging DB-first reusable-template resolution with explicit supported fallback
-Messaging channel availability for the surface/purpose/scope
-active Webinar schedule profiles actually in use
-complete schedule-profile coverage for required Webinar lifecycle messages
-explicit schedule-profile disablement
-missing or inactive selected schedule-profile references
-conflicting active default schedule profiles
-post-event outcome-message enablement
-Messaging delivery-consolidation coverage and standalone fallback
+effective series/occurrence/default binding
+selected MessageChain existence and active/current version
+chain step/variant integrity
+template-version/channel compatibility
+Messaging channel availability
+required token context availability
+consent-domain acknowledgement composition or standalone fallback
+post-event outcome enablement
 ```
 
-Current states:
+States remain:
 
 ```text
 Ready
@@ -520,219 +602,172 @@ Needs attention
 Optional / disabled
 ```
 
-Registration consent acknowledgement readiness is required when transactional Webinar registration messaging has at least one available channel.
-
-Waitlist consent acknowledgement readiness is required when Webinar-waitlist marketing messaging has at least one available channel.
-
-An acknowledgement is ready when every required intent has a valid Messaging-owned delivery path:
+A required acknowledgement is ready when it has:
 
 ```text
-consolidated into a compatible resolved lifecycle message
+a valid composed path through ScheduledMessage components
 or
-resolved as a standalone acknowledgement with a valid fallback
+a valid standalone fallback
 ```
 
-A zero count of standalone opt-in templates is not itself a missing-template failure when consolidation covers the acknowledgement. The UI should distinguish `Managed through delivery consolidation` from a truly missing delivery path.
+A missing standalone acknowledgement template is not itself a failure when the required intent is covered safely through composition.
 
-The current readiness backend/surface baseline predates full delivery-consolidation presentation. Updating that presentation so it reports consolidated and fallback-covered paths accurately remains deferred product work.
+When a channel/surface is intentionally unavailable, the corresponding optional area should not become a false blocker.
 
-When the corresponding messaging surface is unavailable, the consent acknowledgement area is `Optional / disabled` rather than a false blocker.
+Readiness should explain the business problem, not expose raw template-version, chain-version, or binding IDs as the primary message.
 
-Consent-event acknowledgements dispatched by Messaging are Messaging-owned behavior, even when consent is collected on a Webinar surface. They resolve through the `webinar` consent domain, `ConsentOptInDefinitionResolver`, and Messaging-owned delivery-consolidation policy rather than per-scope Webinar `opt_ins` template groups. Webinars owns the registration/waitlist surface, the human-readable consent topic, and the readiness context; Messaging owns consent-domain normalization, consent-grant intent identity, acknowledgement resolution, consolidation/fallback policy, and delivery safety.
+## Current schedule-profile transition
 
-## Selectable webinar schedule profiles
-
-Webinars supports DB-owned selectable schedule profiles for webinar-owned messages.
-
-Schedule profiles decide whether, when, and under what Webinar lifecycle conditions messages are sent. Messaging template presets decide what those messages say and provide reusable delivery-template metadata.
-
-Every Webinar lifecycle message dispatched through the Webinar lifecycle should get its behavior from a `WebinarScheduleProfileItem`, including immediate registration confirmations, waitlist alerts, and post-event follow-ups.
-
-Standalone Messaging-owned consent acknowledgements are not separate Webinar schedule-profile items because the consent-granted lifecycle belongs to Messaging. When an acknowledgement is consolidated into a Webinar lifecycle message, it inherits the primary message's resolved profile timing, conditions, queue, and behavior-owner provenance rather than receiving a second profile item.
-
-Profile items may cover categories such as:
+Current tables/models:
 
 ```text
-registration confirmation schedule
-reminder schedule
-waitlist availability schedule
-post-event transactional follow-up schedule
+webinar_schedule_profiles
+webinar_schedule_profile_items
 ```
 
-Possible examples:
+are transitional.
+
+Their useful behavior moves as follows:
 
 ```text
-full 10-day schedule
-smoke fast schedule
-last-minute only schedule
-no reminders
+profile identity
+    -> MessageChain
+
+profile immutable cadence
+    -> MessageChainVersion
+
+profile item timing/conditions
+    -> MessageChainStep
+
+channel/template selection
+    -> MessageChainStepVariant
+
+series/Webinar profile selection
+    -> Webinars-owned MessageChain binding
 ```
 
+Current schedule-profile config may be converted into MessageChain seed definitions during migration/sync cutover.
 
-Core's default Webinar cadence should remain small and vertical-neutral. The current generic baseline is:
+It must not justify retaining two permanent schedule engines.
 
-```text
-7 days
-24 hours
-30 minutes
-live
-```
+After runtime cutover:
 
-Rich branded/client cadences belong in client config. Numeric/list arrays replace default lists when present, so a client reminder/profile-item list replaces the Core list rather than appending duplicate slots.
+- `WebinarScheduleProfileDefinitionResolver` is removed or replaced by generic chain resolution;
+- `behavior_owner = WebinarScheduleProfileItem` is replaced by chain enrollment/step-variant identity;
+- conditions remain on immutable chain steps and are re-evaluated when the step becomes actionable;
+- conditions are not copied into ScheduledMessage metadata;
+- template/profile/area/config-path provenance is not copied into ScheduledMessage metadata;
+- `skip_when_join_clicked` becomes a typed Webinar/chain condition or gate rule, not generic metadata.
 
-Assignments may be default/global or context-specific. The current durable selection points are webinar series and individual webinar, with individual webinar selection taking precedence over series selection.
+## Timing and timezone
 
-A schedule profile item references runtime dimensions such as dispatch key, message type, channel, purpose, scope, surface, stable `message_template_key`, timing, schedule, conditions, and metadata. `source_config_path` may remain as provenance/debug location, but it is not durable template identity. The item must not embed reusable message copy.
-
-
-Supported generic schedule shapes are:
+Generic chain timing must preserve the existing useful schedule concepts:
 
 ```text
 delay
-    minutes: integer
-
 anchored
-    minutes: integer
-
 next_day_at
-    time: HH:MM
 ```
 
-`next_day_at` uses `config('client.timezone')`, with application timezone fallback. Do not duplicate timezone in each schedule item. `MessageSendTimeResolver` uses an explicit anchor when provided, otherwise `triggeredAt`, as the calendar-day base.
+Authoring may use minutes/hours/days.
 
-Webinar lifecycle behavior owned by the profile item includes:
+Canonical persistence should use:
 
 ```text
-timing
-schedule
-conditions
-is_enabled
-Webinar-specific skip behavior such as skip_when_join_clicked
-other Webinar lifecycle flags that affect whether or when the message exists
+timing type
+anchor key
+offset seconds
 ```
 
-Reusable Messaging templates for Webinar lifecycle messages must not duplicate those fields. A matching profile item is authoritative. If a required lifecycle template has no matching active/effective profile item, Webinars must not silently fall back to template timing or an implicit immediate send. Setup validation should report missing coverage, and runtime should safely decline the unresolved dispatch according to the Webinar contract.
+Calendar-based `next_day_at` behavior uses `config('client.timezone')`.
 
-Before handing a message to Messaging, Webinars resolves the active schedule profile and exact profile item. `WebinarScheduleProfileDefinitionResolver` attaches transient `resolved_behavior` and `behavior_owner` data to the matched content-only definition. `DispatchMessageAction` consumes those transient values and uses `ResolvedMessageDispatchBuilder` to combine the selected reusable Messaging template with Webinar-owned behavior. The resulting `ResolvedMessageDispatch` carries an exact `send_at`, stable logical occurrence identity when supplied, and the `WebinarScheduleProfileItem` as polymorphic behavior provenance.
+Do not duplicate timezone on every chain step.
 
-Multiple reminder slots may share the same generic Messaging `message_type`, for example `message_type = reminder`. The schedule profile item key identifies the Webinar lifecycle slot, while `message_template_key` identifies the reusable Messaging template selected for that slot. `source_config_path` is provenance/debug location only and must not be used as durable matching identity. Messaging should not encode reminder timing into schedule-specific message types such as `reminder_30_minute`.
+For post-event chains, Webinars should use `webinar.ends_at` as the business anchor so delayed webhook processing does not shift the intended next-morning date.
 
-Scheduled-message payloads created by Webinars must remain compact. They should include send-ready payload fields, compact token maps, and compact context arrays. They must not include full Eloquent model arrays, loaded relationships, webinar schedule profile objects, or profile item collections. Schedule profile/source identity belongs in scheduled-message metadata.
+The chain runner normalizes the final `next_action_at`/`send_at` instant to UTC.
 
-Do not repeat the same Contact, Webinar, WebinarSeries, or WebinarRegistration snapshot under top-level payload fields, `tokens`, and `context`. Store only values required for deterministic rendering or deliberately late-bound delivery.
+## Stable occurrence identity
 
+Registration, waitlist, attended, and missed chain starts require stable dedupe identity based on the owning Webinar record and trigger occurrence.
 
-For post-event follow-ups, Webinars should pass `webinar.ends_at` as the schedule anchor. This keeps `next_day_at` tied to the webinar's actual ending calendar day even when provider webhook processing is delayed past midnight.
+Do not use `send_at` as logical identity.
 
-Timezone-aware send times must be normalized consistently before persistence so `ScheduledMessage.send_at` represents the same instant as the queued job delay. During production debugging, a persisted `send_at` discrepancy is not enough to prove the Redis delay is wrong: inspect Horizon `Delayed Until` and/or serialized queue delay metadata before requeueing or manipulating Redis.
+Retrying the same chain start must resolve the existing enrollment rather than create a second chain because the calculated timestamp changed.
 
-Profile-owned conditions are checked when planning the message. Resolved conditions are persisted into `ScheduledMessage.meta.conditions`, and `ScheduledMessageGate` re-evaluates them immediately before provider delivery. A delayed replay follow-up must not send if a required recording/playback criterion is no longer satisfied at send time.
+## Persistence constraints
 
-Webinar dispatch paths should also provide stable module-owned occurrence identity. Registration messages, waitlist notices, and post-event follow-ups should use stable logical occurrence keys based on the owning Webinar records/context rather than treating `send_at` as identity. A retry or recalculated timestamp for the same logical message occurrence should retain the same occurrence identity.
+Webinar message runtime rows must not contain:
 
+```text
+full Contact snapshots
+full Webinar/WebinarSeries/WebinarRegistration snapshots
+profile or profile-item objects
+template assignment/catalog snapshots
+resolved condition arrays copied per message
+delivery-consolidation recipes
+config paths
+human labels
+```
 
-Webinar schedule profiles and profile items are DB-owned definitions with customization semantics.
+Use relationships:
 
-Normal preset sync updates config-owned records that have not been customized, preserves customized profiles and items, and deactivates stale non-customized items that are no longer present in config. Stale customized items remain preserved. Explicit force sync may overwrite customized profiles/items and clears their customization markers.
+```text
+WebinarRegistration
+Webinars-owned chain binding
+MessageChainEnrollment
+MessageChainStepVariant
+MessageTemplateVersion
+ScheduledMessage
+```
 
-At most one active default Webinar schedule profile should exist. Config sync must reject multiple active defaults and duplicate normalized item keys before persistence. Shared setup validation should also treat conflicting active defaults as a hard setup error for manually altered or otherwise corrupted DB state.
-
+The target ScheduledMessage contains no payload or generic metadata JSON.
 
 ## Webinars setup validation ownership
 
-Webinars contributes Webinars-owned setup checks through `WebinarsSetupValidationContributor` to the shared app-level setup validation manager.
+Webinars contributes Webinars-owned checks through `WebinarsSetupValidationContributor`.
 
-Webinars validation uses Webinars-owned schedule/profile definitions and public Messaging validation/resolution seams rather than duplicating Messaging internals. Missing compatible Messaging definitions are hard errors; a valid definition whose channel is unavailable for the surface is a warning.
+Target validation uses Webinars-owned bindings and Messaging public template/chain resolution seams.
 
 At minimum, validate:
 
 ```text
-selected webinar schedule profile exists or a valid default fallback exists
-schedule profile item keys are unique within a profile
-schedule/timing definitions are valid
-`next_day_at.time` uses strict `HH:MM` and does not embed timezone
-schedule profile items reference supported channel/purpose/scope/surface/message context
-every required Webinar lifecycle template/context has matching effective schedule-profile behavior
-reusable Webinar Messaging templates do not duplicate schedule-profile-owned timing, schedule, conditions, enablement, or Webinar-specific skip behavior
-selected Messaging template assignments are compatible and resolvable
-Webinar consent-domain acknowledgement resolution is unambiguous and does not require per-scope `opt_ins`
-required webinar available fields/tokens are supplied by the actual webinar runtime path
-runtime-only URLs such as join/cancel/playback URLs are available for the context that uses them
-schedule/profile identity remains metadata and does not leak full model graphs into scheduled-message payloads
+effective registration/waitlist/attended/missed binding resolves deliberately
+selected MessageChain exists
+selected MessageChain has a valid current/published version
+chain step keys and order are valid
+timing/anchor/offset definitions are valid
+next_day_at uses client timezone without per-step timezone duplication
+step variants reference compatible immutable MessageTemplateVersions
+required channel/purpose/scope contexts are available
+required Webinar tokens/URLs can be supplied by the actual context
+consent acknowledgement composition/fallback is valid
+series/occurrence/default precedence is unambiguous
+stable dedupe identity can be produced
+no required copy or timing remains only in legacy schedule profiles
 ```
 
-A required selected schedule item or template context that cannot execute safely is a hard error. Optional disabled schedule items or intentionally omitted channels may be warnings or omitted depending on operator usefulness.
+After persistence cutover, validation should also reject:
 
-Post-webinar transactional follow-ups are not campaign nurture.
+```text
+ScheduledMessage payload/meta snapshots
+copied chain conditions on runtime rows
+binding/profile labels stored as provenance JSON
+two permanent active schedule engines for the same Webinar lifecycle path
+```
 
-They may contain replay/recording links and should use:
+A required binding that cannot execute safely is a hard error.
 
-    purpose = transactional
-    scope = webinar
-    dispatch_key = webinar_ended
+Optional intentionally disabled chains/channels may be warnings or omitted according to operator usefulness.
 
-Post-webinar nurture campaigns are marketing journeys and should be handled through Campaigns after FlowRoutes enrollment.
+Post-webinar transactional follow-ups remain:
 
-They should use:
+```text
+purpose = transactional
+scope = webinar
+```
 
-    purpose = marketing
-    scope = webinar_nurture
-
-
-Webinars should not directly own Campaign enrollment routing.
-
-Webinars should not directly create CampaignEnrollment records.
-
-Webinars should not transition Workflow status solely to trigger Campaign enrollment.
-
-
-Current outcome direction:
-
-1. Webinars records webinar registration/attendance/outcome state.
-2. Webinars resolves profile-owned lifecycle behavior for messages such as confirmations, reminders, waitlist alerts, and replay follow-ups, then hands the resulting dispatch intent to Messaging through the shared resolved-dispatch seam. Messaging-owned consent-domain acknowledgements remain outside Webinar schedule profiles and per-scope reusable Webinar templates.
-3. Webinars emits `AutomationEventRecorded` for automation-worthy outcomes.
-4. FlowRoutes listens to the generic automation event seam.
-5. FlowRoutes maps generic automation events into `FlowRouteExternalEvent` internally.
-6. FlowRoutes starts matching event-triggered routes or resumes matching `event_wait` points.
-7. FlowRoutes decides whether to create tasks, change status, enroll Campaigns, cancel Campaigns, or send messages.
-8. Campaigns owns Campaign enrollment/progression.
-9. Messaging owns delivery/scheduling.
-
-Current webinar automation events:
-
-    webinar.registered
-    webinar.cancelled
-    webinar.attended
-    webinar.missed
-    webinar.ended
-
-`webinar.ended` may be contactless.
-
-Contactless automation events should not force contact FlowRoute progress to resume unless a contact context exists.
-
-Good:
-
-    DispatchMessageAction
-    ScheduleMessageAction
-    AutomationEventRecorded
-    AutomationEventData
-
-Bad:
-
-    CampaignEnrollment::create(...)
-    ScheduledMessage::create(...)
-    Webinars directly deciding Campaign route orchestration
-
-Webinar registration records should store webinar participation state, registration source, join token, and webinar-specific metadata.
-
-Consent audit details such as IP address, user agent, opt-in language, and opt-in timestamp belong to Messaging consent records, not Webinar registration records.
-
-Webinar outcome fields such as `registered_at`, `attended_at`, and `cancelled_at` belong to Webinars.
-
-Those outcome fields are emitted through `AutomationEventRecorded`, then FlowRoutes maps them into `FlowRouteExternalEvent` internally when needed.
-
-Webinars should not decide Campaign, Workflow, task, or FlowRoute orchestration directly.
-
+Marketing nurture remains Campaign-owned and starts through Campaign/FlowRoutes integration rather than being mislabeled as a transactional Webinar chain.
 
 ## CRM visibility
 

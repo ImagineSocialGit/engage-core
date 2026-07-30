@@ -23,19 +23,22 @@ Detailed sequencing and open decisions are in
 
 This file is intentionally disposable. Add work here when it is real but not yet ready for an implementation slice. Delete items as they are completed. Do not treat this as an architectural reference; long-lived decisions belong in `module-boundaries.md` or a feature-specific doc.
 
-## Immediate system-wide persistence audit
+## Messaging persistence refactor
 
-- [ ] Execute [`model-persistence-bloat-audit.md`](model-persistence-bloat-audit.md) before treating compact persistence as verified.
-- [ ] Build a complete inventory of model/query-builder write paths, including actions, services, jobs, listeners, sync/import code, factories used by runtime helpers, provider ingestion, and bulk updates.
-- [ ] Begin with `ScheduledMessage` and Webinar message-data producers.
-  - Measure actual row size.
-  - Remove repeated Contact/Webinar/WebinarSeries/WebinarRegistration snapshots across top-level payload fields, `tokens`, `context`, and metadata.
-  - Preserve provider-ready content, retryability, dedupe/occurrence identity, consent IDs, consolidation intent keys, conditions, and useful delivery provenance.
-- [ ] Audit Campaign, Broadcast, FlowRoutes, Task, automation-event/opportunity, Forms, Documents, Commerce, inbound/provider, and reporting persistence using the same worksheet.
-- [ ] Add persistence-contract and size-budget tests only after measuring representative real rows.
-- [ ] Define retention/archive policy separately from payload-shape cleanup; do not prune compliance evidence or retry state merely to reduce size.
+- [x] Audit Messaging, Campaigns, Broadcasts, Webinars, FlowRoutes, and InboundMessaging write paths and lock the target architecture in [`model-persistence-bloat-audit.md`](model-persistence-bloat-audit.md).
+- [ ] Add migrations and models only for stable templates, immutable template versions, stable chains, immutable chain versions, chain steps/variants, compact enrollments, compact scheduled messages, lazy render contexts, optional composed-message components, and delivery attempts.
+- [ ] Cut template preset sync and CRM copy editing over to stable template identities and immutable versions.
+- [ ] Cut direct scheduled-message creation over to pinned definitions, compact first-class references, and late-created bounded render context.
+- [ ] Move claim leases, provider submission state, and attempt outcomes fully into delivery-attempt rows while preserving one compact terminal summary on the scheduled message.
+- [ ] Add the generic chain runner with version-pinned enrollments and lazy next-action materialization.
+- [ ] Migrate Campaigns to reference Messaging chains while preserving Campaign identity, activation, audience intent, and reporting.
+- [ ] Migrate Webinars from schedule-profile message orchestration to module-owned chain bindings for registration, waitlist, attended, and missed outcomes.
+- [ ] Migrate Broadcasts to pinned template versions and one first-class scheduled-message relationship per recipient.
+- [ ] Migrate FlowRoutes direct messaging to stable template/chain references without repeated provenance bundles.
+- [ ] Keep raw inbound provider payload only in webhook inbox receipts; normalize inbound messages and retain narrow evidence elsewhere.
+- [ ] Add representative row-size, index-plan, retention, and pruning tests after each runtime cutover rather than after the entire refactor.
 
-This is the next architecture audit, not deferred UX backlog.
+Do not create one-to-one payload or metadata tables that preserve the same bytes. Do not update executable config-template examples until the corresponding runtime contracts have been implemented.
 
 ## Run through after completing an item or system update
 
@@ -83,14 +86,14 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [ ] Confirm Messaging copy passes `MessageTemplateTokenValidator` for the exact producer context; do not use a global token allowlist.
 - [ ] Confirm runtime-only URLs/tokens are not guessed or hard-coded in static config.
 - [ ] Confirm Campaign presets do not own reusable message payload/copy.
-- [ ] Confirm campaign variants reference Messaging-owned template presets/assignments when variant architecture is used.
+- [ ] During the legacy runtime, confirm campaign variants resolve through current Messaging assignments; after chain cutover, confirm Campaigns references stable Messaging chain/template identities without embedded copy.
 - [ ] Confirm Campaign preset step message references use first-class `channel`, `purpose`, and `scope` keys.
 - [ ] Confirm Messaging templates live under the expected channel/purpose/scope path.
 - [ ] Confirm Webinar Messaging definition files do not reintroduce per-scope `opt_ins`; consent acknowledgements should resolve through Messaging consent domains.
 - [ ] Confirm message scopes map to intentional consent domains and unknown scopes remain narrow.
 - [ ] Confirm `next_day_at` schedules use strict `HH:MM` and client timezone rather than embedding timezone.
-- [ ] Confirm delayed lifecycle conditions remain available for send-time revalidation.
-- [ ] Confirm MessageTemplatePreset sync/assignment rules are preserved when DB-backed templates are involved.
+- [ ] Confirm delayed lifecycle conditions remain available for send-time revalidation without copying canonical chain definitions into every ScheduledMessage row.
+- [ ] During the legacy runtime, preserve MessageTemplatePreset sync behavior; after cutover, verify stable template identity and immutable version semantics.
 - [ ] Confirm Task presets create DB-owned task template definitions only and do not create live tasks.
 - [ ] Confirm FlowRoute presets use public action/service/capability references rather than private module internals.
 - [ ] Confirm SMS visibility is controlled by config where the surface exposes channel choices.
@@ -161,7 +164,7 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Series/webinars can select profiles with default fallback.
   - Webinars owns timing/slot identity.
   - Messaging owns reusable copy/templates.
-  - Schedule/profile/template identity belongs in meta. A fresh registration runtime dump showed broader payload/token/context duplication, so compactness remains under the immediate persistence audit.
+  - This structure is now transitional. The target replaces message orchestration with versioned Messaging chains and removes profile/template identity from scheduled-message metadata.
 - [x] Phase 2 — Campaign channel variants.
   - DB-owned campaign step variants exist.
   - Campaign enrollment is lifecycle.
@@ -173,7 +176,7 @@ Use this as a disposable checklist mirror of the roadmap sequence. Keep the road
   - Dependency checks consider same-pass scheduled siblings and persisted ScheduledMessage records.
   - Dependency checks are scoped to the same campaign enrollment, same campaign step, and required variant key.
   - Preset sync creates variants, removes stale non-customized variants, preserves customized stale variants, and protects customized campaigns.
-  - Campaign/step/variant/template identity belongs in meta. Campaign rows must be measured during the system-wide persistence audit rather than assumed compact.
+  - This structure is now transitional. The target moves reusable sequencing to Messaging chains and stores first-class enrollment/step/version references instead of identity bundles in metadata.
 - [x] Phase 3 — Task templates / task defaults.
   - Audit `task_templates` table/model shape for generated/manual tasks.
   - Confirm FlowRoutes `create_task` points can reference `TaskTemplate` records.

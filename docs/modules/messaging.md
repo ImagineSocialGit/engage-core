@@ -1,180 +1,107 @@
 # Messaging Module
 
-## Config and token contracts
-
-Email, SMS, and permission-invitation definitions are covered by registered closed config
-contracts. Messaging registers producer contexts in `TokenContractRegistry`; module-specific
-sources remain owned by their producer modules.
-
-`MessageTemplateTokenValidator` is the canonical reusable validator for authorable Messaging
-copy. Config/setup validation, MessageTemplatePreset sync, and CRM template create/update paths
-reuse it so unknown or registered-but-unavailable tokens fail consistently for the exact producer
-context.
-
-MessageTemplatePreset assignment resolution uses semantic message/variant identity. A
-variant-specific request does not silently fall back to a broad step assignment, and a
-context-specific active assignment outranks a global assignment. `source_config_path` may be
-retained on synced rows as diagnostics/provenance, but it is excluded from assignment identity,
-definition-key inference, dispatch criteria, and Campaign template selection. Field pickers and
-strict validation must query the token registry rather than infer availability from template text.
-
-This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
+## Status
 
 Messaging is a reusable capability module.
 
-Messaging owns outbound and scheduled message infrastructure.
+The versioned-template, versioned-chain, compact-scheduled-message architecture in this document is the approved target and is not yet fully implemented.
+
+The current `MessageTemplatePreset`, assignment, catalog, Webinar schedule-profile, Campaign-step, Broadcast payload, and payload-bearing `ScheduledMessage` paths are transitional. Migrations and models should move first; runtime writers and UI should follow in incremental batches.
+
+Detailed persistence rationale and acceptance targets are in [`../model-persistence-bloat-audit.md`](../model-persistence-bloat-audit.md).
+
+## Responsibility
 
 Messaging owns:
 
-- scheduled messages
-- message consents
-- consent-domain resolution
-- consent acknowledgement resolution
-- consent revocations
-- message suppressions
-- contact permission invitations
-- imported-contact one-time opt-in invitation records
-- public preference confirmation pages for Messaging consent
-- email/SMS provider contracts
-- provider managers
-- message payloads
-- message gates
-- eligibility checks
-- send guards
-- dispatch actions
-- schedule actions
-- scheduled message jobs
-- public opt-out/unsubscribe controllers
-- message-related events
-- recipient gate extension points
-- recipient payload extension points
+- outbound message templates and immutable template versions;
+- reusable message chains and immutable chain versions;
+- message-chain steps and channel variants;
+- message-chain enrollments and progression;
+- compact scheduled-message execution records;
+- provider delivery attempts and terminal outbox events;
+- recipient/destination gates;
+- message consent, consent domains, revocations, and suppressions;
+- consent acknowledgement resolution and delivery composition;
+- contact permission invitations;
+- email/SMS provider contracts and managers;
+- renderer contracts;
+- schedule, dispatch, skip, and send actions;
+- recipient gate and recipient-value extension points;
+- message-related lifecycle events.
 
 Messaging does not own:
 
-- inbound webhook normalization/routing
-- TeamMember models
-- internal notification preferences
-- webinar registrations
-- campaigns
-- FlowRoutes
-- task assignment
+- the business event that starts a chain;
+- Webinar registrations or attendance;
+- Campaign audience/marketing identity;
+- Broadcast recipient selection;
+- FlowRoute progression;
+- task assignment;
+- inbound webhook normalization/routing;
+- TeamMember models or internal-notification preferences.
 
-Other modules may use Messaging through public actions/services/contracts.
+Other modules use Messaging through public actions, services, contracts, registries, and neutral automation actions.
 
-## Reusable template vs resolved behavior contract
-
-Messaging templates are reusable content and delivery-template definitions. They are not workflow engines.
-
-The durable ownership split is:
+## Core ownership split
 
 ```text
-Messaging template / MessageTemplatePreset
-    reusable copy
-    payload class
-    queue
-    channel/purpose/scope/message identity
-    dispatch identity
-    token metadata
-    template provenance
+MessageTemplate / MessageTemplateVersion
+    immutable reusable copy and renderer identity
 
-Owning module
-    whether the message should exist
-    exact lifecycle timing
-    conditions/eligibility owned by that lifecycle
-    sequencing and dependencies
-    enablement
-    module-specific skip behavior
+MessageChain / MessageChainVersion
+    reusable message sequencing, timing, channel variants, dependencies, and exit rules
+
+Owning module or FlowRoutes
+    decides which business event starts which chain
+    supplies recipient, context, and origin
+    owns domain-specific cancellation or outcome meaning
+
+MessageChainEnrollment
+    owns one recipient's progression through one immutable chain version
+
+ScheduledMessage
+    owns one compact delivery execution
+
+ScheduledMessageDeliveryAttempt
+    owns one provider claim/submission/outcome attempt
 ```
 
-For module-owned flows, reusable Messaging templates must not own competing `timing`, `schedule`, `conditions`, lifecycle enablement, sequencing, dependencies, or module-specific skip rules.
+A message chain is not a general trigger engine.
 
-The universal runtime assembly seam is:
+Webinars, Campaigns, Scheduling, Documents, Portal, FlowRoutes, and future modules remain authoritative for their domain events and bindings.
+
+## Config and token contracts
+
+Email, SMS, permission-invitation, and future message-chain seed definitions remain covered by registered closed config contracts.
+
+`TokenContractRegistry` is the executable authority for fields that a producer context can supply.
+
+`MessageTemplateTokenValidator` remains the canonical validator for authorable copy.
+
+Use the same context-aware validation for:
 
 ```text
-Owning module resolves behavior
-    -> ResolvedMessageDispatchBuilder
-    -> ResolvedMessageDispatch
-    -> Messaging gating / persistence / queueing / provider delivery
+config/setup validation
+template/version sync
+CRM template editing
+chain editing
+available-field pickers
+pre-publication validation
+runtime rendering safety
 ```
 
-`ResolvedMessageDispatchBuilder` is Messaging-owned and generic. It combines reusable template data with behavior already resolved by the caller. It must not query or interpret Webinar, Campaign, Broadcast, FlowRoute, Task, InternalNotifications, or vertical-module tables.
+Do not create a second token allowlist from template text, config reference files, caller-supplied arrays, or persisted metadata.
 
-`ResolvedMessageDispatch` is the normalized final dispatch contract. It contains the exact resolved `send_at`, optional polymorphic `behaviorOwner` provenance, optional stable `occurrenceKey` identity, and the generic information required for Messaging to apply delivery safety and persist a `ScheduledMessage`.
+Client-facing aliases may normalize to canonical fields such as `contact.first_name`, but aliases do not create new runtime fields or schema.
 
-`MessageSendTimeResolver` may return a timezone-aware client-local value because calendar behavior such as `next_day_at` belongs to the client's timezone. `ScheduleMessageAction` is the persistence boundary: it converts that instant to UTC before both database persistence and queue delay registration. The normalized instant is stored once in `scheduled_messages.send_at`; `ScheduledMessage.meta` does not duplicate source or normalized scheduling timestamps. Horizon `send_at` metadata is an ISO-8601 UTC timestamp with an explicit offset; offset-free diagnostic timestamps are not allowed.
+## Message templates
 
-The builder accepts an optional polymorphic `behaviorOwner` model. When present, `ScheduledMessage` persists that provenance through `behavior_owner_type` / `behavior_owner_id`. Messaging stores the morph generically and does not import concrete feature-module models to understand their behavior.
+### `message_templates`
 
-Examples:
+A template is stable authoring identity.
 
-```text
-Webinar message
-    behavior owner = WebinarScheduleProfileItem
-
-Campaign message
-    behavior owner = CampaignStepVariant
-
-Broadcast message
-    behavior owner = Broadcast
-
-FlowRoute send_message
-    behavior owner = FlowRoutePoint
-```
-
-Not every message requires a behavior-owner record. The morph is provenance, not a requirement that every module adopt a profile/profile-item table pair.
-
-Missing module-owned behavior must never silently fall back to hidden timing or conditions from a reusable template. A consuming module should either resolve a valid dispatch intent or safely decline/fail according to its explicit runtime and setup-validation contract.
-
-There is no implicit immediate fallback. A resolved dispatch must provide either:
-
-```text
-exact caller-owned sendAt
-or
-explicit caller-owned behavior
-```
-
-Stable logical occurrence identity is separate from the scheduled timestamp. Module-owned dispatch paths should provide a stable `occurrenceKey` for retry/idempotency identity. The same logical occurrence should keep the same occurrence key even when `send_at` changes during a retry or recalculation. Messaging may use that occurrence identity when building dedupe keys; `send_at` alone must not be treated as logical occurrence identity.
-
-Reusable template data is content-only at the builder boundary. `ResolvedMessageDispatchBuilder` rejects behavior fields such as `timing`, `schedule`, `conditions`, and module-specific skip behavior when they arrive on the reusable template itself. Caller-owned behavior is merged only through the explicit behavior input.
-
-Some consuming-module resolvers may attach transient runtime-only keys such as `resolved_behavior` and `behavior_owner` to a resolved definition before calling `DispatchMessageAction`. `DispatchMessageAction` consumes and removes those transient keys before passing the reusable template into `ResolvedMessageDispatchBuilder`; they are not reusable template fields and must not be persisted as template ownership.
-
-
-Resolved lifecycle conditions are planning-time behavior and must also survive to send time. `DispatchMessageAction` persists resolved `conditions` into `ScheduledMessage.meta.conditions`, and `ScheduledMessageGate` re-evaluates them immediately before provider delivery. A delayed message that no longer satisfies its conditions is skipped rather than sent merely because it was valid when originally scheduled.
-
-
-## Message template presets, catalog entries, and assignments
-
-Messaging template presets are the DB-owned form of reusable message definitions.
-
-They let config-defined message copy be synced into the database and edited safely without moving reusable copy into Campaign, Webinar, FlowRoute, Broadcast, or other consuming-module internals.
-
-Messaging owns:
-
-```text
-message_template_presets
-message_template_catalog_entries
-message_template_preset_assignments
-```
-
-These three records have distinct responsibilities:
-
-```text
-MessageTemplatePreset
-    reusable message copy and delivery-template fields
-
-MessageTemplateCatalogEntry
-    Messaging-owned catalog/read organization for browsing grouped templates
-
-MessageTemplatePresetAssignment
-    selected preset for a runtime message context
-```
-
-### MessageTemplatePreset
-
-`MessageTemplatePreset` owns reusable message content and delivery-template metadata. It does not own module lifecycle behavior.
-
-Durable fields include:
+Target fields:
 
 ```text
 id
@@ -182,298 +109,583 @@ key
 name
 description nullable
 channel
-purpose
-scope
-message_type nullable
-payload_class
-queue nullable
-dispatch_keys json nullable
-payload json
-tokens json nullable
-status / is_active
+status
+current_version_id nullable
 source nullable
-source_config_path nullable
 source_version nullable
-is_customized boolean
+is_customized
 customized_at nullable
-last_synced_at nullable
-meta json nullable
 timestamps
 ```
 
-Examples:
+A template does not own:
 
 ```text
-Email / Transactional / Webinars / Registration Confirmation
-Email / Transactional / Webinars / 30-Minute Reminder
-Email / Marketing / Campaigns / Webinar Attended Nurture / Step 1
-SMS / Marketing / Campaigns / Webinar Attended Nurture / Step 1
-```
-
-Template names should be readable catalog labels, not raw config paths.
-
-For config-defined reusable templates, `MessageTemplatePreset.key` is durable identity. List-based definitions must declare an explicit stable `key`; list position must never determine durable template identity because inserting or reordering sibling definitions would otherwise retarget customized DB-owned templates. `source_config_path` remains provenance/debug location and may change independently of durable template identity.
-
-A singular named definition may continue to derive its preset key from its stable named config path when no explicit key is supplied.
-
-### MessageTemplateCatalogEntry
-
-`MessageTemplateCatalogEntry` owns how a template appears in the Messaging template browser/catalog.
-
-It is a read-organization model, not a runtime behavior model.
-
-It should support browsing and filtering by:
-
-```text
-channel
 purpose
 scope
-module_key / module_label
-surface
-group_key / group_label
-item_key / item_label / item_order
-usage_type
-source / source_config_path
-context_type / context_id nullable
-is_active
-meta json nullable
+queue
+Campaign key
+Webinar slot
+FlowRoute trigger
+timing
+conditions
+sequence
+dependency rules
+business enablement
 ```
 
-Examples:
+No generic `meta` column is planned.
 
-```text
-Email -> Marketing -> Campaigns -> Webinar Attended Nurture -> Step 1 Email
-Email -> Transactional -> Webinars -> Webinar Reminders -> 30-Minute Reminder Email
-SMS -> Marketing -> Campaigns -> Webinar Missed Nurture -> Step 1 SMS
-```
+Stable template identity must not depend on list order or physical config path.
 
-A catalog entry does not decide which template sends, when it sends, or why it sends.
+### `message_template_versions`
 
-It should not own:
+A template version is immutable tokenized content.
 
-```text
-campaign timing
-webinar reminder schedules
-FlowRoute trigger behavior
-skip rules
-conditions that change runtime behavior
-channel strategy
-```
-
-Those behaviors remain with the owning runtime modules.
-
-Catalog entries exist so Messaging can provide a clean copy-editing and review surface without forcing operators to hunt through Campaign, Webinar, FlowRoute, or config screens just to find message copy.
-
-### MessageTemplatePresetAssignment
-
-`MessageTemplatePresetAssignment` owns which preset is currently selected for a runtime message context.
-
-Durable fields include:
+Target fields:
 
 ```text
 id
-message_template_preset_id
-channel
-purpose
-scope
-surface nullable
-message_type nullable
-campaign_key nullable
-campaign_step nullable
-campaign_step_variant_key nullable
-source_config_path nullable
-context_type nullable
-context_id nullable
-is_active
-starts_at nullable
-ends_at nullable
-meta json nullable
+message_template_id
+version
+subject nullable
+content json
+renderer_key
+renderer_version
+content_hash
+created_by nullable
+created_at
+```
+
+`content` is bounded authored definition data stored once per version.
+
+Examples:
+
+```text
+email
+    body
+    CTA
+    secondary link
+    footer
+
+sms
+    message
+```
+
+Token names are derived and validated from subject/content. Do not persist a duplicate `tokens` JSON list.
+
+Editing creates a new version and updates `message_templates.current_version_id` for future selection.
+
+Existing chains and scheduled messages remain pinned to their prior version IDs.
+
+## Message chains
+
+### `message_chains`
+
+A chain is stable reusable sequence identity.
+
+Target fields:
+
+```text
+id
+key
+name
+description nullable
+status
+current_version_id nullable
+source nullable
+source_version nullable
+is_customized
+customized_at nullable
 timestamps
 ```
 
-Assignments should support global/default selections and context-specific selections.
+No generic `meta` column is planned.
 
-Examples:
+### `message_chain_versions`
+
+A chain version is immutable execution behavior for future enrollments.
+
+Target fields:
 
 ```text
-campaign + webinar_attended_nurture + step 1 + variant email
-webinar + reminder_30_minute + email + global default
-webinar + post_attended + sms + WebinarSeries:5
-FlowRoute send-message point + selected transactional email template
+id
+message_chain_id
+version
+exit_conditions json nullable
+content_hash
+published_at nullable
+created_by nullable
+created_at
 ```
 
+Existing enrollments do not move automatically when a chain is edited.
 
-Campaign-specific assignments should include stable variant identity when variants are involved:
+### `message_chain_steps`
+
+A step is one ordered business moment.
+
+Target fields:
+
+```text
+id
+message_chain_version_id
+key
+name nullable
+sort_order
+timing_type
+anchor_key nullable
+offset_seconds
+advance_policy
+conditions json nullable
+is_active
+```
+
+Do not persist a message count; derive it from active steps.
+
+Do not copy step conditions into enrollments or scheduled messages.
+
+### `message_chain_step_variants`
+
+A variant is a channel-specific delivery option.
+
+Target fields:
+
+```text
+id
+message_chain_step_id
+key
+sort_order
+message_template_version_id
+channel
+purpose
+scope
+message_type
+queue nullable
+dependency_policy json nullable
+conditions json nullable
+is_active
+```
+
+Small routing columns remain explicit because they are required by hot runtime gates and operational queries.
+
+Reusable copy is referenced through the immutable template-version FK.
+
+Supported strategy concepts remain:
+
+```text
+first_available
+send_all_eligible
+dependency_aware
+```
+
+The exact strategy may live on the step or its immutable version definition, but it must not be inferred from channel names or timing collisions.
+
+## Chain enrollment
+
+### `message_chain_enrollments`
+
+One row represents one recipient moving through one immutable chain version.
+
+Target fields:
+
+```text
+id
+message_chain_version_id
+recipient_type
+recipient_id
+context_type nullable
+context_id nullable
+origin_type nullable
+origin_id nullable
+current_message_chain_step_id nullable
+next_action_at nullable
+status
+dedupe_key nullable
+started_at
+paused_at nullable
+resumed_at nullable
+exited_at nullable
+exit_reason_code nullable
+completed_at nullable
+cancelled_at nullable
+timestamps
+```
+
+Meanings:
+
+```text
+recipient
+    who receives the chain
+
+context
+    what domain record supplies business/token context
+
+origin
+    which module record or FlowRoute progress item started it
+```
+
+The enrollment stores progression and lifecycle results.
+
+It does not copy:
+
+```text
+chain definition
+exit-condition definition
+template content
+start-context object graphs
+scheduled-message IDs
+debug history arrays
+```
+
+## Lazy materialization
+
+Normal chain execution should materialize only the next actionable variant wave.
+
+```text
+start enrollment
+    calculate next_action_at
+
+step becomes due
+    evaluate current conditions
+    create eligible ScheduledMessages for this wave
+
+wave reaches advance_policy
+    advance enrollment
+    calculate next_action_at
+```
+
+Do not create every future reminder/follow-up delivery merely because the chain contains those definitions.
+
+Concurrent variants may be materialized together only when the chain strategy intentionally requires them.
+
+## Scheduled-message persistence contract
+
+### `scheduled_messages`
+
+A scheduled message is a compact execution record.
+
+Target fields:
+
+```text
+id
+recipient_type
+recipient_id
+context_type nullable
+context_id nullable
+origin_type nullable
+origin_id nullable
+
+message_template_version_id
+message_chain_enrollment_id nullable
+message_chain_step_variant_id nullable
+
+channel
+purpose
+scope
+message_type
+queue nullable
+
+destination nullable
+send_at
+status
+attempt_count
+dedupe_key nullable
+provider_idempotency_key nullable
+
+sent_at nullable
+skipped_at nullable
+failed_at nullable
+terminal_reason_code nullable
+
+timestamps
+```
+
+No JSON columns are planned.
+
+Remove from the target row:
+
+```text
+payload
+dispatch_keys
+definition_config_path
+payload_class
+conditions
+template/assignment/profile/catalog snapshots
+delivery-consolidation recipes
+provider claim state
+provider result state
+generic meta
+```
+
+`message_template_version_id` pins immutable copy for both chain and direct sends.
+
+`origin` is the generic creator/business-owner relationship.
+
+`context` remains the about-this-record relationship.
+
+`destination` is frozen no later than first provider submission. Pending messages may intentionally resolve the latest eligible destination at claim time.
+
+The following small repeated values are deliberate operational columns:
 
 ```text
 channel
 purpose
 scope
-surface = campaigns
-campaign_key
-campaign_step
-campaign_step_variant_key
+message_type
+queue
+status
+attempt_count
 ```
 
-The semantic tuple keeps variant-specific assignments distinct even when variants share the same
-Campaign key, step number, dispatch key, and broad message type. A synced assignment may record
-`source_config_path` for diagnostics, but moving the template source must update provenance rather
-than create a second runtime assignment.
+They avoid deep joins in claim, gate, queue, and reporting queries.
 
-Assignment changes should happen from the consuming module's setup surface, not primarily from the Messaging template copy editor.
+### `scheduled_message_render_contexts`
+
+Runtime token values are stored separately and lazily.
+
+Target fields:
+
+```text
+id
+scheduled_message_id unique
+values json
+content_hash
+rendered_at
+expires_at nullable
+timestamps
+```
+
+The context contains only values referenced by the pinned template version and optional composed components.
+
+Do not persist:
+
+```text
+whole Contact arrays
+whole Webinar arrays
+loaded relationships
+config branches
+duplicate tokens/context trees
+template labels
+module provenance
+```
+
+Messages without runtime tokens need no render-context row.
+
+Retries reuse the same frozen render context.
+
+Exact content is reconstructed from:
+
+```text
+immutable template version
++ renderer version
++ immutable render values
+```
+
+The separate table is justified because it is created only when rendering begins and has a distinct retention/archival policy.
+
+### `scheduled_message_components`
+
+Additional composed content uses small relational rows.
+
+Target fields:
+
+```text
+id
+scheduled_message_id
+message_template_version_id
+role
+intent_key nullable
+message_consent_id nullable
+sort_order
+placement_key nullable
+timestamps
+```
+
+The primary template remains on `scheduled_messages`.
+
+Component rows exist only for deliberate composition such as consent acknowledgements.
+
+Covered intent keys and consent IDs must not be copied into a generic consolidation metadata recipe.
+
+## Direct messages
+
+A direct message does not need a chain enrollment.
 
 Examples:
 
 ```text
-Campaign step editor chooses which template each campaign step variant uses.
-Webinar schedule/profile editor chooses which confirmation/reminder/follow-up template applies.
-Routes / FlowRoutes send-message Point editor chooses which message template the Point sends.
+one-off FlowRoute send
+permission invitation
+internal notification
+one-time Broadcast recipient delivery
 ```
 
-The Messaging template page may show read-only usage, such as "Used by Campaigns -> Webinar Attended Nurture -> Step 1 Email," and link to the owning module UI when that UI exists.
+It still pins a `message_template_version_id`, stores compact recipient/context/origin identity, and follows the same gate/render/attempt lifecycle.
 
-Current CRM/admin surfaces:
+## Delivery claims, attempts, and stale recovery
+
+### `scheduled_message_delivery_attempts`
+
+Attempt rows own:
 
 ```text
-Message Templates
-    Messaging-owned copy review and copy editing.
-    Browses catalog entries by channel, purpose, area/module, group, and message/step.
-    Shows read-only usage and links to owning setup surfaces when available.
-
-Campaign Message Templates
-    Campaigns-owned setup surface for choosing the active Messaging template for campaign step variants.
-    Links back to Message Templates for copy editing.
+scheduled_message_id
+attempt_number
+claim_token
+status
+claimed_at
+lease_expires_at
+provider_submission_started_at nullable
+completed_at nullable
+destination
+provider nullable
+provider_message_id nullable
+reason_code nullable
+reason nullable
+timestamps
 ```
 
-Webinar and Automatic Follow-up template selection should follow the same ownership split when their setup surfaces are implemented.
+The scheduled-message row owns only terminal summary and the stable provider idempotency key.
 
-### Runtime resolution target
-
-Messaging resolvers should eventually resolve message definitions in this order:
+Do not duplicate on both rows:
 
 ```text
-1. Most specific active MessageTemplatePresetAssignment for the runtime context.
-2. Less-specific active assignment for the same channel/purpose/scope/message context.
-3. Synced default MessageTemplatePreset.
-4. Canonical config definition resolved from stable semantic identity only where explicitly supported by the resolver.
+claim token
+claim expiry
+provider
+provider message ID
+submission timestamp
+attempt reason
 ```
 
-Long-term runtime should be DB-first. Config should seed/update available presets and catalog entries; it should not remain the only runtime source of reusable message copy.
+`attempt_count` may remain on `scheduled_messages` as a small operational counter used by claim/retry policy.
 
-DB-first template resolution does not make Messaging the owner of consuming-module behavior. After the reusable template is selected, the consuming module remains authoritative for its own timing, conditions, sequencing, dependencies, enablement, and skip behavior before `ResolvedMessageDispatchBuilder` assembles the final runtime contract.
+An expired pre-submission claim may be returned to pending.
 
-A resolved definition's `config_path` and a ScheduledMessage's `definition_config_path` are provenance only. Planning evaluates the resolved definition's enabled state before persistence. Send-time gating uses the persisted plan, conditions, consent, destination, and suppression state; it must not re-open a physical config path, because moving a source file must not invalidate already planned delivery.
- Disabling future planning does not silently rewrite pending work; an owning module that must stop existing deliveries uses an explicit cancellation or skip operation, such as Campaign deactivation.
+After provider submission begins, automatic retry requires a verified provider idempotency contract that is still within its retention window. Otherwise ambiguous delivery becomes visibly failed for operator review rather than risking a duplicate.
 
+### Terminal outbox
 
-For Campaign runtime contexts, assignment and fallback resolution must include the variant key when variants are involved:
+Keep `scheduled_message_outbox_events` as a bounded one-row-per-terminal-event outbox.
+
+It must not carry message content, render context, or module object snapshots.
+
+## Current preset/assignment/catalog transition
+
+Current tables:
 
 ```text
-channel + purpose + scope + campaign_key + campaign_step + campaign_step_variant_key
+message_template_presets
+message_template_preset_assignments
+message_template_catalog_entries
 ```
 
-Step-only Campaign assignment wording is legacy compatibility language only. New Campaign template references and assignments should be variant-aware.
+are transitional.
 
-### Sync/customization rule
-
-Sync may create or update non-customized presets and catalog entries from config.
-
-Sync should not overwrite customized DB copy unless a force option is explicitly used.
-
-For config-owned presets, normal sync should reconcile stale definitions after the complete current definition set has been collected and validated:
+Their current responsibilities overlap:
 
 ```text
-current config-owned preset
-    keep/sync
-
-stale config-owned non-customized preset
-    remove
-
-stale config-owned customized preset
-    preserve
-
-manual/non-config-owned preset
-    preserve
+content
+delivery classification
+config provenance
+selection
+Campaign/Webinar identity
+UI catalog organization
+customization
+runtime fallback
 ```
 
-This cleanup is important when durable template identity changes, such as moving list-based definitions away from positional config-path keys.
+Target migration:
 
-Assignments and catalog entries that belong only to a removed stale preset may be removed through their preset relationship. Do not globally purge manual or customized templates.
+```text
+MessageTemplatePreset
+    -> MessageTemplate + MessageTemplateVersion
 
-Catalog entries are regenerated from source definition context and should stay aligned with the source config/definition shape.
+MessageTemplatePresetAssignment
+    -> direct FK references from immutable chain variants or owning-module bindings
 
-Customized template payload fields remain Messaging-owned and token-validated.
+MessageTemplateCatalogEntry
+    -> derived read model from templates, chains, and usage relationships
+       or a later narrow persisted projection only when measured UI/query needs justify it
+```
 
-### Messaging channel availability
+Do not add another permanent assignment table merely to preserve the current resolver shape.
 
-Messaging owns the canonical channel availability seam.
+Do not persist catalog labels into runtime rows.
 
-Channel availability answers whether a channel is:
+Config remains a seed/source mechanism. Runtime selection becomes DB-owned through template current versions, chain current versions, immutable chain variants, and module-owned bindings.
 
-- runtime-supported
-- provider-enabled
-- visible for a specific client/admin surface
-- allowed for a specific purpose/scope
-- explicit-opt-in only
+## Template and chain editing
 
-Client/admin surfaces should not read raw SMS/provider config directly.
+### Template edit
 
-Surfaces such as Broadcasts, Campaign builders, webinar registration, permission invitation pages, internal notifications, and Route send-message points should ask Messaging’s channel availability service which channels are available for that surface.
+```text
+create new immutable version
+validate tokens and renderer shape
+update current_version_id
+leave existing chain versions and ScheduledMessages unchanged
+```
 
-Canonical channel availability surface keys are:
+### Chain edit
 
-- `broadcasts`
-- `campaigns`
-- `permission_invitations`
-- `webinar_registrations`
-- `webinar_waitlists`
-- `internal_notifications`
-- `route_send_message_points`
+```text
+create new immutable chain version
+copy small step/variant definitions
+pin chosen template-version IDs
+update current_version_id
+leave existing enrollments unchanged
+```
 
-Surface keys describe UI/admin/client channel-choice surfaces.
+### Chain duplication
 
-They should not replace singular Messaging scopes, sources, message types, consent policy keys, token contexts, or payload/context keys.
+```text
+create new chain identity
+create one chain version
+copy small step/variant rows
+reuse existing template versions
+copy template content only when the operator customizes it
+```
 
-Hiding SMS from a surface does not disable SMS runtime safety behavior.
+This copy-on-write rule is required for Webinar-series chain duplication and general CRM authoring.
 
-SMS provider integrations, consent gates, revocations, suppressions, STOP/HELP handling, and send guards remain backend/runtime concerns.
+## Messaging channel availability
 
-Messaging owns reusable message copy and delivery templates, including subject/body/CTA payloads.
+Messaging owns the canonical channel-availability seam.
 
-Reusable copy includes campaign nurture messages, webinar confirmation/reminder/post-event messages, waitlist messages, and internal notification payload templates. Consent acknowledgements are resolved separately from consent-domain configuration rather than authored as per-scope `opt_ins` groups inside reusable Webinar definition files.
+Availability answers whether a channel is:
 
-Campaigns, Webinars, and FlowRoutes may reference Messaging templates or assignments, but they should not become the primary home for reusable subject/body/message copy.
+- runtime-supported;
+- provider-enabled;
+- visible for a specific client/admin surface;
+- allowed for a purpose/scope;
+- explicit-opt-in only.
 
+Client/admin surfaces must not infer availability from raw provider config.
 
-Reusable config-defined Messaging templates live only under:
+Current surface keys include:
 
-    messaging.{channel}.definitions.{purpose}.{scope}
+```text
+broadcasts
+campaigns
+permission_invitations
+webinar_registrations
+webinar_waitlists
+internal_notifications
+route_send_message_points
+```
 
-The `definitions` envelope is the canonical boundary between reusable templates and channel infrastructure. Channel-level settings such as `messaging.email.provider`, `messaging.email.providers`, `messaging.email.from`, and `messaging.sms.inbound` remain outside it and must not be inferred to be message definitions.
+A future chain editor should use a plural surface key such as:
 
-Campaign-owned message templates live inside Messaging configs under:
+```text
+message_chains
+```
 
-    campaigns.{campaign_key}.steps.{step_number}.variants.{variant_key}
+Hiding SMS from an authoring surface does not disable backend consent, suppression, STOP/HELP, provider, or send-guard behavior.
 
-Those campaign message templates are resolved by:
+## Consent domains and opt-in acknowledgements
 
-    channel + purpose + scope + campaign_key + step_number + campaign_step_variant_key
-
-Campaign presets should not duplicate reusable message copy.
-
-Campaign presets should not define or override payloads.
-
-Campaign presets own journey identity, step order, and step timing.
-
-Messaging owns the delivery template for the campaign step.
-
-Post-webinar transactional follow-ups should use the same reusable Messaging definition shape as confirmations, reminders, and campaign message templates. Consent acknowledgements use the separate consent-domain resolver.
-
-
-
-### Consent domains and opt-in acknowledgements
-
-Message scope and consent identity are intentionally separate:
+Message identity and consent identity remain separate:
 
 ```text
 Message identity
@@ -483,164 +695,107 @@ Consent identity
     channel + purpose + consent domain
 ```
 
-`ConsentDomainRegistry` maps a precise message scope to the consent domain that authorizes it.
-
-Resolution rules:
+`ConsentDomainRegistry` resolution remains:
 
 ```text
-1. exact scope mapping wins
-2. otherwise the longest matching registered prefix wins
-3. equal-specificity ambiguity fails loudly
-4. unknown unmapped scopes fall back to themselves
+exact mapping wins
+otherwise longest registered prefix wins
+equal-specificity ambiguity fails loudly
+unknown unmapped scope falls back to itself
 ```
 
-The narrow fallback is deliberate. An undeclared scope must never accidentally inherit broader consent.
+Current Webinar message scopes may intentionally share the `webinar` consent domain.
 
-Current Webinar example:
+`GrantMessageConsentAction`, `ImportMessageConsentAction`, `RevokeMessageConsentAction`, and `MessageGate` normalize through this registry.
+
+Imported consent uses the dedicated import path so it does not emit a grant acknowledgement.
+
+### Consent acknowledgement resolution
+
+`ConsentOptInDefinitionResolver` owns acknowledgement copy and domain topic resolution.
+
+System markers such as:
 
 ```text
-message scopes
-    webinar
-    webinar_waitlist
-    webinar_nurture
-
-consent domain
-    webinar
+:client_name
+:consent_topic
 ```
 
-The Webinar domain declares exact `webinar` coverage plus the `webinar_` prefix, so future scopes such as `webinar_reengagement` can share the same domain without per-scope consent wiring when that broadening is intentional.
+belong to the acknowledgement resolver, not ordinary authorable template tokens.
 
-`GrantMessageConsentAction`, `ImportMessageConsentAction`, `RevokeMessageConsentAction`, and `MessageGate` normalize through the consent-domain registry. The existing physical `scope` column on `message_consents` and `consent_revocations` stores the resolved consent-domain key; no schema rename is required merely to express the new semantic layer.
+Acknowledgement copy should migrate into ordinary versioned Messaging templates so composition can reference immutable versions.
 
-`ConsentOptInDefinitionResolver` owns consent acknowledgement resolution. Generic acknowledgement copy comes from Messaging config and receives human-readable domain context such as:
+## Consent acknowledgement delivery composition
+
+Messaging may deliver an acknowledgement standalone or compose it into a compatible lifecycle message under an explicit policy.
+
+The target representation is relational:
 
 ```text
-client name
-consent topic
+ScheduledMessage
+    primary lifecycle MessageTemplateVersion
+
+ScheduledMessageComponent
+    acknowledgement MessageTemplateVersion
+    role
+    intent_key
+    message_consent_id
+    placement/order
+```
+
+Do not copy the current consolidation working set into `ScheduledMessage.meta`.
+
+Composition inherits the primary message's:
+
+```text
+send time
+recipient
+context
+origin
 channel
-purpose
+purpose/scope compatibility
+delivery attempt lifecycle
 ```
 
-Owning modules/domains supply human-readable topics, for example:
+A required acknowledgement must have either:
 
 ```text
-webinars and webinar follow-up
+a successfully composed path
+or
+an explicit standalone fallback
 ```
 
-Module/client config may override acknowledgement copy for a consent domain. Do not inject raw technical scope keys into customer-facing acknowledgement text.
+Missing primary behavior must not silently discard acknowledgement delivery.
 
-System markers such as `:client_name` and `:consent_topic` are resolved by the consent acknowledgement path. They are not ordinary `{token}` values and must not be exposed as authorable Messaging tokens unless `TokenContractRegistry` explicitly registers them.
+Reserved `delivery_consolidation_*` placement fields remain internal composer concerns and are not universal tokens.
 
-Do not add scope-specific Webinar `opt_ins` groups such as:
+Readiness should evaluate valid delivery paths, not merely count standalone acknowledgement templates.
+
+## Consent and suppression persistence
+
+Consent grants, revocations, and suppressions preserve append-style compliance or safety truth.
+
+Repeated channel/purpose/scope values in these low-volume evidence rows are acceptable.
+
+Audit improvements should focus on:
 
 ```text
-transactional:webinar opt_ins
-marketing:webinar_waitlist opt_ins
-marketing:webinar_nurture opt_ins
+removing copied raw provider event objects
+promoting queried evidence to first-class columns
+retention policy
+redaction
+avoiding generic meta where a narrow evidence contract exists
 ```
 
-Normal consent granting may emit `MessageConsentGranted` and resolve an acknowledgement. Imported consent uses `ImportMessageConsentAction` specifically so imported state is normalized without emitting the grant event or sending an opt-in acknowledgement.
+Suppression remains destination-level operational safety and is not merged into Contact consent history.
 
+## Recipient and context relationships
 
-#### Consent acknowledgement delivery consolidation
+`recipient_type` / `recipient_id` answer who receives the message.
 
-Messaging may deliver a consent acknowledgement as a standalone message or consolidate it into a compatible lifecycle message under an explicit Messaging-owned delivery policy.
+`context_type` / `context_id` answer what the message is about.
 
-Delivery consolidation must preserve separate intent identity even when several intents share one physical `ScheduledMessage`.
-
-A consolidation policy should define:
-
-```text
-primary lifecycle intent
-eligible acknowledgement intents
-channel compatibility
-composition/placement behavior
-standalone fallback behavior
-```
-
-Verified Webinar registration behavior currently follows this shape:
-
-```text
-Email registration confirmation
-    + transactional Webinar email acknowledgement
-    + marketing email acknowledgement
-
-SMS registration confirmation
-    + transactional Webinar SMS acknowledgement
-
-Marketing SMS acknowledgement
-    standalone when it is not compatible with the transactional confirmation
-```
-
-Only newly active consent grants should be considered for acknowledgement delivery. Repeated submissions that do not create a new active transition must not create duplicate acknowledgement messages.
-
-A consolidated scheduled message should retain compact audit provenance in:
-
-```text
-meta.delivery_consolidation.primary_intent_key
-meta.delivery_consolidation.intent_keys
-meta.delivery_consolidation.consent_ids
-meta.delivery_consolidation.policy
-meta.delivery_consolidation.group
-```
-
-The consolidated acknowledgement inherits the primary lifecycle message's resolved `send_at`, queue, conditions, and behavior-owner provenance. Consolidation does not imply immediate delivery. For example, an acknowledgement attached to a delayed Webinar confirmation sends with that confirmation.
-
-Any grant not covered by a successfully resolved consolidated message must follow the policy's explicit standalone fallback. A missing or unschedulable primary lifecycle message must never silently discard a required acknowledgement.
-
-Reserved `delivery_consolidation_*` composition placeholders are supplied only by the Messaging consolidation path. They are not universal authorable tokens and must not be treated as ordinary `TokenContractRegistry` fields.
-
-Readiness should evaluate whether each required acknowledgement has a valid delivery path. A zero count of standalone opt-in templates is not itself a readiness failure when the acknowledgement is covered by consolidation with a valid fallback.
-
-
-Good:
-
-    DispatchMessageAction
-    ScheduleMessageAction
-    SkipScheduledMessagesAction
-    GrantMessageConsentAction
-    RevokeMessageConsentAction
-    MessageRecipientGate
-    MessageRecipientPayloadProvider
-
-Avoid:
-
-    ScheduledMessage::query()->create(...)
-
-unless the code is inside Messaging itself or there is an intentional, documented exception.
-
-Messaging must remain generic.
-
-Messaging must not import InternalNotifications or InboundMessaging.
-
-InternalNotifications can contribute TeamMember-specific behavior to Messaging through Messaging-owned extension points.
-
-Current Messaging extension points include:
-
-- `MessageRecipientGate`
-- `MessageRecipientGateRegistry`
-- `MessageRecipientPayloadProvider`
-- `MessageRecipientPayloadProviderRegistry`
-
-Messaging consent records are currently Contact-scoped.
-
-That is intentional for external contact messaging consent.
-
-Internal team notification preferences belong to InternalNotifications, not Messaging.
-
-Generic recipient support for scheduled delivery lives in `scheduled_messages.recipient_type` / `scheduled_messages.recipient_id`.
-
-Scheduled message domain context lives in `scheduled_messages.context_type` / `scheduled_messages.context_id`.
-
-Meaning:
-
-```text
-recipient_type / recipient_id
-    Who receives the scheduled message.
-
-context_type / context_id
-    What domain record the scheduled message is about or attached to.
-```
+`origin_type` / `origin_id` answer which owning record initiated it.
 
 Examples:
 
@@ -648,196 +803,93 @@ Examples:
 Appointment reminder
     recipient = Contact
     context = Appointment
-
-Document request reminder
-    recipient = Contact
-    context = DocumentRequest
+    origin = MessageChainEnrollment
 
 Webinar reminder
     recipient = Contact
-    context = WebinarRegistration or Webinar
+    context = WebinarRegistration
+    origin = MessageChainEnrollment
 
-Campaign step message
+Campaign chain delivery
     recipient = Contact
     context = CampaignEnrollment
+    origin = MessageChainEnrollment
 
-Task digest
-    recipient = TeamMember
-    context = TaskDigest or null batch context
+Direct FlowRoute message
+    recipient = Contact
+    context = Contact or route subject
+    origin = ContactFlowRouteProgressItem
+
+Broadcast delivery
+    recipient = Contact
+    context = Broadcast
+    origin = BroadcastRecipient
 ```
 
-Do not add separate `subject_type` / `subject_id` columns to `scheduled_messages` unless there is a deliberate future decision to replace the existing `context` morph. The existing `context` morph is the canonical scheduled-message "about this record" relationship.
+Do not add a second generic subject morph to scheduled messages.
 
-Messaging may schedule messages for non-Contact recipients through recipient payload/gate extension points, but it should not own those recipient models or their preferences.
+## FlowRoutes usage
 
-
-
-
-## ScheduledMessage persistence contract
-
-`ScheduledMessage` should persist enough immutable execution state to send, retry, deduplicate, explain, and audit a delivery without becoming a serialized copy of the surrounding application object graph.
-
-First-class columns should answer:
+FlowRoutes may use Messaging in two ways:
 
 ```text
-who receives the message
-what domain record it is about
-which behavior owns the timing
-channel / purpose / scope / message type
-when it should send
-current delivery state and attempts
-provider outcome
-dedupe / occurrence identity
-skip or failure reason
+send one template
+start one message chain
 ```
 
-`payload` should contain provider-ready content plus only the minimal late-bound values required for deterministic delivery.
+Route authoring stores stable template/chain identity.
 
-`meta` should contain compact scheduling and domain provenance such as:
+At execution time:
 
 ```text
-resolved conditions
-intent keys
-consent IDs
-delivery-consolidation coverage
-template/assignment identity
-Campaign, Webinar, FlowRoute, and automation provenance
+direct template
+    pin current MessageTemplateVersion
+    create compact ScheduledMessage
+
+message chain
+    pin current MessageChainVersion
+    create MessageChainEnrollment
 ```
 
-Delivery status, provider outcomes, retry facts, recovery facts, and provider evidence do not belong in `ScheduledMessage.meta`.
+FlowRoutes records the created ScheduledMessage or MessageChainEnrollment on FlowRoutes-owned progress state.
 
-Do not persist the same Contact, Webinar, registration, Campaign, Route, Task, or other model snapshot repeatedly under top-level payload fields, `tokens`, `context`, and metadata. Do not persist loaded relationship graphs merely because `toArray()` is convenient.
+Messaging uses only the generic `origin` morph. It does not store a bundle of FlowRoutes-specific foreign keys.
 
-Raw provider payloads belong only in columns explicitly designed as raw provider snapshots. A runtime producer that violates this contract should be treated as persistence debt to correct through the system-wide model creation and persistence audit, not as an accepted UX tradeoff.
+Direct Route eligibility should become a first-class authoring/usage relationship or template capability flag. Do not preserve route eligibility forever inside generic template/catalog metadata.
 
-### Delivery claims, attempts, and stale recovery
+Internal-purpose, lifecycle-owned, Campaign-owned, permission-invitation, and Webinar-owned definitions remain excluded from the generic direct-message picker unless deliberately exposed.
 
-`pending` to `sending` is a leased claim, not a permanent ownership transfer. Every claim has a unique claim token and explicit expiry. Terminal writes and retry release must present the active claim token so an expired worker cannot overwrite a later worker's outcome.
+## Imported-contact permission invitations
 
-Each claim creates a `scheduled_message_delivery_attempts` row. Attempt history is separate from the customer-visible terminal state on `scheduled_messages`; it records claim, provider-submission, release, recovery, and terminal outcome facts.
+Messaging owns the one-time imported-contact permission-invitation capability.
 
-Current delivery state is owned by first-class `scheduled_messages` columns:
+The send remains:
 
 ```text
-status
-sending_at
-claim_token
-claim_expires_at
-provider_submission_started_at
-recovered_at
-last_attempted_at
-send_attempts
-sent_at
-skipped_at
-failed_at
-provider
-provider_message_id
-skip_reason
-failure_reason
-provider_idempotency_key
+email-only
+transactional
+permission-invitation scoped
+one-time
+limited to imported Contacts
 ```
 
-Per-attempt diagnostics are owned by `scheduled_message_delivery_attempts`, including the claim token, attempt number, provider idempotency key, claim/submission/completion timestamps, attempt status, provider identity, provider message ID, reason code, reason, and provider-specific evidence in attempt `meta`.
-
-`ScheduledMessage.meta.delivery` is not a runtime persistence contract. Delivery completion, retry release, and stale-claim recovery must preserve the message's existing canonical metadata without adding delivery or recovery structures. Explicit import canonicalization discards legacy `meta.delivery` rather than promoting it.
-
-The provider idempotency key identifies one logical ScheduledMessage delivery and remains stable across attempts. `SendScheduledMessageJob` injects the column-backed key only into the in-memory provider payload; it is not persisted in `payload` or `meta`. Providers with a verified idempotency contract may safely receive the same key after an ambiguous stale submission only inside the configured provider retention window. Resend receives this key through its supported idempotency header and uses a conservative retry window below its documented 24-hour retention. A provider without a verified idempotency guarantee, or a claim recovered after that guarantee expired, must not be retried automatically after submission began and the outcome became ambiguous; the ScheduledMessage becomes visibly failed for operator review instead of risking a duplicate.
-
-Messaging schedules stale-claim recovery every minute. An expired pre-submission claim is returned to `pending`, marked for recovery dispatch, and repeatedly eligible for recovery dispatch until a new worker successfully claims it. Recovery facts are recorded on the message's recovery/state columns and the completed attempt row. Recovery never rewrites an existing terminal outcome or adds diagnostics to ScheduledMessage metadata.
-
-## FlowRoutes-created scheduled message provenance
-
-Messaging owns scheduled message delivery, recipient/context morphs, consent, suppression, gates, payloads, scheduling, and send lifecycle.
-
-When FlowRoutes creates or dispatches a message through Messaging public actions/services, the resulting `scheduled_messages` record should keep Messaging's canonical recipient/context shape and also store structured FlowRoutes provenance where applicable:
+The public acceptance path owns:
 
 ```text
-flow_route_progress_id
-flow_route_plan_id
-flow_route_plan_item_id
-flow_route_progress_item_id
-flow_route_id
-flow_route_point_id
-flow_route_capability_id
+consent creation
+accepted channel recording
+submitted SMS phone update when applicable
+accepted state
+neutral permission_invitation.accepted automation event
 ```
 
-Do not add `subject_type` / `subject_id` to `scheduled_messages`; `context_type` / `context_id` remains the canonical scheduled-message about-this-record relationship. FlowRoutes subject context belongs on the route progress/plan/progress item and may be available through provenance relationships.
+The invitation should use a versioned template and a compact ScheduledMessage.
 
-This makes route-created messages queryable and resumable without making Messaging import FlowRoutes execution internals.
+The one-time policy should be first-class invitation state/identity, not an unbounded payload policy object.
 
-### Routes message usage
+### Cancellation, skip, and failure
 
-FlowRoutes may use Messaging through public Messaging actions/services for `send_message` Points.
-
-Template choice belongs on the consuming Route setup surface, not primarily on the Messaging template copy editor.
-
-The current Route editor uses explicit direct-Route eligibility. A reusable Messaging template is eligible only when:
-
-```text
-MessageTemplatePreset.meta.route_authoring.eligible = true
-
-or
-
-active MessageTemplateCatalogEntry.meta.route_authoring.eligible = true
-```
-
-and:
-
-```text
-the template is active
-it has at least one dispatch key
-its purpose is not internal
-```
-
-Internal-purpose templates are never eligible for direct Route authoring.
-
-This prevents webinar confirmations, webinar reminders, Campaign-step templates, permission invitations, internal notifications, and other lifecycle-owned templates from leaking into the generic Route message picker merely because they are active.
-
-When no direct-Route-eligible Messaging template exists, the Route editor should hide the `Send message` capability.
-
-The backend must validate the same eligibility rule so direct requests cannot bypass the authoring boundary.
-
-### Imported-contact permission invitations
-
-Messaging owns the one-time imported-contact permission invitation capability.
-
-This includes:
-
-- `contact_permission_invitations`
-- invitation token generation
-- one-time invitation enforcement
-- public preference confirmation route/controller
-- public preference page consent recording
-- accepted channel tracking
-- runtime injection of preference URLs into invitation email payloads
-- import-batch permission invitation scheduling action
-- import-batch permission invitation eligibility checks
-- duplicate pending/sent scheduled invitation protection
-
-The invitation is not a general consent bypass.
-
-Rules:
-
-- The bypass applies only to the canonical imported-contact permission invitation message.
-- The invitation send is email-only.
-- The recipient must be an imported Contact.
-- The invitation must use `message_type = imported_contact_permission_invitation`.
-- The invitation must carry a `consent_policy.permission_invitation` payload with `source = imported_contact` and `one_time = true`.
-- The system must refuse repeat invitations once a `contact_permission_invitations` row exists for the same contact/channel/source.
-- The system must also refuse repeat scheduling when a pending or sent imported-contact permission invitation scheduled message already exists for the contact.
-- Accepted public preferences create normal Messaging `MessageConsent` records for configured scopes.
-- SMS consent must be explicitly selected by the contact and must not be inferred from email consent.
-
-Current import-batch invitation scheduling is Messaging-owned.
-
-Core may expose the operator entry point on the import batch detail page when Messaging is enabled, but Core must not directly import Messaging actions, services, or models.
-
-Other modules may request this flow through Messaging public services/actions, but they must not create invitation records directly.
-
-
-### Permission invitation cancellation, skip, and failure bookkeeping
-
-Permission invitation lifecycle state remains:
+Keep the current invitation lifecycle:
 
 ```text
 claimed
@@ -846,157 +898,106 @@ failed
 accepted
 ```
 
-Scheduled-message delivery may also be `skipped`, but Messaging does not need matching `skipped` or `cancelled` invitation statuses.
-
-The durable rules are:
+Rules remain:
 
 ```text
-pre-claim scheduled-message skip or cancellation
-    no ContactPermissionInvitation row is created
+pre-claim skip/cancellation
+    no invitation row
 
 post-claim ScheduledMessageSkipped
-    matching claimed ContactPermissionInvitation becomes failed
+    matching claimed invitation -> failed
 
-provider/runtime failure after claim
-    ScheduledMessage becomes failed
-    matching invitation becomes failed
+provider/runtime failure
+    ScheduledMessage -> failed
+    matching claimed invitation -> failed
 
 successful send
-    ScheduledMessage becomes sent
-    invitation becomes sent
+    ScheduledMessage -> sent
+    invitation -> sent
 
-later public acceptance
-    ScheduledMessage stays sent
-    invitation becomes accepted
+public acceptance
+    ScheduledMessage remains sent
+    invitation -> accepted
 ```
 
-Messaging owns reconciliation from `ScheduledMessageSkipped` to a matching claimed permission invitation. Reconciliation must match by `scheduled_message_id` and only transition `claimed` invitations so existing sent, failed, or accepted invitation rows remain untouched.
+Failed invitations remain one-time blocking until a deliberate reissue policy is designed.
 
-Failed invitation rows continue to enforce the current one-time invitation rule. Automatic reissue is not supported.
+Messaging remains independent from downstream consumers of `permission_invitation.accepted`.
 
-Accepted imported-contact permission invitations emit the neutral automation event:
+## Available-field picker support
 
-```text
-permission_invitation.accepted
-```
+Messaging contributes universal recipient/Contact fields.
 
-The acceptance transaction owns consent creation, invitation accepted state, accepted channels, and any submitted SMS phone update. The invitation row should be locked and accepted state rechecked inside the transaction so concurrent submissions cannot emit duplicate acceptance events.
-
-After the acceptance transaction succeeds, Messaging emits `AutomationEventRecorded` with the invitation as subject and compact accepted-channel/consent-scope context.
-
-Shared Automation Opportunities infrastructure may independently retain `permission_invitation.accepted` as evidence-only correlation data. That does not make Messaging responsible for opportunity qualification or suggestion UX, and the evidence row does not create a standalone opportunity by itself.
-
-Messaging must remain independent from consumers. It must not import FlowRoutes or decide downstream status changes, tasks, campaigns, notifications, or vertical behavior.
-
-## Available field/token picker support
-
-Messaging owns universal Contact-recipient message fields and the reusable template/runtime validation path.
-
-The implemented executable source of truth is:
-
-```text
-TokenSourceProvider
-TokenContextProvider
-ComputedTokenValueProvider
-TokenContractRegistry
-MessageTemplateTokenValidator
-```
-
-Client/operator editors should eventually expose an `Insert field` / `Add field` interaction instead of requiring users to memorize token syntax, but the picker must consume the same context-aware registry and validator used by server-side authoring paths.
-
-Messaging should not become the owner of every module-specific field.
+Producer modules contribute domain-specific fields.
 
 Preferred ownership:
 
 ```text
-Messaging contributes universal Contact/recipient fields.
-Webinars contributes webinar fields.
-Tasks contributes task fields.
-Documents contributes document fields.
-Forms contributes form fields.
-Commerce contributes commerce fields.
-Vertical modules contribute vertical subject fields.
+Messaging
+    universal Contact/recipient values
+
+Webinars
+    Webinar and registration values
+
+Campaigns
+    Campaign-specific context values
+
+Tasks
+    task values
+
+Documents
+    document values
+
+Scheduling
+    appointment values
+
+vertical modules
+    vertical subject values
 ```
 
-Message template validation applies to DB-customized templates as well as config-synced templates. Editing copy in CRM/admin UI does not make an unsupported token valid. Config/setup validation, MessageTemplatePreset sync, and CRM template create/update paths should all use `MessageTemplateTokenValidator` rather than maintaining separate token parsing or allowlists.
+Available-field UI must consume the same registry/validator as server-side authoring.
 
+Do not offer aliases or fields that the exact runtime context cannot supply.
 
-## Canonical available fields and client-facing aliases
+## Setup validation ownership
 
-Messaging and shared authoring infrastructure should distinguish canonical internal field identity from client-facing alias vocabulary.
+Messaging contributes validation through `MessagingSetupValidationContributor` and reusable lower-level validators.
 
-Canonical runtime identity should remain universal, for example:
+Target validation covers:
 
 ```text
-contact.first_name
-contact.last_name
-contact.email
+template identity and immutable version shape
+renderer availability/version
+required subject/content fields by channel
+token availability for the exact producer context
+chain identity/version integrity
+step ordering and timing shape
+variant strategy/dependency references
+template-version/channel compatibility
+purpose/scope/channel availability
+module-owned chain bindings
+direct template/chain authoring eligibility
+consent-domain ambiguity
+required acknowledgement delivery paths
+scheduled-message schema invariants after cutover
 ```
 
-A client-facing editor may expose aliases based on the configured Contact noun, for example:
+Hard errors represent impossible or unsafe execution.
 
-```text
-lead_first_name
-fan_first_name
-customer_first_name
-```
+Warnings represent dormant, unused, unavailable, or surprising-but-safe setup.
 
-Those aliases are authoring/display conveniences only. They should normalize to the canonical internal field before storage validation/rendering or through another single documented normalization seam.
+Do not persist validation findings unless an operator workflow later proves historical acknowledgement or audit state is required.
 
-Do not create separate token registries, payload fields, database columns, or runtime branches for Lead, Fan, Customer, Borrower, Owner, and similar presentation nouns when they all represent Core Contact fields.
+## Migration boundary
 
-The available-field registry/provider should be able to expose:
+The migrations/models batch should establish the new records and relationships without switching current runtime behavior.
 
-```text
-canonical key
-client-facing label
-accepted authoring aliases
-owning module/provider
-available contexts
-runtime source
-```
+During the transition:
 
-A client-facing alias must never be offered unless it resolves unambiguously to a canonical field the runtime context can actually supply.
+- current readers/writers may remain operational;
+- target models should not expose compatibility `meta` escape hatches;
+- no production backfill is required while pre-production resets remain allowed;
+- config templates should not be rewritten to an unsupported runtime shape until the corresponding sync/runtime batch;
+- current scheduled-message history must either be imported into the new compact contract or intentionally excluded according to the project-state migration plan.
 
-## Messaging setup validation ownership
-
-Messaging contributes Messaging-owned checks through `MessagingSetupValidationContributor`, adapting the existing `MessageConfigValidator` instead of placing Messaging-specific logic directly in a global command.
-
-`MessageConfigValidator` delegates authorable token checks to `MessageTemplateTokenValidator`, which resolves allowed tokens from `TokenContractRegistry` for the exact producer context. The same validator is reused by MessageTemplatePreset sync and CRM template create/update validation.
-
-Messaging setup validation covers current email/SMS config routes, customized DB-owned `MessageTemplatePreset` records, active assignments, unsupported channel/purpose values, incomplete assignment context/campaign identity, inactive or missing presets, exact active-assignment ambiguity using the runtime identity dimensions, and consent-domain configuration ambiguity.
-
-Messaging validation should cover, as applicable:
-
-```text
-canonical reusable template definition shape
-dispatch key validity
-channel/purpose/scope validity
-payload class availability
-required payload fields
-unresolved or undeclared tokens/available fields
-context-specific field availability
-client-facing alias normalization to canonical fields
-runtime-only URL availability
-DB-customized MessageTemplatePreset payloads
-MessageTemplatePresetAssignment compatibility
-campaign variant template contexts
-webinar message/template contexts
-channel availability for relevant authoring surfaces
-```
-
-Hard errors should represent configuration that cannot safely execute or render. Warnings should represent safe but dormant, unused, unavailable, or potentially surprising setup.
-
-Messaging validation findings should be reusable by:
-
-```text
-setup:validate CLI output
-staging/client handoff checks
-Message Template editing UI
-future Campaign/Webinar/Route authoring surfaces
-available-field/token picker UX
-```
-
-No persistent validation-result tables are required unless a later operator workflow proves retained history or acknowledgement state is needed.
-
-Fields should be filtered by authoring/runtime context so operators cannot insert a field that will be unavailable when the message sends.
+Runtime cutover must proceed in focused batches and remove legacy readers once all producers use the target contract.

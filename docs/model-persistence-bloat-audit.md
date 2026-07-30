@@ -1,608 +1,966 @@
-# Engage Core — System-Wide Model Creation and Persistence Bloat Audit Plan
+# Engage Core — Messaging Persistence and Database Bloat Architecture
 
 ## Status
 
-This is an immediate cross-module audit track, not deferred product backlog.
+Approved target architecture.
+
+This document replaces the earlier audit-only plan for Messaging, Campaigns, Broadcasts, Webinars, FlowRoutes message dispatch, and inbound-provider persistence.
+
+The documentation batch defines the target. The next batch should change migrations and models only. Runtime writers, resolvers, jobs, controllers, and UI should move afterward in smaller module-focused batches.
 
 ## Purpose
 
-This document defines a broad audit for every path that creates or materially updates database records in Engage Core.
+Engage Core must reduce retained database volume without trading one oversized JSON column for another table containing the same oversized data.
 
-The goal is not simply to make JSON columns smaller. The goal is to establish a consistent persistence contract across modules so the database stores what is operationally necessary without becoming a duplicate object graph, configuration archive, request dump, or debugging scratchpad.
-
-This audit should be performed in a clean thread because it spans the entire application and will require current project files, write-path inventories, runtime samples, and focused regression tests.
-
-## Core principle
-
-Persist data because it serves a durable purpose:
-
-- Canonical business state
-- Operational querying
-- Deterministic execution
-- Retry and recovery
-- Compliance evidence
-- Auditability
-- Dedupe and idempotency
-- Historical truth that cannot be safely reconstructed
-
-Do not persist data merely because it was available in memory when a model was created.
-
-## What the audit covers
-
-The audit should include every database-writing mechanism, not only classes named `Data`, `DTO`, or `Payload`.
-
-### Eloquent write paths
-
-Search for and inspect:
-
-- `Model::create()`
-- `Model::forceCreate()`
-- `Model::firstOrCreate()`
-- `Model::updateOrCreate()`
-- `Model::firstOrNew()` followed by `save()`
-- `fill()` and `save()`
-- `update()`
-- `saveQuietly()`
-- `replicate()`
-- relationship `create()` and `createMany()`
-- `upsert()`
-- `insert()` and `insertOrIgnore()`
-
-### Query-builder writes
-
-Inspect:
-
-- `DB::table(...)->insert()`
-- `DB::table(...)->update()`
-- `DB::table(...)->upsert()`
-- raw SQL writes
-
-### Indirect and asynchronous writes
-
-Include:
-
-- Controllers
-- Actions and services
-- Jobs
-- Event listeners and subscribers
-- Observers
-- Model events
-- Console commands
-- Importers
-- Sync actions
-- Seeders and presets
-- Webhook handlers
-- Provider adapters
-- FlowRoutes handlers
-- Campaign schedulers
-- Message planners
-- Notification builders
-- Test/dev utility actions that may later be reused in production
-
-### Data assembly paths
-
-Audit all classes that build arrays or objects later persisted:
-
-- `*Data`
-- `*Dto` / `*DTO`
-- `*Payload`
-- `*Context`
-- `*Snapshot`
-- `*Builder`
-- `*Factory`
-- `*Resolver`
-- `*Mapper`
-- `*Normalizer`
-- `*Serializer`
-- `toArray()` implementations
-- model casts returning arrays
-
-## Audit objectives
-
-For each table and write path, answer:
-
-1. What is the canonical source of each value?
-2. Why must this value be persisted?
-3. Is it queried directly?
-4. Is it required for retry or deterministic execution?
-5. Is it required for compliance or historical evidence?
-6. Can it be derived safely from first-class relationships?
-7. Can it change after the row is created, and should history preserve the old value?
-8. Is the same fact stored elsewhere in the same row?
-9. Is the same nested object copied across many rows?
-10. Is raw provider or request data retained longer than necessary?
-11. What is the expected row volume and retention period?
-12. What breaks if this value is removed?
-
-## Persistence classification system
-
-Classify every persisted field or nested JSON key into one of these categories.
-
-### A. Canonical state
-
-The authoritative business value.
-
-Examples:
-
-- Contact email
-- Registration status
-- Task due date
-- Consent grant timestamp
-
-Usually keep.
-
-### B. Operational index or routing value
-
-Needed for efficient querying, dispatching, or ownership.
-
-Examples:
-
-- `channel`
-- `purpose`
-- `scope`
-- `status`
-- `send_at`
-- morph IDs
-- dedupe keys
-
-Usually keep as first-class columns.
-
-### C. Immutable execution snapshot
-
-A historical value intentionally frozen because later changes must not alter an already planned action.
-
-Examples:
-
-- Final scheduled email subject/body
-- A route-plan definition snapshot
-- A pricing value accepted at checkout
-
-Keep only the minimum snapshot required for deterministic behavior.
-
-### D. Late-bound execution input
-
-A key or reference intentionally resolved at send/run time.
-
-Examples:
-
-- Playback URL not available when registration occurs
-- Provider access token reference
-- Current unsubscribe URL
-
-Persist the stable lookup key and context identity, not an entire future object graph.
-
-### E. Compliance or audit evidence
-
-Required to prove what happened and under what authority.
-
-Examples:
-
-- Consent ID
-- Source
-- IP address
-- User agent
-- Policy/version identifier
-- Final acknowledgement intent coverage
-
-Keep deliberately and document retention.
-
-### F. Derived display data
-
-Convenience values that can be reconstructed from canonical fields.
-
-Examples:
-
-- Repeated full name when first and last name already exist
-- Formatted webinar date repeated in every reminder
-
-Usually remove unless the frozen display value is historically significant.
-
-### G. Redundant duplicate
-
-The same fact stored multiple times in the same row or graph.
-
-Examples:
-
-- `contact_id` at the top level, inside `tokens`, inside `contact`, and inside `context.contact`
-- Full webinar object in both `tokens.webinar` and `context.webinar`
-
-Remove.
-
-### H. Ephemeral execution/debug data
-
-Useful only during one request or for temporary diagnosis.
-
-Examples:
-
-- Entire resolver working set
-- Loaded relationships
-- Intermediate token maps
-- Full configuration branches
-
-Do not persist by default.
-
-### I. Raw external payload
-
-Provider webhook or API response data.
-
-Keep only when there is a clear replay, dispute, debugging, or compliance need. Prefer normalized first-class fields plus a retained raw payload with explicit retention and redaction rules.
-
-## Phase 1 — Build the write inventory
-
-Generate a current project tree and a database-write-site dump before proposing code changes.
-
-Suggested discovery command:
-
-```bash
-mkdir -p file_dumps
-{
-    rg -n --glob '*.php' --glob '!vendor/**' --glob '!storage/**' --glob '!bootstrap/cache/**' \
-        '::create\(|::forceCreate\(|::firstOrCreate\(|::updateOrCreate\(|->create\(|->createMany\(|->save\(|->saveQuietly\(|->update\(|::upsert\(|::insert\(|insertOrIgnore\(|DB::table\(' \
-        app database routes tests client
-} > file_dumps/database-write-sites.txt
-```
-
-Generate a second inventory for array/data builders:
-
-```bash
-{
-    find app client -type f \( \
-        -name '*Data.php' -o \
-        -name '*DTO.php' -o \
-        -name '*Dto.php' -o \
-        -name '*Payload.php' -o \
-        -name '*Context.php' -o \
-        -name '*Snapshot.php' -o \
-        -name '*Builder.php' -o \
-        -name '*Resolver.php' -o \
-        -name '*Mapper.php' -o \
-        -name '*Normalizer.php' -o \
-        -name '*Serializer.php' \
-    \) -print
-} | sort -u > file_dumps/persistence-data-builders.txt
-```
-
-Generate a model/table inventory:
-
-```bash
-{
-    find app -type f -path '*/Models/*.php' -print
-    find database/migrations -type f -name '*.php' -print
-} | sort -u > file_dumps/models-and-migrations.txt
-```
-
-These inventories should be reviewed together. A write site is not understood until the builder that assembled its attributes is also traced.
-
-## Phase 2 — Group by persistence domain
-
-Audit in domain batches rather than file order.
-
-Recommended groups:
-
-1. Messaging and scheduled delivery
-2. Webinars and registrations
-3. Campaigns and enrollments
-4. FlowRoutes plans, progress, and snapshots
-5. Automation behavior/opportunity records
-6. Tasks and links
-7. Core contacts, workflow, imports, and notes
-8. Forms and submissions
-9. Broadcasts and recipients
-10. Inbound messages and webhooks
-11. Scheduling and appointments
-12. Portal and access grants
-13. Locations and geocoding
-14. Documents and uploads
-15. Commerce and provider records
-16. Internal notifications and team preferences
-
-## Phase 3 — Create a model audit worksheet
-
-Use one worksheet entry per table/model.
-
-### Template
-
-```markdown
-## Model: ScheduledMessage
-
-- Table: `scheduled_messages`
-- Expected volume: High
-- Retention: To determine
-- Primary write paths:
-  - `...`
-- Data builders:
-  - `...`
-- First-class operational columns:
-  - `...`
-- JSON columns:
-  - `payload`
-  - `dispatch_keys`
-  - `meta`
-- Largest observed row:
-  - `...`
-- Duplicated facts:
-  - `...`
-- Required immutable snapshot:
-  - `...`
-- Required compliance evidence:
-  - `...`
-- Safely derivable values:
-  - `...`
-- Candidate removals:
-  - `...`
-- Compatibility strategy:
-  - `...`
-- Required tests:
-  - `...`
-```
-
-## Phase 4 — Measure actual row sizes
-
-Do not rely only on visual inspection. Sample realistic rows after fresh migrations, imports, registrations, campaign scheduling, and provider activity.
-
-For MySQL, collect approximate JSON byte sizes with queries such as:
-
-```sql
-SELECT
-    id,
-    OCTET_LENGTH(payload) AS payload_bytes,
-    OCTET_LENGTH(meta) AS meta_bytes,
-    OCTET_LENGTH(dispatch_keys) AS dispatch_keys_bytes
-FROM scheduled_messages
-ORDER BY payload_bytes + meta_bytes DESC
-LIMIT 100;
-```
-
-For every high-volume table, record:
-
-- Average row payload size
-- Median
-- 95th percentile
-- Maximum
-- Rows created per common workflow
-- Expected monthly volume
-- Retention period
-
-The important metric is not only row size. It is:
+The goal is:
 
 ```text
-row size × rows per workflow × workflow volume × retention
+store shared definitions once
+store immutable versions only when authored behavior changes
+keep high-volume runtime rows narrow
+materialize only the next actionable work
+store only irreducible per-recipient execution values
+separate hot operational state from bulky historical/raw state
 ```
 
-## Phase 5 — Trace duplication within and across rows
+The number of tables is not the primary metric.
 
-### Intra-row duplication
+The primary metric is:
 
-Look for the same value repeated in multiple JSON paths.
+```text
+bytes per row
+× rows created per workflow
+× workflow volume
+× retention period
++ index footprint
++ maintenance/backup/DDL cost
+```
 
-Common patterns:
+## Research conclusions
 
-- Top-level ID plus nested ID copies
-- `tokens.contact` plus `context.contact` plus `contact`
-- Raw and normalized versions retained without a use case
-- Full model arrays plus morph references
+The reviewed MySQL discussion does not support a universal database-size or row-count threshold at which performance suddenly becomes unacceptable.
 
-### Inter-row duplication
+The coherent conclusions are:
 
-Look for large immutable structures copied into every scheduled item or progress row.
+```text
+query shape matters more than a headline database size
+indexes and rows scanned matter
+row width and index width matter
+the hot working set and buffer-pool fit matter
+concurrent query/write volume matters
+complex joins can become expensive
+backup, restore, replication, and DDL pain may arrive before ordinary indexed reads become slow
+old or rarely used data should not burden hot operational paths without a reason
+deleting rows does not automatically make InnoDB data files shrink
+```
+
+MySQL's own documentation supports the same practical direction:
+
+- InnoDB caches data and index pages in the buffer pool.
+- JSON consumes roughly the same storage as the equivalent text representation.
+- large table rebuilds and index creation can require substantial temporary disk space and operational time.
+- query plans should be evaluated with `EXPLAIN`, not guessed from total database size.
+- table count itself is not a useful reason to avoid normalized ownership tables.
+
+Engage Core should therefore avoid both extremes:
+
+```text
+bad
+    one giant row containing every object, token, config branch, and audit detail
+
+also bad
+    dozens of one-to-one tables that reproduce the same giant object through joins
+```
+
+The target is deliberate normalization around stable identity, immutable definitions, narrow execution state, and separate retention boundaries.
+
+## Current measured evidence
+
+The supplied Webinar confirmation row contains approximately:
+
+```text
+payload JSON    1,866 bytes
+meta JSON         991 bytes
+combined JSON   2,857 bytes
+```
+
+That single scheduled row repeats or embeds:
+
+```text
+tokenized subject/body/CTA/link structure
+recipient destination
+resolved token values
+Webinar and registration values
+template preset, assignment, definition, and catalog-style identity
+schedule profile, profile item, message area, and item labels/keys
+resolved conditions
+delivery-consolidation recipe
+covered consent IDs and intent keys
+Webinar/registration IDs already represented by relationships
+```
+
+This is before ordinary columns, secondary indexes, clustered-index overhead, delivery-attempt rows, outbox rows, and binary/logging effects.
+
+The problem is not that 2,857 bytes makes one row impossible for MySQL.
+
+The problem is multiplying that shape by:
+
+```text
+every registration
+× every confirmation/reminder/follow-up
+× every retryable or historical delivery
+× every client
+× long retention
+```
+
+## Persistence design rules
+
+### 1. High-cardinality tables must be narrow
+
+Apply the strictest persistence rules to tables that can grow with contacts, registrations, recipients, chain enrollments, scheduled deliveries, provider attempts, inbound events, or webhooks.
+
+Do not add generic `meta`, `payload`, `context`, `snapshot`, or `settings` columns to those tables without a documented bounded contract.
+
+### 2. Low-cardinality definition tables may use bounded JSON
+
+JSON is acceptable where it represents one reusable authored definition and avoids an unstable collection of nullable presentation fields.
 
 Examples:
 
-- Full contact snapshots copied into every reminder
-- Full webinar snapshots copied into every reminder
-- Entire route definition copied into both plan and every plan item
-- Entire form schema copied into every form value
-- Full provider payload copied into multiple related records
+```text
+one immutable email template version
+one immutable chain version's exit-condition definition
+one low-volume recipient-filter definition on a Broadcast
+```
 
-Prefer a single intentional snapshot at the correct ownership level, referenced by ID from child rows.
+It is not acceptable to copy those same objects into every runtime row.
 
-## Phase 6 — Decide schedule-time versus send-time resolution
+### 3. Normalize identity, not every scalar
 
-Every delayed action needs an explicit resolution policy.
+Use foreign keys and small mapping rows for durable ownership and many-to-many relationships.
 
-### Resolve and freeze at schedule time when:
+Do not create lookup tables merely to replace small stable operational columns such as:
 
-- Later edits must not change an already planned communication.
-- Exact historical content must be auditable.
-- Provider-ready retry must not depend on mutable templates.
+```text
+channel
+purpose
+scope
+status
+queue key
+reason code
+```
 
-Persist the final minimal send-ready content.
+Keeping those columns on `scheduled_messages` avoids deep joins in hot gate, claim, and queue queries. This is intentional operational denormalization, not uncontrolled duplication.
 
-### Resolve at send time when:
+### 4. Immutable versions protect historical behavior
 
-- The value does not exist yet.
-- Freshness is required.
-- The latest canonical value is intentionally desired.
+Previously scheduled or sent work must never depend on a mutable template or mutable chain definition.
 
-Persist only:
+Edits create new immutable versions.
 
-- The stable intent/template key
-- The context reference
-- The specific late-bound token names
-- Any required fallback policy
+Existing rows continue to reference the versions they pinned.
 
-Do not persist every available token merely because one token may be late-bound.
+### 5. Separate hot state from large or differently retained state
 
-## Phase 7 — Prioritize high-impact areas
-
-### Priority 1: Scheduled messages
-
-Audit first because they are high-volume and currently show repeated contact, webinar, registration, series, token, and context structures.
-
-Target shape:
-
-- First-class routing/status columns remain.
-- `payload` contains compact provider-ready content and necessary destinations/links.
-- `meta` contains compact behavior, condition, consolidation, consent, provenance, and delivery information.
-- Morph columns identify recipient and context.
-- Avoid whole-model-style nested arrays.
-
-### Priority 2: FlowRoutes snapshots and progress
-
-Review whether route, point, capability, plan, plan item, and progress records duplicate the same definitions across several levels.
-
-Preserve deterministic historical plans, but ensure the snapshot exists at the narrowest correct ownership level.
-
-### Priority 3: Provider raw payloads
-
-Audit:
-
-- Webinar registration provider responses
-- Webhooks
-- Inbound messages
-- Geocoding
-- Commerce providers
-
-Define retention, redaction, and whether raw payloads belong in hot operational tables or an archive.
-
-### Priority 4: Forms
-
-Review overlap among:
-
-- Submission `payload`
-- Submission `raw_payload`
-- Normalized `form_submission_values`
-
-Avoid retaining three complete representations without a defined reason.
-
-### Priority 5: Campaign and broadcast orchestration
-
-Review repeated snapshots, recipient arrays, scheduled-message ID arrays, and source context stored across enrollment, recipient, and message rows.
-
-## Phase 8 — Establish automated guardrails
-
-### Architecture tests
-
-Add tests that reject known bloat patterns in high-volume payloads.
+A separate table is justified when it changes cardinality or retention.
 
 Examples:
 
-- Scheduled-message payload must not contain full `contact`, `webinar`, and `webinar_registration` graphs simultaneously.
-- Payload and metadata may not repeat recipient/context IDs across several nested paths without an approved exception.
-- Provider-ready rows must not contain loaded relationship collections.
+```text
+scheduled_messages
+    narrow hot execution state
 
-### Size-budget tests
+scheduled_message_render_contexts
+    created lazily only when rendering begins
+    retained or pruned under a separate content-history policy
 
-Use representative fixtures and assert reasonable serialized-size budgets.
+webhook_inbox_receipts
+    raw provider payload retained under a provider/debug retention policy
 
-Example concept:
-
-```php
-$this->assertLessThan(4096, strlen(json_encode($scheduledMessage->payload)));
+inbound_messages
+    normalized business record with no copied raw request
 ```
 
-Budgets must be chosen from real workflows, not arbitrary aesthetics. Separate budgets by message type when necessary.
+A one-to-one table that is always created and contains the same old payload is not an improvement.
 
-### Persistence-contract tests
+### 6. Prefer lazy materialization
 
-For each high-volume model, verify:
+A ten-step chain should not automatically create ten future `scheduled_messages` rows per enrollment.
 
-- Required deterministic data is present.
-- Required compliance evidence is present.
-- Derived and duplicate object graphs are absent.
-- Retry still works after related mutable config changes.
-- Historical rows remain readable.
+Normal progression should retain:
 
-### Development diagnostics
+```text
+one message-chain enrollment
+one next-action timestamp
+only the currently actionable step wave
+```
 
-Add optional local logging or metrics for oversized JSON writes. Do not introduce a global production model hook that can unexpectedly block legitimate writes.
+The next wave is materialized after the current step reaches the chain's advancement condition.
 
-A safer approach is a small service used by selected high-volume writers to report:
+### 7. Derived labels and counts remain derived
 
-- Serialized byte count
-- Largest top-level keys
-- Model/table
-- Write path or intent key
+Do not persist:
 
-## Phase 9 — Retention and archival policy
+```text
+chain message count
+human-readable timing summaries
+catalog breadcrumb labels
+template names beside template foreign keys
+current step number beside a current-step foreign key
+campaign key beside a non-null campaign foreign key
+scheduled-message ID arrays where a relationship exists
+```
 
-Trimming new writes is only part of database management.
+Persist a derived value only when a measured hot query or integrity requirement justifies the denormalization.
 
-Define retention separately for:
+## Approved Messaging definition schema
 
-- Pending and retryable messages
-- Sent message content
-- Provider delivery metadata
-- Failed jobs
-- Raw webhook/provider payloads
-- Consent evidence
-- Automation histories
-- Debug-only data
+## `message_templates`
 
-Compliance records may need long retention. Large raw payloads may not.
+Stable editable identity:
 
-Consider:
+```text
+id
+key
+name
+description nullable
+channel
+status
+current_version_id nullable
+source nullable
+source_version nullable
+is_customized
+customized_at nullable
+timestamps
+```
 
-- Keeping compact operational rows in the primary database
-- Moving large historical raw payloads to object storage or archive tables
-- Redacting secrets and signed URLs
-- Pruning expired provider diagnostics
-- Retaining hashes or references where full content is unnecessary
+Rules:
 
-## Phase 10 — Backward compatibility strategy
+- one template is channel-specific;
+- a template does not own timing, chain progression, trigger identity, Campaign identity, Webinar identity, purpose, scope, queue, or conditions;
+- `current_version_id` identifies the version selected for future authoring/runtime resolution;
+- config sync may update non-customized definitions and preserve customized definitions;
+- stable template identity must not depend on a physical config-array position.
 
-Do not require an immediate rewrite of all historical rows.
+No `meta` column is planned.
 
-Recommended migration pattern:
+## `message_template_versions`
 
-1. Make readers tolerate both legacy and compact shapes.
-2. Change new writers to emit the compact contract.
-3. Add metrics to confirm no required behavior is lost.
-4. Backfill only values needed for querying or compatibility.
-5. Optionally archive or compact old rows in a separate maintenance operation.
-6. Remove legacy read support only after the retention horizon permits it.
+Immutable tokenized content:
 
-## Questions that prevent over-trimming
+```text
+id
+message_template_id
+version
+subject nullable
+content
+renderer_key
+renderer_version
+content_hash
+created_by nullable
+created_at
+```
 
-Before removing a field, verify:
+Rules:
 
-- Can a delayed job still execute after the template changes?
-- Can a failed delivery retry without rebuilding from mutable state?
-- Can support explain why the message was sent?
-- Can the system prove which consent authorized delivery?
-- Can the exact customer-facing content be reconstructed where required?
-- Can the operation remain idempotent?
-- Can the row still be queried efficiently?
+- versions are append-only after publication;
+- email subject is first-class and nullable for channels that do not use it;
+- `content` is bounded JSON only where the renderer needs structured content such as body, CTA, secondary link, or footer;
+- SMS may use the same bounded content envelope with a single message field;
+- token usage is derived and validated from subject/content when a version is created;
+- do not persist a duplicate `tokens` JSON allowlist;
+- renderer identity/version is pinned so historical reconstruction does not depend on an unspecified future renderer.
 
-If the answer becomes “no,” the proposed trim is too aggressive or the value must move to a better first-class location.
+A new row is created only when authored content changes.
 
-## Anti-patterns to flag throughout the audit
+## Approved Messaging chain schema
 
-- `model->toArray()` written directly into JSON
-- Loaded relationships persisted unintentionally
-- Entire request payload stored alongside normalized columns
-- Entire config branches copied into every row
-- `tokens`, `context`, and named nested objects containing the same model data
-- IDs repeated at many nesting levels
-- Full signed URLs stored far beyond their useful lifetime
-- Provider secrets or sensitive headers in raw payloads
-- Debug traces in durable `meta`
-- Child rows repeating a snapshot already owned by a parent record
-- Both raw and normalized data retained indefinitely with no policy
-- Large arrays of related IDs where a relationship table already exists
+## `message_chains`
 
-## Expected audit deliverables
+Stable reusable chain identity:
 
-The clean audit thread should produce:
+```text
+id
+key
+name
+description nullable
+status
+current_version_id nullable
+source nullable
+source_version nullable
+is_customized
+customized_at nullable
+timestamps
+```
 
-1. A complete write-site inventory.
-2. A complete data-builder inventory.
-3. A table/model worksheet for every persistence domain.
-4. Runtime size measurements from realistic workflows.
-5. A ranked list of concrete bloat findings.
-6. Proposed compact persistence contracts.
-7. Compatibility and migration plans.
-8. Focused tests and size guardrails.
-9. Retention/archive recommendations.
-10. A phased implementation plan, starting with the highest-volume and highest-duplication paths.
+A chain is a reusable sequence.
 
-## Recommended execution order
+It does not own its business trigger.
 
-1. Inventory only; make no edits.
-2. Audit ScheduledMessage end to end as the pilot.
-3. Agree on persistence-classification language and review format.
-4. Apply the same method to FlowRoutes.
-5. Apply it to remaining modules in domain batches.
-6. Add shared guardrails only after two or more domains prove the pattern.
+Owning modules and FlowRoutes decide when to enroll a recipient.
 
-This approach avoids a one-off scheduled-message cleanup and turns the current observation into a repeatable persistence discipline for the entire platform.
+No `meta` column is planned.
+
+## `message_chain_versions`
+
+Immutable chain behavior:
+
+```text
+id
+message_chain_id
+version
+exit_conditions nullable
+content_hash
+published_at nullable
+created_by nullable
+created_at
+```
+
+`exit_conditions` is low-volume immutable definition data. It is not copied into each enrollment or scheduled message.
+
+Existing enrollments remain pinned to the chain version that was selected when they started.
+
+## `message_chain_steps`
+
+Ordered business moments:
+
+```text
+id
+message_chain_version_id
+key
+name nullable
+sort_order
+timing_type
+anchor_key nullable
+offset_seconds
+advance_policy
+conditions nullable
+is_active
+```
+
+Rules:
+
+- timing is canonicalized into a small fixed shape;
+- client-facing minutes/hours/days may be authoring conveniences, but persistence should use one canonical offset;
+- conditions are definition-level and are evaluated from current context when the step becomes actionable;
+- message count is derived from active steps;
+- no reusable message copy is stored here;
+- no generic `meta` column is planned.
+
+## `message_chain_step_variants`
+
+Channel-specific delivery options:
+
+```text
+id
+message_chain_step_id
+key
+sort_order
+message_template_version_id
+channel
+purpose
+scope
+message_type
+queue nullable
+dependency_policy nullable
+conditions nullable
+is_active
+```
+
+Rules:
+
+- template versions are pinned by the immutable chain version;
+- channel strategies such as `first_available`, `send_all_eligible`, and dependency-aware behavior belong to the chain step/version definition;
+- reusable copy is not duplicated;
+- small routing columns stay first-class because they are operationally useful and avoid expensive hot-path joins;
+- no generic `meta` column is planned.
+
+## Approved chain runtime schema
+
+## `message_chain_enrollments`
+
+One recipient progressing through one immutable chain version:
+
+```text
+id
+message_chain_version_id
+recipient_type
+recipient_id
+context_type nullable
+context_id nullable
+origin_type nullable
+origin_id nullable
+current_message_chain_step_id nullable
+next_action_at nullable
+status
+dedupe_key nullable
+started_at
+paused_at nullable
+resumed_at nullable
+exited_at nullable
+exit_reason_code nullable
+completed_at nullable
+cancelled_at nullable
+timestamps
+```
+
+Rules:
+
+- recipient answers who is moving through the chain;
+- context answers what domain record supplies chain meaning/token context;
+- origin answers which module record or FlowRoute progress item started the enrollment;
+- exit rules remain on the immutable chain version;
+- the enrollment stores the exit result, not a copy of the rules;
+- no `start_context`, `exit_conditions`, or generic `meta` JSON is planned;
+- producer data that cannot be resolved from recipient/context/origin must be introduced through an explicit bounded input contract, not an opaque object dump.
+
+## Lazy progression
+
+The chain runner should normally create only the next actionable variant wave.
+
+Example:
+
+```text
+registration creates chain enrollment
+    no ten-message payload snapshot
+    no ten scheduled-message rows by default
+
+first step becomes actionable
+    eligible variant wave is materialized
+
+wave reaches advancement policy
+    enrollment advances
+    next_action_at is calculated
+```
+
+A workflow may materialize more than one wave only when concurrent independent variants are deliberately required.
+
+## Approved scheduled-delivery schema
+
+## `scheduled_messages`
+
+Compact delivery execution record:
+
+```text
+id
+recipient_type
+recipient_id
+context_type nullable
+context_id nullable
+origin_type nullable
+origin_id nullable
+
+message_template_version_id
+message_chain_enrollment_id nullable
+message_chain_step_variant_id nullable
+
+channel
+purpose
+scope
+message_type
+queue nullable
+
+destination nullable
+send_at
+status
+attempt_count
+dedupe_key nullable
+provider_idempotency_key nullable
+
+sent_at nullable
+skipped_at nullable
+failed_at nullable
+terminal_reason_code nullable
+
+created_at
+updated_at
+```
+
+Rules:
+
+- `message_template_version_id` pins immutable content for every scheduled message, including one-off/direct sends;
+- chain references are nullable because direct messages and Broadcasts may schedule without a chain enrollment;
+- `origin` is the generic creator/business-owner relationship;
+- `context` remains the about-this-record relationship;
+- `destination` is resolved and frozen no later than first provider submission; pending messages may intentionally resolve the latest eligible recipient destination at claim time;
+- `attempt_count` is an allowed small operational counter because claim/retry policy uses it frequently;
+- no `payload`, `dispatch_keys`, `definition_config_path`, or generic `meta` column is planned;
+- provider claim and provider-result details belong to attempts, not this row;
+- the message row stores terminal summary only.
+
+## `scheduled_message_render_contexts`
+
+Irreducible per-delivery values:
+
+```text
+id
+scheduled_message_id unique
+values
+content_hash
+rendered_at
+expires_at nullable
+timestamps
+```
+
+Rules:
+
+- this row is created lazily when provider-ready rendering begins;
+- it contains only token values actually referenced by the pinned template version and optional composed components;
+- it must not contain Eloquent model arrays, loaded relationships, config branches, duplicate context trees, or labels/provenance;
+- messages with no runtime tokens need no row;
+- retries reuse the same frozen render context;
+- retention may differ from the hot scheduled-message row;
+- exact customer-facing content is reconstructed from immutable template version + renderer version + frozen render values.
+
+This one-to-one table is justified because it is not created for every planned row and it has a separate retention/archival boundary.
+
+## `scheduled_message_components`
+
+Optional consolidated content components:
+
+```text
+id
+scheduled_message_id
+message_template_version_id
+role
+intent_key nullable
+message_consent_id nullable
+sort_order
+placement_key nullable
+timestamps
+```
+
+Rules:
+
+- no row is required for the primary template already referenced by `scheduled_messages.message_template_version_id`;
+- rows exist only when additional content is deliberately composed, such as a consent acknowledgement;
+- covered intent and consent identity become relational facts rather than a copied consolidation recipe;
+- component content is immutable through its template-version FK;
+- no generic `meta` column is planned.
+
+## `scheduled_message_delivery_attempts`
+
+Attempt-specific state:
+
+```text
+id
+scheduled_message_id
+attempt_number
+claim_token
+status
+claimed_at
+lease_expires_at
+provider_submission_started_at nullable
+completed_at nullable
+destination
+provider nullable
+provider_message_id nullable
+reason_code nullable
+reason nullable
+timestamps
+```
+
+Rules:
+
+- claim leases and provider outcomes live here;
+- `scheduled_messages` does not duplicate claim token, claim expiry, submission time, provider, provider message ID, or attempt reason;
+- provider idempotency remains stable on the scheduled message when it identifies one logical delivery;
+- provider-specific raw responses do not go into generic attempt metadata;
+- a dedicated provider-evidence table or object-store reference requires a proven support/replay need and retention policy.
+
+## `scheduled_message_outbox_events`
+
+Keep the current bounded terminal outbox pattern.
+
+It is operational, narrow, and one-row-per-message-event.
+
+Do not add rendered content or module snapshots to it.
+
+## Template and chain editing rules
+
+### Editing a template
+
+```text
+save draft/publish
+    create a new immutable MessageTemplateVersion
+    update MessageTemplate.current_version_id for future selection
+    do not rewrite existing chain versions
+    do not rewrite existing ScheduledMessages
+```
+
+### Editing a chain
+
+```text
+save draft/publish
+    create a new immutable MessageChainVersion and child steps/variants
+    pin selected MessageTemplateVersion IDs
+    update MessageChain.current_version_id for future enrollments
+    do not rewrite existing enrollments or scheduled messages
+```
+
+### Duplicating a chain
+
+```text
+create one new MessageChain identity
+create one new MessageChainVersion
+copy small step/variant definitions
+reuse existing immutable MessageTemplateVersion IDs initially
+create new template/version rows only when copy is customized
+```
+
+This is copy-on-write.
+
+Copying a dozen small relationship/definition rows is not database bloat. Copying full message payloads into every recipient execution row is.
+
+## Module cutover contracts
+
+## Campaigns
+
+Target:
+
+```text
+Campaign
+    owns campaign identity, activation, audience/enrollment intent, reporting
+
+Campaign.message_chain_id
+    selects the reusable chain for new Campaign enrollments
+
+CampaignEnrollment
+    thin Campaign-specific wrapper/correlation record
+
+MessageChainEnrollment
+    owns sequence progression and message execution
+```
+
+After cutover:
+
+- Campaign steps and variants move into generic immutable chain versions.
+- Campaign enrollment does not copy chain exit rules or start payloads.
+- Campaign deactivation cancels active chain enrollments and skips pending scheduled deliveries through Messaging public actions.
+- Campaign-specific reporting remains Campaign-owned.
+
+## Broadcasts
+
+Target:
+
+```text
+Broadcast
+    owns one-time send identity, channel, recipient filter, schedule, status
+    references one private or reusable MessageTemplate
+
+published Broadcast
+    pins one MessageTemplateVersion
+
+BroadcastRecipient
+    stores one nullable scheduled_message_id for the current single-channel contract
+```
+
+After cutover:
+
+- Broadcast payload JSON is removed.
+- Broadcast recipient scheduled-message ID arrays are removed.
+- Delivery-result metadata is replaced by direct status/reason columns and the scheduled-message relationship.
+- `recipient_filter` remains bounded low-volume Broadcast definition data.
+
+## Webinars
+
+Target:
+
+```text
+Webinars
+    owns trigger bindings from registration/waitlist/attendance outcomes to MessageChains
+
+MessageChain
+    owns reusable timing, step, variant, and exit behavior
+
+Messaging templates
+    own immutable copy
+
+MessageChainEnrollment
+    owns each registration/outcome chain instance
+```
+
+After cutover:
+
+- Webinar schedule profiles/items are replaced by generic message chains/versions/steps.
+- Webinar series/occurrence selections become module-owned chain bindings.
+- registration, waitlist, attended, and missed outcomes start the selected chains.
+- Webinars does not copy profile, area, template, or condition descriptions into scheduled-message metadata.
+
+## FlowRoutes
+
+FlowRoutes remains the cross-module trigger/control-flow owner.
+
+Route authoring may:
+
+```text
+send one Messaging template
+start one Messaging message chain
+start or stop one Campaign
+```
+
+FlowRoutes stores stable template/chain identity in Point definition data. Each execution pins the then-selected immutable version.
+
+Messaging scheduled rows use the generic `origin` morph for the creating FlowRoute progress item. Messaging does not add a repeated bundle of FlowRoutes foreign keys.
+
+## Inbound messaging and provider receipts
+
+Raw provider webhook content is stored once in `webhook_inbox_receipts.payload`.
+
+Target normalized inbound persistence:
+
+```text
+inbound_messages
+    webhook_inbox_receipt_id nullable
+    sender morph
+    normalized provider/message identity
+    normalized from/to/body/classification/purpose/scope/timestamps
+    no raw request copy
+    no generic meta
+
+provider event/message hash keys
+    unique on inbound_messages
+    replace the separate duplicate inbound receipt identity when all paths use the canonical ingestion boundary
+```
+
+Suppression and consent-revocation rows retain:
+
+```text
+provider
+source_event_id
+normalized reason/source
+required compliance evidence
+```
+
+They do not copy the full email webhook `data` object already retained by the webhook inbox.
+
+Raw webhook retention must be explicit and may be shorter than normalized business/compliance records.
+
+## Consent and compliance history
+
+Consent grants, revocations, and suppressions are not high-priority deletion targets merely because they repeat channel/purpose/scope.
+
+Those rows preserve append-style compliance truth.
+
+The audit should still:
+
+- remove copied raw provider events from generic metadata;
+- replace frequently queried metadata keys with first-class columns;
+- document retention;
+- preserve IP/user-agent evidence only when policy requires it;
+- avoid storing the same acknowledgement content on consent and delivery rows.
+
+## Index and query policy
+
+Every high-volume table needs indexes derived from actual query paths.
+
+Required initial hot-path index families include:
+
+```text
+scheduled_messages
+    status + send_at
+    queue + status + send_at
+    recipient morph + status
+    context morph + message_type
+    origin morph
+    message_chain_enrollment_id + message_chain_step_variant_id
+    dedupe_key unique where applicable
+    provider_idempotency_key unique where applicable
+
+message_chain_enrollments
+    status + next_action_at
+    recipient morph + status
+    context morph
+    origin morph
+    message_chain_version_id + status
+    dedupe_key unique where applicable
+
+scheduled_message_delivery_attempts
+    scheduled_message_id + attempt_number unique
+    status + lease_expires_at
+    claim_token unique
+
+inbound_messages
+    provider event/message identity keys unique
+    sender morph + classification
+    received_at
+```
+
+Do not add indexes for every available column.
+
+Each secondary index increases storage, write amplification, buffer-pool pressure, backup size, and DDL cost.
+
+Use `EXPLAIN` and production-shaped queries to justify indexes.
+
+## Hot and historical data
+
+Status and time indexes should keep ordinary operational queries inside the active working set.
+
+Likely retention tiers:
+
+```text
+hot
+    pending/sending/retryable scheduled messages
+    active chain enrollments
+    recent terminal deliveries
+    current delivery attempts
+
+historical
+    old terminal delivery summaries
+    older render contexts where exact reconstruction is still required
+    older provider attempts
+
+raw/diagnostic
+    webhook payloads
+    provider evidence
+```
+
+Do not introduce partitioning merely because a table may become large.
+
+Consider date partitioning or archival only when:
+
+- the table has substantial measured volume;
+- most queries restrict by the partition key;
+- retention can drop/archive whole ranges;
+- operational and uniqueness constraints remain practical.
+
+## DDL, backup, and restore policy
+
+The architecture must account for whole-table operations before tables become enormous.
+
+Before production rollout:
+
+- keep high-volume row shapes narrow;
+- avoid unnecessary secondary indexes;
+- consolidate branch migrations while the project is pre-production;
+- measure migration temporary-space needs;
+- avoid late table rebuilds that merely remove obviously redundant JSON;
+- establish backup/restore timing and free-space requirements;
+- define raw payload/render-context retention before those tables accumulate indefinitely.
+
+Deleting rows is not a substitute for an archival and space-reclamation plan. InnoDB files may not shrink automatically after deletion.
+
+## Anti-shuffling rules
+
+Reject any design that:
+
+- renames `scheduled_messages.payload` to `scheduled_message_payloads.payload` and creates one row for every message;
+- moves the current full `meta` object into a one-to-one metadata table;
+- creates one row per token value when one bounded render-context JSON document is smaller and clearer;
+- stores the same template content in templates, chain steps, broadcasts, and scheduled messages;
+- stores the same chain rules in chain versions, enrollments, and scheduled messages;
+- creates every future scheduled message at enrollment time without a real concurrent-send requirement;
+- copies raw webhook payloads into inbound messages, suppressions, consent revocations, and automation events;
+- stores IDs, keys, names, labels, config paths, and full snapshots for the same relationship;
+- adds generic `meta` to new high-volume tables as a compatibility escape hatch;
+- treats normalization as an excuse for unbounded join depth on every hot query.
+
+## Implementation sequence
+
+### Batch 0 — Documentation
+
+Complete in this batch:
+
+- lock the target persistence architecture;
+- document MySQL-informed design rules;
+- document module ownership and cutover boundaries;
+- mark current preset/profile/step persistence as transitional.
+
+### Batch 1 — Migrations and models
+
+Next batch:
+
+- replace pre-production migrations rather than add compatibility alters;
+- add template/version models;
+- add chain/version/step/variant/enrollment models;
+- reshape scheduled-message, render-context, component, attempt, Broadcast, Campaign, Webinar binding, and inbound models;
+- add factories and schema/model tests only;
+- do not switch runtime writers yet.
+
+### Runtime batches
+
+Then proceed incrementally:
+
+1. template/version sync and editing;
+2. compact direct scheduling and rendering;
+3. delivery claim/attempt cutover;
+4. message-chain runner;
+5. Campaign cutover;
+6. Webinar cutover;
+7. Broadcast cutover;
+8. FlowRoutes template/chain actions;
+9. inbound/webhook normalization cleanup;
+10. historical import/backfill and legacy reader removal.
+
+Each runtime batch should be small enough to prove behavior and row-size effects before continuing.
+
+## Acceptance targets
+
+### Definition cardinality
+
+```text
+editing one template
+    creates one template version
+
+editing one chain
+    creates one chain version plus small child definition rows
+
+duplicating one chain
+    creates no recipient/runtime rows
+    creates no copied template content until copy is customized
+```
+
+### Webinar registration example
+
+For a ten-step registration chain:
+
+```text
+one MessageChainEnrollment
+zero or one currently actionable ScheduledMessage wave under normal progression
+no copied template body
+no copied chain conditions
+no copied catalog/profile labels
+no generic ScheduledMessage metadata
+render context created only when rendering begins
+```
+
+### Scheduled-message row budget
+
+The hot scheduled row should consist almost entirely of fixed-width IDs/timestamps/status fields plus small classification/destination strings.
+
+No JSON columns are planned on `scheduled_messages`.
+
+### Persistence tests
+
+Required future tests:
+
+- immutable template edit does not alter existing scheduled delivery;
+- immutable chain edit does not alter existing enrollment;
+- chain duplication reuses template versions until copy changes;
+- repeated template saves do not create unrelated assignments/catalog snapshots;
+- only next actionable chain wave is materialized;
+- scheduled rows contain no payload/meta/config snapshots;
+- render context contains only referenced token values;
+- retries reuse the same render context and destination;
+- Broadcast content is stored once;
+- Campaign enrollment does not copy chain rules;
+- Webinar dispatch creates chain enrollment rather than all future payload rows;
+- inbound normalized rows do not contain raw webhook data;
+- raw provider content appears in one canonical receipt only.
+
+## Remaining measurement work
+
+The target architecture is approved, but actual implementation must still measure:
+
+```text
+average and p95 template-version content size
+average and p95 render-context size
+scheduled rows created per workflow before and after lazy materialization
+secondary-index size on scheduled_messages and chain enrollments
+backup/restore and migration temporary-space requirements
+raw webhook retention volume
+```
+
+Those measurements may tune indexes and retention.
+
+They should not reopen the core ownership decision unless they reveal a correctness problem.

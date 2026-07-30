@@ -1,4 +1,3 @@
-
 # Engage Core Client-Readiness Roadmap
 
 ## Config generation lock-in checkpoint
@@ -165,10 +164,11 @@ deferred product work
     generated Webinar URL scheme verification
 
 architecture safety work
-    system-wide model-creation and persistence-bloat audit
+    Messaging persistence migrations and models
+    incremental runtime cutover after the persistence foundation exists
 ```
 
-The persistence audit remains documented in [System-Wide Model Creation and Persistence Bloat Audit](model-persistence-bloat-audit.md). Compact persistence is not considered fully verified.
+The cross-module persistence audit is complete enough to lock the target architecture in [System-Wide Model Creation and Persistence Bloat Audit](model-persistence-bloat-audit.md). The next implementation slice is migrations and models only; the current runtime remains transitional until later cutover batches replace copied payload and metadata persistence.
 
 ## Messaging, consent, and Rob Webinar production-prep completion
 
@@ -229,8 +229,8 @@ MessageSendTimeResolver
 
 Delayed-message conditions
     checked during planning
-    persisted with ScheduledMessage metadata
-    rechecked by ScheduledMessageGate before provider delivery
+    currently copied into ScheduledMessage metadata
+    target architecture keeps them on immutable chain steps and re-evaluates them without copying definition data into every execution row
 ```
 
 The generic registration consent-domain and delivery-consolidation behavior has now been re-verified through a fresh Slam Dunk runtime smoke test.
@@ -268,7 +268,7 @@ Completed architecture correction before deeper UX polish:
 - `ResolvedMessageDispatch` carries the exact `send_at` and normalized generic dispatch contract.
 - `ScheduledMessage` supports polymorphic `behavior_owner` provenance without importing concrete feature modules into Messaging.
 - Missing module-owned behavior does not silently fall back to hidden template timing or implicit immediate delivery. Dispatch requires either an exact caller-owned `sendAt` or explicit caller-owned behavior.
-- Resolved lifecycle conditions are persisted into `ScheduledMessage.meta.conditions` and rechecked by `ScheduledMessageGate` immediately before provider delivery.
+- The current runtime copies resolved lifecycle conditions into `ScheduledMessage.meta.conditions`; the approved target keeps canonical conditions on immutable message-chain steps and re-evaluates them without copying definition data into every execution row.
 - Webinar scheduling supports `next_day_at(time = HH:MM)` using client timezone; post-event follow-ups can anchor to `webinar.ends_at` so delayed provider processing does not shift the intended next-morning date.
 
 Completed runway pieces:
@@ -287,12 +287,15 @@ Completed runway pieces:
 - FlowRoutes event-wait/task-completed resume behavior on top of route plan/progress item correlation.
 - `task.completed` resume through the generic `AutomationEventRecorded` seam without broad contact-only fallback.
 
-Remaining near-term candidates:
+Remaining near-term sequence:
 
-- Immediate system-wide model-creation and persistence-bloat audit, beginning with `ScheduledMessage` and Webinar message-data producers.
-- Routes / FlowRoutes product completion: new Route creation, remaining authoring gaps, consequence previews, and contextual suggestions.
-- Dashboard / contact workspace polish audit after the main runtime and route-management work settles.
-- FOSS-informed module schema audit before production rollout.
+1. Add the approved Messaging persistence migrations and models without changing runtime behavior.
+2. Cut template sync and editing over to immutable template versions.
+3. Cut direct scheduled-message creation over to compact references and lazy render contexts.
+4. Move claim/provider attempt state fully into delivery-attempt rows.
+5. Add the generic message-chain runner with version-pinned enrollments and lazy next-wave materialization.
+6. Migrate Campaigns, Webinars, Broadcasts, FlowRoutes, and InboundMessaging incrementally.
+7. Resume Routes / FlowRoutes product completion, dashboard/contact polish, and broader module-schema audits after the persistence-sensitive cutovers stabilize.
 
 Completed in the current client-readiness sequence:
 
@@ -302,6 +305,56 @@ Completed in the current client-readiness sequence:
 - Backend manual status-change automation impact preview.
 
 The remaining runway pieces should continue to be implemented as durable client-readiness work, not as smoke-test shortcuts.
+
+
+## Messaging persistence refactor sequence
+
+The architecture documentation phase is complete. The approved target is:
+
+```text
+stable MessageTemplate identity
+    -> immutable MessageTemplateVersion content
+
+stable MessageChain identity
+    -> immutable MessageChainVersion
+    -> ordered MessageChainStep / MessageChainStepVariant definitions
+
+MessageChainEnrollment
+    -> pins one chain version
+    -> tracks only compact runtime progression
+
+ScheduledMessage
+    -> compact execution identity and terminal summary
+    -> pins immutable content/chain references
+    -> contains no generic payload or meta JSON
+
+ScheduledMessageRenderContext
+    -> created only when rendering begins
+    -> contains only token values referenced by the pinned version
+    -> has a separate retention policy
+
+ScheduledMessageDeliveryAttempt
+    -> owns claim leases, provider submission, and attempt outcomes
+```
+
+The refactor must reduce cardinality as well as row width. Message chains materialize only the next actionable step wave under normal sequential execution; they do not create every future delivery at enrollment time. Template and chain edits create immutable versions only when authored definitions change, not records proportional to recipients.
+
+The implementation order is intentionally separated:
+
+```text
+1. migrations and models only
+2. template/version sync and editor cutover
+3. compact direct scheduling and render-context cutover
+4. delivery-attempt ownership cutover
+5. generic chain runner and lazy materialization
+6. Campaigns cutover
+7. Webinars cutover
+8. Broadcasts cutover
+9. FlowRoutes direct-template/chain cutover
+10. InboundMessaging raw-payload cleanup
+```
+
+Current Messaging config templates remain executable legacy authoring examples until the corresponding runtime readers are migrated. Do not update those templates ahead of runtime support merely to make documentation look internally uniform.
 
 ## Pre-prod schema-discovery ordering lens
 
@@ -321,8 +374,8 @@ Current schema-discovery sequence:
 
 | Phase | Item | Status | Primary discovery risk | Notes |
 | -: | --- | --- | --- | --- |
-| 1 | Webinar schedule profiles | Complete | DB/schema | DB-owned webinar schedule profiles/items exist. Series/webinars can select profiles with fallback. Webinars owns timing/slot identity. Messaging owns reusable copy/templates. Schedule/profile/template identity belongs in metadata; broader scheduled-payload duplication is now under immediate persistence audit. |
-| 2 | Campaign channel variants | Complete | DB/schema | DB-owned campaign step variants exist. Campaign enrollment is lifecycle, campaign step is the business moment, and campaign step variant is the channel-specific delivery option. Variant strategy and dependency-aware scheduling are hardened. Campaign payload/meta persistence remains subject to the system-wide persistence audit rather than assumed compact. |
+| 1 | Webinar schedule profiles | Complete but transitional | DB/schema | DB-owned webinar schedule profiles/items currently provide schedule selection. The approved Messaging target replaces their message-orchestration role with versioned message chains and removes repeated profile/template identity from scheduled-message metadata. |
+| 2 | Campaign channel variants | Complete but transitional | DB/schema | Current variants provide working channel strategy and dependency behavior. The approved target migrates reusable sequencing into versioned Messaging chains while Campaigns keeps campaign identity, activation, audience intent, and reporting. |
 | 3 | Task templates / task defaults | Complete | DB/schema | DB-owned reusable `task_templates` exist. Phase 3 established due offsets, assignment strategy, responsibility, and the then-current single related-subject defaults. Phase 12 supersedes that relationship shape with zero-to-many TaskLinks and requires automation-created Tasks to be template-backed. |
 | 4A | FlowRoutes relationship, capability, and instance-plan audit | Complete | DB/schema + architecture | Audit confirmed that future subject-scoped route instance adjustment and durable capability discovery are guaranteed requirements before production. FlowRoutes should harden schema now instead of relying on meta-heavy execution/correlation. |
 | 4B | FlowRoutes schema hardening | Complete | DB/schema + architecture | Subject-scoped route progress, contact route plans, plan items, progress/execution items, capability catalog/bindings, created-artifact tracking/correlation, blocked/cancelled runtime handling, provenance/debug consistency, and boundary guardrails are in place. Phase 12 revises the Tasks-specific direct FlowRoutes provenance coupling. |
@@ -335,7 +388,9 @@ Current schema-discovery sequence:
 | 11 | Automation opportunity foundation + Routes / FlowRoutes UX | In progress; backend, preset architecture, and first Route authoring baseline complete | DB/schema + architecture + UI/UX | Automation Opportunities, global Point collapse, module-first preset contributions, Manage Routes/Assignments IA, modal Route/Point editing, drag ordering, explicit Route message eligibility, linear product boundaries, and Point placement policy are complete. Remaining work is new Route creation and focused authoring/discovery UX gaps. |
 | 12 | Standalone and multi-link Tasks | Complete | DB/schema + architecture + UI foundation | Zero-to-many TaskLinks, unlinked/Contact/non-Contact/multi-link Tasks, template/manual/automation invariants, dedicated Task index/show, Core-only operation, optional assignment/notification seams, FlowRoutes-owned Task correlation, module-contributed Point definition/action/authoring architecture, and full-suite green verification are complete. |
 | Next docs | Reporting foundation audit and durable module contract | Planned next documentation branch | Architecture + schema discovery | Expand the minimal Reporting documentation before implementation. Use FOSS feature shapes as reference, keep Reporting optional/independent, lock privacy/identity/retention/attribution boundaries, and define the first Webinar traffic/conversion report. |
-| Immediate | System-wide model creation and persistence-bloat audit | Planned next | Cross-module DB/payload audit | Inventory every create/update path, measure real row sizes, classify durable vs redundant data, and begin with ScheduledMessage/Webinar payload duplication. See `docs/model-persistence-bloat-audit.md`. |
+| 15A | Messaging persistence architecture documentation | Complete | Architecture/schema | The target versioned-template, versioned-chain, compact scheduled-message, lazy render-context, delivery-attempt, and module-cutover contracts are locked in `docs/model-persistence-bloat-audit.md` and the affected module references. |
+| 15B | Messaging persistence migrations and models | Next | DB/schema | Add the target tables and model relationships only. Do not cut runtime writers over in the same batch. |
+| 15C | Messaging runtime cutover | Planned incremental | Runtime/data migration | Move template sync/editing, compact scheduling/rendering, attempts, chains, and consuming modules in separately testable batches. |
 | 13 | Dashboard / contact workspace polish audit | Planned | UI/UX + possible schema | Review orientation surfaces after core runtime pieces settle. Add persisted preferences/acknowledgements only when needed. |
 | 14 | FOSS-informed module schema audit | Planned | DB/schema audit | Compare Engage Core modules against mature FOSS patterns to identify likely missing persisted concepts before production. Pull FlowRoutes-specific FOSS/OSS pattern review earlier into Phase 4 if helpful. |
 
@@ -661,7 +716,9 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | 11 | Automation opportunity foundation + Routes / FlowRoutes UX | In progress; first authoring baseline complete | Shared opportunity persistence/evaluation and the current Routes management/editor baseline are complete. Remaining focused Routes work continues after the schema-sensitive Task slice. |
 | 12 | Standalone and multi-link Tasks | Complete | Task is one generic live work record across template/no-template, zero-to-many domain links, and manual/automation origin. TaskLinks, dedicated index/show, Core-only operation, generic linked-record presentation, Tasks/FlowRoutes boundary correction, and contributor-driven FlowRoutes Point architecture are complete and green. |
 | Next docs | Reporting foundation audit and module documentation | 1 focused documentation/audit branch | Do not implement immediately. Audit current observability/reporting inputs, define privacy-first first-party collection and attribution contracts, then produce the durable Reporting module plan. |
-| Immediate | System-wide model creation and persistence-bloat audit | Multi-session, split by model/domain | Treat as the next architecture audit, not deferred backlog. Inventory/measure all write paths and start with ScheduledMessage/Webinar payload duplication. |
+| 15A | Messaging persistence architecture documentation | Complete | The cross-module write-path audit and target persistence architecture are documented. |
+| 15B | Messaging persistence migrations and models | Next focused batch | Add only schema/model foundations for immutable templates, chains, compact executions, render contexts, components, and attempts. |
+| 15C | Messaging runtime cutover | Multi-session, incremental | Cut over writers/readers one boundary at a time; do not combine template, chain, Campaign, Webinar, Broadcast, FlowRoutes, and inbound changes into one batch. |
 | 13 | Dashboard / contact workspace polish audit | 1–2 sessions | Review shared orientation surfaces after runtime behavior settles. Add persisted state only for proven needs such as acknowledgements or preferences. |
 | 14 | FOSS-informed module schema audit | 2–6 sessions, split by module group | Compare Engage Core module tables against mature FOSS patterns to catch likely missing persisted concepts before production. |
 | Deferred | DB Snapshot / Export Safety Tool | 0.5–1.5 sessions near launch | Command-line SQL/JSONL snapshot tooling for production/launch hardening. Do not build during active pre-prod schema discovery unless real data preservation becomes necessary. |
@@ -734,9 +791,9 @@ Completed baseline:
 
 Completed baseline:
 
-- Messaging owns DB-backed reusable `MessageTemplatePreset` records for synced/editable message copy.
+- Messaging currently owns DB-backed `MessageTemplatePreset` records; these are transitional and will migrate to stable `MessageTemplate` identities plus immutable `MessageTemplateVersion` rows.
 - Messaging owns `MessageTemplateCatalogEntry` records for template browser organization by channel, purpose, module/area, group, and item.
-- Messaging owns `MessageTemplatePresetAssignment` records for selected runtime template behavior.
+- Messaging currently owns `MessageTemplatePresetAssignment` records; the target removes broad assignment/catalog indirection where direct chain-step or owner references can enforce the same selection more clearly.
 - Template sync creates presets, catalog entries, and default assignments from message configs.
 - Normal sync preserves customized template copy and selected assignments unless forced.
 - Runtime resolution can prefer selected DB templates before config fallback.
@@ -754,12 +811,12 @@ Completed baseline:
 - Profiles can be selected at the webinar series or webinar level, with an active default fallback.
 - Generic schedule resolution supports `delay(minutes)`, `anchored(minutes)`, and `next_day_at(time = HH:MM)`.
 - `next_day_at` uses client timezone; Webinar post-event follow-ups may anchor to `webinar.ends_at`.
-- Resolved lifecycle conditions persist into ScheduledMessage metadata and are rechecked immediately before provider delivery.
+- Current resolved lifecycle conditions persist into ScheduledMessage metadata; the target keeps them on immutable chain definitions and rechecks them without copying them into each execution row.
 - Schedule profile items reference stable runtime dimensions such as channel, purpose, scope, surface, message type, dispatch key, and `message_template_key`. `source_config_path` is provenance/debug location only.
 - Multiple reminder slots may share `message_type = reminder`; the schedule profile item key owns the Webinar lifecycle slot, while `message_template_key` identifies the reusable Messaging template. `source_config_path` is provenance only.
 - Existing scheduled messages are not rewritten retroactively when a profile or template assignment changes.
 - Webinar schedule-profile identity belongs in scheduled-message metadata, not as a hydrated profile/items object graph inside `scheduled_messages.payload`.
-- Existing payload-shape tests protect some profile-graph boundaries, but a fresh runtime dump still showed repeated Contact/Webinar/registration snapshots across payload, token, and context branches. Full compactness is therefore not considered verified until the system-wide persistence audit is complete.
+- A fresh runtime dump proved repeated Contact/Webinar/registration content across payload, token, context, and metadata branches. The approved persistence architecture addresses that by pinning immutable definitions and storing only bounded, late-created render context.
 
 ### Webinars message/template setup and readiness
 
@@ -796,7 +853,7 @@ Completed baseline:
 - Variants reference Messaging-owned templates/assignments through channel, purpose, scope, campaign key, step number, and optional variant context.
 - Variants do not own reusable subject/body/message copy.
 - Existing single-channel campaign step configs sync into a default variant for compatibility while the DB-owned variant model becomes the durable runtime shape.
-- Campaign/step/variant/template identity should remain compact and belongs in `scheduled_messages.meta`; Campaign-generated rows must be measured in the system-wide persistence audit rather than assumed compact.
+- Campaign/step/variant/template identity must not be copied into `scheduled_messages.meta`; target rows use first-class enrollment, chain-step, template-version, context, and origin references.
 
 ### FlowRoute trigger bindings and CRM selection UI
 
@@ -1074,7 +1131,7 @@ The next branch is a **Reporting foundation documentation and audit branch**. Re
 
 The Reporting documentation must keep Reporting optional, independent, privacy-first, and malleable. It should use mature FOSS analytics/reporting systems only as feature-shape references, audit current first-party/server observability inputs, define event/identity/attribution/correlation and retention boundaries, and specify the first Webinar traffic-to-registration/conversion report.
 
-The next implementation safety audit remains the **system-wide model creation and persistence-bloat audit**. Reporting schema/collection work should not begin by copying the current oversized payload patterns into a new analytics store.
+The Messaging persistence architecture audit is complete. The next implementation safety target is the **migrations-and-models foundation** defined by `docs/model-persistence-bloat-audit.md`. Reporting schema/collection work must not copy current oversized payload patterns into a new analytics store.
 
 **Phase 12 — Standalone and multi-link Tasks is complete.** The focused and full automated suites are green after the Task generalization and the expanded FlowRoutes contributor refactor.
 
@@ -1127,9 +1184,9 @@ AutomationActionPointHandler
 
 Normal `create_task` authoring is deliberately opinionated: it requires an active Task Template, explains that a new Task is created every time execution reaches the Point, and does not expose a title-only one-time-looking automation path.
 
-After the Reporting documentation/audit locks the module boundary and phased plan, the next implementation safety target is the **system-wide model creation and persistence-bloat audit** documented in `docs/model-persistence-bloat-audit.md`.
+After the Reporting documentation/audit locks the module boundary and phased plan, the next implementation safety target is the **Messaging persistence migrations-and-models foundation** documented in `docs/model-persistence-bloat-audit.md`.
 
-That audit remains ahead of broad Reporting persistence or Phase 13 implementation because the fresh registration runtime dump disproved the assumption that all scheduled-message payload paths are already compact. The Reporting plan should reference that constraint rather than inventing a second unmeasured persistence layer.
+The fresh registration runtime dump disproved the assumption that scheduled-message payload paths were compact. Reporting must therefore consume the new normalized execution/history seams after cutover rather than inventing a second unmeasured persistence layer.
 
 The locked Route boundary remains:
 
