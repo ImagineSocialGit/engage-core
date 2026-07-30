@@ -520,14 +520,23 @@
 │   │   │   ├── Models
 │   │   │   │   ├── ConsentRevocation.php
 │   │   │   │   ├── ContactPermissionInvitation.php
+│   │   │   │   ├── MessageChainEnrollment.php
+│   │   │   │   ├── MessageChain.php
+│   │   │   │   ├── MessageChainStep.php
+│   │   │   │   ├── MessageChainStepVariant.php
+│   │   │   │   ├── MessageChainVersion.php
 │   │   │   │   ├── MessageConsent.php
 │   │   │   │   ├── MessageSuppression.php
 │   │   │   │   ├── MessageTemplateCatalogEntry.php
+│   │   │   │   ├── MessageTemplate.php
 │   │   │   │   ├── MessageTemplatePresetAssignment.php
 │   │   │   │   ├── MessageTemplatePreset.php
+│   │   │   │   ├── MessageTemplateVersion.php
+│   │   │   │   ├── ScheduledMessageComponent.php
 │   │   │   │   ├── ScheduledMessageDeliveryAttempt.php
 │   │   │   │   ├── ScheduledMessageOutboxEvent.php
-│   │   │   │   └── ScheduledMessage.php
+│   │   │   │   ├── ScheduledMessage.php
+│   │   │   │   └── ScheduledMessageRenderContext.php
 │   │   │   ├── Payloads
 │   │   │   │   ├── EmailPayload.php
 │   │   │   │   ├── Internal
@@ -1290,6 +1299,8 @@
 │   │   ├── 2026_07_21_180100_create_bookable_slot_offers_table.php
 │   │   ├── 2026_07_21_180101_create_booking_holds_table.php
 │   │   ├── 2026_07_22_160000_create_webinar_registration_responses_table.php
+│   │   ├── 2026_07_30_224000_create_message_template_and_chain_tables.php
+│   │   ├── 2026_07_30_224001_create_message_chain_runtime_support_tables.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -1850,4 +1861,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-500 directories, 1351 files
+500 directories, 1362 files
