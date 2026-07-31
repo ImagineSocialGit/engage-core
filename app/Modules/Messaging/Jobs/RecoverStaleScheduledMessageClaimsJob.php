@@ -33,35 +33,35 @@ class RecoverStaleScheduledMessageClaimsJob implements ShouldBeUnique, ShouldQue
 
         $this->reportQueueProblems($queueContract);
 
-        $recoverStaleClaims->handle();
+        $result = $recoverStaleClaims->handle();
 
-        ScheduledMessage::query()
-            ->where('status', ScheduledMessage::STATUS_PENDING)
-            ->whereNotNull('recovered_at')
-            ->orderBy('recovered_at')
-            ->orderBy('id')
-            ->limit($deliveryPolicy->recoveryBatchSize())
-            ->get()
-            ->each(function (ScheduledMessage $message) use ($queueContract): void {
-                try {
-                    $queue = $queueContract->assertDispatchable($message->queue);
-                } catch (InvalidArgumentException $exception) {
-                    Log::critical(
-                        'Recovered ScheduledMessage was blocked from invalid queue redispatch.',
-                        [
-                            'scheduled_message_id' => $message->getKey(),
-                            'queue' => $message->queue,
-                            'reason' => $exception->getMessage(),
-                        ],
-                    );
+        foreach ($result['requeued'] as $message) {
+            $this->dispatchRecovered($message, $queueContract);
+        }
+    }
 
-                    return;
-                }
+    private function dispatchRecovered(
+        ScheduledMessage $message,
+        QueueContract $queueContract,
+    ): void {
+        try {
+            $queue = $queueContract->assertDispatchable($message->queue);
+        } catch (InvalidArgumentException $exception) {
+            Log::critical(
+                'Recovered ScheduledMessage was blocked from invalid queue redispatch.',
+                [
+                    'scheduled_message_id' => $message->getKey(),
+                    'queue' => $message->queue,
+                    'reason' => $exception->getMessage(),
+                ],
+            );
 
-                SendScheduledMessageJob::dispatch(
-                    (int) $message->getKey(),
-                )->onQueue($queue);
-            });
+            return;
+        }
+
+        SendScheduledMessageJob::dispatch(
+            (int) $message->getKey(),
+        )->onQueue($queue);
     }
 
     private function reportQueueProblems(QueueContract $queueContract): void
@@ -88,8 +88,7 @@ class RecoverStaleScheduledMessageClaimsJob implements ShouldBeUnique, ShouldQue
                 continue;
             }
 
-            if (
-                $queueContract->hasHorizonEnvironmentConfiguration()
+            if ($queueContract->hasHorizonEnvironmentConfiguration()
                 && ! $queueContract->isConsumed($resolvedQueue)
             ) {
                 $unconsumedPendingQueues[$resolvedQueue] = $count;
@@ -107,8 +106,7 @@ class RecoverStaleScheduledMessageClaimsJob implements ShouldBeUnique, ShouldQue
             ->where('send_at', '<=', $overdueBefore);
         $overdueCount = (clone $overdueQuery)->count();
 
-        if (
-            $contractIssues === []
+        if ($contractIssues === []
             && $unsupportedPendingQueues === []
             && $unconsumedPendingQueues === []
             && $overdueCount === 0
@@ -116,20 +114,23 @@ class RecoverStaleScheduledMessageClaimsJob implements ShouldBeUnique, ShouldQue
             return;
         }
 
-        Log::critical('Messaging queue audit detected a queue contract violation.', [
-            'environment' => $queueContract->environment(),
-            'contract_issues' => $contractIssues,
-            'unsupported_pending_queues' => $unsupportedPendingQueues,
-            'unconsumed_pending_queues' => $unconsumedPendingQueues,
-            'overdue_pending_count' => $overdueCount,
-            'overdue_pending_ids' => (clone $overdueQuery)
-                ->orderBy('id')
-                ->limit(25)
-                ->pluck('id')
-                ->map(fn (mixed $id): int => (int) $id)
-                ->all(),
-            'overdue_before' => $overdueBefore->toISOString(),
-        ]);
+        Log::critical(
+            'Messaging queue audit detected a queue contract violation.',
+            [
+                'environment' => $queueContract->environment(),
+                'contract_issues' => $contractIssues,
+                'unsupported_pending_queues' => $unsupportedPendingQueues,
+                'unconsumed_pending_queues' => $unconsumedPendingQueues,
+                'overdue_pending_count' => $overdueCount,
+                'overdue_pending_ids' => (clone $overdueQuery)
+                    ->orderBy('id')
+                    ->limit(25)
+                    ->pluck('id')
+                    ->map(fn (mixed $id): int => (int) $id)
+                    ->all(),
+                'overdue_before' => $overdueBefore->toISOString(),
+            ],
+        );
     }
 
     private function pendingCountForQueue(mixed $queue): int

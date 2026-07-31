@@ -50,78 +50,114 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_claim_persists_a_fenced_lease_and_independent_attempt(): void
+    public function test_claim_persists_attempt_owned_fenced_lease(): void
     {
         $message = ScheduledMessage::factory()->create([
             'meta' => ['source' => 'lease_test'],
         ]);
 
-        $claimed = app(ClaimScheduledMessageForSendingAction::class)->handle($message);
+        $attempt = app(ClaimScheduledMessageForSendingAction::class)
+            ->handle($message);
 
-        $this->assertInstanceOf(ScheduledMessage::class, $claimed);
-        $this->assertSame(ScheduledMessage::STATUS_SENDING, $claimed->status);
-        $this->assertNotNull($claimed->claim_token);
+        $this->assertInstanceOf(
+            ScheduledMessageDeliveryAttempt::class,
+            $attempt,
+        );
+        $this->assertSame(
+            ScheduledMessageDeliveryAttempt::STATUS_CLAIMED,
+            $attempt->status,
+        );
+        $this->assertNotNull($attempt->claim_token);
         $this->assertSame(
             now()->addMinutes(5)->toISOString(),
-            $claimed->claim_expires_at?->toISOString(),
+            $attempt->lease_expires_at?->toISOString(),
         );
-        $this->assertNotNull($claimed->provider_idempotency_key);
-        $this->assertSame(1, $claimed->send_attempts);
-        $this->assertEquals([
-            'source' => 'lease_test',
-        ], $claimed->meta);
-
-        $this->assertDatabaseHas('scheduled_message_delivery_attempts', [
-            'scheduled_message_id' => $message->getKey(),
-            'claim_token' => $claimed->claim_token,
-            'provider_idempotency_key' => $claimed->provider_idempotency_key,
-            'attempt_number' => 1,
-            'status' => ScheduledMessageDeliveryAttempt::STATUS_CLAIMED,
-        ]);
-
-        $this->assertNull(
-            app(ClaimScheduledMessageForSendingAction::class)->handle($message),
-        );
-    }
-
-    public function test_expired_pre_submission_claim_is_requeued_with_stable_idempotency(): void
-    {
-        $message = ScheduledMessage::factory()->email()->create([
-            'meta' => ['source' => 'lease_test'],
-        ]);
-        $firstClaim = app(ClaimScheduledMessageForSendingAction::class)->handle($message);
-        $firstToken = $firstClaim?->claim_token;
-        $idempotencyKey = $firstClaim?->provider_idempotency_key;
-
-        Carbon::setTestNow(now()->addMinutes(6));
-
-        $result = app(RecoverStaleScheduledMessageClaimsAction::class)->handle();
-
-        $this->assertCount(1, $result['requeued']);
-        $this->assertCount(0, $result['failed']);
 
         $message->refresh();
 
-        $this->assertSame(ScheduledMessage::STATUS_PENDING, $message->status);
-        $this->assertNull($message->claim_token);
-        $this->assertNotNull($message->recovered_at);
-        $this->assertSame($idempotencyKey, $message->provider_idempotency_key);
+        $this->assertSame(ScheduledMessage::STATUS_SENDING, $message->status);
+        $this->assertNotNull($message->provider_idempotency_key);
+        $this->assertSame(1, $message->send_attempts);
         $this->assertEquals([
             'source' => 'lease_test',
         ], $message->meta);
 
         $this->assertDatabaseHas('scheduled_message_delivery_attempts', [
-            'claim_token' => $firstToken,
-            'status' => ScheduledMessageDeliveryAttempt::STATUS_RECOVERED,
-            'reason_code' => 'stale_claim_recovered',
+            'scheduled_message_id' => $message->getKey(),
+            'claim_token' => $attempt->claim_token,
+            'attempt_number' => 1,
+            'status' => ScheduledMessageDeliveryAttempt::STATUS_CLAIMED,
         ]);
 
-        $secondClaim = app(ClaimScheduledMessageForSendingAction::class)->handle($message);
+        $this->assertNull(
+            app(ClaimScheduledMessageForSendingAction::class)
+                ->handle($message),
+        );
+    }
 
-        $this->assertInstanceOf(ScheduledMessage::class, $secondClaim);
-        $this->assertNotSame($firstToken, $secondClaim->claim_token);
-        $this->assertSame($idempotencyKey, $secondClaim->provider_idempotency_key);
-        $this->assertSame(2, $secondClaim->send_attempts);
+    public function test_expired_pre_submission_claim_requeues_with_stable_idempotency(): void
+    {
+        $message = ScheduledMessage::factory()->email()->create([
+            'meta' => ['source' => 'lease_test'],
+        ]);
+        $firstAttempt = app(ClaimScheduledMessageForSendingAction::class)
+            ->handle($message);
+
+        $this->assertInstanceOf(
+            ScheduledMessageDeliveryAttempt::class,
+            $firstAttempt,
+        );
+
+        $firstToken = $firstAttempt->claim_token;
+        $idempotencyKey = $message->refresh()->provider_idempotency_key;
+
+        Carbon::setTestNow(now()->addMinutes(6));
+
+        $result = app(RecoverStaleScheduledMessageClaimsAction::class)
+            ->handle();
+
+        $this->assertCount(1, $result['requeued']);
+        $this->assertCount(0, $result['failed']);
+
+        $message->refresh();
+        $firstAttempt->refresh();
+
+        $this->assertSame(ScheduledMessage::STATUS_PENDING, $message->status);
+        $this->assertSame(
+            $idempotencyKey,
+            $message->provider_idempotency_key,
+        );
+        $this->assertEquals([
+            'source' => 'lease_test',
+        ], $message->meta);
+        $this->assertSame(
+            ScheduledMessageDeliveryAttempt::STATUS_RECOVERED,
+            $firstAttempt->status,
+        );
+        $this->assertSame(
+            'stale_claim_recovered',
+            $firstAttempt->reason_code,
+        );
+
+        $secondAttempt = app(ClaimScheduledMessageForSendingAction::class)
+            ->handle($message);
+
+        $this->assertInstanceOf(
+            ScheduledMessageDeliveryAttempt::class,
+            $secondAttempt,
+        );
+        $this->assertNotSame(
+            $firstToken,
+            $secondAttempt->claim_token,
+        );
+
+        $message->refresh();
+
+        $this->assertSame(
+            $idempotencyKey,
+            $message->provider_idempotency_key,
+        );
+        $this->assertSame(2, $message->send_attempts);
     }
 
     public function test_ambiguous_non_idempotent_submission_fails_instead_of_resending(): void
@@ -129,21 +165,31 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
         $message = ScheduledMessage::factory()->sms()->create([
             'meta' => ['source' => 'lease_test'],
         ]);
-        $claim = app(ClaimScheduledMessageForSendingAction::class)->handle($message);
+        $attempt = app(ClaimScheduledMessageForSendingAction::class)
+            ->handle($message);
 
+        $this->assertInstanceOf(
+            ScheduledMessageDeliveryAttempt::class,
+            $attempt,
+        );
         $this->assertTrue(
             app(ScheduledMessageDeliveryLeaseManager::class)
-                ->beginProviderSubmission($claim),
+                ->beginProviderSubmission(
+                    $attempt,
+                    '+15555550123',
+                ),
         );
 
         Carbon::setTestNow(now()->addMinutes(6));
 
-        $result = app(RecoverStaleScheduledMessageClaimsAction::class)->handle();
+        $result = app(RecoverStaleScheduledMessageClaimsAction::class)
+            ->handle();
 
         $this->assertCount(0, $result['requeued']);
         $this->assertCount(1, $result['failed']);
 
         $message->refresh();
+        $attempt->refresh();
 
         $this->assertSame(ScheduledMessage::STATUS_FAILED, $message->status);
         $this->assertStringContainsString(
@@ -153,12 +199,15 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
         $this->assertEquals([
             'source' => 'lease_test',
         ], $message->meta);
-        $this->assertDatabaseHas('scheduled_message_delivery_attempts', [
-            'scheduled_message_id' => $message->getKey(),
-            'claim_token' => $claim?->claim_token,
-            'status' => ScheduledMessageDeliveryAttempt::STATUS_FAILED,
-            'reason_code' => 'stale_provider_submission_outcome_unknown',
-        ]);
+        $this->assertSame(
+            ScheduledMessageDeliveryAttempt::STATUS_FAILED,
+            $attempt->status,
+        );
+        $this->assertSame(
+            'stale_provider_submission_outcome_unknown',
+            $attempt->reason_code,
+        );
+        $this->assertSame('+15555550123', $attempt->destination);
     }
 
     public function test_expired_provider_idempotency_window_blocks_ambiguous_retry(): void
@@ -166,19 +215,29 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
         $message = ScheduledMessage::factory()->email()->create([
             'meta' => ['source' => 'lease_test'],
         ]);
-        $claim = app(ClaimScheduledMessageForSendingAction::class)->handle($message);
+        $attempt = app(ClaimScheduledMessageForSendingAction::class)
+            ->handle($message);
 
+        $this->assertInstanceOf(
+            ScheduledMessageDeliveryAttempt::class,
+            $attempt,
+        );
         $this->assertTrue(
             app(ScheduledMessageDeliveryLeaseManager::class)
-                ->beginProviderSubmission($claim),
+                ->beginProviderSubmission(
+                    $attempt,
+                    'fixture@example.test',
+                ),
         );
 
         Carbon::setTestNow(now()->addDay());
 
-        $result = app(RecoverStaleScheduledMessageClaimsAction::class)->handle();
+        $result = app(RecoverStaleScheduledMessageClaimsAction::class)
+            ->handle();
 
         $this->assertCount(0, $result['requeued']);
         $this->assertCount(1, $result['failed']);
+
         $message->refresh();
 
         $this->assertSame(
@@ -190,34 +249,44 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
         ], $message->meta);
     }
 
-    public function test_expired_worker_cannot_overwrite_a_later_claim_outcome(): void
+    public function test_expired_worker_cannot_overwrite_a_later_attempt_outcome(): void
     {
         $message = ScheduledMessage::factory()->email()->create([
             'meta' => ['source' => 'lease_test'],
         ]);
-        $oldClaim = app(ClaimScheduledMessageForSendingAction::class)->handle($message);
+        $oldAttempt = app(ClaimScheduledMessageForSendingAction::class)
+            ->handle($message);
+
+        $this->assertInstanceOf(
+            ScheduledMessageDeliveryAttempt::class,
+            $oldAttempt,
+        );
 
         Carbon::setTestNow(now()->addMinutes(6));
         app(RecoverStaleScheduledMessageClaimsAction::class)->handle();
 
-        $newClaim = app(ClaimScheduledMessageForSendingAction::class)->handle($message);
+        $newAttempt = app(ClaimScheduledMessageForSendingAction::class)
+            ->handle($message);
+
+        $this->assertInstanceOf(
+            ScheduledMessageDeliveryAttempt::class,
+            $newAttempt,
+        );
+
         $manager = app(ScheduledMessageDeliveryLeaseManager::class);
         $result = MessageSendResult::sent(
             provider: 'test',
             providerMessageId: 'provider-message-1',
-            meta: [
-                'provider_request_id' => 'provider-request-1',
-            ],
         );
 
         $this->assertNull($manager->complete(
-            claimedMessage: $oldClaim,
+            claimedAttempt: $oldAttempt,
             status: ScheduledMessage::STATUS_SENT,
             result: $result,
         ));
 
         $completed = $manager->complete(
-            claimedMessage: $newClaim,
+            claimedAttempt: $newAttempt,
             status: ScheduledMessage::STATUS_SENT,
             result: $result,
         );
@@ -225,27 +294,27 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
         $this->assertInstanceOf(ScheduledMessage::class, $completed);
 
         $message->refresh();
+        $newAttempt->refresh();
 
         $this->assertSame(ScheduledMessage::STATUS_SENT, $message->status);
         $this->assertSame('test', $message->provider);
-        $this->assertSame('provider-message-1', $message->provider_message_id);
+        $this->assertSame(
+            'provider-message-1',
+            $message->provider_message_id,
+        );
         $this->assertEquals([
             'source' => 'lease_test',
         ], $message->meta);
 
-        $sentAttempt = ScheduledMessageDeliveryAttempt::query()
-            ->where('scheduled_message_id', $message->getKey())
-            ->where('status', ScheduledMessageDeliveryAttempt::STATUS_SENT)
-            ->sole();
-
-        $this->assertSame('test', $sentAttempt->provider);
+        $this->assertSame(
+            ScheduledMessageDeliveryAttempt::STATUS_SENT,
+            $newAttempt->status,
+        );
+        $this->assertSame('test', $newAttempt->provider);
         $this->assertSame(
             'provider-message-1',
-            $sentAttempt->provider_message_id,
+            $newAttempt->provider_message_id,
         );
-        $this->assertEquals([
-            'provider_request_id' => 'provider-request-1',
-        ], $sentAttempt->meta);
     }
 
     public function test_recovery_job_redispatches_recovered_pending_message(): void
@@ -255,19 +324,22 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
         $message = ScheduledMessage::factory()->email()->create([
             'queue' => 'emails',
         ]);
-        app(ClaimScheduledMessageForSendingAction::class)->handle($message);
+        app(ClaimScheduledMessageForSendingAction::class)
+            ->handle($message);
 
         Carbon::setTestNow(now()->addMinutes(6));
 
         (new RecoverStaleScheduledMessageClaimsJob())->handle(
-            recoverStaleClaims: app(RecoverStaleScheduledMessageClaimsAction::class),
-            deliveryPolicy: app(ScheduledMessageDeliveryPolicy::class),
+            recoverStaleClaims:
+                app(RecoverStaleScheduledMessageClaimsAction::class),
+            deliveryPolicy:
+                app(ScheduledMessageDeliveryPolicy::class),
         );
 
         Queue::assertPushed(
             SendScheduledMessageJob::class,
-            fn (SendScheduledMessageJob $job): bool => $job->scheduledMessageId
-                === $message->getKey(),
+            fn (SendScheduledMessageJob $job): bool =>
+                $job->scheduledMessageId === $message->getKey(),
         );
     }
 
@@ -277,7 +349,8 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
 
         config([
             'messaging.email.provider' => 'lease_test',
-            'messaging.email.providers.lease_test.provider' => LeaseTestEmailProvider::class,
+            'messaging.email.providers.lease_test.provider' =>
+                LeaseTestEmailProvider::class,
         ]);
 
         $result = app(EmailMessagingService::class)->send(
@@ -285,7 +358,10 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
         );
 
         $this->assertTrue($result->isSent());
-        $this->assertSame('delivery-key-123', LeaseTestEmailProvider::$idempotencyKey);
+        $this->assertSame(
+            'delivery-key-123',
+            LeaseTestEmailProvider::$idempotencyKey,
+        );
     }
 }
 

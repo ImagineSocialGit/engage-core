@@ -7,9 +7,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('scheduled_message_delivery_attempts', function (Blueprint $table): void {
@@ -17,19 +14,18 @@ return new class extends Migration
             $table->foreignIdFor(ScheduledMessage::class)
                 ->constrained()
                 ->cascadeOnDelete();
-            $table->uuid('claim_token')->unique();
-            $table->string('provider_idempotency_key', 128);
             $table->unsignedInteger('attempt_number');
-            $table->string('status')->index();
+            $table->uuid('claim_token')->unique();
+            $table->string('status', 32)->index();
             $table->timestamp('claimed_at');
             $table->timestamp('lease_expires_at');
             $table->timestamp('provider_submission_started_at')->nullable();
             $table->timestamp('completed_at')->nullable();
-            $table->string('provider')->nullable();
-            $table->string('provider_message_id')->nullable();
-            $table->string('reason_code')->nullable();
+            $table->string('destination', 255)->nullable();
+            $table->string('provider', 64)->nullable();
+            $table->string('provider_message_id', 191)->nullable();
+            $table->string('reason_code', 96)->nullable();
             $table->text('reason')->nullable();
-            $table->json('meta')->nullable();
             $table->timestamps();
 
             $table->unique(
@@ -40,12 +36,13 @@ return new class extends Migration
                 ['scheduled_message_id', 'status'],
                 'scheduled_message_delivery_attempt_status_index',
             );
+            $table->index(
+                ['status', 'lease_expires_at'],
+                'scheduled_message_delivery_attempt_stale_index',
+            );
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('scheduled_message_delivery_attempts');

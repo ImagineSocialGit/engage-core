@@ -102,8 +102,6 @@ class CampaignScheduledMessageTerminalReconciliationTest extends TestCase
             'scope' => 'campaign',
             'status' => ScheduledMessage::STATUS_SENDING,
             'sending_at' => now(),
-            'claim_token' => 'sending-sibling-claim',
-            'claim_expires_at' => now()->addMinutes(5),
             'meta' => array_replace($messageMeta, [
                 'campaign_step_variant_key' => 'sms',
             ]),
@@ -141,8 +139,6 @@ class CampaignScheduledMessageTerminalReconciliationTest extends TestCase
         $sendingSibling->forceFill([
             'status' => ScheduledMessage::STATUS_SENT,
             'sending_at' => null,
-            'claim_token' => null,
-            'claim_expires_at' => null,
             'sent_at' => now(),
         ])->save();
 

@@ -111,9 +111,10 @@ class SendScheduledMessageJobTest extends TestCase
             'test-email-message-1',
             $attempt->provider_message_id,
         );
-        $this->assertEquals([
-            'provider_request_id' => 'test-email-request-1',
-        ], $attempt->meta);
+        $this->assertArrayNotHasKey(
+            'meta',
+            $attempt->getAttributes(),
+        );
 
         Event::assertDispatched(
             ScheduledMessageSent::class,
@@ -1336,11 +1337,23 @@ Thanks.",
         $firstClaim = $action->handle($scheduledMessage);
         $secondClaim = $action->handle($scheduledMessage);
 
-        $this->assertInstanceOf(ScheduledMessage::class, $firstClaim);
-        $this->assertSame(ScheduledMessage::STATUS_SENDING, $firstClaim->status);
-        $this->assertSame(1, $firstClaim->send_attempts);
+        $this->assertInstanceOf(
+            ScheduledMessageDeliveryAttempt::class,
+            $firstClaim,
+        );
+        $this->assertSame(
+            ScheduledMessageDeliveryAttempt::STATUS_CLAIMED,
+            $firstClaim->status,
+        );
         $this->assertNull($secondClaim);
-        $this->assertSame(ScheduledMessage::STATUS_SENDING, $scheduledMessage->refresh()->status);
+
+        $scheduledMessage->refresh();
+
+        $this->assertSame(
+            ScheduledMessage::STATUS_SENDING,
+            $scheduledMessage->status,
+        );
+        $this->assertSame(1, $scheduledMessage->send_attempts);
     }
 
     public function test_service_skip_result_marks_message_skipped_instead_of_sent(): void
@@ -1403,9 +1416,10 @@ Thanks.",
         );
         $this->assertSame('sms_disabled', $attempt->reason_code);
         $this->assertSame('SMS delivery is disabled.', $attempt->reason);
-        $this->assertEquals([
-            'capability' => 'disabled',
-        ], $attempt->meta);
+        $this->assertArrayNotHasKey(
+            'meta',
+            $attempt->getAttributes(),
+        );
 
         Event::assertNotDispatched(ScheduledMessageSent::class);
         Event::assertDispatched(ScheduledMessageSkipped::class);
@@ -1468,7 +1482,10 @@ Thanks.",
             $attempt->reason_code,
         );
         $this->assertSame('Temporary provider outage.', $attempt->reason);
-        $this->assertEquals([], $attempt->meta);
+        $this->assertArrayNotHasKey(
+            'meta',
+            $attempt->getAttributes(),
+        );
 
         Event::assertNotDispatched(ScheduledMessageFailed::class);
     }
@@ -1527,7 +1544,10 @@ Thanks.",
         );
         $this->assertSame('message_delivery_exception', $attempt->reason_code);
         $this->assertSame('Provider still unavailable.', $attempt->reason);
-        $this->assertEquals([], $attempt->meta);
+        $this->assertArrayNotHasKey(
+            'meta',
+            $attempt->getAttributes(),
+        );
 
         Event::assertDispatched(ScheduledMessageFailed::class);
     }

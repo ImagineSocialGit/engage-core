@@ -16,10 +16,21 @@ class ScheduledMessageDeliveryLeaseManager
         private readonly ScheduledMessageEventOutbox $eventOutbox,
     ) {}
 
-    public function beginProviderSubmission(ScheduledMessage $claimedMessage): bool
-    {
-        return DB::transaction(function () use ($claimedMessage): bool {
-            $message = $this->lockedActiveClaim($claimedMessage);
+    public function beginProviderSubmission(
+        ScheduledMessageDeliveryAttempt $claimedAttempt,
+        ?string $destination,
+    ): bool {
+        return DB::transaction(function () use (
+            $claimedAttempt,
+            $destination,
+        ): bool {
+            $attempt = $this->lockedActiveAttempt($claimedAttempt);
+
+            if (! $attempt instanceof ScheduledMessageDeliveryAttempt) {
+                return false;
+            }
+
+            $message = $this->lockedSendingMessage($attempt);
 
             if (! $message instanceof ScheduledMessage) {
                 return false;
@@ -27,25 +38,22 @@ class ScheduledMessageDeliveryLeaseManager
 
             $startedAt = now();
 
-            $message->forceFill([
-                'provider_submission_started_at' => $startedAt,
-                'claim_expires_at' => $this->deliveryPolicy->leaseExpiresAt($startedAt),
-            ])->save();
-
-            $this->attempt($message)->forceFill([
+            $attempt->forceFill([
                 'status' => ScheduledMessageDeliveryAttempt::STATUS_SUBMITTING,
                 'provider_submission_started_at' => $startedAt,
-                'lease_expires_at' => $message->claim_expires_at,
+                'lease_expires_at' => $this->deliveryPolicy
+                    ->leaseExpiresAt($startedAt),
+                'destination' => $this->destination($destination),
             ])->save();
 
-            $this->syncClaimedMessage($claimedMessage, $message);
+            $this->syncClaimedAttempt($claimedAttempt, $attempt);
 
             return true;
         });
     }
 
     public function complete(
-        ScheduledMessage $claimedMessage,
+        ScheduledMessageDeliveryAttempt $claimedAttempt,
         string $status,
         MessageSendResult $result,
         ?Throwable $exception = null,
@@ -55,29 +63,33 @@ class ScheduledMessageDeliveryLeaseManager
             ScheduledMessage::STATUS_SKIPPED,
             ScheduledMessage::STATUS_FAILED,
         ], true)) {
-            throw new InvalidArgumentException("Unsupported ScheduledMessage terminal status [{$status}].");
+            throw new InvalidArgumentException(
+                "Unsupported ScheduledMessage terminal status [{$status}].",
+            );
         }
 
         $completed = DB::transaction(function () use (
-            $claimedMessage,
+            $claimedAttempt,
             $status,
             $result,
             $exception,
         ): ?ScheduledMessage {
-            $message = $this->lockedActiveClaim($claimedMessage);
+            $attempt = $this->lockedActiveAttempt($claimedAttempt);
+
+            if (! $attempt instanceof ScheduledMessageDeliveryAttempt) {
+                return null;
+            }
+
+            $message = $this->lockedSendingMessage($attempt);
 
             if (! $message instanceof ScheduledMessage) {
                 return null;
             }
 
-            $attempt = $this->attempt($message);
             $completedAt = now();
             $attributes = [
                 'status' => $status,
                 'sending_at' => null,
-                'claim_token' => null,
-                'claim_expires_at' => null,
-                'recovered_at' => null,
                 'provider' => $result->provider,
                 'provider_message_id' => $result->providerMessageId,
             ];
@@ -96,7 +108,8 @@ class ScheduledMessageDeliveryLeaseManager
                     'skipped_at' => $completedAt,
                     'failed_at' => null,
                     'failure_reason' => null,
-                    'skip_reason' => $result->reason ?? 'Message delivery was skipped.',
+                    'skip_reason' => $result->reason
+                        ?? 'Message delivery was skipped.',
                 ];
             } else {
                 $attributes += [
@@ -112,20 +125,20 @@ class ScheduledMessageDeliveryLeaseManager
 
             $message->forceFill($attributes)->save();
 
-            $attemptStatus = match ($status) {
-                ScheduledMessage::STATUS_SENT => ScheduledMessageDeliveryAttempt::STATUS_SENT,
-                ScheduledMessage::STATUS_SKIPPED => ScheduledMessageDeliveryAttempt::STATUS_SKIPPED,
-                default => ScheduledMessageDeliveryAttempt::STATUS_FAILED,
-            };
-
             $attempt->forceFill([
-                'status' => $attemptStatus,
+                'status' => match ($status) {
+                    ScheduledMessage::STATUS_SENT =>
+                        ScheduledMessageDeliveryAttempt::STATUS_SENT,
+                    ScheduledMessage::STATUS_SKIPPED =>
+                        ScheduledMessageDeliveryAttempt::STATUS_SKIPPED,
+                    default =>
+                        ScheduledMessageDeliveryAttempt::STATUS_FAILED,
+                },
                 'completed_at' => $completedAt,
                 'provider' => $result->provider,
                 'provider_message_id' => $result->providerMessageId,
                 'reason_code' => $result->reasonCode,
                 'reason' => $exception?->getMessage() ?? $result->reason,
-                'meta' => $result->meta,
             ])->save();
 
             $this->eventOutbox->record(
@@ -138,14 +151,14 @@ class ScheduledMessageDeliveryLeaseManager
         });
 
         if ($completed instanceof ScheduledMessage) {
-            $this->syncClaimedMessage($claimedMessage, $completed);
+            $this->syncClaimedAttempt($claimedAttempt);
         }
 
         return $completed;
     }
 
     public function releaseForRetry(
-        ScheduledMessage $claimedMessage,
+        ScheduledMessageDeliveryAttempt $claimedAttempt,
         Throwable $exception,
     ): ?ScheduledMessage {
         $result = MessageSendResult::failed(
@@ -155,26 +168,27 @@ class ScheduledMessageDeliveryLeaseManager
         );
 
         $released = DB::transaction(function () use (
-            $claimedMessage,
+            $claimedAttempt,
             $exception,
             $result,
         ): ?ScheduledMessage {
-            $message = $this->lockedActiveClaim($claimedMessage);
+            $attempt = $this->lockedActiveAttempt($claimedAttempt);
+
+            if (! $attempt instanceof ScheduledMessageDeliveryAttempt) {
+                return null;
+            }
+
+            $message = $this->lockedSendingMessage($attempt);
 
             if (! $message instanceof ScheduledMessage) {
                 return null;
             }
 
-            $attempt = $this->attempt($message);
             $releasedAt = now();
 
             $message->forceFill([
                 'status' => ScheduledMessage::STATUS_PENDING,
                 'sending_at' => null,
-                'claim_token' => null,
-                'claim_expires_at' => null,
-                'provider_submission_started_at' => null,
-                'recovered_at' => null,
                 'failed_at' => null,
                 'failure_reason' => $exception->getMessage(),
             ])->save();
@@ -184,66 +198,97 @@ class ScheduledMessageDeliveryLeaseManager
                 'completed_at' => $releasedAt,
                 'reason_code' => $result->reasonCode,
                 'reason' => $exception->getMessage(),
-                'meta' => $result->meta,
             ])->save();
 
             return $message;
         });
 
         if ($released instanceof ScheduledMessage) {
-            $this->syncClaimedMessage($claimedMessage, $released);
+            $this->syncClaimedAttempt($claimedAttempt);
         }
 
         return $released;
     }
 
-    public function ownsActiveClaim(ScheduledMessage $claimedMessage): bool
-    {
-        if (! filled($claimedMessage->claim_token)) {
+    public function ownsActiveClaim(
+        ScheduledMessageDeliveryAttempt $claimedAttempt,
+    ): bool {
+        if (! filled($claimedAttempt->claim_token)) {
             return false;
         }
 
-        return ScheduledMessage::query()
-            ->whereKey($claimedMessage->getKey())
-            ->where('status', ScheduledMessage::STATUS_SENDING)
-            ->where('claim_token', $claimedMessage->claim_token)
+        return ScheduledMessageDeliveryAttempt::query()
+            ->whereKey($claimedAttempt->getKey())
+            ->where('claim_token', $claimedAttempt->claim_token)
+            ->active()
+            ->whereHas(
+                'scheduledMessage',
+                fn ($query) => $query->where(
+                    'status',
+                    ScheduledMessage::STATUS_SENDING,
+                ),
+            )
             ->exists();
     }
 
-    public function canRetryAfterProviderSubmission(ScheduledMessage $message): bool
-    {
-        return $this->deliveryPolicy->canSafelyRetryProviderSubmission($message);
+    public function canRetryAfterProviderSubmission(
+        ScheduledMessageDeliveryAttempt $attempt,
+    ): bool {
+        return $this->deliveryPolicy
+            ->canSafelyRetryProviderSubmission($attempt);
     }
 
-    private function lockedActiveClaim(
-        ScheduledMessage $claimedMessage,
-    ): ?ScheduledMessage {
-        if (! filled($claimedMessage->claim_token)) {
+    private function lockedActiveAttempt(
+        ScheduledMessageDeliveryAttempt $claimedAttempt,
+    ): ?ScheduledMessageDeliveryAttempt {
+        if (! filled($claimedAttempt->claim_token)) {
             return null;
         }
 
-        return ScheduledMessage::query()
+        return ScheduledMessageDeliveryAttempt::query()
             ->lockForUpdate()
-            ->whereKey($claimedMessage->getKey())
-            ->where('status', ScheduledMessage::STATUS_SENDING)
-            ->where('claim_token', $claimedMessage->claim_token)
+            ->whereKey($claimedAttempt->getKey())
+            ->where('claim_token', $claimedAttempt->claim_token)
+            ->active()
             ->first();
     }
 
-    private function attempt(
-        ScheduledMessage $message,
-    ): ScheduledMessageDeliveryAttempt {
-        return ScheduledMessageDeliveryAttempt::query()
-            ->where('scheduled_message_id', $message->getKey())
-            ->where('claim_token', $message->claim_token)
+    private function lockedSendingMessage(
+        ScheduledMessageDeliveryAttempt $attempt,
+    ): ?ScheduledMessage {
+        return ScheduledMessage::query()
             ->lockForUpdate()
-            ->firstOrFail();
+            ->whereKey($attempt->scheduled_message_id)
+            ->where('status', ScheduledMessage::STATUS_SENDING)
+            ->first();
     }
 
-    private function syncClaimedMessage(
-        ScheduledMessage $claimedMessage,
-        ScheduledMessage $persistedMessage,
+    private function syncClaimedAttempt(
+        ScheduledMessageDeliveryAttempt $claimedAttempt,
+        ?ScheduledMessageDeliveryAttempt $persistedAttempt = null,
     ): void {
-        $claimedMessage->setRawAttributes($persistedMessage->getAttributes(), true);
+        $persistedAttempt ??= $claimedAttempt->fresh();
+
+        if (! $persistedAttempt instanceof ScheduledMessageDeliveryAttempt) {
+            return;
+        }
+
+        $claimedAttempt->setRawAttributes(
+            $persistedAttempt->getAttributes(),
+            true,
+        );
+    }
+
+    private function destination(?string $destination): ?string
+    {
+        if (! is_string($destination)) {
+            return null;
+        }
+
+        $destination = trim($destination);
+
+        return $destination === ''
+            ? null
+            : mb_substr($destination, 0, 255);
     }
 }

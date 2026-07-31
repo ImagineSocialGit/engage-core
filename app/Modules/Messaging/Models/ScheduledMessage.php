@@ -45,11 +45,7 @@ class ScheduledMessage extends Model
         'send_at',
         'status',
         'sending_at',
-        'claim_token',
-        'claim_expires_at',
         'provider_idempotency_key',
-        'provider_submission_started_at',
-        'recovered_at',
         'last_attempted_at',
         'send_attempts',
         'provider',
@@ -74,9 +70,6 @@ class ScheduledMessage extends Model
             'payload' => 'array',
             'send_at' => 'datetime',
             'sending_at' => 'datetime',
-            'claim_expires_at' => 'datetime',
-            'provider_submission_started_at' => 'datetime',
-            'recovered_at' => 'datetime',
             'last_attempted_at' => 'datetime',
             'send_attempts' => 'integer',
             'sent_at' => 'datetime',
@@ -108,7 +101,14 @@ class ScheduledMessage extends Model
 
     public function deliveryAttempts(): HasMany
     {
-        return $this->hasMany(ScheduledMessageDeliveryAttempt::class);
+        return $this->hasMany(ScheduledMessageDeliveryAttempt::class)
+            ->orderBy('attempt_number');
+    }
+
+    public function latestDeliveryAttempt(): HasOne
+    {
+        return $this->hasOne(ScheduledMessageDeliveryAttempt::class)
+            ->ofMany('attempt_number', 'max');
     }
 
     public function renderContext(): HasOne

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Messaging\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -17,19 +18,18 @@ class ScheduledMessageDeliveryAttempt extends Model
 
     protected $fillable = [
         'scheduled_message_id',
-        'claim_token',
-        'provider_idempotency_key',
         'attempt_number',
+        'claim_token',
         'status',
         'claimed_at',
         'lease_expires_at',
         'provider_submission_started_at',
         'completed_at',
+        'destination',
         'provider',
         'provider_message_id',
         'reason_code',
         'reason',
-        'meta',
     ];
 
     protected function casts(): array
@@ -41,12 +41,30 @@ class ScheduledMessageDeliveryAttempt extends Model
             'lease_expires_at' => 'datetime',
             'provider_submission_started_at' => 'datetime',
             'completed_at' => 'datetime',
-            'meta' => 'array',
         ];
     }
 
     public function scheduledMessage(): BelongsTo
     {
         return $this->belongsTo(ScheduledMessage::class);
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query
+            ->whereIn('status', [
+                self::STATUS_CLAIMED,
+                self::STATUS_SUBMITTING,
+            ])
+            ->whereNull('completed_at');
+    }
+
+    public function isActive(): bool
+    {
+        return $this->completed_at === null
+            && in_array($this->status, [
+                self::STATUS_CLAIMED,
+                self::STATUS_SUBMITTING,
+            ], true);
     }
 }

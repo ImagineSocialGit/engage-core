@@ -4,6 +4,7 @@ namespace App\Modules\Messaging\Services;
 
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Models\ScheduledMessageDeliveryAttempt;
 use Carbon\CarbonInterface;
 
 class ScheduledMessageDeliveryPolicy
@@ -27,10 +28,18 @@ class ScheduledMessageDeliveryPolicy
     }
 
     public function canSafelyRetryProviderSubmission(
-        ScheduledMessage $message,
+        ScheduledMessageDeliveryAttempt $attempt,
     ): bool {
-        if ($message->provider_submission_started_at === null) {
+        if ($attempt->provider_submission_started_at === null) {
             return true;
+        }
+
+        $message = $attempt->relationLoaded('scheduledMessage')
+            ? $attempt->scheduledMessage
+            : $attempt->scheduledMessage()->first();
+
+        if (! $message instanceof ScheduledMessage) {
+            return false;
         }
 
         $providerConfig = $this->providerIdempotencyConfig($message);
@@ -46,7 +55,7 @@ class ScheduledMessageDeliveryPolicy
         ));
 
         return $windowSeconds > 0
-            && $message->provider_submission_started_at
+            && $attempt->provider_submission_started_at
                 ->copy()
                 ->addSeconds($windowSeconds)
                 ->isFuture();
