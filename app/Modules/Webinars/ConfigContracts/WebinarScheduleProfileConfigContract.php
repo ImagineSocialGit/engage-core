@@ -53,6 +53,10 @@ class WebinarScheduleProfileConfigContract implements ConfigContract
         return ConfigSchema::object([
             'name' => ConfigField::required(ConfigSchema::string()),
             'description' => ConfigField::optional(ConfigSchema::string(nullable: true)),
+            'message_template_set_key' => ConfigField::defaulted(
+                ConfigSchema::string(),
+                'default',
+            ),
             'status' => ConfigField::defaulted(ConfigSchema::string(allowedValues: ['active', 'inactive', 'archived']), 'active'),
             'is_default' => ConfigField::defaulted(ConfigSchema::boolean(), false),
             'is_active' => ConfigField::defaulted(ConfigSchema::boolean(), true),
@@ -64,7 +68,7 @@ class WebinarScheduleProfileConfigContract implements ConfigContract
 
     public function example(): array
     {
-        return ['name' => 'Default', 'is_default' => true, 'items' => [[
+        return ['name' => 'Default', 'message_template_set_key' => 'default', 'is_default' => true, 'items' => [[
             'key' => 'email_confirmation', 'context_key' => 'confirmations', 'channel' => 'email', 'purpose' => 'transactional', 'scope' => 'webinar', 'message_type' => 'confirmation', 'dispatch_key' => 'registration_created', 'message_template_key' => 'confirmation', 'timing' => 'immediate', 'schedule' => null,
         ]]];
     }

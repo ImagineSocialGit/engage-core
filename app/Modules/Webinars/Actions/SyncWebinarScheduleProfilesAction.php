@@ -167,6 +167,12 @@ class SyncWebinarScheduleProfilesAction
             }
 
             $profileConfig['items'] = $items;
+            $profileConfig['message_template_set_key'] = $this->normalizeSegment(
+                is_string($profileConfig['message_template_set_key'] ?? null)
+                    && trim($profileConfig['message_template_set_key']) !== ''
+                        ? $profileConfig['message_template_set_key']
+                        : 'default',
+            );
             $normalizedProfiles[$normalizedKey] = $profileConfig;
 
             $status = $this->normalizeSegment((string) (
@@ -203,6 +209,12 @@ class SyncWebinarScheduleProfilesAction
             'key' => $key,
             'name' => $this->requiredString($config, 'name', "webinars.schedule_profiles.{$key}.name"),
             'description' => $this->nullableString($config['description'] ?? null),
+            'message_template_set_key' => $this->normalizeSegment(
+                is_string($config['message_template_set_key'] ?? null)
+                    && trim($config['message_template_set_key']) !== ''
+                        ? $config['message_template_set_key']
+                        : 'default',
+            ),
             'status' => $this->normalizeSegment((string) ($config['status'] ?? WebinarScheduleProfile::STATUS_ACTIVE)),
             'is_default' => (bool) ($config['is_default'] ?? false),
             'is_active' => (bool) ($config['is_active'] ?? true),
@@ -323,6 +335,7 @@ class SyncWebinarScheduleProfilesAction
                 [
                     'source' => 'config',
                     'source_config_path' => "webinars.schedule_profiles.{$profile->key}.items.{$index}",
+                    'message_template_set_key' => $profile->message_template_set_key,
                     'webinar_message_area' => [
                         'key' => $messageArea->key,
                         'label' => $messageArea->label,

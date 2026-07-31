@@ -3,6 +3,7 @@
 namespace App\Modules\Messaging\ConfigContracts;
 
 use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Services\MessageDefinitionConfigSetResolver;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Support\ConfigContracts\Contracts\ConfigContractTargetProvider;
 use App\Support\ConfigContracts\Data\ConfigContractTarget;
@@ -10,6 +11,10 @@ use App\Support\ConfigContracts\Data\ConfigContractTargetContext;
 
 final class MessagingConfigContractTargetProvider implements ConfigContractTargetProvider
 {
+    public function __construct(
+        private readonly MessageDefinitionConfigSetResolver $configSetResolver,
+    ) {}
+
     public function contractKeys(): array
     {
         return [
@@ -68,55 +73,104 @@ final class MessagingConfigContractTargetProvider implements ConfigContractTarge
                     (string) $scope,
                 );
 
-                foreach ($scopeConfig as $messageType => $definition) {
-                    if ($messageType === 'campaigns') {
-                        foreach ($this->campaignDefinitionTargets(
-                            channel: $channel,
-                            purpose: (string) $purpose,
-                            scope: (string) $scope,
-                            campaigns: $definition,
-                            basePath: "{$scopePath}.campaigns",
-                        ) as $target) {
-                            yield $target;
-                        }
+                foreach (
+                    $this->configSetResolver->sets(
+                        (string) $scope,
+                        $scopeConfig,
+                    ) as $set
+                ) {
+                    $templateSetKey = $set['key'];
+            $templateSetSourceKey = $set['source_key'];
+                    $setPath = $templateSetKey === null
+                        || $templateSetKey === MessageDefinitionConfigSetResolver::DEFAULT_TEMPLATE_SET_KEY
+                            && ! array_key_exists(
+                                MessageDefinitionConfigSetResolver::DEFAULT_TEMPLATE_SET_KEY,
+                                $scopeConfig,
+                            )
+                        ? $scopePath
+                        : MessageDefinitionConfigPath::templateSet(
+                            $channel,
+                            $purpose,
+                            (string) $scope,
+                            $templateSetSourceKey ?? $templateSetKey,
+                        );
 
-                        continue;
+                    foreach ($this->definitionTargetsForSet(
+                        channel: $channel,
+                        purpose: (string) $purpose,
+                        scope: (string) $scope,
+                        templateSetKey: $templateSetKey,
+                        definitions: $set['definitions'],
+                        setPath: $setPath,
+                    ) as $target) {
+                        yield $target;
                     }
+                }
+            }
+        }
+    }
 
-                    $definitionPath = "{$scopePath}.".(string) $messageType;
+    /**
+     * @param array<string|int, mixed> $definitions
+     * @return iterable<int, ConfigContractTarget>
+     */
+    private function definitionTargetsForSet(
+        string $channel,
+        string $purpose,
+        string $scope,
+        ?string $templateSetKey,
+        array $definitions,
+        string $setPath,
+    ): iterable {
+        foreach ($definitions as $messageType => $definition) {
+            if ($messageType === 'campaigns') {
+                foreach ($this->campaignDefinitionTargets(
+                    channel: $channel,
+                    purpose: $purpose,
+                    scope: $scope,
+                    campaigns: $definition,
+                    basePath: "{$setPath}.campaigns",
+                ) as $target) {
+                    yield $target;
+                }
 
-                    if (is_array($definition) && array_is_list($definition) && $definition !== []) {
-                        foreach ($definition as $index => $nestedDefinition) {
-                            yield $this->messageTarget(
-                                channel: $channel,
-                                path: "{$definitionPath}.{$index}",
-                                value: $nestedDefinition,
-                                context: [
-                                    'channel' => $channel,
-                                    'purpose' => $purpose,
-                                    'scope' => $scope,
-                                    'message_type' => $messageType,
-                                    'definition_index' => $index,
-                                ],
-                            );
-                        }
+                continue;
+            }
 
-                        continue;
-                    }
+            $definitionPath = "{$setPath}.".(string) $messageType;
+            $context = [
+                'channel' => $channel,
+                'purpose' => $purpose,
+                'scope' => $scope,
+                'template_set_key' => $templateSetKey,
+                'message_type' => $messageType,
+            ];
 
+            if (
+                is_array($definition)
+                && array_is_list($definition)
+                && $definition !== []
+            ) {
+                foreach ($definition as $index => $nestedDefinition) {
                     yield $this->messageTarget(
                         channel: $channel,
-                        path: $definitionPath,
-                        value: $definition,
-                        context: [
-                            'channel' => $channel,
-                            'purpose' => $purpose,
-                            'scope' => $scope,
-                            'message_type' => $messageType,
+                        path: "{$definitionPath}.{$index}",
+                        value: $nestedDefinition,
+                        context: $context + [
+                            'definition_index' => $index,
                         ],
                     );
                 }
+
+                continue;
             }
+
+            yield $this->messageTarget(
+                channel: $channel,
+                path: $definitionPath,
+                value: $definition,
+                context: $context,
+            );
         }
     }
 

@@ -572,6 +572,7 @@
 │   │   │   │   ├── MessageChannelAvailability.php
 │   │   │   │   ├── MessageConfigValidator.php
 │   │   │   │   ├── MessageDedupeKeyBuilder.php
+│   │   │   │   ├── MessageDefinitionConfigSetResolver.php
 │   │   │   │   ├── MessageDefinitionResolver.php
 │   │   │   │   ├── MessageDeliveryConsolidator.php
 │   │   │   │   ├── MessageDeliveryPrimarySelector.php
@@ -1832,6 +1833,7 @@
 │   │   │   ├── WebinarMessageAreaRegistryTest.php
 │   │   │   ├── WebinarMessageReadinessServiceTest.php
 │   │   │   ├── WebinarMessageTemplateControllerTest.php
+│   │   │   ├── WebinarMessageTemplateSetConfigTest.php
 │   │   │   ├── WebinarOccurrenceReplacementControllerTest.php
 │   │   │   ├── WebinarOccurrenceReplacementTest.php
 │   │   │   ├── WebinarProviderEventTypeFoundationTest.php
@@ -1872,4 +1874,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-500 directories, 1373 files
+500 directories, 1375 files

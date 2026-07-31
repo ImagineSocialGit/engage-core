@@ -6,6 +6,7 @@ use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
+use App\Modules\Messaging\Services\MessageDefinitionConfigSetResolver;
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,7 @@ class SyncMessageTemplatePresetsAction
     public function __construct(
         private readonly MessageTemplateTokenValidator $messageTemplateTokenValidator,
         private readonly PublishMessageTemplateVersionAction $publishMessageTemplateVersion,
+        private readonly MessageDefinitionConfigSetResolver $configSetResolver,
     ) {}
 
     /**
@@ -376,14 +378,59 @@ class SyncMessageTemplatePresetsAction
         $channel = $this->normalizeSegment($channel);
         $purpose = $this->normalizeSegment($purpose);
         $scope = $this->normalizeSegment($scope);
-        $scopeConfigPath = MessageDefinitionConfigPath::scope($channel, $purpose, $scope);
 
-        foreach ($scopeConfig as $messageType => $definition) {
+        foreach ($this->configSetResolver->sets($scope, $scopeConfig) as $set) {
+            $templateSetKey = $set['key'];
+            $templateSetSourceKey = $set['source_key'];
+            $definitions = $set['definitions'];
+            $scopeConfigPath = $templateSetKey === null
+                || $templateSetKey === MessageDefinitionConfigSetResolver::DEFAULT_TEMPLATE_SET_KEY
+                    && ! array_key_exists(
+                        MessageDefinitionConfigSetResolver::DEFAULT_TEMPLATE_SET_KEY,
+                        $scopeConfig,
+                    )
+                ? MessageDefinitionConfigPath::scope(
+                    $channel,
+                    $purpose,
+                    $scope,
+                )
+                : MessageDefinitionConfigPath::templateSet(
+                    $channel,
+                    $purpose,
+                    $scope,
+                    $templateSetSourceKey ?? $templateSetKey,
+                );
+
+            yield from $this->definitionsFromTemplateSet(
+                channel: $channel,
+                purpose: $purpose,
+                scope: $scope,
+                templateSetKey: $templateSetKey,
+                definitions: $definitions,
+                scopeConfigPath: $scopeConfigPath,
+            );
+        }
+    }
+
+    /**
+     * @param array<string|int, mixed> $definitions
+     * @return iterable<int, array{key: string, preset: array<string, mixed>, assignment: array<string, mixed>, catalog_entry: array<string, mixed>}>
+     */
+    private function definitionsFromTemplateSet(
+        string $channel,
+        string $purpose,
+        string $scope,
+        ?string $templateSetKey,
+        array $definitions,
+        string $scopeConfigPath,
+    ): iterable {
+        foreach ($definitions as $messageType => $definition) {
             if ($messageType === 'campaigns') {
                 yield from $this->campaignDefinitionsFromConfig(
                     channel: $channel,
                     purpose: $purpose,
                     scope: $scope,
+                    templateSetKey: $templateSetKey,
                     campaigns: $definition,
                     baseConfigPath: "{$scopeConfigPath}.campaigns",
                 );
@@ -405,18 +452,24 @@ class SyncMessageTemplatePresetsAction
                 }
 
                 $configPath = "{$scopeConfigPath}.{$messageType}".($isList ? ".{$index}" : '');
-                $definitionKey = $this->definitionKey(
+                $leafDefinitionKey = $this->definitionKey(
                     definition: $nestedDefinition,
                     configPath: $configPath,
                     required: $isList,
                     fallback: $runtimeMessageType,
                 );
+                $assignmentDefinitionKey = $this->configSetResolver
+                    ->assignmentDefinitionKey(
+                        $templateSetKey,
+                        $leafDefinitionKey,
+                    );
 
                 yield $this->definitionPayload(
                     definition: $nestedDefinition,
                     channel: $channel,
                     purpose: $purpose,
                     scope: $scope,
+                    templateSetKey: $templateSetKey,
                     messageType: $runtimeMessageType,
                     sourceMessageType: $messageType,
                     configPath: $configPath,
@@ -426,7 +479,8 @@ class SyncMessageTemplatePresetsAction
                     surface: $this->surfaceForScope($scope),
                     campaignTemplate: false,
                     listIndex: $isList ? (int) $index : null,
-                    definitionKey: $definitionKey,
+                    definitionKey: $assignmentDefinitionKey,
+                    leafDefinitionKey: $leafDefinitionKey,
                 );
             }
         }
@@ -439,6 +493,7 @@ class SyncMessageTemplatePresetsAction
         string $channel,
         string $purpose,
         string $scope,
+        ?string $templateSetKey,
         mixed $campaigns,
         string $baseConfigPath,
     ): iterable {
@@ -491,6 +546,7 @@ class SyncMessageTemplatePresetsAction
                         channel: $channel,
                         purpose: $purpose,
                         scope: $scope,
+                        templateSetKey: $templateSetKey,
                         messageType: $messageType,
                         sourceMessageType: 'campaign_step',
                         configPath: $configPath,
@@ -516,6 +572,7 @@ class SyncMessageTemplatePresetsAction
         string $channel,
         string $purpose,
         string $scope,
+        ?string $templateSetKey,
         string $messageType,
         string $sourceMessageType,
         string $configPath,
@@ -526,6 +583,7 @@ class SyncMessageTemplatePresetsAction
         bool $campaignTemplate,
         ?int $listIndex,
         ?string $definitionKey,
+        ?string $leafDefinitionKey = null,
     ): array {
         $messageType = $this->normalizeSegment($messageType);
         $dispatchKeys = $this->normalizeDispatchKeys($definition);
@@ -549,6 +607,7 @@ class SyncMessageTemplatePresetsAction
             channel: $channel,
             purpose: $purpose,
             scope: $scope,
+            templateSetKey: $templateSetKey,
             definitionKey: $definitionKey,
             campaignKey: $campaignKey,
             campaignStep: $campaignStep,
@@ -561,6 +620,7 @@ class SyncMessageTemplatePresetsAction
             channel: $channel,
             purpose: $purpose,
             scope: $scope,
+            templateSetKey: $templateSetKey,
             messageType: $messageType,
             sourceMessageType: $sourceMessageType,
             configPath: $configPath,
@@ -572,6 +632,7 @@ class SyncMessageTemplatePresetsAction
             listIndex: $listIndex,
             presetKey: $key,
             definitionKey: $campaignTemplate ? null : $definitionKey,
+            leafDefinitionKey: $campaignTemplate ? null : $leafDefinitionKey,
         );
 
         $this->assertValidPayloadTokens(
@@ -592,7 +653,9 @@ class SyncMessageTemplatePresetsAction
                     'campaign_key' => $campaignKey,
                     'campaign_step' => $campaignStep,
                     'campaign_step_variant_key' => $campaignStepVariantKey,
+                    'template_set_key' => $campaignTemplate ? null : $templateSetKey,
                     'definition_key' => $campaignTemplate ? null : $definitionKey,
+                    'template_key' => $campaignTemplate ? null : $leafDefinitionKey,
                 ],
                 'catalog' => [
                     'group_key' => $catalog['group_key'],
@@ -651,7 +714,9 @@ class SyncMessageTemplatePresetsAction
                 'meta' => [
                     'source' => 'config_sync',
                     'source_config_path' => $configPath,
+                    'template_set_key' => $campaignTemplate ? null : $templateSetKey,
                     'definition_key' => $campaignTemplate ? null : $definitionKey,
+                    'template_key' => $campaignTemplate ? null : $leafDefinitionKey,
                     'campaign_step_variant_key' => $campaignStepVariantKey,
                     'catalog' => [
                         'group_key' => $catalog['group_key'],
@@ -674,6 +739,7 @@ class SyncMessageTemplatePresetsAction
         string $channel,
         string $purpose,
         string $scope,
+        ?string $templateSetKey,
         string $messageType,
         string $sourceMessageType,
         string $configPath,
@@ -685,6 +751,7 @@ class SyncMessageTemplatePresetsAction
         ?int $listIndex,
         string $presetKey,
         ?string $definitionKey,
+        ?string $leafDefinitionKey,
     ): array {
         if ($campaignTemplate && $campaignKey !== null && $campaignStep !== null && $campaignStepVariantKey !== null) {
             $moduleKey = 'campaigns';
@@ -698,8 +765,23 @@ class SyncMessageTemplatePresetsAction
             $moduleKey = $this->moduleKeyForScope($scope);
             $moduleLabel = $this->moduleLabel($moduleKey);
             $normalizedSourceType = $this->normalizeSegment(Str::singular($sourceMessageType));
-            $groupKey = implode(':', array_filter([$moduleKey, $purpose, $scope, $normalizedSourceType]));
-            $groupLabel = $this->groupLabelForMessageType($scope, $sourceMessageType);
+            $catalogTemplateSetKey = $templateSetKey === MessageDefinitionConfigSetResolver::DEFAULT_TEMPLATE_SET_KEY
+                ? null
+                : $templateSetKey;
+            $groupKey = implode(':', array_filter([
+                $moduleKey,
+                $purpose,
+                $scope,
+                $catalogTemplateSetKey,
+                $normalizedSourceType,
+            ]));
+            $baseGroupLabel = $this->groupLabelForMessageType(
+                $scope,
+                $sourceMessageType,
+            );
+            $groupLabel = $catalogTemplateSetKey !== null
+                ? $this->headline($catalogTemplateSetKey).' — '.$baseGroupLabel
+                : $baseGroupLabel;
             $itemLabel = $this->itemLabelForMessage(
                 channel: $channel,
                 sourceMessageType: $sourceMessageType,
@@ -743,7 +825,9 @@ class SyncMessageTemplatePresetsAction
                 'meta' => [
                     'message_type' => $messageType,
                     'source_message_type' => $sourceMessageType,
+                    'template_set_key' => $templateSetKey,
                     'definition_key' => $definitionKey,
+                    'template_key' => $leafDefinitionKey,
                     'campaign_key' => $campaignKey,
                     'campaign_step' => $campaignStep,
                     'campaign_step_variant_key' => $campaignStepVariantKey,
@@ -947,6 +1031,7 @@ class SyncMessageTemplatePresetsAction
         string $channel,
         string $purpose,
         string $scope,
+        ?string $templateSetKey,
         ?string $definitionKey,
         ?string $campaignKey,
         ?int $campaignStep,
@@ -973,12 +1058,23 @@ class SyncMessageTemplatePresetsAction
         }
 
         if ($definitionKey !== null) {
-            return implode('.', [
+            $segments = [
                 $this->normalizeSegment($channel),
                 $this->normalizeSegment($purpose),
                 $this->normalizeSegment($scope),
-                $this->normalizeSegment($definitionKey),
-            ]);
+            ];
+
+            if (
+                $templateSetKey !== null
+                && $templateSetKey !== MessageDefinitionConfigSetResolver::DEFAULT_TEMPLATE_SET_KEY
+            ) {
+                $segments[] = $this->normalizeSegment($templateSetKey);
+            }
+
+            $segments[] = $this->configSetResolver
+                ->leafDefinitionKey($definitionKey);
+
+            return implode('.', $segments);
         }
 
         throw new InvalidArgumentException(

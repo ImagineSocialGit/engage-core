@@ -12,6 +12,10 @@ use Illuminate\Support\Str;
 
 class MessageTemplatePresetAssignmentResolver
 {
+    public function __construct(
+        private readonly MessageDefinitionConfigSetResolver $configSetResolver,
+    ) {}
+
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -158,16 +162,31 @@ class MessageTemplatePresetAssignmentResolver
 
         $definitionKey ??= $this->normalizeNullableSegment($assignment->definition_key)
             ?? $this->normalizeNullableSegment(data_get($assignment->meta, 'definition_key'));
+        $templateSetKey = $this->normalizeNullableSegment(
+            data_get($assignment->meta, 'template_set_key'),
+        );
+        $templateKey = $this->normalizeNullableSegment(
+            data_get($assignment->meta, 'template_key'),
+        );
+
+        if ($templateKey === null && $definitionKey !== null) {
+            $templateKey = $this->configSetResolver
+                ->leafDefinitionKey($definitionKey);
+        }
 
         return array_replace_recursive($definition, array_filter([
             'key' => $definitionKey,
             'definition_key' => $definitionKey,
+            'template_set_key' => $templateSetKey,
+            'template_key' => $templateKey,
             'campaign_step_variant_key' => $variantKey,
             'source_config_path' => $sourceConfigPath,
             'meta' => [
                 'message_template_assignment' => array_filter([
                     'id' => $assignment->getKey(),
                     'definition_key' => $definitionKey,
+                    'template_set_key' => $templateSetKey,
+                    'template_key' => $templateKey,
                     'campaign_step_variant_key' => $variantKey,
                     'source_config_path' => $sourceConfigPath,
                 ], fn (mixed $value): bool => $value !== null),
@@ -244,7 +263,13 @@ class MessageTemplatePresetAssignmentResolver
         string $purpose,
         string $scope,
     ): array {
-        $definitions = config(MessageDefinitionConfigPath::scope($channel, $purpose, $scope));
+        $definitions = config(
+            MessageDefinitionConfigPath::scope(
+                $channel,
+                $purpose,
+                $scope,
+            ),
+        );
 
         if (! is_array($definitions)) {
             return [];
@@ -252,29 +277,52 @@ class MessageTemplatePresetAssignmentResolver
 
         $keys = [];
 
-        foreach ($definitions as $sourceMessageType => $definition) {
-            if ($sourceMessageType === 'campaigns' || ! is_string($sourceMessageType) || ! is_array($definition)) {
-                continue;
-            }
+        foreach ($this->configSetResolver->sets($scope, $definitions) as $set) {
+            $templateSetKey = $set['key'];
 
-            $messageType = Str::singular($this->normalizeSegment($sourceMessageType));
-            $isList = array_is_list($definition);
-            $definitionList = $isList ? $definition : [$definition];
-
-            foreach ($definitionList as $index => $nestedDefinition) {
-                if (! is_array($nestedDefinition) || ! ($nestedDefinition['enabled'] ?? true)) {
+            foreach ($set['definitions'] as $sourceMessageType => $definition) {
+                if (
+                    $sourceMessageType === 'campaigns'
+                    || ! is_string($sourceMessageType)
+                    || ! is_array($definition)
+                ) {
                     continue;
                 }
 
-                $definitionKey = $this->normalizeNullableSegment($nestedDefinition['key'] ?? null)
-                    ?? ($isList ? $messageType.'_'.((int) $index + 1) : $messageType);
+                $messageType = Str::singular(
+                    $this->normalizeSegment($sourceMessageType),
+                );
+                $isList = array_is_list($definition);
+                $definitionList = $isList ? $definition : [$definition];
 
-                $keys[$messageType][] = $definitionKey;
+                foreach ($definitionList as $index => $nestedDefinition) {
+                    if (
+                        ! is_array($nestedDefinition)
+                        || ! ($nestedDefinition['enabled'] ?? true)
+                    ) {
+                        continue;
+                    }
+
+                    $leafKey = $this->normalizeNullableSegment(
+                        $nestedDefinition['key'] ?? null,
+                    ) ?? (
+                        $isList
+                            ? $messageType.'_'.((int) $index + 1)
+                            : $messageType
+                    );
+
+                    $keys[$messageType][] = $this->configSetResolver
+                        ->assignmentDefinitionKey(
+                            $templateSetKey,
+                            $leafKey,
+                        );
+                }
             }
         }
 
         return array_map(
-            fn (array $values): array => array_values(array_unique($values)),
+            fn (array $values): array =>
+                array_values(array_unique($values)),
             $keys,
         );
     }

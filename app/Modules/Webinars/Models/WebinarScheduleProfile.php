@@ -24,6 +24,7 @@ class WebinarScheduleProfile extends Model
         'key',
         'name',
         'description',
+        'message_template_set_key',
         'status',
         'is_default',
         'is_active',

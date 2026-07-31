@@ -467,6 +467,8 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             'customized_at' => now(),
         ])->save();
 
+        app(SyncMessageTemplatePresetsAction::class)->handle();
+
         $this->assertDatabaseHas('message_template_preset_assignments', [
             'message_template_preset_id' => $preset->getKey(),
             'message_type' => 'confirmation',

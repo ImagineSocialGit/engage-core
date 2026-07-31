@@ -15,6 +15,7 @@ return new class extends Migration
             $table->string('key')->unique();
             $table->string('name');
             $table->text('description')->nullable();
+            $table->string('message_template_set_key')->default('default')->index();
             $table->string('status')->default(WebinarScheduleProfile::STATUS_ACTIVE)->index();
             $table->boolean('is_default')->default(false)->index();
             $table->boolean('is_active')->default(true)->index();

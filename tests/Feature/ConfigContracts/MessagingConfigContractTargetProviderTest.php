@@ -10,7 +10,7 @@ class MessagingConfigContractTargetProviderTest extends TestCase
 {
     public function test_it_preserves_untouched_authored_values_for_standard_and_campaign_targets(): void
     {
-        $provider = new MessagingConfigContractTargetProvider;
+        $provider = app(MessagingConfigContractTargetProvider::class);
         $context = ConfigContractTargetContext::proposed([
             'messaging' => [
                 'email' => [
@@ -73,7 +73,7 @@ class MessagingConfigContractTargetProviderTest extends TestCase
 
     public function test_it_traverses_list_backed_standard_message_definitions_without_normalizing_them(): void
     {
-        $provider = new MessagingConfigContractTargetProvider;
+        $provider = app(MessagingConfigContractTargetProvider::class);
         $context = ConfigContractTargetContext::proposed([
             'messaging' => [
                 'email' => [
@@ -119,7 +119,7 @@ class MessagingConfigContractTargetProviderTest extends TestCase
 
     public function test_it_ignores_channel_infrastructure_outside_the_definitions_envelope(): void
     {
-        $provider = new MessagingConfigContractTargetProvider;
+        $provider = app(MessagingConfigContractTargetProvider::class);
         $context = ConfigContractTargetContext::proposed([
             'messaging' => [
                 'email' => [

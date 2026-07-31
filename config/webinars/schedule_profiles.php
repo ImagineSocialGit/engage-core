@@ -5,6 +5,7 @@ return [
     'full_10_day' => [
         'name' => 'Default webinar schedule',
         'description' => 'Confirmation, four universal reminders, waitlist alert, and transactional replay follow-ups.',
+        'message_template_set_key' => 'default',
         'status' => 'active',
         'is_default' => true,
         'is_active' => true,

@@ -12,6 +12,7 @@ class MessageDefinitionResolver
 {
     public function __construct(
         private readonly MessageTemplatePresetAssignmentResolver $assignmentResolver,
+        private readonly MessageDefinitionConfigSetResolver $configSetResolver,
     ) {}
 
     /**
@@ -49,44 +50,79 @@ class MessageDefinitionResolver
 
         $resolved = [];
 
-        foreach ($definitions as $messageType => $definition) {
-            if ($messageType === 'campaigns') {
-                continue;
-            }
-
-            if (! is_string($messageType) || trim($messageType) === '' || ! is_array($definition)) {
-                continue;
-            }
-
-            $isList = array_is_list($definition);
-            $definitionList = $isList ? $definition : [$definition];
-
-            foreach ($definitionList as $index => $nestedDefinition) {
-                if (! is_array($nestedDefinition)) {
-                    continue;
-                }
-
-                if (! ($nestedDefinition['enabled'] ?? true)) {
-                    continue;
-                }
-
-                $definitionKey = $this->standardDefinitionKey(
-                    definition: $nestedDefinition,
-                    messageType: trim($messageType),
-                    listIndex: $isList ? (int) $index : null,
+        foreach ($this->configSetResolver->sets($scope, $definitions) as $set) {
+            $templateSetKey = $set['key'];
+            $templateSetSourceKey = $set['source_key'];
+            $setPath = $templateSetKey === null
+                || $templateSetKey === MessageDefinitionConfigSetResolver::DEFAULT_TEMPLATE_SET_KEY
+                    && ! array_key_exists(
+                        MessageDefinitionConfigSetResolver::DEFAULT_TEMPLATE_SET_KEY,
+                        $definitions,
+                    )
+                ? $scopeConfigPath
+                : MessageDefinitionConfigPath::templateSet(
+                    $channel,
+                    $purpose,
+                    $scope,
+                    $templateSetSourceKey ?? $templateSetKey,
                 );
 
-                $resolved[] = $this->validateDefinition($this->hydrateDefinitionFromPath(
-                    definition: array_replace($nestedDefinition, [
-                        'key' => $definitionKey,
-                        'definition_key' => $definitionKey,
-                    ]),
-                    channel: $channel,
-                    purpose: $purpose,
-                    scope: $scope,
-                    messageType: trim($messageType),
-                    configPath: "{$scopeConfigPath}.{$messageType}".($isList ? ".{$index}" : ''),
-                ));
+            foreach ($set['definitions'] as $messageType => $definition) {
+                if ($messageType === 'campaigns') {
+                    continue;
+                }
+
+                if (
+                    ! is_string($messageType)
+                    || trim($messageType) === ''
+                    || ! is_array($definition)
+                ) {
+                    continue;
+                }
+
+                $isList = array_is_list($definition);
+                $definitionList = $isList ? $definition : [$definition];
+
+                foreach ($definitionList as $index => $nestedDefinition) {
+                    if (! is_array($nestedDefinition)) {
+                        continue;
+                    }
+
+                    if (! ($nestedDefinition['enabled'] ?? true)) {
+                        continue;
+                    }
+
+                    $templateKey = $this->standardDefinitionKey(
+                        definition: $nestedDefinition,
+                        messageType: trim($messageType),
+                        listIndex: $isList ? (int) $index : null,
+                    );
+                    $definitionKey = $this->configSetResolver
+                        ->assignmentDefinitionKey(
+                            $templateSetKey,
+                            $templateKey,
+                        );
+
+                    $resolved[] = $this->validateDefinition(
+                        $this->hydrateDefinitionFromPath(
+                            definition: array_replace(
+                                $nestedDefinition,
+                                [
+                                    'key' => $definitionKey,
+                                    'definition_key' => $definitionKey,
+                                    'template_set_key' => $templateSetKey,
+                                    'template_key' => $templateKey,
+                                ],
+                            ),
+                            channel: $channel,
+                            purpose: $purpose,
+                            scope: $scope,
+                            messageType: trim($messageType),
+                            configPath: "{$setPath}.{$messageType}"
+                                .($isList ? ".{$index}" : ''),
+                        ),
+                    );
+                }
             }
         }
 

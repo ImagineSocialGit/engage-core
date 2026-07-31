@@ -984,7 +984,7 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
             return;
         }
 
-        if (! $this->matchingDefinitionExists($item, $definitions)) {
+        if (! $this->matchingDefinitionExists($profile, $item, $definitions)) {
             yield $this->error(
                 code: 'webinars.schedule_profiles.messaging_definition_missing',
                 message: "Webinar schedule profile item [{$profile->key}:{$item->key}] does not resolve to a compatible Messaging definition.",
@@ -995,6 +995,7 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
                     'scope' => $item->scope,
                     'message_type' => $item->message_type,
                     'dispatch_key' => $item->dispatch_key,
+                    'message_template_set_key' => $profile->message_template_set_key,
                     'message_template_key' => $item->message_template_key,
                     'source_config_path' => $item->source_config_path,
                 ],
@@ -1006,6 +1007,7 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
      * @param array<int, array<string, mixed>> $definitions
      */
     private function matchingDefinitionExists(
+        WebinarScheduleProfile $profile,
         WebinarScheduleProfileItem $item,
         array $definitions,
     ): bool {
@@ -1029,12 +1031,51 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
                 continue;
             }
 
-            $requiredTemplateKey = $this->normalizeSegment((string) $item->message_template_key);
-            $definitionTemplateKey = $this->normalizeSegment((string) (
-                $definition['key'] ?? data_get($definition, 'meta.message_template_preset.key') ?? ''
+            $requiredTemplateSetKey = $this->normalizeSegment(
+                (string) ($profile->message_template_set_key ?: 'default'),
+            );
+            $definitionTemplateSetKey = $this->normalizeSegment((string) (
+                $definition['template_set_key']
+                    ?? data_get(
+                        $definition,
+                        'meta.message_template_assignment.template_set_key',
+                    )
+                    ?? 'default'
             ));
 
-            if ($requiredTemplateKey !== '' && $definitionTemplateKey === $requiredTemplateKey) {
+            if ($definitionTemplateSetKey !== $requiredTemplateSetKey) {
+                continue;
+            }
+
+            $requiredTemplateKey = $this->normalizeSegment(
+                (string) $item->message_template_key,
+            );
+            $definitionTemplateKey = $definition['template_key']
+                ?? data_get(
+                    $definition,
+                    'meta.message_template_assignment.template_key',
+                )
+                ?? $definition['key']
+                ?? data_get(
+                    $definition,
+                    'meta.message_template_preset.key',
+                )
+                ?? '';
+            $definitionTemplateKey = (string) $definitionTemplateKey;
+            $separator = strrpos($definitionTemplateKey, '.');
+
+            if ($separator !== false) {
+                $definitionTemplateKey = substr(
+                    $definitionTemplateKey,
+                    $separator + 1,
+                );
+            }
+
+            if (
+                $requiredTemplateKey !== ''
+                && $this->normalizeSegment($definitionTemplateKey)
+                    === $requiredTemplateKey
+            ) {
                 return true;
             }
         }

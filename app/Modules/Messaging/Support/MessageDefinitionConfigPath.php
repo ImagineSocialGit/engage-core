@@ -19,14 +19,33 @@ final class MessageDefinitionConfigPath
         return self::purpose($channel, $purpose).'.'.self::segment($scope);
     }
 
+    public static function templateSet(
+        string $channel,
+        string $purpose,
+        string $scope,
+        string $templateSetKey,
+    ): string {
+        return self::scope($channel, $purpose, $scope)
+            .'.'.trim($templateSetKey);
+    }
+
     public static function definition(
         string $channel,
         string $purpose,
         string $scope,
         string $messageType,
         int|string|null $index = null,
+        ?string $templateSetKey = null,
     ): string {
-        $path = self::scope($channel, $purpose, $scope).'.'.self::segment($messageType);
+        $root = $templateSetKey === null
+            ? self::scope($channel, $purpose, $scope)
+            : self::templateSet(
+                $channel,
+                $purpose,
+                $scope,
+                $templateSetKey,
+            );
+        $path = $root.'.'.self::segment($messageType);
 
         return $index === null ? $path : $path.'.'.$index;
     }

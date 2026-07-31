@@ -12,6 +12,7 @@ class MessageConfigValidator
     public function __construct(
         private readonly MessageTemplateTokenValidator $messageTemplateTokenValidator,
         private readonly QueueContract $queueContract,
+        private readonly MessageDefinitionConfigSetResolver $configSetResolver,
     ) {}
 
     /**
@@ -45,13 +46,58 @@ class MessageConfigValidator
             return $issues;
         }
 
-        foreach ($scopeConfig as $messageType => $definition) {
+        foreach ($this->configSetResolver->sets($scope, $scopeConfig) as $set) {
+            $templateSetKey = $set['key'];
+            $templateSetSourceKey = $set['source_key'];
+            $setPath = $templateSetKey === null
+                || $templateSetKey === MessageDefinitionConfigSetResolver::DEFAULT_TEMPLATE_SET_KEY
+                    && ! array_key_exists(
+                        MessageDefinitionConfigSetResolver::DEFAULT_TEMPLATE_SET_KEY,
+                        $scopeConfig,
+                    )
+                ? $scopePath
+                : MessageDefinitionConfigPath::templateSet(
+                    $channel,
+                    $purpose,
+                    $scope,
+                    $templateSetSourceKey ?? $templateSetKey,
+                );
+
+            $issues = array_merge(
+                $issues,
+                $this->validateDefinitionSet(
+                    definitions: $set['definitions'],
+                    basePath: $setPath,
+                    channel: $channel,
+                    purpose: $purpose,
+                    scope: $scope,
+                ),
+            );
+        }
+
+        return $issues;
+    }
+
+    /**
+     * @param array<string|int, mixed> $definitions
+     * @return array<int, array{level: string, path: string, message: string}>
+     */
+    private function validateDefinitionSet(
+        array $definitions,
+        string $basePath,
+        string $channel,
+        string $purpose,
+        string $scope,
+    ): array {
+        $issues = [];
+
+        foreach ($definitions as $messageType => $definition) {
             if ($messageType === 'campaigns') {
                 $issues = array_merge(
                     $issues,
                     $this->validateCampaigns(
                         campaigns: $definition,
-                        basePath: "{$scopePath}.campaigns",
+                        basePath: "{$basePath}.campaigns",
                         channel: $channel,
                         purpose: $purpose,
                         scope: $scope,
@@ -62,24 +108,39 @@ class MessageConfigValidator
             }
 
             if (! is_string($messageType) || trim($messageType) === '') {
-                $issues[] = $this->issue('error', $scopePath, 'Message type keys must be non-empty strings.');
+                $issues[] = $this->issue(
+                    'error',
+                    $basePath,
+                    'Message type keys must be non-empty strings.',
+                );
 
                 continue;
             }
 
             if (! is_array($definition)) {
-                $issues[] = $this->issue('error', "{$scopePath}.{$messageType}", 'Message definition must be an array.');
+                $issues[] = $this->issue(
+                    'error',
+                    "{$basePath}.{$messageType}",
+                    'Message definition must be an array.',
+                );
 
                 continue;
             }
 
-            $definitionList = array_is_list($definition) ? $definition : [$definition];
+            $definitionList = array_is_list($definition)
+                ? $definition
+                : [$definition];
 
             foreach ($definitionList as $index => $nestedDefinition) {
-                $definitionPath = "{$scopePath}.{$messageType}".(array_is_list($definition) ? ".{$index}" : '');
+                $definitionPath = "{$basePath}.{$messageType}"
+                    .(array_is_list($definition) ? ".{$index}" : '');
 
                 if (! is_array($nestedDefinition)) {
-                    $issues[] = $this->issue('error', $definitionPath, 'Message definition must be an array.');
+                    $issues[] = $this->issue(
+                        'error',
+                        $definitionPath,
+                        'Message definition must be an array.',
+                    );
 
                     continue;
                 }

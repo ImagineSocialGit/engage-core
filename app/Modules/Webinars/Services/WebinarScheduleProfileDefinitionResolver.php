@@ -81,6 +81,7 @@ class WebinarScheduleProfileDefinitionResolver
             }
 
             $item = $items->first(fn (WebinarScheduleProfileItem $item): bool => $this->itemMatchesDefinition(
+                profile: $profile,
                 item: $item,
                 definition: $definition,
                 dispatchKeys: $dispatchKeys,
@@ -121,6 +122,7 @@ class WebinarScheduleProfileDefinitionResolver
                         'id' => $profile->getKey(),
                         'key' => $profile->key,
                         'name' => $profile->name,
+                        'message_template_set_key' => $profile->message_template_set_key,
                         'item_id' => $item->getKey(),
                         'item_key' => $item->key,
                         'item_label' => $item->label,
@@ -143,6 +145,7 @@ class WebinarScheduleProfileDefinitionResolver
      * @param array<int, string> $dispatchKeys
      */
     private function itemMatchesDefinition(
+        WebinarScheduleProfile $profile,
         WebinarScheduleProfileItem $item,
         array $definition,
         array $dispatchKeys,
@@ -168,6 +171,19 @@ class WebinarScheduleProfileDefinitionResolver
             return false;
         }
 
+        $definitionTemplateSetKey = $this->definitionTemplateSetKey(
+            $definition,
+        );
+
+        if (
+            $definitionTemplateSetKey
+                !== $this->normalizeSegment(
+                    $profile->message_template_set_key ?: 'default',
+                )
+        ) {
+            return false;
+        }
+
         $definitionTemplateKey = $this->definitionTemplateKey($definition);
 
         if ($definitionTemplateKey === null || $definitionTemplateKey !== $this->normalizeSegment($item->message_template_key)) {
@@ -179,13 +195,45 @@ class WebinarScheduleProfileDefinitionResolver
 
 
     /** @param array<string, mixed> $definition */
-    private function definitionTemplateKey(array $definition): ?string
+    private function definitionTemplateSetKey(array $definition): string
     {
-        $key = $definition['key'] ?? data_get($definition, 'meta.message_template_preset.key');
+        $key = $definition['template_set_key']
+            ?? data_get(
+                $definition,
+                'meta.message_template_assignment.template_set_key',
+            )
+            ?? data_get($definition, 'meta.message_template_set.key')
+            ?? 'default';
 
         return is_string($key) && trim($key) !== ''
-            ? $this->normalizeSegment(trim($key))
-            : null;
+            ? $this->normalizeSegment($key)
+            : 'default';
+    }
+
+    /** @param array<string, mixed> $definition */
+    private function definitionTemplateKey(array $definition): ?string
+    {
+        $key = $definition['template_key']
+            ?? data_get(
+                $definition,
+                'meta.message_template_assignment.template_key',
+            )
+            ?? data_get($definition, 'meta.message_template_set.template_key')
+            ?? $definition['key']
+            ?? data_get($definition, 'meta.message_template_preset.key');
+
+        if (! is_string($key) || trim($key) === '') {
+            return null;
+        }
+
+        $key = trim($key);
+        $separator = strrpos($key, '.');
+
+        return $this->normalizeSegment(
+            $separator === false
+                ? $key
+                : substr($key, $separator + 1),
+        );
     }
 
     /**
