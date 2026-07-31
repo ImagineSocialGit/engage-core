@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use RuntimeException;
 
 class MessageChain extends Model
 {
@@ -43,6 +44,27 @@ class MessageChain extends Model
     {
         return $this->hasMany(MessageChainVersion::class)
             ->orderByDesc('version');
+    }
+
+    public function requireCurrentVersion(): MessageChainVersion
+    {
+        $version = $this->relationLoaded('currentVersion')
+            ? $this->getRelation('currentVersion')
+            : $this->currentVersion()
+                ->with('steps.variants')
+                ->first();
+
+        if (! $version instanceof MessageChainVersion) {
+            throw new RuntimeException(
+                "MessageChain [{$this->key}] has no current version.",
+            );
+        }
+
+        if (! $version->relationLoaded('steps')) {
+            $version->load('steps.variants');
+        }
+
+        return $version;
     }
 
     public function scopeActive(Builder $query): Builder

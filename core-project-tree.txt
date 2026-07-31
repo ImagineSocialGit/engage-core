@@ -449,9 +449,11 @@
 │   │   │   │   ├── DispatchConsentOptInMessageAction.php
 │   │   │   │   ├── DispatchMessageAction.php
 │   │   │   │   ├── DispatchMessageIntentsAction.php
+│   │   │   │   ├── DuplicateMessageChainAction.php
 │   │   │   │   ├── GrantMessageConsentAction.php
 │   │   │   │   ├── GrantMessageConsentsAction.php
 │   │   │   │   ├── ImportMessageConsentAction.php
+│   │   │   │   ├── PublishMessageChainVersionAction.php
 │   │   │   │   ├── PublishMessageTemplateVersionAction.php
 │   │   │   │   ├── RecordMessageConsentAction.php
 │   │   │   │   ├── RecoverStaleScheduledMessageClaimsAction.php
@@ -1700,6 +1702,8 @@
 │   │   │   ├── InternalNotificationChannelResolverTest.php
 │   │   │   ├── InternalNotificationGateTest.php
 │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest.php
+│   │   │   ├── MessageChainDuplicationTest.php
+│   │   │   ├── MessageChainVersionPersistenceTest.php
 │   │   │   ├── MessageChannelAvailabilityTest.php
 │   │   │   ├── MessageConfigValidatorTest.php
 │   │   │   ├── MessageDefinitionConfigPathTest.php
@@ -1868,4 +1872,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-500 directories, 1369 files
+500 directories, 1373 files
