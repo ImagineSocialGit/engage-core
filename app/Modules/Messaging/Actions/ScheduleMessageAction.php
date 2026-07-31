@@ -5,6 +5,7 @@ namespace App\Modules\Messaging\Actions;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
+use App\Modules\Messaging\Models\MessageTemplateVersion;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\PendingMessageDeliveryConsolidator;
 use App\Modules\Messaging\Services\ScheduledMessageMetaCanonicalizer;
@@ -62,17 +63,43 @@ class ScheduleMessageAction
                 ? $dispatchKeys
                 : ($meta['dispatch_keys'] ?? []),
         );
+        $templateVersion = $this->messageTemplateVersion(
+            $messageTemplateVersionId,
+        );
+        $conditions = is_array($meta['conditions'] ?? null)
+            ? $meta['conditions']
+            : [];
         $payload = $this->payloadCanonicalizer->forPersistence(
             payloadClass: $payloadClass,
-            payload: $payload,
+            payload: $templateVersion instanceof MessageTemplateVersion
+                ? array_replace_recursive(
+                    $templateVersion->payload(),
+                    $payload,
+                )
+                : $payload,
             channel: $channel,
             purpose: $purpose,
             scope: $scope,
             messageType: $messageType,
-            conditions: is_array($meta['conditions'] ?? null)
-                ? $meta['conditions']
-                : [],
+            conditions: $conditions,
         );
+
+        if ($templateVersion instanceof MessageTemplateVersion) {
+            $templatePayload = $this->payloadCanonicalizer->forPersistence(
+                payloadClass: $payloadClass,
+                payload: $templateVersion->payload(),
+                channel: $channel,
+                purpose: $purpose,
+                scope: $scope,
+                messageType: $messageType,
+                conditions: $conditions,
+            );
+            $payload = $this->payloadDifferences(
+                resolved: $payload,
+                template: $templatePayload,
+            );
+        }
+
         $meta = $this->metaCanonicalizer->forPersistence($meta);
 
         $attributes = [
@@ -138,6 +165,62 @@ class ScheduleMessageAction
         }
 
         return $scheduledMessage;
+    }
+
+    private function messageTemplateVersion(
+        ?int $messageTemplateVersionId,
+    ): ?MessageTemplateVersion {
+        if ($messageTemplateVersionId === null) {
+            return null;
+        }
+
+        return MessageTemplateVersion::query()
+            ->findOrFail($messageTemplateVersionId);
+    }
+
+    /**
+     * @param array<string, mixed> $resolved
+     * @param array<string, mixed> $template
+     * @return array<string, mixed>
+     */
+    private function payloadDifferences(
+        array $resolved,
+        array $template,
+    ): array {
+        $differences = [];
+
+        foreach ($resolved as $key => $value) {
+            if (! array_key_exists($key, $template)) {
+                $differences[$key] = $value;
+
+                continue;
+            }
+
+            $templateValue = $template[$key];
+
+            if (is_array($value)
+                && is_array($templateValue)
+                && ! array_is_list($value)
+                && ! array_is_list($templateValue)
+            ) {
+                $nested = $this->payloadDifferences(
+                    resolved: $value,
+                    template: $templateValue,
+                );
+
+                if ($nested !== []) {
+                    $differences[$key] = $nested;
+                }
+
+                continue;
+            }
+
+            if ($value !== $templateValue) {
+                $differences[$key] = $value;
+            }
+        }
+
+        return $differences;
     }
 
     /**

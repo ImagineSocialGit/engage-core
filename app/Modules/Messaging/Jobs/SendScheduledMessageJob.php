@@ -13,6 +13,7 @@ use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use App\Modules\Messaging\Services\Email\EmailMessagingService;
 use App\Modules\Messaging\Services\ScheduledMessageDeliveryLeaseManager;
 use App\Modules\Messaging\Services\ScheduledMessageGate;
+use App\Modules\Messaging\Services\ScheduledMessagePayloadResolver;
 use App\Modules\Messaging\Services\Sms\SmsMessagingService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -102,7 +103,8 @@ class SendScheduledMessageJob implements ShouldQueue
                 );
             }
 
-            $payload = $this->resolvePayload($scheduledMessage);
+            $payload = app(ScheduledMessagePayloadResolver::class)
+                ->resolve($scheduledMessage);
 
             if ($reason = $this->unresolvedTokenReason($payload)) {
                 $result = MessageSendResult::skipped(
@@ -227,48 +229,6 @@ class SendScheduledMessageJob implements ShouldQueue
             isset($this->horizon['message_type']) ? 'message-type:'.$this->horizon['message_type'] : null,
             isset($this->horizon['queue']) ? 'queue:'.$this->horizon['queue'] : null,
         ]));
-    }
-
-    private function resolvePayload(ScheduledMessage $scheduledMessage): EmailMessage|SmsMessage
-    {
-        $payloadClass = $scheduledMessage->payload_class;
-
-        if (! is_string($payloadClass) || ! class_exists($payloadClass)) {
-            throw new InvalidArgumentException('Scheduled message payload class is invalid.');
-        }
-
-        if (! method_exists($payloadClass, 'fromArray')) {
-            throw new InvalidArgumentException("Payload class [{$payloadClass}] must define fromArray().");
-        }
-
-        $payloadData = array_replace_recursive(
-            [
-                'channel' => $scheduledMessage->channel,
-                'purpose' => $scheduledMessage->purpose,
-                'scope' => $scheduledMessage->scope,
-                'message_type' => $scheduledMessage->message_type,
-            ],
-            $scheduledMessage->payload ?? [],
-        );
-
-        if (filled($scheduledMessage->provider_idempotency_key)) {
-            $payloadData['meta'] = array_replace_recursive(
-                is_array($payloadData['meta'] ?? null) ? $payloadData['meta'] : [],
-                [
-                    'delivery' => [
-                        'provider_idempotency_key' => $scheduledMessage->provider_idempotency_key,
-                    ],
-                ],
-            );
-        }
-
-        $payload = $payloadClass::fromArray($payloadData);
-
-        if (! $payload instanceof EmailMessage && ! $payload instanceof SmsMessage) {
-            throw new InvalidArgumentException("Payload class [{$payloadClass}] must implement a supported message payload contract.");
-        }
-
-        return $payload;
     }
 
     private function unresolvedTokenReason(EmailMessage|SmsMessage $payload): ?string

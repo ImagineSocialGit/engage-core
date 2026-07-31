@@ -116,8 +116,10 @@ class CanonicalMessageTemplateRuntimeCutoverTest extends TestCase
 
         $this->assertSame($version->getKey(), $scheduledMessage->message_template_version_id);
         $this->assertTrue($scheduledMessage->messageTemplateVersion->is($version));
-        $this->assertSame('Canonical fixture subject', $scheduledMessage->payload['subject']);
-        $this->assertSame('Canonical fixture body.', $scheduledMessage->payload['body']);
+        $this->assertSame('fixture@example.test', $scheduledMessage->payload['to']);
+        $this->assertArrayNotHasKey('subject', $scheduledMessage->payload);
+        $this->assertArrayNotHasKey('body', $scheduledMessage->payload);
+        $this->assertArrayNotHasKey('tokens', $scheduledMessage->payload);
 
         Queue::assertPushed(SendScheduledMessageJob::class);
     }

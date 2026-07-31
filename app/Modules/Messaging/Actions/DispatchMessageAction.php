@@ -204,7 +204,11 @@ class DispatchMessageAction
             scope: $definition['scope'],
             messageType: $definition['message_type'],
             payloadClass: $definition['payload_class'],
-            payload: $resolvedPayload,
+            payload: $this->payloadForScheduling(
+                definition: $definition,
+                resolvedPayload: $resolvedPayload,
+                runtimePayload: $payload,
+            ),
             sendAt: $dispatch->sendAt,
             context: $context,
             behaviorOwner: $dispatch->behaviorOwner,
@@ -223,6 +227,38 @@ class DispatchMessageAction
                 ? (int) $definition['message_template_version_id']
                 : null,
         );
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     * @param array<string, mixed> $resolvedPayload
+     * @param array<string, mixed> $runtimePayload
+     * @return array<string, mixed>
+     */
+    private function payloadForScheduling(
+        array $definition,
+        array $resolvedPayload,
+        array $runtimePayload,
+    ): array {
+        if (! is_numeric(
+            $definition['message_template_version_id'] ?? null,
+        )) {
+            return $resolvedPayload;
+        }
+
+        $tokens = is_array($runtimePayload['tokens'] ?? null)
+            ? $runtimePayload['tokens']
+            : [];
+
+        if ($tokens === []) {
+            unset($resolvedPayload['tokens']);
+
+            return $resolvedPayload;
+        }
+
+        $resolvedPayload['tokens'] = $tokens;
+
+        return $resolvedPayload;
     }
 
     private function mayMergeIntoPendingConsolidatedDelivery(

@@ -596,6 +596,7 @@
 │   │   │   │   ├── ScheduledMessageGate.php
 │   │   │   │   ├── ScheduledMessageMetaCanonicalizer.php
 │   │   │   │   ├── ScheduledMessagePayloadCanonicalizer.php
+│   │   │   │   ├── ScheduledMessagePayloadResolver.php
 │   │   │   │   └── Sms
 │   │   │   │       ├── SmsMessagingService.php
 │   │   │   │       ├── SmsProviderManager.php
@@ -1682,6 +1683,7 @@
 │   │   │   └── LocationFoundationTest.php
 │   │   ├── Messaging
 │   │   │   ├── CampaignVariantTemplateAssignmentResolutionTest.php
+│   │   │   ├── CanonicalMessageTemplateRuntimeCutoverTest.php
 │   │   │   ├── ConditionCheckerTest.php
 │   │   │   ├── ConsentDomainActionIntegrationTest.php
 │   │   │   ├── ConsentDomainRegistryTest.php
@@ -1728,6 +1730,7 @@
 │   │   │   ├── ScheduledMessageFlowRoutesBoundaryTest.php
 │   │   │   ├── ScheduledMessageMetaCanonicalizerTest.php
 │   │   │   ├── ScheduledMessagePayloadCanonicalizerTest.php
+│   │   │   ├── ScheduledMessagePayloadResolverTest.php
 │   │   │   ├── ScheduleInternalNotificationActionTest.php
 │   │   │   ├── ScheduleMessageTimeNormalizationTest.php
 │   │   │   ├── SemanticCampaignVariantIdentityResolutionTest.php
@@ -1865,4 +1868,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-500 directories, 1366 files
+500 directories, 1369 files

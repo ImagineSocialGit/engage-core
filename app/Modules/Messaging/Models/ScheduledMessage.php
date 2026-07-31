@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ScheduledMessage extends Model
@@ -108,6 +109,11 @@ class ScheduledMessage extends Model
     public function deliveryAttempts(): HasMany
     {
         return $this->hasMany(ScheduledMessageDeliveryAttempt::class);
+    }
+
+    public function renderContext(): HasOne
+    {
+        return $this->hasOne(ScheduledMessageRenderContext::class);
     }
 
     /**
