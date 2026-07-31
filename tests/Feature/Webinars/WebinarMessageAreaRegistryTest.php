@@ -27,7 +27,7 @@ class WebinarMessageAreaRegistryTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertSame([
+        $this->assertEquals([
             'confirmation',
             'registration_opt_in',
             'reminders',
@@ -36,6 +36,19 @@ class WebinarMessageAreaRegistryTest extends TestCase
             'post_attended',
             'post_missed',
         ], $keys);
+    }
+
+    public function test_template_message_areas_expose_their_immutable_chain_ownership(): void
+    {
+        $areas = app(WebinarMessageAreaRegistry::class)->all();
+
+        $this->assertSame('registration', $areas->get('confirmation')?->chainKey);
+        $this->assertSame('registration', $areas->get('reminders')?->chainKey);
+        $this->assertSame('waitlist', $areas->get('waitlist')?->chainKey);
+        $this->assertSame('post_attended', $areas->get('post_attended')?->chainKey);
+        $this->assertSame('post_missed', $areas->get('post_missed')?->chainKey);
+        $this->assertNull($areas->get('registration_opt_in')?->chainKey);
+        $this->assertNull($areas->get('waitlist_opt_in')?->chainKey);
     }
 
     public function test_client_can_intentionally_disable_a_template_message_area(): void

@@ -26,6 +26,7 @@ final readonly class WebinarMessageAreaDefinition
         public string $surface,
         public string $messageType,
         public string $dispatchKey,
+        public ?string $chainKey,
         public bool|string $required,
         public array $usageTypes,
         public array $profileContextKeys,
@@ -94,6 +95,9 @@ final readonly class WebinarMessageAreaDefinition
         $consolidationPrimary = is_array($config['consolidation_primary'] ?? null)
             ? $config['consolidation_primary']
             : null;
+        $chainKey = $kind === self::KIND_TEMPLATE
+            ? self::nullableSegment($config['chain_key'] ?? null) ?? $key
+            : null;
 
         return new self(
             key: $key,
@@ -107,6 +111,7 @@ final readonly class WebinarMessageAreaDefinition
             surface: self::normalizeSegment(self::requiredString($config, 'surface', $key)),
             messageType: self::normalizeSegment(self::requiredString($config, 'message_type', $key)),
             dispatchKey: self::normalizeSegment(self::requiredString($config, 'dispatch_key', $key)),
+            chainKey: $chainKey,
             required: is_string($required) ? self::normalizeSegment($required) : $required,
             usageTypes: self::normalizeList($config['usage_types'] ?? []),
             profileContextKeys: array_values(array_unique($profileContextKeys)),
@@ -229,6 +234,7 @@ final readonly class WebinarMessageAreaDefinition
             'surface' => $this->surface,
             'message_type' => $this->messageType,
             'dispatch_key' => $this->dispatchKey,
+            'chain_key' => $this->chainKey,
             'required' => $this->required,
             'usage_types' => $this->usageTypes,
             'profile_context_keys' => $this->profileContextKeys,

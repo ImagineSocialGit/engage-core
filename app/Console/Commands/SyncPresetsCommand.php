@@ -112,6 +112,7 @@ class SyncPresetsCommand extends Command
                 $this->renderWebinarScheduleProfileResult(
                     $syncWebinarScheduleProfiles->handle(
                         force: (bool) $this->option('force-webinar-schedule-profiles'),
+                        requireMessageChains: true,
                     ),
                 );
             } else {
@@ -335,6 +336,15 @@ class SyncPresetsCommand extends Command
                 ['Items updated', $result['items_updated']],
                 ['Items customized skipped', $result['items_skipped']],
                 ['Items disabled', $result['items_disabled']],
+                ['Chains created', $result['chains_created']],
+                ['Chains updated', $result['chains_updated']],
+                ['Chains customized skipped', $result['chains_skipped']],
+                ['Chain versions published', $result['chain_versions_published']],
+                ['Chain versions reused', $result['chain_versions_reused']],
+                ['Chain bindings created', $result['chain_bindings_created']],
+                ['Chain bindings updated', $result['chain_bindings_updated']],
+                ['Chain bindings disabled', $result['chain_bindings_disabled']],
+                ['Chain publication deferred', $result['chains_deferred']],
             ],
         );
     }

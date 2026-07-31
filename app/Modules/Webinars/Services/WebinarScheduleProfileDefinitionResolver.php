@@ -177,9 +177,7 @@ class WebinarScheduleProfileDefinitionResolver
 
         if (
             $definitionTemplateSetKey
-                !== $this->normalizeSegment(
-                    $profile->message_template_set_key ?: 'default',
-                )
+                !== $this->expectedTemplateSetKey($profile, $item)
         ) {
             return false;
         }
@@ -193,6 +191,19 @@ class WebinarScheduleProfileDefinitionResolver
         return true;
     }
 
+
+    private function expectedTemplateSetKey(
+        WebinarScheduleProfile $profile,
+        WebinarScheduleProfileItem $item,
+    ): string {
+        if ($this->normalizeSegment($item->scope) !== 'webinar') {
+            return 'default';
+        }
+
+        return $this->normalizeSegment(
+            $profile->message_template_set_key ?: 'default',
+        );
+    }
 
     /** @param array<string, mixed> $definition */
     private function definitionTemplateSetKey(array $definition): string

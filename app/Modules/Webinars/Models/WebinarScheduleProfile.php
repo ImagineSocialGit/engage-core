@@ -66,6 +66,16 @@ class WebinarScheduleProfile extends Model
 
     public function items(): HasMany
     {
-        return $this->hasMany(WebinarScheduleProfileItem::class)->orderBy('sort_order')->orderBy('id');
+        return $this->hasMany(WebinarScheduleProfileItem::class)
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
+    public function messageChainBindings(): HasMany
+    {
+        return $this->hasMany(WebinarScheduleProfileChainBinding::class)
+            ->orderBy('key')
+            ->orderBy('message_area_key')
+            ->orderBy('id');
     }
 }

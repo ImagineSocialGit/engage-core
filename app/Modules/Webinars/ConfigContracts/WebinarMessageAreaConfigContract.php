@@ -48,6 +48,7 @@ class WebinarMessageAreaConfigContract implements ConfigContract
             'surface' => ConfigField::required(ConfigSchema::string()),
             'message_type' => ConfigField::required(ConfigSchema::string()),
             'dispatch_key' => ConfigField::required(ConfigSchema::string()),
+            'chain_key' => ConfigField::optional(ConfigSchema::string(nullable: true)),
             'required' => ConfigField::required(ConfigSchema::oneOf([
                 ConfigSchema::boolean(),
                 ConfigSchema::string(allowedValues: [
@@ -78,6 +79,7 @@ class WebinarMessageAreaConfigContract implements ConfigContract
             'surface' => 'webinar_registrations',
             'message_type' => 'confirmation',
             'dispatch_key' => 'registration_created',
+            'chain_key' => 'registration',
             'required' => true,
             'usage_types' => ['webinar_confirmation'],
             'profile_context_keys' => ['confirmation', 'confirmations'],

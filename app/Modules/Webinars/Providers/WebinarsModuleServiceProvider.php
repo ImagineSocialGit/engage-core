@@ -14,6 +14,7 @@ use App\Modules\Webinars\Services\ContactPanels\WebinarContactPanelProvider;
 use App\Modules\Webinars\Services\Dashboard\WebinarActivityDashboardPanelProvider;
 use App\Modules\Webinars\TokenContracts\WebinarTokenContextProvider;
 use App\Modules\Webinars\TokenContracts\WebinarTokenSourceProvider;
+use App\Modules\Webinars\Validation\WebinarMessageChainSetupValidationContributor;
 use App\Modules\Webinars\Validation\WebinarsSetupValidationContributor;
 use App\Support\Dashboard\DashboardPanelRegistry;
 use Illuminate\Console\Scheduling\Schedule;
@@ -51,6 +52,7 @@ class WebinarsModuleServiceProvider extends ServiceProvider
         ], DashboardPanelRegistry::providerTag());
 
         $this->app->tag([
+            WebinarMessageChainSetupValidationContributor::class,
             WebinarsSetupValidationContributor::class,
         ], 'setup.validation_contributors');
     }

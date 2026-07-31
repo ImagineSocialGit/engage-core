@@ -810,6 +810,7 @@
 │   │   │   │   ├── ResolveWebinarRegistrationReplacementChainAction.php
 │   │   │   │   ├── RetryWebinarRegistrationFinalizationAction.php
 │   │   │   │   ├── SyncWebinarRegistrationToProviderAction.php
+│   │   │   │   ├── SyncWebinarScheduleProfileChainsAction.php
 │   │   │   │   ├── SyncWebinarScheduleProfilesAction.php
 │   │   │   │   └── SyncWebinarSeriesFromProviderAction.php
 │   │   │   ├── ConfigContracts
@@ -874,6 +875,7 @@
 │   │   │   │   ├── Webinar.php
 │   │   │   │   ├── WebinarRegistration.php
 │   │   │   │   ├── WebinarRegistrationResponse.php
+│   │   │   │   ├── WebinarScheduleProfileChainBinding.php
 │   │   │   │   ├── WebinarScheduleProfileItem.php
 │   │   │   │   ├── WebinarScheduleProfile.php
 │   │   │   │   ├── WebinarSeries.php
@@ -904,6 +906,7 @@
 │   │   │   │   ├── WebinarRegistrationCancellationPolicy.php
 │   │   │   │   ├── WebinarRegistrationCsvReader.php
 │   │   │   │   ├── WebinarRegistrationQuestionResolver.php
+│   │   │   │   ├── WebinarScheduleProfileChainDefinitionBuilder.php
 │   │   │   │   ├── WebinarScheduleProfileDefinitionResolver.php
 │   │   │   │   ├── WebinarScheduleProfileResolver.php
 │   │   │   │   └── WebinarStateCanonicalizer.php
@@ -919,6 +922,7 @@
 │   │   │   │   ├── WebinarTokenContextProvider.php
 │   │   │   │   └── WebinarTokenSourceProvider.php
 │   │   │   └── Validation
+│   │   │       ├── WebinarMessageChainSetupValidationContributor.php
 │   │   │       └── WebinarsSetupValidationContributor.php
 │   │   └── Workflow
 │   │       ├── Actions
@@ -1306,6 +1310,7 @@
 │   │   ├── 2026_07_22_160000_create_webinar_registration_responses_table.php
 │   │   ├── 2026_07_30_224000_create_message_template_and_chain_tables.php
 │   │   ├── 2026_07_30_224001_create_message_chain_runtime_support_tables.php
+│   │   ├── 2026_07_31_210000_create_webinar_schedule_profile_chain_bindings_table.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -1856,6 +1861,7 @@
 │   │   │   ├── WebinarReplacementPublicLifecycleTest.php
 │   │   │   ├── WebinarResolvedMessageDispatchOwnershipTest.php
 │   │   │   ├── WebinarScheduleProfileDefinitionResolverMessageAreaTest.php
+│   │   │   ├── WebinarScheduleProfileMessageChainSyncTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
 │   │   │   ├── WebinarStateCanonicalizerTest.php
@@ -1874,4 +1880,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-500 directories, 1375 files
+500 directories, 1381 files

@@ -12,6 +12,7 @@ class SyncWebinarScheduleProfilesAction
 {
     public function __construct(
         private readonly WebinarMessageAreaRegistry $messageAreaRegistry,
+        private readonly SyncWebinarScheduleProfileChainsAction $syncProfileChains,
     ) {}
 
     /**
@@ -22,10 +23,22 @@ class SyncWebinarScheduleProfilesAction
      *     items_created: int,
      *     items_updated: int,
      *     items_skipped: int,
-     *     items_disabled: int
+     *     items_disabled: int,
+     *     chains_created: int,
+     *     chains_updated: int,
+     *     chains_skipped: int,
+     *     chain_versions_published: int,
+     *     chain_versions_reused: int,
+     *     chain_bindings_created: int,
+     *     chain_bindings_updated: int,
+     *     chain_bindings_disabled: int,
+     *     chains_deferred: int
      * }
      */
-    public function handle(bool $force = false): array
+    public function handle(
+        bool $force = false,
+        bool $requireMessageChains = false,
+    ): array
     {
         $profiles = config('webinars.schedule_profiles', []);
 
@@ -35,7 +48,11 @@ class SyncWebinarScheduleProfilesAction
 
         $profiles = $this->validatedProfiles($profiles);
 
-        return DB::transaction(function () use ($profiles, $force): array {
+        return DB::transaction(function () use (
+            $profiles,
+            $force,
+            $requireMessageChains,
+        ): array {
             $result = [
                 'profiles_created' => 0,
                 'profiles_updated' => 0,
@@ -44,6 +61,15 @@ class SyncWebinarScheduleProfilesAction
                 'items_updated' => 0,
                 'items_skipped' => 0,
                 'items_disabled' => 0,
+                'chains_created' => 0,
+                'chains_updated' => 0,
+                'chains_skipped' => 0,
+                'chain_versions_published' => 0,
+                'chain_versions_reused' => 0,
+                'chain_bindings_created' => 0,
+                'chain_bindings_updated' => 0,
+                'chain_bindings_disabled' => 0,
+                'chains_deferred' => 0,
             ];
 
             foreach ($profiles as $key => $profileConfig) {
@@ -102,6 +128,19 @@ class SyncWebinarScheduleProfilesAction
                 $result['items_disabled'] += $staleItems->update([
                     'is_active' => false,
                 ]);
+
+                foreach (
+                    $this->syncProfileChains->handle($profile, $force)
+                    as $resultKey => $count
+                ) {
+                    $result[$resultKey] += $count;
+                }
+            }
+
+            if ($requireMessageChains && $result['chains_deferred'] > 0) {
+                throw new InvalidArgumentException(
+                    'Webinar MessageChain publication was deferred because no canonical MessageTemplates exist. Sync Messaging templates before Webinar schedule profiles.',
+                );
             }
 
             return $result;

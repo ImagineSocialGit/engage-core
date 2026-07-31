@@ -12,6 +12,7 @@ return [
         'surface' => 'webinar_registrations',
         'message_type' => 'confirmation',
         'dispatch_key' => 'registration_created',
+        'chain_key' => 'registration',
         'required' => true,
         'usage_types' => [
             'webinar_confirmation',
@@ -61,6 +62,7 @@ return [
         'surface' => 'webinar_registrations',
         'message_type' => 'reminder',
         'dispatch_key' => 'registration_created',
+        'chain_key' => 'registration',
         'required' => true,
         'usage_types' => [
             'webinar_reminder',
@@ -83,6 +85,7 @@ return [
         'surface' => 'webinar_waitlists',
         'message_type' => 'alert',
         'dispatch_key' => 'webinar_added',
+        'chain_key' => 'waitlist',
         'required' => false,
         'usage_types' => [
             'webinar_waitlist_alert',
@@ -122,6 +125,7 @@ return [
         'surface' => 'webinar_registrations',
         'message_type' => 'post_attended',
         'dispatch_key' => 'webinar_ended',
+        'chain_key' => 'post_attended',
         'required' => true,
         'usage_types' => [
             'webinar_post_attended',
@@ -143,6 +147,7 @@ return [
         'surface' => 'webinar_registrations',
         'message_type' => 'post_missed',
         'dispatch_key' => 'webinar_ended',
+        'chain_key' => 'post_missed',
         'required' => true,
         'usage_types' => [
             'webinar_post_missed',
