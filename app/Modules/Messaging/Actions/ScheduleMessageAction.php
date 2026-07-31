@@ -38,6 +38,7 @@ class ScheduleMessageAction
         ?string $queue = null,
         array $dispatchKeys = [],
         ?string $definitionConfigPath = null,
+        ?int $messageTemplateVersionId = null,
     ): ScheduledMessage {
         $channel = $this->normalizeEnumValue($channel);
         $purpose = $this->normalizeEnumValue($purpose);
@@ -77,6 +78,7 @@ class ScheduleMessageAction
         $attributes = [
             'recipient_type' => $recipient->getMorphClass(),
             'recipient_id' => $recipient->getKey(),
+            'message_template_version_id' => $messageTemplateVersionId,
             'channel' => $channel,
             'message_type' => $messageType,
             'purpose' => $purpose,
@@ -148,6 +150,7 @@ class ScheduleMessageAction
     ): array {
         return array_filter([
             'scheduled_message_id' => $scheduledMessage->id,
+            'message_template_version_id' => $scheduledMessage->message_template_version_id,
             'recipient_type' => class_basename(
                 (string) $scheduledMessage->recipient_type,
             ),

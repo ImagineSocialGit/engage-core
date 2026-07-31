@@ -74,6 +74,11 @@ class MessageTemplateVersion extends Model
         return $this->hasMany(MessageChainStepVariant::class);
     }
 
+    public function scheduledMessages(): HasMany
+    {
+        return $this->hasMany(ScheduledMessage::class);
+    }
+
     public function scheduledMessageComponents(): HasMany
     {
         return $this->hasMany(ScheduledMessageComponent::class);

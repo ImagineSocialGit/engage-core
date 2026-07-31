@@ -32,7 +32,7 @@ class MessageTemplatePresetAssignmentResolver
             ->whereNull('campaign_step_variant_key')
             ->whereNull('context_type')
             ->whereNull('context_id')
-            ->with('messageTemplatePreset')
+            ->with('messageTemplatePreset.canonicalTemplate.currentVersion')
             ->orderBy('message_type')
             ->orderByDesc('id')
             ->get()
@@ -82,7 +82,7 @@ class MessageTemplatePresetAssignmentResolver
                 ->where('campaign_step_variant_key', $variantKey)
                 ->where('context_type', $context->getMorphClass())
                 ->where('context_id', $context->getKey())
-                ->with('messageTemplatePreset')
+                ->with('messageTemplatePreset.canonicalTemplate.currentVersion')
                 ->orderByDesc('id')
                 ->get()
                 ->first(fn (MessageTemplatePresetAssignment $assignment): bool => (bool) $assignment->messageTemplatePreset?->isActive());
@@ -97,7 +97,7 @@ class MessageTemplatePresetAssignmentResolver
                 ->where('campaign_step_variant_key', $variantKey)
                 ->whereNull('context_type')
                 ->whereNull('context_id')
-                ->with('messageTemplatePreset')
+                ->with('messageTemplatePreset.canonicalTemplate.currentVersion')
                 ->orderByDesc('id')
                 ->get()
                 ->first(fn (MessageTemplatePresetAssignment $assignment): bool => (bool) $assignment->messageTemplatePreset?->isActive());

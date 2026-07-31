@@ -13,6 +13,13 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::table('scheduled_messages', function (Blueprint $table): void {
+            $table->foreignIdFor(MessageTemplateVersion::class)
+                ->nullable()
+                ->constrained()
+                ->restrictOnDelete();
+        });
+
         Schema::create('message_chain_enrollments', function (Blueprint $table): void {
             $table->id();
             $table->foreignIdFor(MessageChainVersion::class)
@@ -100,5 +107,9 @@ return new class extends Migration
         Schema::dropIfExists('scheduled_message_components');
         Schema::dropIfExists('scheduled_message_render_contexts');
         Schema::dropIfExists('message_chain_enrollments');
+
+        Schema::table('scheduled_messages', function (Blueprint $table): void {
+            $table->dropConstrainedForeignId('message_template_version_id');
+        });
     }
 };

@@ -219,6 +219,9 @@ class DispatchMessageAction
             definitionConfigPath: is_string($definition['config_path'] ?? null)
                 ? $definition['config_path']
                 : null,
+            messageTemplateVersionId: is_numeric($definition['message_template_version_id'] ?? null)
+                ? (int) $definition['message_template_version_id']
+                : null,
         );
     }
 

@@ -5,6 +5,7 @@ namespace App\Modules\Messaging\Models;
 use Database\Factories\ScheduledMessageFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
@@ -30,6 +31,7 @@ class ScheduledMessage extends Model
         'context_id',
         'behavior_owner_type',
         'behavior_owner_id',
+        'message_template_version_id',
         'channel',
         'message_type',
         'purpose',
@@ -66,6 +68,7 @@ class ScheduledMessage extends Model
             'recipient_id' => 'integer',
             'context_id' => 'integer',
             'behavior_owner_id' => 'integer',
+            'message_template_version_id' => 'integer',
             'dispatch_keys' => 'array',
             'payload' => 'array',
             'send_at' => 'datetime',
@@ -95,6 +98,11 @@ class ScheduledMessage extends Model
     public function behaviorOwner(): MorphTo
     {
         return $this->morphTo('behavior_owner');
+    }
+
+    public function messageTemplateVersion(): BelongsTo
+    {
+        return $this->belongsTo(MessageTemplateVersion::class);
     }
 
     public function deliveryAttempts(): HasMany

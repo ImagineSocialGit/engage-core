@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class MessageTemplatePreset extends Model
 {
@@ -69,6 +70,11 @@ class MessageTemplatePreset extends Model
         return $this->hasMany(MessageTemplateCatalogEntry::class);
     }
 
+    public function canonicalTemplate(): HasOne
+    {
+        return $this->hasOne(MessageTemplate::class, 'key', 'key');
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query
@@ -86,6 +92,16 @@ class MessageTemplatePreset extends Model
      */
     public function toMessageDefinition(?MessageTemplatePresetAssignment $assignment = null): array
     {
+        $this->loadMissing('canonicalTemplate.currentVersion');
+
+        $template = $this->canonicalTemplate;
+        $version = $template instanceof MessageTemplate
+            ? $template->requireCurrentVersion()
+            : null;
+        $payload = $version instanceof MessageTemplateVersion
+            ? $version->payload()
+            : (is_array($this->payload) ? $this->payload : []);
+
         $meta = array_replace_recursive(
             $this->meta ?? [],
             [
@@ -100,6 +116,8 @@ class MessageTemplatePreset extends Model
 
         $definition = array_filter([
             'key' => $this->key,
+            'message_template_id' => $template?->getKey(),
+            'message_template_version_id' => $version?->getKey(),
             'channel' => $assignment?->channel ?? $this->channel,
             'purpose' => $assignment?->purpose ?? $this->purpose,
             'scope' => $assignment?->scope ?? $this->scope,
@@ -107,7 +125,7 @@ class MessageTemplatePreset extends Model
             'dispatch_keys' => $this->dispatchKeys(),
             'payload_class' => $this->payload_class,
             'queue' => $this->queue,
-            'payload' => $this->payload ?? [],
+            'payload' => $payload,
             'campaign_key' => $assignment?->campaign_key,
             'step' => $assignment?->campaign_step,
             'notification_type' => $meta['notification_type'] ?? null,
