@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use RuntimeException;
 
 class MessageTemplate extends Model
 {
@@ -44,6 +45,37 @@ class MessageTemplate extends Model
     {
         return $this->hasMany(MessageTemplateVersion::class)
             ->orderByDesc('version');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function currentPayload(): array
+    {
+        $version = $this->relationLoaded('currentVersion')
+            ? $this->getRelation('currentVersion')
+            : $this->currentVersion()->first();
+
+        if (! $version instanceof MessageTemplateVersion) {
+            return [];
+        }
+
+        return $version->payload();
+    }
+
+    public function requireCurrentVersion(): MessageTemplateVersion
+    {
+        $version = $this->relationLoaded('currentVersion')
+            ? $this->getRelation('currentVersion')
+            : $this->currentVersion()->first();
+
+        if (! $version instanceof MessageTemplateVersion) {
+            throw new RuntimeException(
+                "MessageTemplate [{$this->key}] has no current version.",
+            );
+        }
+
+        return $version;
     }
 
     public function scopeActive(Builder $query): Builder

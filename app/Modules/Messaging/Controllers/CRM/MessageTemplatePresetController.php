@@ -3,8 +3,12 @@
 namespace App\Modules\Messaging\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Modules\Messaging\Actions\PublishMessageTemplateVersionAction;
+use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
+use App\Modules\Messaging\Models\MessageTemplateVersion;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Requests\UpdateMessageTemplatePresetRequest;
@@ -15,11 +19,16 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class MessageTemplatePresetController extends Controller
 {
-    public function index(Request $request, MessageTemplateUsageResolver $usageResolver): View
+    public function index(
+        Request $request,
+        MessageTemplateUsageResolver $usageResolver,
+        MessageTemplateTokenValidator $messageTemplateTokenValidator,
+    ): View
     {
         $catalogEntries = MessageTemplateCatalogEntry::query()
             ->active()
@@ -53,12 +62,25 @@ class MessageTemplatePresetController extends Controller
         $selectedGroupEntries = $selectedGroup['entries'] ?? collect();
         $selectedPreset = $this->selectedPreset($request, $selectedGroupEntries);
 
+        $selectedTemplate = null;
+        $currentTemplateVersion = null;
+
         if ($selectedPreset instanceof MessageTemplatePreset) {
             $selectedPreset->load([
                 'catalogEntries' => fn ($query) => $query->active()->orderBy('item_order')->orderBy('item_label'),
                 'assignments' => fn ($query) => $query->active()->orderBy('surface')->orderBy('campaign_key')->orderBy('campaign_step')->orderBy('message_type'),
             ])->loadCount(['assignments as active_assignments_count' => fn ($query) => $query->active()]);
+
+            $selectedTemplate = MessageTemplate::query()
+                ->with('currentVersion')
+                ->where('key', $selectedPreset->key)
+                ->first();
+            $currentTemplateVersion = $selectedTemplate?->currentVersion;
         }
+
+        $editablePayload = $selectedPreset
+            ? $this->editablePayload($selectedPreset, $currentTemplateVersion)
+            : [];
 
         return view('crm.messaging.message-templates.index', [
             'presets' => $presets,
@@ -67,10 +89,12 @@ class MessageTemplatePresetController extends Controller
             'selectedGroup' => $selectedGroup,
             'selectedGroupEntries' => $selectedGroupEntries,
             'selectedPreset' => $selectedPreset,
+            'selectedTemplate' => $selectedTemplate,
+            'currentTemplateVersion' => $currentTemplateVersion,
             'filterOptions' => $filterOptions,
             'filters' => $filters,
-            'editablePayload' => $selectedPreset ? $this->editablePayload($selectedPreset) : [],
-            'tokens' => $selectedPreset?->tokens ?? [],
+            'editablePayload' => $editablePayload,
+            'tokens' => $messageTemplateTokenValidator->tokensFromPayload($editablePayload),
             'usageSummaries' => $selectedPreset ? $usageResolver->forPreset($selectedPreset) : collect(),
         ]);
     }
@@ -79,20 +103,57 @@ class MessageTemplatePresetController extends Controller
         UpdateMessageTemplatePresetRequest $request,
         MessageTemplatePreset $messageTemplatePreset,
         MessageTemplateTokenValidator $messageTemplateTokenValidator,
+        PublishMessageTemplateVersionAction $publishMessageTemplateVersion,
     ): RedirectResponse {
         $payload = array_replace_recursive(
-            $messageTemplatePreset->payload ?? [],
+            $this->versionedPayloadFor($messageTemplatePreset),
             $request->safePayload(),
         );
+        $customizedAt = now();
 
-        $messageTemplatePreset->forceFill([
-            'name' => $request->validated('name'),
-            'description' => $request->validated('description'),
-            'payload' => $payload,
-            'tokens' => $messageTemplateTokenValidator->tokensFromPayload($payload),
-            'is_customized' => true,
-            'customized_at' => now(),
-        ])->save();
+        DB::transaction(function () use (
+            $request,
+            $messageTemplatePreset,
+            $messageTemplateTokenValidator,
+            $publishMessageTemplateVersion,
+            $payload,
+            $customizedAt,
+        ): void {
+            $messageTemplatePreset->forceFill([
+                'name' => $request->validated('name'),
+                'description' => $request->validated('description'),
+                'payload' => $payload,
+                'tokens' => $messageTemplateTokenValidator->tokensFromPayload($payload),
+                'is_customized' => true,
+                'customized_at' => $customizedAt,
+            ])->save();
+
+            $messageTemplate = MessageTemplate::query()->firstOrNew([
+                'key' => $messageTemplatePreset->key,
+            ]);
+            $messageTemplate->forceFill([
+                'name' => $request->validated('name'),
+                'description' => $request->validated('description'),
+                'channel' => $messageTemplatePreset->channel,
+                'status' => $messageTemplatePreset->isActive()
+                    ? MessageTemplate::STATUS_ACTIVE
+                    : MessageTemplate::STATUS_INACTIVE,
+                'source' => $messageTemplate->exists
+                    ? $messageTemplate->source
+                    : $messageTemplatePreset->source,
+                'source_version' => $this->sourceVersion($messageTemplatePreset->source_version),
+                'is_customized' => true,
+                'customized_at' => $customizedAt,
+            ])->save();
+
+            $actor = $request->user();
+
+            $publishMessageTemplateVersion->handle(
+                messageTemplate: $messageTemplate,
+                payload: $payload,
+                createdBy: $actor instanceof User ? $actor : null,
+            );
+        });
 
         $catalogEntry = $messageTemplatePreset->catalogEntries()
             ->active()
@@ -280,9 +341,43 @@ class MessageTemplatePresetController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function editablePayload(MessageTemplatePreset $preset): array
+    private function versionedPayloadFor(
+        MessageTemplatePreset $messageTemplatePreset,
+    ): array {
+        $messageTemplate = MessageTemplate::query()
+            ->with('currentVersion')
+            ->where('key', $messageTemplatePreset->key)
+            ->first();
+
+        return $messageTemplate?->currentVersion?->payload()
+            ?? (is_array($messageTemplatePreset->payload)
+                ? $messageTemplatePreset->payload
+                : []);
+    }
+
+    private function sourceVersion(mixed $value): ?string
     {
-        $payload = $preset->payload ?? [];
+        if (is_int($value)) {
+            return (string) $value;
+        }
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function editablePayload(
+        MessageTemplatePreset $preset,
+        ?MessageTemplateVersion $version = null,
+    ): array {
+        $payload = $version?->payload() ?? $preset->payload ?? [];
 
         if ($preset->payload_class === EmailPayload::class) {
             return [

@@ -6,9 +6,21 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 
 class MessageTemplateVersion extends Model
 {
+    protected static function booted(): void
+    {
+        static::updating(static function (): never {
+            throw new LogicException('MessageTemplateVersion records are immutable.');
+        });
+
+        static::deleting(static function (): never {
+            throw new LogicException('MessageTemplateVersion records are immutable.');
+        });
+    }
+
     public const UPDATED_AT = null;
 
     protected $fillable = [
@@ -31,6 +43,20 @@ class MessageTemplateVersion extends Model
             'created_by' => 'integer',
             'created_at' => 'datetime',
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function payload(): array
+    {
+        $content = is_array($this->content) ? $this->content : [];
+
+        if (is_string($this->subject) && $this->subject !== '') {
+            return ['subject' => $this->subject] + $content;
+        }
+
+        return $content;
     }
 
     public function messageTemplate(): BelongsTo

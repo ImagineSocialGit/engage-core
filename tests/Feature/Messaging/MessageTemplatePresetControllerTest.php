@@ -16,7 +16,7 @@ class MessageTemplatePresetControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_index_renders_message_templates_with_catalog_grouping_and_business_language(): void
+    public function test_index_exposes_catalog_grouping_and_editable_template_data(): void
     {
         config()->set('modules.enabled', [
             'messaging',
@@ -25,34 +25,34 @@ class MessageTemplatePresetControllerTest extends TestCase
         $user = User::factory()->create();
 
         $preset = MessageTemplatePreset::factory()->create([
-            'name' => 'Webinar Confirmations — Confirmation Email',
+            'name' => 'Fixture Template',
             'channel' => 'email',
             'purpose' => 'transactional',
-            'scope' => 'webinar',
-            'message_type' => 'confirmation',
+            'scope' => 'fixture',
+            'message_type' => 'fixture_primary',
             'payload_class' => EmailPayload::class,
             'queue' => 'confirmation_messages',
-            'dispatch_keys' => ['registration_created'],
+            'dispatch_keys' => ['fixture_dispatched'],
             'payload' => [
-                'subject' => 'You are registered',
-                'body' => 'Thanks for registering.',
+                'subject' => 'Fixture subject {first_name}',
+                'body' => 'Fixture body.',
             ],
-            'tokens' => ['first_name'],
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmations.0',
+            'tokens' => [],
+            'source_config_path' => 'messaging.email.definitions.transactional.fixture.primary',
         ]);
 
         MessageTemplateCatalogEntry::factory()
             ->forPreset($preset)
             ->create([
-                'module_key' => 'webinars',
-                'module_label' => 'Webinars',
-                'surface' => 'webinar_registrations',
-                'group_key' => 'webinars:transactional:webinar:confirmation',
-                'group_label' => 'Webinar Confirmations',
-                'item_key' => 'email.transactional.webinar.confirmations.0',
-                'item_label' => 'Confirmation Email',
+                'module_key' => 'messaging',
+                'module_label' => 'Messaging',
+                'surface' => 'message_templates',
+                'group_key' => 'fixture:transactional:primary',
+                'group_label' => 'Fixture Group',
+                'item_key' => 'email.transactional.fixture.primary',
+                'item_label' => 'Fixture Template',
                 'item_order' => 0,
-                'usage_type' => 'webinar_confirmation',
+                'usage_type' => 'fixture',
             ]);
 
         $this->withoutMiddleware(ForceStagingAccess::class);
@@ -60,12 +60,37 @@ class MessageTemplatePresetControllerTest extends TestCase
         $this->actingAs($user)
             ->get('http://crm.'.config('app.root_domain').'/message-templates')
             ->assertOk()
-            ->assertSee($preset->name)
-            ->assertSee('Webinars')
-            ->assertSee('Webinar Confirmations')
-            ->assertSee('Confirmation Email')
-            ->assertSee('You are registered')
-            ->assertSee('first_name')
+            ->assertViewIs('crm.messaging.message-templates.index')
+            ->assertViewHas(
+                'selectedPreset',
+                fn (mixed $selectedPreset): bool =>
+                    $selectedPreset instanceof MessageTemplatePreset
+                    && $selectedPreset->is($preset),
+            )
+            ->assertViewHas(
+                'selectedGroup',
+                fn (mixed $selectedGroup): bool =>
+                    is_array($selectedGroup)
+                    && ($selectedGroup['key'] ?? null) === 'fixture:transactional:primary'
+                    && ($selectedGroup['entries'] ?? null) instanceof \Illuminate\Support\Collection
+                    && $selectedGroup['entries']->contains(
+                        fn (MessageTemplateCatalogEntry $entry): bool =>
+                            $entry->messageTemplatePreset?->is($preset) ?? false,
+                    ),
+            )
+            ->assertViewHas(
+                'editablePayload',
+                fn (mixed $editablePayload): bool =>
+                    is_array($editablePayload)
+                    && ($editablePayload['subject'] ?? null) === 'Fixture subject {first_name}'
+                    && ($editablePayload['body'] ?? null) === 'Fixture body.',
+            )
+            ->assertViewHas(
+                'tokens',
+                fn (mixed $tokens): bool =>
+                    is_array($tokens)
+                    && $tokens === ['first_name'],
+            )
             ->assertDontSee('payload_class');
     }
 
@@ -277,7 +302,7 @@ class MessageTemplatePresetControllerTest extends TestCase
 
         $this->assertSame('Hi {first_name}, your webinar starts soon.', $preset->payload['message']);
         $this->assertTrue($preset->is_customized);
-        $this->assertSame(['first_name'], $preset->tokens);
+        $this->assertEquals(['first_name'], $preset->tokens);
     }
 
     public function test_email_template_requires_subject_and_body(): void

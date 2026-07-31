@@ -452,6 +452,7 @@
 │   │   │   │   ├── GrantMessageConsentAction.php
 │   │   │   │   ├── GrantMessageConsentsAction.php
 │   │   │   │   ├── ImportMessageConsentAction.php
+│   │   │   │   ├── PublishMessageTemplateVersionAction.php
 │   │   │   │   ├── RecordMessageConsentAction.php
 │   │   │   │   ├── RecoverStaleScheduledMessageClaimsAction.php
 │   │   │   │   ├── RevokeMessageConsentAction.php
@@ -1706,13 +1707,16 @@
 │   │   │   ├── MessageEligibilityGateTest.php
 │   │   │   ├── MessageSuppressionServiceTest.php
 │   │   │   ├── MessageTemplateBehaviorOwnershipValidationTest.php
+│   │   │   ├── MessageTemplateEditorVersionCutoverTest.php
 │   │   │   ├── MessageTemplatePresetAssignmentResolverTest.php
 │   │   │   ├── MessageTemplatePresetControllerTest.php
 │   │   │   ├── MessageTemplatePresetSyncActionTest.php
 │   │   │   ├── MessageTemplatePresetTokenValidationSyncTest.php
+│   │   │   ├── MessageTemplateSyncVersionCutoverTest.php
 │   │   │   ├── MessageTemplateTokenValidationControllerTest.php
 │   │   │   ├── MessageTemplateTokenValidatorTest.php
 │   │   │   ├── MessageTemplateUsageResolverTest.php
+│   │   │   ├── MessageTemplateVersionPersistenceTest.php
 │   │   │   ├── MessagingSetupValidationContributorTest.php
 │   │   │   ├── QueueContractTest.php
 │   │   │   ├── ResolvedMessageDispatchBuilderTest.php
@@ -1861,4 +1865,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-500 directories, 1362 files
+500 directories, 1366 files

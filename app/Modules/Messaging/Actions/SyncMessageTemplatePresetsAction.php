@@ -2,6 +2,7 @@
 
 namespace App\Modules\Messaging\Actions;
 
+use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
@@ -15,10 +16,11 @@ class SyncMessageTemplatePresetsAction
 {
     public function __construct(
         private readonly MessageTemplateTokenValidator $messageTemplateTokenValidator,
+        private readonly PublishMessageTemplateVersionAction $publishMessageTemplateVersion,
     ) {}
 
     /**
-     * @return array{created: int, updated: int, customized_skipped: int, stale_removed: int, assignments_created: int, assignments_updated: int, assignments_preserved: int, catalog_entries_created: int, catalog_entries_updated: int}
+     * @return array{created: int, updated: int, customized_skipped: int, stale_removed: int, assignments_created: int, assignments_updated: int, assignments_preserved: int, catalog_entries_created: int, catalog_entries_updated: int, templates_created: int, templates_updated: int, templates_customized_skipped: int, template_versions_created: int, template_versions_reused: int, templates_archived: int}
      */
     public function handle(bool $force = false): array
     {
@@ -36,6 +38,12 @@ class SyncMessageTemplatePresetsAction
                 'assignments_preserved' => 0,
                 'catalog_entries_created' => 0,
                 'catalog_entries_updated' => 0,
+                'templates_created' => 0,
+                'templates_updated' => 0,
+                'templates_customized_skipped' => 0,
+                'template_versions_created' => 0,
+                'template_versions_reused' => 0,
+                'templates_archived' => 0,
             ];
 
             foreach ($definitions as $definition) {
@@ -55,6 +63,10 @@ class SyncMessageTemplatePresetsAction
                     ])->save();
                     $result['updated']++;
                 }
+
+                $templateResult = $this->syncVersionedTemplate($preset, $force);
+                $result[$templateResult['template']]++;
+                $result[$templateResult['version']]++;
 
                 $assignmentAttributes = array_replace($definition['assignment'], [
                     'message_template_preset_id' => $preset->getKey(),
@@ -122,8 +134,118 @@ class SyncMessageTemplatePresetsAction
             $result['stale_removed'] = $stalePresets->count();
             $stalePresets->delete();
 
+            $staleTemplates = MessageTemplate::query()
+                ->where('source', 'config')
+                ->where('is_customized', false)
+                ->where('status', '!=', MessageTemplate::STATUS_ARCHIVED);
+
+            if ($activeKeys !== []) {
+                $staleTemplates->whereNotIn('key', $activeKeys);
+            }
+
+            $result['templates_archived'] = $staleTemplates->update([
+                'status' => MessageTemplate::STATUS_ARCHIVED,
+                'updated_at' => now(),
+            ]);
+
             return $result;
         });
+    }
+
+    /**
+     * @return array{template: string, version: string}
+     */
+    private function syncVersionedTemplate(
+        MessageTemplatePreset $preset,
+        bool $force,
+    ): array {
+        $template = MessageTemplate::query()
+            ->where('key', $preset->key)
+            ->first();
+
+        if (! $template instanceof MessageTemplate) {
+            $template = MessageTemplate::query()->create(
+                $this->versionedTemplateAttributes($preset),
+            );
+            $templateResult = 'templates_created';
+        } elseif ($template->is_customized && ! $force) {
+            $template->loadMissing('currentVersion');
+
+            if ($template->currentVersion === null) {
+                $version = $this->publishMessageTemplateVersion->handle(
+                    messageTemplate: $template,
+                    payload: is_array($preset->payload) ? $preset->payload : [],
+                );
+            } else {
+                $version = $template->currentVersion;
+            }
+
+            $payload = $version->payload();
+
+            $preset->forceFill([
+                'name' => $template->name,
+                'description' => $template->description,
+                'payload' => $payload,
+                'tokens' => $this->messageTemplateTokenValidator->tokensFromPayload($payload),
+                'status' => $template->isActive()
+                    ? MessageTemplatePreset::STATUS_ACTIVE
+                    : MessageTemplatePreset::STATUS_INACTIVE,
+                'is_active' => $template->isActive(),
+                'is_customized' => true,
+                'customized_at' => $template->customized_at,
+            ])->save();
+
+            return [
+                'template' => 'templates_customized_skipped',
+                'version' => $version->wasRecentlyCreated
+                    ? 'template_versions_created'
+                    : 'template_versions_reused',
+            ];
+        } else {
+            $template->forceFill(
+                $this->versionedTemplateAttributes($preset),
+            )->save();
+            $templateResult = 'templates_updated';
+        }
+
+        $version = $this->publishMessageTemplateVersion->handle(
+            messageTemplate: $template,
+            payload: is_array($preset->payload) ? $preset->payload : [],
+        );
+
+        return [
+            'template' => $templateResult,
+            'version' => $version->wasRecentlyCreated
+                ? 'template_versions_created'
+                : 'template_versions_reused',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function versionedTemplateAttributes(
+        MessageTemplatePreset $preset,
+    ): array {
+        $sourceVersion = $preset->source_version;
+
+        return [
+            'key' => $preset->key,
+            'name' => $preset->name,
+            'description' => $preset->description,
+            'channel' => $preset->channel,
+            'status' => $preset->isActive()
+                ? MessageTemplate::STATUS_ACTIVE
+                : MessageTemplate::STATUS_INACTIVE,
+            'source' => $preset->source,
+            'source_version' => is_int($sourceVersion)
+                ? (string) $sourceVersion
+                : (is_string($sourceVersion) && trim($sourceVersion) !== ''
+                    ? trim($sourceVersion)
+                    : null),
+            'is_customized' => (bool) $preset->is_customized,
+            'customized_at' => $preset->customized_at,
+        ];
     }
 
     /**
