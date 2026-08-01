@@ -111,6 +111,7 @@ class RecoverStaleScheduledMessageClaimsAction
                     scheduledMessage: $message,
                     eventType: ScheduledMessage::STATUS_FAILED,
                     occurredAt: $recoveredAt,
+                    deliveryAttempt: $attempt,
                 );
 
                 return [

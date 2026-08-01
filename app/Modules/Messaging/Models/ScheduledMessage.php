@@ -125,6 +125,11 @@ class ScheduledMessage extends Model
             ->ofMany('attempt_number', 'max');
     }
 
+    public function terminalOutboxEvent(): HasOne
+    {
+        return $this->hasOne(ScheduledMessageOutboxEvent::class);
+    }
+
     public function renderContext(): HasOne
     {
         return $this->hasOne(ScheduledMessageRenderContext::class);

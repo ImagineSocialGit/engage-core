@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Messaging\Models\ScheduledMessageDeliveryAttempt;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -14,7 +15,17 @@ return new class extends Migration
                 ->unique('scheduled_message_outbox_events_message_unique')
                 ->constrained('scheduled_messages')
                 ->cascadeOnDelete();
+            $table->foreignIdFor(
+                ScheduledMessageDeliveryAttempt::class,
+                'delivery_attempt_id',
+            )
+                ->nullable()
+                ->constrained('scheduled_message_delivery_attempts')
+                ->cascadeOnDelete();
             $table->string('event_type', 32)->index();
+            $table->timestamp('occurred_at')->index();
+            $table->string('reason_code', 96)->nullable();
+            $table->text('reason')->nullable();
             $table->string('status', 32)->default('pending')->index();
             $table->timestamp('available_at')->index();
             $table->uuid('claim_token')->nullable();

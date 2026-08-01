@@ -9,6 +9,7 @@ use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Models\ScheduledMessageDeliveryAttempt;
 use App\Modules\Messaging\Models\ScheduledMessageOutboxEvent;
 use App\Modules\Messaging\Services\Email\EmailMessagingService;
 use App\Modules\Messaging\Services\ScheduledMessageEventOutbox;
@@ -100,10 +101,19 @@ class ScheduledMessageEventOutboxTest extends TestCase
         $scheduledMessage->refresh();
         $outboxEvent = ScheduledMessageOutboxEvent::query()->firstOrFail();
 
+        $attempt = ScheduledMessageDeliveryAttempt::query()->firstOrFail();
+
         $this->assertSame(ScheduledMessage::STATUS_SENT, $scheduledMessage->status);
+        $this->assertSame(1, ScheduledMessageDeliveryAttempt::query()->count());
+        $this->assertSame('provider-message-1', $attempt->provider_message_id);
+        $this->assertSame(ScheduledMessage::STATUS_SENT, $outboxEvent->event_type);
+        $this->assertSame($attempt->getKey(), $outboxEvent->delivery_attempt_id);
+        $this->assertSame(
+            $attempt->completed_at?->toISOString(),
+            $outboxEvent->occurred_at?->toISOString(),
+        );
         $this->assertSame(1, $scheduledMessage->send_attempts);
         $this->assertSame('provider-message-1', $scheduledMessage->provider_message_id);
-        $this->assertSame(ScheduledMessage::STATUS_SENT, $outboxEvent->event_type);
         $this->assertSame(ScheduledMessageOutboxEvent::STATUS_PENDING, $outboxEvent->status);
         $this->assertSame(1, $outboxEvent->attempts);
         $this->assertSame('Injected downstream listener failure.', $outboxEvent->last_error);
@@ -114,7 +124,7 @@ class ScheduledMessageEventOutboxTest extends TestCase
             'attempt_number' => 1,
             'provider' => 'fault_injection_email',
             'provider_message_id' => 'provider-message-1',
-            'occurred_at' => $scheduledMessage->sent_at->toISOString(),
+            'occurred_at' => $outboxEvent->occurred_at->toISOString(),
         ], $terminalResults[0]);
 
         $this->assertSame(
@@ -136,7 +146,12 @@ class ScheduledMessageEventOutboxTest extends TestCase
             'handle',
         ]);
 
-        $this->assertSame(1, $scheduledMessage->refresh()->send_attempts);
+        $this->assertSame(
+            1,
+            ScheduledMessageDeliveryAttempt::query()
+                ->where('scheduled_message_id', $scheduledMessage->getKey())
+                ->count(),
+        );
     }
 }
 

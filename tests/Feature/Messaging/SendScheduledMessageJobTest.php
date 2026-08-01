@@ -312,13 +312,15 @@ class SendScheduledMessageJobTest extends TestCase
         Event::fake([ScheduledMessageSent::class]);
 
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Original subject for {first_name}',
-                    'body' => 'Original body for {first_name}.',
+            'default' => [
+                'confirmation' => [
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Original subject for {first_name}',
+                        'body' => 'Original body for {first_name}.',
+                    ],
                 ],
             ],
         ]);

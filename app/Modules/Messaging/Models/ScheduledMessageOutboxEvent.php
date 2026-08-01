@@ -13,7 +13,11 @@ class ScheduledMessageOutboxEvent extends Model
 
     protected $fillable = [
         'scheduled_message_id',
+        'delivery_attempt_id',
         'event_type',
+        'occurred_at',
+        'reason_code',
+        'reason',
         'status',
         'available_at',
         'claim_token',
@@ -28,6 +32,8 @@ class ScheduledMessageOutboxEvent extends Model
     {
         return [
             'scheduled_message_id' => 'integer',
+            'delivery_attempt_id' => 'integer',
+            'occurred_at' => 'datetime',
             'available_at' => 'datetime',
             'claim_expires_at' => 'datetime',
             'attempts' => 'integer',
@@ -39,5 +45,13 @@ class ScheduledMessageOutboxEvent extends Model
     public function scheduledMessage(): BelongsTo
     {
         return $this->belongsTo(ScheduledMessage::class);
+    }
+
+    public function deliveryAttempt(): BelongsTo
+    {
+        return $this->belongsTo(
+            ScheduledMessageDeliveryAttempt::class,
+            'delivery_attempt_id',
+        );
     }
 }

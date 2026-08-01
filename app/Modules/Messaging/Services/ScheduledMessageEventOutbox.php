@@ -7,6 +7,7 @@ use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Models\ScheduledMessageDeliveryAttempt;
 use App\Modules\Messaging\Models\ScheduledMessageOutboxEvent;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -23,25 +24,45 @@ class ScheduledMessageEventOutbox
         ScheduledMessage $scheduledMessage,
         string $eventType,
         ?CarbonInterface $occurredAt = null,
+        ?ScheduledMessageDeliveryAttempt $deliveryAttempt = null,
+        ?string $reasonCode = null,
+        ?string $reason = null,
     ): ScheduledMessageOutboxEvent {
         $this->assertEventType($eventType);
+        $this->assertMessageStatus($scheduledMessage, $eventType);
+        $this->assertDeliveryAttempt(
+            scheduledMessage: $scheduledMessage,
+            eventType: $eventType,
+            deliveryAttempt: $deliveryAttempt,
+        );
+
+        $occurredAt ??= $deliveryAttempt?->completed_at ?? now();
+        $reasonCode = $this->nullableString($reasonCode);
+        $reason = $this->nullableString($reason);
 
         $outboxEvent = ScheduledMessageOutboxEvent::query()
             ->firstOrNew([
                 'scheduled_message_id' => $scheduledMessage->getKey(),
             ]);
 
-        if ($outboxEvent->exists && $outboxEvent->event_type !== $eventType) {
-            throw new LogicException(
-                "ScheduledMessage [{$scheduledMessage->getKey()}] already has terminal outbox event [{$outboxEvent->event_type}].",
+        if ($outboxEvent->exists) {
+            $this->assertExistingRecordMatches(
+                outboxEvent: $outboxEvent,
+                eventType: $eventType,
+                occurredAt: $occurredAt,
+                deliveryAttempt: $deliveryAttempt,
+                reasonCode: $reasonCode,
+                reason: $reason,
             );
-        }
-
-        if (! $outboxEvent->exists) {
+        } else {
             $outboxEvent->forceFill([
+                'delivery_attempt_id' => $deliveryAttempt?->getKey(),
                 'event_type' => $eventType,
+                'occurred_at' => $occurredAt,
+                'reason_code' => $reasonCode,
+                'reason' => $reason,
                 'status' => ScheduledMessageOutboxEvent::STATUS_PENDING,
-                'available_at' => $occurredAt ?? now(),
+                'available_at' => $occurredAt,
                 'attempts' => 0,
             ])->save();
         }
@@ -193,8 +214,9 @@ class ScheduledMessageEventOutbox
 
     private function domainEvent(ScheduledMessageOutboxEvent $outboxEvent): object
     {
+        $outboxEvent->loadMissing('deliveryAttempt');
+
         $scheduledMessage = ScheduledMessage::query()
-            ->with('latestDeliveryAttempt')
             ->find($outboxEvent->scheduled_message_id);
 
         if (! $scheduledMessage instanceof ScheduledMessage) {
@@ -209,8 +231,8 @@ class ScheduledMessageEventOutbox
             );
         }
 
-        $terminalResult = ScheduledMessageTerminalResult::fromScheduledMessage(
-            $scheduledMessage,
+        $terminalResult = ScheduledMessageTerminalResult::fromOutboxEvent(
+            $outboxEvent,
         );
 
         return match ($outboxEvent->event_type) {
@@ -243,6 +265,93 @@ class ScheduledMessageEventOutbox
                 "Unsupported ScheduledMessage outbox event [{$eventType}].",
             );
         }
+    }
+
+    private function assertMessageStatus(
+        ScheduledMessage $scheduledMessage,
+        string $eventType,
+    ): void {
+        if ($scheduledMessage->status !== $eventType) {
+            throw new LogicException(
+                "ScheduledMessage [{$scheduledMessage->getKey()}] status [{$scheduledMessage->status}] does not match terminal event [{$eventType}].",
+            );
+        }
+    }
+
+    private function assertDeliveryAttempt(
+        ScheduledMessage $scheduledMessage,
+        string $eventType,
+        ?ScheduledMessageDeliveryAttempt $deliveryAttempt,
+    ): void {
+        if (! $deliveryAttempt instanceof ScheduledMessageDeliveryAttempt) {
+            if ($eventType !== ScheduledMessage::STATUS_SKIPPED) {
+                throw new LogicException(
+                    "ScheduledMessage terminal event [{$eventType}] requires a delivery attempt.",
+                );
+            }
+
+            return;
+        }
+
+        if (! $deliveryAttempt->exists
+            || (int) $deliveryAttempt->scheduled_message_id !== (int) $scheduledMessage->getKey()
+        ) {
+            throw new LogicException(
+                'ScheduledMessage terminal outbox event requires a persisted matching delivery attempt.',
+            );
+        }
+
+        $expectedAttemptStatus = match ($eventType) {
+            ScheduledMessage::STATUS_SENT => ScheduledMessageDeliveryAttempt::STATUS_SENT,
+            ScheduledMessage::STATUS_SKIPPED => ScheduledMessageDeliveryAttempt::STATUS_SKIPPED,
+            ScheduledMessage::STATUS_FAILED => ScheduledMessageDeliveryAttempt::STATUS_FAILED,
+            default => throw new InvalidArgumentException(
+                "Unsupported ScheduledMessage outbox event [{$eventType}].",
+            ),
+        };
+
+        if ($deliveryAttempt->status !== $expectedAttemptStatus
+            || $deliveryAttempt->completed_at === null
+        ) {
+            throw new LogicException(
+                "ScheduledMessage delivery attempt [{$deliveryAttempt->getKey()}] is not the matching terminal attempt for [{$eventType}].",
+            );
+        }
+    }
+
+    private function assertExistingRecordMatches(
+        ScheduledMessageOutboxEvent $outboxEvent,
+        string $eventType,
+        CarbonInterface $occurredAt,
+        ?ScheduledMessageDeliveryAttempt $deliveryAttempt,
+        ?string $reasonCode,
+        ?string $reason,
+    ): void {
+        $matches = $outboxEvent->event_type === $eventType
+            && (int) ($outboxEvent->delivery_attempt_id ?? 0)
+                === (int) ($deliveryAttempt?->getKey() ?? 0)
+            && $outboxEvent->occurred_at?->copy()->startOfSecond()->equalTo(
+                $occurredAt->copy()->startOfSecond(),
+            )
+            && $this->nullableString($outboxEvent->reason_code) === $reasonCode
+            && $this->nullableString($outboxEvent->reason) === $reason;
+
+        if (! $matches) {
+            throw new LogicException(
+                "ScheduledMessage [{$outboxEvent->scheduled_message_id}] already has a different immutable terminal outbox result.",
+            );
+        }
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
     }
 
     private function claimLeaseSeconds(): int

@@ -126,11 +126,13 @@ class SkipScheduledMessagesAction
                 ->where('status', ScheduledMessage::STATUS_SKIPPED)
                 ->orderBy('id')
                 ->get()
-                ->each(function (ScheduledMessage $scheduledMessage): void {
+                ->each(function (ScheduledMessage $scheduledMessage) use ($reason): void {
                     $this->eventOutbox->record(
                         scheduledMessage: $scheduledMessage,
                         eventType: ScheduledMessage::STATUS_SKIPPED,
                         occurredAt: $scheduledMessage->skipped_at,
+                        reasonCode: 'scheduled_message_skipped_before_claim',
+                        reason: $reason,
                     );
                 });
 

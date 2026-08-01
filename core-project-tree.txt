@@ -1771,7 +1771,6 @@
 │   │   │   ├── ScheduledMessagePayloadCanonicalizerTest.php
 │   │   │   ├── ScheduledMessagePayloadResolverTest.php
 │   │   │   ├── ScheduledMessageTerminalEventContractTest.php
-│   │   │   ├── ScheduledMessageTerminalPersistenceSchemaTest.php
 │   │   │   ├── ScheduleInternalNotificationActionTest.php
 │   │   │   ├── ScheduleMessageTimeNormalizationTest.php
 │   │   │   ├── SemanticCampaignVariantIdentityResolutionTest.php
@@ -1912,4 +1911,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-501 directories, 1412 files
+501 directories, 1411 files

@@ -5,6 +5,7 @@ namespace Tests\Feature\Messaging;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Messaging\Actions\SkipScheduledMessagesAction;
+use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\ScheduledMessage;
@@ -48,7 +49,17 @@ class SkipScheduledMessagesActionTest extends TestCase
             $this->assertDatabaseHas('scheduled_messages', [
                 'id' => $message->getKey(),
                 'status' => ScheduledMessage::STATUS_SKIPPED,
+            ]);
+            $this->assertDatabaseHas('scheduled_messages', [
+                'id' => $message->getKey(),
                 'skip_reason' => 'batch_cancelled',
+            ]);
+            $this->assertDatabaseHas('scheduled_message_outbox_events', [
+                'scheduled_message_id' => $message->getKey(),
+                'delivery_attempt_id' => null,
+                'event_type' => ScheduledMessage::STATUS_SKIPPED,
+                'reason_code' => 'scheduled_message_skipped_before_claim',
+                'reason' => 'batch_cancelled',
             ]);
         }
 
@@ -103,8 +114,13 @@ class SkipScheduledMessagesActionTest extends TestCase
         $message->refresh();
         $invitation->refresh();
 
+        $terminalResult = ScheduledMessageTerminalResult::fromScheduledMessage(
+            $message->load('terminalOutboxEvent.deliveryAttempt'),
+        );
+
         $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $message->status);
         $this->assertSame('permission_invitation_cancelled', $message->skip_reason);
+        $this->assertSame('permission_invitation_cancelled', $terminalResult->reason);
         $this->assertSame(ContactPermissionInvitation::STATUS_FAILED, $invitation->status);
         $this->assertSame('permission_invitation_cancelled', $invitation->failure_reason);
         $this->assertNotNull($invitation->failed_at);

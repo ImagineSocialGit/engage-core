@@ -87,6 +87,14 @@ class ScheduledMessageDeliveryLeaseManager
             }
 
             $completedAt = now();
+            $reason = match ($status) {
+                ScheduledMessage::STATUS_SENT => null,
+                ScheduledMessage::STATUS_SKIPPED => $result->reason
+                    ?? 'Message delivery was skipped.',
+                default => $exception?->getMessage()
+                    ?? $result->reason
+                    ?? 'Message delivery failed.',
+            };
             $attributes = [
                 'status' => $status,
                 'sending_at' => null,
@@ -108,17 +116,14 @@ class ScheduledMessageDeliveryLeaseManager
                     'skipped_at' => $completedAt,
                     'failed_at' => null,
                     'failure_reason' => null,
-                    'skip_reason' => $result->reason
-                        ?? 'Message delivery was skipped.',
+                    'skip_reason' => $reason,
                 ];
             } else {
                 $attributes += [
                     'sent_at' => null,
                     'skipped_at' => null,
                     'failed_at' => $completedAt,
-                    'failure_reason' => $exception?->getMessage()
-                        ?? $result->reason
-                        ?? 'Message delivery failed.',
+                    'failure_reason' => $reason,
                     'skip_reason' => null,
                 ];
             }
@@ -138,13 +143,14 @@ class ScheduledMessageDeliveryLeaseManager
                 'provider' => $result->provider,
                 'provider_message_id' => $result->providerMessageId,
                 'reason_code' => $result->reasonCode,
-                'reason' => $exception?->getMessage() ?? $result->reason,
+                'reason' => $reason,
             ])->save();
 
             $this->eventOutbox->record(
                 scheduledMessage: $message,
                 eventType: $status,
                 occurredAt: $completedAt,
+                deliveryAttempt: $attempt,
             );
 
             return $message;
