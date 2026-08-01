@@ -33,7 +33,7 @@ Rules:
 - Webinar post-event config owns provider orchestration, not message copy.
 - Webinar schedule profile configs own webinar message timing/slot identity, not message copy.
 - Supported generic Messaging schedule shapes are `delay` with integer `minutes`, `anchored` with integer `minutes`, and `next_day_at` with strict `time = HH:MM`. `next_day_at` uses `config('client.timezone')`; do not duplicate timezone in each schedule item.
-- For delayed lifecycle messages, persist resolved conditions with the ScheduledMessage so `ScheduledMessageGate` can re-evaluate them immediately before provider send.
+- For direct non-chain delayed messages, persist bounded resolved conditions with the ScheduledMessage so `ScheduledMessageGate` can re-evaluate them before provider send. For MessageChains, keep canonical conditions on immutable steps/variants and evaluate them when the wave becomes actionable.
 - Schedule profile items may share generic Messaging message types such as `reminder`; use the schedule-profile item key for lifecycle-slot identity and stable `message_template_key` for reusable template identity. `source_config_path` is provenance/debug location only. Do not invent schedule-specific message types such as `reminder_30_minute`.
 - Persisted runtime payloads should be compact. Do not store full Eloquent model arrays or loaded relationship graphs in scheduled message payloads, automation events, route progress, task metadata, or broadcast/inbound metadata unless that column is explicitly a raw provider payload.
 - Do not duplicate the same domain snapshot under payload, tokens, context, and metadata branches merely because multiple consumers can read it.

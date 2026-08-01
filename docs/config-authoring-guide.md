@@ -63,7 +63,7 @@ See [Config Contracts and Token Contracts](config-contracts.md) and the
 26. Do not add per-scope `opt_ins` groups to Webinar Messaging definitions. Consent acknowledgements resolve through `ConsentDomainRegistry` and `ConsentOptInDefinitionResolver`.
 27. `MessageTemplateTokenValidator` is the canonical authorable-token validator for Messaging copy; config/setup validation, preset sync, and CRM template editing reuse it against `TokenContractRegistry`.
 28. Webinar schedule profiles may use `delay(minutes)`, `anchored(minutes)`, or `next_day_at(time = HH:MM)`. `next_day_at` uses client timezone rather than per-item timezone.
-29. Resolved delayed-message conditions persist with ScheduledMessage metadata and are rechecked immediately before provider delivery.
+29. Direct non-chain delayed-message conditions may persist in bounded ScheduledMessage metadata for send-time revalidation. MessageChain conditions remain on immutable step/variant definitions and are evaluated when the wave becomes actionable.
 30. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
 31. Module docs are the source of truth for module ownership and client-facing scope. Configs should not create a module feature that the owning module does not support.
 32. Commerce and Location configs should support admin convenience and integrations; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
@@ -662,7 +662,7 @@ At runtime, some owning-module resolvers may attach transient `resolved_behavior
 Stable occurrence identity is also caller-owned. Use a stable `occurrenceKey` for the same logical message occurrence across retries or send-time recalculation. Do not use `send_at` as the sole occurrence identity.
 
 
-Resolved lifecycle conditions must survive delayed scheduling. `DispatchMessageAction` persists resolved conditions into `ScheduledMessage.meta.conditions`, and `ScheduledMessageGate` re-evaluates them immediately before provider delivery. A message that no longer satisfies its conditions should be skipped rather than sent.
+Direct non-chain resolved lifecycle conditions must survive delayed scheduling. `DispatchMessageAction` may persist those bounded conditions into `ScheduledMessage.meta.conditions`, and `ScheduledMessageGate` re-evaluates them before provider delivery. MessageChain conditions remain on immutable steps/variants and are evaluated when their wave becomes actionable. A delivery that no longer satisfies an applicable send-time condition should be skipped rather than sent.
 
 
 For webinar transactional email/SMS definitions, use this reusable-content shape across defaults and clients:
@@ -1610,7 +1610,7 @@ next_day_at
 
 `MessageSendTimeResolver` uses an explicit anchor when provided, otherwise `triggeredAt`, as the calendar-day base for `next_day_at`. Webinar post-event follow-ups should pass `webinar.ends_at` as the anchor when next-morning behavior is intended.
 
-Profile-owned conditions are checked when planning the message. Resolved conditions are persisted into `ScheduledMessage.meta.conditions` and rechecked by `ScheduledMessageGate` immediately before provider delivery.
+Webinar schedule-profile sync compiles profile-owned conditions into immutable MessageChain step/variant definitions. The chain runner evaluates those conditions when the relevant step or variant becomes actionable and does not copy them into chain-created `ScheduledMessage.meta`. Direct non-chain delayed dispatches may still persist bounded resolved conditions for send-time revalidation.
 
 ## Post-event config shape
 

@@ -61,9 +61,10 @@ return [
     | follow-ups pass webinar.ends_at as the anchor so delayed provider webhook
     | processing does not shift the intended next-morning date.
     |
-    | Profile-owned conditions are checked when the message is planned. Resolved
-    | conditions are also persisted with ScheduledMessage metadata and rechecked
-    | by ScheduledMessageGate immediately before provider delivery.
+    | Preset sync compiles active profile items into immutable Messaging chain
+    | steps/variants and Webinars-owned profile bindings. Chain conditions are
+    | evaluated from those immutable definitions when a step/variant becomes
+    | actionable; they are not copied into each chain-created ScheduledMessage.
     |
     | `source_version` is numeric. Sync persists numeric versions only; do not
     | use descriptive release strings in this field.
@@ -95,7 +96,7 @@ return [
                 'message_type' => 'confirmation',
                 'dispatch_key' => 'registration_created',
                 'message_template_key' => 'confirmation',
-                'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmations.0',
+                'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.confirmations.0',
                 'timing' => 'scheduled',
                 'schedule' => [
                     'type' => 'delay',
@@ -125,7 +126,7 @@ return [
                 'message_type' => 'reminder',
                 'dispatch_key' => 'registration_created',
                 'message_template_key' => 'reminder_1_week',
-                'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.0',
+                'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.reminders.0',
                 'timing' => 'scheduled',
                 'schedule' => [
                     'type' => 'anchored',
@@ -149,7 +150,7 @@ return [
                 'message_type' => 'reminder',
                 'dispatch_key' => 'registration_created',
                 'message_template_key' => 'reminder_1_day',
-                'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.1',
+                'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.reminders.1',
                 'timing' => 'scheduled',
                 'schedule' => [
                     'type' => 'anchored',
@@ -173,7 +174,7 @@ return [
                 'message_type' => 'reminder',
                 'dispatch_key' => 'registration_created',
                 'message_template_key' => 'reminder_30_minute',
-                'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.2',
+                'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.reminders.2',
                 'timing' => 'scheduled',
                 'schedule' => [
                     'type' => 'anchored',
@@ -197,7 +198,7 @@ return [
                 'message_type' => 'reminder',
                 'dispatch_key' => 'registration_created',
                 'message_template_key' => 'reminder_live',
-                'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.3',
+                'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.reminders.3',
                 'timing' => 'scheduled',
                 'schedule' => [
                     'type' => 'anchored',
@@ -223,7 +224,7 @@ return [
                 'message_type' => 'post_attended',
                 'dispatch_key' => 'webinar_ended',
                 'message_template_key' => 'post_attended',
-                'source_config_path' => 'messaging.email.definitions.transactional.webinar.post_attended.0',
+                'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.post_attended.0',
                 'timing' => 'scheduled',
                 'schedule' => [
                     'type' => 'next_day_at',

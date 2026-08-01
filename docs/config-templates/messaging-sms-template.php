@@ -13,7 +13,11 @@ return [
     | config/messaging/sms/definitions/{purpose}/{scope}.php
     | client/{client-key}/config/messaging/sms/definitions/{purpose}/{scope}.php
     |
-    | Create one file per purpose/scope pair.
+    | Webinar scope is set-based. The base webinar.php file must return one
+    | explicit default set. Additional sets live at:
+    | client/{client-key}/config/messaging/sms/definitions/{purpose}/webinar/{set-key}.php
+    |
+    | Create one file per ordinary purpose/scope pair or Webinar template set.
     |
     | Reusable Messaging templates own content and delivery-template metadata.
     | They must not own business timing, lifecycle conditions, sequencing,
@@ -105,122 +109,124 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'confirmations' => [
-        [
-            'key' => 'confirmation',
-            'dispatch_key' => 'registration_created',
-            'message_type' => 'confirmation',
-            'channel' => 'sms',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
+    'default' => [
+        'confirmations' => [
+            [
+                'key' => 'confirmation',
+                'dispatch_key' => 'registration_created',
+                'message_type' => 'confirmation',
+                'channel' => 'sms',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
 
-            'payload_class' => SmsPayload::class,
-            'queue' => 'confirmation_messages',
+                'payload_class' => SmsPayload::class,
+                'queue' => 'confirmation_messages',
 
-            'payload' => [
-                'message' => 'You’re registered for {webinar_title}. Join here: {webinar_join_url}',
-            ],
-        ],
-    ],
-
-    'reminders' => [
-        [
-            'key' => 'reminder_1_week',
-            'dispatch_key' => 'registration_created',
-            'message_type' => 'reminder',
-            'channel' => 'sms',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-
-            'payload_class' => SmsPayload::class,
-            'queue' => 'reminders',
-
-            'payload' => [
-                'message' => '{webinar_title} is one week away on {webinar_start_date} at {webinar_start_time}.',
+                'payload' => [
+                    'message' => 'You’re registered for {webinar_title}. Join here: {webinar_join_url}',
+                ],
             ],
         ],
 
-        [
-            'key' => 'reminder_1_day',
-            'dispatch_key' => 'registration_created',
-            'message_type' => 'reminder',
-            'channel' => 'sms',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
+        'reminders' => [
+            [
+                'key' => 'reminder_1_week',
+                'dispatch_key' => 'registration_created',
+                'message_type' => 'reminder',
+                'channel' => 'sms',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
 
-            'payload_class' => SmsPayload::class,
-            'queue' => 'reminders',
+                'payload_class' => SmsPayload::class,
+                'queue' => 'reminders',
 
-            'payload' => [
-                'message' => '{webinar_title} is tomorrow at {webinar_start_time}. Join: {webinar_join_url}',
+                'payload' => [
+                    'message' => '{webinar_title} is one week away on {webinar_start_date} at {webinar_start_time}.',
+                ],
+            ],
+
+            [
+                'key' => 'reminder_1_day',
+                'dispatch_key' => 'registration_created',
+                'message_type' => 'reminder',
+                'channel' => 'sms',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+
+                'payload_class' => SmsPayload::class,
+                'queue' => 'reminders',
+
+                'payload' => [
+                    'message' => '{webinar_title} is tomorrow at {webinar_start_time}. Join: {webinar_join_url}',
+                ],
+            ],
+
+            [
+                'key' => 'reminder_30_minute',
+                'dispatch_key' => 'registration_created',
+                'message_type' => 'reminder',
+                'channel' => 'sms',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+
+                'payload_class' => SmsPayload::class,
+                'queue' => 'reminders',
+
+                'payload' => [
+                    'message' => '{webinar_title} starts in 30 minutes. Join: {webinar_join_url}',
+                ],
+            ],
+
+            [
+                'key' => 'reminder_live',
+                'dispatch_key' => 'registration_created',
+                'message_type' => 'reminder',
+                'channel' => 'sms',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+
+                'payload_class' => SmsPayload::class,
+                'queue' => 'reminders',
+
+                'payload' => [
+                    'message' => '{webinar_title} is live now. Join: {webinar_join_url}',
+                ],
             ],
         ],
 
-        [
-            'key' => 'reminder_30_minute',
-            'dispatch_key' => 'registration_created',
-            'message_type' => 'reminder',
-            'channel' => 'sms',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
+        'post_attended' => [
+            [
+                'key' => 'post_attended',
+                'dispatch_key' => 'webinar_ended',
+                'message_type' => 'post_attended',
+                'channel' => 'sms',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
 
-            'payload_class' => SmsPayload::class,
-            'queue' => 'reminders',
+                'payload_class' => SmsPayload::class,
+                'queue' => 'post_event',
 
-            'payload' => [
-                'message' => '{webinar_title} starts in 30 minutes. Join: {webinar_join_url}',
+                'payload' => [
+                    'message' => 'Thanks for joining {webinar_title}. Replay: {webinar_playback_url}',
+                ],
             ],
         ],
 
-        [
-            'key' => 'reminder_live',
-            'dispatch_key' => 'registration_created',
-            'message_type' => 'reminder',
-            'channel' => 'sms',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
+        'post_missed' => [
+            [
+                'key' => 'post_missed',
+                'dispatch_key' => 'webinar_ended',
+                'message_type' => 'post_missed',
+                'channel' => 'sms',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
 
-            'payload_class' => SmsPayload::class,
-            'queue' => 'reminders',
+                'payload_class' => SmsPayload::class,
+                'queue' => 'post_event',
 
-            'payload' => [
-                'message' => '{webinar_title} is live now. Join: {webinar_join_url}',
-            ],
-        ],
-    ],
-
-    'post_attended' => [
-        [
-            'key' => 'post_attended',
-            'dispatch_key' => 'webinar_ended',
-            'message_type' => 'post_attended',
-            'channel' => 'sms',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-
-            'payload_class' => SmsPayload::class,
-            'queue' => 'post_event',
-
-            'payload' => [
-                'message' => 'Thanks for joining {webinar_title}. Replay: {webinar_playback_url}',
-            ],
-        ],
-    ],
-
-    'post_missed' => [
-        [
-            'key' => 'post_missed',
-            'dispatch_key' => 'webinar_ended',
-            'message_type' => 'post_missed',
-            'channel' => 'sms',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-
-            'payload_class' => SmsPayload::class,
-            'queue' => 'post_event',
-
-            'payload' => [
-                'message' => 'Sorry we missed you at {webinar_title}. Replay: {webinar_playback_url}',
+                'payload' => [
+                    'message' => 'Sorry we missed you at {webinar_title}. Replay: {webinar_playback_url}',
+                ],
             ],
         ],
     ],

@@ -163,12 +163,19 @@ deferred product work
     multipart HTML + plain-text email
     generated Webinar URL scheme verification
 
-architecture safety work
-    Messaging persistence migrations and models
-    incremental runtime cutover after the persistence foundation exists
+completed architecture safety work
+    immutable template/chain persistence
+    lazy Webinar chain runtime
+    delivery-attempt authority
+    terminal outbox authority
+    Broadcast terminal normalization
+    legacy consolidator removal
+
+next data-safety work
+    DB snapshot/export/import tooling against the post-15B schema
 ```
 
-The cross-module persistence audit is complete enough to lock the target architecture in [System-Wide Model Creation and Persistence Bloat Audit](model-persistence-bloat-audit.md). The next implementation slice is migrations and models only; the current runtime remains transitional until later cutover batches replace copied payload and metadata persistence.
+The cross-module Messaging persistence refactor is complete and green. The current post-15B schema is now the target for the project-state export/import work. Remaining Campaign, Broadcast content/FK, FlowRoutes authoring-identity, and inbound-provider cleanup items are separate future module refactors and must be mapped explicitly rather than silently assumed complete.
 
 ## Messaging, consent, and Rob Webinar production-prep completion
 
@@ -228,9 +235,9 @@ MessageSendTimeResolver
     next_day_at uses client timezone
 
 Delayed-message conditions
-    checked during planning
-    currently copied into ScheduledMessage metadata
-    target architecture keeps them on immutable chain steps and re-evaluates them without copying definition data into every execution row
+    direct non-chain dispatches may retain bounded conditions for send-time revalidation
+    Webinar profile sync compiles conditions into immutable chain steps/variants
+    chain-created Webinar messages do not copy those canonical conditions into ScheduledMessage metadata
 ```
 
 The generic registration consent-domain and delivery-consolidation behavior has now been re-verified through a fresh Slam Dunk runtime smoke test.
@@ -268,7 +275,7 @@ Completed architecture correction before deeper UX polish:
 - `ResolvedMessageDispatch` carries the exact `send_at` and normalized generic dispatch contract.
 - `ScheduledMessage` supports polymorphic `behavior_owner` provenance without importing concrete feature modules into Messaging.
 - Missing module-owned behavior does not silently fall back to hidden template timing or implicit immediate delivery. Dispatch requires either an exact caller-owned `sendAt` or explicit caller-owned behavior.
-- The current runtime copies resolved lifecycle conditions into `ScheduledMessage.meta.conditions`; the approved target keeps canonical conditions on immutable message-chain steps and re-evaluates them without copying definition data into every execution row.
+- Direct non-chain delayed dispatches may persist bounded conditions for send-time revalidation. Webinar schedule-profile runtime now compiles conditions into immutable chain definitions and evaluates them when the relevant step/variant becomes actionable without copying them into chain-created ScheduledMessage metadata.
 - Webinar scheduling supports `next_day_at(time = HH:MM)` using client timezone; post-event follow-ups can anchor to `webinar.ends_at` so delayed provider processing does not shift the intended next-morning date.
 
 Completed runway pieces:
@@ -289,13 +296,10 @@ Completed runway pieces:
 
 Remaining near-term sequence:
 
-1. Add the approved Messaging persistence migrations and models without changing runtime behavior.
-2. Cut template sync and editing over to immutable template versions.
-3. Cut direct scheduled-message creation over to compact references and lazy render contexts.
-4. Move claim/provider attempt state fully into delivery-attempt rows.
-5. Add the generic message-chain runner with version-pinned enrollments and lazy next-wave materialization.
-6. Migrate Campaigns, Webinars, Broadcasts, FlowRoutes, and InboundMessaging incrementally.
-7. Resume Routes / FlowRoutes product completion, dashboard/contact polish, and broader module-schema audits after the persistence-sensitive cutovers stabilize.
+1. Build the project-state DB snapshot/export/import safety tool against the current post-15B schema.
+2. Prove deterministic dry-run, validation, mapping, and semantic round-trip behavior before production use.
+3. Keep current Campaign/Broadcast transitional records in the export contract until their separate migrations exist.
+4. Resume focused Routes / FlowRoutes product completion, dashboard/contact polish, and broader module-schema audits after the export/import safety path is established.
 
 Completed in the current client-readiness sequence:
 
@@ -307,54 +311,78 @@ Completed in the current client-readiness sequence:
 The remaining runway pieces should continue to be implemented as durable client-readiness work, not as smoke-test shortcuts.
 
 
-## Messaging persistence refactor sequence
+## Messaging persistence refactor completion
 
-The architecture documentation phase is complete. The approved target is:
+The core persistence refactor is complete and green.
+
+Implemented architecture:
 
 ```text
-stable MessageTemplate identity
-    -> immutable MessageTemplateVersion content
+MessageTemplate
+    stable identity
 
-stable MessageChain identity
-    -> immutable MessageChainVersion
-    -> ordered MessageChainStep / MessageChainStepVariant definitions
+MessageTemplateVersion
+    immutable tokenized content
+
+MessageChain / MessageChainVersion / steps / variants
+    immutable reusable sequence behavior
 
 MessageChainEnrollment
-    -> pins one chain version
-    -> tracks only compact runtime progression
+    version-pinned compact progression
+    lazy actionable-wave materialization
 
 ScheduledMessage
-    -> compact execution identity and terminal summary
-    -> pins immutable content/chain references
-    -> contains no generic payload or meta JSON
+    compact logical delivery/status row
+    pinned template/chain relationships when applicable
+    bounded canonical payload differences and operational metadata
+    no parent attempt/provider/terminal summary fields
 
 ScheduledMessageRenderContext
-    -> created only when rendering begins
-    -> contains only token values referenced by the pinned version
-    -> has a separate retention policy
+    lazy frozen runtime token values
+
+ScheduledMessageComponent
+    relational composed acknowledgement/content identity
 
 ScheduledMessageDeliveryAttempt
-    -> owns claim leases, provider submission, and attempt outcomes
+    claim lease, destination, provider submission, attempt result
+
+ScheduledMessageOutboxEvent
+    exact terminal occurrence/reason and publication authority
 ```
 
-The refactor must reduce cardinality as well as row width. Message chains materialize only the next actionable step wave under normal sequential execution; they do not create every future delivery at enrollment time. Template and chain edits create immutable versions only when authored definitions change, not records proportional to recipients.
-
-The implementation order is intentionally separated:
+Completed sequence:
 
 ```text
-1. migrations and models only
-2. template/version sync and editor cutover
-3. compact direct scheduling and render-context cutover
-4. delivery-attempt ownership cutover
-5. generic chain runner and lazy materialization
-6. Campaigns cutover
-7. Webinars cutover
-8. Broadcasts cutover
-9. FlowRoutes direct-template/chain cutover
-10. InboundMessaging raw-payload cleanup
+15A
+    immutable terminal-result contract
+
+15B1
+    durable terminal outbox + exact attempt ownership
+
+15B2A
+    stop parent terminal dual writes
+
+15B2B
+    remove parent terminal columns and fallback readers
+
+15B3
+    normalize BroadcastRecipient terminal outcome persistence
+
+15B4
+    remove obsolete PendingMessageDeliveryConsolidator
 ```
 
-Current Messaging config templates remain executable legacy authoring examples until the corresponding runtime readers are migrated. Do not update those templates ahead of runtime support merely to make documentation look internally uniform.
+Still separate future work:
+
+```text
+Campaign full MessageChain migration
+Broadcast payload/template-version + single ScheduledMessage FK migration
+FlowRoutes direct authoring identity cleanup
+Inbound raw-provider persistence cleanup
+measured retention/pruning/index tuning
+```
+
+Those items do not block the DB snapshot/export/import feature. The exporter must preserve the current schema honestly and version its mapping rules so future module migrations can add explicit translators.
 
 ## Pre-prod schema-discovery ordering lens
 
@@ -389,8 +417,8 @@ Current schema-discovery sequence:
 | 12 | Standalone and multi-link Tasks | Complete | DB/schema + architecture + UI foundation | Zero-to-many TaskLinks, unlinked/Contact/non-Contact/multi-link Tasks, template/manual/automation invariants, dedicated Task index/show, Core-only operation, optional assignment/notification seams, FlowRoutes-owned Task correlation, module-contributed Point definition/action/authoring architecture, and full-suite green verification are complete. |
 | Next docs | Reporting foundation audit and durable module contract | Planned next documentation branch | Architecture + schema discovery | Expand the minimal Reporting documentation before implementation. Use FOSS feature shapes as reference, keep Reporting optional/independent, lock privacy/identity/retention/attribution boundaries, and define the first Webinar traffic/conversion report. |
 | 15A | Messaging persistence architecture documentation | Complete | Architecture/schema | The target versioned-template, versioned-chain, compact scheduled-message, lazy render-context, delivery-attempt, and module-cutover contracts are locked in `docs/model-persistence-bloat-audit.md` and the affected module references. |
-| 15B | Messaging persistence migrations and models | Next | DB/schema | Add the target tables and model relationships only. Do not cut runtime writers over in the same batch. |
-| 15C | Messaging runtime cutover | Planned incremental | Runtime/data migration | Move template sync/editing, compact scheduling/rendering, attempts, chains, and consuming modules in separately testable batches. |
+| 15B | Messaging persistence implementation | Complete | DB/schema + runtime | Immutable templates/chains, lazy chain runtime, delivery attempts, terminal outbox, parent schema compaction, Broadcast terminal normalization, and dead-code removal are green. |
+| Next data safety | DB Snapshot / Export / Import Tool | Ready to resume | Data migration + safety | Build deterministic versioned export/import around the current post-15B schema with validation, dry-run, mapping, and semantic round-trip coverage. |
 | 13 | Dashboard / contact workspace polish audit | Planned | UI/UX + possible schema | Review orientation surfaces after core runtime pieces settle. Add persisted preferences/acknowledgements only when needed. |
 | 14 | FOSS-informed module schema audit | Planned | DB/schema audit | Compare Engage Core modules against mature FOSS patterns to identify likely missing persisted concepts before production. Pull FlowRoutes-specific FOSS/OSS pattern review earlier into Phase 4 if helpful. |
 
@@ -406,11 +434,11 @@ new docs/TODO changes
 follow-up risks for later phases
 ```
 
-Deferred launch hardening:
+Current data-safety priority:
 
-- DB Snapshot / Export Safety Tool.
+- DB Snapshot / Export / Import Tool.
 
-Do not build DB snapshot/export tooling during active pre-production schema discovery unless real data preservation becomes necessary. While the product is not yet in production, schema-heavy phases may replace branch migrations and reset local/staging data as needed. Add command-line SQL/JSONL snapshot tooling when schemas are stabilizing and production rollout is near.
+The persistence-sensitive Messaging cutover is now complete and green, so the earlier deferral condition has been satisfied. Build the tool against the current schema, version the exported format, validate all references before apply, and make historical legacy-field handling explicit rather than implicit.
 
 
 ## Phase 11 automation opportunity foundation and Routes product work
@@ -717,11 +745,11 @@ Use the pre-prod schema-discovery sequence as the current implementation order.
 | 12 | Standalone and multi-link Tasks | Complete | Task is one generic live work record across template/no-template, zero-to-many domain links, and manual/automation origin. TaskLinks, dedicated index/show, Core-only operation, generic linked-record presentation, Tasks/FlowRoutes boundary correction, and contributor-driven FlowRoutes Point architecture are complete and green. |
 | Next docs | Reporting foundation audit and module documentation | 1 focused documentation/audit branch | Do not implement immediately. Audit current observability/reporting inputs, define privacy-first first-party collection and attribution contracts, then produce the durable Reporting module plan. |
 | 15A | Messaging persistence architecture documentation | Complete | The cross-module write-path audit and target persistence architecture are documented. |
-| 15B | Messaging persistence migrations and models | Next focused batch | Add only schema/model foundations for immutable templates, chains, compact executions, render contexts, components, and attempts. |
-| 15C | Messaging runtime cutover | Multi-session, incremental | Cut over writers/readers one boundary at a time; do not combine template, chain, Campaign, Webinar, Broadcast, FlowRoutes, and inbound changes into one batch. |
+| 15B | Messaging persistence implementation | Complete | Immutable definitions, lazy chains, attempts/outbox authority, parent compaction, Broadcast terminal normalization, and final dead-code removal are complete and green. |
+| Next | DB Snapshot / Export / Import Tool | 1+ focused sessions | Resume the previously deferred versioned state export/import work against the stabilized post-15B schema. |
 | 13 | Dashboard / contact workspace polish audit | 1–2 sessions | Review shared orientation surfaces after runtime behavior settles. Add persisted state only for proven needs such as acknowledgements or preferences. |
 | 14 | FOSS-informed module schema audit | 2–6 sessions, split by module group | Compare Engage Core module tables against mature FOSS patterns to catch likely missing persisted concepts before production. |
-| Deferred | DB Snapshot / Export Safety Tool | 0.5–1.5 sessions near launch | Command-line SQL/JSONL snapshot tooling for production/launch hardening. Do not build during active pre-prod schema discovery unless real data preservation becomes necessary. |
+| Current | DB Snapshot / Export / Import Tool | Focused multi-batch | Deterministic versioned export, strict validation, dry-run mapping, semantic round trip, and production-safe apply workflow. |
 | Ongoing | Feature-specific docs as modules stabilize | Ongoing | Keep module docs current when architecture/operator behavior changes. Do not turn docs into speculative backlog. |
 | Later | Client self-serve readiness audit | 0.5–1 session | Separate controlled beta/operator-assisted readiness from true client self-serve readiness. |
 | Later | PetServices vertical planning | 0.5–1 session | Plan vertical-owned pet/service concepts without pushing domain fields into Core. |
@@ -791,7 +819,7 @@ Completed baseline:
 
 Completed baseline:
 
-- Messaging currently owns DB-backed `MessageTemplatePreset` records; these are transitional and will migrate to stable `MessageTemplate` identities plus immutable `MessageTemplateVersion` rows.
+- Messaging still owns DB-backed `MessageTemplatePreset` compatibility records, while stable `MessageTemplate` identities and immutable `MessageTemplateVersion` rows are now implemented and used by the versioned runtime.
 - Messaging owns `MessageTemplateCatalogEntry` records for template browser organization by channel, purpose, module/area, group, and item.
 - Messaging currently owns `MessageTemplatePresetAssignment` records; the target removes broad assignment/catalog indirection where direct chain-step or owner references can enforce the same selection more clearly.
 - Template sync creates presets, catalog entries, and default assignments from message configs.
@@ -811,11 +839,11 @@ Completed baseline:
 - Profiles can be selected at the webinar series or webinar level, with an active default fallback.
 - Generic schedule resolution supports `delay(minutes)`, `anchored(minutes)`, and `next_day_at(time = HH:MM)`.
 - `next_day_at` uses client timezone; Webinar post-event follow-ups may anchor to `webinar.ends_at`.
-- Current resolved lifecycle conditions persist into ScheduledMessage metadata; the target keeps them on immutable chain definitions and rechecks them without copying them into each execution row.
+- Webinar schedule-profile sync now compiles lifecycle conditions into immutable chain definitions; the chain runner evaluates them at actionable-wave materialization without copying them into chain-created ScheduledMessage metadata.
 - Schedule profile items reference stable runtime dimensions such as channel, purpose, scope, surface, message type, dispatch key, and `message_template_key`. `source_config_path` is provenance/debug location only.
 - Multiple reminder slots may share `message_type = reminder`; the schedule profile item key owns the Webinar lifecycle slot, while `message_template_key` identifies the reusable Messaging template. `source_config_path` is provenance only.
 - Existing scheduled messages are not rewritten retroactively when a profile or template assignment changes.
-- Webinar schedule-profile identity belongs in scheduled-message metadata, not as a hydrated profile/items object graph inside `scheduled_messages.payload`.
+- Webinar schedule-profile identity resolves through Webinars-owned chain bindings and immutable chain references rather than copied profile/item objects in ScheduledMessage payload or metadata.
 - A fresh runtime dump proved repeated Contact/Webinar/registration content across payload, token, context, and metadata branches. The approved persistence architecture addresses that by pinning immutable definitions and storing only bounded, late-created render context.
 
 ### Webinars message/template setup and readiness
@@ -1131,7 +1159,7 @@ The next branch is a **Reporting foundation documentation and audit branch**. Re
 
 The Reporting documentation must keep Reporting optional, independent, privacy-first, and malleable. It should use mature FOSS analytics/reporting systems only as feature-shape references, audit current first-party/server observability inputs, define event/identity/attribution/correlation and retention boundaries, and specify the first Webinar traffic-to-registration/conversion report.
 
-The Messaging persistence architecture audit is complete. The next implementation safety target is the **migrations-and-models foundation** defined by `docs/model-persistence-bloat-audit.md`. Reporting schema/collection work must not copy current oversized payload patterns into a new analytics store.
+The Messaging persistence architecture and implementation are complete through 15B4. The next data-safety target is the **DB snapshot/export/import tool** defined by the current project-state migration work. Reporting schema/collection work must consume normalized delivery authority rather than copy ScheduledMessage payload/meta or provider attempt history.
 
 **Phase 12 — Standalone and multi-link Tasks is complete.** The focused and full automated suites are green after the Task generalization and the expanded FlowRoutes contributor refactor.
 
@@ -1184,9 +1212,9 @@ AutomationActionPointHandler
 
 Normal `create_task` authoring is deliberately opinionated: it requires an active Task Template, explains that a new Task is created every time execution reaches the Point, and does not expose a title-only one-time-looking automation path.
 
-After the Reporting documentation/audit locks the module boundary and phased plan, the next implementation safety target is the **Messaging persistence migrations-and-models foundation** documented in `docs/model-persistence-bloat-audit.md`.
+The Messaging persistence foundation is now complete. The next implementation safety target is the versioned DB snapshot/export/import path so existing Contacts, consents, registrations, and selected Messaging history can move into the current schema deliberately.
 
-The fresh registration runtime dump disproved the assumption that scheduled-message payload paths were compact. Reporting must therefore consume the new normalized execution/history seams after cutover rather than inventing a second unmeasured persistence layer.
+The historical registration runtime dump disproved the assumption that the old scheduled-message payload path was compact. Reporting and export/import tooling must use the implemented immutable definitions, render contexts, delivery attempts, and terminal outbox authority rather than inventing another copied history layer.
 
 The locked Route boundary remains:
 

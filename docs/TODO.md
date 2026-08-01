@@ -25,20 +25,38 @@ This file is intentionally disposable. Add work here when it is real but not yet
 
 ## Messaging persistence refactor
 
-- [x] Audit Messaging, Campaigns, Broadcasts, Webinars, FlowRoutes, and InboundMessaging write paths and lock the target architecture in [`model-persistence-bloat-audit.md`](model-persistence-bloat-audit.md).
-- [ ] Add migrations and models only for stable templates, immutable template versions, stable chains, immutable chain versions, chain steps/variants, compact enrollments, compact scheduled messages, lazy render contexts, optional composed-message components, and delivery attempts.
-- [ ] Cut template preset sync and CRM copy editing over to stable template identities and immutable versions.
-- [ ] Cut direct scheduled-message creation over to pinned definitions, compact first-class references, and late-created bounded render context.
-- [ ] Move claim leases, provider submission state, and attempt outcomes fully into delivery-attempt rows while preserving one compact terminal summary on the scheduled message.
-- [ ] Add the generic chain runner with version-pinned enrollments and lazy next-action materialization.
-- [ ] Migrate Campaigns to reference Messaging chains while preserving Campaign identity, activation, audience intent, and reporting.
-- [ ] Migrate Webinars from schedule-profile message orchestration to module-owned chain bindings for registration, waitlist, attended, and missed outcomes.
-- [ ] Migrate Broadcasts to pinned template versions and one first-class scheduled-message relationship per recipient.
-- [ ] Migrate FlowRoutes direct messaging to stable template/chain references without repeated provenance bundles.
-- [ ] Keep raw inbound provider payload only in webhook inbox receipts; normalize inbound messages and retain narrow evidence elsewhere.
-- [ ] Add representative row-size, index-plan, retention, and pruning tests after each runtime cutover rather than after the entire refactor.
+- [x] Audit Messaging, Campaigns, Broadcasts, Webinars, FlowRoutes, and InboundMessaging write paths and lock the ownership rules in [`model-persistence-bloat-audit.md`](model-persistence-bloat-audit.md).
+- [x] Add stable templates, immutable template versions, stable chains, immutable chain versions, steps/variants, compact enrollments, lazy render contexts, composed-message components, delivery attempts, and terminal outbox events.
+- [x] Cut template sync/editing and Webinar runtime over to immutable definitions and version-pinned chains.
+- [x] Add the generic lazy MessageChain runner.
+- [x] Move claim leases, provider submission state, destinations, attempt results, and terminal reasons/times off the ScheduledMessage parent row.
+- [x] Make `ScheduledMessageTerminalResult` resolve only from durable outbox/attempt authority.
+- [x] Normalize BroadcastRecipient terminal bookkeeping and remove copied `meta.delivery` snapshots.
+- [x] Remove the obsolete mutable pending-delivery consolidator.
 
-Do not create one-to-one payload or metadata tables that preserve the same bytes. Do not update executable config-template examples until the corresponding runtime contracts have been implemented.
+Separate future module work:
+
+- [ ] Migrate Campaigns fully to Messaging MessageChains while preserving Campaign identity, activation, audience intent, and reporting.
+- [ ] Migrate Broadcast content to pinned template versions and replace recipient ScheduledMessage ID arrays with one relationship.
+- [ ] Migrate FlowRoutes direct messaging to stable template/chain authoring identity without repeated provenance bundles.
+- [ ] Keep raw inbound provider payload only in canonical webhook receipts and normalize narrow inbound/compliance evidence.
+- [ ] Add production-shaped row-size, index-plan, retention, and pruning measurements.
+
+Do not create one-to-one payload or metadata tables that preserve the same bytes. Current ScheduledMessage payload/meta fields must remain bounded canonical runtime differences, not copied definitions or provider history.
+
+## DB snapshot / export / import safety
+
+- [ ] Define a versioned export envelope and manifest for the current post-15B schema.
+- [ ] Export Contacts, contact statuses/tags, consent history, permission invitations as needed, Webinar series/occurrences/registrations, and selected Messaging records required for historical truth.
+- [ ] Explicitly classify historical queued/pending Campaign or ScheduledMessage rows as mapped, intentionally dropped, or unsupported.
+- [ ] Validate source schema/version, required references, enum/status values, and destination compatibility before apply.
+- [ ] Provide deterministic dry-run output with creates/updates/skips/conflicts/errors and no mutations.
+- [ ] Apply through owning module actions/import services where runtime invariants require them; use direct inserts only for clearly defined historical/state restoration paths.
+- [ ] Make imports idempotent through stable external/export identities and prove safe reruns.
+- [ ] Add semantic round-trip tests from export -> fresh migrate -> import -> invariant comparison.
+- [ ] Flag legacy ScheduledMessage terminal fields and copied provider/meta snapshots rather than silently importing them into removed columns.
+- [ ] Preserve current Campaign/Broadcast transitional fields until explicit later migrations provide versioned translators.
+- [ ] Document production backup, verification, rollback, and post-import queue/Horizon safety steps.
 
 ## Run through after completing an item or system update
 
@@ -86,14 +104,14 @@ These are repeatable checklists. Run the relevant checklist after a production s
 - [ ] Confirm Messaging copy passes `MessageTemplateTokenValidator` for the exact producer context; do not use a global token allowlist.
 - [ ] Confirm runtime-only URLs/tokens are not guessed or hard-coded in static config.
 - [ ] Confirm Campaign presets do not own reusable message payload/copy.
-- [ ] During the legacy runtime, confirm campaign variants resolve through current Messaging assignments; after chain cutover, confirm Campaigns references stable Messaging chain/template identities without embedded copy.
+- [ ] Confirm current Campaign variants resolve through Messaging assignments; after the separate Campaign chain cutover, confirm Campaigns references stable Messaging chain/template identities without embedded copy.
 - [ ] Confirm Campaign preset step message references use first-class `channel`, `purpose`, and `scope` keys.
 - [ ] Confirm Messaging templates live under the expected channel/purpose/scope path.
 - [ ] Confirm Webinar Messaging definition files do not reintroduce per-scope `opt_ins`; consent acknowledgements should resolve through Messaging consent domains.
 - [ ] Confirm message scopes map to intentional consent domains and unknown scopes remain narrow.
 - [ ] Confirm `next_day_at` schedules use strict `HH:MM` and client timezone rather than embedding timezone.
 - [ ] Confirm delayed lifecycle conditions remain available for send-time revalidation without copying canonical chain definitions into every ScheduledMessage row.
-- [ ] During the legacy runtime, preserve MessageTemplatePreset sync behavior; after cutover, verify stable template identity and immutable version semantics.
+- [ ] Preserve MessageTemplatePreset compatibility sync while verifying stable MessageTemplate identity and immutable version semantics for the versioned runtime.
 - [ ] Confirm Task presets create DB-owned task template definitions only and do not create live tasks.
 - [ ] Confirm FlowRoute presets use public action/service/capability references rather than private module internals.
 - [ ] Confirm SMS visibility is controlled by config where the surface exposes channel choices.
@@ -412,14 +430,14 @@ These are open code/runtime investigations surfaced by the first production Webi
 ### Messaging, scheduling, and queue diagnostics
 
 - [X] Verify `ScheduledMessage.send_at` persists the same absolute instant as the timezone-aware queued delay.
-  - `ScheduleMessageAction` now normalizes the source instant to UTC before both persistence and queue delay registration and retains source/UTC values in `meta.message_scheduling`.
+  - `ScheduleMessageAction` normalizes the source instant to UTC before both persistence and queue delay registration. Current metadata does not retain a duplicate scheduling snapshot; diagnostics use the persisted UTC instant and queued job payload.
 - [X] Make queued send-time diagnostics timezone-explicit.
   - Horizon/debug `send_at` metadata now uses an ISO-8601 UTC value with an explicit offset.
 - [X] Normalize multi-CTA support across config validation and runtime unresolved-token validation.
   - Config validation accepted `ctas` with `{cta}` while runtime unresolved-token validation did not consistently accept the same shape.
-- [ ] Add a safer first-class operational recovery mechanism for exact skipped/failed `ScheduledMessage` rows.
-  - Current recovery still depends on surgical Tinker commands for narrow incidents.
-  - Preserve the current safety principle: identify exact rows, exact channel, exact status, and exact reason; never broaden recovery into indiscriminate retries or queue resets.
+- [ ] Add a safer first-class owning-module reissue/recovery mechanism for exact skipped/failed logical deliveries.
+  - Do not reset terminal ScheduledMessage rows or delete their attempt/outbox evidence.
+  - Recovery should preserve the original result and create a new explicitly authorized occurrence with fresh dedupe/idempotency identity.
 - [ ] Improve first-class queued-job diagnostics.
   - Surface effective queue connection, queue name, Redis prefix, delayed/reserved key identity, Horizon metadata, and delayed-until information so operators do not need manual Redis spelunking.
   - Deployment docs already require the restart; the remaining question is whether tooling should reduce the chance of human omission.

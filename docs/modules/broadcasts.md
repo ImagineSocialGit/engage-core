@@ -4,9 +4,18 @@
 
 Broadcasts is optional.
 
-The current Broadcast payload JSON and `broadcast_recipients.scheduled_message_ids` JSON array are transitional.
+The Broadcast terminal-result normalization is implemented:
 
-The approved target stores one authored message version per Broadcast and one compact ScheduledMessage relationship per recipient.
+```text
+BroadcastRecipient.status
+BroadcastRecipient.sent_at for sent outcomes
+BroadcastRecipient.terminal_reason for skipped/failed/cancelled business outcomes
+no BroadcastRecipient.meta.delivery provider/attempt snapshot
+```
+
+Messaging delivery attempts and terminal outbox events remain authoritative for provider execution and exact terminal occurrence.
+
+The broader Broadcast content refactor remains future work. `broadcasts.payload`, `broadcast_recipients.scheduled_message_ids`, and generic Broadcast metadata are still transitional. The approved future target stores one authored immutable message version per Broadcast and one compact ScheduledMessage relationship per recipient.
 
 ## Responsibility
 
@@ -185,32 +194,38 @@ Broadcast-owned exclusions may remain:
 
 Do not copy the resolved Contact ID list into the Broadcast row after BroadcastRecipient rows are created.
 
-## Target BroadcastRecipient schema
+## BroadcastRecipient persistence
 
-Conceptual fields:
+Current fields:
 
 ```text
 id
 broadcast_id
 contact_id
-scheduled_message_id nullable
 status
+scheduled_message_ids json nullable
 sent_at nullable
-skip_reason_code nullable
-failure_reason_code nullable
+terminal_reason nullable
+meta json nullable
 timestamps
 ```
 
-Rules:
+Current rules:
 
-- one Broadcast is single-channel, so one nullable `scheduled_message_id` is sufficient;
-- remove `scheduled_message_ids` JSON;
-- remove generic `meta`;
-- use direct reason-code columns;
-- provider failure detail remains on Messaging delivery attempts;
-- BroadcastRecipient is Broadcast bookkeeping, not delivery ownership.
+- `status` is compact Broadcast-owned bookkeeping;
+- `sent_at` records the Broadcast-owned sent outcome;
+- `terminal_reason` stores one bounded business reason for skipped, failed, or cancelled recipients;
+- provider, provider message ID, attempt number, exact terminal occurrence, and attempt history remain Messaging-owned;
+- `meta.delivery` snapshots are forbidden and removed during terminal reconciliation;
+- unrelated bounded Broadcast-owned metadata may remain until the broader Broadcast schema redesign.
 
-`broadcast_id + contact_id` remains unique.
+Remaining target:
+
+```text
+scheduled_message_id nullable
+```
+
+Because a normal Broadcast is single-channel, the eventual relationship should replace the current ScheduledMessage ID array with one nullable FK. That future migration should also decide whether any remaining generic recipient metadata has independent Broadcast value rather than moving the same data elsewhere.
 
 ## Scheduling flow
 
@@ -255,36 +270,30 @@ The existing `broadcasts.meta.scheduling` summary should move to first-class cou
 
 ## Delivery reconciliation
 
-Messaging terminal events update BroadcastRecipient status.
+Messaging publishes terminal events whose immutable result resolves through `ScheduledMessageTerminalResult`.
 
-Target recipient states may include:
+`BroadcastScheduledMessageResultRecorder` maps that result into compact Broadcast bookkeeping:
 
 ```text
-pending
-scheduled
 sent
+    status = sent
+    sent_at = terminal occurred_at
+    terminal_reason = null
+
 skipped
+    status = skipped
+    sent_at = null
+    terminal_reason = bounded reason/reason_code fallback
+
 failed
-cancelled
+    status = failed
+    sent_at = null
+    terminal_reason = bounded reason/reason_code fallback
 ```
 
-Broadcast completes when every recipient is terminal.
+Reconciliation is idempotent and strips any legacy `meta.delivery` snapshot while preserving unrelated Broadcast-owned metadata.
 
-Broadcast-level sent/skipped/failed counts may be maintained transactionally because they are frequent operational summaries and are tiny compared with copied payload/history objects.
-
-Do not copy:
-
-```text
-provider response
-provider message ID
-delivery attempt history
-ScheduledMessage failure text
-full terminal event payload
-```
-
-into BroadcastRecipient metadata.
-
-The scheduled-message and attempt relationships remain the authoritative delivery history.
+Broadcast completes when every recipient is terminal. Provider execution detail remains available through the ScheduledMessage relationship, delivery attempts, and terminal outbox—not copied recipient metadata.
 
 ## Cancellation
 
@@ -383,20 +392,20 @@ Messaging owns delivery history.
 
 Old terminal BroadcastRecipient rows are small and may remain for reporting.
 
-Large content is stored once in immutable template versions.
+Current Broadcast content is stored once on the Broadcast row rather than copied per recipient. The future content refactor should pin one immutable Messaging template version.
 
 Do not retain copied rendered bodies per recipient unless Messaging's separate render-context retention contract requires exact reconstruction.
 
-## Migration boundary
+## Remaining Broadcast migration boundary
 
-The next migrations/models batch should:
+The completed 15B3 work normalized recipient terminal outcomes only.
 
-- replace Broadcast payload storage with template/template-version FKs;
+A separate future Broadcast persistence refactor may:
+
+- replace Broadcast payload storage with stable template/template-version FKs;
 - replace recipient ScheduledMessage ID arrays with one nullable FK;
-- replace scheduling/delivery metadata with first-class count/reason columns;
-- remove generic Broadcast/BroadcastRecipient metadata from the target schema;
-- add model relationships and schema tests;
-- keep current scheduling actions/listeners operational until later runtime batches;
-- use pre-production migration replacement rather than compatibility alter migrations.
+- replace remaining scheduling metadata with justified first-class summaries;
+- remove generic Broadcast/BroadcastRecipient metadata only after each retained value is audited;
+- update authoring, scheduling, cancellation, and CRM presentation together in focused batches.
 
-The runtime cutover should then migrate draft editing, scheduling, result reconciliation, cancellation, and CRM presentation in focused Broadcast batches.
+That work is not required to reopen the completed Messaging terminal-authority refactor. Export/import tooling should preserve or deliberately transform the current Broadcast payload and ScheduledMessage ID array until that separate migration exists.

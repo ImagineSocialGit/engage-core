@@ -2,11 +2,19 @@
 
 ## Status
 
-Approved target architecture.
+Implemented architecture with explicitly deferred module-specific work.
 
-This document replaces the earlier audit-only plan for Messaging, Campaigns, Broadcasts, Webinars, FlowRoutes message dispatch, and inbound-provider persistence.
+The core Messaging persistence refactor completed through Batches 15A–15B4 and the full suite is green. The implemented foundation includes immutable templates/chains, lazy chain execution, render contexts, relational components, delivery-attempt authority, terminal outbox authority, strict terminal-result resolution, Broadcast terminal normalization, and removal of the obsolete pending-delivery consolidator.
 
-The documentation batch defines the target. The next batch should change migrations and models only. Runtime writers, resolvers, jobs, controllers, and UI should move afterward in smaller module-focused batches.
+This document now records both:
+
+```text
+implemented post-15B ownership
+remaining bounded compatibility fields
+separate future Campaign/Broadcast/FlowRoutes/inbound refactors
+```
+
+The current schema intentionally still contains bounded `scheduled_messages.payload` and `scheduled_messages.meta` fields for runtime differences and compatibility paths. They must remain canonical and compact; they are not a license to restore the historical copied snapshots measured below.
 
 ## Purpose
 
@@ -76,7 +84,7 @@ The target is deliberate normalization around stable identity, immutable definit
 
 ## Current measured evidence
 
-The supplied Webinar confirmation row contains approximately:
+The historical pre-refactor Webinar confirmation row supplied during the audit contained approximately:
 
 ```text
 payload JSON    1,866 bytes
@@ -213,7 +221,7 @@ scheduled-message ID arrays where a relationship exists
 
 Persist a derived value only when a measured hot query or integrity requirement justifies the denormalization.
 
-## Approved Messaging definition schema
+## Implemented Messaging definition schema
 
 ## `message_templates`
 
@@ -273,7 +281,7 @@ Rules:
 
 A new row is created only when authored content changes.
 
-## Approved Messaging chain schema
+## Implemented Messaging chain schema
 
 ## `message_chains`
 
@@ -375,7 +383,7 @@ Rules:
 - small routing columns stay first-class because they are operationally useful and avoid expensive hot-path joins;
 - no generic `meta` column is planned.
 
-## Approved chain runtime schema
+## Implemented chain runtime schema
 
 ## `message_chain_enrollments`
 
@@ -435,11 +443,11 @@ wave reaches advancement policy
 
 A workflow may materialize more than one wave only when concurrent independent variants are deliberately required.
 
-## Approved scheduled-delivery schema
+## Implemented scheduled-delivery schema
 
 ## `scheduled_messages`
 
-Compact delivery execution record:
+Compact logical delivery/execution record:
 
 ```text
 id
@@ -447,55 +455,65 @@ recipient_type
 recipient_id
 context_type nullable
 context_id nullable
-origin_type nullable
-origin_id nullable
+behavior_owner_type nullable
+behavior_owner_id nullable
 
-message_template_version_id
+message_template_version_id nullable
 message_chain_enrollment_id nullable
 message_chain_step_variant_id nullable
 
 channel
+message_type
 purpose
 scope
-message_type
+payload_class
 queue nullable
-
-destination nullable
+dispatch_keys json nullable
+definition_config_path nullable
+payload json
 send_at
 status
-attempt_count
-dedupe_key nullable
 provider_idempotency_key nullable
-
-sent_at nullable
-skipped_at nullable
-failed_at nullable
-terminal_reason_code nullable
+dedupe_key nullable
+meta json nullable
 
 created_at
 updated_at
 ```
 
-Rules:
+Implemented rules:
 
-- `message_template_version_id` pins immutable content for every scheduled message, including one-off/direct sends;
-- chain references are nullable because direct messages and Broadcasts may schedule without a chain enrollment;
-- `origin` is the generic creator/business-owner relationship;
-- `context` remains the about-this-record relationship;
-- `destination` is resolved and frozen no later than first provider submission; pending messages may intentionally resolve the latest eligible recipient destination at claim time;
-- `attempt_count` is an allowed small operational counter because claim/retry policy uses it frequently;
-- no `payload`, `dispatch_keys`, `definition_config_path`, or generic `meta` column is planned;
-- provider claim and provider-result details belong to attempts, not this row;
-- the message row stores terminal summary only.
+- immutable copy is pinned through `message_template_version_id` when a versioned template is used;
+- chain-created deliveries pin the exact enrollment and step variant;
+- `behavior_owner` preserves the durable owner of resolved lifecycle behavior;
+- `payload` is canonicalized and, for versioned templates, stores only differences/operational values rather than reusable template content;
+- the normal chain path persists destination-only payload differences and empty generic metadata;
+- runtime token values move lazily into `scheduled_message_render_contexts` and are removed from parent payload;
+- `meta` is a closed bounded operational contract, not arbitrary snapshots;
+- `status` remains a compact parent lifecycle summary;
+- attempt count, claim state, provider result, terminal occurrence, terminal timestamps, and terminal reason are not parent columns;
+- the stable provider idempotency key remains on the logical delivery row.
+
+The retained JSON fields are accepted only under bounded canonicalizers. They must not contain:
+
+```text
+full template content already referenced by version
+model arrays or loaded relationships
+profile/catalog/assignment snapshots
+provider responses or attempt history
+terminal timestamps/reasons
+consolidation recipes
+unbounded debug metadata
+```
 
 ## `scheduled_message_render_contexts`
 
-Irreducible per-delivery values:
+Irreducible per-delivery token values:
 
 ```text
 id
 scheduled_message_id unique
-values
+values json
 content_hash
 rendered_at
 expires_at nullable
@@ -504,19 +522,15 @@ timestamps
 
 Rules:
 
-- this row is created lazily when provider-ready rendering begins;
-- it contains only token values actually referenced by the pinned template version and optional composed components;
-- it must not contain Eloquent model arrays, loaded relationships, config branches, duplicate context trees, or labels/provenance;
-- messages with no runtime tokens need no row;
-- retries reuse the same frozen render context;
-- retention may differ from the hot scheduled-message row;
-- exact customer-facing content is reconstructed from immutable template version + renderer version + frozen render values.
-
-This one-to-one table is justified because it is not created for every planned row and it has a separate retention/archival boundary.
+- created lazily during first provider-ready payload resolution;
+- contains frozen runtime token values required by the pinned template/components;
+- retries reuse the same frozen context;
+- parent payload tokens are removed after the context is created;
+- retention may differ from the hot ScheduledMessage row.
 
 ## `scheduled_message_components`
 
-Optional consolidated content components:
+Optional composed content components:
 
 ```text
 id
@@ -530,17 +544,11 @@ placement_key nullable
 timestamps
 ```
 
-Rules:
-
-- no row is required for the primary template already referenced by `scheduled_messages.message_template_version_id`;
-- rows exist only when additional content is deliberately composed, such as a consent acknowledgement;
-- covered intent and consent identity become relational facts rather than a copied consolidation recipe;
-- component content is immutable through its template-version FK;
-- no generic `meta` column is planned.
+Covered intent/consent identity is relational. No delivery-consolidation recipe is stored on the parent row.
 
 ## `scheduled_message_delivery_attempts`
 
-Attempt-specific state:
+Attempt and provider execution authority:
 
 ```text
 id
@@ -552,7 +560,7 @@ claimed_at
 lease_expires_at
 provider_submission_started_at nullable
 completed_at nullable
-destination
+destination nullable
 provider nullable
 provider_message_id nullable
 reason_code nullable
@@ -563,18 +571,36 @@ timestamps
 Rules:
 
 - claim leases and provider outcomes live here;
-- `scheduled_messages` does not duplicate claim token, claim expiry, submission time, provider, provider message ID, or attempt reason;
-- provider idempotency remains stable on the scheduled message when it identifies one logical delivery;
-- provider-specific raw responses do not go into generic attempt metadata;
-- a dedicated provider-evidence table or object-store reference requires a proven support/replay need and retention policy.
+- the parent does not duplicate attempt number, claim, provider, completion, or reason facts;
+- provider-specific raw responses require a separate proven evidence/retention contract;
+- automatic retry after provider submission requires a verified idempotency guarantee.
 
 ## `scheduled_message_outbox_events`
 
-Keep the current bounded terminal outbox pattern.
+Terminal occurrence and event publication authority:
 
-It is operational, narrow, and one-row-per-message-event.
+```text
+id
+scheduled_message_id unique
+delivery_attempt_id nullable
+event_type
+occurred_at
+reason_code nullable
+reason nullable
+status
+available_at
+claim_token nullable
+claim_expires_at nullable
+attempts
+last_attempted_at nullable
+published_at nullable
+last_error nullable
+timestamps
+```
 
-Do not add rendered content or module snapshots to it.
+Sent/failed terminal events reference their exact completed attempt. A pre-attempt direct skip may carry its reason on the outbox event without an attempt.
+
+`ScheduledMessageTerminalResult` resolves only from this outbox row and its attempt. Removed parent terminal columns are not a compatibility fallback.
 
 ## Template and chain editing rules
 
@@ -616,76 +642,66 @@ Copying a dozen small relationship/definition rows is not database bloat. Copyin
 
 ## Campaigns
 
-Target:
+Current state:
+
+- Campaigns still owns the active CampaignStep/CampaignStepVariant progression engine;
+- Campaign terminal reconciliation consumes immutable `ScheduledMessageTerminalResult` data from the durable outbox/attempt contract;
+- Campaign metadata does not own provider attempt or terminal history.
+
+Remaining separate target:
 
 ```text
-Campaign
-    owns campaign identity, activation, audience/enrollment intent, reporting
-
 Campaign.message_chain_id
-    selects the reusable chain for new Campaign enrollments
-
-CampaignEnrollment
-    thin Campaign-specific wrapper/correlation record
-
-MessageChainEnrollment
-    owns sequence progression and message execution
+CampaignEnrollment -> MessageChainEnrollment
+Messaging MessageChain owns reusable progression
 ```
 
-After cutover:
-
-- Campaign steps and variants move into generic immutable chain versions.
-- Campaign enrollment does not copy chain exit rules or start payloads.
-- Campaign deactivation cancels active chain enrollments and skips pending scheduled deliveries through Messaging public actions.
-- Campaign-specific reporting remains Campaign-owned.
+That future Campaign migration is not required to reopen completed ScheduledMessage terminal persistence.
 
 ## Broadcasts
 
-Target:
+Current state after 15B3:
 
 ```text
-Broadcast
-    owns one-time send identity, channel, recipient filter, schedule, status
-    references one private or reusable MessageTemplate
-
-published Broadcast
-    pins one MessageTemplateVersion
-
-BroadcastRecipient
-    stores one nullable scheduled_message_id for the current single-channel contract
+BroadcastRecipient.status
+BroadcastRecipient.sent_at for sent outcomes
+BroadcastRecipient.terminal_reason for skipped/failed/cancelled outcomes
+no copied meta.delivery provider/attempt snapshot
 ```
 
-After cutover:
+Messaging attempts/outbox remain authoritative for provider execution and exact terminal occurrence.
 
-- Broadcast payload JSON is removed.
-- Broadcast recipient scheduled-message ID arrays are removed.
-- Delivery-result metadata is replaced by direct status/reason columns and the scheduled-message relationship.
-- `recipient_filter` remains bounded low-volume Broadcast definition data.
+Still deferred:
+
+- Broadcast payload -> private/reusable immutable template version;
+- `scheduled_message_ids` JSON -> one nullable ScheduledMessage FK;
+- audit/removal of remaining generic Broadcast metadata.
+
+Export/import must preserve the current Broadcast shape until that separate migration is implemented.
 
 ## Webinars
 
-Target:
+Implemented runtime state:
 
 ```text
-Webinars
-    owns trigger bindings from registration/waitlist/attendance outcomes to MessageChains
+Webinar schedule profiles/items
+    operator-facing cadence authoring and selection
 
-MessageChain
-    owns reusable timing, step, variant, and exit behavior
+profile sync
+    publishes immutable MessageChains/versions/steps/variants
+    creates Webinars-owned profile bindings
 
-Messaging templates
-    own immutable copy
+series customization
+    owns copy-on-write series MessageChain bindings
 
-MessageChainEnrollment
-    owns each registration/outcome chain instance
+registration/post-event runtime
+    starts version-pinned MessageChainEnrollments
+    lazily materializes only actionable deliveries
 ```
 
-After cutover:
+Chain-created Webinar ScheduledMessages pin template/chain relationships and retain only runtime differences such as destination. They do not copy profile, label, template, or condition snapshots.
 
-- Webinar schedule profiles/items are replaced by generic message chains/versions/steps.
-- Webinar series/occurrence selections become module-owned chain bindings.
-- registration, waitlist, attended, and missed outcomes start the selected chains.
-- Webinars does not copy profile, area, template, or condition descriptions into scheduled-message metadata.
+A later product simplification may replace schedule-profile authoring tables, but the current hybrid is runtime-correct and should not be described as an unimplemented cutover.
 
 ## FlowRoutes
 
@@ -855,112 +871,94 @@ Reject any design that:
 - adds generic `meta` to new high-volume tables as a compatibility escape hatch;
 - treats normalization as an excuse for unbounded join depth on every hot query.
 
-## Implementation sequence
+## Completed implementation sequence
 
-### Batch 0 — Documentation
-
-Complete in this batch:
-
-- lock the target persistence architecture;
-- document MySQL-informed design rules;
-- document module ownership and cutover boundaries;
-- mark current preset/profile/step persistence as transitional.
-
-### Batch 1 — Migrations and models
-
-Next batch:
-
-- replace pre-production migrations rather than add compatibility alters;
-- add template/version models;
-- add chain/version/step/variant/enrollment models;
-- reshape scheduled-message, render-context, component, attempt, Broadcast, Campaign, Webinar binding, and inbound models;
-- add factories and schema/model tests only;
-- do not switch runtime writers yet.
-
-### Runtime batches
-
-Then proceed incrementally:
-
-1. template/version sync and editing;
-2. compact direct scheduling and rendering;
-3. delivery claim/attempt cutover;
-4. message-chain runner;
-5. Campaign cutover;
-6. Webinar cutover;
-7. Broadcast cutover;
-8. FlowRoutes template/chain actions;
-9. inbound/webhook normalization cleanup;
-10. historical import/backfill and legacy reader removal.
-
-Each runtime batch should be small enough to prove behavior and row-size effects before continuing.
-
-## Acceptance targets
-
-### Definition cardinality
+The persistence refactor was delivered incrementally:
 
 ```text
-editing one template
-    creates one template version
+15A
+    immutable terminal-result event contract
 
-editing one chain
-    creates one chain version plus small child definition rows
+15B1
+    durable terminal outbox and exact attempt ownership
 
-duplicating one chain
-    creates no recipient/runtime rows
-    creates no copied template content until copy is customized
+15B2A
+    stop duplicate parent terminal writes
+
+15B2B
+    remove parent terminal columns and fallback readers
+
+15B3
+    normalize Broadcast recipient terminal bookkeeping
+
+15B4
+    delete obsolete PendingMessageDeliveryConsolidator
 ```
 
-### Webinar registration example
+Earlier runtime batches also established immutable templates/versions, immutable chains/versions, Webinar bindings, lazy chain execution, render contexts, and relational components.
 
-For a ten-step registration chain:
+Separate future projects remain:
 
 ```text
-one MessageChainEnrollment
-zero or one currently actionable ScheduledMessage wave under normal progression
-no copied template body
-no copied chain conditions
-no copied catalog/profile labels
-no generic ScheduledMessage metadata
-render context created only when rendering begins
+Campaign full MessageChain migration
+Broadcast content/version and single-FK migration
+FlowRoutes direct template/chain identity cleanup
+Inbound raw-provider persistence cleanup
+measured retention/pruning/index tuning
 ```
 
-### Scheduled-message row budget
+Those projects must not be relabeled as unfinished core 15B terminal persistence.
 
-The hot scheduled row should consist almost entirely of fixed-width IDs/timestamps/status fields plus small classification/destination strings.
+The post-15B schema is stable enough to resume the versioned DB snapshot/export/import safety tool. That tool must preserve current transitional Campaign/Broadcast fields and explicitly reject or translate removed legacy ScheduledMessage terminal columns.
 
-No JSON columns are planned on `scheduled_messages`.
+## Implemented acceptance results and deferred targets
 
-### Persistence tests
+### Implemented
 
-Required future tests:
+```text
+template edits create immutable versions
+chain edits create immutable versions
+Webinar chain duplication is copy-on-write
+Webinar runtime creates MessageChainEnrollments
+normal chain execution materializes only the actionable wave
+chain-created ScheduledMessages do not copy template/profile/condition snapshots
+runtime token values freeze lazily in render contexts
+consent composition uses relational component rows
+delivery attempts own claims/provider outcomes
+terminal outbox owns occurrence/reason
+ScheduledMessageTerminalResult has no parent-column fallback
+BroadcastRecipient has one bounded terminal_reason and no meta.delivery snapshot
+```
 
-- immutable template edit does not alter existing scheduled delivery;
-- immutable chain edit does not alter existing enrollment;
-- chain duplication reuses template versions until copy changes;
-- repeated template saves do not create unrelated assignments/catalog snapshots;
-- only next actionable chain wave is materialized;
-- scheduled rows contain no payload/meta/config snapshots;
-- render context contains only referenced token values;
-- retries reuse the same render context and destination;
-- Broadcast content is stored once;
-- Campaign enrollment does not copy chain rules;
-- Webinar dispatch creates chain enrollment rather than all future payload rows;
-- inbound normalized rows do not contain raw webhook data;
-- raw provider content appears in one canonical receipt only.
+### Current bounded compatibility contract
+
+`scheduled_messages.payload` and `scheduled_messages.meta` still exist. Acceptance now means:
+
+- versioned template content is not copied into payload;
+- payload retains only canonical runtime differences/operational values;
+- tokens move to the lazy render-context row;
+- metadata is canonical, bounded, and free of provider/terminal history and copied definitions.
+
+### Deferred module targets
+
+- Campaign enrollment does not yet wrap generic MessageChainEnrollment;
+- Broadcast content is not yet pinned to a private immutable template version;
+- BroadcastRecipient still uses `scheduled_message_ids` JSON;
+- inbound provider normalization remains separate work;
+- complete removal of ScheduledMessage compatibility JSON requires a future measured cutover, not a documentation-only declaration.
 
 ## Remaining measurement work
 
-The target architecture is approved, but actual implementation must still measure:
+The completed refactor should now be measured against production-shaped data:
 
 ```text
+average and p95 ScheduledMessage payload/meta size
 average and p95 template-version content size
 average and p95 render-context size
-scheduled rows created per workflow before and after lazy materialization
-secondary-index size on scheduled_messages and chain enrollments
+ScheduledMessages created per workflow after lazy materialization
+secondary-index size on ScheduledMessage, attempts, outbox, and chain enrollments
 backup/restore and migration temporary-space requirements
 raw webhook retention volume
 ```
 
-Those measurements may tune indexes and retention.
-
-They should not reopen the core ownership decision unless they reveal a correctness problem.
+Those measurements may justify later retention, indexing, Broadcast/Campaign migration, or final compatibility-field removal. They should not reopen immutable definition ownership or attempt/outbox terminal authority without a correctness issue.

@@ -209,7 +209,7 @@ Diagnostic rule:
 
 > Inspect the actual Horizon `Delayed Until` value and/or serialized queue delay metadata before manipulating Redis or requeueing jobs. Do not assume a persisted database `send_at` value proves the Redis delay is wrong.
 
-`ScheduleMessageAction` normalizes timezone-aware Carbon values to UTC before persistence and queue delay registration. `ScheduledMessage.send_at`, the queued delay, and Horizon `send_at` metadata therefore represent the same instant. The message's `meta.message_scheduling` payload retains the source timezone and both source and UTC ISO-8601 values for diagnosis. A discrepancy in older data is a code/data consistency issue; it is not, by itself, proof that the queued delay is wrong.
+`ScheduleMessageAction` normalizes timezone-aware Carbon values to UTC before persistence and queue delay registration. `ScheduledMessage.send_at`, the queued delay, and Horizon `send_at` metadata therefore represent the same instant. Current ScheduledMessage metadata does not retain a duplicate source-timezone scheduling snapshot; diagnose discrepancies from the owning definition/binding, the persisted UTC instant, and the queued job payload. A discrepancy in older data is a code/data consistency issue; it is not, by itself, proof that the queued delay is wrong.
 
 ---
 
@@ -559,37 +559,45 @@ Fix future definition state and separately decide what to do with already schedu
 
 ---
 
-# 15. Safe surgical recovery for skipped scheduled messages
+# 15. Safe surgical recovery for terminal scheduled messages
 
-For a narrow production failure, recover only the exact affected ScheduledMessage instances after the code/config/runtime cause is fixed.
+A terminal ScheduledMessage is immutable delivery history for operational recovery purposes.
+
+Its durable result is owned by:
+
+```text
+ScheduledMessage.status
+ScheduledMessageOutboxEvent
+ScheduledMessageDeliveryAttempt, when an attempt existed
+```
+
+Do not reset a sent, skipped, or failed ScheduledMessage row to pending. The terminal outbox is one-row-per-message, and the original attempt/outbox evidence must remain intact.
 
 Safe recovery principle:
 
 ```text
-1. Identify the exact affected scheduled-message IDs.
-2. Filter by channel.
-3. Filter by current status.
-4. Filter by the exact skip or failure reason.
-5. Reset only those rows to pending.
-6. Clear skipped_at, skip_reason, and stale failure state only as appropriate for those rows.
-7. Dispatch only those specific SendScheduledMessageJob instances.
-8. Verify final statuses.
+1. Identify the exact affected ScheduledMessage IDs and owning domain records.
+2. Confirm the code/config/provider cause is fixed.
+3. Inspect the durable terminal result, including outbox occurrence and attempt/reason.
+4. Use the owning module's explicit retry/reissue/reschedule path when one exists.
+5. Otherwise create a new logical delivery occurrence with a new dedupe/idempotency identity.
+6. Preserve the original ScheduledMessage, delivery attempts, and outbox event unchanged.
+7. Dispatch only the newly created replacement deliveries.
+8. Verify both the preserved original result and the replacement result.
 ```
 
-Do not perform broad status resets, indiscriminate retries, queue flushes, or Redis destruction for a small, identified failure set.
+Do not perform broad status resets, delete terminal outbox rows, reuse provider idempotency keys, indiscriminately retry jobs, flush queues, or destroy Redis for a small identified failure set.
 
-Before retrying jobs after a PHP runtime fix:
+Before creating replacement deliveries after a PHP runtime fix:
 
 ```text
 deploy the fix
-→ restart <CLIENT_HORIZON_PROGRAM> through Supervisor
+→ restart <CLIENT_HORIZON_PROGRAM> through Supervisor when worker code changed
 → verify the running Horizon process
-→ retry only the exact affected messages
+→ invoke only the owning module's exact recovery/reissue path
 ```
 
 The production correction should be narrower than the incident whenever possible.
-
----
 
 # 16. Diagnostic command set
 

@@ -140,7 +140,7 @@ next_day_at
 
 `next_day_at` uses `config('client.timezone')`, with application timezone fallback. Do not duplicate timezone in each schedule item.
 
-For delayed lifecycle messages, resolved conditions should be persisted with the `ScheduledMessage` and re-evaluated by `ScheduledMessageGate` immediately before provider delivery.
+For direct non-chain delayed messages, bounded resolved conditions may be persisted with the `ScheduledMessage` and re-evaluated by `ScheduledMessageGate` before provider delivery. MessageChain conditions remain on immutable steps/variants and are evaluated when the wave becomes actionable.
 
 Client associative config merges over defaults. Numeric/list arrays replace the default list when present, so a client reminder cadence replaces the Core reminder list rather than appending duplicate slots.
 

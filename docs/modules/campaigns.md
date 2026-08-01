@@ -4,9 +4,7 @@
 
 Campaigns is optional.
 
-The current `campaign_steps`, `campaign_step_variants`, and Campaign-owned message-progression engine are transitional.
-
-The approved target is:
+The current `campaign_steps`, `campaign_step_variants`, and Campaign-owned progression engine remain transitional. The approved longer-term target is:
 
 ```text
 Campaigns owns Campaign identity, activation, audience/enrollment intent, and reporting.
@@ -14,7 +12,9 @@ Messaging owns reusable MessageChains and MessageChainEnrollments.
 Campaigns references a MessageChain rather than duplicating a second chain engine.
 ```
 
-Migrations and models should move before runtime scheduling behavior.
+The shared Messaging foundation required for that future migration is now implemented. Campaigns already consumes immutable ScheduledMessage terminal results through the durable outbox/attempt contract and does not copy provider-attempt state.
+
+Campaign-specific migration to MessageChains remains a separate future refactor; it is not unfinished 15B terminal-persistence work.
 
 ## Responsibility
 
@@ -312,7 +312,7 @@ Campaigns may interpret final campaign outcomes after the chain completes or exi
 
 ### Terminal delivery policy
 
-A failed ScheduledMessage is a terminal accounted-for result after Messaging exhausts that delivery's safe retry policy.
+A failed ScheduledMessage is a terminal accounted-for result after Messaging exhausts that delivery's safe retry policy. Campaign reconciliation consumes `ScheduledMessageTerminalResult`, whose occurrence/reason/provider facts come from the durable terminal outbox and exact delivery attempt rather than parent ScheduledMessage summary columns.
 
 Generic chain progression should determine whether the step:
 
@@ -574,18 +574,17 @@ Messaging remains the source of delivery execution facts.
 
 Campaigns should query through stable relationships/read services rather than copy delivery history into CampaignEnrollment metadata.
 
-## Migration boundary
+## Remaining Campaign migration boundary
 
-The next migrations/models batch should:
+The shared immutable template/chain, delivery-attempt, and terminal-outbox foundations already exist.
 
-- add the Campaign-to-MessageChain relationship;
-- slim CampaignEnrollment and add its MessageChainEnrollment relationship;
-- preserve current Campaign lifecycle fields needed before runtime cutover;
-- introduce target models without switching the current scheduler;
-- rewrite pre-production create migrations rather than add compatibility alter migrations;
-- add schema/model tests;
-- leave controller, sync, scheduler, listener, and UI cutover for later batches.
+The remaining Campaign-specific cutover should:
 
-The legacy CampaignStep and CampaignStepVariant models may need to remain temporarily while runtime still depends on them.
+- add/select a Campaign-to-MessageChain relationship;
+- create a thin CampaignEnrollment wrapper around MessageChainEnrollment;
+- migrate Campaign step/variant authoring into immutable Messaging chain definitions;
+- preserve Campaign lifecycle, audience/source intent, and reporting;
+- update cancellation/deactivation to use Messaging public chain actions;
+- remove duplicate Campaign-owned progression fields only after all runtime readers move.
 
-Their eventual removal is part of runtime cutover, not a reason to keep duplicate target and legacy progression indefinitely.
+Until that dedicated cutover, current Campaign step/variant rows and metadata required by the active scheduler must be exported/imported faithfully. Do not treat provider/attempt/terminal state as Campaign-owned data.

@@ -1274,7 +1274,7 @@ Messaging does not own:
 
 Other modules use Messaging through public actions/services/contracts.
 
-Target persistence rules:
+Implemented persistence rules:
 
 ```text
 templates/chains
@@ -1285,27 +1285,30 @@ chain enrollments
     no copied chain definition or start-context object graph
 
 scheduled messages
-    immutable template-version FK
-    recipient/context/origin relationships
+    pinned template/chain relationships when applicable
+    recipient/context/behavior-owner relationships
     small routing/status columns
-    no payload JSON
-    no generic meta JSON
+    bounded canonical payload differences
+    bounded canonical operational metadata
+    no parent attempt/provider/terminal summary fields
 
 render contexts
     created lazily
-    contain only referenced runtime token values
+    contain frozen runtime token values
     separate retention policy
 
 delivery attempts
-    own claim/provider attempt state
-    not duplicated on ScheduledMessage
+    sole claim/provider attempt authority
+
+terminal outbox
+    sole terminal occurrence/reason authority
 ```
 
-Current `message_template_presets`, assignments, catalog entries, Campaign steps/variants, Webinar schedule profiles/items, and payload-bearing ScheduledMessages are transitional implementation details.
+Current `message_template_presets`, assignments, catalog entries, Campaign steps/variants, Broadcast payload/recipient ID arrays, FlowRoutes direct-message provenance, and inbound raw-provider persistence remain separate transitional areas.
 
-Do not add new features that deepen dependence on those overlapping shapes while the cutover is in progress.
+Webinar schedule profiles now compile to immutable Messaging chains and bindings; they are an authoring/selection layer rather than a second direct ScheduledMessage runtime engine.
 
-A separate table is justified only when it changes cardinality, ownership, query integrity, or retention. Do not move the current full ScheduledMessage payload/meta into always-created one-to-one tables.
+A separate table is justified only when it changes cardinality, ownership, query integrity, or retention. Do not move bounded ScheduledMessage payload/meta into always-created one-to-one compatibility tables, and do not reintroduce copied definitions/provider outcomes into those fields.
 
 Messaging templates own reusable content only.
 
@@ -2295,7 +2298,7 @@ MessageChainEnrollment
     owns progression, current step, next action, exit result, and scheduled deliveries
 ```
 
-Current CampaignStep and CampaignStepVariant persistence is transitional and should migrate into generic immutable MessageChainVersion step/variant records.
+Current CampaignStep and CampaignStepVariant persistence is transitional and should migrate into generic immutable MessageChainVersion step/variant records. Until then, Campaign reconciliation consumes immutable ScheduledMessageTerminalResult data and must not copy provider-attempt or terminal-outbox state.
 
 Campaigns must not copy:
 
@@ -2349,7 +2352,7 @@ Remove the target Broadcast payload JSON and recipient ScheduledMessage ID array
 
 `recipient_filter` may remain bounded Broadcast definition JSON because it is stored once per Broadcast and is not copied per recipient.
 
-BroadcastRecipient should use direct status/reason fields and no generic metadata. Provider attempt detail remains Messaging-owned.
+BroadcastRecipient currently uses direct `status`, sent-only `sent_at`, and bounded `terminal_reason`. Terminal reconciliation removes copied `meta.delivery` snapshots while unrelated bounded Broadcast metadata remains until the separate Broadcast schema redesign. Provider attempt and exact terminal occurrence detail remain Messaging-owned.
 
 Normal Broadcasts remain consent-gated.
 
@@ -2382,9 +2385,9 @@ attendance missed -> selected missed follow-up MessageChain
 
 A chain does not own the Webinar trigger.
 
-Current WebinarScheduleProfile and WebinarScheduleProfileItem persistence is transitional and should migrate into MessageChain/Version/Step/Variant records.
+WebinarScheduleProfile and WebinarScheduleProfileItem remain the operator-facing cadence authoring/selection layer. Sync now publishes immutable MessageChain/Version/Step/Variant records and Webinars-owned bindings, and runtime starts MessageChainEnrollments rather than scheduling directly from profile items.
 
-Current selection precedence should remain:
+Current selection precedence remains:
 
 ```text
 occurrence binding
@@ -2398,7 +2401,7 @@ A successful registration normally creates one MessageChainEnrollment and only t
 
 Do not create every future reminder at registration time.
 
-Do not copy Webinar/registration/profile/template/condition snapshots into ScheduledMessage payload/meta.
+Do not copy Webinar/registration/profile/template/condition snapshots into ScheduledMessage payload/meta. Chain-created Webinar deliveries should retain only compact runtime differences such as destination plus their immutable relationships.
 
 Chain duplication for a Webinar series uses copy-on-write:
 
@@ -2754,9 +2757,10 @@ Recommended direction:
 7. FlowRoutes has a read-only manual ContactStatus automation impact preview for the eventual manual-status consequence warning UX.
 8. The module-first preset contribution architecture is implemented and must remain separate from runtime module availability and trigger assignment.
 9. Routes now has a real Manage Routes / Assignments baseline, modal Route/Point editing, linear authoring boundaries, explicit direct-message eligibility, and server-authoritative Point placement rules.
-10. Run the system-wide model creation and persistence-bloat audit, starting with `ScheduledMessage`, before assuming current JSON/runtime payload shapes are production-ready.
-11. Continue focused Routes product completion or the dashboard/contact workspace polish audit after the persistence audit, according to the client-readiness roadmap.
-12. Regenerate `core-project-tree.txt` from the repo after each structural batch.
+10. Treat the completed Messaging persistence refactor as the current export/import target: immutable definitions, lazy chain execution, delivery-attempt authority, terminal outbox authority, and bounded ScheduledMessage compatibility fields.
+11. Resume the DB snapshot/export/import safety tool now that the core persistence-sensitive cutover is green; preserve current Campaign/Broadcast transitional fields unless an explicit later migration maps them.
+12. Continue focused Routes product completion or dashboard/contact workspace polish after the export/import safety path is established.
+13. Regenerate `core-project-tree.txt` from the repo after each structural batch.
 
 Do not use this section as a backlog. Actionable items belong in `TODO.md`.
 

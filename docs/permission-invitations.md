@@ -323,7 +323,7 @@ Duplicate invitation discovered at claim
 Local preparation failure after claim, including unresolved tokens
     ScheduledMessage = skipped
     ContactPermissionInvitation = failed
-    invitation.failure_reason mirrors the scheduled-message skip reason
+    invitation.failure_reason records the immutable ScheduledMessageTerminalResult reason
 
 Provider/runtime exception after claim
     ScheduledMessage = failed

@@ -616,48 +616,42 @@ When a channel/surface is intentionally unavailable, the corresponding optional 
 
 Readiness should explain the business problem, not expose raw template-version, chain-version, or binding IDs as the primary message.
 
-## Current schedule-profile transition
+## Current schedule-profile and chain architecture
 
-Current tables/models:
+Webinar schedule profiles remain the DB-owned authoring/selection surface:
 
 ```text
 webinar_schedule_profiles
 webinar_schedule_profile_items
 ```
 
-are transitional.
-
-Their useful behavior moves as follows:
+They are no longer the direct runtime delivery engine. Preset/profile sync compiles active profile definitions into Messaging-owned immutable chains:
 
 ```text
-profile identity
-    -> MessageChain
+profile + message area
+    -> stable MessageChain
 
-profile immutable cadence
-    -> MessageChainVersion
+profile cadence/items
+    -> immutable MessageChainVersion / steps / variants
 
-profile item timing/conditions
-    -> MessageChainStep
+profile message-area selection
+    -> WebinarScheduleProfileChainBinding
 
-channel/template selection
-    -> MessageChainStepVariant
-
-series/Webinar profile selection
-    -> Webinars-owned MessageChain binding
+series customization
+    -> WebinarSeriesMessageChainBinding with copy-on-write template/chain ownership
 ```
 
-Current schedule-profile config may be converted into MessageChain seed definitions during migration/sync cutover.
+Registration and post-event paths start version-pinned MessageChainEnrollments through Webinars-owned bindings. The generic chain runner materializes only the actionable delivery wave.
 
-It must not justify retaining two permanent schedule engines.
+The current hybrid is deliberate:
 
-After runtime cutover:
+- schedule profiles provide operator-friendly Webinar cadence authoring and selection;
+- immutable MessageChains provide runtime behavior/history;
+- Webinars owns trigger/binding precedence;
+- Messaging owns chain progression, template versions, delivery attempts, and terminal outbox;
+- ScheduledMessages created by the chain contain destination/runtime differences and chain FKs, not copied profile/template/condition snapshots.
 
-- `WebinarScheduleProfileDefinitionResolver` is removed or replaced by generic chain resolution;
-- `behavior_owner = WebinarScheduleProfileItem` is replaced by chain enrollment/step-variant identity;
-- conditions remain on immutable chain steps and are re-evaluated when the step becomes actionable;
-- conditions are not copied into ScheduledMessage metadata;
-- template/profile/area/config-path provenance is not copied into ScheduledMessage metadata;
-- `skip_when_join_clicked` becomes a typed Webinar/chain condition or gate rule, not generic metadata.
+Do not add a second direct profile-to-ScheduledMessage runtime path. A later product simplification may replace the profile authoring tables, but it must preserve the current usable authoring surface and is not required for runtime correctness.
 
 ## Timing and timezone
 
@@ -704,16 +698,15 @@ full Contact snapshots
 full Webinar/WebinarSeries/WebinarRegistration snapshots
 profile or profile-item objects
 template assignment/catalog snapshots
-resolved condition arrays copied per message
+canonical chain condition arrays copied per message
 delivery-consolidation recipes
-config paths
-human labels
+human labels or config branches
 ```
 
-Use relationships:
+Current chain-created ScheduledMessages use relationships:
 
 ```text
-WebinarRegistration
+WebinarRegistration or other Webinar context
 Webinars-owned chain binding
 MessageChainEnrollment
 MessageChainStepVariant
@@ -721,7 +714,9 @@ MessageTemplateVersion
 ScheduledMessage
 ```
 
-The target ScheduledMessage contains no payload or generic metadata JSON.
+Their payload is limited to runtime differences such as the current destination; reusable copy comes from the immutable template version. Their generic metadata is empty for the normal chain path. Runtime token values are frozen lazily in ScheduledMessageRenderContext.
+
+Direct non-chain Messaging paths may retain bounded payload/meta under the Messaging persistence contract, but Webinars must not reintroduce copied profile/template provenance there.
 
 ## Webinars setup validation ownership
 
@@ -747,7 +742,7 @@ stable dedupe identity can be produced
 no required copy or timing remains only in legacy schedule profiles
 ```
 
-After persistence cutover, validation should also reject:
+Validation should also reject:
 
 ```text
 ScheduledMessage payload/meta snapshots
