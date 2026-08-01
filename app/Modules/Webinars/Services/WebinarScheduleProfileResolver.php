@@ -4,6 +4,7 @@ namespace App\Modules\Webinars\Services;
 
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
+use App\Modules\Webinars\Models\WebinarSeries;
 
 class WebinarScheduleProfileResolver
 {
@@ -15,10 +16,29 @@ class WebinarScheduleProfileResolver
             return $webinar->webinarScheduleProfile;
         }
 
-        if ($webinar?->webinarSeries?->webinarScheduleProfile?->is_active && $webinar->webinarSeries->webinarScheduleProfile->status === WebinarScheduleProfile::STATUS_ACTIVE) {
-            return $webinar->webinarSeries->webinarScheduleProfile;
+        if ($webinar?->webinarSeries instanceof WebinarSeries) {
+            return $this->resolveForSeries($webinar->webinarSeries);
         }
 
+        return $this->defaultProfile();
+    }
+
+    public function resolveForSeries(?WebinarSeries $series): ?WebinarScheduleProfile
+    {
+        $series?->loadMissing('webinarScheduleProfile.items');
+
+        if (
+            $series?->webinarScheduleProfile?->is_active
+            && $series->webinarScheduleProfile->status === WebinarScheduleProfile::STATUS_ACTIVE
+        ) {
+            return $series->webinarScheduleProfile;
+        }
+
+        return $this->defaultProfile();
+    }
+
+    private function defaultProfile(): ?WebinarScheduleProfile
+    {
         return WebinarScheduleProfile::query()
             ->active()
             ->where('is_default', true)

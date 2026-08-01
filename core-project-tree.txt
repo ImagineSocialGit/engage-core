@@ -796,8 +796,10 @@
 │   │   │   │   ├── CancelWebinarRegistrationWithProviderAction.php
 │   │   │   │   ├── CreateWebinarRegistrationAction.php
 │   │   │   │   ├── CreateWebinarWaitlistSignupAction.php
+│   │   │   │   ├── DeleteWebinarSeriesAction.php
 │   │   │   │   ├── DispatchWebinarRegistrationMessagesAction.php
 │   │   │   │   ├── DispatchWebinarWaitlistMessagesAction.php
+│   │   │   │   ├── DuplicateWebinarSeriesMessageChainsAction.php
 │   │   │   │   ├── EmitWebinarAutomationEventAction.php
 │   │   │   │   ├── FinalizeWebinarRegistrationAction.php
 │   │   │   │   ├── FlushWebinarCachesAction.php
@@ -825,7 +827,8 @@
 │   │   │   │   ├── SyncWebinarRegistrationToProviderAction.php
 │   │   │   │   ├── SyncWebinarScheduleProfileChainsAction.php
 │   │   │   │   ├── SyncWebinarScheduleProfilesAction.php
-│   │   │   │   └── SyncWebinarSeriesFromProviderAction.php
+│   │   │   │   ├── SyncWebinarSeriesFromProviderAction.php
+│   │   │   │   └── UpdateWebinarSeriesMessageTemplateAction.php
 │   │   │   ├── ConfigContracts
 │   │   │   │   ├── WebinarMessageAreaConfigContract.php
 │   │   │   │   ├── WebinarPostEventConfigContract.php
@@ -844,7 +847,8 @@
 │   │   │   │   │   ├── WebinarMessageTemplateController.php
 │   │   │   │   │   ├── WebinarProviderCancellationController.php
 │   │   │   │   │   ├── WebinarRegistrationFinalizationController.php
-│   │   │   │   │   └── WebinarRegistrationFollowUpController.php
+│   │   │   │   │   ├── WebinarRegistrationFollowUpController.php
+│   │   │   │   │   └── WebinarSeriesMessageChainController.php
 │   │   │   │   ├── Public
 │   │   │   │   │   ├── WebinarJoinRedirectController.php
 │   │   │   │   │   ├── WebinarPlaybackRedirectController.php
@@ -891,6 +895,7 @@
 │   │   │   │   ├── WebinarScheduleProfileChainBinding.php
 │   │   │   │   ├── WebinarScheduleProfileItem.php
 │   │   │   │   ├── WebinarScheduleProfile.php
+│   │   │   │   ├── WebinarSeriesMessageChainBinding.php
 │   │   │   │   ├── WebinarSeries.php
 │   │   │   │   └── WebinarWaitlistSignup.php
 │   │   │   ├── Presets
@@ -905,6 +910,7 @@
 │   │   │   │   ├── StoreWebinarWaitlistSignupRequest.php
 │   │   │   │   ├── SyncWebinarSeriesRequest.php
 │   │   │   │   ├── UpdateWebinarMessageTemplateRequest.php
+│   │   │   │   ├── UpdateWebinarSeriesMessageTemplateRequest.php
 │   │   │   │   ├── UpdateWebinarSeriesProviderEventTypeRequest.php
 │   │   │   │   └── UpdateWebinarSeriesScheduleProfileRequest.php
 │   │   │   ├── Services
@@ -913,6 +919,7 @@
 │   │   │   │   ├── Dashboard
 │   │   │   │   │   └── WebinarActivityDashboardPanelProvider.php
 │   │   │   │   ├── WebinarMessageAreaRegistry.php
+│   │   │   │   ├── WebinarMessageChainBindingResolver.php
 │   │   │   │   ├── WebinarMessageChainExecutionContextProvider.php
 │   │   │   │   ├── WebinarMessageReadinessService.php
 │   │   │   │   ├── WebinarProviderManager.php
@@ -1325,6 +1332,7 @@
 │   │   ├── 2026_07_30_224000_create_message_template_and_chain_tables.php
 │   │   ├── 2026_07_30_224001_create_message_chain_runtime_support_tables.php
 │   │   ├── 2026_07_31_210000_create_webinar_schedule_profile_chain_bindings_table.php
+│   │   ├── 2026_08_01_023600_create_webinar_series_message_chain_bindings_table.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -1541,6 +1549,8 @@
 │       │   │   └── show.blade.php
 │       │   └── webinars
 │       │       ├── index.blade.php
+│       │       ├── message-chains
+│       │       │   └── show.blade.php
 │       │       └── message-templates
 │       │           └── index.blade.php
 │       ├── email.blade.php
@@ -1878,6 +1888,7 @@
 │   │   │   ├── WebinarScheduleProfileDefinitionResolverMessageAreaTest.php
 │   │   │   ├── WebinarScheduleProfileMessageChainSyncTest.php
 │   │   │   ├── WebinarScheduleProfileTest.php
+│   │   │   ├── WebinarSeriesMessageChainOwnershipTest.php
 │   │   │   ├── WebinarsSetupValidationContributorTest.php
 │   │   │   ├── WebinarStateCanonicalizerTest.php
 │   │   │   ├── WebinarTokenReferenceContractTest.php
@@ -1895,4 +1906,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-500 directories, 1396 files
+501 directories, 1406 files

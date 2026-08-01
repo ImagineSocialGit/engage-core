@@ -15,10 +15,11 @@ use App\Modules\Messaging\Services\MessageChainTimingResolver;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarScheduleProfileChainBinding;
+use App\Modules\Webinars\Models\WebinarSeriesMessageChainBinding;
 use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use App\Modules\Webinars\Services\WebinarMessageAreaRegistry;
+use App\Modules\Webinars\Services\WebinarMessageChainBindingResolver;
 use App\Modules\Webinars\Services\WebinarMessageChainExecutionContextProvider;
-use App\Modules\Webinars\Services\WebinarScheduleProfileResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use RuntimeException;
@@ -28,7 +29,7 @@ class StartWebinarMessageChainEnrollmentAction
     public function __construct(
         private readonly StartMessageChainEnrollmentAction $startEnrollment,
         private readonly ProcessMessageChainEnrollmentAction $processEnrollment,
-        private readonly WebinarScheduleProfileResolver $scheduleProfileResolver,
+        private readonly WebinarMessageChainBindingResolver $bindingResolver,
         private readonly WebinarMessageAreaRegistry $messageAreaRegistry,
         private readonly WebinarMessageChainExecutionContextProvider $executionContextProvider,
         private readonly MessageChainTimingResolver $timingResolver,
@@ -60,28 +61,20 @@ class StartWebinarMessageChainEnrollmentAction
             webinar: $webinar,
         );
         $startedAt = ($startedAt ? Carbon::parse($startedAt) : now())->utc();
-        $profile = $this->scheduleProfileResolver->resolveForWebinar($webinar);
+        $binding = $this->bindingResolver->resolveForWebinar(
+            webinar: $webinar,
+            messageAreaKey: $messageArea->key,
+        );
 
-        if ($profile === null) {
-            return $this->unavailable(
-                required: $required,
-                message: "Webinar [{$webinar->getKey()}] has no active schedule profile.",
-            );
-        }
-
-        $binding = WebinarScheduleProfileChainBinding::query()
-            ->with('messageChain.currentVersion.steps.variants')
-            ->where('webinar_schedule_profile_id', $profile->getKey())
-            ->where('message_area_key', $messageArea->key)
-            ->where('is_active', true)
-            ->first();
-
-        if (! $binding instanceof WebinarScheduleProfileChainBinding) {
+        if (
+            ! $binding instanceof WebinarSeriesMessageChainBinding
+            && ! $binding instanceof WebinarScheduleProfileChainBinding
+        ) {
             return $this->unavailable(
                 required: $required,
                 message: sprintf(
-                    'Webinar schedule profile [%s] has no active chain binding for message area [%s].',
-                    $profile->key,
+                    'Webinar [%s] has no effective MessageChain binding for message area [%s].',
+                    $webinar->getKey(),
                     $messageArea->key,
                 ),
             );
@@ -93,8 +86,8 @@ class StartWebinarMessageChainEnrollmentAction
             return $this->unavailable(
                 required: $required,
                 message: sprintf(
-                    'Webinar schedule profile [%s] message area [%s] has no active MessageChain.',
-                    $profile->key,
+                    'Webinar [%s] message area [%s] has no active MessageChain.',
+                    $webinar->getKey(),
                     $messageArea->key,
                 ),
             );

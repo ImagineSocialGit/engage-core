@@ -84,6 +84,14 @@ class WebinarSeries extends Model
         return $this->belongsTo(WebinarScheduleProfile::class);
     }
 
+    public function messageChainBindings(): HasMany
+    {
+        return $this->hasMany(WebinarSeriesMessageChainBinding::class)
+            ->orderBy('key')
+            ->orderBy('message_area_key')
+            ->orderBy('id');
+    }
+
     public function providerKey(): string
     {
         $provider = is_string($this->platform)

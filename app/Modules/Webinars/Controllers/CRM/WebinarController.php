@@ -3,6 +3,7 @@
 namespace App\Modules\Webinars\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Webinars\Actions\DeleteWebinarSeriesAction;
 use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
 use App\Modules\Webinars\Actions\GetNextUpcomingWebinarAction;
 use App\Modules\Webinars\Actions\ReplaceWebinarOccurrenceAction;
@@ -35,7 +36,12 @@ class WebinarController extends Controller
     public function index(Request $request): View
     {
         $series = WebinarSeries::query()
-            ->with('webinarScheduleProfile')
+            ->with([
+                'webinarScheduleProfile',
+                'messageChainBindings' => fn ($query) => $query
+                    ->active()
+                    ->with('messageChain.currentVersion'),
+            ])
             ->orderBy('title')
             ->get();
 
@@ -257,19 +263,17 @@ class WebinarController extends Controller
             ->with('success', 'Webinar schedule profile updated.');
     }
 
-    public function destroySeries(WebinarSeries $series): RedirectResponse
-    {
+    public function destroySeries(
+        WebinarSeries $series,
+        DeleteWebinarSeriesAction $deleteMessageChains,
+    ): RedirectResponse {
         if (Webinar::query()->where('webinar_series_id', $series->id)->exists()) {
             return redirect()
                 ->route('crm.webinar-series.index')
                 ->with('error', 'Cannot delete a series that has webinar events.');
         }
 
-        $seriesSlug = $series->slug;
-
-        $series->delete();
-
-        $this->flushWebinarCachesAction->handle(seriesSlug: $seriesSlug);
+        $deleteMessageChains->handle($series);
 
         return redirect()
             ->route('crm.webinar-series.index')

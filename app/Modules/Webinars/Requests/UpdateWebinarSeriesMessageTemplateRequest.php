@@ -1,0 +1,104 @@
+<?php
+
+namespace App\Modules\Webinars\Requests;
+
+use App\Modules\Messaging\Models\MessageChainStepVariant;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class UpdateWebinarSeriesMessageTemplateRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function rules(): array
+    {
+        return [
+            'payload' => ['required', 'array'],
+            'payload.subject' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::requiredIf($this->variant()?->channel === 'email'),
+            ],
+            'payload.body' => [
+                'nullable',
+                'string',
+                'max:10000',
+                Rule::requiredIf($this->variant()?->channel === 'email'),
+            ],
+            'payload.message' => [
+                'nullable',
+                'string',
+                'max:1600',
+                Rule::requiredIf($this->variant()?->channel === 'sms'),
+            ],
+            'payload.footer' => ['nullable', 'string', 'max:2000'],
+            'payload.cta' => ['nullable', 'array'],
+            'payload.cta.label' => ['nullable', 'string', 'max:255'],
+            'payload.cta.url' => ['nullable', 'string', 'max:1000'],
+            'payload.secondary_link' => ['nullable', 'array'],
+            'payload.secondary_link.label' => ['nullable', 'string', 'max:255'],
+            'payload.secondary_link.url' => ['nullable', 'string', 'max:1000'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function safePayload(): array
+    {
+        $payload = $this->validated('payload');
+
+        if (! is_array($payload)) {
+            return [];
+        }
+
+        $clean = [];
+
+        foreach (['subject', 'body', 'message', 'footer'] as $key) {
+            if (! array_key_exists($key, $payload)) {
+                continue;
+            }
+
+            $value = $payload[$key];
+
+            if (is_string($value)) {
+                $clean[$key] = trim($value);
+            }
+        }
+
+        foreach (['cta', 'secondary_link'] as $key) {
+            $link = $payload[$key] ?? null;
+
+            if (! is_array($link)) {
+                continue;
+            }
+
+            $clean[$key] = [
+                'label' => is_string($link['label'] ?? null)
+                    ? trim($link['label'])
+                    : '',
+                'url' => is_string($link['url'] ?? null)
+                    ? trim($link['url'])
+                    : '',
+            ];
+        }
+
+        return $clean;
+    }
+
+    private function variant(): ?MessageChainStepVariant
+    {
+        $variant = $this->route('variant');
+
+        return $variant instanceof MessageChainStepVariant
+            ? $variant
+            : null;
+    }
+}

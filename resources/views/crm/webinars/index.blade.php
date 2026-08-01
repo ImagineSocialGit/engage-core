@@ -1,3 +1,4 @@
+
 <x-layouts.crm :title="$title" :heading="$heading">
     <div
         class="space-y-6"
@@ -1216,6 +1217,25 @@
                                                 Delete
                                             </button>
                                         </form>
+                                    </div>
+
+                                    @php
+                                        $hasCustomMessageChains = $seriesItem->messageChainBindings
+                                            ->where('is_active', true)
+                                            ->isNotEmpty();
+                                    @endphp
+
+                                    <div class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                                        <span class="text-xs font-semibold {{ $hasCustomMessageChains ? 'text-indigo-700' : 'text-slate-600' }}">
+                                            {{ $hasCustomMessageChains ? 'Custom message chain' : 'Uses profile message chain' }}
+                                        </span>
+
+                                        <a
+                                            href="{{ route('crm.webinar-series.message-chains.show', $seriesItem) }}"
+                                            class="text-xs font-extrabold text-indigo-700 hover:text-indigo-900"
+                                        >
+                                            {{ $hasCustomMessageChains ? 'Edit series messages' : 'Customize series messages' }}
+                                        </a>
                                     </div>
 
                                     <form

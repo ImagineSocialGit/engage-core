@@ -21,6 +21,7 @@ use App\Modules\Webinars\Controllers\CRM\WebinarMessageTemplateController;
 use App\Modules\Webinars\Controllers\CRM\WebinarProviderCancellationController;
 use App\Modules\Webinars\Controllers\CRM\WebinarRegistrationFinalizationController;
 use App\Modules\Webinars\Controllers\CRM\WebinarRegistrationFollowUpController;
+use App\Modules\Webinars\Controllers\CRM\WebinarSeriesMessageChainController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
@@ -70,6 +71,20 @@ Route::middleware('auth')->group(function () {
 
         Route::patch('/webinar-series/{series}/schedule-profile', [WebinarController::class, 'updateSeriesScheduleProfile'])
             ->name('crm.webinar-series.schedule-profile.update');
+
+        Route::middleware('module:messaging')
+            ->prefix('webinar-series/{series}/message-chains')
+            ->name('crm.webinar-series.message-chains.')
+            ->group(function () {
+                Route::get('/', [WebinarSeriesMessageChainController::class, 'show'])
+                    ->name('show');
+
+                Route::post('/duplicate', [WebinarSeriesMessageChainController::class, 'duplicate'])
+                    ->name('duplicate');
+
+                Route::patch('/variants/{variant}', [WebinarSeriesMessageChainController::class, 'updateVariant'])
+                    ->name('variants.update');
+            });
 
         Route::post('/webinars/{webinar}/replacement', [WebinarController::class, 'replaceOccurrence'])
             ->name('crm.webinars.replacements.store');
