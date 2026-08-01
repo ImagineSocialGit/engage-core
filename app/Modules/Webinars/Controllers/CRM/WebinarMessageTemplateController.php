@@ -7,6 +7,7 @@ use App\Modules\Messaging\Actions\AssignMessageTemplatePresetAction;
 use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
+use App\Modules\Messaging\Services\MessageDefinitionConfigSetResolver;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Requests\UpdateWebinarMessageTemplateRequest;
 use App\Modules\Webinars\Services\WebinarMessageAreaRegistry;
@@ -21,6 +22,10 @@ use Illuminate\Validation\ValidationException;
 
 class WebinarMessageTemplateController extends Controller
 {
+    public function __construct(
+        private readonly MessageDefinitionConfigSetResolver $configSetResolver,
+    ) {}
+
     public function index(
         Request $request,
         WebinarMessageReadinessService $messageReadiness,
@@ -382,27 +387,34 @@ class WebinarMessageTemplateController extends Controller
         $messageType = $this->normalizeSegment($messageType);
         $keys = [];
 
-        foreach ($definitions as $sourceMessageType => $definition) {
-            if ($sourceMessageType === 'campaigns' || ! is_string($sourceMessageType) || ! is_array($definition)) {
-                continue;
-            }
-
-            $runtimeMessageType = Str::singular($this->normalizeSegment($sourceMessageType));
-
-            if ($runtimeMessageType !== $messageType) {
-                continue;
-            }
-
-            $isList = array_is_list($definition);
-            $definitionList = $isList ? $definition : [$definition];
-
-            foreach ($definitionList as $index => $nestedDefinition) {
-                if (! is_array($nestedDefinition) || ! ($nestedDefinition['enabled'] ?? true)) {
+        foreach ($this->configSetResolver->sets($scope, $definitions) as $set) {
+            foreach ($set['definitions'] as $sourceMessageType => $definition) {
+                if ($sourceMessageType === 'campaigns' || ! is_string($sourceMessageType) || ! is_array($definition)) {
                     continue;
                 }
 
-                $keys[] = $this->normalizeNullableSegment($nestedDefinition['key'] ?? null)
-                    ?? ($isList ? $runtimeMessageType.'_'.((int) $index + 1) : $runtimeMessageType);
+                $runtimeMessageType = Str::singular($this->normalizeSegment($sourceMessageType));
+
+                if ($runtimeMessageType !== $messageType) {
+                    continue;
+                }
+
+                $isList = array_is_list($definition);
+                $definitionList = $isList ? $definition : [$definition];
+
+                foreach ($definitionList as $index => $nestedDefinition) {
+                    if (! is_array($nestedDefinition) || ! ($nestedDefinition['enabled'] ?? true)) {
+                        continue;
+                    }
+
+                    $definitionKey = $this->normalizeNullableSegment($nestedDefinition['key'] ?? null)
+                        ?? ($isList ? $runtimeMessageType.'_'.((int) $index + 1) : $runtimeMessageType);
+
+                    $keys[] = $this->configSetResolver->assignmentDefinitionKey(
+                        $set['key'],
+                        $definitionKey,
+                    );
+                }
             }
         }
 

@@ -198,37 +198,41 @@ class ImportWebinarRegistrationReminderDispatchTest extends TestCase
     private function configureMessageDefinitions(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'key' => 'confirmation',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Registered',
-                    'body' => 'You are registered.',
+            'default' => [
+                'confirmation' => [
+                    'key' => 'confirmation',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Registered',
+                        'body' => 'You are registered.',
+                    ],
                 ],
-            ],
-            'reminder' => [
-                $this->emailReminderDefinition('reminder_3_hour', 'Three hours'),
-                $this->emailReminderDefinition('reminder_30_minute', 'Thirty minutes'),
-                $this->emailReminderDefinition('reminder_10_minute', 'Ten minutes'),
+                'reminder' => [
+                    $this->emailReminderDefinition('reminder_3_hour', 'Three hours'),
+                    $this->emailReminderDefinition('reminder_30_minute', 'Thirty minutes'),
+                    $this->emailReminderDefinition('reminder_10_minute', 'Ten minutes'),
+                ],
             ],
         ]);
 
         Config::set('messaging.sms.definitions.transactional.webinar', [
-            'confirmation' => [
-                'key' => 'confirmation',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => SmsPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'message' => 'You are registered.',
+            'default' => [
+                'confirmation' => [
+                    'key' => 'confirmation',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => SmsPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'message' => 'You are registered.',
+                    ],
                 ],
-            ],
-            'reminder' => [
-                $this->smsReminderDefinition('reminder_3_hour', 'Three hours'),
-                $this->smsReminderDefinition('reminder_30_minute', 'Thirty minutes'),
-                $this->smsReminderDefinition('reminder_10_minute', 'Ten minutes'),
+                'reminder' => [
+                    $this->smsReminderDefinition('reminder_3_hour', 'Three hours'),
+                    $this->smsReminderDefinition('reminder_30_minute', 'Thirty minutes'),
+                    $this->smsReminderDefinition('reminder_10_minute', 'Ten minutes'),
+                ],
             ],
         ]);
     }

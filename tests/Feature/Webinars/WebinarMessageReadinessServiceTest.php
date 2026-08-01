@@ -75,7 +75,7 @@ class WebinarMessageReadinessServiceTest extends TestCase
         $this->assertSame(WebinarMessageReadinessService::STATUS_OPTIONAL, $readiness['contexts']['waitlist_opt_in']['status']);
         $this->assertArrayNotHasKey('post_attended', $readiness['contexts']);
         $this->assertArrayNotHasKey('post_missed', $readiness['contexts']);
-        $this->assertSame(['Config fallback'], $readiness['contexts']['confirmation']['channels'][0]['source_labels']);
+        $this->assertEquals(['Config fallback'], $readiness['contexts']['confirmation']['channels'][0]['source_labels']);
     }
 
 
@@ -83,14 +83,16 @@ class WebinarMessageReadinessServiceTest extends TestCase
     {
         Config::set('webinars.message_areas.reminders.enabled', false);
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => $this->definition(
-                dispatchKey: 'registration_created',
-                subject: 'Registered',
-            ),
-            'opt_in' => $this->definition(
-                dispatchKey: 'consent_granted',
-                subject: 'Subscribed',
-            ),
+            'default' => [
+                'confirmation' => $this->definition(
+                    dispatchKey: 'registration_created',
+                    subject: 'Registered',
+                ),
+                'opt_in' => $this->definition(
+                    dispatchKey: 'consent_granted',
+                    subject: 'Subscribed',
+                ),
+            ],
         ]);
 
         $readiness = app(WebinarMessageReadinessService::class)->resolve();
@@ -103,10 +105,12 @@ class WebinarMessageReadinessServiceTest extends TestCase
     public function test_it_needs_attention_when_a_required_message_context_does_not_resolve(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => $this->definition(
-                dispatchKey: 'registration_created',
-                subject: 'Registered',
-            ),
+            'default' => [
+                'confirmation' => $this->definition(
+                    dispatchKey: 'registration_created',
+                    subject: 'Registered',
+                ),
+            ],
         ]);
 
         $readiness = app(WebinarMessageReadinessService::class)->resolve();
@@ -212,18 +216,20 @@ class WebinarMessageReadinessServiceTest extends TestCase
     private function configureRequiredRegistrationDefinitions(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => $this->definition(
-                dispatchKey: 'registration_created',
-                subject: 'Registered',
-            ),
-            'opt_in' => $this->definition(
-                dispatchKey: 'consent_granted',
-                subject: 'Subscribed',
-            ),
-            'reminder' => $this->definition(
-                dispatchKey: 'registration_created',
-                subject: 'Reminder',
-            ),
+            'default' => [
+                'confirmation' => $this->definition(
+                    dispatchKey: 'registration_created',
+                    subject: 'Registered',
+                ),
+                'opt_in' => $this->definition(
+                    dispatchKey: 'consent_granted',
+                    subject: 'Subscribed',
+                ),
+                'reminder' => $this->definition(
+                    dispatchKey: 'registration_created',
+                    subject: 'Reminder',
+                ),
+            ],
         ]);
     }
 

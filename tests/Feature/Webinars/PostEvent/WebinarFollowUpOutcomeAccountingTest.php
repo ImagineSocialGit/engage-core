@@ -389,24 +389,26 @@ class WebinarFollowUpOutcomeAccountingTest extends TestCase
     private function configureEmailDefinitions(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'post_attended' => [
-                'key' => 'post_attended',
-                'dispatch_key' => 'webinar_ended',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'notifications',
-                'payload' => [
-                    'subject' => 'Thanks for attending',
-                    'body' => 'Replay: {webinar_playback_url}',
+            'default' => [
+                'post_attended' => [
+                    'key' => 'post_attended',
+                    'dispatch_key' => 'webinar_ended',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'notifications',
+                    'payload' => [
+                        'subject' => 'Thanks for attending',
+                        'body' => 'Replay: {webinar_playback_url}',
+                    ],
                 ],
-            ],
-            'post_missed' => [
-                'key' => 'post_missed',
-                'dispatch_key' => 'webinar_ended',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'notifications',
-                'payload' => [
-                    'subject' => 'Sorry we missed you',
-                    'body' => 'Replay: {webinar_playback_url}',
+                'post_missed' => [
+                    'key' => 'post_missed',
+                    'dispatch_key' => 'webinar_ended',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'notifications',
+                    'payload' => [
+                        'subject' => 'Sorry we missed you',
+                        'body' => 'Replay: {webinar_playback_url}',
+                    ],
                 ],
             ],
         ]);

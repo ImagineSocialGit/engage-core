@@ -108,35 +108,37 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
         Queue::fake();
 
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'key' => 'confirmation',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Config confirmation',
-                    'body' => 'Config confirmation body.',
-                ],
-            ],
-            'reminders' => [
-                [
-                    'key' => 'reminder_1_day',
+            'default' => [
+                'confirmation' => [
+                    'key' => 'confirmation',
                     'dispatch_key' => 'registration_created',
                     'payload_class' => EmailPayload::class,
-                    'queue' => 'reminders',
+                    'queue' => 'confirmation_messages',
                     'payload' => [
-                        'subject' => 'Config one day',
-                        'body' => 'Config one day body.',
+                        'subject' => 'Config confirmation',
+                        'body' => 'Config confirmation body.',
                     ],
                 ],
-                [
-                    'key' => 'reminder_30_minute',
-                    'dispatch_key' => 'registration_created',
-                    'payload_class' => EmailPayload::class,
-                    'queue' => 'reminders',
-                    'payload' => [
-                        'subject' => 'Config thirty minute',
-                        'body' => 'Config thirty minute body.',
+                'reminders' => [
+                    [
+                        'key' => 'reminder_1_day',
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'reminders',
+                        'payload' => [
+                            'subject' => 'Config one day',
+                            'body' => 'Config one day body.',
+                        ],
+                    ],
+                    [
+                        'key' => 'reminder_30_minute',
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'reminders',
+                        'payload' => [
+                            'subject' => 'Config thirty minute',
+                            'body' => 'Config thirty minute body.',
+                        ],
                     ],
                 ],
             ],
@@ -160,7 +162,7 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
                 'surface' => 'webinar_registrations',
                 'message_type' => 'reminder',
                 'definition_key' => 'reminder_1_day',
-                'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.0',
+                'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.reminders.0',
             ]);
 
         $profile = $this->registrationProfile([
@@ -224,24 +226,26 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
     private function configureRegistrationMessages(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'key' => 'confirmation',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Config confirmation for {first_name}',
-                    'body' => 'Config confirmation copy.',
+            'default' => [
+                'confirmation' => [
+                    'key' => 'confirmation',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Config confirmation for {first_name}',
+                        'body' => 'Config confirmation copy.',
+                    ],
                 ],
-            ],
-            'reminder' => [
-                'key' => 'reminder',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'reminders',
-                'payload' => [
-                    'subject' => 'Config reminder',
-                    'body' => 'Starts soon.',
+                'reminder' => [
+                    'key' => 'reminder',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'reminders',
+                    'payload' => [
+                        'subject' => 'Config reminder',
+                        'body' => 'Starts soon.',
+                    ],
                 ],
             ],
         ]);

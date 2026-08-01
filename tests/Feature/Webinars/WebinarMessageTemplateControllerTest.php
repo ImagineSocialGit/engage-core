@@ -235,7 +235,7 @@ class WebinarMessageTemplateControllerTest extends TestCase
             'usage_type' => 'webinar_reminder',
             'group_label' => 'Webinar Reminders',
             'item_label' => '10 Day Email',
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.0',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.reminders.0',
             'payload' => [
                 'subject' => 'Original ten day',
                 'body' => 'Original ten day body.',
@@ -249,7 +249,7 @@ class WebinarMessageTemplateControllerTest extends TestCase
             'usage_type' => 'webinar_reminder',
             'group_label' => 'Webinar Reminders',
             'item_label' => '10 Day Email Alternate',
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.0',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.reminders.0',
             'payload' => [
                 'subject' => 'Custom ten day',
                 'body' => 'Custom ten day body.',
@@ -263,7 +263,7 @@ class WebinarMessageTemplateControllerTest extends TestCase
             'usage_type' => 'webinar_reminder',
             'group_label' => 'Webinar Reminders',
             'item_label' => '1 Day Email',
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.1',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.reminders.1',
             'payload' => [
                 'subject' => 'One day',
                 'body' => 'One day body.',
@@ -271,8 +271,8 @@ class WebinarMessageTemplateControllerTest extends TestCase
         ]);
 
         foreach ([
-            [$tenDayPreset, 'reminder_10_day', 'messaging.email.definitions.transactional.webinar.reminders.0'],
-            [$oneDayPreset, 'reminder_1_day', 'messaging.email.definitions.transactional.webinar.reminders.1'],
+            [$tenDayPreset, 'reminder_10_day', 'messaging.email.definitions.transactional.webinar.default.reminders.0'],
+            [$oneDayPreset, 'reminder_1_day', 'messaging.email.definitions.transactional.webinar.default.reminders.1'],
         ] as [$preset, $definitionKey, $sourceConfigPath]) {
             MessageTemplatePresetAssignment::factory()
                 ->forPreset($preset)
@@ -305,12 +305,12 @@ class WebinarMessageTemplateControllerTest extends TestCase
         $this->assertDatabaseHas('message_template_preset_assignments', [
             'message_template_preset_id' => $customTenDayPreset->getKey(),
             'definition_key' => 'reminder_10_day',
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.0',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.reminders.0',
         ]);
         $this->assertDatabaseHas('message_template_preset_assignments', [
             'message_template_preset_id' => $oneDayPreset->getKey(),
             'definition_key' => 'reminder_1_day',
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.1',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.reminders.1',
         ]);
 
         $definitions = app(MessageDefinitionResolver::class)->resolve(
@@ -398,7 +398,7 @@ class WebinarMessageTemplateControllerTest extends TestCase
             'message_type' => 'confirmation',
             'usage_type' => 'webinar_confirmation',
             'source_config_path' =>
-                'messaging.email.definitions.transactional.webinar.confirmations.0',
+                'messaging.email.definitions.transactional.webinar.default.confirmations.0',
         ]);
         $catalogEntry = $preset->catalogEntries()->firstOrFail();
 
@@ -477,7 +477,7 @@ class WebinarMessageTemplateControllerTest extends TestCase
             'surface' => 'webinar_registrations',
             'message_type' => 'confirmation',
             'dispatch_key' => 'registration_created',
-            'message_template_key' => $preset->key,
+            'message_template_key' => 'confirmation',
             'source_config_path' => $preset->source_config_path,
             'is_enabled' => true,
             'is_active' => true,
@@ -507,11 +507,13 @@ class WebinarMessageTemplateControllerTest extends TestCase
         $user = User::factory()->create();
 
         $preset = $this->webinarTemplate([
+            'definition_key' => 'post_attended',
             'message_type' => 'post_attended',
             'dispatch_keys' => ['webinar_ended'],
             'usage_type' => 'webinar_post_attended',
             'group_label' => 'Post-Webinar Follow-Up',
             'item_label' => 'Attended Follow-Up Email',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.post_attended',
         ]);
 
         MessageTemplatePresetAssignment::factory()
@@ -541,7 +543,7 @@ class WebinarMessageTemplateControllerTest extends TestCase
             'surface' => 'webinar_registrations',
             'message_type' => 'post_attended',
             'dispatch_key' => 'webinar_ended',
-            'message_template_key' => $preset->key,
+            'message_template_key' => 'post_attended',
             'source_config_path' => $preset->source_config_path,
             'is_enabled' => true,
             'is_active' => true,
@@ -626,7 +628,7 @@ class WebinarMessageTemplateControllerTest extends TestCase
         unset($overrides['usage_type'], $overrides['group_label'], $overrides['item_label'], $overrides['definition_key']);
 
         $preset = MessageTemplatePreset::factory()->create(array_replace_recursive([
-            'key' => 'email.transactional.webinar.confirmation.'.uniqid(),
+            'key' => 'email.transactional.webinar.fixture_'.uniqid().'.'.$definitionKey,
             'name' => 'Webinar Confirmations — Confirmation Email',
             'channel' => 'email',
             'purpose' => 'transactional',
@@ -639,7 +641,7 @@ class WebinarMessageTemplateControllerTest extends TestCase
                 'subject' => 'Registered',
                 'body' => 'You are registered.',
             ],
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmation',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.confirmation',
             'meta' => [
                 'seed' => [
                     'definition_key' => $definitionKey,

@@ -7,6 +7,9 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Payloads\EmailPayload;
+use App\Modules\Messaging\Payloads\SmsPayload;
+use App\Modules\Messaging\Services\ScheduledMessagePayloadResolver;
 use App\Modules\Webinars\Models\WebinarSeries;
 use App\Modules\Webinars\Models\WebinarWaitlistSignup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -112,7 +115,7 @@ class WebinarWaitlistSignupControllerTest extends TestCase
         $this->assertNotNull($signup);
         $this->assertSame($contact->id, $signup->contact_id);
         $this->assertSame($series->id, $signup->webinar_series_id);
-        $this->assertSame(['email'], $signup->meta['accepted_channels']['marketing']);
+        $this->assertEquals(['email'], $signup->meta['accepted_channels']['marketing']);
 
         $this->assertDatabaseHas('message_consents', [
             'contact_id' => $contact->id,
@@ -154,9 +157,18 @@ class WebinarWaitlistSignupControllerTest extends TestCase
             ->first();
 
         $this->assertNotNull($message);
-        $this->assertSame('jeff-opt-in@example.com', $message->payload['to']);
-        $this->assertStringNotContainsString('{webinar_registration_url}', $message->payload['body']);
-        $this->assertStringNotContainsString('{webinar_series}', $message->payload['body']);
+        $this->assertEquals([
+            'to' => 'jeff-opt-in@example.com',
+            'contact_id' => $message->recipient_id,
+        ], $message->payload);
+
+        $payload = app(ScheduledMessagePayloadResolver::class)->resolve($message);
+
+        $this->assertInstanceOf(EmailPayload::class, $payload);
+        $this->assertStringNotContainsString('{webinar_registration_url}', $payload->body);
+        $this->assertStringNotContainsString('{webinar_series}', $payload->body);
+        $this->assertArrayNotHasKey('webinar_registration_url', $payload->tokens);
+        $this->assertArrayNotHasKey('webinar_series', $payload->tokens);
     }
 
     public function test_it_schedules_marketing_waitlist_sms_opt_in_to_contact_phone(): void
@@ -191,9 +203,16 @@ class WebinarWaitlistSignupControllerTest extends TestCase
             ->first();
 
         $this->assertNotNull($message);
-        $this->assertSame('+15555550123', $message->payload['to']);
+        $this->assertEquals([
+            'to' => '+15555550123',
+        ], $message->payload);
         $this->assertNotSame('jeff-sms-opt-in@example.com', $message->payload['to']);
-        $this->assertStringNotContainsString('{webinar_registration_url}', $message->payload['message']);
+
+        $payload = app(ScheduledMessagePayloadResolver::class)->resolve($message);
+
+        $this->assertInstanceOf(SmsPayload::class, $payload);
+        $this->assertStringNotContainsString('{webinar_registration_url}', $payload->message);
+        $this->assertArrayNotHasKey('webinar_registration_url', $payload->tokens);
     }
 
     public function test_it_shows_success_confirmation_after_waitlist_signup(): void
@@ -304,7 +323,7 @@ class WebinarWaitlistSignupControllerTest extends TestCase
         $this->assertNotNull($signup);
 
         $this->assertSame('+15555550123', $contact->phone);
-        $this->assertSame(['email', 'sms'], $signup->meta['accepted_channels']['marketing']);
+        $this->assertEquals(['email', 'sms'], $signup->meta['accepted_channels']['marketing']);
 
         foreach ([MessageChannel::Email->value, MessageChannel::Sms->value] as $channel) {
             $this->assertDatabaseHas('message_consents', [
@@ -322,7 +341,7 @@ class WebinarWaitlistSignupControllerTest extends TestCase
     public function test_it_updates_existing_signup_without_creating_duplicate(): void
     {
         Queue::fake();
-        
+
         $series = WebinarSeries::factory()->create([
             'status' => 'active',
             'slug' => 'homebuyer-basics',

@@ -209,24 +209,26 @@ class WebinarScheduleProfileTest extends TestCase
     private function configureRegistrationMessages(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'key' => 'confirmation',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Registered',
-                    'body' => 'Registered for {webinar.title} in {webinar_series.title}.',
+            'default' => [
+                'confirmation' => [
+                    'key' => 'confirmation',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Registered',
+                        'body' => 'Registered for {webinar.title} in {webinar_series.title}.',
+                    ],
                 ],
-            ],
-            'reminder' => [
-                'key' => 'reminder',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'reminders',
-                'payload' => [
-                    'subject' => 'Reminder',
-                    'body' => 'Reminder.',
+                'reminder' => [
+                    'key' => 'reminder',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'reminders',
+                    'payload' => [
+                        'subject' => 'Reminder',
+                        'body' => 'Reminder.',
+                    ],
                 ],
             ],
         ]);

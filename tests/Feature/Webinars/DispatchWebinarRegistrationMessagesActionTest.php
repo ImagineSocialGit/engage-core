@@ -195,59 +195,63 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
     private function configureRegistrationMessages(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'key' => 'confirmation',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'You are registered for {webinar.title}',
-                    'body' => 'Hi {first_name}, your webinar starts {webinar_start_datetime}. {cta}',
-                    'cta' => [
-                        'label' => 'Join webinar',
-                        'url' => '{webinar_join_url}',
-                    ],
-                    'secondary_link' => [
-                        'label' => 'Cancel registration',
-                        'url' => '{cancel_registration_url}',
+            'default' => [
+                'confirmation' => [
+                    'key' => 'confirmation',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'You are registered for {webinar.title}',
+                        'body' => 'Hi {first_name}, your webinar starts {webinar_start_datetime}. {cta}',
+                        'cta' => [
+                            'label' => 'Join webinar',
+                            'url' => '{webinar_join_url}',
+                        ],
+                        'secondary_link' => [
+                            'label' => 'Cancel registration',
+                            'url' => '{cancel_registration_url}',
+                        ],
                     ],
                 ],
-            ],
 
-            'reminder' => [
-                'key' => 'reminder',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'reminders',
-                'payload' => [
-                    'subject' => '{webinar.title} starts soon',
-                    'body' => 'Hi {first_name}, join at {webinar_start_datetime}. {cta}',
-                    'cta' => [
-                        'label' => 'Join webinar',
-                        'url' => '{webinar_join_url}',
+                'reminder' => [
+                    'key' => 'reminder',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'reminders',
+                    'payload' => [
+                        'subject' => '{webinar.title} starts soon',
+                        'body' => 'Hi {first_name}, join at {webinar_start_datetime}. {cta}',
+                        'cta' => [
+                            'label' => 'Join webinar',
+                            'url' => '{webinar_join_url}',
+                        ],
                     ],
                 ],
             ],
         ]);
 
         Config::set('messaging.sms.definitions.transactional.webinar', [
-            'confirmation' => [
-                'key' => 'confirmation',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => SmsPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'message' => 'Hi {first_name}, you are registered for {webinar.title} at {webinar_start_datetime}. Join: {webinar_join_url}',
+            'default' => [
+                'confirmation' => [
+                    'key' => 'confirmation',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => SmsPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'message' => 'Hi {first_name}, you are registered for {webinar.title} at {webinar_start_datetime}. Join: {webinar_join_url}',
+                    ],
                 ],
-            ],
 
-            'reminder' => [
-                'key' => 'reminder',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => SmsPayload::class,
-                'queue' => 'reminders',
-                'payload' => [
-                    'message' => 'Hi {first_name}, {webinar.title} starts at {webinar_start_datetime}. Join: {webinar_join_url}',
+                'reminder' => [
+                    'key' => 'reminder',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => SmsPayload::class,
+                    'queue' => 'reminders',
+                    'payload' => [
+                        'message' => 'Hi {first_name}, {webinar.title} starts at {webinar_start_datetime}. Join: {webinar_join_url}',
+                    ],
                 ],
             ],
         ]);

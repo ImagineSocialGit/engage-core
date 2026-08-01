@@ -75,7 +75,7 @@ class WebinarsSetupValidationContributorTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertSame([
+        $this->assertEquals([
             'services.zoom.account_id',
             'services.zoom.client_id',
             'services.zoom.client_secret',
@@ -94,7 +94,7 @@ class WebinarsSetupValidationContributorTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertSame([
+        $this->assertEquals([
             'webinars.providers.zoom.base_url',
             'webinars.providers.zoom.oauth_url',
         ], $paths);
@@ -180,7 +180,7 @@ class WebinarsSetupValidationContributorTest extends TestCase
             ),
         ));
 
-        $this->assertSame([], $providerFindings);
+        $this->assertEquals([], $providerFindings);
     }
 
     public function test_it_reports_invalid_message_area_configuration_as_a_setup_finding(): void
@@ -235,7 +235,7 @@ class WebinarsSetupValidationContributorTest extends TestCase
 
         $this->item($profile);
 
-        $this->assertSame([], $this->findings());
+        $this->assertEquals([], $this->findings());
     }
 
     public function test_it_reports_duplicate_normalized_config_keys_and_multiple_defaults(): void
@@ -344,7 +344,7 @@ class WebinarsSetupValidationContributorTest extends TestCase
             ) === 'valid_next_day_at',
         ));
 
-        $this->assertSame([], $validItemFindings);
+        $this->assertEquals([], $validItemFindings);
     }
 
     public function test_it_reports_conflicting_active_default_profiles_in_db_state(): void
@@ -689,7 +689,7 @@ class WebinarsSetupValidationContributorTest extends TestCase
             ),
         ));
 
-        $this->assertSame([], $registerFindings);
+        $this->assertEquals([], $registerFindings);
     }
 
     public function test_manager_resolves_tagged_webinars_contributor(): void
@@ -829,14 +829,16 @@ class WebinarsSetupValidationContributorTest extends TestCase
     private function configureValidMessagingDefinition(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'key' => 'confirmation',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Registered',
-                    'body' => 'Thanks',
+            'default' => [
+                'confirmation' => [
+                    'key' => 'confirmation',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Registered',
+                        'body' => 'Thanks',
+                    ],
                 ],
             ],
         ]);

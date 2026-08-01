@@ -3,14 +3,19 @@
 namespace Tests\Feature\Webinars\PostEvent;
 
 use App\Modules\Core\Models\Contact;
-use App\Modules\Messaging\Actions\DispatchMessageAction;
+use App\Modules\Messaging\Actions\SyncMessageTemplatePresetsAction;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
+use App\Modules\Messaging\Models\MessageConsent;
+use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
+use App\Modules\Messaging\Services\ScheduledMessagePayloadResolver;
 use App\Modules\Webinars\Actions\PostEvent\DispatchPostWebinarFollowUpsAction;
 use App\Modules\Webinars\Actions\PostEvent\RecordWebinarProviderAttendanceAction;
 use App\Modules\Webinars\Actions\PostEvent\ResolveWebinarPlaybackAction;
+use App\Modules\Webinars\Actions\SyncWebinarScheduleProfileChainsAction;
 use App\Modules\Webinars\Contracts\WebinarProvider;
 use App\Modules\Webinars\Data\ProviderAttendanceSnapshot;
 use App\Modules\Webinars\Data\ProviderRecordingData;
@@ -22,6 +27,7 @@ use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
 use App\Modules\Webinars\Services\WebinarProviderManager;
+use App\Modules\Webinars\Support\WebinarPlaybackLinkGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
@@ -207,7 +213,7 @@ class ProcessPostWebinarEventJobTest extends TestCase
         $this->assertSame('missed', data_get($missedRegistration->meta, 'attendance.status'));
     }
 
-    public function test_it_dispatches_transactional_follow_ups_for_configured_channels_with_canonical_playback_payload(): void
+    public function test_it_enrolls_transactional_follow_up_chains_for_configured_channels_with_canonical_playback_context(): void
     {
         Queue::fake();
 
@@ -240,7 +246,12 @@ class ProcessPostWebinarEventJobTest extends TestCase
 
         Carbon::setTestNow('2026-06-12 12:00:00');
 
-        [$webinar, , , $attendanceRecord] = $this->makeWebinarWithRegistrations();
+        [
+            $webinar,
+            $attendedRegistration,
+            $missedRegistration,
+            $attendanceRecord,
+        ] = $this->makeWebinarWithRegistrations();
 
         $provider = $this->mock(WebinarProvider::class, function (MockInterface $mock) use ($webinar, $attendanceRecord): void {
             $mock->shouldReceive('key')
@@ -265,18 +276,6 @@ class ProcessPostWebinarEventJobTest extends TestCase
                 ));
         });
 
-        $dispatches = [];
-
-        $this->mock(DispatchMessageAction::class, function (MockInterface $mock) use (&$dispatches): void {
-            $mock->shouldReceive('handle')
-                ->times(4)
-                ->andReturnUsing(function (...$arguments) use (&$dispatches): array {
-                    $dispatches[] = $arguments;
-
-                    return [];
-                });
-        });
-
         $this->mockProviderManager($provider);
 
         app(ProcessWebinarProviderEventJob::class, [
@@ -287,25 +286,66 @@ class ProcessPostWebinarEventJobTest extends TestCase
             webinarProviderManager: app(WebinarProviderManager::class),
         );
 
-        $this->assertCount(4, $dispatches);
-        $this->assertSame([
+        $webinar->refresh();
+
+        $expectedPlaybackUrl = app(WebinarPlaybackLinkGenerator::class)
+            ->forWebinar($webinar);
+
+        $messages = ScheduledMessage::query()
+            ->with([
+                'messageChainEnrollment',
+                'messageTemplateVersion',
+            ])
+            ->orderBy('id')
+            ->get();
+
+        $this->assertSame(2, MessageChainEnrollment::query()->count());
+        $this->assertCount(4, $messages);
+        $this->assertEqualsCanonicalizing([
             MessageChannel::Email->value,
             MessageChannel::Sms->value,
             MessageChannel::Email->value,
             MessageChannel::Sms->value,
-        ], array_map(fn (array $dispatch): string => $dispatch[1], $dispatches));
+        ], $messages->pluck('channel')->all());
+        $this->assertEqualsCanonicalizing([
+            'post_attended',
+            'post_attended',
+            'post_missed',
+            'post_missed',
+        ], $messages->pluck('message_type')->all());
 
-        foreach ($dispatches as $dispatch) {
-            $payload = $dispatch[5];
+        foreach ($messages as $message) {
+            $payload = app(ScheduledMessagePayloadResolver::class)->resolve($message);
 
-            $this->assertSame(MessagePurpose::Transactional->value, $dispatch[2]);
-            $this->assertSame('webinar', $dispatch[3]);
-            $this->assertSame('webinar_ended', $dispatch[4]);
-
-            $this->assertArrayHasKey('webinar_playback_url', $payload);
-            $this->assertSame('https://zoom.example.test/rec/play/abc123', $payload['webinar_playback_url']);
-            $this->assertArrayNotHasKey('playback_url', $payload);
+            $this->assertSame(
+                $expectedPlaybackUrl,
+                $payload->tokens['webinar_playback_url'] ?? null,
+            );
+            $this->assertArrayNotHasKey('playback_url', $payload->tokens);
+            $this->assertNotNull($message->message_chain_enrollment_id);
+            $this->assertNotNull($message->message_chain_step_variant_id);
+            $this->assertNotNull($message->message_template_version_id);
         }
+
+        $attendedRegistration->refresh();
+        $missedRegistration->refresh();
+
+        $this->assertSame(
+            'scheduled',
+            data_get($attendedRegistration->meta, 'post_event_follow_up.status'),
+        );
+        $this->assertSame(
+            'attended',
+            data_get($attendedRegistration->meta, 'post_event_follow_up.outcome'),
+        );
+        $this->assertSame(
+            'scheduled',
+            data_get($missedRegistration->meta, 'post_event_follow_up.status'),
+        );
+        $this->assertSame(
+            'missed',
+            data_get($missedRegistration->meta, 'post_event_follow_up.outcome'),
+        );
     }
 
 
@@ -454,46 +494,64 @@ class ProcessPostWebinarEventJobTest extends TestCase
 
     private function configurePostEventMessagesAndScheduleProfile(): void
     {
-        Config::set('messaging.email.definitions.transactional.webinar', [
-            'post_attended' => [
-                'key' => 'post_attended',
-                'dispatch_key' => 'webinar_ended',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'notifications',
-                'payload' => [
-                    'subject' => 'Thanks for attending',
-                    'body' => 'Replay: {webinar_playback_url}',
+        foreach ([MessageChannel::Email->value, MessageChannel::Sms->value] as $channel) {
+            Config::set("messaging.channel_availability.{$channel}", [
+                'runtime_supported' => true,
+                'provider_enabled' => true,
+                'requires_explicit_opt_in' => $channel === MessageChannel::Sms->value,
+                'surfaces' => [
+                    'webinar_registrations' => true,
                 ],
-            ],
-            'post_missed' => [
-                'key' => 'post_missed',
-                'dispatch_key' => 'webinar_ended',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'notifications',
-                'payload' => [
-                    'subject' => 'Sorry we missed you',
-                    'body' => 'Replay: {webinar_playback_url}',
+                'purpose_scopes' => [
+                    'transactional:webinar' => true,
+                ],
+            ]);
+        }
+
+        Config::set('messaging.email.definitions.transactional.webinar', [
+            'default' => [
+                'post_attended' => [
+                    'key' => 'post_attended',
+                    'dispatch_key' => 'webinar_ended',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'notifications',
+                    'payload' => [
+                        'subject' => 'Thanks for attending',
+                        'body' => 'Replay: {webinar_playback_url}',
+                    ],
+                ],
+                'post_missed' => [
+                    'key' => 'post_missed',
+                    'dispatch_key' => 'webinar_ended',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'notifications',
+                    'payload' => [
+                        'subject' => 'Sorry we missed you',
+                        'body' => 'Replay: {webinar_playback_url}',
+                    ],
                 ],
             ],
         ]);
 
         Config::set('messaging.sms.definitions.transactional.webinar', [
-            'post_attended' => [
-                'key' => 'post_attended',
-                'dispatch_key' => 'webinar_ended',
-                'payload_class' => SmsPayload::class,
-                'queue' => 'notifications',
-                'payload' => [
-                    'message' => 'Thanks for attending. Replay: {webinar_playback_url}',
+            'default' => [
+                'post_attended' => [
+                    'key' => 'post_attended',
+                    'dispatch_key' => 'webinar_ended',
+                    'payload_class' => SmsPayload::class,
+                    'queue' => 'notifications',
+                    'payload' => [
+                        'message' => 'Thanks for attending. Replay: {webinar_playback_url}',
+                    ],
                 ],
-            ],
-            'post_missed' => [
-                'key' => 'post_missed',
-                'dispatch_key' => 'webinar_ended',
-                'payload_class' => SmsPayload::class,
-                'queue' => 'notifications',
-                'payload' => [
-                    'message' => 'Sorry we missed you. Replay: {webinar_playback_url}',
+                'post_missed' => [
+                    'key' => 'post_missed',
+                    'dispatch_key' => 'webinar_ended',
+                    'payload_class' => SmsPayload::class,
+                    'queue' => 'notifications',
+                    'payload' => [
+                        'message' => 'Sorry we missed you. Replay: {webinar_playback_url}',
+                    ],
                 ],
             ],
         ]);
@@ -504,6 +562,7 @@ class ProcessPostWebinarEventJobTest extends TestCase
             'status' => WebinarScheduleProfile::STATUS_ACTIVE,
             'is_default' => true,
             'is_active' => true,
+            'message_template_set_key' => 'default',
         ]);
 
         foreach ([MessageChannel::Email->value, MessageChannel::Sms->value] as $channel) {
@@ -527,6 +586,12 @@ class ProcessPostWebinarEventJobTest extends TestCase
                 ]);
             }
         }
+
+        app(SyncMessageTemplatePresetsAction::class)->handle(force: true);
+        app(SyncWebinarScheduleProfileChainsAction::class)->handle(
+            profile: $profile,
+            force: true,
+        );
     }
 
     private function makeWebinarWithRegistrations(): array
@@ -550,6 +615,19 @@ class ProcessPostWebinarEventJobTest extends TestCase
             'email' => 'missed@example.com',
             'phone' => '+15555550102',
         ]);
+
+        foreach ([$attendedContact, $missedContact] as $contact) {
+            foreach ([MessageChannel::Email->value, MessageChannel::Sms->value] as $channel) {
+                MessageConsent::query()->create([
+                    'contact_id' => $contact->getKey(),
+                    'channel' => $channel,
+                    'purpose' => MessagePurpose::Transactional->value,
+                    'scope' => 'webinar',
+                    'consented_at' => now()->subMinute(),
+                    'source' => 'test',
+                ]);
+            }
+        }
 
         $attendedRegistration = WebinarRegistration::factory()
             ->for($webinar)
