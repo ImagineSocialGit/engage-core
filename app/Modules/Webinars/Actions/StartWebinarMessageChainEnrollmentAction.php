@@ -5,6 +5,7 @@ namespace App\Modules\Webinars\Actions;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\ProcessMessageChainEnrollmentAction;
 use App\Modules\Messaging\Actions\StartMessageChainEnrollmentAction;
+use App\Modules\Messaging\Data\Delivery\MessageDeliveryComponent;
 use App\Modules\Messaging\Models\MessageChain;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\MessageChainStep;
@@ -33,6 +34,9 @@ class StartWebinarMessageChainEnrollmentAction
         private readonly MessageChainTimingResolver $timingResolver,
     ) {}
 
+    /**
+     * @param array<int, MessageDeliveryComponent> $components
+     */
     public function handle(
         Webinar $webinar,
         string $messageAreaKey,
@@ -40,6 +44,7 @@ class StartWebinarMessageChainEnrollmentAction
         WebinarRegistration|WebinarWaitlistSignup $context,
         Carbon|string|null $startedAt = null,
         bool $required = true,
+        array $components = [],
     ): ?MessageChainEnrollment {
         $messageArea = $this->messageAreaRegistry->get($messageAreaKey);
 
@@ -55,7 +60,6 @@ class StartWebinarMessageChainEnrollmentAction
             webinar: $webinar,
         );
         $startedAt = ($startedAt ? Carbon::parse($startedAt) : now())->utc();
-
         $profile = $this->scheduleProfileResolver->resolveForWebinar($webinar);
 
         if ($profile === null) {
@@ -104,16 +108,22 @@ class StartWebinarMessageChainEnrollmentAction
             );
         }
 
+        $contextValues = $this->executionContextProvider->valuesFor(
+            webinar: $webinar,
+            context: $context,
+        );
         $startStep = $this->startStepForArea(
             version: $version,
             areaKey: $messageArea->key,
             messageType: $messageArea->messageType,
             required: $required,
-            skipPastSteps: $messageArea->key === 'reminders',
-            contextValues: $this->executionContextProvider->valuesFor(
-                webinar: $webinar,
-                context: $context,
+            skipPastSteps: in_array(
+                $messageArea->key,
+                ['confirmation', 'reminders'],
+                true,
             ),
+            includeFollowingSteps: $messageArea->key === 'confirmation',
+            contextValues: $contextValues,
             baseAt: $startedAt,
             notBefore: now()->utc(),
         );
@@ -137,79 +147,125 @@ class StartWebinarMessageChainEnrollmentAction
             startStepKey: $startStep->key,
         );
 
-        if (
-            $enrollment->isActive()
-            && $enrollment->next_action_at !== null
-            && ! $enrollment->next_action_at->isFuture()
+        if ($enrollment->isActive()
+            && ($components !== []
+                || ($enrollment->next_action_at !== null
+                    && ! $enrollment->next_action_at->isFuture()))
         ) {
-            $enrollment = $this->processEnrollment->handle($enrollment);
+            $enrollment = $this->processEnrollment->handle(
+                enrollment: $enrollment,
+                components: $components,
+                materializeCurrentWave: $components !== [],
+            );
         }
 
         return $enrollment->fresh([
             'messageChainVersion.messageChain',
             'currentMessageChainStep.variants',
-            'scheduledMessages',
+            'scheduledMessages.components',
         ]) ?? $enrollment;
     }
 
+    /**
+     * @param array<string, mixed> $contextValues
+     */
     private function startStepForArea(
         MessageChainVersion $version,
         string $areaKey,
         string $messageType,
         bool $required,
         bool $skipPastSteps,
+        bool $includeFollowingSteps,
         array $contextValues,
         Carbon $baseAt,
         Carbon $notBefore,
     ): ?MessageChainStep {
         $version->loadMissing('steps.variants');
+        $steps = $version->steps
+            ->filter(fn (MessageChainStep $step): bool => (bool) $step->is_active)
+            ->sortBy([
+                ['sort_order', 'asc'],
+                ['id', 'asc'],
+            ])
+            ->values();
+        $areaStart = $steps->search(fn (MessageChainStep $candidate): bool =>
+            $this->belongsToArea(
+                step: $candidate,
+                areaKey: $areaKey,
+                messageType: $messageType,
+            )
+        );
 
-        $step = $version->steps->first(function (
+        if ($areaStart === false) {
+            return $this->missingStep($version, $messageType, $required);
+        }
+
+        $candidates = $includeFollowingSteps
+            ? $steps->slice((int) $areaStart)->values()
+            : $steps->filter(fn (MessageChainStep $candidate): bool =>
+                $this->belongsToArea(
+                    step: $candidate,
+                    areaKey: $areaKey,
+                    messageType: $messageType,
+                )
+            )->values();
+
+        $step = $candidates->first(function (
             MessageChainStep $candidate,
         ) use (
-            $areaKey,
-            $messageType,
             $skipPastSteps,
             $contextValues,
             $baseAt,
             $notBefore,
         ): bool {
-            $belongsToArea = str_starts_with(
-                $candidate->key,
-                $areaKey.'_',
-            ) || $candidate->variants->contains(
-                fn (MessageChainStepVariant $variant): bool =>
-                    (bool) $variant->is_active
-                    && $variant->message_type === $messageType,
-            );
-
-            if (! $candidate->is_active || ! $belongsToArea) {
-                return false;
-            }
-
             if (! $skipPastSteps) {
                 return true;
             }
 
-            return $this->timingResolver->resolve(
+            $resolvedAt = $this->timingResolver->resolve(
                 step: $candidate,
                 context: $contextValues,
                 baseAt: $baseAt,
-            )->greaterThanOrEqualTo($notBefore);
+            );
+
+            if ($candidate->timing_type === MessageChainStep::TIMING_IMMEDIATE) {
+                return $resolvedAt->greaterThanOrEqualTo($baseAt);
+            }
+
+            return $resolvedAt->greaterThanOrEqualTo($notBefore);
         });
 
-        if (! $step instanceof MessageChainStep) {
-            return $this->unavailable(
-                required: $required,
-                message: sprintf(
-                    'MessageChainVersion [%s] has no active step for Webinar message type [%s].',
-                    $version->getKey(),
-                    $messageType,
-                ),
-            );
-        }
+        return $step instanceof MessageChainStep
+            ? $step
+            : $this->missingStep($version, $messageType, $required);
+    }
 
-        return $step;
+    private function belongsToArea(
+        MessageChainStep $step,
+        string $areaKey,
+        string $messageType,
+    ): bool {
+        return str_starts_with($step->key, $areaKey.'_')
+            || $step->variants->contains(
+                fn (MessageChainStepVariant $variant): bool =>
+                    (bool) $variant->is_active
+                    && $variant->message_type === $messageType,
+            );
+    }
+
+    private function missingStep(
+        MessageChainVersion $version,
+        string $messageType,
+        bool $required,
+    ): null {
+        return $this->unavailable(
+            required: $required,
+            message: sprintf(
+                'MessageChainVersion [%s] has no active non-past step for Webinar message type [%s].',
+                $version->getKey(),
+                $messageType,
+            ),
+        );
     }
 
     private function assertContextMatchesWebinar(

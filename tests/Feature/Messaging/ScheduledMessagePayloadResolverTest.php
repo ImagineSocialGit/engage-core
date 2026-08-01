@@ -6,6 +6,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Actions\PublishMessageTemplateVersionAction;
 use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Models\ScheduledMessageComponent;
 use App\Modules\Messaging\Models\ScheduledMessageRenderContext;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Services\ScheduledMessagePayloadResolver;
@@ -43,6 +44,25 @@ class ScheduledMessagePayloadResolverTest extends TestCase
             ],
         );
 
+        $componentTemplate = MessageTemplate::query()->create([
+            'key' => 'email.transactional.fixture.component',
+            'name' => 'Rendering Component Fixture',
+            'description' => null,
+            'channel' => 'email',
+            'status' => MessageTemplate::STATUS_ACTIVE,
+            'source' => 'test',
+            'source_version' => '1',
+            'is_customized' => false,
+            'customized_at' => null,
+        ]);
+        $componentVersion = app(PublishMessageTemplateVersionAction::class)->handle(
+            messageTemplate: $componentTemplate,
+            payload: [
+                'subject' => 'Ignored component subject',
+                'body' => 'Acknowledgement for {runtime_code}.',
+            ],
+        );
+
         $scheduledMessage = ScheduledMessage::factory()->create([
             'recipient_type' => $contact->getMorphClass(),
             'recipient_id' => $contact->getKey(),
@@ -68,6 +88,16 @@ class ScheduledMessagePayloadResolverTest extends TestCase
             'status' => ScheduledMessage::STATUS_PENDING,
         ]);
 
+        ScheduledMessageComponent::query()->create([
+            'scheduled_message_id' => $scheduledMessage->getKey(),
+            'message_template_version_id' => $componentVersion->getKey(),
+            'role' => ScheduledMessageComponent::ROLE_CONSENT_ACKNOWLEDGEMENT,
+            'intent_key' => 'consent.transactional.email.acknowledgement',
+            'message_consent_id' => null,
+            'sort_order' => 100,
+            'placement_key' => 'email_body_append',
+        ]);
+
         $contact->forceFill([
             'first_name' => 'Rendered Name',
         ])->save();
@@ -76,7 +106,7 @@ class ScheduledMessagePayloadResolverTest extends TestCase
         $firstPayload = $resolver->resolve($scheduledMessage);
 
         $this->assertSame('Hello Rendered Name', $firstPayload->subject());
-        $this->assertSame('Reference ABC-123.', $firstPayload->text());
+        $this->assertSame("Reference ABC-123.\n\nAcknowledgement for ABC-123.", $firstPayload->text());
 
         $renderContext = ScheduledMessageRenderContext::query()->sole();
 
@@ -100,7 +130,7 @@ class ScheduledMessagePayloadResolverTest extends TestCase
         $retryPayload = $resolver->resolve($scheduledMessage->fresh());
 
         $this->assertSame('Hello Rendered Name', $retryPayload->subject());
-        $this->assertSame('Reference ABC-123.', $retryPayload->text());
+        $this->assertSame("Reference ABC-123.\n\nAcknowledgement for ABC-123.", $retryPayload->text());
         $this->assertSame(1, ScheduledMessageRenderContext::query()->count());
         $this->assertEquals(
             $renderContext->values,

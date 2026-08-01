@@ -2,6 +2,7 @@
 
 namespace App\Modules\Messaging\Actions;
 
+use App\Modules\Messaging\Data\Delivery\MessageDeliveryComponent;
 use App\Modules\Messaging\Jobs\ProcessMessageChainEnrollmentJob;
 use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\MessageChainStep;
@@ -34,17 +35,27 @@ class ProcessMessageChainEnrollmentAction
         private readonly MessageChannelAvailability $messageChannelAvailability,
         private readonly MessagePlanningGate $planningGate,
         private readonly ScheduleMessageAction $scheduleMessage,
+        private readonly AttachScheduledMessageComponentsAction $attachComponents,
     ) {}
 
+    /**
+     * @param array<int, MessageDeliveryComponent> $components
+     */
     public function handle(
         MessageChainEnrollment|int $enrollment,
+        array $components = [],
+        bool $materializeCurrentWave = false,
     ): MessageChainEnrollment {
         $enrollmentId = $enrollment instanceof MessageChainEnrollment
             ? (int) $enrollment->getKey()
             : $enrollment;
 
         $result = DB::transaction(
-            fn (): array => $this->processLocked($enrollmentId),
+            fn (): array => $this->processLocked(
+                enrollmentId: $enrollmentId,
+                components: $components,
+                materializeCurrentWave: $materializeCurrentWave,
+            ),
             3,
         );
 
@@ -122,21 +133,35 @@ class ProcessMessageChainEnrollmentAction
     }
 
     /**
+     * @param array<int, MessageDeliveryComponent> $components
      * @return array{enrollment: MessageChainEnrollment, dispatch: bool}
      */
-    private function processLocked(int $enrollmentId): array
-    {
+    private function processLocked(
+        int $enrollmentId,
+        array $components = [],
+        bool $materializeCurrentWave = false,
+    ): array {
         $enrollment = $this->lockedEnrollment($enrollmentId);
 
         if (! $enrollment->isActive()) {
             return ['enrollment' => $enrollment, 'dispatch' => false];
         }
 
+        $step = $enrollment->currentMessageChainStep;
+
+        if ($step instanceof MessageChainStep && $components !== []) {
+            $this->attachToWave(
+                enrollment: $enrollment,
+                step: $step,
+                components: $components,
+            );
+        }
+
         if ($enrollment->next_action_at === null) {
             return ['enrollment' => $enrollment, 'dispatch' => false];
         }
 
-        if ($enrollment->next_action_at->isFuture()) {
+        if ($enrollment->next_action_at->isFuture() && ! $materializeCurrentWave) {
             return ['enrollment' => $enrollment, 'dispatch' => false];
         }
 
@@ -158,8 +183,6 @@ class ProcessMessageChainEnrollmentAction
 
             return ['enrollment' => $enrollment, 'dispatch' => false];
         }
-
-        $step = $enrollment->currentMessageChainStep;
 
         if (! $step instanceof MessageChainStep) {
             $this->complete($enrollment);
@@ -185,6 +208,10 @@ class ProcessMessageChainEnrollmentAction
         $existingWave = $this->waveMessages($enrollment, $step);
 
         if ($existingWave->isNotEmpty()) {
+            $this->attachToMessages(
+                messages: $existingWave,
+                components: $components,
+            );
             $enrollment->forceFill(['next_action_at' => null])->save();
 
             if ($this->waveSatisfied($enrollment, $step, $existingWave)) {
@@ -215,10 +242,14 @@ class ProcessMessageChainEnrollmentAction
         $sendAt = $enrollment->next_action_at->copy();
 
         foreach ($variants as $variant) {
-            $this->materialize(
+            $message = $this->materialize(
                 enrollment: $enrollment,
                 variant: $variant,
                 sendAt: $sendAt,
+            );
+            $this->attachComponents->handle(
+                scheduledMessage: $message,
+                components: $components,
             );
         }
 
@@ -355,7 +386,7 @@ class ProcessMessageChainEnrollmentAction
         MessageChainEnrollment $enrollment,
         MessageChainStepVariant $variant,
         Carbon $sendAt,
-    ): void {
+    ): ScheduledMessage {
         $recipient = $enrollment->recipient;
 
         if (! $recipient instanceof Model) {
@@ -378,7 +409,7 @@ class ProcessMessageChainEnrollmentAction
             );
         }
 
-        $this->scheduleMessage->handle(
+        return $this->scheduleMessage->handle(
             recipient: $recipient,
             channel: $variant->channel,
             purpose: $variant->purpose,
@@ -403,6 +434,36 @@ class ProcessMessageChainEnrollmentAction
             messageChainEnrollment: $enrollment,
             messageChainStepVariant: $variant,
         );
+    }
+
+    /**
+     * @param array<int, MessageDeliveryComponent> $components
+     */
+    private function attachToWave(
+        MessageChainEnrollment $enrollment,
+        MessageChainStep $step,
+        array $components,
+    ): void {
+        $this->attachToMessages(
+            messages: $this->waveMessages($enrollment, $step),
+            components: $components,
+        );
+    }
+
+    /**
+     * @param Collection<int, ScheduledMessage> $messages
+     * @param array<int, MessageDeliveryComponent> $components
+     */
+    private function attachToMessages(
+        Collection $messages,
+        array $components,
+    ): void {
+        foreach ($messages as $message) {
+            $this->attachComponents->handle(
+                scheduledMessage: $message,
+                components: $components,
+            );
+        }
     }
 
     /**

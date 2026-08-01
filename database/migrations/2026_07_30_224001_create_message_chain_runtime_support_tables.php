@@ -117,6 +117,10 @@ return new class extends Migration
                 ['scheduled_message_id', 'sort_order'],
                 'scheduled_message_components_message_order_unique',
             );
+            $table->unique(
+                ['scheduled_message_id', 'intent_key'],
+                'scheduled_message_components_message_intent_unique',
+            );
             $table->index(
                 ['scheduled_message_id', 'role'],
                 'scheduled_message_components_message_role_index',

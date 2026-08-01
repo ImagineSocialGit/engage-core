@@ -2,6 +2,7 @@
 
 namespace App\Modules\Messaging\Actions;
 
+use App\Modules\Messaging\Data\Delivery\MessageDeliveryComponent;
 use App\Modules\Messaging\Data\Delivery\MessageDeliveryIntent;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\MessageDeliveryConsolidator;
@@ -11,6 +12,7 @@ class DispatchMessageIntentsAction
     public function __construct(
         private readonly MessageDeliveryConsolidator $consolidator,
         private readonly DispatchMessageAction $dispatchMessage,
+        private readonly AttachScheduledMessageComponentsAction $attachComponents,
     ) {}
 
     /**
@@ -34,34 +36,70 @@ class DispatchMessageIntentsAction
             $intents = $this->consolidator->consolidate($intents, $policyKey);
         }
 
+        $queue = $intents;
         $scheduledMessages = [];
+        $seenFallbacks = [];
 
-        foreach ($intents as $intent) {
-            $definition = $intent->definition;
-            $dispatchKeys = $definition['dispatch_keys'] ?? $definition['dispatch_key'] ?? [];
+        while ($queue !== []) {
+            /** @var MessageDeliveryIntent $intent */
+            $intent = array_shift($queue);
+            $messages = $this->dispatchIntent($intent);
+            $coveredIntentKeys = [];
 
-            $scheduledMessages = [
-                ...$scheduledMessages,
-                ...$this->dispatchMessage->handle(
-                    recipient: $intent->recipient,
-                    channel: (string) ($definition['channel'] ?? ''),
-                    purpose: (string) ($definition['purpose'] ?? ''),
-                    scope: (string) ($definition['scope'] ?? ''),
-                    dispatchKeys: $dispatchKeys,
-                    payload: $intent->payload,
-                    context: $intent->context,
-                    triggeredAt: $intent->triggeredAt,
-                    anchor: $intent->anchor,
-                    meta: $intent->meta,
-                    definitions: [$definition],
-                    sendAt: $intent->sendAt,
-                    behaviorOwner: $intent->behaviorOwner,
-                    behavior: $intent->behavior,
-                    occurrenceKey: $intent->occurrenceKey,
-                ),
-            ];
+            foreach ($messages as $message) {
+                $scheduledMessages[(int) $message->getKey()] = $message;
+                $coveredIntentKeys = array_values(array_unique([
+                    ...$coveredIntentKeys,
+                    ...$this->attachComponents->handle(
+                        scheduledMessage: $message,
+                        components: $intent->components,
+                    ),
+                ]));
+            }
+
+            foreach ($intent->components as $component) {
+                if (! $component instanceof MessageDeliveryComponent
+                    || in_array($component->intentKey, $coveredIntentKeys, true)
+                    || isset($seenFallbacks[spl_object_id($component->standaloneIntent)])
+                ) {
+                    continue;
+                }
+
+                $seenFallbacks[spl_object_id($component->standaloneIntent)] = true;
+                $queue[] = $component->standaloneIntent;
+            }
         }
 
-        return $scheduledMessages;
+        return array_values($scheduledMessages);
+    }
+
+    /**
+     * @return array<int, ScheduledMessage>
+     */
+    private function dispatchIntent(
+        MessageDeliveryIntent $intent,
+    ): array {
+        $definition = $intent->definition;
+        $dispatchKeys = $definition['dispatch_keys']
+            ?? $definition['dispatch_key']
+            ?? [];
+
+        return $this->dispatchMessage->handle(
+            recipient: $intent->recipient,
+            channel: (string) ($definition['channel'] ?? ''),
+            purpose: (string) ($definition['purpose'] ?? ''),
+            scope: (string) ($definition['scope'] ?? ''),
+            dispatchKeys: $dispatchKeys,
+            payload: $intent->payload,
+            context: $intent->context,
+            triggeredAt: $intent->triggeredAt,
+            anchor: $intent->anchor,
+            meta: $intent->meta,
+            definitions: [$definition],
+            sendAt: $intent->sendAt,
+            behaviorOwner: $intent->behaviorOwner,
+            behavior: $intent->behavior,
+            occurrenceKey: $intent->occurrenceKey,
+        );
     }
 }

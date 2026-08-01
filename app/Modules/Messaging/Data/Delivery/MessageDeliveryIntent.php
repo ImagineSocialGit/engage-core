@@ -12,6 +12,7 @@ final readonly class MessageDeliveryIntent
      * @param array<string, mixed> $payload
      * @param array<string, mixed> $behavior
      * @param array<string, mixed> $meta
+     * @param array<int, MessageDeliveryComponent> $components
      */
     public function __construct(
         public string $key,
@@ -26,12 +27,14 @@ final readonly class MessageDeliveryIntent
         public array $behavior = [],
         public ?string $occurrenceKey = null,
         public array $meta = [],
+        public array $components = [],
     ) {}
 
     /**
      * @param array<string, mixed> $definition
      * @param array<string, mixed> $payload
      * @param array<string, mixed> $meta
+     * @param array<int, MessageDeliveryComponent> $components
      */
     public static function fromDefinition(
         string $key,
@@ -46,6 +49,7 @@ final readonly class MessageDeliveryIntent
         array $behavior = [],
         ?string $occurrenceKey = null,
         array $meta = [],
+        array $components = [],
     ): self {
         $definitionBehaviorOwner = $definition['behavior_owner'] ?? null;
         $definitionBehavior = is_array($definition['resolved_behavior'] ?? null)
@@ -69,6 +73,29 @@ final readonly class MessageDeliveryIntent
             behavior: array_replace_recursive($definitionBehavior, $behavior),
             occurrenceKey: $occurrenceKey,
             meta: $meta,
+            components: $components,
+        );
+    }
+
+    /**
+     * @param array<int, MessageDeliveryComponent> $components
+     */
+    public function withComponents(array $components): self
+    {
+        return new self(
+            key: $this->key,
+            recipient: $this->recipient,
+            definition: $this->definition,
+            payload: $this->payload,
+            context: $this->context,
+            triggeredAt: $this->triggeredAt,
+            anchor: $this->anchor,
+            sendAt: $this->sendAt,
+            behaviorOwner: $this->behaviorOwner,
+            behavior: $this->behavior,
+            occurrenceKey: $this->occurrenceKey,
+            meta: $this->meta,
+            components: array_values($components),
         );
     }
 

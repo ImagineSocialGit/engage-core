@@ -12,6 +12,7 @@ class BuildConsentOptInMessageIntentAction
 {
     public function __construct(
         private readonly ConsentOptInDefinitionResolver $definitionResolver,
+        private readonly EnsureConsentOptInMessageTemplateVersionAction $ensureTemplateVersion,
     ) {}
 
     /**
@@ -34,7 +35,7 @@ class BuildConsentOptInMessageIntentAction
             purpose: $grant->purpose,
             messageScope: $grant->requestedScope,
         );
-
+        $version = $this->ensureTemplateVersion->handle($definition);
         $dispatchKeys = $definition['dispatch_keys'] ?? null;
 
         if ($dispatchKeys === null && is_string($definition['dispatch_key'] ?? null)) {
@@ -44,16 +45,21 @@ class BuildConsentOptInMessageIntentAction
         $definition['dispatch_keys'] = is_array($dispatchKeys)
             ? $dispatchKeys
             : ['consent_granted'];
+        $definition['message_template_version_id'] = $version->getKey();
+        $definition['message_template_id'] = $version->message_template_id;
+        $definition['message_template_key'] = $version->messageTemplate?->key;
 
         unset($definition['dispatch_key']);
 
+        $intentKey = implode('.', [
+            'consent',
+            $this->normalizeSegment($grant->purpose),
+            $this->normalizeSegment($grant->channel),
+            'acknowledgement',
+        ]);
+
         return MessageDeliveryIntent::fromDefinition(
-            key: implode('.', [
-                'consent',
-                $this->normalizeSegment($grant->purpose),
-                $this->normalizeSegment($grant->channel),
-                'acknowledgement',
-            ]),
+            key: $intentKey,
             recipient: $contact,
             definition: $definition,
             payload: $payload,
@@ -72,12 +78,7 @@ class BuildConsentOptInMessageIntentAction
             meta: [
                 'resolver_context' => $resolverContext,
                 'delivery_intent' => [
-                    'key' => implode('.', [
-                        'consent',
-                        $this->normalizeSegment($grant->purpose),
-                        $this->normalizeSegment($grant->channel),
-                        'acknowledgement',
-                    ]),
+                    'key' => $intentKey,
                     'consent_ids' => [$grant->consent->getKey()],
                 ],
                 'consent' => [

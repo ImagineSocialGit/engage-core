@@ -36,7 +36,7 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
         $this->configureWebinarRegistrationChannelAvailability();
     }
 
-    public function test_it_keeps_confirmation_direct_and_enrolls_reminders_when_sms_is_hidden(): void
+    public function test_it_materializes_email_confirmation_from_one_registration_chain_when_sms_is_hidden(): void
     {
         Queue::fake();
 
@@ -73,13 +73,13 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
             'channel' => MessageChannel::Sms->value,
         ]);
         $this->assertSame(1, ScheduledMessage::query()->count());
-        $this->assertReminderEnrollment($registration);
+        $this->assertRegistrationChainEnrollment($registration);
 
         Queue::assertPushed(SendScheduledMessageJob::class, 1);
         Queue::assertPushed(ProcessMessageChainEnrollmentJob::class, 1);
     }
 
-    public function test_it_keeps_both_consented_confirmations_direct_and_enrolls_one_reminder_chain(): void
+    public function test_it_materializes_both_confirmations_from_one_registration_chain(): void
     {
         Queue::fake();
 
@@ -119,7 +119,7 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
             'message_type' => 'reminder',
         ]);
         $this->assertSame(2, ScheduledMessage::query()->count());
-        $this->assertReminderEnrollment($registration);
+        $this->assertRegistrationChainEnrollment($registration);
         $this->assertCompactScheduledPayloads();
 
         Queue::assertPushed(SendScheduledMessageJob::class, 2);
@@ -152,7 +152,7 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
             'channel' => MessageChannel::Sms->value,
         ]);
         $this->assertSame(1, ScheduledMessage::query()->count());
-        $this->assertReminderEnrollment($registration);
+        $this->assertRegistrationChainEnrollment($registration);
 
         Queue::assertPushed(SendScheduledMessageJob::class, 1);
     }
@@ -187,7 +187,7 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
             'channel' => MessageChannel::Sms->value,
         ]);
         $this->assertSame(1, ScheduledMessage::query()->count());
-        $this->assertReminderEnrollment($registration);
+        $this->assertRegistrationChainEnrollment($registration);
 
         Queue::assertPushed(SendScheduledMessageJob::class, 1);
     }
@@ -406,7 +406,7 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
         Config::set('messaging.channel_availability.sms.surfaces.webinar_registrations', true);
     }
 
-    private function assertReminderEnrollment(
+    private function assertRegistrationChainEnrollment(
         WebinarRegistration $registration,
     ): void {
         $enrollment = MessageChainEnrollment::query()
@@ -417,66 +417,32 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
 
         $this->assertSame(MessageChainEnrollment::STATUS_ACTIVE, $enrollment->status);
         $this->assertSame('webinar_registrations', $enrollment->surface);
-        $this->assertNotNull($enrollment->next_action_at);
-        $this->assertTrue($enrollment->next_action_at->isFuture());
+        $this->assertNull($enrollment->next_action_at);
         $this->assertTrue(
             $enrollment->currentMessageChainStep->variants->every(
-                fn ($variant): bool => $variant->message_type === 'reminder',
+                fn ($variant): bool => $variant->message_type === 'confirmation',
             ),
+        );
+        $this->assertTrue(
+            ScheduledMessage::query()
+                ->where('message_chain_enrollment_id', $enrollment->getKey())
+                ->whereNotNull('message_chain_step_variant_id')
+                ->exists(),
         );
     }
 
     private function assertCompactScheduledPayloads(): void
     {
         foreach (ScheduledMessage::query()->get() as $message) {
-            $payload = $message->payload;
-            $encoded = json_encode(
-                $payload,
-                JSON_THROW_ON_ERROR
-                    | JSON_UNESCAPED_SLASHES
-                    | JSON_UNESCAPED_UNICODE,
-            );
-
-            $this->assertLessThanOrEqual(
-                $message->channel === MessageChannel::Email->value
-                    ? 2500
-                    : 1400,
-                strlen($encoded),
-            );
-
-            foreach ([
-                'context',
-                'runtime_context',
-                'contact',
-                'webinar',
-                'webinar_series',
-                'webinar_registration',
-                'recipient_type',
-                'recipient_id',
-                'channel',
-                'purpose',
-                'scope',
-                'message_type',
-            ] as $forbiddenKey) {
-                $this->assertArrayNotHasKey($forbiddenKey, $payload);
-            }
-
-            $this->assertArrayNotHasKey(
-                'contact',
-                $payload['tokens'] ?? [],
-            );
-            $this->assertArrayNotHasKey(
-                'webinar_series',
-                $payload['tokens'] ?? [],
-            );
-            $this->assertArrayNotHasKey(
-                'webinar_registration',
-                $payload['tokens'] ?? [],
-            );
-            $this->assertEqualsCanonicalizing(
-                ['title'],
-                array_keys($payload['tokens']['webinar'] ?? []),
-            );
+            $this->assertEquals([
+                'to' => $message->channel === MessageChannel::Email->value
+                    ? 'jeff@example.com'
+                    : '+15555550123',
+            ], $message->payload);
+            $this->assertNotNull($message->message_template_version_id);
+            $this->assertNotNull($message->message_chain_enrollment_id);
+            $this->assertNotNull($message->message_chain_step_variant_id);
+            $this->assertEquals([], $message->meta);
         }
     }
 }

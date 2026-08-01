@@ -38,7 +38,7 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
         $this->configureWebinarRegistrationChannelAvailability();
     }
 
-    public function test_direct_confirmation_uses_assigned_db_preset_while_reminders_are_chain_enrolled(): void
+    public function test_chain_confirmation_pins_the_assigned_db_template_version(): void
     {
         Queue::fake();
 
@@ -93,10 +93,9 @@ class DispatchWebinarRegistrationMessagesTemplateAssignmentTest extends TestCase
             ->sole();
 
         $this->assertSame((int) $version->getKey(), (int) $confirmation->message_template_version_id);
-        $this->assertSame(
-            $preset->getKey(),
-            data_get($confirmation->meta, 'message_template.preset_id'),
-        );
+        $this->assertNotNull($confirmation->message_chain_enrollment_id);
+        $this->assertNotNull($confirmation->message_chain_step_variant_id);
+        $this->assertEquals([], $confirmation->meta);
         $this->assertDatabaseMissing('scheduled_messages', [
             'message_type' => 'reminder',
         ]);

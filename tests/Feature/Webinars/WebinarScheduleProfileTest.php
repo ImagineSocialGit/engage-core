@@ -5,13 +5,17 @@ namespace Tests\Feature\Webinars;
 use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Actions\SyncMessageTemplatePresetsAction;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Jobs\ProcessMessageChainEnrollmentJob;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Webinars\Actions\DispatchWebinarRegistrationMessagesAction;
+use App\Modules\Webinars\Actions\SyncWebinarScheduleProfileChainsAction;
 use App\Modules\Webinars\Actions\SyncWebinarScheduleProfilesAction;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
@@ -150,6 +154,12 @@ class WebinarScheduleProfileTest extends TestCase
             'schedule' => ['type' => 'anchored', 'minutes' => -30],
         ]);
 
+        app(SyncMessageTemplatePresetsAction::class)->handle(force: true);
+        app(SyncWebinarScheduleProfileChainsAction::class)->handle(
+            profile: $profile,
+            force: true,
+        );
+
         $series = WebinarSeries::factory()->create(['webinar_schedule_profile_id' => $profile->getKey()]);
         $webinar = Webinar::factory()->create([
             'webinar_series_id' => $series->getKey(),
@@ -159,52 +169,19 @@ class WebinarScheduleProfileTest extends TestCase
 
         app(DispatchWebinarRegistrationMessagesAction::class)->handle($registration);
 
-        $confirmation = ScheduledMessage::query()->where('message_type', 'confirmation')->firstOrFail();
+        $enrollment = MessageChainEnrollment::query()
+            ->with('currentMessageChainStep.variants')
+            ->sole();
 
-        $this->assertTrue($confirmation->send_at->equalTo(now()->addMinutes(2)));
-        $this->assertEquals([
-            'profile_id' => $profile->getKey(),
-            'profile_key' => 'fast',
-            'item_id' => $profileItem->getKey(),
-            'item_key' => 'email_confirmation_fast',
-            'area_key' => 'confirmation',
-        ], data_get($confirmation->meta, 'webinar_schedule'));
-        $this->assertArrayNotHasKey(
-            'webinar_schedule_profile',
-            $confirmation->meta,
+        $this->assertNotNull($enrollment->currentMessageChainStep);
+        $this->assertTrue(
+            $enrollment->currentMessageChainStep->variants
+                ->every(fn ($variant): bool => $variant->message_type === 'confirmation'),
         );
-        $this->assertArrayNotHasKey(
-            'webinar_message_area',
-            $confirmation->meta,
-        );
-        $this->assertArrayNotHasKey(
-            'message_scheduling',
-            $confirmation->meta,
-        );
-        $this->assertSame(
-            $webinar->title,
-            data_get($confirmation->payload, 'tokens.webinar.title'),
-        );
-        $this->assertSame(
-            $series->title,
-            data_get($confirmation->payload, 'tokens.webinar_series.title'),
-        );
-        $this->assertEqualsCanonicalizing(
-            ['webinar', 'webinar_series'],
-            array_keys($confirmation->payload['tokens']),
-        );
-        $this->assertEqualsCanonicalizing(
-            ['title'],
-            array_keys($confirmation->payload['tokens']['webinar']),
-        );
-        $this->assertEqualsCanonicalizing(
-            ['title'],
-            array_keys($confirmation->payload['tokens']['webinar_series']),
-        );
-        $this->assertArrayNotHasKey('context', $confirmation->payload);
-        $this->assertArrayNotHasKey('runtime_context', $confirmation->payload);
-        $this->assertDatabaseMissing('scheduled_messages', ['message_type' => 'reminder']);
-        Queue::assertPushed(SendScheduledMessageJob::class, 1);
+        $this->assertTrue($enrollment->next_action_at->equalTo(now()->addMinutes(2)));
+        $this->assertSame(0, ScheduledMessage::query()->count());
+        Queue::assertPushed(ProcessMessageChainEnrollmentJob::class, 1);
+        Queue::assertNotPushed(SendScheduledMessageJob::class);
     }
 
     public function test_operator_can_choose_series_schedule_profile(): void

@@ -130,6 +130,13 @@ class ScheduledMessage extends Model
         return $this->hasOne(ScheduledMessageRenderContext::class);
     }
 
+    public function components(): HasMany
+    {
+        return $this->hasMany(ScheduledMessageComponent::class)
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
     /**
      * @return array<int, string>
      */

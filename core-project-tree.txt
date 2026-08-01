@@ -443,6 +443,7 @@
 │   │   ├── Messaging
 │   │   │   ├── Actions
 │   │   │   │   ├── AssignMessageTemplatePresetAction.php
+│   │   │   │   ├── AttachScheduledMessageComponentsAction.php
 │   │   │   │   ├── BuildConsentOptInMessageIntentAction.php
 │   │   │   │   ├── ClaimScheduledMessageForSendingAction.php
 │   │   │   │   ├── CreateContactPermissionInvitationsForImportBatchAction.php
@@ -450,6 +451,7 @@
 │   │   │   │   ├── DispatchMessageAction.php
 │   │   │   │   ├── DispatchMessageIntentsAction.php
 │   │   │   │   ├── DuplicateMessageChainAction.php
+│   │   │   │   ├── EnsureConsentOptInMessageTemplateVersionAction.php
 │   │   │   │   ├── GrantMessageConsentAction.php
 │   │   │   │   ├── GrantMessageConsentsAction.php
 │   │   │   │   ├── ImportMessageConsentAction.php
@@ -501,6 +503,7 @@
 │   │   │   │   ├── Consent
 │   │   │   │   │   └── MessageConsentGrantResult.php
 │   │   │   │   ├── Delivery
+│   │   │   │   │   ├── MessageDeliveryComponent.php
 │   │   │   │   │   ├── MessageDeliveryIntent.php
 │   │   │   │   │   ├── MessageSendResult.php
 │   │   │   │   │   └── SmsSendDecision.php
@@ -601,6 +604,7 @@
 │   │   │   │   ├── PhoneNumberNormalizer.php
 │   │   │   │   ├── ResolvedMessageDispatchBuilder.php
 │   │   │   │   ├── RouteAuthoringMessageTemplateEligibilityResolver.php
+│   │   │   │   ├── ScheduledMessageComponentComposer.php
 │   │   │   │   ├── ScheduledMessageDeliveryLeaseManager.php
 │   │   │   │   ├── ScheduledMessageDeliveryPolicy.php
 │   │   │   │   ├── ScheduledMessageEventOutbox.php
@@ -817,6 +821,7 @@
 │   │   │   │   ├── ResolveWebinarRegistrationReconciliationAction.php
 │   │   │   │   ├── ResolveWebinarRegistrationReplacementChainAction.php
 │   │   │   │   ├── RetryWebinarRegistrationFinalizationAction.php
+│   │   │   │   ├── StartWebinarMessageChainEnrollmentAction.php
 │   │   │   │   ├── SyncWebinarRegistrationToProviderAction.php
 │   │   │   │   ├── SyncWebinarScheduleProfileChainsAction.php
 │   │   │   │   ├── SyncWebinarScheduleProfilesAction.php
@@ -908,6 +913,7 @@
 │   │   │   │   ├── Dashboard
 │   │   │   │   │   └── WebinarActivityDashboardPanelProvider.php
 │   │   │   │   ├── WebinarMessageAreaRegistry.php
+│   │   │   │   ├── WebinarMessageChainExecutionContextProvider.php
 │   │   │   │   ├── WebinarMessageReadinessService.php
 │   │   │   │   ├── WebinarProviderManager.php
 │   │   │   │   ├── WebinarRegisterPageDefinitionValidator.php
@@ -1889,4 +1895,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-500 directories, 1390 files
+500 directories, 1396 files

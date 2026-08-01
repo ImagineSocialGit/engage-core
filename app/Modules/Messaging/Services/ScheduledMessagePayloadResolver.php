@@ -18,6 +18,7 @@ class ScheduledMessagePayloadResolver
         private readonly MessageRecipientPayloadResolver $recipientPayloadResolver,
         private readonly ScheduledMessagePayloadCanonicalizer $payloadCanonicalizer,
         private readonly MessageChainExecutionContextResolver $chainExecutionContextResolver,
+        private readonly ScheduledMessageComponentComposer $componentComposer,
     ) {}
 
     public function resolve(
@@ -40,6 +41,10 @@ class ScheduledMessagePayloadResolver
         ScheduledMessage $scheduledMessage,
     ): array {
         $version = $this->messageTemplateVersion($scheduledMessage);
+        $templatePayload = $this->componentComposer->compose(
+            scheduledMessage: $scheduledMessage,
+            primaryPayload: $version->payload(),
+        );
         $runtimePayload = is_array($scheduledMessage->payload)
             ? $scheduledMessage->payload
             : [];
@@ -49,7 +54,7 @@ class ScheduledMessagePayloadResolver
             return $this->withOperationalFields(
                 scheduledMessage: $scheduledMessage,
                 payload: $this->mergeFrozenRenderContext(
-                    templatePayload: $version->payload(),
+                    templatePayload: $templatePayload,
                     runtimePayload: $runtimePayload,
                     values: $renderContext->values,
                 ),
@@ -75,7 +80,7 @@ class ScheduledMessagePayloadResolver
             purpose: $scheduledMessage->purpose,
             scope: $scheduledMessage->scope,
             messageType: $scheduledMessage->message_type,
-            definitionPayload: $version->payload(),
+            definitionPayload: $templatePayload,
             payload: $runtimePayload,
         );
 
