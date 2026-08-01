@@ -5,6 +5,7 @@ namespace Tests\Feature\Messaging;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Models\ScheduledMessageDeliveryAttempt;
+use App\Modules\Messaging\Models\ScheduledMessageOutboxEvent;
 use App\Modules\Messaging\Services\ContactShow\ContactScheduledMessagesVisibilityDataProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -14,7 +15,7 @@ class ContactScheduledMessagesTerminalResultTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_recent_message_visibility_uses_the_terminal_result_contract(): void
+    public function test_recent_message_visibility_uses_the_durable_terminal_result_contract(): void
     {
         config()->set('client.timezone', 'UTC');
         Carbon::setTestNow(Carbon::parse('2026-08-01 03:00:00 UTC'));
@@ -24,11 +25,9 @@ class ContactScheduledMessagesTerminalResultTest extends TestCase
             'recipient_type' => $contact->getMorphClass(),
             'recipient_id' => $contact->getKey(),
             'status' => ScheduledMessage::STATUS_FAILED,
-            'failed_at' => now()->subHour(),
-            'failure_reason' => 'Legacy message summary.',
         ]);
 
-        ScheduledMessageDeliveryAttempt::query()->create([
+        $attempt = ScheduledMessageDeliveryAttempt::query()->create([
             'scheduled_message_id' => $message->getKey(),
             'attempt_number' => 2,
             'claim_token' => 'terminal-result-contact-visibility',
@@ -41,6 +40,18 @@ class ContactScheduledMessagesTerminalResultTest extends TestCase
             'provider_message_id' => 'contact-visibility-provider-message',
             'reason_code' => 'provider_rejected',
             'reason' => 'Authoritative delivery-attempt failure.',
+        ]);
+
+        ScheduledMessageOutboxEvent::query()->create([
+            'scheduled_message_id' => $message->getKey(),
+            'delivery_attempt_id' => $attempt->getKey(),
+            'event_type' => ScheduledMessage::STATUS_FAILED,
+            'occurred_at' => $attempt->completed_at,
+            'status' => ScheduledMessageOutboxEvent::STATUS_PUBLISHED,
+            'available_at' => $attempt->completed_at,
+            'attempts' => 1,
+            'last_attempted_at' => $attempt->completed_at,
+            'published_at' => $attempt->completed_at,
         ]);
 
         $data = app(ContactScheduledMessagesVisibilityDataProvider::class)

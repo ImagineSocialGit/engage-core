@@ -9,6 +9,7 @@ use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Campaigns\Models\CampaignStepVariant;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Models\MessageConsent;
@@ -64,7 +65,6 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             'scope' => 'webinar',
             'message_type' => 'webinar_attended_step_1',
             'status' => ScheduledMessage::STATUS_SENT,
-            'sent_at' => now(),
             'meta' => [
                 'campaign_enrollment_id' => $enrollment->id,
                 'campaign_id' => $campaign->id,
@@ -75,7 +75,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             ],
         ]);
 
-        app(ScheduleNextCampaignStepAfterScheduledMessageSent::class)->handle(new ScheduledMessageSent($sentMessage));
+        app(ScheduleNextCampaignStepAfterScheduledMessageSent::class)->handle($this->sentEvent($sentMessage));
 
         $enrollment->refresh();
 
@@ -92,7 +92,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
         $this->assertSame('marketing', $nextMessage->purpose);
         $this->assertSame('webinar', $nextMessage->scope);
         $this->assertSame('marketing', $nextMessage->queue);
-        $this->assertSame(['campaign_step_due'], $nextMessage->dispatch_keys);
+        $this->assertEquals(['campaign_step_due'], $nextMessage->dispatch_keys);
         $this->assertSame('messaging.email.definitions.marketing.webinar.campaigns.webinar_attended.steps.2.variants.email', $nextMessage->definition_config_path);
         $this->assertSame($enrollment->id, $nextMessage->meta['campaign_enrollment_id']);
         $this->assertSame($campaign->id, $nextMessage->meta['campaign_id']);
@@ -142,7 +142,6 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             'scope' => 'webinar',
             'message_type' => 'webinar_attended_step_1',
             'status' => ScheduledMessage::STATUS_SENT,
-            'sent_at' => now(),
             'meta' => [
                 'campaign_enrollment_id' => $enrollment->id,
                 'campaign_id' => $campaign->id,
@@ -172,7 +171,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             ],
         ]);
 
-        app(ScheduleNextCampaignStepAfterScheduledMessageSent::class)->handle(new ScheduledMessageSent($sentMessage));
+        app(ScheduleNextCampaignStepAfterScheduledMessageSent::class)->handle($this->sentEvent($sentMessage));
 
         $enrollment->refresh();
 
@@ -184,11 +183,14 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
 
         $pendingSibling->forceFill([
             'status' => ScheduledMessage::STATUS_SKIPPED,
-            'skipped_at' => now(),
-            'skip_reason' => 'Message conditions no longer pass.',
         ])->save();
 
-        app(ScheduleNextCampaignStepAfterScheduledMessageSent::class)->handle(new ScheduledMessageSkipped($pendingSibling));
+        app(ScheduleNextCampaignStepAfterScheduledMessageSent::class)->handle(
+            $this->skippedEvent(
+                $pendingSibling,
+                'Message conditions no longer pass.',
+            ),
+        );
 
         $enrollment->refresh();
 
@@ -256,11 +258,10 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
 
         $smsMessage->forceFill([
             'status' => ScheduledMessage::STATUS_SENT,
-            'sent_at' => now(),
         ])->save();
 
         app(ScheduleNextCampaignStepAfterScheduledMessageSent::class)->handle(
-            new ScheduledMessageSent($smsMessage),
+            $this->sentEvent($smsMessage),
         );
 
         $enrollment->refresh();
@@ -337,8 +338,6 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             'scope' => 'webinar',
             'message_type' => 'webinar_attended_step_1',
             'status' => ScheduledMessage::STATUS_SKIPPED,
-            'skipped_at' => now(),
-            'skip_reason' => 'Message conditions no longer pass.',
             'meta' => [
                 'campaign_enrollment_id' => $enrollment->id,
                 'campaign_id' => $campaign->id,
@@ -350,7 +349,10 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
         ]);
 
         app(ScheduleNextCampaignStepAfterScheduledMessageSent::class)->handle(
-            new ScheduledMessageSkipped($oldStepOneMessage),
+            $this->skippedEvent(
+                $oldStepOneMessage,
+                'Message conditions no longer pass.',
+            ),
         );
 
         $enrollment->refresh();
@@ -376,14 +378,42 @@ class ScheduleNextCampaignStepAfterScheduledMessageSentTest extends TestCase
             'scope' => 'webinar',
             'message_type' => 'confirmation',
             'status' => ScheduledMessage::STATUS_SENT,
-            'sent_at' => now(),
             'meta' => [],
         ]);
 
-        app(ScheduleNextCampaignStepAfterScheduledMessageSent::class)->handle(new ScheduledMessageSent($sentMessage));
+        app(ScheduleNextCampaignStepAfterScheduledMessageSent::class)->handle($this->sentEvent($sentMessage));
 
         $this->assertDatabaseCount('campaign_enrollments', 0);
         $this->assertDatabaseCount('scheduled_messages', 1);
+    }
+
+    private function sentEvent(
+        ScheduledMessage $scheduledMessage,
+    ): ScheduledMessageSent {
+        return new ScheduledMessageSent(
+            $scheduledMessage,
+            new ScheduledMessageTerminalResult(
+                scheduledMessageId: (int) $scheduledMessage->getKey(),
+                status: ScheduledMessage::STATUS_SENT,
+                occurredAt: now()->toImmutable(),
+            ),
+        );
+    }
+
+    private function skippedEvent(
+        ScheduledMessage $scheduledMessage,
+        string $reason,
+    ): ScheduledMessageSkipped {
+        return new ScheduledMessageSkipped(
+            $scheduledMessage,
+            new ScheduledMessageTerminalResult(
+                scheduledMessageId: (int) $scheduledMessage->getKey(),
+                status: ScheduledMessage::STATUS_SKIPPED,
+                occurredAt: now()->toImmutable(),
+                reasonCode: 'campaign_test_skipped',
+                reason: $reason,
+            ),
+        );
     }
 
     private function createCampaignWithSteps(): Campaign

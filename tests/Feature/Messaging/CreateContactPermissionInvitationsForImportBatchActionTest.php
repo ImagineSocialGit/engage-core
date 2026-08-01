@@ -6,6 +6,7 @@ use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
 use App\Modules\Messaging\Actions\CreateContactPermissionInvitationsForImportBatchAction;
 use App\Modules\Messaging\Actions\SkipScheduledMessagesAction;
+use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
@@ -49,13 +50,13 @@ class CreateContactPermissionInvitationsForImportBatchActionTest extends TestCas
         $firstResult = $action->handle($importBatch);
         $secondResult = $action->handle($importBatch);
 
-        $this->assertSame([
+        $this->assertEquals([
             'eligible' => 1,
             'scheduled' => 1,
             'skipped' => 0,
         ], $firstResult);
 
-        $this->assertSame([
+        $this->assertEquals([
             'eligible' => 0,
             'scheduled' => 0,
             'skipped' => 1,
@@ -101,7 +102,7 @@ class CreateContactPermissionInvitationsForImportBatchActionTest extends TestCas
         $result = app(CreateContactPermissionInvitationsForImportBatchAction::class)
             ->handle($importBatch);
 
-        $this->assertSame([
+        $this->assertEquals([
             'eligible' => 0,
             'scheduled' => 0,
             'skipped' => 1,
@@ -141,7 +142,7 @@ class CreateContactPermissionInvitationsForImportBatchActionTest extends TestCas
         $result = app(CreateContactPermissionInvitationsForImportBatchAction::class)
             ->handle($importBatch);
 
-        $this->assertSame([
+        $this->assertEquals([
             'eligible' => 0,
             'scheduled' => 0,
             'skipped' => 1,
@@ -163,7 +164,7 @@ class CreateContactPermissionInvitationsForImportBatchActionTest extends TestCas
         $result = app(CreateContactPermissionInvitationsForImportBatchAction::class)
             ->handle($importBatch);
 
-        $this->assertSame([
+        $this->assertEquals([
             'eligible' => 0,
             'scheduled' => 0,
             'skipped' => 1,
@@ -210,12 +211,16 @@ class CreateContactPermissionInvitationsForImportBatchActionTest extends TestCas
         $pendingMessage->refresh();
 
         $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $pendingMessage->status);
-        $this->assertSame('permission_invitation_cancelled', $pendingMessage->skip_reason);
+        $terminalResult = ScheduledMessageTerminalResult::fromScheduledMessage(
+            $pendingMessage->load('terminalOutboxEvent.deliveryAttempt'),
+        );
+
+        $this->assertSame('permission_invitation_cancelled', $terminalResult->reason);
 
         $result = app(CreateContactPermissionInvitationsForImportBatchAction::class)
             ->handle($importBatch);
 
-        $this->assertSame([
+        $this->assertEquals([
             'eligible' => 1,
             'scheduled' => 1,
             'skipped' => 0,

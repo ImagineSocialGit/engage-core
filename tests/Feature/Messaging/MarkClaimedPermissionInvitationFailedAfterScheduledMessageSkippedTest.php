@@ -3,6 +3,7 @@
 namespace Tests\Feature\Messaging;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\ScheduledMessage;
@@ -21,12 +22,10 @@ class MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest exte
             'source' => 'import',
             'email' => 'imported@example.test',
         ]);
-
         $scheduledMessage = $this->permissionInvitationMessage($contact, [
             'status' => ScheduledMessage::STATUS_SKIPPED,
-            'skipped_at' => now(),
-            'skip_reason' => 'Message payload contains unresolved token(s): {missing_token}.',
         ]);
+        $occurredAt = now()->subMinute()->toImmutable();
 
         $invitation = ContactPermissionInvitation::query()->create([
             'contact_id' => $contact->id,
@@ -35,17 +34,30 @@ class MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest exte
             'channel' => ContactPermissionInvitation::CHANNEL_EMAIL,
             'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
             'status' => ContactPermissionInvitation::STATUS_CLAIMED,
-            'claimed_at' => now()->subMinute(),
+            'claimed_at' => now()->subMinutes(2),
             'meta' => [],
         ]);
 
-        event(new ScheduledMessageSkipped($scheduledMessage));
+        event(new ScheduledMessageSkipped(
+            $scheduledMessage,
+            $this->skippedResult(
+                $scheduledMessage,
+                $occurredAt,
+                'Message payload contains unresolved token(s): {missing_token}.',
+            ),
+        ));
 
         $invitation->refresh();
 
         $this->assertSame(ContactPermissionInvitation::STATUS_FAILED, $invitation->status);
-        $this->assertNotNull($invitation->failed_at);
-        $this->assertSame($scheduledMessage->skip_reason, $invitation->failure_reason);
+        $this->assertSame(
+            $occurredAt->copy()->startOfSecond()->toISOString(),
+            $invitation->failed_at?->copy()->startOfSecond()->toISOString(),
+        );
+        $this->assertSame(
+            'Message payload contains unresolved token(s): {missing_token}.',
+            $invitation->failure_reason,
+        );
         $this->assertSame($scheduledMessage->id, $invitation->scheduled_message_id);
     }
 
@@ -55,14 +67,18 @@ class MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest exte
             'source' => 'import',
             'email' => 'imported@example.test',
         ]);
-
         $scheduledMessage = $this->permissionInvitationMessage($contact, [
             'status' => ScheduledMessage::STATUS_SKIPPED,
-            'skipped_at' => now(),
-            'skip_reason' => 'Message eligibility gate denied send.',
         ]);
 
-        event(new ScheduledMessageSkipped($scheduledMessage));
+        event(new ScheduledMessageSkipped(
+            $scheduledMessage,
+            $this->skippedResult(
+                $scheduledMessage,
+                now()->toImmutable(),
+                'Message eligibility gate denied send.',
+            ),
+        ));
 
         $this->assertDatabaseMissing('contact_permission_invitations', [
             'contact_id' => $contact->id,
@@ -76,10 +92,8 @@ class MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest exte
             'source' => 'import',
             'email' => 'imported@example.test',
         ]);
-
         $originalMessage = $this->permissionInvitationMessage($contact, [
             'status' => ScheduledMessage::STATUS_SENT,
-            'sent_at' => now()->subMinutes(5),
         ]);
 
         $existingInvitation = ContactPermissionInvitation::query()->create([
@@ -96,11 +110,16 @@ class MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest exte
 
         $duplicateMessage = $this->permissionInvitationMessage($contact, [
             'status' => ScheduledMessage::STATUS_SKIPPED,
-            'skipped_at' => now(),
-            'skip_reason' => 'Imported contact permission invitation was already used.',
         ]);
 
-        event(new ScheduledMessageSkipped($duplicateMessage));
+        event(new ScheduledMessageSkipped(
+            $duplicateMessage,
+            $this->skippedResult(
+                $duplicateMessage,
+                now()->toImmutable(),
+                'Imported contact permission invitation was already used.',
+            ),
+        ));
 
         $existingInvitation->refresh();
 
@@ -139,5 +158,19 @@ class MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest exte
                 ],
             ],
         ], $attributes));
+    }
+
+    private function skippedResult(
+        ScheduledMessage $scheduledMessage,
+        \Carbon\CarbonImmutable $occurredAt,
+        string $reason,
+    ): ScheduledMessageTerminalResult {
+        return new ScheduledMessageTerminalResult(
+            scheduledMessageId: (int) $scheduledMessage->getKey(),
+            status: ScheduledMessage::STATUS_SKIPPED,
+            occurredAt: $occurredAt,
+            reasonCode: 'permission_invitation_skipped',
+            reason: $reason,
+        );
     }
 }

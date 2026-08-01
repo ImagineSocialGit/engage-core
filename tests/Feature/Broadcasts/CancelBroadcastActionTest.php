@@ -57,8 +57,6 @@ class CancelBroadcastActionTest extends TestCase
 
         $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $scheduledMessage->status);
         $this->assertSame('broadcast_cancelled', $terminalResult->reason);
-        $this->assertNull($scheduledMessage->skip_reason);
-        $this->assertNull($scheduledMessage->skipped_at);
     }
 
     public function test_it_uses_a_custom_cancellation_reason(): void
@@ -97,8 +95,6 @@ class CancelBroadcastActionTest extends TestCase
             'admin_cancelled',
             $this->terminalResult($scheduledMessage)->reason,
         );
-        $this->assertNull($scheduledMessage->skip_reason);
-        $this->assertNull($scheduledMessage->skipped_at);
     }
 
     public function test_it_does_not_change_terminal_recipients(): void
@@ -147,12 +143,11 @@ class CancelBroadcastActionTest extends TestCase
             'status' => ScheduledMessage::STATUS_PENDING,
         ]);
 
-        $sentMessage = ScheduledMessage::factory()->create([
+        $sentMessage = ScheduledMessage::factory()->sent()->create([
             'recipient_type' => $contact->getMorphClass(),
             'recipient_id' => $contact->id,
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
-            'status' => ScheduledMessage::STATUS_SENT,
         ]);
 
         app(CancelBroadcastAction::class)->handle($broadcast);
@@ -222,8 +217,6 @@ class CancelBroadcastActionTest extends TestCase
             'broadcast_cancelled',
             $this->terminalResult($scheduledMessage)->reason,
         );
-        $this->assertNull($scheduledMessage->skip_reason);
-        $this->assertNull($scheduledMessage->skipped_at);
 
         $this->assertDatabaseMissing('contact_permission_invitations', [
             'contact_id' => $contact->id,
@@ -250,7 +243,7 @@ class CancelBroadcastActionTest extends TestCase
             'email' => 'claimed@example.com',
         ]);
 
-        $sentMessage = ScheduledMessage::factory()->create([
+        $sentMessage = ScheduledMessage::factory()->sent()->create([
             'recipient_type' => $contact->getMorphClass(),
             'recipient_id' => $contact->id,
             'context_type' => $broadcast->getMorphClass(),
@@ -259,8 +252,6 @@ class CancelBroadcastActionTest extends TestCase
             'purpose' => 'transactional',
             'scope' => 'permission_invitation',
             'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
-            'status' => ScheduledMessage::STATUS_SENT,
-            'sent_at' => now()->subMinutes(5),
         ]);
 
         $invitation = ContactPermissionInvitation::query()->create([

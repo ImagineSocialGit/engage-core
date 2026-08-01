@@ -46,18 +46,8 @@ class ScheduledMessage extends Model
         'payload',
         'send_at',
         'status',
-        'sending_at',
         'provider_idempotency_key',
-        'last_attempted_at',
-        'send_attempts',
-        'provider',
-        'provider_message_id',
-        'sent_at',
-        'skipped_at',
-        'failed_at',
         'dedupe_key',
-        'failure_reason',
-        'skip_reason',
         'meta',
     ];
 
@@ -73,12 +63,6 @@ class ScheduledMessage extends Model
             'dispatch_keys' => 'array',
             'payload' => 'array',
             'send_at' => 'datetime',
-            'sending_at' => 'datetime',
-            'last_attempted_at' => 'datetime',
-            'send_attempts' => 'integer',
-            'sent_at' => 'datetime',
-            'skipped_at' => 'datetime',
-            'failed_at' => 'datetime',
             'meta' => 'array',
         ];
     }

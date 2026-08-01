@@ -74,6 +74,16 @@ class ContactImportBatchControllerTest extends TestCase
             'contact_import_batch_id' => null,
         ]);
 
+        ScheduledMessage::factory()
+            ->skipped('permission_invitation_cancelled')
+            ->create([
+                'recipient_type' => $included->getMorphClass(),
+                'recipient_id' => $included->getKey(),
+                'context_type' => $importBatch->getMorphClass(),
+                'context_id' => $importBatch->getKey(),
+                'message_type' => ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION,
+            ]);
+
         $response = $this
             ->actingAs($user)
             ->get(route('crm.contacts.import-batches.show', $importBatch));
@@ -85,6 +95,8 @@ class ContactImportBatchControllerTest extends TestCase
         $response->assertSee('jane@example.test');
         $response->assertSee('5551112222');
         $response->assertDontSee('ignored@example.test');
+        $response->assertSee('Cancelled');
+        $response->assertSee('permission_invitation_cancelled');
 
         $this->assertSame($importBatch->id, $included->refresh()->contact_import_batch_id);
     }
@@ -149,8 +161,6 @@ class ContactImportBatchControllerTest extends TestCase
 
         $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $scheduledMessage->status);
         $this->assertSame('permission_invitation_cancelled', $terminalResult->reason);
-        $this->assertNull($scheduledMessage->skip_reason);
-        $this->assertNull($scheduledMessage->skipped_at);
 
         $this->assertDatabaseMissing('contact_permission_invitations', [
             'contact_id' => $contact->id,

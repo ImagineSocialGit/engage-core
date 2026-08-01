@@ -37,8 +37,6 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
             'status' => ScheduledMessage::STATUS_SKIPPED,
-            'skipped_at' => now()->subHour(),
-            'skip_reason' => 'legacy_consent_missing',
             'meta' => [
                 'broadcast_id' => $broadcast->id,
                 'broadcast_recipient_id' => $recipient->id,
@@ -87,8 +85,6 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
             'status' => ScheduledMessage::STATUS_FAILED,
-            'failed_at' => now()->subHour(),
-            'failure_reason' => 'Legacy provider failure.',
             'meta' => [
                 'broadcast_id' => $broadcast->id,
                 'broadcast_recipient_id' => $recipient->id,
@@ -136,14 +132,13 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
             'broadcast_id' => $broadcast->id,
         ]);
 
-        $scheduledMessage = ScheduledMessage::factory()->create([
+        $scheduledMessage = ScheduledMessage::factory()
+            ->skipped('suppressed')
+            ->create([
             'recipient_type' => $contact->getMorphClass(),
             'recipient_id' => $contact->id,
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
-            'status' => ScheduledMessage::STATUS_SKIPPED,
-            'skipped_at' => now(),
-            'skip_reason' => 'suppressed',
             'meta' => [
                 'broadcast_recipient_id' => $recipient->id,
             ],
@@ -175,14 +170,13 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
             'broadcast_id' => $broadcast->id,
         ]);
 
-        $scheduledMessage = ScheduledMessage::factory()->create([
+        $scheduledMessage = ScheduledMessage::factory()
+            ->failed('Provider failure.')
+            ->create([
             'recipient_type' => $contact->getMorphClass(),
             'recipient_id' => $contact->id,
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
-            'status' => ScheduledMessage::STATUS_FAILED,
-            'failed_at' => now(),
-            'failure_reason' => 'Provider failure.',
             'meta' => [
                 'broadcast_recipient_id' => $recipient->id,
             ],
@@ -208,14 +202,13 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
             'contact_id' => $contact->id,
         ]);
 
-        $scheduledMessage = ScheduledMessage::factory()->create([
+        $scheduledMessage = ScheduledMessage::factory()
+            ->skipped('suppressed')
+            ->create([
             'recipient_type' => $contact->getMorphClass(),
             'recipient_id' => $contact->id,
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
-            'status' => ScheduledMessage::STATUS_SKIPPED,
-            'skipped_at' => now(),
-            'skip_reason' => 'suppressed',
             'meta' => [
                 'broadcast_recipient_id' => $recipient->id,
             ],
@@ -242,14 +235,13 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
             'contact_id' => $contact->id,
         ]);
 
-        $scheduledMessage = ScheduledMessage::factory()->create([
+        $scheduledMessage = ScheduledMessage::factory()
+            ->skipped('suppressed')
+            ->create([
             'recipient_type' => $contact->getMorphClass(),
             'recipient_id' => $contact->id,
             'context_type' => Contact::class,
             'context_id' => $contact->id,
-            'status' => ScheduledMessage::STATUS_SKIPPED,
-            'skipped_at' => now(),
-            'skip_reason' => 'suppressed',
         ]);
 
         app(MarkBroadcastRecipientSkipped::class)->handle(

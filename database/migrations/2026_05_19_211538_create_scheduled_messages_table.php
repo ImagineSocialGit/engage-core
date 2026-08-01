@@ -17,48 +17,20 @@ return new class extends Migration
 
             $table->string('channel')->index();
             $table->string('message_type')->index();
-
             $table->string('purpose')->index();
             $table->string('scope')->index();
-
             $table->string('payload_class');
             $table->string('queue')->nullable()->index();
-
             $table->json('dispatch_keys')->nullable();
             $table->string('definition_config_path')->nullable()->index();
-
             $table->json('payload');
-
             $table->timestamp('send_at')->index();
-
-            $table->string('status')
-                ->default('pending')
-                ->index();
-
-            $table->timestamp('sending_at')->nullable()->index();
-            $table->timestamp('last_attempted_at')->nullable()->index();
-            $table->unsignedInteger('send_attempts')->default(0);
-
-            $table->string('provider', 64)->nullable()->index();
-            $table->string('provider_message_id', 191)->nullable()->index();
-
-            $table->timestamp('sent_at')->nullable()->index();
-            $table->timestamp('skipped_at')->nullable()->index();
-            $table->timestamp('failed_at')->nullable()->index();
-
-            $table->string('dedupe_key')
-                ->nullable()
-                ->unique();
-
-            $table->text('failure_reason')->nullable();
-            $table->text('skip_reason')->nullable();
-
+            $table->string('status')->default('pending')->index();
             $table->string('provider_idempotency_key', 128)
                 ->nullable()
                 ->unique('scheduled_messages_provider_idempotency_key_unique');
-
+            $table->string('dedupe_key')->nullable()->unique();
             $table->json('meta')->nullable();
-
             $table->timestamps();
 
             $table->index([

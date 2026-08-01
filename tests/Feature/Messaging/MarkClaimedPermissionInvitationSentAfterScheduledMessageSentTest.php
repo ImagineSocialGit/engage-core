@@ -4,7 +4,7 @@ namespace Tests\Feature\Messaging;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
-use App\Modules\Messaging\Events\ScheduledMessageFailed;
+use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
@@ -12,17 +12,16 @@ use App\Modules\Messaging\Services\ContactPermissionInvitationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailedTest extends TestCase
+class MarkClaimedPermissionInvitationSentAfterScheduledMessageSentTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_claimed_invitation_uses_the_terminal_event_failure_reason(): void
+    public function test_claimed_invitation_uses_the_terminal_event_occurrence(): void
     {
         $contact = Contact::factory()->create([
             'source' => 'import',
-            'email' => 'failed-import@example.test',
+            'email' => 'sent-import@example.test',
         ]);
-
         $scheduledMessage = ScheduledMessage::factory()->create([
             'recipient_type' => $contact->getMorphClass(),
             'recipient_id' => $contact->getKey(),
@@ -36,7 +35,7 @@ class MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailedTest exten
                 'subject' => 'Confirm your preferences',
                 'body' => 'Please confirm your communication preferences.',
             ],
-            'status' => ScheduledMessage::STATUS_FAILED,
+            'status' => ScheduledMessage::STATUS_SENT,
             'meta' => [
                 'conditions' => [],
                 'consent_policy' => [
@@ -47,51 +46,42 @@ class MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailedTest exten
                 ],
             ],
         ]);
-
         $invitation = ContactPermissionInvitation::query()->create([
             'contact_id' => $contact->getKey(),
             'scheduled_message_id' => $scheduledMessage->getKey(),
-            'token' => 'failed-claimed-token',
+            'token' => 'sent-claimed-token',
             'channel' => ContactPermissionInvitation::CHANNEL_EMAIL,
             'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
             'status' => ContactPermissionInvitation::STATUS_CLAIMED,
             'claimed_at' => now()->subMinute(),
             'meta' => [],
         ]);
+        $occurredAt = now()->subSeconds(15)->toImmutable();
 
-        $occurredAt = now()->subMinutes(3)->toImmutable();
-
-        event(new ScheduledMessageFailed(
+        event(new ScheduledMessageSent(
             $scheduledMessage,
             new ScheduledMessageTerminalResult(
                 scheduledMessageId: (int) $scheduledMessage->getKey(),
-                status: ScheduledMessage::STATUS_FAILED,
+                status: ScheduledMessage::STATUS_SENT,
                 occurredAt: $occurredAt,
-                deliveryAttemptId: 72,
-                attemptNumber: 3,
+                deliveryAttemptId: 91,
+                attemptNumber: 2,
                 provider: 'permission_invitation_test',
-                reasonCode: 'provider_rejected',
-                reason: 'Authoritative permission invitation failure.',
+                providerMessageId: 'permission-invitation-provider-message',
             ),
         ));
 
         $invitation->refresh();
 
         $this->assertSame(
-            ContactPermissionInvitation::STATUS_FAILED,
+            ContactPermissionInvitation::STATUS_SENT,
             $invitation->status,
         );
         $this->assertSame(
             $occurredAt->copy()->startOfSecond()->toISOString(),
-            $invitation->failed_at?->copy()->startOfSecond()->toISOString(),
+            $invitation->sent_at?->copy()->startOfSecond()->toISOString(),
         );
-        $this->assertSame(
-            'Authoritative permission invitation failure.',
-            $invitation->failure_reason,
-        );
-        $this->assertSame(
-            $scheduledMessage->getKey(),
-            $invitation->scheduled_message_id,
-        );
+        $this->assertNull($invitation->failed_at);
+        $this->assertNull($invitation->failure_reason);
     }
 }

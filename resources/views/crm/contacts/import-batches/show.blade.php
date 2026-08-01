@@ -466,6 +466,14 @@
                                                 $message->message_type === 'imported_contact_permission_invitation'
                                                 && $message->status === 'skipped'
                                             );
+
+                                        $skippedInvitationReason = data_get(
+                                            $skippedInvitation,
+                                            'terminalOutboxEvent.deliveryAttempt.reason',
+                                        ) ?? data_get(
+                                            $skippedInvitation,
+                                            'terminalOutboxEvent.reason',
+                                        );
                                     @endphp
 
                                     <td class="px-6 py-4">
@@ -487,7 +495,7 @@
                                             </span>
                                         @elseif ($skippedInvitation)
                                             <span
-                                                title="{{ $skippedInvitation->skip_reason }}"
+                                                title="{{ $skippedInvitationReason }}"
                                                 class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600"
                                             >
                                                 Cancelled

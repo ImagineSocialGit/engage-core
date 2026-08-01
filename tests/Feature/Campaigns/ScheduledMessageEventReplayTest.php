@@ -8,6 +8,7 @@ use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -75,7 +76,6 @@ class ScheduledMessageEventReplayTest extends TestCase
             'recipient_type' => $contact->getMorphClass(),
             'recipient_id' => $contact->getKey(),
             'status' => ScheduledMessage::STATUS_SENT,
-            'sent_at' => now(),
             'meta' => [
                 'campaign_enrollment_id' => $enrollment->getKey(),
                 'campaign_id' => $campaign->getKey(),
@@ -100,7 +100,14 @@ class ScheduledMessageEventReplayTest extends TestCase
         app()->instance(ScheduleNextCampaignStepAction::class, $nextStep);
 
         $listener = app(ScheduleNextCampaignStepAfterScheduledMessageSent::class);
-        $event = new ScheduledMessageSent($scheduledMessage);
+        $event = new ScheduledMessageSent(
+            $scheduledMessage,
+            new ScheduledMessageTerminalResult(
+                scheduledMessageId: (int) $scheduledMessage->getKey(),
+                status: ScheduledMessage::STATUS_SENT,
+                occurredAt: now()->toImmutable(),
+            ),
+        );
 
         $listener->handle($event);
         $listener->handle($event);

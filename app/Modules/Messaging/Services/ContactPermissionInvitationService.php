@@ -10,6 +10,7 @@ use App\Modules\Messaging\Actions\RecordMessageConsentAction;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Support\AutomationEvents\Data\AutomationEventData;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
+use Carbon\CarbonInterface;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -133,13 +134,12 @@ class ContactPermissionInvitationService
     public function markSent(
         ContactPermissionInvitation $invitation,
         ScheduledMessage $scheduledMessage,
+        ?CarbonInterface $sentAt = null,
     ): void {
-        $sentAt = $scheduledMessage->sent_at ?? now();
-
         $invitation->forceFill([
             'scheduled_message_id' => $scheduledMessage->getKey(),
             'status' => ContactPermissionInvitation::STATUS_SENT,
-            'sent_at' => $sentAt,
+            'sent_at' => $sentAt ?? now(),
             'failed_at' => null,
             'failure_reason' => null,
         ])->save();
@@ -149,11 +149,12 @@ class ContactPermissionInvitationService
         ContactPermissionInvitation $invitation,
         ScheduledMessage $scheduledMessage,
         string $reason,
+        ?CarbonInterface $failedAt = null,
     ): void {
         $invitation->forceFill([
             'scheduled_message_id' => $scheduledMessage->getKey(),
             'status' => ContactPermissionInvitation::STATUS_FAILED,
-            'failed_at' => now(),
+            'failed_at' => $failedAt ?? now(),
             'failure_reason' => $reason,
         ])->save();
     }

@@ -381,17 +381,27 @@ class CampaignVariantDependencyAwareTest extends TestCase
         string $variantKey,
         string $status,
     ): ScheduledMessage {
-        return ScheduledMessage::factory()->create([
+        $factory = match ($status) {
+            ScheduledMessage::STATUS_SENT => ScheduledMessage::factory()->sent(),
+
+            ScheduledMessage::STATUS_SKIPPED => ScheduledMessage::factory()
+                ->skipped('Campaign dependency fixture skipped.'),
+
+            ScheduledMessage::STATUS_FAILED => ScheduledMessage::factory()
+                ->failed('Campaign dependency fixture failed.'),
+
+            default => ScheduledMessage::factory()->state([
+                'status' => $status,
+            ]),
+        };
+
+        return $factory->create([
             'recipient_type' => Contact::class,
             'recipient_id' => $contact->id,
             'channel' => $variantKey === 'sms' ? 'sms' : 'email',
             'purpose' => 'marketing',
             'scope' => 'webinar_nurture',
             'message_type' => 'webinar_attended_nurture_step_'.$step->step_number,
-            'status' => $status,
-            'sent_at' => $status === ScheduledMessage::STATUS_SENT ? now() : null,
-            'skipped_at' => $status === ScheduledMessage::STATUS_SKIPPED ? now() : null,
-            'failed_at' => $status === ScheduledMessage::STATUS_FAILED ? now() : null,
             'meta' => [
                 'campaign_enrollment_id' => $enrollment->id,
                 'campaign_id' => $enrollment->campaign_id,

@@ -39,6 +39,7 @@ class MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailed
                 invitation: $invitation,
                 scheduledMessage: $scheduledMessage,
                 reason: $reason,
+                failedAt: $event->terminalResult->occurredAt,
             );
         });
     }

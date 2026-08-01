@@ -6,7 +6,6 @@ use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Models\ScheduledMessageDeliveryAttempt;
 use App\Modules\Messaging\Models\ScheduledMessageOutboxEvent;
 use Carbon\CarbonImmutable;
-use Carbon\CarbonInterface;
 use InvalidArgumentException;
 use LogicException;
 
@@ -43,21 +42,23 @@ final readonly class ScheduledMessageTerminalResult
                 ->with('deliveryAttempt')
                 ->first();
 
-        if ($outboxEvent instanceof ScheduledMessageOutboxEvent) {
-            if ($scheduledMessage->status !== $outboxEvent->event_type) {
-                throw new LogicException(
-                    "ScheduledMessage [{$scheduledMessage->getKey()}] status [{$scheduledMessage->status}] does not match terminal outbox event [{$outboxEvent->event_type}].",
-                );
-            }
-
-            if (! $outboxEvent->relationLoaded('deliveryAttempt')) {
-                $outboxEvent->load('deliveryAttempt');
-            }
-
-            return self::fromOutboxEvent($outboxEvent);
+        if (! $outboxEvent instanceof ScheduledMessageOutboxEvent) {
+            throw new LogicException(
+                "ScheduledMessage [{$scheduledMessage->getKey()}] has no durable terminal outbox event.",
+            );
         }
 
-        return self::fromLegacyScheduledMessage($scheduledMessage);
+        if ($scheduledMessage->status !== $outboxEvent->event_type) {
+            throw new LogicException(
+                "ScheduledMessage [{$scheduledMessage->getKey()}] status [{$scheduledMessage->status}] does not match terminal outbox event [{$outboxEvent->event_type}].",
+            );
+        }
+
+        if (! $outboxEvent->relationLoaded('deliveryAttempt')) {
+            $outboxEvent->load('deliveryAttempt');
+        }
+
+        return self::fromOutboxEvent($outboxEvent);
     }
 
     public static function fromOutboxEvent(
@@ -111,41 +112,6 @@ final readonly class ScheduledMessageTerminalResult
         return $this->status === ScheduledMessage::STATUS_FAILED;
     }
 
-    private static function fromLegacyScheduledMessage(
-        ScheduledMessage $scheduledMessage,
-    ): self {
-        $status = (string) $scheduledMessage->status;
-        $attempt = self::terminalAttempt($scheduledMessage);
-        $occurredAt = $attempt?->completed_at
-            ?? self::terminalTimestamp($scheduledMessage)
-            ?? $scheduledMessage->updated_at
-            ?? now();
-
-        return new self(
-            scheduledMessageId: (int) $scheduledMessage->getKey(),
-            status: $status,
-            occurredAt: CarbonImmutable::instance($occurredAt),
-            deliveryAttemptId: $attempt?->getKey() !== null
-                ? (int) $attempt->getKey()
-                : null,
-            attemptNumber: $attempt?->attempt_number !== null
-                ? (int) $attempt->attempt_number
-                : null,
-            provider: self::normalizedString(
-                $attempt?->provider ?? $scheduledMessage->provider,
-            ),
-            providerMessageId: self::normalizedString(
-                $attempt?->provider_message_id
-                    ?? $scheduledMessage->provider_message_id,
-            ),
-            reasonCode: self::normalizedString($attempt?->reason_code),
-            reason: self::terminalReason(
-                scheduledMessage: $scheduledMessage,
-                attempt: $attempt,
-            ),
-        );
-    }
-
     private static function assertAttemptMatches(
         ScheduledMessageOutboxEvent $outboxEvent,
         mixed $attempt,
@@ -190,67 +156,6 @@ final readonly class ScheduledMessageTerminalResult
                 "ScheduledMessage delivery attempt [{$attempt->getKey()}] is not the matching terminal attempt for [{$outboxEvent->event_type}].",
             );
         }
-    }
-
-    private static function terminalAttempt(
-        ScheduledMessage $scheduledMessage,
-    ): ?ScheduledMessageDeliveryAttempt {
-        $expectedStatus = match ($scheduledMessage->status) {
-            ScheduledMessage::STATUS_SENT => ScheduledMessageDeliveryAttempt::STATUS_SENT,
-            ScheduledMessage::STATUS_SKIPPED => ScheduledMessageDeliveryAttempt::STATUS_SKIPPED,
-            ScheduledMessage::STATUS_FAILED => ScheduledMessageDeliveryAttempt::STATUS_FAILED,
-            default => throw new InvalidArgumentException(
-                "ScheduledMessage [{$scheduledMessage->getKey()}] is not terminal.",
-            ),
-        };
-        $loadedAttempt = $scheduledMessage->relationLoaded('latestDeliveryAttempt')
-            ? $scheduledMessage->getRelation('latestDeliveryAttempt')
-            : null;
-
-        if ($loadedAttempt instanceof ScheduledMessageDeliveryAttempt
-            && $loadedAttempt->status === $expectedStatus
-        ) {
-            return $loadedAttempt;
-        }
-
-        return ScheduledMessageDeliveryAttempt::query()
-            ->where('scheduled_message_id', $scheduledMessage->getKey())
-            ->where('status', $expectedStatus)
-            ->orderByDesc('attempt_number')
-            ->first();
-    }
-
-    private static function terminalTimestamp(
-        ScheduledMessage $scheduledMessage,
-    ): ?CarbonInterface {
-        return match ($scheduledMessage->status) {
-            ScheduledMessage::STATUS_SENT => $scheduledMessage->sent_at,
-            ScheduledMessage::STATUS_SKIPPED => $scheduledMessage->skipped_at,
-            ScheduledMessage::STATUS_FAILED => $scheduledMessage->failed_at,
-            default => throw new InvalidArgumentException(
-                "ScheduledMessage [{$scheduledMessage->getKey()}] is not terminal.",
-            ),
-        };
-    }
-
-    private static function terminalReason(
-        ScheduledMessage $scheduledMessage,
-        ?ScheduledMessageDeliveryAttempt $attempt,
-    ): ?string {
-        if ($scheduledMessage->status === ScheduledMessage::STATUS_SENT) {
-            return null;
-        }
-
-        return self::normalizedString($attempt?->reason)
-            ?? match ($scheduledMessage->status) {
-                ScheduledMessage::STATUS_SKIPPED => self::normalizedString(
-                    $scheduledMessage->skip_reason,
-                ),
-                ScheduledMessage::STATUS_FAILED => self::normalizedString(
-                    $scheduledMessage->failure_reason,
-                ),
-                default => null,
-            };
     }
 
     private static function normalizedString(mixed $value): ?string

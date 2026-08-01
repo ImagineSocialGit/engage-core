@@ -156,14 +156,17 @@ class DeactivateCampaignActionTest extends TestCase
 
             $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $message->status);
             $this->assertSame(DeactivateCampaignAction::REASON, $terminalResult->reason);
-            $this->assertNull($message->skip_reason);
-            $this->assertNull($message->skipped_at);
         }
 
         $this->assertSame(ScheduledMessage::STATUS_SENDING, $sending->refresh()->status);
         $this->assertSame(ScheduledMessage::STATUS_SENT, $sent->refresh()->status);
         $this->assertSame(ScheduledMessage::STATUS_FAILED, $failed->refresh()->status);
-        $this->assertSame('previous_reason', $previouslySkipped->refresh()->skip_reason);
+        $previouslySkipped->refresh();
+        $previousTerminalResult = ScheduledMessageTerminalResult::fromScheduledMessage(
+            $previouslySkipped->load('terminalOutboxEvent.deliveryAttempt'),
+        );
+
+        $this->assertSame('previous_reason', $previousTerminalResult->reason);
         $this->assertSame(ScheduledMessage::STATUS_PENDING, $unrelatedPending->refresh()->status);
 
         $secondResult = app(DeactivateCampaignAction::class)->handle(

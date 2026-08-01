@@ -39,7 +39,7 @@ class ContactScheduledMessagesVisibilityDataProvider implements ContactShowDataP
             ->get();
 
         $recentMessages = (clone $baseQuery)
-            ->with('latestDeliveryAttempt')
+            ->with('terminalOutboxEvent.deliveryAttempt')
             ->whereIn('status', ['sent', 'failed', 'skipped'])
             ->latest('updated_at')
             ->limit(10)

@@ -7,6 +7,7 @@ use App\Modules\Messaging\Actions\ProcessMessageChainEnrollmentAction;
 use App\Modules\Messaging\Actions\PublishMessageChainVersionAction;
 use App\Modules\Messaging\Actions\PublishMessageTemplateVersionAction;
 use App\Modules\Messaging\Actions\StartMessageChainEnrollmentAction;
+use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Jobs\ProcessDueMessageChainEnrollmentsJob;
@@ -434,23 +435,41 @@ class MessageChainEnrollmentRunnerTest extends TestCase
     private function markSent(
         ScheduledMessage $message,
     ): void {
+        $occurredAt = now()->toImmutable();
+
         $message->forceFill([
             'status' => ScheduledMessage::STATUS_SENT,
-            'sent_at' => now(),
         ])->save();
 
-        event(new ScheduledMessageSent($message->fresh()));
+        event(new ScheduledMessageSent(
+            $message->fresh(),
+            new ScheduledMessageTerminalResult(
+                scheduledMessageId: (int) $message->getKey(),
+                status: ScheduledMessage::STATUS_SENT,
+                occurredAt: $occurredAt,
+            ),
+        ));
     }
 
     private function markSkipped(
         ScheduledMessage $message,
     ): void {
+        $occurredAt = now()->toImmutable();
+
         $message->forceFill([
             'status' => ScheduledMessage::STATUS_SKIPPED,
-            'skipped_at' => now(),
         ])->save();
 
-        event(new ScheduledMessageSkipped($message->fresh()));
+        event(new ScheduledMessageSkipped(
+            $message->fresh(),
+            new ScheduledMessageTerminalResult(
+                scheduledMessageId: (int) $message->getKey(),
+                status: ScheduledMessage::STATUS_SKIPPED,
+                occurredAt: $occurredAt,
+                reasonCode: 'test_step_skipped',
+                reason: 'Test step skipped.',
+            ),
+        ));
     }
 
     protected function tearDown(): void

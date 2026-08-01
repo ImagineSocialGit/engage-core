@@ -6,6 +6,7 @@ use App\Modules\Messaging\Actions\ClaimScheduledMessageForSendingAction;
 use App\Modules\Messaging\Contracts\Email\EmailMessage;
 use App\Modules\Messaging\Contracts\Sms\SmsMessage;
 use App\Modules\Messaging\Data\Delivery\MessageSendResult;
+use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\ScheduledMessage;
@@ -189,7 +190,13 @@ class SendScheduledMessageJob implements ShouldQueue
             }
 
             if ($permissionInvitation) {
-                $permissionInvitationService->markSent($permissionInvitation, $scheduledMessage);
+                $terminalResult = $this->terminalResult($scheduledMessage);
+
+                $permissionInvitationService->markSent(
+                    invitation: $permissionInvitation,
+                    scheduledMessage: $scheduledMessage,
+                    sentAt: $terminalResult->occurredAt,
+                );
             }
         } catch (Throwable $exception) {
             if (! $deliveryLeaseManager->ownsActiveClaim($deliveryAttempt)) {
@@ -472,10 +479,29 @@ class SendScheduledMessageJob implements ShouldQueue
             return;
         }
 
+        $terminalResult = $this->terminalResult($currentMessage);
+
         $permissionInvitationService->markFailed(
             invitation: $permissionInvitation,
             scheduledMessage: $scheduledMessage,
-            reason: $reason,
+            reason: $terminalResult->reason ?? $reason,
+            failedAt: $terminalResult->occurredAt,
+        );
+    }
+
+    private function terminalResult(
+        ScheduledMessage $scheduledMessage,
+    ): ScheduledMessageTerminalResult {
+        $currentMessage = $scheduledMessage->fresh();
+
+        if (! $currentMessage instanceof ScheduledMessage) {
+            throw new RuntimeException(
+                "ScheduledMessage [{$scheduledMessage->getKey()}] no longer exists.",
+            );
+        }
+
+        return ScheduledMessageTerminalResult::fromScheduledMessage(
+            $currentMessage->load('terminalOutboxEvent.deliveryAttempt'),
         );
     }
 }

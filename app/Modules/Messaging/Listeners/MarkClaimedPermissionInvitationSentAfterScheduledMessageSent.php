@@ -33,6 +33,7 @@ class MarkClaimedPermissionInvitationSentAfterScheduledMessageSent
             $this->permissionInvitationService->markSent(
                 invitation: $invitation,
                 scheduledMessage: $scheduledMessage,
+                sentAt: $event->terminalResult->occurredAt,
             );
         });
     }

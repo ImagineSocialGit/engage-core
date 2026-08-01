@@ -32,7 +32,7 @@ class ContactImportBatchController extends Controller
             $contactsQuery->with([
                 'messageConsents',
                 'permissionInvitations',
-                'scheduledMessages',
+                'scheduledMessages.terminalOutboxEvent.deliveryAttempt',
             ]);
         }
 

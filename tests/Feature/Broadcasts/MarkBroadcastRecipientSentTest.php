@@ -28,13 +28,11 @@ class MarkBroadcastRecipientSentTest extends TestCase
             'contact_id' => $contact->id,
         ]);
 
-        $scheduledMessage = ScheduledMessage::factory()->create([
+        $scheduledMessage = ScheduledMessage::factory()->sent()->create([
             'recipient_type' => $contact->getMorphClass(),
             'recipient_id' => $contact->id,
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
-            'status' => ScheduledMessage::STATUS_SENT,
-            'sent_at' => now(),
             'meta' => [
                 'broadcast_id' => $broadcast->id,
                 'broadcast_recipient_id' => $recipient->id,
@@ -70,13 +68,11 @@ class MarkBroadcastRecipientSentTest extends TestCase
             'broadcast_id' => $broadcast->id,
         ]);
 
-        $scheduledMessage = ScheduledMessage::factory()->create([
+        $scheduledMessage = ScheduledMessage::factory()->sent()->create([
             'recipient_type' => $contact->getMorphClass(),
             'recipient_id' => $contact->id,
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
-            'status' => ScheduledMessage::STATUS_SENT,
-            'sent_at' => now(),
             'meta' => [
                 'broadcast_recipient_id' => $recipient->id,
             ],
@@ -106,13 +102,11 @@ class MarkBroadcastRecipientSentTest extends TestCase
             'broadcast_id' => $broadcast->id,
         ]);
 
-        $scheduledMessage = ScheduledMessage::factory()->create([
+        $scheduledMessage = ScheduledMessage::factory()->sent()->create([
             'recipient_type' => $contact->getMorphClass(),
             'recipient_id' => $contact->id,
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
-            'status' => ScheduledMessage::STATUS_SENT,
-            'sent_at' => now(),
             'meta' => [
                 'broadcast_recipient_id' => $recipient->id,
             ],
@@ -138,13 +132,11 @@ class MarkBroadcastRecipientSentTest extends TestCase
             'contact_id' => $contact->id,
         ]);
 
-        $scheduledMessage = ScheduledMessage::factory()->create([
+        $scheduledMessage = ScheduledMessage::factory()->sent()->create([
             'recipient_type' => $contact->getMorphClass(),
             'recipient_id' => $contact->id,
             'context_type' => Contact::class,
             'context_id' => $contact->id,
-            'status' => ScheduledMessage::STATUS_SENT,
-            'sent_at' => now(),
         ]);
 
         app(MarkBroadcastRecipientSent::class)->handle(

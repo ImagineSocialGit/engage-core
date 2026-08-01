@@ -81,15 +81,14 @@ class CampaignScheduledMessageTerminalReconciliationTest extends TestCase
             'campaign_step_waits_for_all_scheduled_variants' => true,
         ];
 
-        $failedMessage = ScheduledMessage::factory()->create([
+        $failedMessage = ScheduledMessage::factory()->failed(
+            'Legacy provider rejection.',
+        )->create([
             'recipient_type' => Contact::class,
             'recipient_id' => $contact->id,
             'channel' => 'email',
             'purpose' => 'marketing',
             'scope' => 'campaign',
-            'status' => ScheduledMessage::STATUS_FAILED,
-            'failed_at' => now()->subHour(),
-            'failure_reason' => 'Legacy provider rejection.',
             'meta' => array_replace($messageMeta, [
                 'campaign_step_variant_key' => 'email',
             ]),
@@ -102,7 +101,6 @@ class CampaignScheduledMessageTerminalReconciliationTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'campaign',
             'status' => ScheduledMessage::STATUS_SENDING,
-            'sending_at' => now(),
             'meta' => array_replace($messageMeta, [
                 'campaign_step_variant_key' => 'sms',
             ]),
@@ -165,13 +163,20 @@ class CampaignScheduledMessageTerminalReconciliationTest extends TestCase
             ),
         );
 
+        $sentOccurredAt = now()->toImmutable();
+
         $sendingSibling->forceFill([
             'status' => ScheduledMessage::STATUS_SENT,
-            'sending_at' => null,
-            'sent_at' => now(),
         ])->save();
 
-        event(new ScheduledMessageSent($sendingSibling));
+        event(new ScheduledMessageSent(
+            $sendingSibling,
+            new ScheduledMessageTerminalResult(
+                scheduledMessageId: (int) $sendingSibling->getKey(),
+                status: ScheduledMessage::STATUS_SENT,
+                occurredAt: $sentOccurredAt,
+            ),
+        ));
 
         $enrollment->refresh();
 
