@@ -18,13 +18,15 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
     public function test_standard_message_resolution_prefers_active_assignment_before_config(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Config subject',
-                    'body' => 'Config body.',
+            'default' => [
+                'confirmation' => [
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Config subject',
+                        'body' => 'Config body.',
+                    ],
                 ],
             ],
         ]);
@@ -42,7 +44,7 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
                 'subject' => 'DB subject',
                 'body' => 'DB body.',
             ],
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmation',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.confirmation',
         ]);
 
         MessageTemplatePresetAssignment::factory()
@@ -127,13 +129,15 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
     public function test_resolution_falls_back_to_config_when_no_assignment_exists(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Config subject',
-                    'body' => 'Config body.',
+            'default' => [
+                'confirmation' => [
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Config subject',
+                        'body' => 'Config body.',
+                    ],
                 ],
             ],
         ]);
@@ -146,19 +150,21 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
 
         $this->assertCount(1, $definitions);
         $this->assertSame('Config subject', $definitions[0]['payload']['subject']);
-        $this->assertSame('messaging.email.definitions.transactional.webinar.confirmation', $definitions[0]['config_path']);
+        $this->assertSame('messaging.email.definitions.transactional.webinar.default.confirmation', $definitions[0]['config_path']);
     }
 
     public function test_standard_resolution_uses_newest_active_assignment_for_same_message_context(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Config subject',
-                    'body' => 'Config body.',
+            'default' => [
+                'confirmation' => [
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Config subject',
+                        'body' => 'Config body.',
+                    ],
                 ],
             ],
         ]);
@@ -215,13 +221,15 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
     public function test_expired_assignment_is_ignored_and_resolution_falls_back_to_config(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Config subject',
-                    'body' => 'Config body.',
+            'default' => [
+                'confirmation' => [
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Config subject',
+                        'body' => 'Config body.',
+                    ],
                 ],
             ],
         ]);
@@ -255,12 +263,12 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
 
         $this->assertCount(1, $definitions);
         $this->assertSame('Config subject', $definitions[0]['payload']['subject']);
-        $this->assertSame('messaging.email.definitions.transactional.webinar.confirmation', $definitions[0]['config_path']);
+        $this->assertSame('messaging.email.definitions.transactional.webinar.default.confirmation', $definitions[0]['config_path']);
     }
 
     public function test_standard_resolution_uses_semantically_keyed_synced_assignment_before_config(): void
     {
-        $sourceConfigPath = 'messaging.email.definitions.transactional.webinar.confirmation';
+        $sourceConfigPath = 'messaging.email.definitions.transactional.webinar.default.confirmation';
 
         Config::set($sourceConfigPath, [
             'key' => 'confirmation',
@@ -321,7 +329,7 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
 
     public function test_manual_standard_assignment_overrides_seed_assignment_for_same_semantic_definition(): void
     {
-        $sourceConfigPath = 'messaging.email.definitions.transactional.webinar.confirmation';
+        $sourceConfigPath = 'messaging.email.definitions.transactional.webinar.default.confirmation';
 
         Config::set($sourceConfigPath, [
             'key' => 'confirmation',
@@ -406,25 +414,27 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
     public function test_standard_assignments_preserve_multiple_list_definitions_by_semantic_key(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'reminders' => [
-                [
-                    'key' => 'reminder_10_day',
-                    'dispatch_key' => 'registration_created',
-                    'payload_class' => EmailPayload::class,
-                    'queue' => 'reminders',
-                    'payload' => [
-                        'subject' => 'Config first reminder',
-                        'body' => 'Config first body.',
+            'default' => [
+                'reminders' => [
+                    [
+                        'key' => 'reminder_10_day',
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'reminders',
+                        'payload' => [
+                            'subject' => 'Config first reminder',
+                            'body' => 'Config first body.',
+                        ],
                     ],
-                ],
-                [
-                    'key' => 'reminder_1_day',
-                    'dispatch_key' => 'registration_created',
-                    'payload_class' => EmailPayload::class,
-                    'queue' => 'reminders',
-                    'payload' => [
-                        'subject' => 'Config second reminder',
-                        'body' => 'Config second body.',
+                    [
+                        'key' => 'reminder_1_day',
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'reminders',
+                        'payload' => [
+                            'subject' => 'Config second reminder',
+                            'body' => 'Config second body.',
+                        ],
                     ],
                 ],
             ],
@@ -442,7 +452,7 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
                 'subject' => 'DB second reminder',
             ],
         ] as $definition) {
-            $sourceConfigPath = 'messaging.email.definitions.transactional.webinar.reminders.'.$definition['index'];
+            $sourceConfigPath = 'messaging.email.definitions.transactional.webinar.default.reminders.'.$definition['index'];
 
             $preset = MessageTemplatePreset::factory()->create([
                 'key' => 'email.transactional.webinar.'.$definition['key'],
@@ -489,25 +499,27 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
     public function test_exact_manual_reminder_assignment_preserves_sibling_reminder_definitions(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'reminders' => [
-                [
-                    'key' => 'reminder_10_day',
-                    'dispatch_key' => 'registration_created',
-                    'payload_class' => EmailPayload::class,
-                    'queue' => 'reminders',
-                    'payload' => [
-                        'subject' => 'Config ten day',
-                        'body' => 'Config ten day body.',
+            'default' => [
+                'reminders' => [
+                    [
+                        'key' => 'reminder_10_day',
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'reminders',
+                        'payload' => [
+                            'subject' => 'Config ten day',
+                            'body' => 'Config ten day body.',
+                        ],
                     ],
-                ],
-                [
-                    'key' => 'reminder_1_day',
-                    'dispatch_key' => 'registration_created',
-                    'payload_class' => EmailPayload::class,
-                    'queue' => 'reminders',
-                    'payload' => [
-                        'subject' => 'Config one day',
-                        'body' => 'Config one day body.',
+                    [
+                        'key' => 'reminder_1_day',
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'reminders',
+                        'payload' => [
+                            'subject' => 'Config one day',
+                            'body' => 'Config one day body.',
+                        ],
                     ],
                 ],
             ],
@@ -519,7 +531,7 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
             ['index' => 0, 'key' => 'reminder_10_day', 'subject' => 'Seed ten day'],
             ['index' => 1, 'key' => 'reminder_1_day', 'subject' => 'Seed one day'],
         ] as $definition) {
-            $sourceConfigPath = 'messaging.email.definitions.transactional.webinar.reminders.'.$definition['index'];
+            $sourceConfigPath = 'messaging.email.definitions.transactional.webinar.default.reminders.'.$definition['index'];
             $preset = MessageTemplatePreset::factory()->create([
                 'key' => 'email.transactional.webinar.'.$definition['key'],
                 'channel' => 'email',
@@ -574,7 +586,7 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
             scope: 'webinar',
             surface: 'webinar_registrations',
             messageType: 'reminder',
-            sourceConfigPath: 'messaging.email.definitions.transactional.webinar.reminders.0',
+            sourceConfigPath: 'messaging.email.definitions.transactional.webinar.default.reminders.0',
             definitionKey: 'reminder_10_day',
         );
 
@@ -586,7 +598,7 @@ class MessageTemplatePresetAssignmentResolverTest extends TestCase
 
         $this->assertDatabaseCount('message_template_preset_assignments', 2);
         $this->assertCount(2, $definitions);
-        $this->assertSame([
+        $this->assertEquals([
             'reminder_10_day' => 'Custom ten day',
             'reminder_1_day' => 'Seed one day',
         ], collect($definitions)->mapWithKeys(

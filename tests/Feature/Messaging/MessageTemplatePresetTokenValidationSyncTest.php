@@ -25,16 +25,18 @@ class MessageTemplatePresetTokenValidationSyncTest extends TestCase
     public function test_config_sync_rejects_invalid_tokens_before_persisting_presets(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmations' => [[
-                'key' => 'confirmation',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Registered',
-                    'body' => 'Continue here: {not_a_real_token}',
-                ],
-            ]],
+            'default' => [
+                'confirmations' => [[
+                    'key' => 'confirmation',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Registered',
+                        'body' => 'Continue here: {not_a_real_token}',
+                    ],
+                ]],
+            ],
         ]);
 
         try {
@@ -51,16 +53,18 @@ class MessageTemplatePresetTokenValidationSyncTest extends TestCase
     public function test_config_sync_uses_the_same_registry_backed_validation_and_token_extraction(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmations' => [[
-                'key' => 'confirmation',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Registered for {webinar_title}',
-                    'body' => 'Hi {first_name}. Join: {webinar_join_url}',
-                ],
-            ]],
+            'default' => [
+                'confirmations' => [[
+                    'key' => 'confirmation',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Registered for {webinar_title}',
+                        'body' => 'Hi {first_name}. Join: {webinar_join_url}',
+                    ],
+                ]],
+            ],
         ]);
 
         $result = app(SyncMessageTemplatePresetsAction::class)->handle();

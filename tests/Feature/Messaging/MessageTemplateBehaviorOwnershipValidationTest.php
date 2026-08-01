@@ -12,16 +12,18 @@ class MessageTemplateBehaviorOwnershipValidationTest extends TestCase
     public function test_reusable_message_template_rejects_timing_schedule_and_conditions(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'notifications',
-                'timing' => 'scheduled',
-                'schedule' => ['type' => 'delay', 'minutes' => 10],
-                'conditions' => [['field' => 'webinar.starts_at', 'operator' => 'filled']],
-                'payload' => [
-                    'subject' => 'Registered',
-                    'body' => 'Thanks',
+            'default' => [
+                'confirmation' => [
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'notifications',
+                    'timing' => 'scheduled',
+                    'schedule' => ['type' => 'delay', 'minutes' => 10],
+                    'conditions' => [['field' => 'webinar.starts_at', 'operator' => 'filled']],
+                    'payload' => [
+                        'subject' => 'Registered',
+                        'body' => 'Thanks',
+                    ],
                 ],
             ],
         ]);
@@ -42,13 +44,15 @@ class MessageTemplateBehaviorOwnershipValidationTest extends TestCase
     public function test_content_only_reusable_message_template_is_valid(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'notifications',
-                'payload' => [
-                    'subject' => 'Registered',
-                    'body' => 'Thanks',
+            'default' => [
+                'confirmation' => [
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'notifications',
+                    'payload' => [
+                        'subject' => 'Registered',
+                        'body' => 'Thanks',
+                    ],
                 ],
             ],
         ]);
@@ -59,7 +63,6 @@ class MessageTemplateBehaviorOwnershipValidationTest extends TestCase
             scope: 'webinar',
         );
 
-        $this->assertSame([], $issues);
+        $this->assertEquals([], $issues);
     }
 }
-

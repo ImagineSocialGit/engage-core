@@ -80,18 +80,20 @@ class MessagingConfigContractTargetProviderTest extends TestCase
                     'definitions' => [
                         'transactional' => [
                             'webinar' => [
-                                'reminder' => [
-                                    [
-                                        'dispatch_key' => 'reminder_one',
-                                        'payload_class' => 'FirstPayload',
-                                        'queue' => 'messages',
-                                        'payload' => ['subject' => 'One', 'body' => 'One'],
-                                    ],
-                                    [
-                                        'dispatch_key' => 'reminder_two',
-                                        'payload_class' => 'SecondPayload',
-                                        'queue' => 'messages',
-                                        'payload' => ['subject' => 'Two', 'body' => 'Two'],
+                                'default' => [
+                                    'reminder' => [
+                                        [
+                                            'dispatch_key' => 'reminder_one',
+                                            'payload_class' => 'FirstPayload',
+                                            'queue' => 'messages',
+                                            'payload' => ['subject' => 'One', 'body' => 'One'],
+                                        ],
+                                        [
+                                            'dispatch_key' => 'reminder_two',
+                                            'payload_class' => 'SecondPayload',
+                                            'queue' => 'messages',
+                                            'payload' => ['subject' => 'Two', 'body' => 'Two'],
+                                        ],
                                     ],
                                 ],
                             ],
@@ -109,11 +111,11 @@ class MessagingConfigContractTargetProviderTest extends TestCase
 
         $this->assertNotNull($targets->firstWhere(
             'path',
-            'messaging.email.definitions.transactional.webinar.reminder.0',
+            'messaging.email.definitions.transactional.webinar.default.reminder.0',
         ));
         $this->assertNotNull($targets->firstWhere(
             'path',
-            'messaging.email.definitions.transactional.webinar.reminder.1',
+            'messaging.email.definitions.transactional.webinar.default.reminder.1',
         ));
     }
 
@@ -137,13 +139,15 @@ class MessagingConfigContractTargetProviderTest extends TestCase
                     'definitions' => [
                         'transactional' => [
                             'webinar' => [
-                                'confirmation' => [
-                                    'dispatch_key' => 'registration_created',
-                                    'payload_class' => 'EmailPayload',
-                                    'queue' => 'messages',
-                                    'payload' => [
-                                        'subject' => 'Registered',
-                                        'body' => 'Thanks',
+                                'default' => [
+                                    'confirmation' => [
+                                        'dispatch_key' => 'registration_created',
+                                        'payload_class' => 'EmailPayload',
+                                        'queue' => 'messages',
+                                        'payload' => [
+                                            'subject' => 'Registered',
+                                            'body' => 'Thanks',
+                                        ],
                                     ],
                                 ],
                             ],
@@ -164,7 +168,7 @@ class MessagingConfigContractTargetProviderTest extends TestCase
 
         $this->assertNotNull($targets->firstWhere(
             'path',
-            'messaging.email.definitions.transactional.webinar.confirmation',
+            'messaging.email.definitions.transactional.webinar.default.confirmation',
         ));
 
         $this->assertNull($targets->firstWhere('path', 'messaging.email.from.marketing.address'));

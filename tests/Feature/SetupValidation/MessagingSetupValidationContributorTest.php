@@ -22,19 +22,21 @@ class MessagingSetupValidationContributorTest extends TestCase
     public function test_registry_backed_webinar_aliases_are_accepted_by_setup_validation(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmations' => [[
-                'dispatch_key' => 'registration_created',
-                'payload_class' => TestContributorEmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => '{webinar_title}',
-                    'body' => "Hi {first_name}.\n{cta}",
-                    'cta' => [
-                        'label' => 'Join',
-                        'url' => '{webinar_join_url}',
+            'default' => [
+                'confirmations' => [[
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => TestContributorEmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => '{webinar_title}',
+                        'body' => "Hi {first_name}.\n{cta}",
+                        'cta' => [
+                            'label' => 'Join',
+                            'url' => '{webinar_join_url}',
+                        ],
                     ],
-                ],
-            ]],
+                ]],
+            ],
         ]);
 
         $tokenFindings = collect(app(MessagingSetupValidationContributor::class)->findings())
@@ -50,15 +52,17 @@ class MessagingSetupValidationContributorTest extends TestCase
         ]);
 
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmations' => [[
-                'dispatch_key' => 'registration_created',
-                'payload_class' => TestContributorEmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => '{invented_token}',
-                    'body' => 'Join us.',
-                ],
-            ]],
+            'default' => [
+                'confirmations' => [[
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => TestContributorEmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => '{invented_token}',
+                        'body' => 'Join us.',
+                    ],
+                ]],
+            ],
         ]);
 
         $finding = collect(app(MessagingSetupValidationContributor::class)->findings())
@@ -72,15 +76,17 @@ class MessagingSetupValidationContributorTest extends TestCase
     public function test_registered_but_unavailable_tokens_block_setup_validation(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmations' => [[
-                'dispatch_key' => 'registration_created',
-                'payload_class' => TestContributorEmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Registered',
-                    'body' => 'Replay: {webinar_playback_url}',
-                ],
-            ]],
+            'default' => [
+                'confirmations' => [[
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => TestContributorEmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Registered',
+                        'body' => 'Replay: {webinar_playback_url}',
+                    ],
+                ]],
+            ],
         ]);
 
         $finding = collect(app(MessagingSetupValidationContributor::class)->findings())

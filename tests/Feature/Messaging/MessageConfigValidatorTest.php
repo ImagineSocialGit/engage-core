@@ -48,19 +48,21 @@ class MessageConfigValidatorTest extends TestCase
             scope: 'webinar_nurture',
         );
 
-        $this->assertSame([], $issues);
+        $this->assertEquals([], $issues);
     }
 
     public function test_it_reports_invalid_definition_shape(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmations' => [
-                [
-                    'dispatch_key' => 'registration_created',
-                    'payload_class' => 'Missing\\Payload',
-                    'queue' => '',
-                    'payload' => [
-                        'subject' => '',
+            'default' => [
+                'confirmations' => [
+                    [
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => 'Missing\\Payload',
+                        'queue' => '',
+                        'payload' => [
+                            'subject' => '',
+                        ],
                     ],
                 ],
             ],
@@ -82,14 +84,16 @@ class MessageConfigValidatorTest extends TestCase
     public function test_it_reports_unknown_payload_tokens_as_errors_without_a_caller_allowlist(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmations' => [
-                [
-                    'dispatch_key' => 'registration_created',
-                    'payload_class' => EmailPayload::class,
-                    'queue' => 'confirmation_messages',
-                    'payload' => [
-                        'subject' => 'Registered for {webinar_title}',
-                        'body' => 'Continue here: {next_step_url}',
+            'default' => [
+                'confirmations' => [
+                    [
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'confirmation_messages',
+                        'payload' => [
+                            'subject' => 'Registered for {webinar_title}',
+                            'body' => 'Continue here: {next_step_url}',
+                        ],
                     ],
                 ],
             ],
@@ -108,7 +112,7 @@ class MessageConfigValidatorTest extends TestCase
         $this->assertNotNull($tokenIssue);
         $this->assertSame('error', $tokenIssue['level']);
         $this->assertSame(
-            'messaging.email.definitions.transactional.webinar.confirmations.0.payload.body',
+            'messaging.email.definitions.transactional.webinar.default.confirmations.0.payload.body',
             $tokenIssue['path'],
         );
     }
@@ -116,17 +120,19 @@ class MessageConfigValidatorTest extends TestCase
     public function test_it_accepts_webinar_tokens_registered_for_registration_created_and_render_slots(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmations' => [
-                [
-                    'dispatch_key' => 'registration_created',
-                    'payload_class' => EmailPayload::class,
-                    'queue' => 'confirmation_messages',
-                    'payload' => [
-                        'subject' => 'You are registered for {webinar_title}',
-                        'body' => "Hi {first_name}, your webinar starts on {webinar_start_date} at {webinar_start_time}.\n{cta}",
-                        'cta' => [
-                            'label' => 'Join Webinar',
-                            'url' => '{webinar_join_url}',
+            'default' => [
+                'confirmations' => [
+                    [
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'confirmation_messages',
+                        'payload' => [
+                            'subject' => 'You are registered for {webinar_title}',
+                            'body' => "Hi {first_name}, your webinar starts on {webinar_start_date} at {webinar_start_time}.\n{cta}",
+                            'cta' => [
+                                'label' => 'Join Webinar',
+                                'url' => '{webinar_join_url}',
+                            ],
                         ],
                     ],
                 ],
@@ -139,20 +145,22 @@ class MessageConfigValidatorTest extends TestCase
             scope: 'webinar',
         );
 
-        $this->assertSame([], $issues);
+        $this->assertEquals([], $issues);
     }
 
     public function test_it_rejects_post_event_token_from_registration_created_context(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmations' => [
-                [
-                    'dispatch_key' => 'registration_created',
-                    'payload_class' => EmailPayload::class,
-                    'queue' => 'confirmation_messages',
-                    'payload' => [
-                        'subject' => 'Registered',
-                        'body' => 'Replay: {webinar_playback_url}',
+            'default' => [
+                'confirmations' => [
+                    [
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'confirmation_messages',
+                        'payload' => [
+                            'subject' => 'Registered',
+                            'body' => 'Replay: {webinar_playback_url}',
+                        ],
                     ],
                 ],
             ],
@@ -193,19 +201,21 @@ class MessageConfigValidatorTest extends TestCase
             scope: 'webinar_waitlist',
         );
 
-        $this->assertSame([], $issues);
+        $this->assertEquals([], $issues);
     }
 
     public function test_it_accepts_valid_sms_with_registry_backed_webinar_tokens(): void
     {
         Config::set('messaging.sms.definitions.transactional.webinar', [
-            'confirmations' => [
-                [
-                    'dispatch_key' => 'registration_created',
-                    'payload_class' => SmsPayload::class,
-                    'queue' => 'confirmation_messages',
-                    'payload' => [
-                        'message' => 'You are registered for {webinar_title} on {webinar_start_date} at {webinar_start_time}. Join: {webinar_join_url}',
+            'default' => [
+                'confirmations' => [
+                    [
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => SmsPayload::class,
+                        'queue' => 'confirmation_messages',
+                        'payload' => [
+                            'message' => 'You are registered for {webinar_title} on {webinar_start_date} at {webinar_start_time}. Join: {webinar_join_url}',
+                        ],
                     ],
                 ],
             ],
@@ -217,6 +227,6 @@ class MessageConfigValidatorTest extends TestCase
             scope: 'webinar',
         );
 
-        $this->assertSame([], $issues);
+        $this->assertEquals([], $issues);
     }
 }

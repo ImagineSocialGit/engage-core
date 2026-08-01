@@ -21,13 +21,15 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         Config::set('messaging.email.definitions', [
             'transactional' => [
                 'webinar' => [
-                    'confirmation' => [
-                        'dispatch_key' => 'registration_created',
-                        'payload_class' => EmailPayload::class,
-                        'queue' => 'confirmation_messages',
-                        'payload' => [
-                            'subject' => 'Registered {first_name}',
-                            'body' => 'Thanks for registering.',
+                    'default' => [
+                        'confirmation' => [
+                            'dispatch_key' => 'registration_created',
+                            'payload_class' => EmailPayload::class,
+                            'queue' => 'confirmation_messages',
+                            'payload' => [
+                                'subject' => 'Registered {first_name}',
+                                'body' => 'Thanks for registering.',
+                            ],
                         ],
                     ],
                 ],
@@ -71,9 +73,9 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         $this->assertSame('transactional', $confirmation->purpose);
         $this->assertSame('webinar', $confirmation->scope);
         $this->assertSame('confirmation', $confirmation->message_type);
-        $this->assertSame(['registration_created'], $confirmation->dispatch_keys);
-        $this->assertSame(['first_name'], $confirmation->tokens);
-        $this->assertSame('messaging.email.definitions.transactional.webinar.confirmation', $confirmation->source_config_path);
+        $this->assertEquals(['registration_created'], $confirmation->dispatch_keys);
+        $this->assertEquals(['first_name'], $confirmation->tokens);
+        $this->assertSame('messaging.email.definitions.transactional.webinar.default.confirmation', $confirmation->source_config_path);
 
         $campaignVariant = MessageTemplatePreset::query()
             ->where('key', 'email.marketing.webinar_nurture.campaigns.webinar_attended_nurture.steps.1.variants.email')
@@ -141,25 +143,27 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         Config::set('messaging.email.definitions', [
             'transactional' => [
                 'webinar' => [
-                    'reminders' => [
-                        [
-                            'key' => 'webinar_reminder_1_day',
-                            'dispatch_key' => 'registration_created',
-                            'payload_class' => EmailPayload::class,
-                            'queue' => 'reminders',
-                            'payload' => [
-                                'subject' => 'Tomorrow',
-                                'body' => 'Starts tomorrow.',
+                    'default' => [
+                        'reminders' => [
+                            [
+                                'key' => 'webinar_reminder_1_day',
+                                'dispatch_key' => 'registration_created',
+                                'payload_class' => EmailPayload::class,
+                                'queue' => 'reminders',
+                                'payload' => [
+                                    'subject' => 'Tomorrow',
+                                    'body' => 'Starts tomorrow.',
+                                ],
                             ],
-                        ],
-                        [
-                            'key' => 'webinar_reminder_30_minute',
-                            'dispatch_key' => 'registration_created',
-                            'payload_class' => EmailPayload::class,
-                            'queue' => 'reminders',
-                            'payload' => [
-                                'subject' => 'Soon',
-                                'body' => 'Starts soon.',
+                            [
+                                'key' => 'webinar_reminder_30_minute',
+                                'dispatch_key' => 'registration_created',
+                                'payload_class' => EmailPayload::class,
+                                'queue' => 'reminders',
+                                'payload' => [
+                                    'subject' => 'Soon',
+                                    'body' => 'Starts soon.',
+                                ],
                             ],
                         ],
                     ],
@@ -177,17 +181,17 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             ->orderBy('source_config_path')
             ->get();
 
-        $this->assertSame([
-            'messaging.email.definitions.transactional.webinar.reminders.0',
-            'messaging.email.definitions.transactional.webinar.reminders.1',
+        $this->assertEquals([
+            'messaging.email.definitions.transactional.webinar.default.reminders.0',
+            'messaging.email.definitions.transactional.webinar.default.reminders.1',
         ], $presets->pluck('source_config_path')->all());
 
-        $this->assertSame([
+        $this->assertEquals([
             'email.transactional.webinar.webinar_reminder_1_day',
             'email.transactional.webinar.webinar_reminder_30_minute',
         ], $presets->pluck('key')->all());
 
-        $this->assertSame(['reminder', 'reminder'], $presets->pluck('message_type')->all());
+        $this->assertEquals(['reminder', 'reminder'], $presets->pluck('message_type')->all());
         $this->assertDatabaseMissing('message_template_presets', ['message_type' => 'reminder_1_day']);
         $this->assertDatabaseMissing('message_template_presets', ['message_type' => 'reminder_30_minute']);
 
@@ -209,13 +213,15 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         Config::set('messaging.email.definitions', [
             'transactional' => [
                 'webinar' => [
-                    'confirmation' => [
-                        'dispatch_key' => 'registration_created',
-                        'payload_class' => EmailPayload::class,
-                        'queue' => 'confirmation_messages',
-                        'payload' => [
-                            'subject' => 'Original subject',
-                            'body' => 'Original body.',
+                    'default' => [
+                        'confirmation' => [
+                            'dispatch_key' => 'registration_created',
+                            'payload_class' => EmailPayload::class,
+                            'queue' => 'confirmation_messages',
+                            'payload' => [
+                                'subject' => 'Original subject',
+                                'body' => 'Original body.',
+                            ],
                         ],
                     ],
                 ],
@@ -237,7 +243,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             'customized_at' => now(),
         ])->save();
 
-        Config::set('messaging.email.definitions.transactional.webinar.confirmation.payload.subject', 'Changed config subject');
+        Config::set('messaging.email.definitions.transactional.webinar.default.confirmation.payload.subject', 'Changed config subject');
 
         $result = app(SyncMessageTemplatePresetsAction::class)->handle();
 
@@ -259,13 +265,15 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         Config::set('messaging.email.definitions', [
             'transactional' => [
                 'webinar' => [
-                    'confirmation' => [
-                        'dispatch_key' => 'registration_created',
-                        'payload_class' => EmailPayload::class,
-                        'queue' => 'confirmation_messages',
-                        'payload' => [
-                            'subject' => 'Config subject',
-                            'body' => 'Config body.',
+                    'default' => [
+                        'confirmation' => [
+                            'dispatch_key' => 'registration_created',
+                            'payload_class' => EmailPayload::class,
+                            'queue' => 'confirmation_messages',
+                            'payload' => [
+                                'subject' => 'Config subject',
+                                'body' => 'Config body.',
+                            ],
                         ],
                     ],
                 ],
@@ -311,13 +319,15 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         Config::set('messaging.email.definitions', [
             'transactional' => [
                 'webinar' => [
-                    'confirmation' => [
-                        'dispatch_key' => 'registration_created',
-                        'payload_class' => EmailPayload::class,
-                        'queue' => 'confirmation_messages',
-                        'payload' => [
-                            'subject' => 'Config subject',
-                            'body' => 'Config body.',
+                    'default' => [
+                        'confirmation' => [
+                            'dispatch_key' => 'registration_created',
+                            'payload_class' => EmailPayload::class,
+                            'queue' => 'confirmation_messages',
+                            'payload' => [
+                                'subject' => 'Config subject',
+                                'body' => 'Config body.',
+                            ],
                         ],
                     ],
                 ],
@@ -362,25 +372,27 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         Config::set('messaging.email.definitions', [
             'transactional' => [
                 'webinar' => [
-                    'reminders' => [
-                        [
-                            'key' => 'webinar_reminder_30_minute',
-                            'dispatch_key' => 'registration_created',
-                            'payload_class' => EmailPayload::class,
-                            'queue' => 'reminders',
-                            'payload' => [
-                                'subject' => '30 minutes',
-                                'body' => 'Join soon, {first_name}.',
+                    'default' => [
+                        'reminders' => [
+                            [
+                                'key' => 'webinar_reminder_30_minute',
+                                'dispatch_key' => 'registration_created',
+                                'payload_class' => EmailPayload::class,
+                                'queue' => 'reminders',
+                                'payload' => [
+                                    'subject' => '30 minutes',
+                                    'body' => 'Join soon, {first_name}.',
+                                ],
                             ],
-                        ],
-                        [
-                            'key' => 'webinar_reminder_10_minute',
-                            'dispatch_key' => 'registration_created',
-                            'payload_class' => EmailPayload::class,
-                            'queue' => 'reminders',
-                            'payload' => [
-                                'subject' => '10 minutes',
-                                'body' => 'Join now, {first_name}.',
+                            [
+                                'key' => 'webinar_reminder_10_minute',
+                                'dispatch_key' => 'registration_created',
+                                'payload_class' => EmailPayload::class,
+                                'queue' => 'reminders',
+                                'payload' => [
+                                    'subject' => '10 minutes',
+                                    'body' => 'Join now, {first_name}.',
+                                ],
                             ],
                         ],
                     ],
@@ -398,14 +410,14 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             'key' => 'email.transactional.webinar.webinar_reminder_30_minute',
             'message_type' => 'reminder',
             'name' => 'Webinar Reminders — Reminder Email',
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.0',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.reminders.0',
         ]);
 
         $this->assertDatabaseHas('message_template_presets', [
             'key' => 'email.transactional.webinar.webinar_reminder_10_minute',
             'message_type' => 'reminder',
             'name' => 'Webinar Reminders — Reminder 2 Email',
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.1',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.reminders.1',
         ]);
 
         $this->assertDatabaseMissing('message_template_presets', [
@@ -421,7 +433,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             'item_label' => 'Reminder Email',
             'item_order' => 0,
             'usage_type' => 'webinar_reminder',
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.0',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.reminders.0',
         ]);
 
         $this->assertDatabaseHas('message_template_catalog_entries', [
@@ -429,7 +441,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             'item_label' => 'Reminder 2 Email',
             'item_order' => 1,
             'usage_type' => 'webinar_reminder',
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.1',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.reminders.1',
         ]);
     }
 
@@ -439,13 +451,15 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         Config::set('messaging.email.definitions', [
             'transactional' => [
                 'webinar' => [
-                    'confirmation' => [
-                        'dispatch_key' => 'registration_created',
-                        'payload_class' => EmailPayload::class,
-                        'queue' => 'confirmation_messages',
-                        'payload' => [
-                            'subject' => 'Config subject',
-                            'body' => 'Config body.',
+                    'default' => [
+                        'confirmation' => [
+                            'dispatch_key' => 'registration_created',
+                            'payload_class' => EmailPayload::class,
+                            'queue' => 'confirmation_messages',
+                            'payload' => [
+                                'subject' => 'Config subject',
+                                'body' => 'Config body.',
+                            ],
                         ],
                     ],
                 ],
@@ -473,7 +487,7 @@ class MessageTemplatePresetSyncActionTest extends TestCase
             'message_template_preset_id' => $preset->getKey(),
             'message_type' => 'confirmation',
             'definition_key' => 'confirmation',
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmation',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.confirmation',
             'is_active' => true,
         ]);
 
@@ -494,14 +508,16 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         Config::set('messaging.email.definitions', [
             'transactional' => [
                 'webinar' => [
-                    'confirmation' => [
-                        'key' => 'confirmation',
-                        'dispatch_key' => 'registration_created',
-                        'payload_class' => EmailPayload::class,
-                        'queue' => 'confirmation_messages',
-                        'payload' => [
-                            'subject' => 'Config subject',
-                            'body' => 'Config body.',
+                    'default' => [
+                        'confirmation' => [
+                            'key' => 'confirmation',
+                            'dispatch_key' => 'registration_created',
+                            'payload_class' => EmailPayload::class,
+                            'queue' => 'confirmation_messages',
+                            'payload' => [
+                                'subject' => 'Config subject',
+                                'body' => 'Config body.',
+                            ],
                         ],
                     ],
                 ],
@@ -516,9 +532,9 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         $assignment = $preset->assignments()->firstOrFail();
 
         $assignment->forceFill([
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.old_confirmation',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.old_confirmation',
             'meta' => array_replace($assignment->meta ?? [], [
-                'source_config_path' => 'messaging.email.definitions.transactional.webinar.old_confirmation',
+                'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.old_confirmation',
             ]),
         ])->save();
 
@@ -527,11 +543,11 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         $this->assertSame(1, $result['assignments_updated']);
         $this->assertDatabaseCount('message_template_preset_assignments', 1);
         $this->assertSame(
-            'messaging.email.definitions.transactional.webinar.confirmation',
+            'messaging.email.definitions.transactional.webinar.default.confirmation',
             $assignment->refresh()->source_config_path,
         );
         $this->assertSame(
-            'messaging.email.definitions.transactional.webinar.confirmation',
+            'messaging.email.definitions.transactional.webinar.default.confirmation',
             data_get($assignment->meta, 'source_config_path'),
         );
     }
@@ -607,14 +623,16 @@ class MessageTemplatePresetSyncActionTest extends TestCase
         Config::set('messaging.email.definitions', [
             'transactional' => [
                 'webinar' => [
-                    'confirmation' => [
-                        'key' => 'confirmation',
-                        'dispatch_key' => 'registration_created',
-                        'payload_class' => EmailPayload::class,
-                        'queue' => 'confirmation_messages',
-                        'payload' => [
-                            'subject' => 'Config subject',
-                            'body' => 'Config body.',
+                    'default' => [
+                        'confirmation' => [
+                            'key' => 'confirmation',
+                            'dispatch_key' => 'registration_created',
+                            'payload_class' => EmailPayload::class,
+                            'queue' => 'confirmation_messages',
+                            'payload' => [
+                                'subject' => 'Config subject',
+                                'body' => 'Config body.',
+                            ],
                         ],
                     ],
                 ],

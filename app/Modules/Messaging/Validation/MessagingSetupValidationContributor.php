@@ -9,6 +9,7 @@ use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ConsentDomainRegistry;
 use App\Modules\Messaging\Services\MessageConfigValidator;
+use App\Modules\Messaging\Services\MessageDefinitionConfigSetResolver;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Support\Queues\QueueContract;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
@@ -22,6 +23,7 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
 
     public function __construct(
         private readonly MessageConfigValidator $messageConfigValidator,
+        private readonly MessageDefinitionConfigSetResolver $configSetResolver,
         private readonly ConsentDomainRegistry $consentDomainRegistry,
         private readonly QueueContract $queueContract,
     ) {}
@@ -557,34 +559,39 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
         $messageType = $this->normalizedNullableString($messageType);
         $keys = [];
 
-        foreach ($definitions as $sourceMessageType => $definition) {
-            if ($sourceMessageType === 'campaigns' || ! is_string($sourceMessageType) || ! is_array($definition)) {
-                continue;
-            }
-
-            $runtimeMessageType = Str::singular($this->normalizedNullableString($sourceMessageType));
-
-            if ($runtimeMessageType !== $messageType) {
-                continue;
-            }
-
-            $isList = array_is_list($definition);
-            $definitionList = $isList ? $definition : [$definition];
-
-            foreach ($definitionList as $index => $nestedDefinition) {
-                if (! is_array($nestedDefinition) || ! ($nestedDefinition['enabled'] ?? true)) {
+        foreach ($this->configSetResolver->sets($scope, $definitions) as $set) {
+            foreach ($set['definitions'] as $sourceMessageType => $definition) {
+                if ($sourceMessageType === 'campaigns' || ! is_string($sourceMessageType) || ! is_array($definition)) {
                     continue;
                 }
 
-                $key = $this->normalizedNullableString($nestedDefinition['key'] ?? null);
+                $runtimeMessageType = Str::singular($this->normalizedNullableString($sourceMessageType));
 
-                if ($key === '') {
-                    $key = $isList
-                        ? $runtimeMessageType.'_'.((int) $index + 1)
-                        : $runtimeMessageType;
+                if ($runtimeMessageType !== $messageType) {
+                    continue;
                 }
 
-                $keys[] = $key;
+                $isList = array_is_list($definition);
+                $definitionList = $isList ? $definition : [$definition];
+
+                foreach ($definitionList as $index => $nestedDefinition) {
+                    if (! is_array($nestedDefinition) || ! ($nestedDefinition['enabled'] ?? true)) {
+                        continue;
+                    }
+
+                    $key = $this->normalizedNullableString($nestedDefinition['key'] ?? null);
+
+                    if ($key === '') {
+                        $key = $isList
+                            ? $runtimeMessageType.'_'.((int) $index + 1)
+                            : $runtimeMessageType;
+                    }
+
+                    $keys[] = $this->configSetResolver->assignmentDefinitionKey(
+                        $set['key'],
+                        $key,
+                    );
+                }
             }
         }
 

@@ -71,7 +71,7 @@ class MessageTemplateSyncVersionCutoverTest extends TestCase
             'status' => MessageTemplatePreset::STATUS_ACTIVE,
             'is_active' => true,
             'source' => 'config',
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmation',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.confirmation',
             'is_customized' => true,
             'customized_at' => now()->subMinute(),
         ]);
@@ -143,13 +143,15 @@ class MessageTemplateSyncVersionCutoverTest extends TestCase
         Config::set('messaging.email.definitions', [
             'transactional' => [
                 'webinar' => [
-                    'confirmation' => [
-                        'dispatch_key' => 'registration_created',
-                        'payload_class' => EmailPayload::class,
-                        'queue' => 'confirmation_messages',
-                        'payload' => [
-                            'subject' => $subject,
-                            'body' => 'Hi {first_name}.',
+                    'default' => [
+                        'confirmation' => [
+                            'dispatch_key' => 'registration_created',
+                            'payload_class' => EmailPayload::class,
+                            'queue' => 'confirmation_messages',
+                            'payload' => [
+                                'subject' => $subject,
+                                'body' => 'Hi {first_name}.',
+                            ],
                         ],
                     ],
                 ],

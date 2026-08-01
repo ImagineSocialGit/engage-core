@@ -17,24 +17,26 @@ class MessageDefinitionResolverTest extends TestCase
     public function test_it_resolves_content_only_message_definitions_for_scope(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Registered',
-                    'body' => 'Thanks',
+            'default' => [
+                'confirmation' => [
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Registered',
+                        'body' => 'Thanks',
+                    ],
                 ],
+                'reminders' => [[
+                    'dispatch_keys' => ['registration_created', 'webinar_rescheduled'],
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'reminders',
+                    'payload' => [
+                        'subject' => 'Reminder',
+                        'body' => 'Tomorrow',
+                    ],
+                ]],
             ],
-            'reminders' => [[
-                'dispatch_keys' => ['registration_created', 'webinar_rescheduled'],
-                'payload_class' => EmailPayload::class,
-                'queue' => 'reminders',
-                'payload' => [
-                    'subject' => 'Reminder',
-                    'body' => 'Tomorrow',
-                ],
-            ]],
         ]);
 
         $definitions = app(MessageDefinitionResolver::class)->resolve(
@@ -52,13 +54,13 @@ class MessageDefinitionResolverTest extends TestCase
         }
 
         $this->assertSame('confirmation', $definitions[0]['message_type']);
-        $this->assertSame(['registration_created'], $definitions[0]['dispatch_keys']);
-        $this->assertSame('messaging.email.definitions.transactional.webinar.confirmation', $definitions[0]['config_path']);
+        $this->assertEquals(['registration_created'], $definitions[0]['dispatch_keys']);
+        $this->assertSame('messaging.email.definitions.transactional.webinar.default.confirmation', $definitions[0]['config_path']);
     }
 
     public function test_it_returns_empty_when_scope_missing(): void
     {
-        $this->assertSame([], app(MessageDefinitionResolver::class)->resolve(
+        $this->assertEquals([], app(MessageDefinitionResolver::class)->resolve(
             channel: 'email',
             purpose: 'transactional',
             scope: 'does_not_exist',
@@ -67,25 +69,27 @@ class MessageDefinitionResolverTest extends TestCase
     public function test_exact_assigned_reminder_replaces_only_its_matching_config_definition(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'reminders' => [
-                [
-                    'key' => 'reminder_1_day',
-                    'dispatch_key' => 'registration_created',
-                    'payload_class' => EmailPayload::class,
-                    'queue' => 'reminders',
-                    'payload' => [
-                        'subject' => 'Config one day',
-                        'body' => 'Config one day body.',
+            'default' => [
+                'reminders' => [
+                    [
+                        'key' => 'reminder_1_day',
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'reminders',
+                        'payload' => [
+                            'subject' => 'Config one day',
+                            'body' => 'Config one day body.',
+                        ],
                     ],
-                ],
-                [
-                    'key' => 'reminder_30_minute',
-                    'dispatch_key' => 'registration_created',
-                    'payload_class' => EmailPayload::class,
-                    'queue' => 'reminders',
-                    'payload' => [
-                        'subject' => 'Config thirty minute',
-                        'body' => 'Config thirty minute body.',
+                    [
+                        'key' => 'reminder_30_minute',
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'reminders',
+                        'payload' => [
+                            'subject' => 'Config thirty minute',
+                            'body' => 'Config thirty minute body.',
+                        ],
                     ],
                 ],
             ],
@@ -111,7 +115,7 @@ class MessageDefinitionResolverTest extends TestCase
             ->create([
                 'surface' => 'webinar_registrations',
                 'definition_key' => 'reminder_1_day',
-                'source_config_path' => 'messaging.email.definitions.transactional.webinar.reminders.0',
+                'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.reminders.0',
             ]);
 
         $definitions = app(MessageDefinitionResolver::class)->resolve(
@@ -121,7 +125,7 @@ class MessageDefinitionResolverTest extends TestCase
         );
 
         $this->assertCount(2, $definitions);
-        $this->assertSame([
+        $this->assertEquals([
             'reminder_1_day' => 'Assigned one day',
             'reminder_30_minute' => 'Config thirty minute',
         ], collect($definitions)->mapWithKeys(

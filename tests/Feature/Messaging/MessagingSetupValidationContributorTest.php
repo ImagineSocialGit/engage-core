@@ -38,29 +38,33 @@ class MessagingSetupValidationContributorTest extends TestCase
     public function test_it_accepts_valid_config_and_empty_db_runtime_state(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Registered',
-                    'body' => 'Hi {first_name}, thanks for registering.',
+            'default' => [
+                'confirmation' => [
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Registered',
+                        'body' => 'Hi {first_name}, thanks for registering.',
+                    ],
                 ],
             ],
         ]);
 
-        $this->assertSame([], $this->findings());
+        $this->assertEquals([], $this->findings());
     }
 
     public function test_it_adapts_message_config_validator_issues_into_shared_findings(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'registration_created',
-                'payload_class' => 'Missing\\Payload',
-                'queue' => '',
-                'payload' => [
-                    'subject' => '',
+            'default' => [
+                'confirmation' => [
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => 'Missing\\Payload',
+                    'queue' => '',
+                    'payload' => [
+                        'subject' => '',
+                    ],
                 ],
             ],
         ]);
@@ -147,12 +151,12 @@ class MessagingSetupValidationContributorTest extends TestCase
     {
         $firstPreset = $this->preset([
             'key' => 'confirmation.first',
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmations.0',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.confirmations.0',
         ]);
 
         $secondPreset = $this->preset([
             'key' => 'confirmation.second',
-            'source_config_path' => 'messaging.email.definitions.transactional.webinar.confirmations.1',
+            'source_config_path' => 'messaging.email.definitions.transactional.webinar.default.confirmations.1',
         ]);
 
         MessageTemplatePresetAssignment::query()->create(
@@ -222,25 +226,27 @@ class MessagingSetupValidationContributorTest extends TestCase
     public function test_it_reports_ambiguous_standard_assignment_without_definition_key_for_multi_definition_message_type(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'reminders' => [
-                [
-                    'key' => 'reminder_1_day',
-                    'dispatch_key' => 'registration_created',
-                    'payload_class' => EmailPayload::class,
-                    'queue' => 'reminders',
-                    'payload' => [
-                        'subject' => 'Tomorrow',
-                        'body' => 'Tomorrow.',
+            'default' => [
+                'reminders' => [
+                    [
+                        'key' => 'reminder_1_day',
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'reminders',
+                        'payload' => [
+                            'subject' => 'Tomorrow',
+                            'body' => 'Tomorrow.',
+                        ],
                     ],
-                ],
-                [
-                    'key' => 'reminder_30_minute',
-                    'dispatch_key' => 'registration_created',
-                    'payload_class' => EmailPayload::class,
-                    'queue' => 'reminders',
-                    'payload' => [
-                        'subject' => 'Soon',
-                        'body' => 'Soon.',
+                    [
+                        'key' => 'reminder_30_minute',
+                        'dispatch_key' => 'registration_created',
+                        'payload_class' => EmailPayload::class,
+                        'queue' => 'reminders',
+                        'payload' => [
+                            'subject' => 'Soon',
+                            'body' => 'Soon.',
+                        ],
                     ],
                 ],
             ],
@@ -269,13 +275,15 @@ class MessagingSetupValidationContributorTest extends TestCase
     public function test_manager_resolves_tagged_messaging_contributor(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'registration_created',
-                'payload_class' => 'Missing\\Payload',
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Registered',
-                    'body' => 'Thanks',
+            'default' => [
+                'confirmation' => [
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => 'Missing\\Payload',
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Registered',
+                        'body' => 'Thanks',
+                    ],
                 ],
             ],
         ]);
