@@ -995,7 +995,11 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
                     'scope' => $item->scope,
                     'message_type' => $item->message_type,
                     'dispatch_key' => $item->dispatch_key,
-                    'message_template_set_key' => $profile->message_template_set_key,
+                    'message_template_set_key' => $this->expectedTemplateSetKey(
+                        $profile,
+                        $item,
+                    ),
+                    'profile_message_template_set_key' => $profile->message_template_set_key,
                     'message_template_key' => $item->message_template_key,
                     'source_config_path' => $item->source_config_path,
                 ],
@@ -1031,8 +1035,9 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
                 continue;
             }
 
-            $requiredTemplateSetKey = $this->normalizeSegment(
-                (string) ($profile->message_template_set_key ?: 'default'),
+            $requiredTemplateSetKey = $this->expectedTemplateSetKey(
+                $profile,
+                $item,
             );
             $definitionTemplateSetKey = $this->normalizeSegment((string) (
                 $definition['template_set_key']
@@ -1081,6 +1086,19 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
         }
 
         return false;
+    }
+
+    private function expectedTemplateSetKey(
+        WebinarScheduleProfile $profile,
+        WebinarScheduleProfileItem $item,
+    ): string {
+        if ($this->normalizeSegment($item->scope) !== 'webinar') {
+            return 'default';
+        }
+
+        return $this->normalizeSegment(
+            $profile->message_template_set_key ?: 'default',
+        );
     }
 
     /**

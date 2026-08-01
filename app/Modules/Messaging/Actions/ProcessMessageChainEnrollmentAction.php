@@ -190,6 +190,18 @@ class ProcessMessageChainEnrollmentAction
             return ['enrollment' => $enrollment, 'dispatch' => false];
         }
 
+        if ($this->expiredBeforeEnrollment(
+            enrollment: $enrollment,
+            step: $step,
+            scheduledAt: $enrollment->next_action_at,
+        )) {
+            return $this->advance(
+                enrollment: $enrollment,
+                context: $context,
+                baseAt: now(),
+            );
+        }
+
         $stepConditions = is_array($step->conditions)
             ? $step->conditions
             : [];
@@ -483,42 +495,76 @@ class ProcessMessageChainEnrollmentAction
             return ['enrollment' => $enrollment, 'dispatch' => false];
         }
 
-        $nextStep = MessageChainStep::query()
+        while (true) {
+            $nextStep = $this->nextActiveStep(
+                enrollment: $enrollment,
+                after: $currentStep,
+            );
+
+            if (! $nextStep instanceof MessageChainStep) {
+                $this->complete($enrollment);
+
+                return ['enrollment' => $enrollment, 'dispatch' => false];
+            }
+
+            $nextActionAt = $this->timingResolver->resolve(
+                step: $nextStep,
+                context: $context,
+                baseAt: $baseAt,
+            );
+
+            if ($this->expiredBeforeEnrollment(
+                enrollment: $enrollment,
+                step: $nextStep,
+                scheduledAt: $nextActionAt,
+            )) {
+                $currentStep = $nextStep;
+
+                continue;
+            }
+
+            $enrollment->forceFill([
+                'current_message_chain_step_id' => $nextStep->getKey(),
+                'next_action_at' => $nextActionAt,
+            ])->save();
+            $enrollment->setRelation('currentMessageChainStep', $nextStep);
+
+            return ['enrollment' => $enrollment, 'dispatch' => true];
+        }
+    }
+
+    private function nextActiveStep(
+        MessageChainEnrollment $enrollment,
+        MessageChainStep $after,
+    ): ?MessageChainStep {
+        return MessageChainStep::query()
             ->where(
                 'message_chain_version_id',
                 $enrollment->message_chain_version_id,
             )
             ->where('is_active', true)
-            ->where(function ($query) use ($currentStep): void {
+            ->where(function ($query) use ($after): void {
                 $query
-                    ->where('sort_order', '>', $currentStep->sort_order)
-                    ->orWhere(function ($query) use ($currentStep): void {
+                    ->where('sort_order', '>', $after->sort_order)
+                    ->orWhere(function ($query) use ($after): void {
                         $query
-                            ->where('sort_order', $currentStep->sort_order)
-                            ->where('id', '>', $currentStep->getKey());
+                            ->where('sort_order', $after->sort_order)
+                            ->where('id', '>', $after->getKey());
                     });
             })
             ->orderBy('sort_order')
             ->orderBy('id')
             ->first();
+    }
 
-        if (! $nextStep instanceof MessageChainStep) {
-            $this->complete($enrollment);
-
-            return ['enrollment' => $enrollment, 'dispatch' => false];
-        }
-
-        $enrollment->forceFill([
-            'current_message_chain_step_id' => $nextStep->getKey(),
-            'next_action_at' => $this->timingResolver->resolve(
-                step: $nextStep,
-                context: $context,
-                baseAt: $baseAt,
-            ),
-        ])->save();
-        $enrollment->setRelation('currentMessageChainStep', $nextStep);
-
-        return ['enrollment' => $enrollment, 'dispatch' => true];
+    private function expiredBeforeEnrollment(
+        MessageChainEnrollment $enrollment,
+        MessageChainStep $step,
+        Carbon $scheduledAt,
+    ): bool {
+        return $step->timing_type === MessageChainStep::TIMING_ANCHORED
+            && $enrollment->started_at !== null
+            && $scheduledAt->lt($enrollment->started_at);
     }
 
     private function complete(

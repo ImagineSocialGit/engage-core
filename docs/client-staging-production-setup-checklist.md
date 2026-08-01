@@ -545,6 +545,26 @@ Do not preserve an old campaigns queue requirement from stale Webinar nurture co
 
 Horizon must consume every queue the current runtime can actually dispatch to. Verify effective runtime configuration rather than trusting a historical `.env` queue list.
 
+### Configure Laravel Scheduler
+
+Engage Core uses Laravel Scheduler for database-backed recovery and outbox reconciliation. Redis/Horizon remains the primary delayed-job execution path, but the Scheduler must run so due message-chain enrollments, stale delivery claims, and unpublished outbox events can be recovered.
+
+Install exactly one cron entry for this client deployment under the intended deployment/process user:
+
+```cron
+* * * * * cd <APP_PATH> && <PHP_BIN> artisan schedule:run >> /dev/null 2>&1
+```
+
+Verify the entry and the effective schedule:
+
+```bash
+sudo crontab -u <DEPLOY_USER> -l
+cd <APP_PATH>
+<PHP_BIN> artisan schedule:list
+```
+
+Do not run `schedule:work` in parallel with the cron entry. The working directory and environment must resolve the intended `CLIENT_KEY`, database, Redis namespace, and client configuration.
+
 ## 19. Run migrations
 
 For a normal staging deployment:
@@ -646,6 +666,8 @@ php artisan tinker --execute="dump([
 - [ ] All required queues consumed.
 - [ ] No unexpected failed jobs.
 - [ ] Redis prefixes understood.
+- [ ] Laravel Scheduler cron installed for this client deployment.
+- [ ] `php artisan schedule:list` shows the expected Messaging recovery/outbox tasks.
 
 ## 26. Verify email
 
@@ -793,6 +815,7 @@ Before production:
 [ ] Redis isolation verified
 [ ] Horizon process path verified
 [ ] All required queues consumed
+[ ] Laravel Scheduler cron installed and effective schedule verified
 [ ] DNS/Nginx/SSL verified
 [ ] CRM login verified
 [ ] Email tested when enabled
@@ -899,6 +922,16 @@ ps aux | grep "[a]rtisan horizon"
 
 This restart is mandatory after deploying PHP changes that alter queued-job runtime behavior, including job execution, validation, payload rendering, gates, or providers, because long-running workers otherwise continue executing the old code already loaded in memory.
 
+Also verify the production Scheduler entry and effective task list:
+
+```bash
+sudo crontab -u <DEPLOY_USER> -l
+cd <APP_PATH>
+<PHP_BIN> artisan schedule:list
+```
+
+The production deployment is not ready when Horizon is healthy but the once-per-minute Scheduler entry is absent.
+
 ## 39. Verify production routes and hosts
 
 ```bash
@@ -926,6 +959,8 @@ Run production-safe tests before real client traffic or a live event.
 [ ] Correct cache/Redis/Horizon prefixes
 [ ] Correct Horizon process path
 [ ] Required queues consumed
+[ ] Laravel Scheduler cron installed
+[ ] Effective Scheduler task list verified
 [ ] setup:validate passes
 ```
 
@@ -1045,6 +1080,7 @@ Import rules:
 [ ] Horizon prefix unique
 [ ] Horizon process path verified
 [ ] Every required queue consumed
+[ ] Laravel Scheduler cron installed and `schedule:list` verified
 [ ] No stale jobs from a previous disposable DB state
 [ ] DNS correct
 [ ] Nginx correct for every hostname

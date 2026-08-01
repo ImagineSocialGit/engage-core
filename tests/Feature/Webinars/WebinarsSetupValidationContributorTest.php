@@ -376,6 +376,88 @@ class WebinarsSetupValidationContributorTest extends TestCase
         );
     }
 
+    public function test_named_webinar_template_sets_share_default_waitlist_definitions(): void
+    {
+        Config::set('webinars.message_areas', [
+            'waitlist' => [
+                'enabled' => true,
+                'disableable' => true,
+                'kind' => 'template',
+                'label' => 'Waitlist alerts',
+                'description' => 'Sent when a new Webinar session becomes available.',
+                'purpose' => 'marketing',
+                'scope' => 'webinar_waitlist',
+                'surface' => 'webinar_waitlists',
+                'message_type' => 'alert',
+                'dispatch_key' => 'webinar_added',
+                'required' => true,
+                'usage_types' => ['webinar_waitlist'],
+                'profile_context_keys' => ['waitlist'],
+                'sort_order' => 10,
+            ],
+        ]);
+
+        Config::set('messaging.email.definitions.marketing.webinar_waitlist', [
+            'alerts' => [
+                [
+                    'key' => 'alert',
+                    'dispatch_key' => 'webinar_added',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'notifications',
+                    'payload' => [
+                        'subject' => 'A new Webinar session is open',
+                        'body' => 'Reserve your spot.',
+                    ],
+                ],
+            ],
+        ]);
+
+        Config::set(
+            'messaging.channel_availability.email.surfaces.webinar_waitlists',
+            true,
+        );
+        Config::set('messaging.channel_availability.email.purpose_scopes', [
+            'marketing:webinar_waitlist' => true,
+        ]);
+
+        foreach ([
+            'homebuyer_profile' => 'homebuyer_game_plan',
+            'va_profile' => 'va_homebuyer_game_plan',
+        ] as $profileKey => $templateSetKey) {
+            $profile = $this->profile([
+                'key' => $profileKey,
+                'message_template_set_key' => $templateSetKey,
+            ]);
+
+            $this->item($profile, [
+                'key' => 'email_waitlist_alert',
+                'label' => 'Email waitlist alert',
+                'context_key' => 'waitlist',
+                'purpose' => 'marketing',
+                'scope' => 'webinar_waitlist',
+                'surface' => 'webinar_waitlists',
+                'message_type' => 'alert',
+                'dispatch_key' => 'webinar_added',
+                'message_template_key' => 'alert',
+                'timing' => 'immediate',
+                'schedule' => null,
+            ]);
+        }
+
+        $waitlistDefinitionFindings = collect($this->findings())
+            ->where(
+                'code',
+                'webinars.schedule_profiles.messaging_definition_missing',
+            )
+            ->filter(fn (array $finding): bool =>
+                data_get($finding, 'context.scope') === 'webinar_waitlist'
+            )
+            ->values()
+            ->all();
+
+        $this->assertEquals([], $waitlistDefinitionFindings);
+    }
+
     public function test_it_warns_when_channel_is_unavailable_for_surface_but_definition_resolves(): void
     {
         $this->configureValidMessagingDefinition();

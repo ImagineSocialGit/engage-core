@@ -200,6 +200,171 @@ class MessageChainEnrollmentRunnerTest extends TestCase
         $this->assertNotNull($enrollment->completed_at);
     }
 
+    public function test_it_skips_anchored_steps_that_expired_before_the_enrollment_started(): void
+    {
+        Carbon::setTestNow('2026-08-01 12:00:00 UTC');
+        Queue::fake();
+
+        $contact = $this->contactWithConsent(['email']);
+        $version = $this->templateVersion(
+            key: 'email.transactional.webinar.fixture_expired_steps',
+            channel: 'email',
+            payload: [
+                'subject' => 'Fixture expired steps',
+                'body' => 'Fixture expired steps.',
+            ],
+        );
+        $chain = $this->chain(
+            key: 'fixture.expired_steps',
+            steps: [
+                [
+                    'key' => 'confirmation',
+                    'sort_order' => 10,
+                    'timing_type' => MessageChainStep::TIMING_IMMEDIATE,
+                    'variants' => [[
+                        'key' => 'email',
+                        'message_template_version_id' => $version->getKey(),
+                        'channel' => 'email',
+                        'purpose' => 'transactional',
+                        'scope' => 'webinar',
+                        'message_type' => 'fixture_confirmation',
+                    ]],
+                ],
+                [
+                    'key' => 'expired_10_day',
+                    'sort_order' => 20,
+                    'timing_type' => MessageChainStep::TIMING_ANCHORED,
+                    'anchor_key' => 'contact.created_at',
+                    'offset_seconds' => -864000,
+                    'variants' => [[
+                        'key' => 'email',
+                        'message_template_version_id' => $version->getKey(),
+                        'channel' => 'email',
+                        'purpose' => 'transactional',
+                        'scope' => 'webinar',
+                        'message_type' => 'fixture_expired_10_day',
+                    ]],
+                ],
+                [
+                    'key' => 'expired_7_day',
+                    'sort_order' => 30,
+                    'timing_type' => MessageChainStep::TIMING_ANCHORED,
+                    'anchor_key' => 'contact.created_at',
+                    'offset_seconds' => -604800,
+                    'variants' => [[
+                        'key' => 'email',
+                        'message_template_version_id' => $version->getKey(),
+                        'channel' => 'email',
+                        'purpose' => 'transactional',
+                        'scope' => 'webinar',
+                        'message_type' => 'fixture_expired_7_day',
+                    ]],
+                ],
+                [
+                    'key' => 'future_reminder',
+                    'sort_order' => 40,
+                    'timing_type' => MessageChainStep::TIMING_ANCHORED,
+                    'anchor_key' => 'contact.created_at',
+                    'offset_seconds' => 3600,
+                    'variants' => [[
+                        'key' => 'email',
+                        'message_template_version_id' => $version->getKey(),
+                        'channel' => 'email',
+                        'purpose' => 'transactional',
+                        'scope' => 'webinar',
+                        'message_type' => 'fixture_future_reminder',
+                    ]],
+                ],
+            ],
+        );
+
+        $enrollment = app(StartMessageChainEnrollmentAction::class)->handle(
+            messageChain: $chain,
+            recipient: $contact,
+            dedupeKey: 'fixture:expired-steps:'.$contact->getKey(),
+        );
+
+        app(ProcessMessageChainEnrollmentAction::class)->handle($enrollment);
+
+        $confirmation = ScheduledMessage::query()->sole();
+
+        $this->assertSame('fixture_confirmation', $confirmation->message_type);
+
+        $this->markSent($confirmation);
+        $enrollment->refresh();
+
+        $this->assertSame(
+            'future_reminder',
+            $enrollment->currentMessageChainStep?->key,
+        );
+        $this->assertTrue(
+            $enrollment->next_action_at?->equalTo(
+                Carbon::now()->addHour(),
+            ) ?? false,
+        );
+        $this->assertSame(1, ScheduledMessage::query()->count());
+        $this->assertDatabaseMissing('scheduled_messages', [
+            'message_type' => 'fixture_expired_10_day',
+        ]);
+        $this->assertDatabaseMissing('scheduled_messages', [
+            'message_type' => 'fixture_expired_7_day',
+        ]);
+    }
+
+    public function test_it_materializes_an_anchored_step_that_became_overdue_after_enrollment_started(): void
+    {
+        Carbon::setTestNow('2026-08-01 12:00:00 UTC');
+        Queue::fake();
+
+        $contact = $this->contactWithConsent(['email']);
+        $version = $this->templateVersion(
+            key: 'email.transactional.webinar.fixture_recoverable_overdue',
+            channel: 'email',
+            payload: [
+                'subject' => 'Fixture recoverable overdue',
+                'body' => 'Fixture recoverable overdue.',
+            ],
+        );
+        $chain = $this->chain(
+            key: 'fixture.recoverable_overdue',
+            steps: [[
+                'key' => 'recoverable_overdue',
+                'timing_type' => MessageChainStep::TIMING_ANCHORED,
+                'anchor_key' => 'contact.created_at',
+                'offset_seconds' => 3600,
+                'variants' => [[
+                    'key' => 'email',
+                    'message_template_version_id' => $version->getKey(),
+                    'channel' => 'email',
+                    'purpose' => 'transactional',
+                    'scope' => 'webinar',
+                    'message_type' => 'fixture_recoverable_overdue',
+                ]],
+            ]],
+        );
+
+        $enrollment = app(StartMessageChainEnrollmentAction::class)->handle(
+            messageChain: $chain,
+            recipient: $contact,
+            dedupeKey: 'fixture:recoverable-overdue:'.$contact->getKey(),
+        );
+        $expectedSendAt = Carbon::now()->addHour();
+
+        Carbon::setTestNow(Carbon::now()->addHours(2));
+        app(ProcessMessageChainEnrollmentAction::class)->handle($enrollment);
+
+        $message = ScheduledMessage::query()->sole();
+
+        $this->assertSame(
+            'fixture_recoverable_overdue',
+            $message->message_type,
+        );
+        $this->assertTrue(
+            $message->send_at?->equalTo($expectedSendAt) ?? false,
+        );
+        $this->assertNull($enrollment->refresh()->next_action_at);
+    }
+
     public function test_first_available_selects_the_first_currently_eligible_variant(): void
     {
         Carbon::setTestNow('2026-08-01 12:00:00 UTC');
