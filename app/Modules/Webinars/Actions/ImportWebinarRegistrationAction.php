@@ -19,7 +19,7 @@ class ImportWebinarRegistrationAction
         private readonly CreateOrUpdateContactAction $createOrUpdateContact,
         private readonly PhoneNumberNormalizer $phoneNumberNormalizer,
         private readonly ImportMessageConsentAction $importMessageConsent,
-        private readonly DispatchWebinarRegistrationMessagesAction $dispatchWebinarRegistrationMessages,
+        private readonly StartWebinarMessageChainEnrollmentAction $startMessageChainEnrollment,
     ) {}
 
     public function handle(
@@ -83,7 +83,7 @@ class ImportWebinarRegistrationAction
                 registrationCreated: $registrationCreated,
                 consentsCreated: $consentCounts['created'],
                 consentsUpdated: $consentCounts['updated'],
-                remindersScheduled: 0,
+                reminderEnrollments: 0,
             );
         });
 
@@ -91,9 +91,17 @@ class ImportWebinarRegistrationAction
             return $result;
         }
 
-        $scheduledMessages = $this->dispatchWebinarRegistrationMessages->handle(
-            registration: $result->registration,
-            contextKeys: ['reminders'],
+        if ($row->acceptedTransactionalChannels() === []) {
+            return $result;
+        }
+
+        $enrollment = $this->startMessageChainEnrollment->handle(
+            webinar: $webinar,
+            messageAreaKey: 'reminders',
+            recipient: $result->contact,
+            context: $result->registration,
+            startedAt: $result->registration->registered_at ?? $registeredAt,
+            required: false,
         );
 
         return new WebinarRegistrationImportResult(
@@ -103,7 +111,7 @@ class ImportWebinarRegistrationAction
             registrationCreated: $result->registrationCreated,
             consentsCreated: $result->consentsCreated,
             consentsUpdated: $result->consentsUpdated,
-            remindersScheduled: count($scheduledMessages),
+            reminderEnrollments: $enrollment === null ? 0 : 1,
         );
     }
 

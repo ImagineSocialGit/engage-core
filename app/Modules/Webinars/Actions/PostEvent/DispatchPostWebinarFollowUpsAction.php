@@ -2,20 +2,15 @@
 
 namespace App\Modules\Webinars\Actions\PostEvent;
 
-use App\Modules\Messaging\Actions\DispatchMessageAction;
-use App\Modules\Messaging\Enums\MessageChannel;
-use App\Modules\Messaging\Models\ScheduledMessage;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Services\ConditionChecker;
-use App\Modules\Messaging\Services\MessageDefinitionResolver;
 use App\Modules\Webinars\Actions\EmitWebinarAutomationEventAction;
+use App\Modules\Webinars\Actions\StartWebinarMessageChainEnrollmentAction;
 use App\Modules\Webinars\Contracts\WebinarProvider;
 use App\Modules\Webinars\Data\WebinarFollowUpDispatchResult;
-use App\Modules\Webinars\Data\WebinarMessageAreaDefinition;
-use App\Modules\Webinars\Data\WebinarMessageData;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Services\WebinarMessageAreaRegistry;
-use App\Modules\Webinars\Services\WebinarScheduleProfileDefinitionResolver;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -31,11 +26,9 @@ class DispatchPostWebinarFollowUpsAction
 
     public function __construct(
         private readonly ConditionChecker $conditionChecker,
-        private readonly DispatchMessageAction $dispatchMessageAction,
         private readonly EmitWebinarAutomationEventAction $emitWebinarAutomationEvent,
-        private readonly MessageDefinitionResolver $messageDefinitionResolver,
-        private readonly WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
         private readonly WebinarMessageAreaRegistry $messageAreaRegistry,
+        private readonly StartWebinarMessageChainEnrollmentAction $startMessageChainEnrollment,
     ) {}
 
     public function execute(
@@ -78,7 +71,7 @@ class DispatchPostWebinarFollowUpsAction
                 ],
             );
 
-            $webinar = $this->markMeta($webinar, [
+            $this->markMeta($webinar, [
                 'automation_events' => [
                     'webinar_ended_recorded_at' => now()->toIso8601String(),
                 ],
@@ -118,8 +111,6 @@ class DispatchPostWebinarFollowUpsAction
                     registration: $registration,
                     outcome: $outcome,
                     reason: 'webinar_missing',
-                    channels: [],
-                    scheduledMessageIds: [],
                 );
             }
 
@@ -128,8 +119,6 @@ class DispatchPostWebinarFollowUpsAction
                     registration: $registration,
                     outcome: $outcome,
                     reason: 'contact_missing',
-                    channels: [],
-                    scheduledMessageIds: [],
                 );
             }
 
@@ -146,40 +135,42 @@ class DispatchPostWebinarFollowUpsAction
                 );
             }
 
-            $webinar = $registration->webinar;
-            $messageData = array_replace_recursive(
-                WebinarMessageData::fromRegistration($registration)->toArray(),
-                [
-                    'webinar_id' => $webinar->getKey(),
-                    'webinar_registration_id' => $registration->getKey(),
-                    'webinar_slug' => $registration->webinar_slug,
-                    'webinar_title' => $webinar->title,
-                    'webinar_playback_url' => $webinar->playback_url,
-                    'registration_attended_at' => $registration->attended_at?->toIso8601String(),
-                ],
+            $enrollment = $this->startMessageChainEnrollment->handle(
+                webinar: $registration->webinar,
+                messageAreaKey: $areaKey,
+                recipient: $registration->contact,
+                context: $registration,
+                startedAt: now(),
             );
 
-            unset($messageData['playback_url']);
+            if (! $this->enrollmentHasPlannedDelivery($enrollment)) {
+                return $this->recordNotApplicable(
+                    registration: $registration,
+                    outcome: $outcome,
+                    reason: 'no_channels_eligible',
+                    messageChainEnrollmentId: (int) $enrollment->getKey(),
+                );
+            }
 
-            $payload = array_replace_recursive(
-                $messageData,
-                [
-                    'tokens' => $messageData,
-                    'context' => [
-                        'contact' => $messageData['contact'] ?? [],
-                        'webinar' => $messageData['webinar'] ?? [],
-                        'webinar_registration' => $messageData['webinar_registration'] ?? [],
-                        'webinar_series' => $messageData['webinar_series'] ?? [],
-                    ],
-                ],
-            );
+            $enrollmentId = (int) $enrollment->getKey();
 
-            return $this->dispatchRegistrationMessages(
-                registration: $registration,
-                webinar: $webinar,
+            $this->updateClaimedState($registration, [
+                'status' => 'scheduled',
+                'outcome' => $outcome,
+                'message_chain_enrollment_id' => $enrollmentId,
+                'completed_at' => now()->toISOString(),
+                'reason' => null,
+                'failed_at' => null,
+                'failure_reason' => null,
+                'last_error_class' => null,
+                'last_error_code' => null,
+            ]);
+
+            return new WebinarFollowUpDispatchResult(
+                status: WebinarFollowUpDispatchResult::STATUS_SCHEDULED,
+                registrationId: (int) $registration->getKey(),
                 outcome: $outcome,
-                payload: $payload,
-                messageArea: $messageArea,
+                messageChainEnrollmentId: $enrollmentId,
             );
         } catch (Throwable $exception) {
             report($exception);
@@ -187,9 +178,7 @@ class DispatchPostWebinarFollowUpsAction
             return $this->recordFailure(
                 registration: $registration,
                 outcome: $outcome,
-                reason: 'follow_up_planning_exception',
-                channels: [],
-                scheduledMessageIds: [],
+                reason: 'message_chain_enrollment_exception',
                 exception: $exception,
             );
         }
@@ -267,163 +256,11 @@ class DispatchPostWebinarFollowUpsAction
             ->all();
     }
 
-    /**
-     * @param array<string, mixed> $payload
-     */
-    private function dispatchRegistrationMessages(
-        WebinarRegistration $registration,
-        Webinar $webinar,
-        string $outcome,
-        array $payload,
-        WebinarMessageAreaDefinition $messageArea,
-    ): WebinarFollowUpDispatchResult {
-        $channelResults = [];
-        $scheduledMessageIds = $this->scheduledMessageIds(
-            data_get($registration->fresh()?->meta, 'post_event_follow_up', []),
-        );
-        $failureReason = null;
-        $failureException = null;
-
-        foreach ($this->channels() as $channel) {
-            try {
-                $definitions = $this->scheduleProfileDefinitionResolver->applyForWebinar(
-                    webinar: $webinar,
-                    definitions: $this->messageDefinitionResolver->resolve(
-                        channel: $channel,
-                        purpose: $messageArea->purpose,
-                        scope: $messageArea->scope,
-                    ),
-                    dispatchKeys: $messageArea->dispatchKey,
-                    surface: $messageArea->surface,
-                );
-
-                $definitions = $this->messageAreaRegistry->filterDefinitions(
-                    definitions: $definitions,
-                    areaKeys: [$messageArea->key],
-                    surface: $messageArea->surface,
-                );
-
-                if ($definitions === []) {
-                    $channelResults[$channel] = [
-                        'status' => 'failed',
-                        'reason' => 'message_definition_unavailable',
-                        'scheduled_message_ids' => [],
-                    ];
-                    $failureReason ??= 'message_definition_unavailable';
-
-                    continue;
-                }
-
-                $meta = [
-                    'webinar_id' => $webinar->getKey(),
-                    'webinar_registration_id' => $registration->getKey(),
-                    'webinar_slug' => $registration->webinar_slug,
-                    'webinar_message_area' => $messageArea->key,
-                    'post_event' => [
-                        'type' => 'transactional_follow_up',
-                        'attended' => $outcome === 'attended',
-                    ],
-                    'webinar_schedule_profile_applied' => true,
-                ];
-
-                $messages = $this->dispatchMessageAction->handle(
-                    recipient: $registration->contact,
-                    channel: $channel,
-                    purpose: $messageArea->purpose,
-                    scope: $messageArea->scope,
-                    dispatchKeys: $messageArea->dispatchKey,
-                    payload: $payload,
-                    context: $registration,
-                    triggeredAt: now(),
-                    anchor: $webinar->ends_at,
-                    meta: $meta,
-                    definitions: $definitions,
-                    occurrenceKey: implode(':', [
-                        'webinar_post_event',
-                        $registration->getKey(),
-                        $webinar->getKey(),
-                    ]),
-                );
-
-                $messageIds = array_values(array_unique(array_map(
-                    fn (ScheduledMessage $message): int => (int) $message->getKey(),
-                    array_values(array_filter(
-                        $messages,
-                        fn (mixed $message): bool => $message instanceof ScheduledMessage,
-                    )),
-                )));
-
-                if ($messageIds === []) {
-                    $channelResults[$channel] = [
-                        'status' => 'not_applicable',
-                        'reason' => 'messaging_planning_gate_rejected',
-                        'scheduled_message_ids' => [],
-                    ];
-
-                    continue;
-                }
-
-                $scheduledMessageIds = array_values(array_unique([
-                    ...$scheduledMessageIds,
-                    ...$messageIds,
-                ]));
-                $channelResults[$channel] = [
-                    'status' => 'scheduled',
-                    'scheduled_message_ids' => $messageIds,
-                ];
-            } catch (Throwable $exception) {
-                report($exception);
-
-                $channelResults[$channel] = [
-                    'status' => 'failed',
-                    'reason' => 'message_dispatch_exception',
-                    'scheduled_message_ids' => [],
-                    'last_error_class' => $exception::class,
-                    'last_error_code' => (string) $exception->getCode(),
-                ];
-                $failureReason ??= 'message_dispatch_exception';
-                $failureException ??= $exception;
-            }
-        }
-
-        if ($failureReason !== null) {
-            return $this->recordFailure(
-                registration: $registration,
-                outcome: $outcome,
-                reason: $failureReason,
-                channels: $channelResults,
-                scheduledMessageIds: $scheduledMessageIds,
-                exception: $failureException,
-            );
-        }
-
-        if ($scheduledMessageIds === []) {
-            return $this->recordNotApplicable(
-                registration: $registration,
-                outcome: $outcome,
-                reason: 'no_channels_eligible',
-                channels: $channelResults,
-            );
-        }
-
-        $this->updateClaimedState($registration, [
-            'status' => 'scheduled',
-            'outcome' => $outcome,
-            'channels' => $channelResults,
-            'scheduled_message_ids' => $scheduledMessageIds,
-            'completed_at' => now()->toISOString(),
-            'failed_at' => null,
-            'failure_reason' => null,
-            'last_error_class' => null,
-            'last_error_code' => null,
-        ]);
-
-        return new WebinarFollowUpDispatchResult(
-            status: WebinarFollowUpDispatchResult::STATUS_SCHEDULED,
-            registrationId: (int) $registration->getKey(),
-            outcome: $outcome,
-            scheduledMessageIds: $scheduledMessageIds,
-        );
+    private function enrollmentHasPlannedDelivery(
+        MessageChainEnrollment $enrollment,
+    ): bool {
+        return $enrollment->scheduledMessages->isNotEmpty()
+            || ($enrollment->isActive() && $enrollment->next_action_at !== null);
     }
 
     private function claimAttempt(
@@ -442,13 +279,14 @@ class DispatchPostWebinarFollowUpsAction
             $storedOutcome = is_string($state['outcome'] ?? null)
                 ? $state['outcome']
                 : $outcome;
+            $enrollmentId = $this->messageChainEnrollmentId($state);
 
             if (($state['status'] ?? null) === 'scheduled') {
                 return new WebinarFollowUpDispatchResult(
                     status: WebinarFollowUpDispatchResult::STATUS_ALREADY_SCHEDULED,
                     registrationId: (int) $locked->getKey(),
                     outcome: $storedOutcome,
-                    scheduledMessageIds: $this->scheduledMessageIds($state),
+                    messageChainEnrollmentId: $enrollmentId,
                 );
             }
 
@@ -457,7 +295,10 @@ class DispatchPostWebinarFollowUpsAction
                     status: WebinarFollowUpDispatchResult::STATUS_NOT_APPLICABLE,
                     registrationId: (int) $locked->getKey(),
                     outcome: $storedOutcome,
-                    reason: is_string($state['reason'] ?? null) ? $state['reason'] : null,
+                    messageChainEnrollmentId: $enrollmentId,
+                    reason: is_string($state['reason'] ?? null)
+                        ? $state['reason']
+                        : null,
                 );
             }
 
@@ -469,11 +310,12 @@ class DispatchPostWebinarFollowUpsAction
                     status: WebinarFollowUpDispatchResult::STATUS_IN_PROGRESS,
                     registrationId: (int) $locked->getKey(),
                     outcome: $storedOutcome,
-                    scheduledMessageIds: $this->scheduledMessageIds($state),
+                    messageChainEnrollmentId: $enrollmentId,
                 );
             }
 
             $attemptedAt = now()->toISOString();
+            $state = $this->compactState($state);
             $meta['post_event_follow_up'] = array_replace($state, [
                 'status' => 'planning',
                 'outcome' => $outcome,
@@ -497,14 +339,13 @@ class DispatchPostWebinarFollowUpsAction
         WebinarRegistration $registration,
         string $outcome,
         string $reason,
-        array $channels = [],
+        ?int $messageChainEnrollmentId = null,
     ): WebinarFollowUpDispatchResult {
         $this->updateClaimedState($registration, [
             'status' => 'not_applicable',
             'outcome' => $outcome,
             'reason' => $reason,
-            'channels' => $channels,
-            'scheduled_message_ids' => [],
+            'message_chain_enrollment_id' => $messageChainEnrollmentId,
             'completed_at' => now()->toISOString(),
             'failed_at' => null,
             'failure_reason' => null,
@@ -516,27 +357,22 @@ class DispatchPostWebinarFollowUpsAction
             status: WebinarFollowUpDispatchResult::STATUS_NOT_APPLICABLE,
             registrationId: (int) $registration->getKey(),
             outcome: $outcome,
+            messageChainEnrollmentId: $messageChainEnrollmentId,
             reason: $reason,
         );
     }
 
-    /**
-     * @param array<string, mixed> $channels
-     * @param array<int, int> $scheduledMessageIds
-     */
     private function recordFailure(
         WebinarRegistration $registration,
         string $outcome,
         string $reason,
-        array $channels,
-        array $scheduledMessageIds,
+        ?int $messageChainEnrollmentId = null,
         ?Throwable $exception = null,
     ): WebinarFollowUpDispatchResult {
         $this->updateClaimedState($registration, [
             'status' => 'failed',
             'outcome' => $outcome,
-            'channels' => $channels,
-            'scheduled_message_ids' => $scheduledMessageIds,
+            'message_chain_enrollment_id' => $messageChainEnrollmentId,
             'failed_at' => now()->toISOString(),
             'failure_reason' => $reason,
             'last_error_class' => $exception ? $exception::class : null,
@@ -549,7 +385,7 @@ class DispatchPostWebinarFollowUpsAction
             status: WebinarFollowUpDispatchResult::STATUS_FAILED,
             registrationId: (int) $registration->getKey(),
             outcome: $outcome,
-            scheduledMessageIds: $scheduledMessageIds,
+            messageChainEnrollmentId: $messageChainEnrollmentId,
             reason: $reason,
         );
     }
@@ -573,20 +409,36 @@ class DispatchPostWebinarFollowUpsAction
                 return;
             }
 
-            $meta['post_event_follow_up'] = array_replace($state, $changes);
+            $meta['post_event_follow_up'] = array_replace(
+                $this->compactState($state),
+                $changes,
+            );
             $locked->forceFill(['meta' => $meta])->save();
         });
     }
 
-    /** @param array<string, mixed> $state */
-    private function scheduledMessageIds(array $state): array
+    /**
+     * @param array<string, mixed> $state
+     * @return array<string, mixed>
+     */
+    private function compactState(array $state): array
     {
-        return array_values(array_unique(array_filter(array_map(
-            fn (mixed $id): ?int => is_numeric($id) ? (int) $id : null,
-            is_array($state['scheduled_message_ids'] ?? null)
-                ? $state['scheduled_message_ids']
-                : [],
-        ), fn (?int $id): bool => $id !== null && $id > 0)));
+        unset(
+            $state['channels'],
+            $state['scheduled_message_ids'],
+        );
+
+        return $state;
+    }
+
+    /** @param array<string, mixed> $state */
+    private function messageChainEnrollmentId(array $state): ?int
+    {
+        $value = $state['message_chain_enrollment_id'] ?? null;
+
+        return is_numeric($value) && (int) $value > 0
+            ? (int) $value
+            : null;
     }
 
     private function hasEnabledOutcomeMessages(): bool
@@ -598,30 +450,6 @@ class DispatchPostWebinarFollowUpsAction
         }
 
         return false;
-    }
-
-    /** @return array<int, string> */
-    private function channels(): array
-    {
-        $channels = config('webinars.post_event.outcome_messages.channels', [
-            MessageChannel::Email->value,
-        ]);
-
-        if (! is_array($channels)) {
-            $channels = [MessageChannel::Email->value];
-        }
-
-        $allowed = [
-            MessageChannel::Email->value,
-            MessageChannel::Sms->value,
-        ];
-
-        return array_values(array_unique(array_filter(array_map(
-            fn (mixed $channel): ?string => is_string($channel) && in_array(strtolower(trim($channel)), $allowed, true)
-                ? strtolower(trim($channel))
-                : null,
-            $channels,
-        )))) ?: [MessageChannel::Email->value];
     }
 
     /** @return array<string, mixed> */

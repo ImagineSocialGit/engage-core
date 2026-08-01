@@ -30,8 +30,12 @@ class StartMessageChainEnrollmentAction
         ?Model $context = null,
         ?Model $origin = null,
         Carbon|string|null $startedAt = null,
+        ?string $surface = null,
+        ?string $startStepKey = null,
     ): MessageChainEnrollment {
         $dedupeKey = $this->dedupeKey($dedupeKey);
+        $surface = $this->nullableSegment($surface, 96);
+        $startStepKey = $this->nullableSegment($startStepKey, 128);
         $startedAt = ($startedAt ? Carbon::parse($startedAt) : now())->utc();
 
         $result = DB::transaction(function () use (
@@ -41,6 +45,8 @@ class StartMessageChainEnrollmentAction
             $context,
             $origin,
             $startedAt,
+            $surface,
+            $startStepKey,
         ): array {
             $chain = MessageChain::query()
                 ->with('currentVersion.steps')
@@ -74,6 +80,7 @@ class StartMessageChainEnrollmentAction
                     recipient: $recipient,
                     context: $context,
                     origin: $origin,
+                    surface: $surface,
                 );
 
                 return [
@@ -82,7 +89,10 @@ class StartMessageChainEnrollmentAction
                 ];
             }
 
-            $firstStep = $this->firstActiveStep($version);
+            $firstStep = $this->startingStep(
+                version: $version,
+                startStepKey: $startStepKey,
+            );
 
             $enrollment = MessageChainEnrollment::query()->create([
                 'message_chain_version_id' => $version->getKey(),
@@ -92,6 +102,7 @@ class StartMessageChainEnrollmentAction
                 'context_id' => $context?->getKey(),
                 'origin_type' => $origin?->getMorphClass(),
                 'origin_id' => $origin?->getKey(),
+                'surface' => $surface,
                 'current_message_chain_step_id' => $firstStep?->getKey(),
                 'next_action_at' => null,
                 'status' => $firstStep instanceof MessageChainStep
@@ -137,18 +148,34 @@ class StartMessageChainEnrollmentAction
         return $enrollment;
     }
 
-    private function firstActiveStep(
+    private function startingStep(
         MessageChainVersion $version,
+        ?string $startStepKey,
     ): ?MessageChainStep {
         $steps = $version->relationLoaded('steps')
             ? $version->getRelation('steps')
             : $version->steps()->get();
 
-        return $steps
-            ->first(
+        if ($startStepKey === null) {
+            return $steps->first(
                 fn (MessageChainStep $step): bool =>
                     (bool) $step->is_active,
             );
+        }
+
+        $step = $steps->first(
+            fn (MessageChainStep $candidate): bool =>
+                (bool) $candidate->is_active
+                && $candidate->key === $startStepKey,
+        );
+
+        if (! $step instanceof MessageChainStep) {
+            throw new InvalidArgumentException(
+                "MessageChainVersion [{$version->getKey()}] has no active start step [{$startStepKey}].",
+            );
+        }
+
+        return $step;
     }
 
     private function assertExistingEnrollmentMatches(
@@ -157,6 +184,7 @@ class StartMessageChainEnrollmentAction
         Model $recipient,
         ?Model $context,
         ?Model $origin,
+        ?string $surface,
     ): void {
         $version = $enrollment->messageChainVersion()
             ->with('messageChain')
@@ -167,6 +195,12 @@ class StartMessageChainEnrollmentAction
         ) {
             throw new LogicException(
                 "Message-chain enrollment dedupe key [{$enrollment->dedupe_key}] belongs to a different chain.",
+            );
+        }
+
+        if ($enrollment->surface !== $surface) {
+            throw new LogicException(
+                "Message-chain enrollment dedupe key [{$enrollment->dedupe_key}] has conflicting surface identity.",
             );
         }
 
@@ -197,6 +231,25 @@ class StartMessageChainEnrollmentAction
         ProcessMessageChainEnrollmentJob::dispatch(
             enrollmentId: (int) $enrollment->getKey(),
         )->delay($enrollment->next_action_at);
+    }
+
+    private function nullableSegment(
+        ?string $value,
+        int $maximumLength,
+    ): ?string {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $value = str_replace('-', '_', strtolower(trim($value)));
+
+        if (mb_strlen($value) > $maximumLength) {
+            throw new InvalidArgumentException(
+                "Message-chain enrollment segment cannot exceed {$maximumLength} characters.",
+            );
+        }
+
+        return $value;
     }
 
     private function dedupeKey(string $value): string

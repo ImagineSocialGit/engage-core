@@ -14,6 +14,6 @@ readonly class WebinarRegistrationImportResult
         public bool $registrationCreated,
         public int $consentsCreated,
         public int $consentsUpdated,
-        public int $remindersScheduled,
+        public int $reminderEnrollments,
     ) {}
 }

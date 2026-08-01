@@ -2,16 +2,11 @@
 
 namespace App\Modules\Webinars\Actions;
 
-use App\Modules\Messaging\Actions\DispatchMessageAction;
 use App\Modules\Messaging\Enums\MessageChannel;
-use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
-use App\Modules\Messaging\Services\MessageDefinitionResolver;
-use App\Modules\Webinars\Services\WebinarMessageAreaRegistry;
-use App\Modules\Webinars\Services\WebinarScheduleProfileDefinitionResolver;
-use App\Modules\Webinars\Data\WebinarMessageData;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarWaitlistSignup;
+use App\Modules\Webinars\Services\WebinarMessageAreaRegistry;
 
 class DispatchWebinarWaitlistMessagesAction
 {
@@ -20,10 +15,8 @@ class DispatchWebinarWaitlistMessagesAction
     private const SCOPE = 'webinar_waitlist';
 
     public function __construct(
-        private readonly DispatchMessageAction $dispatchMessageAction,
+        private readonly StartWebinarMessageChainEnrollmentAction $startMessageChainEnrollment,
         private readonly MessageChannelAvailability $messageChannelAvailability,
-        private readonly MessageDefinitionResolver $messageDefinitionResolver,
-        private readonly WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
         private readonly WebinarMessageAreaRegistry $messageAreaRegistry,
     ) {}
 
@@ -42,7 +35,7 @@ class DispatchWebinarWaitlistMessagesAction
             ->get();
 
         foreach ($signups as $signup) {
-            if (! $this->dispatchForSignup($signup, $webinar)) {
+            if (! $this->enrollSignup($signup, $webinar)) {
                 continue;
             }
 
@@ -52,85 +45,37 @@ class DispatchWebinarWaitlistMessagesAction
         }
     }
 
-    private function dispatchForSignup(WebinarWaitlistSignup $signup, Webinar $webinar): bool
-    {
-        if (! $signup->contact) {
+    private function enrollSignup(
+        WebinarWaitlistSignup $signup,
+        Webinar $webinar,
+    ): bool {
+        if (! $signup->contact || $this->availableAcceptedChannels($signup) === []) {
             return false;
         }
 
-        $channels = $this->availableAcceptedChannels($signup);
+        $enrollment = $this->startMessageChainEnrollment->handle(
+            webinar: $webinar,
+            messageAreaKey: 'waitlist',
+            recipient: $signup->contact,
+            context: $signup,
+            startedAt: now(),
+            required: false,
+        );
 
-        if ($channels === []) {
+        if ($enrollment === null) {
             return false;
         }
 
-        $messageData = WebinarMessageData::fromWaitlistSignup($signup, $webinar)->toArray();
-
-        $scheduledCount = 0;
-
-        foreach ($channels as $channel) {
-            $definitions = $this->scheduleProfileDefinitionResolver->applyForWebinar(
-                webinar: $webinar,
-                definitions: $this->messageDefinitionResolver->resolve(
-                    channel: $channel,
-                    purpose: MessagePurpose::Marketing->value,
-                    scope: self::SCOPE,
-                ),
-                dispatchKeys: 'webinar_added',
-                surface: self::SURFACE,
-            );
-
-            $definitions = $this->messageAreaRegistry->filterDefinitions(
-                definitions: $definitions,
-                areaKeys: ['waitlist'],
-                surface: self::SURFACE,
-            );
-
-            if ($definitions === []) {
-                continue;
-            }
-
-            $scheduledCount += count($this->dispatchMessageAction->handle(
-                recipient: $signup->contact,
-                channel: $channel,
-                purpose: MessagePurpose::Marketing,
-                scope: self::SCOPE,
-                dispatchKeys: 'webinar_added',
-                payload: [
-                    'tokens' => $messageData,
-                    'context' => [
-                        'contact' => $messageData['contact'] ?? [],
-                        'webinar_waitlist_signup' => $messageData['webinar_waitlist_signup'] ?? [],
-                        'webinar' => $messageData['webinar'] ?? [],
-                        'webinar_series' => $messageData['webinar_series'] ?? [],
-                    ],
-                ],
-                context: $signup,
-                triggeredAt: now(),
-                anchor: $webinar->starts_at,
-                meta: [
-                    'webinar_schedule_profile_applied' => true,
-                    'webinar_waitlist_signup_id' => $signup->getKey(),
-                    'webinar_id' => $webinar->getKey(),
-                    'webinar_series_id' => $webinar->webinar_series_id,
-                ],
-                definitions: $definitions,
-                occurrenceKey: implode(':', [
-                    'webinar_waitlist',
-                    $signup->getKey(),
-                    $webinar->getKey(),
-                ]),
-            ));
-        }
-
-        return $scheduledCount > 0;
+        return $enrollment->scheduledMessages->isNotEmpty()
+            || ($enrollment->isActive() && $enrollment->next_action_at !== null);
     }
 
     /**
      * @return array<int, MessageChannel>
      */
-    private function availableAcceptedChannels(WebinarWaitlistSignup $signup): array
-    {
+    private function availableAcceptedChannels(
+        WebinarWaitlistSignup $signup,
+    ): array {
         $acceptedChannels = $signup->meta['accepted_channels'][self::PURPOSE] ?? [];
 
         if (! is_array($acceptedChannels)) {

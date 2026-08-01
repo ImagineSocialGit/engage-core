@@ -4,6 +4,7 @@ namespace App\Modules\Messaging\Services;
 
 use App\Modules\Messaging\Contracts\Email\EmailMessage;
 use App\Modules\Messaging\Contracts\Sms\SmsMessage;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\MessageTemplateVersion;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Models\ScheduledMessageRenderContext;
@@ -16,6 +17,7 @@ class ScheduledMessagePayloadResolver
     public function __construct(
         private readonly MessageRecipientPayloadResolver $recipientPayloadResolver,
         private readonly ScheduledMessagePayloadCanonicalizer $payloadCanonicalizer,
+        private readonly MessageChainExecutionContextResolver $chainExecutionContextResolver,
     ) {}
 
     public function resolve(
@@ -53,6 +55,11 @@ class ScheduledMessagePayloadResolver
                 ),
             );
         }
+
+        $runtimePayload = $this->withChainExecutionContext(
+            scheduledMessage: $scheduledMessage,
+            runtimePayload: $runtimePayload,
+        );
 
         $recipient = $scheduledMessage->recipient()->first();
 
@@ -124,6 +131,38 @@ class ScheduledMessagePayloadResolver
             scheduledMessage: $scheduledMessage,
             payload: $canonical,
         );
+    }
+
+    /**
+     * @param array<string, mixed> $runtimePayload
+     * @return array<string, mixed>
+     */
+    private function withChainExecutionContext(
+        ScheduledMessage $scheduledMessage,
+        array $runtimePayload,
+    ): array {
+        if ($scheduledMessage->message_chain_enrollment_id === null) {
+            return $runtimePayload;
+        }
+
+        $enrollment = $scheduledMessage->relationLoaded('messageChainEnrollment')
+            ? $scheduledMessage->getRelation('messageChainEnrollment')
+            : $scheduledMessage->messageChainEnrollment()->first();
+
+        if (! $enrollment instanceof MessageChainEnrollment) {
+            throw new InvalidArgumentException(
+                'Scheduled message chain enrollment could not be resolved for rendering.',
+            );
+        }
+
+        $runtimePayload['tokens'] = array_replace_recursive(
+            $this->chainExecutionContextResolver->resolve($enrollment),
+            is_array($runtimePayload['tokens'] ?? null)
+                ? $runtimePayload['tokens']
+                : [],
+        );
+
+        return $runtimePayload;
     }
 
     /**

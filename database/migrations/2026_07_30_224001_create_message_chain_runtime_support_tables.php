@@ -30,6 +30,7 @@ return new class extends Migration
             $table->morphs('recipient');
             $table->nullableMorphs('context');
             $table->nullableMorphs('origin');
+            $table->string('surface', 96)->nullable()->index();
             $table->foreignIdFor(MessageChainStep::class, 'current_message_chain_step_id')
                 ->nullable()
                 ->constrained('message_chain_steps')

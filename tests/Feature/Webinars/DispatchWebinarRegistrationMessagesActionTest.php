@@ -5,12 +5,16 @@ namespace Tests\Feature\Webinars;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
+use App\Modules\Messaging\Actions\SyncMessageTemplatePresetsAction;
+use App\Modules\Messaging\Jobs\ProcessMessageChainEnrollmentJob;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Webinars\Actions\DispatchWebinarRegistrationMessagesAction;
+use App\Modules\Webinars\Actions\SyncWebinarScheduleProfileChainsAction;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
@@ -32,7 +36,7 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
         $this->configureWebinarRegistrationChannelAvailability();
     }
 
-    public function test_it_dispatches_registration_created_email_messages_when_sms_is_hidden_for_registration(): void
+    public function test_it_keeps_confirmation_direct_and_enrolls_reminders_when_sms_is_hidden(): void
     {
         Queue::fake();
 
@@ -60,26 +64,22 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
             'payload_class' => EmailPayload::class,
             'status' => 'pending',
         ]);
-
-        $this->assertDatabaseHas('scheduled_messages', [
-            'recipient_type' => Contact::class,
+        $this->assertDatabaseMissing('scheduled_messages', [
             'recipient_id' => $registration->contact_id,
-            'channel' => MessageChannel::Email->value,
             'message_type' => 'reminder',
         ]);
-
         $this->assertDatabaseMissing('scheduled_messages', [
-            'recipient_type' => Contact::class,
             'recipient_id' => $registration->contact_id,
             'channel' => MessageChannel::Sms->value,
         ]);
+        $this->assertSame(1, ScheduledMessage::query()->count());
+        $this->assertReminderEnrollment($registration);
 
-        $this->assertSame(2, ScheduledMessage::query()->count());
-
-        Queue::assertPushed(SendScheduledMessageJob::class, 2);
+        Queue::assertPushed(SendScheduledMessageJob::class, 1);
+        Queue::assertPushed(ProcessMessageChainEnrollmentJob::class, 1);
     }
 
-    public function test_it_dispatches_registration_created_sms_messages_when_sms_is_available_and_consented(): void
+    public function test_it_keeps_both_consented_confirmations_direct_and_enrolls_one_reminder_chain(): void
     {
         Queue::fake();
 
@@ -96,54 +96,37 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
 
         app(DispatchWebinarRegistrationMessagesAction::class)->handle($registration);
 
-        $this->assertDatabaseHas('scheduled_messages', [
-            'recipient_type' => Contact::class,
-            'recipient_id' => $registration->contact_id,
-            'context_type' => $registration->getMorphClass(),
-            'context_id' => $registration->id,
-            'channel' => MessageChannel::Email->value,
-            'purpose' => MessagePurpose::Transactional->value,
-            'scope' => 'webinar',
-            'message_type' => 'confirmation',
-            'payload_class' => EmailPayload::class,
-            'status' => 'pending',
-        ]);
+        foreach ([
+            MessageChannel::Email->value => EmailPayload::class,
+            MessageChannel::Sms->value => SmsPayload::class,
+        ] as $channel => $payloadClass) {
+            $this->assertDatabaseHas('scheduled_messages', [
+                'recipient_type' => Contact::class,
+                'recipient_id' => $registration->contact_id,
+                'context_type' => $registration->getMorphClass(),
+                'context_id' => $registration->id,
+                'channel' => $channel,
+                'purpose' => MessagePurpose::Transactional->value,
+                'scope' => 'webinar',
+                'message_type' => 'confirmation',
+                'payload_class' => $payloadClass,
+                'status' => 'pending',
+            ]);
+        }
 
-        $this->assertDatabaseHas('scheduled_messages', [
-            'recipient_type' => Contact::class,
+        $this->assertDatabaseMissing('scheduled_messages', [
             'recipient_id' => $registration->contact_id,
-            'context_type' => $registration->getMorphClass(),
-            'context_id' => $registration->id,
-            'channel' => MessageChannel::Sms->value,
-            'purpose' => MessagePurpose::Transactional->value,
-            'scope' => 'webinar',
-            'message_type' => 'confirmation',
-            'payload_class' => SmsPayload::class,
-            'status' => 'pending',
-        ]);
-
-        $this->assertDatabaseHas('scheduled_messages', [
-            'recipient_type' => Contact::class,
-            'recipient_id' => $registration->contact_id,
-            'channel' => MessageChannel::Email->value,
             'message_type' => 'reminder',
         ]);
-
-        $this->assertDatabaseHas('scheduled_messages', [
-            'recipient_type' => Contact::class,
-            'recipient_id' => $registration->contact_id,
-            'channel' => MessageChannel::Sms->value,
-            'message_type' => 'reminder',
-        ]);
-
-        $this->assertSame(4, ScheduledMessage::query()->count());
-
+        $this->assertSame(2, ScheduledMessage::query()->count());
+        $this->assertReminderEnrollment($registration);
         $this->assertCompactScheduledPayloads();
 
-        Queue::assertPushed(SendScheduledMessageJob::class, 4);
+        Queue::assertPushed(SendScheduledMessageJob::class, 2);
+        Queue::assertPushed(ProcessMessageChainEnrollmentJob::class, 1);
     }
 
-    public function test_it_does_not_dispatch_sms_when_sms_is_available_but_not_consented(): void
+    public function test_it_does_not_dispatch_sms_confirmation_when_sms_is_not_consented(): void
     {
         Queue::fake();
 
@@ -160,24 +143,21 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
         app(DispatchWebinarRegistrationMessagesAction::class)->handle($registration);
 
         $this->assertDatabaseHas('scheduled_messages', [
-            'recipient_type' => Contact::class,
             'recipient_id' => $registration->contact_id,
             'channel' => MessageChannel::Email->value,
+            'message_type' => 'confirmation',
         ]);
-
         $this->assertDatabaseMissing('scheduled_messages', [
-            'recipient_type' => Contact::class,
             'recipient_id' => $registration->contact_id,
             'channel' => MessageChannel::Sms->value,
         ]);
+        $this->assertSame(1, ScheduledMessage::query()->count());
+        $this->assertReminderEnrollment($registration);
 
-        $this->assertSame(2, ScheduledMessage::query()->count());
-
-        Queue::assertPushed(SendScheduledMessageJob::class, 2);
+        Queue::assertPushed(SendScheduledMessageJob::class, 1);
     }
 
-
-    public function test_it_does_not_dispatch_sms_when_contact_has_sms_consent_but_registration_did_not_accept_sms(): void
+    public function test_it_does_not_dispatch_sms_when_registration_did_not_accept_sms(): void
     {
         Queue::fake();
 
@@ -198,20 +178,18 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
         app(DispatchWebinarRegistrationMessagesAction::class)->handle($registration);
 
         $this->assertDatabaseHas('scheduled_messages', [
-            'recipient_type' => Contact::class,
             'recipient_id' => $registration->contact_id,
             'channel' => MessageChannel::Email->value,
+            'message_type' => 'confirmation',
         ]);
-
         $this->assertDatabaseMissing('scheduled_messages', [
-            'recipient_type' => Contact::class,
             'recipient_id' => $registration->contact_id,
             'channel' => MessageChannel::Sms->value,
         ]);
+        $this->assertSame(1, ScheduledMessage::query()->count());
+        $this->assertReminderEnrollment($registration);
 
-        $this->assertSame(2, ScheduledMessage::query()->count());
-
-        Queue::assertPushed(SendScheduledMessageJob::class, 2);
+        Queue::assertPushed(SendScheduledMessageJob::class, 1);
     }
 
     private function configureRegistrationMessages(): void
@@ -283,6 +261,7 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
             'status' => WebinarScheduleProfile::STATUS_ACTIVE,
             'is_default' => true,
             'is_active' => true,
+            'message_template_set_key' => 'default',
         ]);
 
         foreach ([MessageChannel::Email->value, MessageChannel::Sms->value] as $channel) {
@@ -325,6 +304,12 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
                 'is_active' => true,
             ]);
         }
+
+        app(SyncMessageTemplatePresetsAction::class)->handle(force: true);
+        app(SyncWebinarScheduleProfileChainsAction::class)->handle(
+            profile: $profile,
+            force: true,
+        );
     }
 
     /**
@@ -419,6 +404,26 @@ class DispatchWebinarRegistrationMessagesActionTest extends TestCase
     private function enableWebinarRegistrationSms(): void
     {
         Config::set('messaging.channel_availability.sms.surfaces.webinar_registrations', true);
+    }
+
+    private function assertReminderEnrollment(
+        WebinarRegistration $registration,
+    ): void {
+        $enrollment = MessageChainEnrollment::query()
+            ->with('currentMessageChainStep.variants')
+            ->where('context_type', $registration->getMorphClass())
+            ->where('context_id', $registration->getKey())
+            ->sole();
+
+        $this->assertSame(MessageChainEnrollment::STATUS_ACTIVE, $enrollment->status);
+        $this->assertSame('webinar_registrations', $enrollment->surface);
+        $this->assertNotNull($enrollment->next_action_at);
+        $this->assertTrue($enrollment->next_action_at->isFuture());
+        $this->assertTrue(
+            $enrollment->currentMessageChainStep->variants->every(
+                fn ($variant): bool => $variant->message_type === 'reminder',
+            ),
+        );
     }
 
     private function assertCompactScheduledPayloads(): void

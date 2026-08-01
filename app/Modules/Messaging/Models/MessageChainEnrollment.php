@@ -24,6 +24,7 @@ class MessageChainEnrollment extends Model
         'context_id',
         'origin_type',
         'origin_id',
+        'surface',
         'current_message_chain_step_id',
         'next_action_at',
         'status',

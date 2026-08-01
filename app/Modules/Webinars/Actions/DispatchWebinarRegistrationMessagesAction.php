@@ -10,8 +10,8 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\MessageChannelAvailability;
-use App\Modules\Messaging\Services\MessageEligibilityGate;
 use App\Modules\Messaging\Services\MessageDefinitionResolver;
+use App\Modules\Messaging\Services\MessageEligibilityGate;
 use App\Modules\Webinars\Data\WebinarMessageData;
 use App\Modules\Webinars\Models\WebinarRegistration;
 use App\Modules\Webinars\Services\WebinarMessageAreaRegistry;
@@ -20,6 +20,7 @@ use App\Modules\Webinars\Services\WebinarScheduleProfileDefinitionResolver;
 class DispatchWebinarRegistrationMessagesAction
 {
     private const SCOPE = 'webinar';
+    private const SURFACE = 'webinar_registrations';
 
     public function __construct(
         private readonly DispatchMessageIntentsAction $dispatchMessageIntents,
@@ -29,9 +30,14 @@ class DispatchWebinarRegistrationMessagesAction
         private readonly MessageDefinitionResolver $messageDefinitionResolver,
         private readonly WebinarScheduleProfileDefinitionResolver $scheduleProfileDefinitionResolver,
         private readonly WebinarMessageAreaRegistry $messageAreaRegistry,
+        private readonly StartWebinarMessageChainEnrollmentAction $startMessageChainEnrollment,
     ) {}
 
     /**
+     * Confirmation and consent acknowledgements remain on the direct intent path
+     * until component-aware consolidation is cut over. Reminders are enrolled in
+     * the immutable registration chain and materialized only when due.
+     *
      * @param array<int, string>|null $contextKeys
      * @param array<int, MessageConsentGrantResult> $consentGrants
      * @return array<int, ScheduledMessage>
@@ -47,16 +53,88 @@ class DispatchWebinarRegistrationMessagesAction
             'webinar.webinarSeries',
         ]);
 
-        if (! $registration->contact) {
+        if (! $registration->contact || ! $registration->webinar) {
             return [];
         }
 
         $contextKeys = $this->normalizeContextKeys($contextKeys);
-        $messageData = WebinarMessageData::fromRegistration($registration)->toArray();
-        $payload = $this->messagePayload($messageData);
+        $channels = $this->availableTransactionalChannels($registration);
+        $messages = [];
+
+        if ($this->includesConfirmationContext($contextKeys)
+            || $this->includesInitialRegistrationContext($contextKeys)
+        ) {
+            $messageData = WebinarMessageData::fromRegistration($registration)->toArray();
+            $payload = $this->messagePayload($messageData);
+            $intents = $this->confirmationIntents(
+                registration: $registration,
+                channels: $channels,
+                payload: $payload,
+            );
+
+            if ($this->includesInitialRegistrationContext($contextKeys)) {
+                foreach ($consentGrants as $grant) {
+                    if (! $grant instanceof MessageConsentGrantResult || ! $grant->becameActive) {
+                        continue;
+                    }
+
+                    $intent = $this->buildConsentOptInIntent->handle(
+                        contact: $registration->contact,
+                        grant: $grant,
+                        payload: $payload,
+                        context: $registration,
+                        resolverContext: [
+                            'webinar_slug' => $registration->webinar_slug,
+                        ],
+                    );
+
+                    if ($intent instanceof MessageDeliveryIntent) {
+                        $intents[] = $intent;
+                    }
+                }
+            }
+
+            $messages = $this->dispatchMessageIntents->handle(
+                intents: $intents,
+                policyKey: 'webinar_registration',
+            );
+        }
+
+        if (
+            $channels !== []
+            && $this->includesReminderContext($contextKeys)
+            && $this->messageAreaRegistry->isEnabled('reminders')
+        ) {
+            $this->startMessageChainEnrollment->handle(
+                webinar: $registration->webinar,
+                messageAreaKey: 'reminders',
+                recipient: $registration->contact,
+                context: $registration,
+                startedAt: $registration->registered_at ?? now(),
+                required: false,
+            );
+        }
+
+        return $messages;
+    }
+
+    /**
+     * @param array<int, MessageChannel> $channels
+     * @param array<string, mixed> $payload
+     * @return array<int, MessageDeliveryIntent>
+     */
+    private function confirmationIntents(
+        WebinarRegistration $registration,
+        array $channels,
+        array $payload,
+    ): array {
+        if (! $this->messageAreaRegistry->isEnabled('confirmation')) {
+            return [];
+        }
+
         $intents = [];
 
-        foreach ($this->availableTransactionalChannels($registration) as $channel) {
+        foreach ($channels as $channel) {
             if (! $this->messageEligibilityGate->allows(
                 contact: $registration->contact,
                 channel: $channel,
@@ -74,13 +152,13 @@ class DispatchWebinarRegistrationMessagesAction
                     scope: self::SCOPE,
                 ),
                 dispatchKeys: 'registration_created',
-                surface: 'webinar_registrations',
+                surface: self::SURFACE,
             );
 
             $definitions = $this->messageAreaRegistry->filterDefinitions(
                 definitions: $definitions,
-                areaKeys: $contextKeys,
-                surface: 'webinar_registrations',
+                areaKeys: ['confirmation'],
+                surface: self::SURFACE,
             );
 
             foreach ($definitions as $definition) {
@@ -109,32 +187,7 @@ class DispatchWebinarRegistrationMessagesAction
             }
         }
 
-        if ($this->includesInitialRegistrationContext($contextKeys)) {
-            foreach ($consentGrants as $grant) {
-                if (! $grant instanceof MessageConsentGrantResult || ! $grant->becameActive) {
-                    continue;
-                }
-
-                $intent = $this->buildConsentOptInIntent->handle(
-                    contact: $registration->contact,
-                    grant: $grant,
-                    payload: $payload,
-                    context: $registration,
-                    resolverContext: [
-                        'webinar_slug' => $registration->webinar_slug,
-                    ],
-                );
-
-                if ($intent instanceof MessageDeliveryIntent) {
-                    $intents[] = $intent;
-                }
-            }
-        }
-
-        return $this->dispatchMessageIntents->handle(
-            intents: $intents,
-            policyKey: 'webinar_registration',
-        );
+        return $intents;
     }
 
     /**
@@ -157,10 +210,11 @@ class DispatchWebinarRegistrationMessagesAction
     /**
      * @return array<int, MessageChannel>
      */
-    private function availableTransactionalChannels(WebinarRegistration $registration): array
-    {
+    private function availableTransactionalChannels(
+        WebinarRegistration $registration,
+    ): array {
         $channels = $this->messageChannelAvailability->visibleChannelsForSurface(
-            surface: 'webinar_registrations',
+            surface: self::SURFACE,
             purpose: MessagePurpose::Transactional->value,
             scope: self::SCOPE,
         );
@@ -181,17 +235,31 @@ class DispatchWebinarRegistrationMessagesAction
     /**
      * @param array<int, string>|null $contextKeys
      */
+    private function includesConfirmationContext(?array $contextKeys): bool
+    {
+        return $contextKeys === null
+            || in_array('confirmation', $contextKeys, true);
+    }
+
+    /**
+     * @param array<int, string>|null $contextKeys
+     */
+    private function includesReminderContext(?array $contextKeys): bool
+    {
+        return $contextKeys === null
+            || in_array('reminders', $contextKeys, true);
+    }
+
+    /**
+     * @param array<int, string>|null $contextKeys
+     */
     private function includesInitialRegistrationContext(?array $contextKeys): bool
     {
         if (! $this->messageAreaRegistry->isEnabled('registration_opt_in')) {
             return false;
         }
 
-        if ($contextKeys === null) {
-            return true;
-        }
-
-        return in_array('confirmation', $contextKeys, true);
+        return $this->includesConfirmationContext($contextKeys);
     }
 
     /**

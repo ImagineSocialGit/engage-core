@@ -2,10 +2,14 @@
 
 namespace Tests\Feature\Webinars;
 
+use App\Modules\Messaging\Actions\ProcessMessageChainEnrollmentAction;
+use App\Modules\Messaging\Actions\SyncMessageTemplatePresetsAction;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Webinars\Actions\ImportWebinarRegistrationAction;
+use App\Modules\Webinars\Actions\SyncWebinarScheduleProfileChainsAction;
 use App\Modules\Webinars\Data\WebinarRegistrationImportRow;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
@@ -31,7 +35,7 @@ class ImportWebinarRegistrationReminderDispatchTest extends TestCase
         $this->configureMessageDefinitions();
     }
 
-    public function test_import_schedules_only_future_reminders_and_never_confirmation(): void
+    public function test_import_creates_one_lazy_enrollment_at_the_first_future_reminder(): void
     {
         $profile = $this->createScheduleProfile();
         $webinar = Webinar::factory()->create([
@@ -53,34 +57,27 @@ class ImportWebinarRegistrationReminderDispatchTest extends TestCase
             registeredAt: now(),
         );
 
-        $this->assertSame(4, $result->remindersScheduled);
+        $this->assertSame(1, $result->reminderEnrollments);
+        $this->assertDatabaseCount('scheduled_messages', 0);
 
-        $messages = ScheduledMessage::query()->orderBy('channel')->orderBy('send_at')->get();
+        $enrollment = MessageChainEnrollment::query()
+            ->with('currentMessageChainStep.variants')
+            ->sole();
 
-        $this->assertCount(4, $messages);
-        $this->assertEquals(['email', 'sms'], $messages->pluck('channel')->unique()->values()->all());
-        $this->assertEquals(['reminder'], $messages->pluck('message_type')->unique()->values()->all());
-
-        $this->assertTrue($messages->every(
-            fn (ScheduledMessage $message): bool => $message->send_at->isFuture()
-                && data_get($message->meta, 'webinar_schedule.item_key') !== 'email_confirmation'
-                && data_get($message->meta, 'webinar_schedule.item_key') !== 'sms_confirmation'
-        ));
-
+        $this->assertSame('webinar_registrations', $enrollment->surface);
+        $this->assertTrue(
+            $enrollment->next_action_at->equalTo($webinar->starts_at->copy()->subMinutes(30)),
+        );
+        $this->assertEqualsCanonicalizing(
+            ['email', 'sms'],
+            $enrollment->currentMessageChainStep->variants->pluck('channel')->all(),
+        );
         $this->assertDatabaseMissing('scheduled_messages', [
             'message_type' => 'confirmation',
         ]);
-
-        $this->assertDatabaseMissing('scheduled_messages', [
-            'definition_config_path' => 'messaging.email.definitions.transactional.webinar.reminder.0',
-        ]);
-
-        $this->assertDatabaseMissing('scheduled_messages', [
-            'definition_config_path' => 'messaging.sms.definitions.transactional.webinar.reminder.0',
-        ]);
     }
 
-    public function test_import_schedules_no_sms_without_transactional_sms_consent(): void
+    public function test_imported_channel_acceptance_is_evaluated_when_the_reminder_becomes_due(): void
     {
         $profile = $this->createScheduleProfile();
         $webinar = Webinar::factory()->create([
@@ -100,16 +97,28 @@ class ImportWebinarRegistrationReminderDispatchTest extends TestCase
             ]),
         );
 
-        $this->assertSame(2, $result->remindersScheduled);
-        $this->assertDatabaseCount('scheduled_messages', 2);
-        $this->assertDatabaseMissing('scheduled_messages', ['channel' => 'sms']);
+        $this->assertSame(1, $result->reminderEnrollments);
         $this->assertEquals(
             ['email'],
             data_get($result->registration->meta, 'accepted_channels.transactional'),
         );
+
+        $enrollment = MessageChainEnrollment::query()->sole();
+        Carbon::setTestNow($enrollment->next_action_at);
+        app(ProcessMessageChainEnrollmentAction::class)->handle($enrollment);
+
+        $this->assertDatabaseCount('scheduled_messages', 1);
+        $this->assertDatabaseHas('scheduled_messages', [
+            'channel' => 'email',
+            'message_type' => 'reminder',
+            'message_chain_enrollment_id' => $enrollment->getKey(),
+        ]);
+        $this->assertDatabaseMissing('scheduled_messages', [
+            'channel' => 'sms',
+        ]);
     }
 
-    public function test_rerun_does_not_duplicate_future_reminders(): void
+    public function test_rerun_reuses_the_same_reminder_enrollment(): void
     {
         $profile = $this->createScheduleProfile();
         $webinar = Webinar::factory()->create([
@@ -127,17 +136,16 @@ class ImportWebinarRegistrationReminderDispatchTest extends TestCase
         ]);
 
         $action = app(ImportWebinarRegistrationAction::class);
-
         $first = $action->handle($webinar, $row, now());
         $second = $action->handle($webinar, $row, now()->addMinute());
 
-        $this->assertSame(4, $first->remindersScheduled);
-        $this->assertSame(4, $second->remindersScheduled);
-        $this->assertDatabaseCount('scheduled_messages', 4);
-        $this->assertCount(4, ScheduledMessage::query()->pluck('dedupe_key')->unique());
+        $this->assertSame(1, $first->reminderEnrollments);
+        $this->assertSame(1, $second->reminderEnrollments);
+        $this->assertDatabaseCount('message_chain_enrollments', 1);
+        $this->assertDatabaseCount('scheduled_messages', 0);
     }
 
-    public function test_import_can_skip_reminder_dispatch_for_state_only_checkpoint(): void
+    public function test_import_can_skip_reminder_enrollment_for_state_only_checkpoint(): void
     {
         $profile = $this->createScheduleProfile();
         $webinar = Webinar::factory()->create([
@@ -155,7 +163,8 @@ class ImportWebinarRegistrationReminderDispatchTest extends TestCase
             scheduleReminders: false,
         );
 
-        $this->assertSame(0, $result->remindersScheduled);
+        $this->assertSame(0, $result->reminderEnrollments);
+        $this->assertDatabaseCount('message_chain_enrollments', 0);
         $this->assertDatabaseCount('scheduled_messages', 0);
     }
 
@@ -231,6 +240,7 @@ class ImportWebinarRegistrationReminderDispatchTest extends TestCase
             'name' => 'Import test profile',
             'is_default' => false,
             'is_active' => true,
+            'message_template_set_key' => 'default',
         ]);
 
         foreach (['email', 'sms'] as $channel) {
@@ -279,7 +289,13 @@ class ImportWebinarRegistrationReminderDispatchTest extends TestCase
             }
         }
 
-        return $profile;
+        app(SyncMessageTemplatePresetsAction::class)->handle(force: true);
+        app(SyncWebinarScheduleProfileChainsAction::class)->handle(
+            profile: $profile,
+            force: true,
+        );
+
+        return $profile->refresh();
     }
 
     /** @return array<string, mixed> */

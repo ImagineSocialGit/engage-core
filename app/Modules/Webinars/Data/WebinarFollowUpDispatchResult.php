@@ -10,12 +10,11 @@ final readonly class WebinarFollowUpDispatchResult
     public const STATUS_IN_PROGRESS = 'in_progress';
     public const STATUS_FAILED = 'failed';
 
-    /** @param array<int, int> $scheduledMessageIds */
     public function __construct(
         public string $status,
         public int $registrationId,
         public string $outcome,
-        public array $scheduledMessageIds = [],
+        public ?int $messageChainEnrollmentId = null,
         public ?string $reason = null,
     ) {}
 

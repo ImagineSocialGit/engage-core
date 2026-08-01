@@ -3,14 +3,18 @@
 namespace Tests\Feature\Webinars;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Actions\SyncMessageTemplatePresetsAction;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Payloads\SmsPayload;
+use App\Modules\Messaging\Services\ScheduledMessagePayloadResolver;
 use App\Modules\Webinars\Actions\DispatchWebinarWaitlistMessagesAction;
+use App\Modules\Webinars\Actions\SyncWebinarScheduleProfileChainsAction;
 use App\Modules\Webinars\Models\Webinar;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Models\WebinarScheduleProfileItem;
@@ -84,6 +88,13 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
             'payload_class' => EmailPayload::class,
             'status' => 'pending',
         ]);
+
+        $message = ScheduledMessage::query()
+            ->where('channel', MessageChannel::Email->value)
+            ->firstOrFail();
+
+        $this->assertNotNull($message->message_chain_enrollment_id);
+        $this->assertNotNull($message->message_chain_step_variant_id);
 
         $this->assertDatabaseMissing('scheduled_messages', [
             'recipient_type' => Contact::class,
@@ -182,21 +193,49 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
             ->first();
 
         $this->assertNotNull($message);
-        $this->assertSame('A new webinar is available. Register here: {webinar_registration_url}', $message->payload['body']);
-        $this->assertSame('{webinar_registration_url}', $message->payload['cta']['url']);
-        $this->assertNotEmpty($message->payload['tokens']['webinar_registration_url']);
+        $this->assertEquals(['to' => $contact->email], $message->payload);
+
+        $payload = app(ScheduledMessagePayloadResolver::class)->resolve($message);
+
+        $this->assertInstanceOf(EmailPayload::class, $payload);
+        $this->assertSame(
+            'A new webinar is available. Register here: {webinar_registration_url}',
+            $payload->body,
+        );
+        $this->assertSame('{webinar_registration_url}', $payload->cta['url']);
+        $this->assertNotEmpty($payload->tokens['webinar_registration_url']);
 
         $this->assertStringStartsWith(
             'https://webinar.engagecore.test/',
-            $message->payload['tokens']['webinar_registration_url'],
+            $payload->tokens['webinar_registration_url'],
         );
 
-        $this->assertStringContainsString(route('webinar.waitlist.register', ['seriesSlug' => $series->slug, 'signup' => $signup->id], false), $message->payload['tokens']['webinar_registration_url']);
-        $this->assertStringContainsString('signature=', $message->payload['tokens']['webinar_registration_url']);
+        $this->assertStringContainsString(
+            route('webinar.waitlist.register', [
+                'seriesSlug' => $series->slug,
+                'signup' => $signup->id,
+            ], false),
+            $payload->tokens['webinar_registration_url'],
+        );
+        $this->assertStringContainsString(
+            'signature=',
+            $payload->tokens['webinar_registration_url'],
+        );
 
         $signup->refresh();
-
         $this->assertNotNull($signup->notified_at);
+
+        $frozenRegistrationUrl = $payload->tokens['webinar_registration_url'];
+        $signup->delete();
+
+        $retryPayload = app(ScheduledMessagePayloadResolver::class)->resolve(
+            $message->fresh(),
+        );
+
+        $this->assertSame(
+            $frozenRegistrationUrl,
+            $retryPayload->tokens['webinar_registration_url'],
+        );
     }
 
     public function test_it_dispatches_prefilled_waitlist_notification_when_provider_registration_url_is_missing(): void
@@ -225,7 +264,12 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         $message = ScheduledMessage::query()->first();
 
         $this->assertNotNull($message);
-        $this->assertNotEmpty($message->payload['tokens']['webinar_registration_url']);
+        $this->assertEquals(['to' => $contact->email], $message->payload);
+
+        $payload = app(ScheduledMessagePayloadResolver::class)->resolve($message);
+
+        $this->assertInstanceOf(EmailPayload::class, $payload);
+        $this->assertNotEmpty($payload->tokens['webinar_registration_url']);
 
         $signup->refresh();
 
@@ -296,6 +340,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         app(DispatchWebinarWaitlistMessagesAction::class)->handle($webinar);
 
         $this->assertSame(0, ScheduledMessage::query()->count());
+        $this->assertSame(0, MessageChainEnrollment::query()->count());
 
         $signup->refresh();
 
@@ -326,6 +371,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         Queue::assertNothingPushed();
 
         $this->assertSame(0, ScheduledMessage::query()->count());
+        $this->assertSame(0, MessageChainEnrollment::query()->count());
     }
 
     private function configureWaitlistMessages(): void
@@ -368,6 +414,7 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
             'status' => WebinarScheduleProfile::STATUS_ACTIVE,
             'is_default' => true,
             'is_active' => true,
+            'message_template_set_key' => 'default',
         ]);
 
         foreach ([MessageChannel::Email->value, MessageChannel::Sms->value] as $channel) {
@@ -394,6 +441,12 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
                 'is_active' => true,
             ]);
         }
+
+        app(SyncMessageTemplatePresetsAction::class)->handle(force: true);
+        app(SyncWebinarScheduleProfileChainsAction::class)->handle(
+            profile: $profile,
+            force: true,
+        );
     }
 
     private function createSeries(): WebinarSeries
@@ -507,5 +560,3 @@ class DispatchWebinarWaitlistMessagesActionTest extends TestCase
         Config::set('messaging.channel_availability.sms.surfaces.webinar_waitlists', true);
     }
 }
-
-

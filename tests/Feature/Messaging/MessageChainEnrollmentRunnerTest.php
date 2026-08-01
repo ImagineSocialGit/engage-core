@@ -147,7 +147,11 @@ class MessageChainEnrollmentRunnerTest extends TestCase
             $this->assertNotNull(
                 $message->message_chain_step_variant_id,
             );
-            $this->assertEquals([], $message->payload);
+            $this->assertEquals([
+                'to' => $message->channel === 'email'
+                    ? $contact->email
+                    : $contact->phone,
+            ], $message->payload);
             $this->assertEquals([], $message->meta);
         }
 

@@ -157,6 +157,10 @@ readonly class WebinarMessageData extends MessageData
             'registered_at' => $this->registration->registered_at?->toIso8601String(),
             'attended_at' => $this->registration->attended_at?->toIso8601String(),
             'cancelled_at' => $this->registration->cancelled_at?->toIso8601String(),
+            'join_clicked_at' => $this->registrationJoinClickedAt(),
+            'accepted_channels' => $this->acceptedChannels(
+                $this->registration->meta,
+            ),
         ];
     }
 
@@ -175,6 +179,9 @@ readonly class WebinarMessageData extends MessageData
             'webinar_series_id' => $this->waitlistSignup->webinar_series_id,
             'source_page' => $this->waitlistSignup->source_page,
             'notified_at' => $this->waitlistSignup->notified_at?->toIso8601String(),
+            'accepted_channels' => $this->acceptedChannels(
+                $this->waitlistSignup->meta,
+            ),
         ];
     }
 
@@ -218,6 +225,51 @@ readonly class WebinarMessageData extends MessageData
             'slug' => $webinarSeries->slug,
             'status' => $webinarSeries->status,
         ];
+    }
+
+
+    private function registrationJoinClickedAt(): ?string
+    {
+        $value = data_get($this->registration?->meta, 'join_clicked_at')
+            ?? data_get($this->registration?->meta, 'normalized.join_clicked_at');
+
+        return is_string($value) && trim($value) !== ''
+            ? trim($value)
+            : null;
+    }
+
+    /**
+     * @param array<string, mixed>|null $meta
+     * @return array<string, array<string, bool>>
+     */
+    private function acceptedChannels(?array $meta): array
+    {
+        $accepted = is_array($meta['accepted_channels'] ?? null)
+            ? $meta['accepted_channels']
+            : [];
+        $resolved = [];
+
+        foreach ($accepted as $purpose => $channels) {
+            if (! is_string($purpose) || ! is_array($channels)) {
+                continue;
+            }
+
+            $purpose = str_replace('-', '_', strtolower(trim($purpose)));
+
+            foreach ($channels as $channel) {
+                if (! is_string($channel) || trim($channel) === '') {
+                    continue;
+                }
+
+                $resolved[$purpose][str_replace(
+                    '-',
+                    '_',
+                    strtolower(trim($channel)),
+                )] = true;
+            }
+        }
+
+        return $resolved;
     }
 
     private function waitlistRegistrationUrl(): ?string

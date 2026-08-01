@@ -13,6 +13,7 @@ use App\Modules\Messaging\Payloads\SmsPayload;
 use App\Modules\Messaging\Services\ConditionChecker;
 use App\Modules\Messaging\Services\MessageChainExecutionContextResolver;
 use App\Modules\Messaging\Services\MessageChainTimingResolver;
+use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Modules\Messaging\Services\MessagePlanningGate;
 use App\Modules\Messaging\Services\MessageRecipientPayloadResolver;
 use Illuminate\Database\Eloquent\Model;
@@ -30,6 +31,7 @@ class ProcessMessageChainEnrollmentAction
         private readonly MessageChainTimingResolver $timingResolver,
         private readonly ConditionChecker $conditionChecker,
         private readonly MessageRecipientPayloadResolver $recipientPayloadResolver,
+        private readonly MessageChannelAvailability $messageChannelAvailability,
         private readonly MessagePlanningGate $planningGate,
         private readonly ScheduleMessageAction $scheduleMessage,
     ) {}
@@ -272,7 +274,20 @@ class ProcessMessageChainEnrollmentAction
             )
             ->filter(function (
                 MessageChainStepVariant $variant,
-            ) use ($recipient, $contextModel, $context): bool {
+            ) use ($enrollment, $recipient, $contextModel, $context): bool {
+                if (
+                    is_string($enrollment->surface)
+                    && $enrollment->surface !== ''
+                    && ! $this->messageChannelAvailability->isVisibleForSurface(
+                        channel: $variant->channel,
+                        surface: $enrollment->surface,
+                        purpose: $variant->purpose,
+                        scope: $variant->scope,
+                    )
+                ) {
+                    return false;
+                }
+
                 $conditions = is_array($variant->conditions)
                     ? $variant->conditions
                     : [];
@@ -352,6 +367,16 @@ class ProcessMessageChainEnrollmentAction
         $context = $enrollment->context instanceof Model
             ? $enrollment->context
             : null;
+        $destination = $this->recipientPayloadResolver->destinationForChannel(
+            recipient: $recipient,
+            channel: $variant->channel,
+        );
+
+        if (! is_string($destination) || trim($destination) === '') {
+            throw new RuntimeException(
+                "MessageChainStepVariant [{$variant->getKey()}] has no current destination.",
+            );
+        }
 
         $this->scheduleMessage->handle(
             recipient: $recipient,
@@ -360,7 +385,9 @@ class ProcessMessageChainEnrollmentAction
             scope: $variant->scope,
             messageType: $variant->message_type,
             payloadClass: $this->payloadClass($variant->channel),
-            payload: [],
+            payload: [
+                'to' => trim($destination),
+            ],
             sendAt: $sendAt,
             context: $context,
             behaviorOwner: $enrollment,

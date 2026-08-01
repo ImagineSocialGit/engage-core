@@ -19,7 +19,7 @@ class ImportWebinarRegistrationsCommand extends Command
     protected $signature = 'webinars:import-registrations
         {path : Path to the webinar registration CSV}
         {--webinar= : Webinar slug}
-        {--apply : Persist the import and schedule future-valid reminders}';
+        {--apply : Persist the import and enroll future reminders}';
 
     protected $description = 'Dry-run or apply a webinar registration import from CSV.';
 
@@ -157,7 +157,7 @@ class ImportWebinarRegistrationsCommand extends Command
             'registrations_created' => 0,
             'consents_created' => 0,
             'consents_updated' => 0,
-            'reminders_scheduled' => 0,
+            'reminder_enrollments' => 0,
         ];
 
         foreach ($rows as $rowNumber => $row) {
@@ -174,14 +174,14 @@ class ImportWebinarRegistrationsCommand extends Command
                 $totals['registrations_created'] += $result->registrationCreated ? 1 : 0;
                 $totals['consents_created'] += $result->consentsCreated;
                 $totals['consents_updated'] += $result->consentsUpdated;
-                $totals['reminders_scheduled'] += $result->remindersScheduled;
+                $totals['reminder_enrollments'] += $result->reminderEnrollments;
 
                 $this->line(sprintf(
-                    'Row %d: %s — imported (%d reminder%s scheduled)',
+                    'Row %d: %s — imported (%d reminder chain enrollment%s)',
                     $rowNumber,
                     $row->email,
-                    $result->remindersScheduled,
-                    $result->remindersScheduled === 1 ? '' : 's',
+                    $result->reminderEnrollments,
+                    $result->reminderEnrollments === 1 ? '' : 's',
                 ));
             } catch (Throwable $exception) {
                 $totals['failed']++;
@@ -199,7 +199,7 @@ class ImportWebinarRegistrationsCommand extends Command
                 ['Registrations created', $totals['registrations_created']],
                 ['Consents created', $totals['consents_created']],
                 ['Consents updated', $totals['consents_updated']],
-                ['Reminders scheduled', $totals['reminders_scheduled']],
+                ['Reminder chain enrollments', $totals['reminder_enrollments']],
             ],
         );
 

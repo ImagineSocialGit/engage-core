@@ -191,6 +191,7 @@ class WebinarScheduleProfileChainDefinitionBuilder
             ->values()
             ->map(function (array $resolved) use ($channelCounts): array {
                 $item = $resolved['item'];
+                $area = $resolved['area'];
                 $definition = $resolved['definition'];
                 $channel = $this->normalizeSegment($item->channel);
                 $variantKey = ((int) $channelCounts->get($channel, 0)) === 1
@@ -214,7 +215,10 @@ class WebinarScheduleProfileChainDefinitionBuilder
                     'message_type' => $this->normalizeSegment($item->message_type),
                     'queue' => $this->nullableSegment($definition['queue'] ?? null),
                     'dependency_policy' => null,
-                    'conditions' => null,
+                    'conditions' => $this->variantConditions(
+                        area: $area,
+                        channel: $channel,
+                    ),
                     'is_active' => true,
                 ];
             })
@@ -342,6 +346,31 @@ class WebinarScheduleProfileChainDefinitionBuilder
                 "Webinar schedule profile item [{$item->key}] has unsupported chain timing [{$type}].",
             ),
         };
+    }
+
+    /**
+     * @return array<int, array{field: string, operator: string}>|null
+     */
+    private function variantConditions(
+        WebinarMessageAreaDefinition $area,
+        string $channel,
+    ): ?array {
+        $field = match ($area->key) {
+            'confirmation', 'reminders' =>
+                "webinar_registration.accepted_channels.transactional.{$channel}",
+            'waitlist' =>
+                "webinar_waitlist_signup.accepted_channels.marketing.{$channel}",
+            'post_attended', 'post_missed' =>
+                "webinar_post_event.allowed_channels.{$channel}",
+            default => null,
+        };
+
+        return $field !== null
+            ? [[
+                'field' => $field,
+                'operator' => 'truthy',
+            ]]
+            : null;
     }
 
     /**
