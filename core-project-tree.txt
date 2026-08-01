@@ -453,6 +453,7 @@
 │   │   │   │   ├── GrantMessageConsentAction.php
 │   │   │   │   ├── GrantMessageConsentsAction.php
 │   │   │   │   ├── ImportMessageConsentAction.php
+│   │   │   │   ├── ProcessMessageChainEnrollmentAction.php
 │   │   │   │   ├── PublishMessageChainVersionAction.php
 │   │   │   │   ├── PublishMessageTemplateVersionAction.php
 │   │   │   │   ├── RecordMessageConsentAction.php
@@ -460,6 +461,7 @@
 │   │   │   │   ├── RevokeMessageConsentAction.php
 │   │   │   │   ├── ScheduleMessageAction.php
 │   │   │   │   ├── SkipScheduledMessagesAction.php
+│   │   │   │   ├── StartMessageChainEnrollmentAction.php
 │   │   │   │   └── SyncMessageTemplatePresetsAction.php
 │   │   │   ├── Automation
 │   │   │   │   ├── MessagingAutomationPointAuthoringContributor.php
@@ -480,6 +482,7 @@
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailMessage.php
 │   │   │   │   │   └── EmailProvider.php
+│   │   │   │   ├── MessageChainExecutionContextProvider.php
 │   │   │   │   ├── MessageRecipientGate.php
 │   │   │   │   ├── MessageRecipientPayloadProvider.php
 │   │   │   │   └── Sms
@@ -513,10 +516,13 @@
 │   │   │   │   ├── ScheduledMessageSent.php
 │   │   │   │   └── ScheduledMessageSkipped.php
 │   │   │   ├── Jobs
+│   │   │   │   ├── ProcessDueMessageChainEnrollmentsJob.php
+│   │   │   │   ├── ProcessMessageChainEnrollmentJob.php
 │   │   │   │   ├── PublishScheduledMessageOutboxEventsJob.php
 │   │   │   │   ├── RecoverStaleScheduledMessageClaimsJob.php
 │   │   │   │   └── SendScheduledMessageJob.php
 │   │   │   ├── Listeners
+│   │   │   │   ├── AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal.php
 │   │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailed.php
 │   │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped.php
 │   │   │   │   └── MarkClaimedPermissionInvitationSentAfterScheduledMessageSent.php
@@ -569,6 +575,8 @@
 │   │   │   │   ├── Email
 │   │   │   │   │   ├── EmailMessagingService.php
 │   │   │   │   │   └── EmailProviderManager.php
+│   │   │   │   ├── MessageChainExecutionContextResolver.php
+│   │   │   │   ├── MessageChainTimingResolver.php
 │   │   │   │   ├── MessageChannelAvailability.php
 │   │   │   │   ├── MessageConfigValidator.php
 │   │   │   │   ├── MessageDedupeKeyBuilder.php
@@ -1709,6 +1717,7 @@
 │   │   │   ├── InternalNotificationGateTest.php
 │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest.php
 │   │   │   ├── MessageChainDuplicationTest.php
+│   │   │   ├── MessageChainEnrollmentRunnerTest.php
 │   │   │   ├── MessageChainVersionPersistenceTest.php
 │   │   │   ├── MessageChannelAvailabilityTest.php
 │   │   │   ├── MessageConfigValidatorTest.php
@@ -1880,4 +1889,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-500 directories, 1381 files
+500 directories, 1390 files

@@ -1,6 +1,8 @@
 <?php
 
+use App\Modules\Messaging\Models\MessageChainEnrollment;
 use App\Modules\Messaging\Models\MessageChainStep;
+use App\Modules\Messaging\Models\MessageChainStepVariant;
 use App\Modules\Messaging\Models\MessageChainVersion;
 use App\Modules\Messaging\Models\MessageConsent;
 use App\Modules\Messaging\Models\MessageTemplateVersion;
@@ -58,6 +60,25 @@ return new class extends Migration
             );
         });
 
+        Schema::table('scheduled_messages', function (Blueprint $table): void {
+            $table->foreignIdFor(MessageChainEnrollment::class)
+                ->nullable()
+                ->constrained()
+                ->restrictOnDelete();
+            $table->foreignIdFor(MessageChainStepVariant::class)
+                ->nullable()
+                ->constrained()
+                ->restrictOnDelete();
+
+            $table->index(
+                [
+                    'message_chain_enrollment_id',
+                    'message_chain_step_variant_id',
+                ],
+                'scheduled_messages_chain_enrollment_variant_index',
+            );
+        });
+
         Schema::create('scheduled_message_render_contexts', function (Blueprint $table): void {
             $table->id();
             $table->foreignIdFor(ScheduledMessage::class)
@@ -106,6 +127,19 @@ return new class extends Migration
     {
         Schema::dropIfExists('scheduled_message_components');
         Schema::dropIfExists('scheduled_message_render_contexts');
+
+        Schema::table('scheduled_messages', function (Blueprint $table): void {
+            $table->dropIndex(
+                'scheduled_messages_chain_enrollment_variant_index',
+            );
+            $table->dropConstrainedForeignId(
+                'message_chain_step_variant_id',
+            );
+            $table->dropConstrainedForeignId(
+                'message_chain_enrollment_id',
+            );
+        });
+
         Schema::dropIfExists('message_chain_enrollments');
 
         Schema::table('scheduled_messages', function (Blueprint $table): void {

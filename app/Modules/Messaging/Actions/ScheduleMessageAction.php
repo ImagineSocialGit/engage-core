@@ -5,6 +5,9 @@ namespace App\Modules\Messaging\Actions;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
 use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
+use App\Modules\Messaging\Models\MessageChainEnrollment;
+use App\Modules\Messaging\Models\MessageChainStep;
+use App\Modules\Messaging\Models\MessageChainStepVariant;
 use App\Modules\Messaging\Models\MessageTemplateVersion;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\PendingMessageDeliveryConsolidator;
@@ -13,6 +16,7 @@ use App\Modules\Messaging\Services\ScheduledMessagePayloadCanonicalizer;
 use App\Support\Queues\QueueContract;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use InvalidArgumentException;
 
 class ScheduleMessageAction
 {
@@ -40,11 +44,24 @@ class ScheduleMessageAction
         array $dispatchKeys = [],
         ?string $definitionConfigPath = null,
         ?int $messageTemplateVersionId = null,
+        ?MessageChainEnrollment $messageChainEnrollment = null,
+        ?MessageChainStepVariant $messageChainStepVariant = null,
     ): ScheduledMessage {
         $channel = $this->normalizeEnumValue($channel);
         $purpose = $this->normalizeEnumValue($purpose);
         $scope = $this->normalizeSegment($scope);
         $messageType = $this->normalizeSegment($messageType);
+        [
+            $messageChainEnrollmentId,
+            $messageChainStepVariantId,
+        ] = $this->chainReferences(
+            enrollment: $messageChainEnrollment,
+            variant: $messageChainStepVariant,
+        );
+
+        if ($behaviorOwner === null && $messageChainEnrollment !== null) {
+            $behaviorOwner = $messageChainEnrollment;
+        }
 
         $sourceSendAt = $sendAt ? Carbon::parse($sendAt) : now();
         $sendAt = $sourceSendAt->copy()->utc();
@@ -106,6 +123,8 @@ class ScheduleMessageAction
             'recipient_type' => $recipient->getMorphClass(),
             'recipient_id' => $recipient->getKey(),
             'message_template_version_id' => $messageTemplateVersionId,
+            'message_chain_enrollment_id' => $messageChainEnrollmentId,
+            'message_chain_step_variant_id' => $messageChainStepVariantId,
             'channel' => $channel,
             'message_type' => $messageType,
             'purpose' => $purpose,
@@ -234,6 +253,8 @@ class ScheduleMessageAction
         return array_filter([
             'scheduled_message_id' => $scheduledMessage->id,
             'message_template_version_id' => $scheduledMessage->message_template_version_id,
+            'message_chain_enrollment_id' => $scheduledMessage->message_chain_enrollment_id,
+            'message_chain_step_variant_id' => $scheduledMessage->message_chain_step_variant_id,
             'recipient_type' => class_basename(
                 (string) $scheduledMessage->recipient_type,
             ),
@@ -257,6 +278,48 @@ class ScheduleMessageAction
             'campaign_key' => $scheduledMessage->meta['campaign_key'] ?? null,
             'campaign_step' => $scheduledMessage->meta['campaign_step'] ?? null,
         ], fn (mixed $value): bool => $value !== null && $value !== []);
+    }
+
+    /**
+     * @return array{0: int|null, 1: int|null}
+     */
+    private function chainReferences(
+        ?MessageChainEnrollment $enrollment,
+        ?MessageChainStepVariant $variant,
+    ): array {
+        if ($enrollment === null && $variant === null) {
+            return [null, null];
+        }
+
+        if ($enrollment === null || $variant === null) {
+            throw new InvalidArgumentException(
+                'Scheduled chain messages require both enrollment and step-variant references.',
+            );
+        }
+
+        $step = $variant->relationLoaded('messageChainStep')
+            ? $variant->getRelation('messageChainStep')
+            : $variant->messageChainStep()->first();
+
+        if (! $step instanceof MessageChainStep) {
+            throw new InvalidArgumentException(
+                "MessageChainStepVariant [{$variant->getKey()}] has no resolvable step.",
+            );
+        }
+
+        if (
+            (int) $step->message_chain_version_id
+            !== (int) $enrollment->message_chain_version_id
+        ) {
+            throw new InvalidArgumentException(
+                'Scheduled chain message references do not belong to the same immutable chain version.',
+            );
+        }
+
+        return [
+            (int) $enrollment->getKey(),
+            (int) $variant->getKey(),
+        ];
     }
 
     /**

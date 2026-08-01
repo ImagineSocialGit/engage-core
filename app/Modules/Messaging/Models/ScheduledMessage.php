@@ -33,6 +33,8 @@ class ScheduledMessage extends Model
         'behavior_owner_type',
         'behavior_owner_id',
         'message_template_version_id',
+        'message_chain_enrollment_id',
+        'message_chain_step_variant_id',
         'channel',
         'message_type',
         'purpose',
@@ -66,6 +68,8 @@ class ScheduledMessage extends Model
             'context_id' => 'integer',
             'behavior_owner_id' => 'integer',
             'message_template_version_id' => 'integer',
+            'message_chain_enrollment_id' => 'integer',
+            'message_chain_step_variant_id' => 'integer',
             'dispatch_keys' => 'array',
             'payload' => 'array',
             'send_at' => 'datetime',
@@ -97,6 +101,16 @@ class ScheduledMessage extends Model
     public function messageTemplateVersion(): BelongsTo
     {
         return $this->belongsTo(MessageTemplateVersion::class);
+    }
+
+    public function messageChainEnrollment(): BelongsTo
+    {
+        return $this->belongsTo(MessageChainEnrollment::class);
+    }
+
+    public function messageChainStepVariant(): BelongsTo
+    {
+        return $this->belongsTo(MessageChainStepVariant::class);
     }
 
     public function deliveryAttempts(): HasMany

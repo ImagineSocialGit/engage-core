@@ -15,8 +15,10 @@ use App\Modules\Messaging\Console\Commands\SyncMessageTemplatePresetsCommand;
 use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
+use App\Modules\Messaging\Jobs\ProcessDueMessageChainEnrollmentsJob;
 use App\Modules\Messaging\Jobs\PublishScheduledMessageOutboxEventsJob;
 use App\Modules\Messaging\Jobs\RecoverStaleScheduledMessageClaimsJob;
+use App\Modules\Messaging\Listeners\AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal;
 use App\Modules\Messaging\Listeners\MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailed;
 use App\Modules\Messaging\Listeners\MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped;
 use App\Modules\Messaging\Listeners\MarkClaimedPermissionInvitationSentAfterScheduledMessageSent;
@@ -26,6 +28,7 @@ use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ContactShow\ContactMessagingShowDataProvider;
 use App\Modules\Messaging\Services\ContactShow\ContactScheduledMessagesVisibilityDataProvider;
 use App\Modules\Messaging\Services\Email\EmailProviderManager;
+use App\Modules\Messaging\Services\MessageChainExecutionContextResolver;
 use App\Modules\Messaging\Services\MessageRecipientGateRegistry;
 use App\Modules\Messaging\Services\MessageRecipientPayloadProviderRegistry;
 use App\Modules\Messaging\Services\Sms\SmsProviderManager;
@@ -105,6 +108,14 @@ class MessagingModuleServiceProvider extends ServiceProvider
             );
         });
 
+        $this->app->singleton(MessageChainExecutionContextResolver::class, function ($app) {
+            return new MessageChainExecutionContextResolver(
+                providers: $app->tagged(
+                    'messaging.message_chain_execution_context_providers',
+                ),
+            );
+        });
+
         $this->app->tag([
             ContactMessagingShowDataProvider::class,
             ContactScheduledMessagesVisibilityDataProvider::class,
@@ -122,6 +133,11 @@ class MessagingModuleServiceProvider extends ServiceProvider
                     ->withoutOverlapping();
 
                 $schedule
+                    ->job(new ProcessDueMessageChainEnrollmentsJob())
+                    ->everyMinute()
+                    ->withoutOverlapping();
+
+                $schedule
                     ->job(new PublishScheduledMessageOutboxEventsJob())
                     ->everyMinute()
                     ->withoutOverlapping();
@@ -132,15 +148,27 @@ class MessagingModuleServiceProvider extends ServiceProvider
             ScheduledMessageSent::class,
             MarkClaimedPermissionInvitationSentAfterScheduledMessageSent::class,
         );
+        Event::listen(
+            ScheduledMessageSent::class,
+            AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal::class,
+        );
 
         Event::listen(
             ScheduledMessageSkipped::class,
             MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped::class,
         );
+        Event::listen(
+            ScheduledMessageSkipped::class,
+            AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal::class,
+        );
 
         Event::listen(
             ScheduledMessageFailed::class,
             MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailed::class,
+        );
+        Event::listen(
+            ScheduledMessageFailed::class,
+            AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal::class,
         );
 
         if ($this->app->runningInConsole()) {

@@ -5,6 +5,7 @@ namespace App\Modules\Messaging\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class MessageChainEnrollment extends Model
@@ -80,6 +81,12 @@ class MessageChainEnrollment extends Model
             MessageChainStep::class,
             'current_message_chain_step_id',
         );
+    }
+
+    public function scheduledMessages(): HasMany
+    {
+        return $this->hasMany(ScheduledMessage::class)
+            ->orderBy('id');
     }
 
     public function scopeDue(Builder $query): Builder
