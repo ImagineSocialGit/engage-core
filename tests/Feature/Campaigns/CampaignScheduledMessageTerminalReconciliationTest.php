@@ -7,6 +7,7 @@ use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Models\ScheduledMessage;
@@ -87,8 +88,8 @@ class CampaignScheduledMessageTerminalReconciliationTest extends TestCase
             'purpose' => 'marketing',
             'scope' => 'campaign',
             'status' => ScheduledMessage::STATUS_FAILED,
-            'failed_at' => now(),
-            'failure_reason' => 'Provider rejected the message.',
+            'failed_at' => now()->subHour(),
+            'failure_reason' => 'Legacy provider rejection.',
             'meta' => array_replace($messageMeta, [
                 'campaign_step_variant_key' => 'email',
             ]),
@@ -122,12 +123,40 @@ class CampaignScheduledMessageTerminalReconciliationTest extends TestCase
 
         app()->instance(ScheduleNextCampaignStepAction::class, $nextStep);
 
-        event(new ScheduledMessageFailed($failedMessage));
+        $terminalOccurredAt = now()->subMinutes(5)->toImmutable();
+
+        event(new ScheduledMessageFailed(
+            $failedMessage,
+            new ScheduledMessageTerminalResult(
+                scheduledMessageId: (int) $failedMessage->getKey(),
+                status: ScheduledMessage::STATUS_FAILED,
+                occurredAt: $terminalOccurredAt,
+                deliveryAttemptId: 57,
+                attemptNumber: 2,
+                provider: 'campaign_test_provider',
+                reasonCode: 'provider_rejected',
+                reason: 'Authoritative provider rejection.',
+            ),
+        ));
 
         $enrollment->refresh();
 
         $this->assertSame(1, $enrollment->current_step);
         $this->assertSame($stepOne->id, $enrollment->current_campaign_step_id);
+        $this->assertSame(
+            'Authoritative provider rejection.',
+            data_get(
+                $enrollment->meta,
+                'scheduled_message_terminal_failures.'.$failedMessage->id.'.failure_reason',
+            ),
+        );
+        $this->assertSame(
+            'provider_rejected',
+            data_get(
+                $enrollment->meta,
+                'scheduled_message_terminal_failures.'.$failedMessage->id.'.failure_reason_code',
+            ),
+        );
         $this->assertSame(
             'wait_for_scheduled_sibling_variants',
             data_get(
@@ -155,7 +184,9 @@ class CampaignScheduledMessageTerminalReconciliationTest extends TestCase
         $this->assertSame($stepTwo->id, $enrollment->current_campaign_step_id);
         $this->assertIsArray($failure);
         $this->assertSame($failedMessage->id, $failure['scheduled_message_id']);
-        $this->assertSame('Provider rejected the message.', $failure['failure_reason']);
+        $this->assertSame('Authoritative provider rejection.', $failure['failure_reason']);
+        $this->assertSame('provider_rejected', $failure['failure_reason_code']);
+        $this->assertSame($terminalOccurredAt->toISOString(), $failure['failed_at']);
         $this->assertSame(
             'skip_failed_variant_after_all_scheduled_variants_terminal',
             $failure['policy'],

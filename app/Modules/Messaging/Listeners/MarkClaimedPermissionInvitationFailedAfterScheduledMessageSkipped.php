@@ -30,9 +30,9 @@ class MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkipped
                 return;
             }
 
-            $reason = is_string($scheduledMessage->skip_reason)
-                && trim($scheduledMessage->skip_reason) !== ''
-                    ? trim($scheduledMessage->skip_reason)
+            $reason = is_string($event->terminalResult->reason)
+                && trim($event->terminalResult->reason) !== ''
+                    ? trim($event->terminalResult->reason)
                     : 'Scheduled permission invitation was skipped after claim.';
 
             $this->permissionInvitationService->markFailed(

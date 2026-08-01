@@ -5,13 +5,18 @@ namespace App\Modules\Broadcasts\Services;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Models\ScheduledMessage;
 
 class BroadcastScheduledMessageResultRecorder
 {
-    public function recordSent(ScheduledMessage $scheduledMessage): void
-    {
-        if ($scheduledMessage->status !== ScheduledMessage::STATUS_SENT) {
+    public function recordSent(
+        ScheduledMessage $scheduledMessage,
+        ScheduledMessageTerminalResult $terminalResult,
+    ): void {
+        if ($scheduledMessage->status !== ScheduledMessage::STATUS_SENT
+            || ! $terminalResult->isSent()
+        ) {
             return;
         }
 
@@ -28,7 +33,7 @@ class BroadcastScheduledMessageResultRecorder
         }
 
         if ($this->isOpenRecipient($recipient)) {
-            $sentAt = $scheduledMessage->sent_at ?? now();
+            $sentAt = $terminalResult->occurredAt;
 
             $recipient->forceFill([
                 'status' => BroadcastRecipient::STATUS_SENT,
@@ -46,9 +51,13 @@ class BroadcastScheduledMessageResultRecorder
         $this->completeBroadcastWhenFinished($broadcast);
     }
 
-    public function recordSkipped(ScheduledMessage $scheduledMessage): void
-    {
-        if ($scheduledMessage->status !== ScheduledMessage::STATUS_SKIPPED) {
+    public function recordSkipped(
+        ScheduledMessage $scheduledMessage,
+        ScheduledMessageTerminalResult $terminalResult,
+    ): void {
+        if ($scheduledMessage->status !== ScheduledMessage::STATUS_SKIPPED
+            || ! $terminalResult->isSkipped()
+        ) {
             return;
         }
 
@@ -65,8 +74,10 @@ class BroadcastScheduledMessageResultRecorder
         }
 
         if ($this->isOpenRecipient($recipient)) {
-            $skippedAt = $scheduledMessage->skipped_at ?? now();
-            $skipReason = $scheduledMessage->skip_reason ?: 'scheduled_message_skipped';
+            $skippedAt = $terminalResult->occurredAt;
+            $skipReason = $terminalResult->reason
+                ?? $terminalResult->reasonCode
+                ?? 'scheduled_message_skipped';
 
             $recipient->forceFill([
                 'status' => BroadcastRecipient::STATUS_SKIPPED,
@@ -84,9 +95,13 @@ class BroadcastScheduledMessageResultRecorder
         $this->completeBroadcastWhenFinished($broadcast);
     }
 
-    public function recordFailed(ScheduledMessage $scheduledMessage): void
-    {
-        if ($scheduledMessage->status !== ScheduledMessage::STATUS_FAILED) {
+    public function recordFailed(
+        ScheduledMessage $scheduledMessage,
+        ScheduledMessageTerminalResult $terminalResult,
+    ): void {
+        if ($scheduledMessage->status !== ScheduledMessage::STATUS_FAILED
+            || ! $terminalResult->isFailed()
+        ) {
             return;
         }
 
@@ -103,7 +118,7 @@ class BroadcastScheduledMessageResultRecorder
         }
 
         if ($this->isOpenRecipient($recipient)) {
-            $failedAt = $scheduledMessage->failed_at ?? now();
+            $failedAt = $terminalResult->occurredAt;
 
             $recipient->forceFill([
                 'status' => BroadcastRecipient::STATUS_FAILED,
@@ -112,7 +127,7 @@ class BroadcastScheduledMessageResultRecorder
                     'delivery' => [
                         'failed_at' => $failedAt->toISOString(),
                         'scheduled_message_id' => $scheduledMessage->getKey(),
-                        'failure_reason' => $scheduledMessage->failure_reason,
+                        'failure_reason' => $terminalResult->reason,
                     ],
                 ]),
             ])->save();

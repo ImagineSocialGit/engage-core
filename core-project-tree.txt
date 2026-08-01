@@ -506,6 +506,7 @@
 │   │   │   │   │   ├── MessageDeliveryComponent.php
 │   │   │   │   │   ├── MessageDeliveryIntent.php
 │   │   │   │   │   ├── MessageSendResult.php
+│   │   │   │   │   ├── ScheduledMessageTerminalResult.php
 │   │   │   │   │   └── SmsSendDecision.php
 │   │   │   │   ├── MessageData.php
 │   │   │   │   └── ResolvedMessageDispatch.php
@@ -1722,6 +1723,7 @@
 │   │   │   ├── ConsentOptInDefinitionResolverTest.php
 │   │   │   ├── ConsentRevocationControllerTest.php
 │   │   │   ├── ContactPermissionInvitationControllerTest.php
+│   │   │   ├── ContactScheduledMessagesTerminalResultTest.php
 │   │   │   ├── CreateContactPermissionInvitationsForImportBatchActionTest.php
 │   │   │   ├── DispatchConsentOptInMessageActionTest.php
 │   │   │   ├── DispatchMessageActionTest.php
@@ -1732,6 +1734,7 @@
 │   │   │   ├── InternalNotificationChannelResolverTest.php
 │   │   │   ├── InternalNotificationGateTest.php
 │   │   │   ├── LegacyPendingMessageConsolidationRemovalTest.php
+│   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailedTest.php
 │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest.php
 │   │   │   ├── MessageChainDuplicationTest.php
 │   │   │   ├── MessageChainEnrollmentRunnerTest.php
@@ -1767,6 +1770,8 @@
 │   │   │   ├── ScheduledMessageMetaCanonicalizerTest.php
 │   │   │   ├── ScheduledMessagePayloadCanonicalizerTest.php
 │   │   │   ├── ScheduledMessagePayloadResolverTest.php
+│   │   │   ├── ScheduledMessageTerminalEventContractTest.php
+│   │   │   ├── ScheduledMessageTerminalPersistenceSchemaTest.php
 │   │   │   ├── ScheduleInternalNotificationActionTest.php
 │   │   │   ├── ScheduleMessageTimeNormalizationTest.php
 │   │   │   ├── SemanticCampaignVariantIdentityResolutionTest.php
@@ -1907,4 +1912,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-501 directories, 1407 files
+501 directories, 1412 files

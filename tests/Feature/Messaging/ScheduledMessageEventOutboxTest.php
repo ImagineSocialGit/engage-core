@@ -72,9 +72,20 @@ class ScheduledMessageEventOutboxTest extends TestCase
         app()->instance(EmailMessagingService::class, $emailService);
 
         $listenerAttempts = 0;
+        $terminalResults = [];
 
-        Event::listen(ScheduledMessageSent::class, function () use (&$listenerAttempts): void {
+        Event::listen(ScheduledMessageSent::class, function (
+            ScheduledMessageSent $event,
+        ) use (&$listenerAttempts, &$terminalResults): void {
             $listenerAttempts++;
+            $terminalResults[] = [
+                'scheduled_message_id' => $event->terminalResult->scheduledMessageId,
+                'status' => $event->terminalResult->status,
+                'attempt_number' => $event->terminalResult->attemptNumber,
+                'provider' => $event->terminalResult->provider,
+                'provider_message_id' => $event->terminalResult->providerMessageId,
+                'occurred_at' => $event->terminalResult->occurredAt->toISOString(),
+            ];
 
             if ($listenerAttempts === 1) {
                 throw new RuntimeException('Injected downstream listener failure.');
@@ -97,6 +108,14 @@ class ScheduledMessageEventOutboxTest extends TestCase
         $this->assertSame(1, $outboxEvent->attempts);
         $this->assertSame('Injected downstream listener failure.', $outboxEvent->last_error);
         $this->assertSame(1, $listenerAttempts);
+        $this->assertEquals([
+            'scheduled_message_id' => $scheduledMessage->id,
+            'status' => ScheduledMessage::STATUS_SENT,
+            'attempt_number' => 1,
+            'provider' => 'fault_injection_email',
+            'provider_message_id' => 'provider-message-1',
+            'occurred_at' => $scheduledMessage->sent_at->toISOString(),
+        ], $terminalResults[0]);
 
         $this->assertSame(
             1,
@@ -110,6 +129,7 @@ class ScheduledMessageEventOutboxTest extends TestCase
         $this->assertNotNull($outboxEvent->published_at);
         $this->assertNull($outboxEvent->last_error);
         $this->assertSame(2, $listenerAttempts);
+        $this->assertEquals($terminalResults[0], $terminalResults[1]);
 
         app()->call([
             new SendScheduledMessageJob((int) $scheduledMessage->getKey()),

@@ -30,9 +30,9 @@ class MarkClaimedPermissionInvitationFailedAfterScheduledMessageFailed
                 return;
             }
 
-            $reason = is_string($scheduledMessage->failure_reason)
-                && trim($scheduledMessage->failure_reason) !== ''
-                    ? trim($scheduledMessage->failure_reason)
+            $reason = is_string($event->terminalResult->reason)
+                && trim($event->terminalResult->reason) !== ''
+                    ? trim($event->terminalResult->reason)
                     : 'Scheduled permission invitation delivery failed.';
 
             $this->permissionInvitationService->markFailed(

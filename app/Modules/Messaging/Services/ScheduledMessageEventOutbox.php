@@ -2,6 +2,7 @@
 
 namespace App\Modules\Messaging\Services;
 
+use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
@@ -193,6 +194,7 @@ class ScheduledMessageEventOutbox
     private function domainEvent(ScheduledMessageOutboxEvent $outboxEvent): object
     {
         $scheduledMessage = ScheduledMessage::query()
+            ->with('latestDeliveryAttempt')
             ->find($outboxEvent->scheduled_message_id);
 
         if (! $scheduledMessage instanceof ScheduledMessage) {
@@ -207,10 +209,23 @@ class ScheduledMessageEventOutbox
             );
         }
 
+        $terminalResult = ScheduledMessageTerminalResult::fromScheduledMessage(
+            $scheduledMessage,
+        );
+
         return match ($outboxEvent->event_type) {
-            ScheduledMessage::STATUS_SENT => new ScheduledMessageSent($scheduledMessage),
-            ScheduledMessage::STATUS_SKIPPED => new ScheduledMessageSkipped($scheduledMessage),
-            ScheduledMessage::STATUS_FAILED => new ScheduledMessageFailed($scheduledMessage),
+            ScheduledMessage::STATUS_SENT => new ScheduledMessageSent(
+                $scheduledMessage,
+                $terminalResult,
+            ),
+            ScheduledMessage::STATUS_SKIPPED => new ScheduledMessageSkipped(
+                $scheduledMessage,
+                $terminalResult,
+            ),
+            ScheduledMessage::STATUS_FAILED => new ScheduledMessageFailed(
+                $scheduledMessage,
+                $terminalResult,
+            ),
             default => throw new InvalidArgumentException(
                 "Unsupported ScheduledMessage outbox event [{$outboxEvent->event_type}].",
             ),

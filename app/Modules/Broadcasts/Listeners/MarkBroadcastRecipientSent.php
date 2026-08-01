@@ -13,6 +13,9 @@ class MarkBroadcastRecipientSent
 
     public function handle(ScheduledMessageSent $event): void
     {
-        $this->resultRecorder->recordSent($event->scheduledMessage);
+        $this->resultRecorder->recordSent(
+            $event->scheduledMessage,
+            $event->terminalResult,
+        );
     }
 }

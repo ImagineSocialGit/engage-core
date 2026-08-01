@@ -13,6 +13,9 @@ class MarkBroadcastRecipientSkipped
 
     public function handle(ScheduledMessageSkipped $event): void
     {
-        $this->resultRecorder->recordSkipped($event->scheduledMessage);
+        $this->resultRecorder->recordSkipped(
+            $event->scheduledMessage,
+            $event->terminalResult,
+        );
     }
 }

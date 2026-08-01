@@ -4,6 +4,7 @@ namespace App\Modules\Messaging\Services\ContactShow;
 
 use App\Modules\Core\Contracts\Contacts\ContactShowDataProvider;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -38,6 +39,7 @@ class ContactScheduledMessagesVisibilityDataProvider implements ContactShowDataP
             ->get();
 
         $recentMessages = (clone $baseQuery)
+            ->with('latestDeliveryAttempt')
             ->whereIn('status', ['sent', 'failed', 'skipped'])
             ->latest('updated_at')
             ->limit(10)
@@ -103,6 +105,13 @@ class ContactScheduledMessagesVisibilityDataProvider implements ContactShowDataP
             'Message ID' => '#'.$message->id,
             'Queue' => $this->label($message->queue),
         ];
+        $terminalResult = in_array($message->status, [
+            ScheduledMessage::STATUS_SENT,
+            ScheduledMessage::STATUS_SKIPPED,
+            ScheduledMessage::STATUS_FAILED,
+        ], true)
+            ? ScheduledMessageTerminalResult::fromScheduledMessage($message)
+            : null;
 
         return match ($message->status) {
             ScheduledMessage::STATUS_PENDING => array_merge($meta, [
@@ -110,17 +119,17 @@ class ContactScheduledMessagesVisibilityDataProvider implements ContactShowDataP
             ]),
 
             ScheduledMessage::STATUS_SENT => array_merge($meta, [
-                'Sent At' => $this->date($message->sent_at),
+                'Sent At' => $this->date($terminalResult?->occurredAt),
             ]),
 
             ScheduledMessage::STATUS_SKIPPED => array_merge($meta, [
-                'Skipped At' => $this->date($message->skipped_at),
-                'Reason' => $message->skip_reason,
+                'Skipped At' => $this->date($terminalResult?->occurredAt),
+                'Reason' => $terminalResult?->reason,
             ]),
 
             ScheduledMessage::STATUS_FAILED => array_merge($meta, [
-                'Failed At' => $this->date($message->failed_at),
-                'Failure' => $message->failure_reason,
+                'Failed At' => $this->date($terminalResult?->occurredAt),
+                'Failure' => $terminalResult?->reason,
             ]),
 
             default => array_merge($meta, [

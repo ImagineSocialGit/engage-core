@@ -7,6 +7,7 @@ use App\Modules\Broadcasts\Listeners\MarkBroadcastRecipientSkipped;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
 use App\Modules\Messaging\Models\ScheduledMessage;
@@ -36,8 +37,8 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
             'status' => ScheduledMessage::STATUS_SKIPPED,
-            'skipped_at' => now(),
-            'skip_reason' => 'consent_missing',
+            'skipped_at' => now()->subHour(),
+            'skip_reason' => 'legacy_consent_missing',
             'meta' => [
                 'broadcast_id' => $broadcast->id,
                 'broadcast_recipient_id' => $recipient->id,
@@ -45,15 +46,26 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
         ]);
 
         app(MarkBroadcastRecipientSkipped::class)->handle(
-            new ScheduledMessageSkipped($scheduledMessage),
+            new ScheduledMessageSkipped(
+                $scheduledMessage,
+                new ScheduledMessageTerminalResult(
+                    scheduledMessageId: (int) $scheduledMessage->getKey(),
+                    status: ScheduledMessage::STATUS_SKIPPED,
+                    occurredAt: now()->toImmutable(),
+                    deliveryAttemptId: 41,
+                    attemptNumber: 2,
+                    reasonCode: 'consent_missing',
+                    reason: 'authoritative_consent_missing',
+                ),
+            ),
         );
 
         $recipient->refresh();
 
         $this->assertSame(BroadcastRecipient::STATUS_SKIPPED, $recipient->status);
-        $this->assertSame('consent_missing', $recipient->skip_reason);
+        $this->assertSame('authoritative_consent_missing', $recipient->skip_reason);
         $this->assertSame($scheduledMessage->id, $recipient->meta['delivery']['scheduled_message_id']);
-        $this->assertSame('consent_missing', $recipient->meta['delivery']['skip_reason']);
+        $this->assertSame('authoritative_consent_missing', $recipient->meta['delivery']['skip_reason']);
         $this->assertSame('2026-07-01T12:00:00.000000Z', $recipient->meta['delivery']['skipped_at']);
     }
 
@@ -75,8 +87,8 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
             'context_type' => $broadcast->getMorphClass(),
             'context_id' => $broadcast->id,
             'status' => ScheduledMessage::STATUS_FAILED,
-            'failed_at' => now(),
-            'failure_reason' => 'Provider failure.',
+            'failed_at' => now()->subHour(),
+            'failure_reason' => 'Legacy provider failure.',
             'meta' => [
                 'broadcast_id' => $broadcast->id,
                 'broadcast_recipient_id' => $recipient->id,
@@ -84,7 +96,19 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
         ]);
 
         app(MarkBroadcastRecipientFailed::class)->handle(
-            new ScheduledMessageFailed($scheduledMessage),
+            new ScheduledMessageFailed(
+                $scheduledMessage,
+                new ScheduledMessageTerminalResult(
+                    scheduledMessageId: (int) $scheduledMessage->getKey(),
+                    status: ScheduledMessage::STATUS_FAILED,
+                    occurredAt: now()->toImmutable(),
+                    deliveryAttemptId: 42,
+                    attemptNumber: 3,
+                    provider: 'test_provider',
+                    reasonCode: 'provider_rejected',
+                    reason: 'Authoritative provider failure.',
+                ),
+            ),
         );
 
         $recipient->refresh();
@@ -92,7 +116,7 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
         $this->assertSame(BroadcastRecipient::STATUS_FAILED, $recipient->status);
         $this->assertNull($recipient->skip_reason);
         $this->assertSame($scheduledMessage->id, $recipient->meta['delivery']['scheduled_message_id']);
-        $this->assertSame('Provider failure.', $recipient->meta['delivery']['failure_reason']);
+        $this->assertSame('Authoritative provider failure.', $recipient->meta['delivery']['failure_reason']);
         $this->assertSame('2026-07-01T12:00:00.000000Z', $recipient->meta['delivery']['failed_at']);
     }
 

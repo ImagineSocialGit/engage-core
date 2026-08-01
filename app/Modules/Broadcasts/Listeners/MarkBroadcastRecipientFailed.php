@@ -13,6 +13,9 @@ class MarkBroadcastRecipientFailed
 
     public function handle(ScheduledMessageFailed $event): void
     {
-        $this->resultRecorder->recordFailed($event->scheduledMessage);
+        $this->resultRecorder->recordFailed(
+            $event->scheduledMessage,
+            $event->terminalResult,
+        );
     }
 }

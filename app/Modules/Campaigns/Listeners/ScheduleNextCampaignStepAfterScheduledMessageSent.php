@@ -8,6 +8,7 @@ use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Campaigns\Models\CampaignStep;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
@@ -27,6 +28,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSent
         ScheduledMessageSent|ScheduledMessageSkipped|ScheduledMessageFailed $event,
     ): void {
         $scheduledMessage = $event->scheduledMessage;
+        $terminalResult = $event->terminalResult;
 
         $campaignEnrollmentId = $scheduledMessage->meta['campaign_enrollment_id'] ?? null;
 
@@ -34,7 +36,11 @@ class ScheduleNextCampaignStepAfterScheduledMessageSent
             return;
         }
 
-        DB::transaction(function () use ($scheduledMessage, $campaignEnrollmentId): void {
+        DB::transaction(function () use (
+            $scheduledMessage,
+            $terminalResult,
+            $campaignEnrollmentId,
+        ): void {
             $enrollment = CampaignEnrollment::query()
                 ->lockForUpdate()
                 ->find((int) $campaignEnrollmentId);
@@ -69,6 +75,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSent
                 campaignEnrollmentId: (int) $campaignEnrollmentId,
                 campaignStepId: $campaignStepId,
                 hasNonTerminalSiblings: $hasNonTerminalSiblings,
+                currentTerminalResult: $terminalResult,
             );
 
             if ($hasNonTerminalSiblings) {
@@ -157,6 +164,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSent
         int $campaignEnrollmentId,
         mixed $campaignStepId,
         bool $hasNonTerminalSiblings,
+        ScheduledMessageTerminalResult $currentTerminalResult,
     ): void {
         if (! is_numeric($campaignStepId)) {
             return;
@@ -166,6 +174,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSent
             ->where('status', ScheduledMessage::STATUS_FAILED)
             ->where('meta->campaign_enrollment_id', $campaignEnrollmentId)
             ->where('meta->campaign_step_id', (int) $campaignStepId)
+            ->with('latestDeliveryAttempt')
             ->orderBy('id')
             ->get();
 
@@ -179,13 +188,28 @@ class ScheduleNextCampaignStepAfterScheduledMessageSent
             : [];
 
         foreach ($failedMessages as $failedMessage) {
+            $failureKey = (string) $failedMessage->id;
+            $existingFailure = is_array($failures[$failureKey] ?? null)
+                ? $failures[$failureKey]
+                : [];
+            $terminalResult = $failedMessage->is($scheduledMessage)
+                && $currentTerminalResult->isFailed()
+                    ? $currentTerminalResult
+                    : ScheduledMessageTerminalResult::fromScheduledMessage(
+                        $failedMessage,
+                    );
+
             $failure = [
                 'scheduled_message_id' => $failedMessage->id,
                 'campaign_step_id' => (int) $campaignStepId,
                 'campaign_step_variant_id' => data_get($failedMessage->meta, 'campaign_step_variant_id'),
                 'campaign_step_variant_key' => data_get($failedMessage->meta, 'campaign_step_variant_key'),
-                'failure_reason' => $failedMessage->failure_reason,
-                'failed_at' => $failedMessage->failed_at?->toISOString(),
+                'failure_reason_code' => $existingFailure['failure_reason_code']
+                    ?? $terminalResult->reasonCode,
+                'failure_reason' => $existingFailure['failure_reason']
+                    ?? $terminalResult->reason,
+                'failed_at' => $existingFailure['failed_at']
+                    ?? $terminalResult->occurredAt->toISOString(),
                 'policy' => self::TERMINAL_FAILURE_POLICY,
                 'decision' => $hasNonTerminalSiblings
                     ? 'wait_for_scheduled_sibling_variants'
@@ -194,7 +218,7 @@ class ScheduleNextCampaignStepAfterScheduledMessageSent
                 'reconciled_at' => now()->toISOString(),
             ];
 
-            $failures[(string) $failedMessage->id] = $failure;
+            $failures[$failureKey] = $failure;
             $meta['last_scheduled_message_terminal_failure'] = $failure;
         }
 
