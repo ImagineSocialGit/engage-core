@@ -50,7 +50,7 @@ class CancelBroadcastActionTest extends TestCase
 
         $recipient->refresh();
         $this->assertSame(BroadcastRecipient::STATUS_CANCELLED, $recipient->status);
-        $this->assertSame('broadcast_cancelled', $recipient->skip_reason);
+        $this->assertSame('broadcast_cancelled', $recipient->terminal_reason);
 
         $scheduledMessage->refresh();
         $terminalResult = $this->terminalResult($scheduledMessage);
@@ -86,7 +86,7 @@ class CancelBroadcastActionTest extends TestCase
 
         $recipient->refresh();
         $this->assertSame(BroadcastRecipient::STATUS_CANCELLED, $recipient->status);
-        $this->assertSame('admin_cancelled', $recipient->skip_reason);
+        $this->assertSame('admin_cancelled', $recipient->terminal_reason);
 
         $scheduledMessage->refresh();
 
@@ -121,13 +121,13 @@ class CancelBroadcastActionTest extends TestCase
         $failedRecipient->refresh();
 
         $this->assertSame(BroadcastRecipient::STATUS_SENT, $sentRecipient->status);
-        $this->assertNull($sentRecipient->skip_reason);
+        $this->assertNull($sentRecipient->terminal_reason);
 
         $this->assertSame(BroadcastRecipient::STATUS_SKIPPED, $skippedRecipient->status);
-        $this->assertSame('not_eligible', $skippedRecipient->skip_reason);
+        $this->assertSame('not_eligible', $skippedRecipient->terminal_reason);
 
         $this->assertSame(BroadcastRecipient::STATUS_FAILED, $failedRecipient->status);
-        $this->assertNull($failedRecipient->skip_reason);
+        $this->assertSame('delivery_failed', $failedRecipient->terminal_reason);
     }
 
     public function test_it_only_skips_pending_scheduled_messages(): void
@@ -208,7 +208,7 @@ class CancelBroadcastActionTest extends TestCase
 
         $recipient->refresh();
         $this->assertSame(BroadcastRecipient::STATUS_CANCELLED, $recipient->status);
-        $this->assertSame('broadcast_cancelled', $recipient->skip_reason);
+        $this->assertSame('broadcast_cancelled', $recipient->terminal_reason);
 
         $scheduledMessage->refresh();
 
@@ -280,7 +280,7 @@ class CancelBroadcastActionTest extends TestCase
 
         $sentRecipient->refresh();
         $this->assertSame(BroadcastRecipient::STATUS_SENT, $sentRecipient->status);
-        $this->assertNull($sentRecipient->skip_reason);
+        $this->assertNull($sentRecipient->terminal_reason);
 
         $invitation->refresh();
         $this->assertSame(ContactPermissionInvitation::STATUS_SENT, $invitation->status);

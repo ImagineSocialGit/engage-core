@@ -22,7 +22,7 @@ class BroadcastRecipientFactory extends Factory
             'status' => BroadcastRecipient::STATUS_PENDING,
             'scheduled_message_ids' => null,
             'sent_at' => null,
-            'skip_reason' => null,
+            'terminal_reason' => null,
             'meta' => [],
         ];
     }
@@ -40,7 +40,7 @@ class BroadcastRecipientFactory extends Factory
         return $this->state(fn (): array => [
             'status' => BroadcastRecipient::STATUS_SENT,
             'sent_at' => now(),
-            'skip_reason' => null,
+            'terminal_reason' => null,
         ]);
     }
 
@@ -48,14 +48,17 @@ class BroadcastRecipientFactory extends Factory
     {
         return $this->state(fn (): array => [
             'status' => BroadcastRecipient::STATUS_SKIPPED,
-            'skip_reason' => $reason,
+            'sent_at' => null,
+            'terminal_reason' => $reason,
         ]);
     }
 
-    public function failed(): static
+    public function failed(?string $reason = 'delivery_failed'): static
     {
         return $this->state(fn (): array => [
             'status' => BroadcastRecipient::STATUS_FAILED,
+            'sent_at' => null,
+            'terminal_reason' => $reason,
         ]);
     }
 }

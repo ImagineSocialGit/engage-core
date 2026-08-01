@@ -31,7 +31,7 @@ class CancelBroadcastAction
                 ])
                 ->update([
                     'status' => BroadcastRecipient::STATUS_CANCELLED,
-                    'skip_reason' => $reason,
+                    'terminal_reason' => $reason,
                     'updated_at' => now(),
                 ]);
 
@@ -55,6 +55,10 @@ class CancelBroadcastAction
     {
         $reason = is_string($reason) ? trim($reason) : '';
 
-        return $reason !== '' ? $reason : 'broadcast_cancelled';
+        return mb_substr(
+            $reason !== '' ? $reason : 'broadcast_cancelled',
+            0,
+            255,
+        );
     }
 }

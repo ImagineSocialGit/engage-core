@@ -26,6 +26,12 @@ class MarkBroadcastRecipientSentTest extends TestCase
         $recipient = BroadcastRecipient::factory()->scheduled([123])->create([
             'broadcast_id' => $broadcast->id,
             'contact_id' => $contact->id,
+            'meta' => [
+                'retained' => 'recipient-metadata',
+                'delivery' => [
+                    'legacy' => true,
+                ],
+            ],
         ]);
 
         $scheduledMessage = ScheduledMessage::factory()->sent()->create([
@@ -47,9 +53,9 @@ class MarkBroadcastRecipientSentTest extends TestCase
 
         $this->assertSame(BroadcastRecipient::STATUS_SENT, $recipient->status);
         $this->assertSame('2026-07-01 12:00:00', $recipient->sent_at->toDateTimeString());
-        $this->assertNull($recipient->skip_reason);
-        $this->assertSame($scheduledMessage->id, $recipient->meta['delivery']['scheduled_message_id']);
-        $this->assertSame('2026-07-01T12:00:00.000000Z', $recipient->meta['delivery']['sent_at']);
+        $this->assertNull($recipient->terminal_reason);
+        $this->assertSame('recipient-metadata', $recipient->meta['retained']);
+        $this->assertArrayNotHasKey('delivery', $recipient->meta);
     }
 
     public function test_it_completes_the_broadcast_when_all_recipients_are_terminal(): void

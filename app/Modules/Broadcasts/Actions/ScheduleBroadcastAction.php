@@ -40,7 +40,7 @@ class ScheduleBroadcastAction
                     [
                         'status' => BroadcastRecipient::STATUS_PENDING,
                         'scheduled_message_ids' => null,
-                        'skip_reason' => null,
+                        'terminal_reason' => null,
                         'meta' => [],
                     ],
                 );
@@ -54,7 +54,8 @@ class ScheduleBroadcastAction
                     $recipient->forceFill([
                         'status' => BroadcastRecipient::STATUS_SKIPPED,
                         'scheduled_message_ids' => null,
-                        'skip_reason' => 'broadcast_channel_unavailable',
+                        'sent_at' => null,
+                        'terminal_reason' => 'broadcast_channel_unavailable',
                         'meta' => array_replace_recursive($recipient->meta ?? [], [
                             'broadcast' => [
                                 'attempted_at' => now()->toISOString(),
@@ -62,7 +63,6 @@ class ScheduleBroadcastAction
                                 'purpose' => $broadcast->purpose,
                                 'scope' => $broadcast->scope,
                                 'surface' => 'broadcasts',
-                                'skip_reason' => 'broadcast_channel_unavailable',
                             ],
                         ]),
                     ])->save();
@@ -118,7 +118,8 @@ class ScheduleBroadcastAction
                     $recipient->forceFill([
                         'status' => BroadcastRecipient::STATUS_SKIPPED,
                         'scheduled_message_ids' => null,
-                        'skip_reason' => 'not_scheduled_by_messaging',
+                        'sent_at' => null,
+                        'terminal_reason' => 'not_scheduled_by_messaging',
                         'meta' => array_replace_recursive($recipient->meta ?? [], [
                             'broadcast' => [
                                 'attempted_at' => now()->toISOString(),
@@ -134,7 +135,8 @@ class ScheduleBroadcastAction
                 $recipient->forceFill([
                     'status' => BroadcastRecipient::STATUS_SCHEDULED,
                     'scheduled_message_ids' => $scheduledMessageIds,
-                    'skip_reason' => null,
+                    'sent_at' => null,
+                    'terminal_reason' => null,
                     'meta' => array_replace_recursive($recipient->meta ?? [], [
                         'broadcast' => [
                             'scheduled_at' => now()->toISOString(),

@@ -30,7 +30,7 @@ class BroadcastRecipient extends Model
         'status',
         'scheduled_message_ids',
         'sent_at',
-        'skip_reason',
+        'terminal_reason',
         'meta',
     ];
 

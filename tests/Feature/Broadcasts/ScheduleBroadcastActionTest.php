@@ -87,7 +87,7 @@ class ScheduleBroadcastActionTest extends TestCase
             $this->assertNotNull($recipient);
             $this->assertSame(BroadcastRecipient::STATUS_SCHEDULED, $recipient->status);
             $this->assertCount(1, $recipient->scheduled_message_ids);
-            $this->assertNull($recipient->skip_reason);
+            $this->assertNull($recipient->terminal_reason);
         }
     }
 
@@ -156,7 +156,7 @@ class ScheduleBroadcastActionTest extends TestCase
                 $this->assertSame('sms', $channel);
                 $this->assertSame('marketing', $purpose);
                 $this->assertSame('broadcast', $scope);
-                $this->assertSame([
+                $this->assertEquals([
                     'message' => 'This is an SMS broadcast.',
                 ], $payload);
 
@@ -170,10 +170,10 @@ class ScheduleBroadcastActionTest extends TestCase
                 $this->assertSame('marketing', $definitions[0]['purpose']);
                 $this->assertSame('broadcast', $definitions[0]['scope']);
                 $this->assertSame(SmsPayload::class, $definitions[0]['payload_class']);
-                $this->assertSame([
+                $this->assertEquals([
                     'message' => 'This is an SMS broadcast.',
                 ], $definitions[0]['payload']);
-                $this->assertSame([], $definitions[0]['consent_policy']);
+                $this->assertEquals([], $definitions[0]['consent_policy']);
 
                 return [
                     ScheduledMessage::factory()->create([
@@ -210,7 +210,7 @@ class ScheduleBroadcastActionTest extends TestCase
             $this->assertNotNull($recipient);
             $this->assertSame(BroadcastRecipient::STATUS_SCHEDULED, $recipient->status);
             $this->assertCount(1, $recipient->scheduled_message_ids);
-            $this->assertNull($recipient->skip_reason);
+            $this->assertNull($recipient->terminal_reason);
         }
     }
 
@@ -241,9 +241,9 @@ class ScheduleBroadcastActionTest extends TestCase
                 $meta = $arguments['meta'] ?? $arguments[9];
                 $definitions = $arguments['definitions'] ?? $arguments[11];
 
-                $this->assertSame([], $meta['consent_policy']);
-                $this->assertSame([], $definitions[0]['consent_policy']);
-                $this->assertSame([], $definitions[0]['meta']['consent_policy']);
+                $this->assertEquals([], $meta['consent_policy']);
+                $this->assertEquals([], $definitions[0]['consent_policy']);
+                $this->assertEquals([], $definitions[0]['meta']['consent_policy']);
 
                 return [
                     ScheduledMessage::factory()->create([
@@ -286,7 +286,7 @@ class ScheduleBroadcastActionTest extends TestCase
                 $meta = $arguments['meta'] ?? $arguments[9];
                 $definitions = $arguments['definitions'] ?? $arguments[11];
 
-                $this->assertSame([
+                $this->assertEquals([
                     'permission_invitation' => [
                         'source' => ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT,
                         'one_time' => true,
@@ -488,9 +488,9 @@ class ScheduleBroadcastActionTest extends TestCase
                 $meta = $arguments['meta'] ?? $arguments[9];
                 $definitions = $arguments['definitions'] ?? $arguments[11];
 
-                $this->assertSame([], $meta['consent_policy']);
-                $this->assertSame([], $definitions[0]['consent_policy']);
-                $this->assertSame([], $definitions[0]['meta']['consent_policy']);
+                $this->assertEquals([], $meta['consent_policy']);
+                $this->assertEquals([], $definitions[0]['consent_policy']);
+                $this->assertEquals([], $definitions[0]['meta']['consent_policy']);
 
                 return [
                     ScheduledMessage::factory()->create([
@@ -569,7 +569,7 @@ class ScheduleBroadcastActionTest extends TestCase
         $this->assertNotNull($recipient);
         $this->assertSame(BroadcastRecipient::STATUS_SKIPPED, $recipient->status);
         $this->assertNull($recipient->scheduled_message_ids);
-        $this->assertSame('broadcast_channel_unavailable', $recipient->skip_reason);
+        $this->assertSame('broadcast_channel_unavailable', $recipient->terminal_reason);
         $this->assertSame('sms', data_get($recipient->meta, 'broadcast.channel'));
         $this->assertSame('broadcasts', data_get($recipient->meta, 'broadcast.surface'));
     }
@@ -631,7 +631,7 @@ class ScheduleBroadcastActionTest extends TestCase
         $this->assertNotNull($recipient);
         $this->assertSame(BroadcastRecipient::STATUS_SKIPPED, $recipient->status);
         $this->assertNull($recipient->scheduled_message_ids);
-        $this->assertSame('not_scheduled_by_messaging', $recipient->skip_reason);
+        $this->assertSame('not_scheduled_by_messaging', $recipient->terminal_reason);
     }
 
     public function test_it_schedules_a_broadcast_to_specific_contacts(): void
@@ -767,7 +767,7 @@ class ScheduleBroadcastActionTest extends TestCase
         $this->assertSame($contact->id, $recipient->contact_id);
         $this->assertSame(BroadcastRecipient::STATUS_SKIPPED, $recipient->status);
         $this->assertNull($recipient->scheduled_message_ids);
-        $this->assertSame('not_scheduled_by_messaging', $recipient->skip_reason);
+        $this->assertSame('not_scheduled_by_messaging', $recipient->terminal_reason);
     }
 
     public function test_it_applies_a_five_minute_buffer_to_send_now_broadcasts(): void

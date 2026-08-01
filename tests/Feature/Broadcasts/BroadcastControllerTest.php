@@ -100,7 +100,7 @@ class BroadcastControllerTest extends TestCase
         $this->assertSame('Weekly update', $broadcast->name);
         $this->assertSame('This week', $broadcast->payload['subject']);
         $this->assertSame('Here is the update.', $broadcast->payload['body']);
-        $this->assertSame(['type' => 'all'], $broadcast->recipient_filter);
+        $this->assertEquals(['type' => 'all'], $broadcast->recipient_filter);
     }
 
     public function test_it_creates_a_draft_broadcast_with_prior_broadcast_exclusions(): void
@@ -135,9 +135,9 @@ class BroadcastControllerTest extends TestCase
 
         $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
 
-        $this->assertSame(['type' => 'all'], array_intersect_key($broadcast->recipient_filter, ['type' => true]));
-        $this->assertSame([$previousBroadcast->id], data_get($broadcast->recipient_filter, 'exclude.broadcast_ids'));
-        $this->assertSame([
+        $this->assertEquals(['type' => 'all'], array_intersect_key($broadcast->recipient_filter, ['type' => true]));
+        $this->assertEquals([$previousBroadcast->id], data_get($broadcast->recipient_filter, 'exclude.broadcast_ids'));
+        $this->assertEquals([
             BroadcastRecipient::STATUS_SCHEDULED,
             BroadcastRecipient::STATUS_SENT,
         ], data_get($broadcast->recipient_filter, 'exclude.statuses'));
@@ -175,7 +175,7 @@ class BroadcastControllerTest extends TestCase
         $this->assertSame('email', $broadcast->channel);
         $this->assertSame('transactional', $broadcast->purpose);
         $this->assertSame('permission_invitation', $broadcast->scope);
-        $this->assertSame(['type' => 'imported'], $broadcast->recipient_filter);
+        $this->assertEquals(['type' => 'imported'], $broadcast->recipient_filter);
     }
 
     public function test_permission_invitation_create_request_ignores_submitted_recipient_filter(): void
@@ -203,7 +203,7 @@ class BroadcastControllerTest extends TestCase
 
         $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
 
-        $this->assertSame(['type' => 'imported'], $broadcast->recipient_filter);
+        $this->assertEquals(['type' => 'imported'], $broadcast->recipient_filter);
         $this->assertSame('email', $broadcast->channel);
         $this->assertSame('transactional', $broadcast->purpose);
         $this->assertSame('permission_invitation', $broadcast->scope);
@@ -248,7 +248,7 @@ class BroadcastControllerTest extends TestCase
 
         $this->assertSame(Broadcast::STATUS_SCHEDULED, $broadcast->status);
         $this->assertSame('tag', $broadcast->recipient_filter['type']);
-        $this->assertSame(['homebuyer'], $broadcast->recipient_filter['tags']);
+        $this->assertEquals(['homebuyer'], $broadcast->recipient_filter['tags']);
     }
 
     public function test_regular_broadcast_form_hides_sms_when_sms_is_not_visible_for_broadcasts(): void
@@ -454,7 +454,7 @@ class BroadcastControllerTest extends TestCase
             'broadcast_id' => $broadcast->id,
             'contact_id' => $skippedContact->id,
             'status' => BroadcastRecipient::STATUS_SKIPPED,
-            'skip_reason' => 'broadcast_channel_unavailable',
+            'terminal_reason' => 'broadcast_channel_unavailable',
             'scheduled_message_ids' => null,
         ]);
 
@@ -462,12 +462,7 @@ class BroadcastControllerTest extends TestCase
             'broadcast_id' => $broadcast->id,
             'contact_id' => $failedContact->id,
             'status' => BroadcastRecipient::STATUS_FAILED,
-            'skip_reason' => null,
-            'meta' => [
-                'delivery' => [
-                    'failure_reason' => 'provider_rejected',
-                ],
-            ],
+            'terminal_reason' => 'provider_rejected',
         ]);
 
         $response = $this
@@ -605,7 +600,7 @@ class BroadcastControllerTest extends TestCase
         $this->assertSame('Updated subject', $broadcast->payload['subject']);
         $this->assertSame('Updated body', $broadcast->payload['body']);
         $this->assertSame('tag', $broadcast->recipient_filter['type']);
-        $this->assertSame(['realtor'], $broadcast->recipient_filter['tags']);
+        $this->assertEquals(['realtor'], $broadcast->recipient_filter['tags']);
         $this->assertNotNull($broadcast->send_at);
     }
 
@@ -644,9 +639,9 @@ class BroadcastControllerTest extends TestCase
         $broadcast->refresh();
 
         $this->assertSame('tag', $broadcast->recipient_filter['type']);
-        $this->assertSame(['homebuyer'], $broadcast->recipient_filter['tags']);
-        $this->assertSame([$previousBroadcast->id], data_get($broadcast->recipient_filter, 'exclude.broadcast_ids'));
-        $this->assertSame([
+        $this->assertEquals(['homebuyer'], $broadcast->recipient_filter['tags']);
+        $this->assertEquals([$previousBroadcast->id], data_get($broadcast->recipient_filter, 'exclude.broadcast_ids'));
+        $this->assertEquals([
             BroadcastRecipient::STATUS_SCHEDULED,
             BroadcastRecipient::STATUS_SENT,
         ], data_get($broadcast->recipient_filter, 'exclude.statuses'));
@@ -688,7 +683,7 @@ class BroadcastControllerTest extends TestCase
         $this->assertSame('Updated invitation', $broadcast->name);
         $this->assertSame('Updated subject', $broadcast->payload['subject']);
         $this->assertSame('Updated body', $broadcast->payload['body']);
-        $this->assertSame(['type' => 'imported'], $broadcast->recipient_filter);
+        $this->assertEquals(['type' => 'imported'], $broadcast->recipient_filter);
     }
 
     public function test_it_creates_a_draft_broadcast_for_selected_contacts(): void
@@ -717,7 +712,7 @@ class BroadcastControllerTest extends TestCase
         $response->assertRedirect(route('crm.broadcasts.show', $broadcast));
 
         $this->assertSame('contact_ids', $broadcast->recipient_filter['type']);
-        $this->assertSame([$included->id], $broadcast->recipient_filter['contact_ids']);
+        $this->assertEquals([$included->id], $broadcast->recipient_filter['contact_ids']);
         $this->assertNotContains($other->id, $broadcast->recipient_filter['contact_ids']);
     }
 
@@ -750,7 +745,7 @@ class BroadcastControllerTest extends TestCase
         $broadcast->refresh();
 
         $this->assertSame('contact_ids', $broadcast->recipient_filter['type']);
-        $this->assertSame([$included->id], $broadcast->recipient_filter['contact_ids']);
+        $this->assertEquals([$included->id], $broadcast->recipient_filter['contact_ids']);
         $this->assertNotContains($other->id, $broadcast->recipient_filter['contact_ids']);
     }
 
@@ -826,7 +821,7 @@ class BroadcastControllerTest extends TestCase
         $this->assertSame('Original broadcast', $broadcast->name);
         $this->assertSame('Original subject', $broadcast->payload['subject']);
         $this->assertSame('Original body', $broadcast->payload['body']);
-        $this->assertSame(['type' => 'all'], $broadcast->recipient_filter);
+        $this->assertEquals(['type' => 'all'], $broadcast->recipient_filter);
     }
 
     public function test_it_schedules_an_existing_draft_broadcast(): void
@@ -1135,7 +1130,7 @@ class BroadcastControllerTest extends TestCase
 
         $this->assertSame(Broadcast::BROADCAST_TYPE_PERMISSION_INVITATION, $broadcast->meta['broadcast_type']);
         $this->assertSame(Broadcast::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION, $broadcast->message_type);
-        $this->assertSame([
+        $this->assertEquals([
             'type' => 'import_batch',
             'import_batch_ids' => [$batch->id],
         ], $broadcast->recipient_filter);
@@ -1180,7 +1175,7 @@ class BroadcastControllerTest extends TestCase
         $broadcast->refresh();
 
         $this->assertSame('Updated invitation', $broadcast->name);
-        $this->assertSame([
+        $this->assertEquals([
             'type' => 'import_batch',
             'import_batch_ids' => [$batch->id],
         ], $broadcast->recipient_filter);

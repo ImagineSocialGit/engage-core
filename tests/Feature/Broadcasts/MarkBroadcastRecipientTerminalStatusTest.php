@@ -29,6 +29,12 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
         $recipient = BroadcastRecipient::factory()->scheduled([123])->create([
             'broadcast_id' => $broadcast->id,
             'contact_id' => $contact->id,
+            'meta' => [
+                'retained' => 'recipient-metadata',
+                'delivery' => [
+                    'legacy' => true,
+                ],
+            ],
         ]);
 
         $scheduledMessage = ScheduledMessage::factory()->create([
@@ -61,10 +67,10 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
         $recipient->refresh();
 
         $this->assertSame(BroadcastRecipient::STATUS_SKIPPED, $recipient->status);
-        $this->assertSame('authoritative_consent_missing', $recipient->skip_reason);
-        $this->assertSame($scheduledMessage->id, $recipient->meta['delivery']['scheduled_message_id']);
-        $this->assertSame('authoritative_consent_missing', $recipient->meta['delivery']['skip_reason']);
-        $this->assertSame('2026-07-01T12:00:00.000000Z', $recipient->meta['delivery']['skipped_at']);
+        $this->assertSame('authoritative_consent_missing', $recipient->terminal_reason);
+        $this->assertNull($recipient->sent_at);
+        $this->assertSame('recipient-metadata', $recipient->meta['retained']);
+        $this->assertArrayNotHasKey('delivery', $recipient->meta);
     }
 
     public function test_it_marks_a_broadcast_recipient_failed_from_a_failed_scheduled_message(): void
@@ -77,6 +83,12 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
         $recipient = BroadcastRecipient::factory()->scheduled([123])->create([
             'broadcast_id' => $broadcast->id,
             'contact_id' => $contact->id,
+            'meta' => [
+                'retained' => 'recipient-metadata',
+                'delivery' => [
+                    'legacy' => true,
+                ],
+            ],
         ]);
 
         $scheduledMessage = ScheduledMessage::factory()->create([
@@ -110,10 +122,10 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
         $recipient->refresh();
 
         $this->assertSame(BroadcastRecipient::STATUS_FAILED, $recipient->status);
-        $this->assertNull($recipient->skip_reason);
-        $this->assertSame($scheduledMessage->id, $recipient->meta['delivery']['scheduled_message_id']);
-        $this->assertSame('Authoritative provider failure.', $recipient->meta['delivery']['failure_reason']);
-        $this->assertSame('2026-07-01T12:00:00.000000Z', $recipient->meta['delivery']['failed_at']);
+        $this->assertSame('Authoritative provider failure.', $recipient->terminal_reason);
+        $this->assertNull($recipient->sent_at);
+        $this->assertSame('recipient-metadata', $recipient->meta['retained']);
+        $this->assertArrayNotHasKey('delivery', $recipient->meta);
     }
 
     public function test_it_completes_the_broadcast_when_skipped_recipient_makes_all_recipients_terminal(): void
@@ -222,7 +234,7 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
 
         $this->assertSame(BroadcastRecipient::STATUS_SENT, $recipient->status);
         $this->assertNotNull($recipient->sent_at);
-        $this->assertNull($recipient->skip_reason);
+        $this->assertNull($recipient->terminal_reason);
     }
 
     public function test_it_ignores_scheduled_messages_for_other_contexts(): void
@@ -252,7 +264,7 @@ class MarkBroadcastRecipientTerminalStatusTest extends TestCase
         $broadcast->refresh();
 
         $this->assertSame(BroadcastRecipient::STATUS_SCHEDULED, $recipient->status);
-        $this->assertNull($recipient->skip_reason);
+        $this->assertNull($recipient->terminal_reason);
         $this->assertSame(Broadcast::STATUS_SCHEDULED, $broadcast->status);
     }
 }

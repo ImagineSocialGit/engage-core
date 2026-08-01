@@ -221,7 +221,7 @@
                                         </td>
 
                                         <td class="px-6 py-4 text-slate-600">
-                                            @php($reason = $recipient->skip_reason ?? $recipient->meta['delivery']['failure_reason'] ?? null)
+                                            @php($reason = $recipient->terminal_reason)
 
                                             {{ $reason ? str_replace('_', ' ', $reason) : '—' }}
                                         </td>

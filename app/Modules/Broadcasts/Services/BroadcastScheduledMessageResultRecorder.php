@@ -33,18 +33,11 @@ class BroadcastScheduledMessageResultRecorder
         }
 
         if ($this->isOpenRecipient($recipient)) {
-            $sentAt = $terminalResult->occurredAt;
-
             $recipient->forceFill([
                 'status' => BroadcastRecipient::STATUS_SENT,
-                'sent_at' => $sentAt,
-                'skip_reason' => null,
-                'meta' => array_replace_recursive($recipient->meta ?? [], [
-                    'delivery' => [
-                        'sent_at' => $sentAt->toISOString(),
-                        'scheduled_message_id' => $scheduledMessage->getKey(),
-                    ],
-                ]),
+                'sent_at' => $terminalResult->occurredAt,
+                'terminal_reason' => null,
+                'meta' => $this->withoutDeliverySnapshot($recipient->meta ?? []),
             ])->save();
         }
 
@@ -74,21 +67,14 @@ class BroadcastScheduledMessageResultRecorder
         }
 
         if ($this->isOpenRecipient($recipient)) {
-            $skippedAt = $terminalResult->occurredAt;
-            $skipReason = $terminalResult->reason
-                ?? $terminalResult->reasonCode
-                ?? 'scheduled_message_skipped';
-
             $recipient->forceFill([
                 'status' => BroadcastRecipient::STATUS_SKIPPED,
-                'skip_reason' => $skipReason,
-                'meta' => array_replace_recursive($recipient->meta ?? [], [
-                    'delivery' => [
-                        'skipped_at' => $skippedAt->toISOString(),
-                        'scheduled_message_id' => $scheduledMessage->getKey(),
-                        'skip_reason' => $skipReason,
-                    ],
-                ]),
+                'sent_at' => null,
+                'terminal_reason' => $this->terminalReason(
+                    terminalResult: $terminalResult,
+                    fallback: 'scheduled_message_skipped',
+                ),
+                'meta' => $this->withoutDeliverySnapshot($recipient->meta ?? []),
             ])->save();
         }
 
@@ -118,18 +104,14 @@ class BroadcastScheduledMessageResultRecorder
         }
 
         if ($this->isOpenRecipient($recipient)) {
-            $failedAt = $terminalResult->occurredAt;
-
             $recipient->forceFill([
                 'status' => BroadcastRecipient::STATUS_FAILED,
-                'skip_reason' => null,
-                'meta' => array_replace_recursive($recipient->meta ?? [], [
-                    'delivery' => [
-                        'failed_at' => $failedAt->toISOString(),
-                        'scheduled_message_id' => $scheduledMessage->getKey(),
-                        'failure_reason' => $terminalResult->reason,
-                    ],
-                ]),
+                'sent_at' => null,
+                'terminal_reason' => $this->terminalReason(
+                    terminalResult: $terminalResult,
+                    fallback: 'scheduled_message_failed',
+                ),
+                'meta' => $this->withoutDeliverySnapshot($recipient->meta ?? []),
             ])->save();
         }
 
@@ -178,6 +160,40 @@ class BroadcastScheduledMessageResultRecorder
             BroadcastRecipient::STATUS_PENDING,
             BroadcastRecipient::STATUS_SCHEDULED,
         ], true);
+    }
+
+    private function terminalReason(
+        ScheduledMessageTerminalResult $terminalResult,
+        string $fallback,
+    ): string {
+        $reason = is_string($terminalResult->reason)
+            ? trim($terminalResult->reason)
+            : '';
+
+        if ($reason !== '') {
+            return mb_substr($reason, 0, 255);
+        }
+
+        $reasonCode = is_string($terminalResult->reasonCode)
+            ? trim($terminalResult->reasonCode)
+            : '';
+
+        return mb_substr(
+            $reasonCode !== '' ? $reasonCode : $fallback,
+            0,
+            255,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     * @return array<string, mixed>
+     */
+    private function withoutDeliverySnapshot(array $meta): array
+    {
+        unset($meta['delivery']);
+
+        return $meta;
     }
 
     private function completeBroadcastWhenFinished(Broadcast $broadcast): void
