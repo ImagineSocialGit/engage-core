@@ -67,8 +67,8 @@ See [Config Contracts and Token Contracts](config-contracts.md) and the
 30. SMS capabilities may exist in code while SMS UI options are hidden by client/surface config.
 31. Module docs are the source of truth for module ownership and client-facing scope. Configs should not create a module feature that the owning module does not support.
 32. Commerce and Location configs should support admin convenience and integrations; do not turn Engage Core into a storefront, checkout, GIS, routing, or map product.
-33. Messaging-owned delivery consolidation may combine compatible lifecycle and consent-acknowledgement intents into one physical message. Covered intent keys and consent IDs must remain auditable, and uncovered required acknowledgements need an explicit standalone fallback.
-34. Reserved `delivery_consolidation_*` placeholders are internal composition fields, not universal authorable tokens. Use them only in a documented consolidation-aware template context.
+33. Messaging-owned delivery composition may attach compatible consent acknowledgements to one physical lifecycle message through immutable `ScheduledMessageComponent` rows. Covered intent keys and consent IDs remain relationally auditable, and uncovered required acknowledgements need an explicit standalone fallback.
+34. Do not author `delivery_consolidation_*` placeholders or persistence recipes. Component placement is selected by Messaging policy and rendered from pinned immutable template versions.
 35. Public Webinar registration presentation is client-configurable. Tests and config audits should validate structure, accessibility, legal-link validity, channel/consent behavior, and runtime safety rather than identical client copy or exact Tailwind class counts.
 36. Persisted runtime payloads must be send-ready and compact. Do not duplicate whole model arrays or the same domain snapshot under payload, token, context, and metadata branches.
 ## Universal internal terminology vs configured client nouns
@@ -241,27 +241,21 @@ Consent acknowledgement definition, delivery policy, consolidation, and fallback
 
 A feature module may supply a compatible lifecycle message, but it must not absorb acknowledgement ownership into its own reusable template area.
 
-A consolidation-aware path should preserve:
+A composition-aware path should preserve:
 
 ```text
-primary lifecycle intent
-covered acknowledgement intent keys
-covered MessageConsent IDs
-policy/group identity
+primary lifecycle ScheduledMessage
+one immutable component template version per covered acknowledgement intent
+covered MessageConsent ID
+deterministic placement and sort order
 standalone fallback for uncovered grants
 ```
 
-The acknowledgement inherits the primary lifecycle message's resolved behavior. For example, a Webinar acknowledgement consolidated into a delayed registration confirmation sends with that confirmation rather than immediately.
+The acknowledgement inherits the primary lifecycle message's resolved behavior. For example, a Webinar acknowledgement attached to a delayed registration confirmation sends with that confirmation rather than immediately.
 
-Do not create duplicate standalone acknowledgements for intents already covered by a successfully scheduled consolidated message.
+Do not create duplicate standalone acknowledgements for intents already covered by relational components on a successfully scheduled message.
 
-Reserved placeholders named like:
-
-```text
-{delivery_consolidation_*}
-```
-
-are composition fields supplied by the Messaging consolidation path. They are not universal Contact/Webinar tokens and should not be added to `TokenContractRegistry` merely to silence ordinary token validation.
+Do not add `delivery_consolidation_*` placeholders to authored templates or `TokenContractRegistry`. Messaging composes the pinned primary and component template versions during payload resolution; no copied fragment or consolidation recipe belongs in `ScheduledMessage.payload` or `ScheduledMessage.meta`.
 
 A module readiness page should evaluate the final delivery path. `No standalone opt-in template` is not equivalent to `no acknowledgement delivery` when a valid consolidated path and fallback exist.
 
@@ -565,23 +559,32 @@ Do not guess URLs in static config.
 
 ## Messaging config locations
 
-Messaging configs live under:
+Messaging configs normally live under:
 
 ```text
 config/messaging/{channel}/definitions/{purpose}/{scope}.php
 client/{client-key}/config/messaging/{channel}/definitions/{purpose}/{scope}.php
 ```
 
+Webinar definitions always use an explicit named template set. The base scope file returns a nested `default` set; additional series-specific sets use one file per set:
+
+```text
+config/messaging/{channel}/definitions/{purpose}/webinar.php
+client/{client-key}/config/messaging/{channel}/definitions/{purpose}/webinar/{set-key}.php
+```
+
 Examples:
 
 ```text
 config/messaging/email/definitions/transactional/webinar.php
+client/[CLIENT_KEY]/config/messaging/email/definitions/transactional/webinar/investor-strategy.php
 config/messaging/email/definitions/marketing/webinar_nurture.php
 config/messaging/email/definitions/marketing/mortgage_homebuyer_nurture.php
 config/messaging/permission_invitations.php
-client/slam-dunk-crm/config/messaging/email/definitions/transactional/webinar.php
-client/slam-dunk-crm/config/messaging/email/definitions/marketing/webinar_nurture.php
+client/[CLIENT_KEY]/config/messaging/email/definitions/marketing/webinar_nurture.php
 ```
+
+The Webinar scope does not accept the former flat `confirmations`, `reminders`, `post_attended`, or `post_missed` root shape. Even the default file must return those groups beneath `default`.
 
 Messaging reusable definitions live behind an explicit `definitions` envelope:
 
@@ -1622,11 +1625,13 @@ emit automation events
 
 It should not own reusable message copy.
 
-Message copy belongs in:
+Message copy belongs in the explicit default set or a named series set:
 
 ```text
-config/messaging/email/definitions/transactional/webinar.php
-config/messaging/sms/definitions/transactional/webinar.php
+config/messaging/email/definitions/transactional/webinar.php                  # returns ['default' => [...]]
+config/messaging/sms/definitions/transactional/webinar.php                    # returns ['default' => [...]]
+client/[CLIENT_KEY]/config/messaging/email/definitions/transactional/webinar/{set-key}.php
+client/[CLIENT_KEY]/config/messaging/sms/definitions/transactional/webinar/{set-key}.php
 ```
 
 Transactional post-event follow-ups use:

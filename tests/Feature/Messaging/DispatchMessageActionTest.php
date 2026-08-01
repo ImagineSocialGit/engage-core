@@ -27,15 +27,18 @@ class DispatchMessageActionTest extends TestCase
         Queue::fake();
 
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                
-                'payload' => [
-                    'subject' => 'Registered',
-                    'body' => 'Hello {first_name}',
+            'default' => [
+                'confirmation' => [
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+
+                    'payload' => [
+                        'subject' => 'Registered',
+                        'body' => 'Hello {first_name}',
+                    ],
                 ],
+
             ],
         ]);
 
@@ -75,14 +78,17 @@ class DispatchMessageActionTest extends TestCase
         Queue::fake();
 
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'consent_granted',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'notifications',
-                'payload' => [
-                    'subject' => 'A',
-                    'body' => 'B',
+            'default' => [
+                'confirmation' => [
+                    'dispatch_key' => 'consent_granted',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'notifications',
+                    'payload' => [
+                        'subject' => 'A',
+                        'body' => 'B',
+                    ],
                 ],
+
             ],
         ]);
 
@@ -105,17 +111,20 @@ class DispatchMessageActionTest extends TestCase
         Queue::fake();
 
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'registration_created',
+            'default' => [
+                'confirmation' => [
+                    'dispatch_key' => 'registration_created',
 
-                'payload_class' => EmailPayload::class,
+                    'payload_class' => EmailPayload::class,
 
-                'queue' => 'notifications',
+                    'queue' => 'notifications',
 
-                'payload' => [
-                    'subject' => 'Registered',
-                    'body' => 'Hello {first_name}',
+                    'payload' => [
+                        'subject' => 'Registered',
+                        'body' => 'Hello {first_name}',
+                    ],
                 ],
+
             ],
         ]);
 
@@ -158,7 +167,7 @@ class DispatchMessageActionTest extends TestCase
         $this->assertArrayNotHasKey('runtime_context', $message->payload);
 
         $this->assertSame(
-            'messaging.email.definitions.transactional.webinar.confirmation',
+            'messaging.email.definitions.transactional.webinar.default.confirmation',
             $message->definition_config_path,
         );
         $this->assertSame('notifications', $message->queue);
@@ -326,28 +335,31 @@ class DispatchMessageActionTest extends TestCase
         Queue::fake();
 
         Config::set('messaging.email.definitions.marketing.webinar', [
-            'first_drip' => [
-                'dispatch_key' => 'campaign_step_due',
-                'campaign_key' => 'webinar_attended',
-                'step' => 1,
-                'payload_class' => EmailPayload::class,
-                'queue' => 'marketing',
-                'payload' => [
-                    'subject' => 'Step 1',
-                    'body' => 'First',
+            'default' => [
+                'first_drip' => [
+                    'dispatch_key' => 'campaign_step_due',
+                    'campaign_key' => 'webinar_attended',
+                    'step' => 1,
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'marketing',
+                    'payload' => [
+                        'subject' => 'Step 1',
+                        'body' => 'First',
+                    ],
                 ],
-            ],
 
-            'second_drip' => [
-                'dispatch_key' => 'campaign_step_due',
-                'campaign_key' => 'webinar_attended',
-                'step' => 2,
-                'payload_class' => EmailPayload::class,
-                'queue' => 'marketing',
-                'payload' => [
-                    'subject' => 'Step 2',
-                    'body' => 'Second',
+                'second_drip' => [
+                    'dispatch_key' => 'campaign_step_due',
+                    'campaign_key' => 'webinar_attended',
+                    'step' => 2,
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'marketing',
+                    'payload' => [
+                        'subject' => 'Step 2',
+                        'body' => 'Second',
+                    ],
                 ],
+
             ],
         ]);
 
@@ -385,16 +397,19 @@ class DispatchMessageActionTest extends TestCase
         Queue::fake();
 
         Config::set('messaging.email.definitions.marketing.webinar', [
-            'first_drip' => [
-                'dispatch_key' => 'campaign_step_due',
-                'campaign_key' => 'webinar_attended',
-                'step' => 1,
-                'payload_class' => EmailPayload::class,
-                'queue' => 'marketing',
-                'payload' => [
-                    'subject' => 'Step 1',
-                    'body' => 'First',
+            'default' => [
+                'first_drip' => [
+                    'dispatch_key' => 'campaign_step_due',
+                    'campaign_key' => 'webinar_attended',
+                    'step' => 1,
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'marketing',
+                    'payload' => [
+                        'subject' => 'Step 1',
+                        'body' => 'First',
+                    ],
                 ],
+
             ],
         ]);
 
@@ -426,28 +441,31 @@ class DispatchMessageActionTest extends TestCase
         Queue::fake();
 
         Config::set('messaging.email.definitions.marketing.webinar', [
-            'first_drip_a' => [
-                'dispatch_key' => 'campaign_step_due',
-                'campaign_key' => 'webinar_attended',
-                'step' => 2,
-                'payload_class' => EmailPayload::class,
-                'queue' => 'marketing',
-                'payload' => [
-                    'subject' => 'A',
-                    'body' => 'A',
+            'default' => [
+                'first_drip_a' => [
+                    'dispatch_key' => 'campaign_step_due',
+                    'campaign_key' => 'webinar_attended',
+                    'step' => 2,
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'marketing',
+                    'payload' => [
+                        'subject' => 'A',
+                        'body' => 'A',
+                    ],
                 ],
-            ],
 
-            'first_drip_b' => [
-                'dispatch_key' => 'campaign_step_due',
-                'campaign_key' => 'webinar_attended',
-                'step' => 2,
-                'payload_class' => EmailPayload::class,
-                'queue' => 'marketing',
-                'payload' => [
-                    'subject' => 'B',
-                    'body' => 'B',
+                'first_drip_b' => [
+                    'dispatch_key' => 'campaign_step_due',
+                    'campaign_key' => 'webinar_attended',
+                    'step' => 2,
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'marketing',
+                    'payload' => [
+                        'subject' => 'B',
+                        'body' => 'B',
+                    ],
                 ],
+
             ],
         ]);
 
@@ -492,21 +510,24 @@ class DispatchMessageActionTest extends TestCase
         $this->assertSame('broadcast', $payload->kind());
         $this->assertSame('marketing', $payload->purpose());
     }
-    
+
 
     public function test_it_stores_message_template_preset_metadata_on_scheduled_message(): void
     {
         Queue::fake();
 
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Config subject',
-                    'body' => 'Config body.',
+            'default' => [
+                'confirmation' => [
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Config subject',
+                        'body' => 'Config body.',
+                    ],
                 ],
+
             ],
         ]);
 
@@ -565,14 +586,17 @@ class DispatchMessageActionTest extends TestCase
         Queue::fake();
 
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Registered',
-                    'body' => 'Hello {first_name}',
+            'default' => [
+                'confirmation' => [
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Registered',
+                        'body' => 'Hello {first_name}',
+                    ],
                 ],
+
             ],
         ]);
 
@@ -613,14 +637,17 @@ class DispatchMessageActionTest extends TestCase
         Queue::fake();
 
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'follow_up' => [
-                'dispatch_key' => 'webinar_ended',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'notifications',
-                'payload' => [
-                    'subject' => 'Follow up',
-                    'body' => 'Thanks for attending webinar {webinar.id} with outcome {webinar.outcome}.',
+            'default' => [
+                'follow_up' => [
+                    'dispatch_key' => 'webinar_ended',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'notifications',
+                    'payload' => [
+                        'subject' => 'Follow up',
+                        'body' => 'Thanks for attending webinar {webinar.id} with outcome {webinar.outcome}.',
+                    ],
                 ],
+
             ],
         ]);
 

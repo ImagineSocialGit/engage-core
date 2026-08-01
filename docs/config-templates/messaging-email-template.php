@@ -13,7 +13,11 @@ return [
     | config/messaging/email/definitions/{purpose}/{scope}.php
     | client/{client-key}/config/messaging/email/definitions/{purpose}/{scope}.php
     |
-    | Create one file per purpose/scope pair.
+    | Webinar scope is set-based. The base webinar.php file must return one
+    | explicit default set. Additional sets live at:
+    | client/{client-key}/config/messaging/email/definitions/{purpose}/webinar/{set-key}.php
+    |
+    | Create one file per ordinary purpose/scope pair or Webinar template set.
     |
     | Reusable Messaging templates own content and delivery-template metadata.
     | They must not own business timing, lifecycle conditions, sequencing,
@@ -33,6 +37,7 @@ return [
     |
     | Examples:
     | config/messaging/email/definitions/transactional/webinar.php
+    | client/[CLIENT_KEY]/config/messaging/email/definitions/transactional/webinar/investor-strategy.php
     | Permission-invitation page/email config is separate:
     | config/messaging/permission_invitations.php
     | config/messaging/email/definitions/marketing/webinar_nurture.php
@@ -71,15 +76,15 @@ return [
     | System markers such as :client_name and :consent_topic belong to the
     | consent acknowledgement resolver. They are not message-template tokens.
     |
-    | A Messaging-owned delivery-consolidation policy may compose compatible
-    | acknowledgement intents into a lifecycle email. The acknowledgement inherits
-    | the primary message's resolved send time, conditions, queue, and behavior
-    | provenance. Any uncovered required acknowledgement needs an explicit
-    | standalone fallback.
+    | A Messaging-owned delivery-composition policy may attach compatible
+    | acknowledgement intents as immutable ScheduledMessageComponent rows. The
+    | acknowledgement inherits the primary message's resolved send time,
+    | conditions, queue, and behavior provenance. Any uncovered required
+    | acknowledgement needs an explicit standalone fallback.
     |
-    | Reserved {delivery_consolidation_*} placement fields are supplied only by
-    | the consolidation composer. They are not universal TokenContractRegistry
-    | fields and must not be invented in unrelated templates.
+    | Do not author {delivery_consolidation_*} placement fields. Messaging composes
+    | pinned primary and component template versions during payload resolution;
+    | no copied fragment or consolidation recipe belongs in message payload/meta.
     |
     | Normal Broadcasts usually provide ad hoc payloads inline from the
     | Broadcast record. Email Broadcast payloads use subject/body. Do not add
@@ -114,25 +119,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | transactional:webinar example shape
+    | transactional:webinar explicit default-set shape
     |--------------------------------------------------------------------------
     */
 
-    'confirmations' => [
-        [
-            'key' => 'confirmation',
-            'dispatch_key' => 'registration_created',
-            'message_type' => 'confirmation',
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-
-            'payload_class' => EmailPayload::class,
-            'queue' => 'confirmation_messages',
-
-            'payload' => [
-                'subject' => 'You’re registered for {webinar_title}',
-                'body' => <<<'TEXT'
+    'default' => [
+        'confirmations' => [
+            [
+                'key' => 'confirmation',
+                'dispatch_key' => 'registration_created',
+                'message_type' => 'confirmation',
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+    
+                'payload_class' => EmailPayload::class,
+                'queue' => 'confirmation_messages',
+    
+                'payload' => [
+                    'subject' => 'You’re registered for {webinar_title}',
+                    'body' => <<<'TEXT'
 Hi {first_name},
 
 You’re registered for {webinar_title}.
@@ -144,218 +150,141 @@ Time: {webinar_start_time}
 
 We’ll send reminders as the event gets closer.
 TEXT,
-                'cta' => [
-                    'label' => 'Join Webinar',
-                    'url' => '{webinar_join_url}',
-                ],
-                'secondary_link' => [
-                    'label' => 'Need to cancel?',
-                    'url' => '{cancel_registration_url}',
-                ],
-            ],
-        ],
-    ],
-
-    'reminders' => [
-        [
-            'key' => 'reminder_1_week',
-            'dispatch_key' => 'registration_created',
-            'message_type' => 'reminder',
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-
-            'payload_class' => EmailPayload::class,
-            'queue' => 'reminders',
-
-            'payload' => [
-                'subject' => 'Your webinar is one week away',
-                'body' => 'Hi {first_name}, {webinar_title} is one week away. We’ll send another reminder as the event gets closer.',
-            ],
-        ],
-
-        [
-            'key' => 'reminder_1_day',
-            'dispatch_key' => 'registration_created',
-            'message_type' => 'reminder',
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-
-            'payload_class' => EmailPayload::class,
-            'queue' => 'reminders',
-
-            'payload' => [
-                'subject' => 'Your webinar is tomorrow',
-                'body' => 'Hi {first_name}, {webinar_title} is tomorrow at {webinar_start_time}. Use the link below when it is time to join.',
-                'cta' => [
-                    'label' => 'Join Webinar',
-                    'url' => '{webinar_join_url}',
-                ],
-            ],
-        ],
-
-        [
-            'key' => 'reminder_30_minute',
-            'dispatch_key' => 'registration_created',
-            'message_type' => 'reminder',
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-
-            'payload_class' => EmailPayload::class,
-            'queue' => 'reminders',
-
-            'payload' => [
-                'subject' => 'Your webinar starts in 30 minutes',
-                'body' => 'Hi {first_name}, {webinar_title} starts in 30 minutes. Use the link below to join.',
-                'cta' => [
-                    'label' => 'Join Webinar',
-                    'url' => '{webinar_join_url}',
-                ],
-            ],
-        ],
-
-        [
-            'key' => 'reminder_live',
-            'dispatch_key' => 'registration_created',
-            'message_type' => 'reminder',
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-
-            'payload_class' => EmailPayload::class,
-            'queue' => 'reminders',
-
-            'payload' => [
-                'subject' => 'Your webinar is live',
-                'body' => 'Hi {first_name}, {webinar_title} is live now. Use the link below to join.',
-                'cta' => [
-                    'label' => 'Join Now',
-                    'url' => '{webinar_join_url}',
-                ],
-            ],
-        ],
-    ],
-
-    'post_attended' => [
-        [
-            'key' => 'post_attended',
-            'dispatch_key' => 'webinar_ended',
-            'message_type' => 'post_attended',
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-
-            'payload_class' => EmailPayload::class,
-            'queue' => 'post_event',
-
-            'payload' => [
-                'subject' => 'Thanks for joining {webinar_title}',
-                'body' => 'Hi {first_name}, thanks for joining {webinar_title}. You can watch the replay using the link below.',
-                'cta' => [
-                    'label' => 'Watch Replay',
-                    'url' => '{webinar_playback_url}',
-                ],
-            ],
-        ],
-    ],
-
-    'post_missed' => [
-        [
-            'key' => 'post_missed',
-            'dispatch_key' => 'webinar_ended',
-            'message_type' => 'post_missed',
-            'channel' => 'email',
-            'purpose' => 'transactional',
-            'scope' => 'webinar',
-
-            'payload_class' => EmailPayload::class,
-            'queue' => 'post_event',
-
-            'payload' => [
-                'subject' => 'Sorry we missed you — here’s the replay',
-                'body' => 'Hi {first_name}, sorry we missed you at {webinar_title}. You can still watch the replay using the link below.',
-                'cta' => [
-                    'label' => 'Watch Replay',
-                    'url' => '{webinar_playback_url}',
-                ],
-            ],
-        ],
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | marketing:broadcast note
-    |--------------------------------------------------------------------------
-    |
-    | Regular email Broadcasts are single-channel ad hoc sends. The Broadcast
-    | stores payload.subject and payload.body, then passes an inline Messaging
-    | definition with dispatch_key = broadcast_send. That means this template
-    | normally does not need to define reusable broadcast copy.
-    |
-    | If a future feature intentionally dispatches reusable Broadcast-style
-    | email from config, it should use purpose = marketing, scope = broadcast,
-    | dispatch_key = broadcast_send, and EmailPayload::class.
-    */
-
-    /*
-    |--------------------------------------------------------------------------
-    | marketing:webinar_nurture campaign template example
-    |--------------------------------------------------------------------------
-    |
-    | In a real config file, keep only the sections that belong to that
-    | purpose/scope. Do not mix transactional and marketing definitions in one
-    | deployed config file unless that file truly represents that purpose/scope.
-    |
-    | Campaign templates may always use universal Contact tokens when the
-    | recipient is a Contact:
-    |
-    | {first_name}
-    | {last_name}
-    | {name}
-    | {email}
-    | {phone}
-    |
-    | Do not include runtime-only URL tokens such as {next_step_url},
-    | {application_url}, {contact_url}, or {webinar_registration_url} unless
-    | the campaign enrollment/start path explicitly supplies them.
-    */
-
-    'campaigns' => [
-        'webinar_attended_nurture' => [
-            'steps' => [
-                1 => [
-                    'variants' => [
-                        'email' => [
-                            'dispatch_key' => 'campaign_step_due',
-                            'payload_class' => EmailPayload::class,
-                            'queue' => 'marketing',
-
-                            'payload' => [
-                                'subject' => 'Thanks for joining — here are a few next steps',
-                                'body' => 'Hi {first_name}, thanks for joining the webinar. Reply with your biggest question and we’ll help you with the next step.',
-                            ],
-                        ],
+                    'cta' => [
+                        'label' => 'Join Webinar',
+                        'url' => '{webinar_join_url}',
+                    ],
+                    'secondary_link' => [
+                        'label' => 'Need to cancel?',
+                        'url' => '{cancel_registration_url}',
                     ],
                 ],
             ],
         ],
-
-        'webinar_missed_nurture' => [
-            'steps' => [
-                1 => [
-                    'variants' => [
-                        'email' => [
-                            'dispatch_key' => 'campaign_step_due',
-                            'payload_class' => EmailPayload::class,
-                            'queue' => 'marketing',
-
-                            'payload' => [
-                                'subject' => 'Sorry we missed you',
-                                'body' => 'Hi {first_name}, sorry we missed you at the webinar. Reply with your biggest question and we’ll help you with the next step.',
-                            ],
-                        ],
+    
+        'reminders' => [
+            [
+                'key' => 'reminder_1_week',
+                'dispatch_key' => 'registration_created',
+                'message_type' => 'reminder',
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+    
+                'payload_class' => EmailPayload::class,
+                'queue' => 'reminders',
+    
+                'payload' => [
+                    'subject' => 'Your webinar is one week away',
+                    'body' => 'Hi {first_name}, {webinar_title} is one week away. We’ll send another reminder as the event gets closer.',
+                ],
+            ],
+    
+            [
+                'key' => 'reminder_1_day',
+                'dispatch_key' => 'registration_created',
+                'message_type' => 'reminder',
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+    
+                'payload_class' => EmailPayload::class,
+                'queue' => 'reminders',
+    
+                'payload' => [
+                    'subject' => 'Your webinar is tomorrow',
+                    'body' => 'Hi {first_name}, {webinar_title} is tomorrow at {webinar_start_time}. Use the link below when it is time to join.',
+                    'cta' => [
+                        'label' => 'Join Webinar',
+                        'url' => '{webinar_join_url}',
+                    ],
+                ],
+            ],
+    
+            [
+                'key' => 'reminder_30_minute',
+                'dispatch_key' => 'registration_created',
+                'message_type' => 'reminder',
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+    
+                'payload_class' => EmailPayload::class,
+                'queue' => 'reminders',
+    
+                'payload' => [
+                    'subject' => 'Your webinar starts in 30 minutes',
+                    'body' => 'Hi {first_name}, {webinar_title} starts in 30 minutes. Use the link below to join.',
+                    'cta' => [
+                        'label' => 'Join Webinar',
+                        'url' => '{webinar_join_url}',
+                    ],
+                ],
+            ],
+    
+            [
+                'key' => 'reminder_live',
+                'dispatch_key' => 'registration_created',
+                'message_type' => 'reminder',
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+    
+                'payload_class' => EmailPayload::class,
+                'queue' => 'reminders',
+    
+                'payload' => [
+                    'subject' => 'Your webinar is live',
+                    'body' => 'Hi {first_name}, {webinar_title} is live now. Use the link below to join.',
+                    'cta' => [
+                        'label' => 'Join Now',
+                        'url' => '{webinar_join_url}',
+                    ],
+                ],
+            ],
+        ],
+    
+        'post_attended' => [
+            [
+                'key' => 'post_attended',
+                'dispatch_key' => 'webinar_ended',
+                'message_type' => 'post_attended',
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+    
+                'payload_class' => EmailPayload::class,
+                'queue' => 'post_event',
+    
+                'payload' => [
+                    'subject' => 'Thanks for joining {webinar_title}',
+                    'body' => 'Hi {first_name}, thanks for joining {webinar_title}. You can watch the replay using the link below.',
+                    'cta' => [
+                        'label' => 'Watch Replay',
+                        'url' => '{webinar_playback_url}',
+                    ],
+                ],
+            ],
+        ],
+    
+        'post_missed' => [
+            [
+                'key' => 'post_missed',
+                'dispatch_key' => 'webinar_ended',
+                'message_type' => 'post_missed',
+                'channel' => 'email',
+                'purpose' => 'transactional',
+                'scope' => 'webinar',
+    
+                'payload_class' => EmailPayload::class,
+                'queue' => 'post_event',
+    
+                'payload' => [
+                    'subject' => 'Sorry we missed you — here’s the replay',
+                    'body' => 'Hi {first_name}, sorry we missed you at {webinar_title}. You can still watch the replay using the link below.',
+                    'cta' => [
+                        'label' => 'Watch Replay',
+                        'url' => '{webinar_playback_url}',
                     ],
                 ],
             ],

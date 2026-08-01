@@ -8,9 +8,19 @@ class CoreWebinarMessagingDefaultsTest extends TestCase
 {
     public function test_core_webinar_defaults_are_generic_and_intentionally_small(): void
     {
+        $emailTransactionalRoot = require base_path(
+            'config/messaging/email/definitions/transactional/webinar.php',
+        );
+        $smsTransactionalRoot = require base_path(
+            'config/messaging/sms/definitions/transactional/webinar.php',
+        );
+
+        $this->assertEquals(['default'], array_keys($emailTransactionalRoot));
+        $this->assertEquals(['default'], array_keys($smsTransactionalRoot));
+
         $configs = [
-            'email_transactional' => require base_path('config/messaging/email/definitions/transactional/webinar.php'),
-            'sms_transactional' => require base_path('config/messaging/sms/definitions/transactional/webinar.php'),
+            'email_transactional' => $emailTransactionalRoot['default'],
+            'sms_transactional' => $smsTransactionalRoot['default'],
             'email_waitlist' => require base_path('config/messaging/email/definitions/marketing/webinar_waitlist.php'),
             'sms_waitlist' => require base_path('config/messaging/sms/definitions/marketing/webinar_waitlist.php'),
             'email_nurture' => require base_path('config/messaging/email/definitions/marketing/webinar_nurture.php'),
@@ -40,7 +50,7 @@ class CoreWebinarMessagingDefaultsTest extends TestCase
             );
         }
 
-        $this->assertSame(
+        $this->assertEquals(
             [
                 'reminder_1_week',
                 'reminder_1_day',
@@ -50,7 +60,7 @@ class CoreWebinarMessagingDefaultsTest extends TestCase
             array_column($configs['email_transactional']['reminders'], 'key'),
         );
 
-        $this->assertSame(
+        $this->assertEquals(
             [
                 'reminder_1_week',
                 'reminder_1_day',
@@ -60,7 +70,7 @@ class CoreWebinarMessagingDefaultsTest extends TestCase
             array_column($configs['sms_transactional']['reminders'], 'key'),
         );
 
-        $this->assertSame(
+        $this->assertEquals(
             [
                 'webinar_attended_nurture',
                 'webinar_missed_nurture',
@@ -105,7 +115,7 @@ class CoreWebinarMessagingDefaultsTest extends TestCase
 
             $step = $definition['steps'][0];
 
-            $this->assertSame(
+            $this->assertEquals(
                 [
                     'type' => 'delay',
                     'days' => 7,
@@ -115,12 +125,12 @@ class CoreWebinarMessagingDefaultsTest extends TestCase
 
             $this->assertCount(2, $step['variants']);
 
-            $this->assertSame(
+            $this->assertEquals(
                 ['sms', 'email'],
                 array_keys($step['variants']),
             );
 
-            $this->assertSame(
+            $this->assertEquals(
                 ['sms', 'email'],
                 array_column($step['variants'], 'channel'),
             );
@@ -152,7 +162,7 @@ class CoreWebinarMessagingDefaultsTest extends TestCase
         foreach (['email', 'sms'] as $channel) {
             $items = $reminderItems->get($channel, collect());
 
-            $this->assertSame(
+            $this->assertEquals(
                 [
                     'reminder_1_week',
                     'reminder_1_day',
@@ -165,7 +175,7 @@ class CoreWebinarMessagingDefaultsTest extends TestCase
             $live = $items->firstWhere('message_template_key', 'reminder_live');
 
             $this->assertIsArray($live);
-            $this->assertSame(
+            $this->assertEquals(
                 [
                     'type' => 'anchored',
                     'minutes' => 0,

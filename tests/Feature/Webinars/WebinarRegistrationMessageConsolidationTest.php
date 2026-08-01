@@ -287,41 +287,47 @@ class WebinarRegistrationMessageConsolidationTest extends TestCase
     private function configureDefinitions(): void
     {
         Config::set('messaging.email.definitions.transactional.webinar', [
-            'confirmation' => [
-                'key' => 'confirmation',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => [
-                    'subject' => 'Confirmation',
-                    'body' => 'Confirmation body.',
+            'default' => [
+                'confirmation' => [
+                    'key' => 'confirmation',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => [
+                        'subject' => 'Confirmation',
+                        'body' => 'Confirmation body.',
+                    ],
                 ],
-            ],
-            'reminder' => [
-                'key' => 'reminder',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => EmailPayload::class,
-                'queue' => 'reminders',
-                'payload' => [
-                    'subject' => 'Reminder',
-                    'body' => 'Reminder body.',
+                'reminder' => [
+                    'key' => 'reminder',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => EmailPayload::class,
+                    'queue' => 'reminders',
+                    'payload' => [
+                        'subject' => 'Reminder',
+                        'body' => 'Reminder body.',
+                    ],
                 ],
+
             ],
         ]);
         Config::set('messaging.sms.definitions.transactional.webinar', [
-            'confirmation' => [
-                'key' => 'confirmation',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => SmsPayload::class,
-                'queue' => 'confirmation_messages',
-                'payload' => ['message' => 'Confirmation SMS.'],
-            ],
-            'reminder' => [
-                'key' => 'reminder',
-                'dispatch_key' => 'registration_created',
-                'payload_class' => SmsPayload::class,
-                'queue' => 'reminders',
-                'payload' => ['message' => 'Reminder SMS.'],
+            'default' => [
+                'confirmation' => [
+                    'key' => 'confirmation',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => SmsPayload::class,
+                    'queue' => 'confirmation_messages',
+                    'payload' => ['message' => 'Confirmation SMS.'],
+                ],
+                'reminder' => [
+                    'key' => 'reminder',
+                    'dispatch_key' => 'registration_created',
+                    'payload_class' => SmsPayload::class,
+                    'queue' => 'reminders',
+                    'payload' => ['message' => 'Reminder SMS.'],
+                ],
+
             ],
         ]);
     }

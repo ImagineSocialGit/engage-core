@@ -1731,6 +1731,7 @@
 │   │   │   ├── ImportMessageConsentActionTest.php
 │   │   │   ├── InternalNotificationChannelResolverTest.php
 │   │   │   ├── InternalNotificationGateTest.php
+│   │   │   ├── LegacyPendingMessageConsolidationRemovalTest.php
 │   │   │   ├── MarkClaimedPermissionInvitationFailedAfterScheduledMessageSkippedTest.php
 │   │   │   ├── MessageChainDuplicationTest.php
 │   │   │   ├── MessageChainEnrollmentRunnerTest.php
@@ -1906,4 +1907,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-501 directories, 1406 files
+501 directories, 1407 files

@@ -19,10 +19,15 @@ return [
     |
     | It does not own email/SMS copy.
     |
-    | Transactional replay/follow-up copy belongs in:
+    | Transactional replay/follow-up copy belongs in an explicit Webinar set:
     |
     | config/messaging/email/definitions/transactional/webinar.php
     | config/messaging/sms/definitions/transactional/webinar.php
+    | client/[CLIENT_KEY]/config/messaging/email/definitions/transactional/webinar/{set-key}.php
+    | client/[CLIENT_KEY]/config/messaging/sms/definitions/transactional/webinar/{set-key}.php
+    |
+    | The base webinar.php files return ['default' => [...]]. Flat Webinar
+    | confirmation/reminder/post-event groups are not supported.
     |
     | Campaign nurture copy belongs in:
     |

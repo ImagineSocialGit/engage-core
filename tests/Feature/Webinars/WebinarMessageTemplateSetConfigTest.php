@@ -7,17 +7,39 @@ use App\Modules\Messaging\Models\MessageTemplate;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Modules\Messaging\Services\MessageConfigValidator;
+use App\Modules\Messaging\Services\MessageDefinitionConfigSetResolver;
 use App\Modules\Messaging\Services\MessageTemplatePresetAssignmentResolver;
 use App\Modules\Webinars\Actions\SyncWebinarScheduleProfilesAction;
 use App\Modules\Webinars\Models\WebinarScheduleProfile;
 use App\Modules\Webinars\Services\WebinarScheduleProfileDefinitionResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use InvalidArgumentException;
 use Tests\TestCase;
 
 class WebinarMessageTemplateSetConfigTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_flat_webinar_definition_shape_is_rejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'Webinar message definitions must be grouped under a named template set',
+        );
+
+        app(MessageDefinitionConfigSetResolver::class)->sets(
+            scope: 'webinar',
+            scopeConfig: [
+                'confirmations' => [
+                    $this->emailDefinition(
+                        subject: 'Legacy flat subject',
+                        body: 'Legacy flat body.',
+                    ),
+                ],
+            ],
+        );
+    }
 
     public function test_named_webinar_files_sync_as_distinct_template_sets(): void
     {

@@ -211,7 +211,7 @@ class ScheduledMessageMetaCanonicalizerTest extends TestCase
         $this->assertArrayNotHasKey('metadata', $record);
     }
 
-    public function test_consolidation_and_consent_metadata_are_bounded_and_canonical(): void
+    public function test_consent_metadata_is_bounded_and_legacy_consolidation_metadata_is_discarded(): void
     {
         $canonical = $this->canonicalizer()->forPersistence([
             'consent_policy' => [
@@ -222,7 +222,7 @@ class ScheduledMessageMetaCanonicalizerTest extends TestCase
                 ],
             ],
             'delivery_intent' => [
-                'key' => 'discarded_after_consolidation',
+                'key' => 'discarded_after_composition',
             ],
             'resolver_context' => [
                 'webinar' => ['entire' => 'graph'],
@@ -233,18 +233,11 @@ class ScheduledMessageMetaCanonicalizerTest extends TestCase
                 'intent_keys' => [
                     'webinar.registration.confirmation',
                     'consent.transactional.email.acknowledgement',
-                    'webinar.registration.confirmation',
                 ],
-                'consent_ids' => [10, '11', 10],
-                'primary_intent_key' => 'webinar.registration.confirmation',
-                'template_key' => 'confirmation',
-                'template_source' => 'primary_intent',
+                'consent_ids' => [10, 11],
                 'payload_key' => 'body',
                 'position' => 'append',
                 'separator' => "\n\n",
-                'fragment_tokens' => [
-                    'delivery_consolidation_webinar_email_acknowledgement',
-                ],
                 'raw_intents' => [
                     ['recipient' => ['email' => 'private@example.com']],
                 ],
@@ -257,24 +250,6 @@ class ScheduledMessageMetaCanonicalizerTest extends TestCase
                     'source' => 'imported_contact',
                     'one_time' => true,
                 ],
-            ],
-            'delivery_consolidation' => [
-                'policy' => 'webinar_registration',
-                'group' => 'email_acknowledgements',
-                'primary_intent_key' => 'webinar.registration.confirmation',
-                'template_key' => 'confirmation',
-                'template_source' => 'primary_intent',
-                'payload_key' => 'body',
-                'position' => 'append',
-                'separator' => "\n\n",
-                'intent_keys' => [
-                    'webinar.registration.confirmation',
-                    'consent.transactional.email.acknowledgement',
-                ],
-                'fragment_tokens' => [
-                    'delivery_consolidation_webinar_email_acknowledgement',
-                ],
-                'consent_ids' => [10, 11],
             ],
         ], $canonical);
     }

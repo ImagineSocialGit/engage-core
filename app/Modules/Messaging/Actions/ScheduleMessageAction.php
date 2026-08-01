@@ -10,7 +10,6 @@ use App\Modules\Messaging\Models\MessageChainStep;
 use App\Modules\Messaging\Models\MessageChainStepVariant;
 use App\Modules\Messaging\Models\MessageTemplateVersion;
 use App\Modules\Messaging\Models\ScheduledMessage;
-use App\Modules\Messaging\Services\PendingMessageDeliveryConsolidator;
 use App\Modules\Messaging\Services\ScheduledMessageMetaCanonicalizer;
 use App\Modules\Messaging\Services\ScheduledMessagePayloadCanonicalizer;
 use App\Support\Queues\QueueContract;
@@ -21,7 +20,6 @@ use InvalidArgumentException;
 class ScheduleMessageAction
 {
     public function __construct(
-        private readonly PendingMessageDeliveryConsolidator $pendingMessageDeliveryConsolidator,
         private readonly QueueContract $queueContract,
         private readonly ScheduledMessageMetaCanonicalizer $metaCanonicalizer,
         private readonly ScheduledMessagePayloadCanonicalizer $payloadCanonicalizer,
@@ -157,17 +155,6 @@ class ScheduleMessageAction
             : ScheduledMessage::query()->create($attributes);
 
         $wasRecentlyCreated = $scheduledMessage->wasRecentlyCreated;
-
-        if (
-            ! $wasRecentlyCreated
-            && is_array(data_get($meta, 'delivery_consolidation'))
-        ) {
-            $scheduledMessage = $this->pendingMessageDeliveryConsolidator
-                ->merge(
-                    scheduledMessage: $scheduledMessage,
-                    incomingAttributes: $attributes,
-                );
-        }
 
         if ($wasRecentlyCreated) {
             SendScheduledMessageJob::dispatch(

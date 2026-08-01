@@ -8,6 +8,18 @@ final class MessageDefinitionConfigSetResolver
 {
     public const DEFAULT_TEMPLATE_SET_KEY = 'default';
 
+    private const DEFINITION_FIELDS = [
+        'channel',
+        'dispatch_key',
+        'dispatch_keys',
+        'message_type',
+        'payload',
+        'payload_class',
+        'purpose',
+        'queue',
+        'scope',
+    ];
+
     /**
      * @param array<string|int, mixed> $scopeConfig
      * @return array<int, array{
@@ -26,20 +38,17 @@ final class MessageDefinitionConfigSetResolver
             ]];
         }
 
-        $flatDefinitions = [];
+        if ($scopeConfig === []) {
+            return [];
+        }
+
         $sets = [];
 
-        foreach ($scopeConfig as $key => $value) {
-            if ($this->isFlatDefinitionGroup($key, $value)) {
-                $flatDefinitions[$key] = $value;
-
-                continue;
-            }
-
-            if (! is_string($key) || trim($key) === '' || ! is_array($value)) {
-                $flatDefinitions[$key] = $value;
-
-                continue;
+        foreach ($scopeConfig as $key => $definitions) {
+            if (! $this->isNamedSet($key, $definitions)) {
+                throw new InvalidArgumentException(
+                    'Webinar message definitions must be grouped under a named template set such as [default].',
+                );
             }
 
             $normalizedKey = $this->normalizeSegment($key);
@@ -53,24 +62,7 @@ final class MessageDefinitionConfigSetResolver
             $sets[$normalizedKey] = [
                 'key' => $normalizedKey,
                 'source_key' => trim($key),
-                'definitions' => $value,
-            ];
-        }
-
-        if ($flatDefinitions !== []) {
-            if (array_key_exists(self::DEFAULT_TEMPLATE_SET_KEY, $sets)) {
-                throw new InvalidArgumentException(
-                    'Webinar message definitions cannot combine flat default definitions with a nested [default] template set.',
-                );
-            }
-
-            $sets = [
-                self::DEFAULT_TEMPLATE_SET_KEY => [
-                    'key' => self::DEFAULT_TEMPLATE_SET_KEY,
-                    'source_key' => null,
-                    'definitions' => $flatDefinitions,
-                ],
-                ...$sets,
+                'definitions' => $definitions,
             ];
         }
 
@@ -106,39 +98,23 @@ final class MessageDefinitionConfigSetResolver
         );
     }
 
-    private function isFlatDefinitionGroup(
-        string|int $key,
-        mixed $value,
-    ): bool {
-        if ($key === 'campaigns') {
-            return true;
+    private function isNamedSet(string|int $key, mixed $definitions): bool
+    {
+        if (! is_string($key) || trim($key) === '' || ! is_array($definitions)) {
+            return false;
         }
 
-        if (! is_array($value)) {
-            return true;
+        if (array_is_list($definitions)) {
+            return false;
         }
 
-        if (array_is_list($value)) {
-            return true;
-        }
-
-        foreach ([
-            'channel',
-            'dispatch_key',
-            'dispatch_keys',
-            'message_type',
-            'payload',
-            'payload_class',
-            'purpose',
-            'queue',
-            'scope',
-        ] as $definitionField) {
-            if (array_key_exists($definitionField, $value)) {
-                return true;
+        foreach (self::DEFINITION_FIELDS as $definitionField) {
+            if (array_key_exists($definitionField, $definitions)) {
+                return false;
             }
         }
 
-        return false;
+        return true;
     }
 
     private function normalizeNullableSegment(mixed $value): ?string

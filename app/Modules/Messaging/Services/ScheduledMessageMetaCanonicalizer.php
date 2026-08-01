@@ -127,14 +127,6 @@ class ScheduledMessageMetaCanonicalizer
             $canonical['consent'] = $consent;
         }
 
-        $deliveryConsolidation = $this->deliveryConsolidation(
-            $meta['delivery_consolidation'] ?? null,
-        );
-
-        if ($deliveryConsolidation !== []) {
-            $canonical['delivery_consolidation'] = $deliveryConsolidation;
-        }
-
         $messageTemplate = $this->messageTemplate(
             $meta,
             $acceptWriterAliases,
@@ -382,54 +374,6 @@ class ScheduledMessageMetaCanonicalizer
     /**
      * @return array<string, mixed>
      */
-    private function deliveryConsolidation(mixed $value): array
-    {
-        if (! is_array($value)) {
-            return [];
-        }
-
-        $canonical = [];
-
-        foreach ([
-            'policy',
-            'group',
-            'primary_intent_key',
-            'template_key',
-            'template_source',
-            'payload_key',
-            'position',
-        ] as $key) {
-            $this->copyString($canonical, $key, $value[$key] ?? null);
-        }
-
-        $separator = $value['separator'] ?? null;
-
-        if ($separator instanceof Stringable) {
-            $separator = (string) $separator;
-        }
-
-        if (is_string($separator) && $separator !== '') {
-            $this->assertStringSize($separator);
-            $canonical['separator'] = $separator;
-        }
-
-        foreach (['intent_keys', 'fragment_tokens'] as $key) {
-            $values = $this->stringList($value[$key] ?? null);
-
-            if ($values !== []) {
-                $canonical[$key] = $values;
-            }
-        }
-
-        $consentIds = $this->integerList($value['consent_ids'] ?? null);
-
-        if ($consentIds !== []) {
-            $canonical['consent_ids'] = $consentIds;
-        }
-
-        return $canonical;
-    }
-
     /**
      * @param array<string, mixed> $meta
      * @return array<string, mixed>

@@ -175,10 +175,6 @@ class DispatchMessageAction
         if (
             ($definition['timing'] ?? null) === 'scheduled'
             && $dispatch->sendAt->lt(now())
-            && ! $this->mayMergeIntoPendingConsolidatedDelivery(
-                dedupeKey: $dedupeKey,
-                dispatch: $dispatch,
-            )
         ) {
             return null;
         }
@@ -259,20 +255,6 @@ class DispatchMessageAction
         $resolvedPayload['tokens'] = $tokens;
 
         return $resolvedPayload;
-    }
-
-    private function mayMergeIntoPendingConsolidatedDelivery(
-        string $dedupeKey,
-        ResolvedMessageDispatch $dispatch,
-    ): bool {
-        if (! is_array(data_get($dispatch->meta, 'delivery_consolidation'))) {
-            return false;
-        }
-
-        return ScheduledMessage::query()
-            ->where('dedupe_key', $dedupeKey)
-            ->where('status', ScheduledMessage::STATUS_PENDING)
-            ->exists();
     }
 
     private function normalizeEnumValue(MessageChannel|MessagePurpose|string $value): string
