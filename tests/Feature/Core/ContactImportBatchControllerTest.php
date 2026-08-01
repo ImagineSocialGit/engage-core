@@ -5,6 +5,7 @@ namespace Tests\Feature\Core;
 use App\Models\User;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactImportBatch;
+use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
@@ -142,8 +143,14 @@ class ContactImportBatchControllerTest extends TestCase
 
         $scheduledMessage->refresh();
 
+        $terminalResult = ScheduledMessageTerminalResult::fromScheduledMessage(
+            $scheduledMessage->load('terminalOutboxEvent.deliveryAttempt'),
+        );
+
         $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $scheduledMessage->status);
-        $this->assertSame('permission_invitation_cancelled', $scheduledMessage->skip_reason);
+        $this->assertSame('permission_invitation_cancelled', $terminalResult->reason);
+        $this->assertNull($scheduledMessage->skip_reason);
+        $this->assertNull($scheduledMessage->skipped_at);
 
         $this->assertDatabaseMissing('contact_permission_invitations', [
             'contact_id' => $contact->id,

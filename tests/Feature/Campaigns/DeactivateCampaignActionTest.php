@@ -8,6 +8,7 @@ use App\Modules\Campaigns\Actions\DeactivateCampaignAction;
 use App\Modules\Campaigns\Models\Campaign;
 use App\Modules\Campaigns\Models\CampaignEnrollment;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -148,8 +149,15 @@ class DeactivateCampaignActionTest extends TestCase
 
         foreach ([$pendingById, $pendingByKey] as $message) {
             $message->refresh();
+
+            $terminalResult = ScheduledMessageTerminalResult::fromScheduledMessage(
+                $message->load('terminalOutboxEvent.deliveryAttempt'),
+            );
+
             $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $message->status);
-            $this->assertSame(DeactivateCampaignAction::REASON, $message->skip_reason);
+            $this->assertSame(DeactivateCampaignAction::REASON, $terminalResult->reason);
+            $this->assertNull($message->skip_reason);
+            $this->assertNull($message->skipped_at);
         }
 
         $this->assertSame(ScheduledMessage::STATUS_SENDING, $sending->refresh()->status);

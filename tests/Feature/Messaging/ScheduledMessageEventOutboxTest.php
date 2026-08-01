@@ -112,8 +112,7 @@ class ScheduledMessageEventOutboxTest extends TestCase
             $attempt->completed_at?->toISOString(),
             $outboxEvent->occurred_at?->toISOString(),
         );
-        $this->assertSame(1, $scheduledMessage->send_attempts);
-        $this->assertSame('provider-message-1', $scheduledMessage->provider_message_id);
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
         $this->assertSame(ScheduledMessageOutboxEvent::STATUS_PENDING, $outboxEvent->status);
         $this->assertSame(1, $outboxEvent->attempts);
         $this->assertSame('Injected downstream listener failure.', $outboxEvent->last_error);
@@ -153,6 +152,21 @@ class ScheduledMessageEventOutboxTest extends TestCase
                 ->count(),
         );
     }
+    private function assertParentDeliverySummaryUnwritten(
+        ScheduledMessage $message,
+    ): void {
+        $this->assertNull($message->sending_at);
+        $this->assertNull($message->last_attempted_at);
+        $this->assertSame(0, (int) $message->send_attempts);
+        $this->assertNull($message->provider);
+        $this->assertNull($message->provider_message_id);
+        $this->assertNull($message->sent_at);
+        $this->assertNull($message->skipped_at);
+        $this->assertNull($message->failed_at);
+        $this->assertNull($message->failure_reason);
+        $this->assertNull($message->skip_reason);
+    }
+
 }
 
 class OutboxTestEmailPayload implements EmailMessage

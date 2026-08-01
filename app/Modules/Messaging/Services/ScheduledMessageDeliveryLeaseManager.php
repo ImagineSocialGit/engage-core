@@ -95,40 +95,9 @@ class ScheduledMessageDeliveryLeaseManager
                     ?? $result->reason
                     ?? 'Message delivery failed.',
             };
-            $attributes = [
+            $message->forceFill([
                 'status' => $status,
-                'sending_at' => null,
-                'provider' => $result->provider,
-                'provider_message_id' => $result->providerMessageId,
-            ];
-
-            if ($status === ScheduledMessage::STATUS_SENT) {
-                $attributes += [
-                    'sent_at' => $completedAt,
-                    'skipped_at' => null,
-                    'failed_at' => null,
-                    'failure_reason' => null,
-                    'skip_reason' => null,
-                ];
-            } elseif ($status === ScheduledMessage::STATUS_SKIPPED) {
-                $attributes += [
-                    'sent_at' => null,
-                    'skipped_at' => $completedAt,
-                    'failed_at' => null,
-                    'failure_reason' => null,
-                    'skip_reason' => $reason,
-                ];
-            } else {
-                $attributes += [
-                    'sent_at' => null,
-                    'skipped_at' => null,
-                    'failed_at' => $completedAt,
-                    'failure_reason' => $reason,
-                    'skip_reason' => null,
-                ];
-            }
-
-            $message->forceFill($attributes)->save();
+            ])->save();
 
             $attempt->forceFill([
                 'status' => match ($status) {
@@ -194,9 +163,6 @@ class ScheduledMessageDeliveryLeaseManager
 
             $message->forceFill([
                 'status' => ScheduledMessage::STATUS_PENDING,
-                'sending_at' => null,
-                'failed_at' => null,
-                'failure_reason' => $exception->getMessage(),
             ])->save();
 
             $attempt->forceFill([

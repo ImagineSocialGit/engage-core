@@ -46,7 +46,6 @@ class SkipScheduledMessagesAction
                 ->where('context_id', $context->getKey())
                 ->where('meta->'.$key, $value),
             reason: $reason,
-            clearFailureReason: true,
         );
     }
 
@@ -63,7 +62,6 @@ class SkipScheduledMessagesAction
                 ->where('scope', 'broadcast')
                 ->where('message_type', ContactPermissionInvitationService::MESSAGE_TYPE_IMPORTED_CONTACT_PERMISSION_INVITATION),
             reason: $reason ?: 'permission_invitation_cancelled',
-            clearFailureReason: true,
         );
     }
 
@@ -87,9 +85,8 @@ class SkipScheduledMessagesAction
     private function skip(
         Builder $query,
         ?string $reason,
-        bool $clearFailureReason = false,
     ): int {
-        return DB::transaction(function () use ($query, $reason, $clearFailureReason): int {
+        return DB::transaction(function () use ($query, $reason): int {
             $ids = $query
                 ->where('status', ScheduledMessage::STATUS_PENDING)
                 ->lockForUpdate()
@@ -102,20 +99,14 @@ class SkipScheduledMessagesAction
                 return 0;
             }
 
-            $updates = [
-                'status' => ScheduledMessage::STATUS_SKIPPED,
-                'skipped_at' => now(),
-                'skip_reason' => $reason,
-            ];
-
-            if ($clearFailureReason) {
-                $updates['failure_reason'] = null;
-            }
+            $occurredAt = now();
 
             $updated = ScheduledMessage::query()
                 ->whereKey($ids)
                 ->where('status', ScheduledMessage::STATUS_PENDING)
-                ->update($updates);
+                ->update([
+                    'status' => ScheduledMessage::STATUS_SKIPPED,
+                ]);
 
             if ($updated < 1) {
                 return 0;
@@ -126,11 +117,11 @@ class SkipScheduledMessagesAction
                 ->where('status', ScheduledMessage::STATUS_SKIPPED)
                 ->orderBy('id')
                 ->get()
-                ->each(function (ScheduledMessage $scheduledMessage) use ($reason): void {
+                ->each(function (ScheduledMessage $scheduledMessage) use ($occurredAt, $reason): void {
                     $this->eventOutbox->record(
                         scheduledMessage: $scheduledMessage,
                         eventType: ScheduledMessage::STATUS_SKIPPED,
-                        occurredAt: $scheduledMessage->skipped_at,
+                        occurredAt: $occurredAt,
                         reasonCode: 'scheduled_message_skipped_before_claim',
                         reason: $reason,
                     );

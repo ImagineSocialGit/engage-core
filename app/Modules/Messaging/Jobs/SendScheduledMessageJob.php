@@ -197,7 +197,6 @@ class SendScheduledMessageJob implements ShouldQueue
             }
 
             if ($this->shouldRetry(
-                scheduledMessage: $scheduledMessage,
                 deliveryAttempt: $deliveryAttempt,
                 exception: $exception,
                 deliveryLeaseManager: $deliveryLeaseManager,
@@ -418,7 +417,6 @@ class SendScheduledMessageJob implements ShouldQueue
     }
 
     private function shouldRetry(
-        ScheduledMessage $scheduledMessage,
         ScheduledMessageDeliveryAttempt $deliveryAttempt,
         Throwable $exception,
         ScheduledMessageDeliveryLeaseManager $deliveryLeaseManager,
@@ -427,7 +425,7 @@ class SendScheduledMessageJob implements ShouldQueue
             return false;
         }
 
-        return (int) $scheduledMessage->send_attempts < $this->tries
+        return (int) $deliveryAttempt->attempt_number < $this->tries
             && $deliveryLeaseManager->canRetryAfterProviderSubmission(
                 $deliveryAttempt,
             );

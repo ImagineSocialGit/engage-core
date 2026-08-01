@@ -77,7 +77,8 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
 
         $this->assertSame(ScheduledMessage::STATUS_SENDING, $message->status);
         $this->assertNotNull($message->provider_idempotency_key);
-        $this->assertSame(1, $message->send_attempts);
+        $this->assertSame(1, $attempt->attempt_number);
+        $this->assertParentDeliverySummaryUnwritten($message);
         $this->assertEquals([
             'source' => 'lease_test',
         ], $message->meta);
@@ -157,7 +158,8 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
             $idempotencyKey,
             $message->provider_idempotency_key,
         );
-        $this->assertSame(2, $message->send_attempts);
+        $this->assertSame(2, $secondAttempt->attempt_number);
+        $this->assertParentDeliverySummaryUnwritten($message);
     }
 
     public function test_ambiguous_non_idempotent_submission_fails_instead_of_resending(): void
@@ -192,10 +194,7 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
         $attempt->refresh();
 
         $this->assertSame(ScheduledMessage::STATUS_FAILED, $message->status);
-        $this->assertStringContainsString(
-            'automatic retry was blocked',
-            (string) $message->failure_reason,
-        );
+        $this->assertParentDeliverySummaryUnwritten($message);
         $this->assertEquals([
             'source' => 'lease_test',
         ], $message->meta);
@@ -206,6 +205,10 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
         $this->assertSame(
             'stale_provider_submission_outcome_unknown',
             $attempt->reason_code,
+        );
+        $this->assertStringContainsString(
+            'automatic retry was blocked',
+            (string) $attempt->reason,
         );
         $this->assertSame('+15555550123', $attempt->destination);
     }
@@ -239,10 +242,16 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
         $this->assertCount(1, $result['failed']);
 
         $message->refresh();
+        $attempt->refresh();
 
         $this->assertSame(
             ScheduledMessage::STATUS_FAILED,
             $message->status,
+        );
+        $this->assertParentDeliverySummaryUnwritten($message);
+        $this->assertSame(
+            'stale_provider_submission_outcome_unknown',
+            $attempt->reason_code,
         );
         $this->assertEquals([
             'source' => 'lease_test',
@@ -297,11 +306,7 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
         $newAttempt->refresh();
 
         $this->assertSame(ScheduledMessage::STATUS_SENT, $message->status);
-        $this->assertSame('test', $message->provider);
-        $this->assertSame(
-            'provider-message-1',
-            $message->provider_message_id,
-        );
+        $this->assertParentDeliverySummaryUnwritten($message);
         $this->assertEquals([
             'source' => 'lease_test',
         ], $message->meta);
@@ -341,6 +346,21 @@ class ScheduledMessageDeliveryLeaseTest extends TestCase
             fn (SendScheduledMessageJob $job): bool =>
                 $job->scheduledMessageId === $message->getKey(),
         );
+    }
+
+    private function assertParentDeliverySummaryUnwritten(
+        ScheduledMessage $message,
+    ): void {
+        $this->assertNull($message->sending_at);
+        $this->assertNull($message->last_attempted_at);
+        $this->assertSame(0, (int) $message->send_attempts);
+        $this->assertNull($message->provider);
+        $this->assertNull($message->provider_message_id);
+        $this->assertNull($message->sent_at);
+        $this->assertNull($message->skipped_at);
+        $this->assertNull($message->failed_at);
+        $this->assertNull($message->failure_reason);
+        $this->assertNull($message->skip_reason);
     }
 
     public function test_email_service_passes_stable_provider_idempotency_key(): void

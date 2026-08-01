@@ -6,6 +6,7 @@ use App\Modules\Broadcasts\Actions\CancelBroadcastAction;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Broadcasts\Models\BroadcastRecipient;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Data\Delivery\ScheduledMessageTerminalResult;
 use App\Modules\Messaging\Models\ContactPermissionInvitation;
 use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ContactPermissionInvitationService;
@@ -52,9 +53,12 @@ class CancelBroadcastActionTest extends TestCase
         $this->assertSame('broadcast_cancelled', $recipient->skip_reason);
 
         $scheduledMessage->refresh();
+        $terminalResult = $this->terminalResult($scheduledMessage);
+
         $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $scheduledMessage->status);
-        $this->assertSame('broadcast_cancelled', $scheduledMessage->skip_reason);
-        $this->assertNotNull($scheduledMessage->skipped_at);
+        $this->assertSame('broadcast_cancelled', $terminalResult->reason);
+        $this->assertNull($scheduledMessage->skip_reason);
+        $this->assertNull($scheduledMessage->skipped_at);
     }
 
     public function test_it_uses_a_custom_cancellation_reason(): void
@@ -87,8 +91,14 @@ class CancelBroadcastActionTest extends TestCase
         $this->assertSame('admin_cancelled', $recipient->skip_reason);
 
         $scheduledMessage->refresh();
+
         $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $scheduledMessage->status);
-        $this->assertSame('admin_cancelled', $scheduledMessage->skip_reason);
+        $this->assertSame(
+            'admin_cancelled',
+            $this->terminalResult($scheduledMessage)->reason,
+        );
+        $this->assertNull($scheduledMessage->skip_reason);
+        $this->assertNull($scheduledMessage->skipped_at);
     }
 
     public function test_it_does_not_change_terminal_recipients(): void
@@ -206,8 +216,14 @@ class CancelBroadcastActionTest extends TestCase
         $this->assertSame('broadcast_cancelled', $recipient->skip_reason);
 
         $scheduledMessage->refresh();
+
         $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $scheduledMessage->status);
-        $this->assertSame('broadcast_cancelled', $scheduledMessage->skip_reason);
+        $this->assertSame(
+            'broadcast_cancelled',
+            $this->terminalResult($scheduledMessage)->reason,
+        );
+        $this->assertNull($scheduledMessage->skip_reason);
+        $this->assertNull($scheduledMessage->skipped_at);
 
         $this->assertDatabaseMissing('contact_permission_invitations', [
             'contact_id' => $contact->id,
@@ -285,5 +301,13 @@ class CancelBroadcastActionTest extends TestCase
             ->where('channel', ContactPermissionInvitation::CHANNEL_EMAIL)
             ->where('source', ContactPermissionInvitation::SOURCE_IMPORTED_CONTACT)
             ->count());
+    }
+
+    private function terminalResult(
+        ScheduledMessage $scheduledMessage,
+    ): ScheduledMessageTerminalResult {
+        return ScheduledMessageTerminalResult::fromScheduledMessage(
+            $scheduledMessage->load('terminalOutboxEvent.deliveryAttempt'),
+        );
     }
 }

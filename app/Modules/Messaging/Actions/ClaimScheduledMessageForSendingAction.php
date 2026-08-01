@@ -35,19 +35,16 @@ class ClaimScheduledMessageForSendingAction
             }
 
             $attemptedAt = now();
-            $attemptNumber = ((int) $message->send_attempts) + 1;
+            $attemptNumber = ((int) ScheduledMessageDeliveryAttempt::query()
+                ->where('scheduled_message_id', $message->getKey())
+                ->max('attempt_number')) + 1;
             $providerIdempotencyKey = filled($message->provider_idempotency_key)
                 ? $message->provider_idempotency_key
                 : 'scheduled-message-'.$message->getKey().'-'.Str::uuid();
 
             $message->forceFill([
                 'status' => ScheduledMessage::STATUS_SENDING,
-                'sending_at' => $attemptedAt,
                 'provider_idempotency_key' => $providerIdempotencyKey,
-                'last_attempted_at' => $attemptedAt,
-                'send_attempts' => $attemptNumber,
-                'skip_reason' => null,
-                'failed_at' => null,
             ])->save();
 
             return ScheduledMessageDeliveryAttempt::query()->create([

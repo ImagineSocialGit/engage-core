@@ -50,10 +50,8 @@ class SkipScheduledMessagesActionTest extends TestCase
                 'id' => $message->getKey(),
                 'status' => ScheduledMessage::STATUS_SKIPPED,
             ]);
-            $this->assertDatabaseHas('scheduled_messages', [
-                'id' => $message->getKey(),
-                'skip_reason' => 'batch_cancelled',
-            ]);
+            $message->refresh();
+            $this->assertParentDeliverySummaryUnwritten($message);
             $this->assertDatabaseHas('scheduled_message_outbox_events', [
                 'scheduled_message_id' => $message->getKey(),
                 'delivery_attempt_id' => null,
@@ -119,10 +117,25 @@ class SkipScheduledMessagesActionTest extends TestCase
         );
 
         $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $message->status);
-        $this->assertSame('permission_invitation_cancelled', $message->skip_reason);
+        $this->assertParentDeliverySummaryUnwritten($message);
         $this->assertSame('permission_invitation_cancelled', $terminalResult->reason);
         $this->assertSame(ContactPermissionInvitation::STATUS_FAILED, $invitation->status);
         $this->assertSame('permission_invitation_cancelled', $invitation->failure_reason);
         $this->assertNotNull($invitation->failed_at);
+    }
+
+    private function assertParentDeliverySummaryUnwritten(
+        ScheduledMessage $message,
+    ): void {
+        $this->assertNull($message->sending_at);
+        $this->assertNull($message->last_attempted_at);
+        $this->assertSame(0, (int) $message->send_attempts);
+        $this->assertNull($message->provider);
+        $this->assertNull($message->provider_message_id);
+        $this->assertNull($message->sent_at);
+        $this->assertNull($message->skipped_at);
+        $this->assertNull($message->failed_at);
+        $this->assertNull($message->failure_reason);
+        $this->assertNull($message->skip_reason);
     }
 }

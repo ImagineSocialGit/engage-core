@@ -93,10 +93,6 @@ class RecoverStaleScheduledMessageClaimsAction
             if ($submissionIsAmbiguous) {
                 $message->forceFill([
                     'status' => ScheduledMessage::STATUS_FAILED,
-                    'sending_at' => null,
-                    'failed_at' => $recoveredAt,
-                    'failure_reason' => $reason,
-                    'skip_reason' => null,
                 ])->save();
 
                 $attempt->forceFill([
@@ -122,10 +118,6 @@ class RecoverStaleScheduledMessageClaimsAction
 
             $message->forceFill([
                 'status' => ScheduledMessage::STATUS_PENDING,
-                'sending_at' => null,
-                'failed_at' => null,
-                'failure_reason' => null,
-                'skip_reason' => null,
             ])->save();
 
             $attempt->forceFill([

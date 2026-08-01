@@ -86,21 +86,12 @@ class SendScheduledMessageJobTest extends TestCase
         $scheduledMessage->refresh();
 
         $this->assertSame('sent', $scheduledMessage->status);
-        $this->assertNotNull($scheduledMessage->sent_at);
-        $this->assertSame(1, $scheduledMessage->send_attempts);
-        $this->assertSame('test_email', $scheduledMessage->provider);
-        $this->assertSame(
-            'test-email-message-1',
-            $scheduledMessage->provider_message_id,
-        );
-        $this->assertNull($scheduledMessage->sending_at);
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
         $this->assertEquals([
             'conditions' => [],
         ], $scheduledMessage->meta);
 
-        $attempt = ScheduledMessageDeliveryAttempt::query()
-            ->where('scheduled_message_id', $scheduledMessage->getKey())
-            ->sole();
+        $attempt = $this->terminalAttempt($scheduledMessage);
 
         $this->assertSame(
             ScheduledMessageDeliveryAttempt::STATUS_SENT,
@@ -164,7 +155,7 @@ class SendScheduledMessageJobTest extends TestCase
         $scheduledMessage->refresh();
 
         $this->assertSame('sent', $scheduledMessage->status);
-        $this->assertNotNull($scheduledMessage->sent_at);
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
         Event::assertDispatched(
             ScheduledMessageSent::class,
@@ -226,7 +217,7 @@ class SendScheduledMessageJobTest extends TestCase
         $scheduledMessage->refresh();
 
         $this->assertSame(ScheduledMessage::STATUS_SENT, $scheduledMessage->status);
-        $this->assertNotNull($scheduledMessage->sent_at);
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
         $this->assertInstanceOf(SmsPayload::class, $capturedPayload);
         $this->assertSame('Hi Jeff, join here: https://example.test/join/abc123', $capturedPayload->message());
         $this->assertSame('Hi {first_name}, join here: {webinar_join_url}', $scheduledMessage->payload['message']);
@@ -297,8 +288,9 @@ class SendScheduledMessageJobTest extends TestCase
         );
         $this->assertStringContainsString(
             '{webinar.title}',
-            (string) $scheduledMessage->skip_reason,
+            (string) $this->terminalAttempt($scheduledMessage)->reason,
         );
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
         Event::assertDispatched(
             ScheduledMessageSkipped::class,
             fn (ScheduledMessageSkipped $event): bool => $event->scheduledMessage->is($scheduledMessage),
@@ -441,7 +433,7 @@ class SendScheduledMessageJobTest extends TestCase
         $scheduledMessage->refresh();
 
         $this->assertSame(ScheduledMessage::STATUS_SENT, $scheduledMessage->status);
-        $this->assertNotNull($scheduledMessage->sent_at);
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
         Event::assertDispatched(
             ScheduledMessageSent::class,
@@ -495,7 +487,7 @@ class SendScheduledMessageJobTest extends TestCase
         $scheduledMessage->refresh();
 
         $this->assertSame('sent', $scheduledMessage->status);
-        $this->assertNotNull($scheduledMessage->sent_at);
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
         $this->assertDatabaseHas('contact_permission_invitations', [
             'contact_id' => $contact->id,
@@ -554,8 +546,11 @@ class SendScheduledMessageJobTest extends TestCase
         $scheduledMessage->refresh();
 
         $this->assertSame('skipped', $scheduledMessage->status);
-        $this->assertSame('Message eligibility gate denied send.', $scheduledMessage->skip_reason);
-        $this->assertNull($scheduledMessage->sent_at);
+        $this->assertSame(
+            'Message eligibility gate denied send.',
+            $this->terminalAttempt($scheduledMessage)->reason,
+        );
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
         $this->assertDatabaseMissing('contact_permission_invitations', [
             'contact_id' => $contact->id,
@@ -617,8 +612,11 @@ class SendScheduledMessageJobTest extends TestCase
         $scheduledMessage->refresh();
 
         $this->assertSame('skipped', $scheduledMessage->status);
-        $this->assertSame('Message eligibility gate denied send.', $scheduledMessage->skip_reason);
-        $this->assertNull($scheduledMessage->sent_at);
+        $this->assertSame(
+            'Message eligibility gate denied send.',
+            $this->terminalAttempt($scheduledMessage)->reason,
+        );
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
         $this->assertSame(1, ContactPermissionInvitation::query()
             ->where('contact_id', $contact->id)
@@ -673,9 +671,9 @@ class SendScheduledMessageJobTest extends TestCase
         $this->assertSame('skipped', $scheduledMessage->status);
         $this->assertSame(
             'Message conditions no longer pass.',
-            $scheduledMessage->skip_reason
+            $this->terminalAttempt($scheduledMessage)->reason,
         );
-        $this->assertNull($scheduledMessage->failure_reason);
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
         Event::assertNotDispatched(ScheduledMessageSent::class);
     }
@@ -726,9 +724,10 @@ class SendScheduledMessageJobTest extends TestCase
         $scheduledMessage->refresh();
 
         $this->assertSame('skipped', $scheduledMessage->status);
-        $this->assertNotNull($scheduledMessage->skip_reason);
-        $this->assertNull($scheduledMessage->failure_reason);
-        $this->assertNull($scheduledMessage->sent_at);
+        $this->assertNotNull(
+            $this->terminalAttempt($scheduledMessage)->reason,
+        );
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
         Event::assertNotDispatched(ScheduledMessageSent::class);
     }
@@ -773,9 +772,9 @@ class SendScheduledMessageJobTest extends TestCase
         $this->assertSame('skipped', $scheduledMessage->status);
         $this->assertSame(
             'Message eligibility gate denied send.',
-            $scheduledMessage->skip_reason
+            $this->terminalAttempt($scheduledMessage)->reason,
         );
-        $this->assertNull($scheduledMessage->failure_reason);
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
         Event::assertNotDispatched(ScheduledMessageSent::class);
     }
@@ -817,8 +816,9 @@ class SendScheduledMessageJobTest extends TestCase
             $this->assertSame('failed', $scheduledMessage->status);
             $this->assertSame(
                 'Scheduled message payload class is invalid.',
-                $scheduledMessage->failure_reason
+                $this->terminalAttempt($scheduledMessage)->reason,
             );
+            $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
             Event::assertNotDispatched(ScheduledMessageSent::class);
         }
@@ -1291,10 +1291,9 @@ Thanks.",
         $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $scheduledMessage->status);
         $this->assertStringContainsString(
             'Message payload contains unresolved token(s): {missing_token}.',
-            (string) $scheduledMessage->skip_reason,
+            (string) $this->terminalAttempt($scheduledMessage)->reason,
         );
-        $this->assertNull($scheduledMessage->sent_at);
-        $this->assertNull($scheduledMessage->failure_reason);
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
 
         Event::assertNotDispatched(ScheduledMessageSent::class);
     }
@@ -1355,7 +1354,8 @@ Thanks.",
             ScheduledMessage::STATUS_SENDING,
             $scheduledMessage->status,
         );
-        $this->assertSame(1, $scheduledMessage->send_attempts);
+        $this->assertSame(1, $firstClaim->attempt_number);
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
     }
 
     public function test_service_skip_result_marks_message_skipped_instead_of_sent(): void
@@ -1401,9 +1401,7 @@ Thanks.",
         $scheduledMessage->refresh();
 
         $this->assertSame(ScheduledMessage::STATUS_SKIPPED, $scheduledMessage->status);
-        $this->assertSame('SMS delivery is disabled.', $scheduledMessage->skip_reason);
-        $this->assertNull($scheduledMessage->sent_at);
-        $this->assertNull($scheduledMessage->sending_at);
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
         $this->assertEquals([
             'conditions' => [],
         ], $scheduledMessage->meta);
@@ -1463,10 +1461,7 @@ Thanks.",
         $scheduledMessage->refresh();
 
         $this->assertSame(ScheduledMessage::STATUS_PENDING, $scheduledMessage->status);
-        $this->assertSame(1, $scheduledMessage->send_attempts);
-        $this->assertNull($scheduledMessage->sending_at);
-        $this->assertNull($scheduledMessage->failed_at);
-        $this->assertSame('Temporary provider outage.', $scheduledMessage->failure_reason);
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
         $this->assertEquals([
             'conditions' => [],
         ], $scheduledMessage->meta);
@@ -1509,9 +1504,22 @@ Thanks.",
             'message_type' => 'confirmation',
             'payload_class' => FakeJobEmailPayload::class,
             'payload' => ['to' => 'final-attempt@example.com'],
-            'send_attempts' => 2,
             'meta' => ['conditions' => []],
         ]);
+
+        foreach ([1, 2] as $attemptNumber) {
+            ScheduledMessageDeliveryAttempt::query()->create([
+                'scheduled_message_id' => $scheduledMessage->getKey(),
+                'attempt_number' => $attemptNumber,
+                'claim_token' => 'prior-attempt-'.$attemptNumber,
+                'status' => ScheduledMessageDeliveryAttempt::STATUS_RELEASED,
+                'claimed_at' => now()->subMinutes(4 - $attemptNumber),
+                'lease_expires_at' => now()->subMinutes(3 - $attemptNumber),
+                'completed_at' => now()->subMinutes(2 - $attemptNumber),
+                'reason_code' => 'message_delivery_retryable_exception',
+                'reason' => 'Earlier retryable failure.',
+            ]);
+        }
 
         $emailService = Mockery::mock(EmailMessagingService::class);
         $emailService->shouldReceive('send')
@@ -1529,16 +1537,12 @@ Thanks.",
         $scheduledMessage->refresh();
 
         $this->assertSame(ScheduledMessage::STATUS_FAILED, $scheduledMessage->status);
-        $this->assertSame(3, $scheduledMessage->send_attempts);
-        $this->assertNotNull($scheduledMessage->failed_at);
-        $this->assertNull($scheduledMessage->sending_at);
+        $this->assertParentDeliverySummaryUnwritten($scheduledMessage);
         $this->assertEquals([
             'conditions' => [],
         ], $scheduledMessage->meta);
 
-        $attempt = ScheduledMessageDeliveryAttempt::query()
-            ->where('scheduled_message_id', $scheduledMessage->getKey())
-            ->sole();
+        $attempt = $this->terminalAttempt($scheduledMessage);
 
         $this->assertSame(
             ScheduledMessageDeliveryAttempt::STATUS_FAILED,
@@ -1552,6 +1556,30 @@ Thanks.",
         );
 
         Event::assertDispatched(ScheduledMessageFailed::class);
+    }
+
+    private function terminalAttempt(
+        ScheduledMessage $scheduledMessage,
+    ): ScheduledMessageDeliveryAttempt {
+        return ScheduledMessageDeliveryAttempt::query()
+            ->where('scheduled_message_id', $scheduledMessage->getKey())
+            ->orderByDesc('attempt_number')
+            ->firstOrFail();
+    }
+
+    private function assertParentDeliverySummaryUnwritten(
+        ScheduledMessage $scheduledMessage,
+    ): void {
+        $this->assertNull($scheduledMessage->sending_at);
+        $this->assertNull($scheduledMessage->last_attempted_at);
+        $this->assertSame(0, (int) $scheduledMessage->send_attempts);
+        $this->assertNull($scheduledMessage->provider);
+        $this->assertNull($scheduledMessage->provider_message_id);
+        $this->assertNull($scheduledMessage->sent_at);
+        $this->assertNull($scheduledMessage->skipped_at);
+        $this->assertNull($scheduledMessage->failed_at);
+        $this->assertNull($scheduledMessage->failure_reason);
+        $this->assertNull($scheduledMessage->skip_reason);
     }
 
     private function handleScheduledMessage(
