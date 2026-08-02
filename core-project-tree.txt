@@ -1151,6 +1151,11 @@
 │   │           ├── flow-routes.php
 │   │           └── tasks.php
 │   ├── presets.php
+│   ├── project_state
+│   │   ├── core.php
+│   │   ├── messaging.php
+│   │   ├── tasks.php
+│   │   └── webinars.php
 │   ├── project_state.php
 │   ├── queue.php
 │   ├── reference
@@ -1651,7 +1656,8 @@
 │   │   │   └── WebinarNurtureFirstAvailableVariantTest.php
 │   │   ├── Clients
 │   │   │   ├── ClientConfigFallbackTest.php
-│   │   │   └── ClientEnvironmentLoaderTest.php
+│   │   │   ├── ClientEnvironmentLoaderTest.php
+│   │   │   └── ProjectStateClientEnvironmentContractTest.php
 │   │   ├── Commerce
 │   │   │   └── CommerceFoundationTest.php
 │   │   ├── ConfigContracts
@@ -1802,7 +1808,10 @@
 │   │   │   ├── ModuleFirstPresetCompositionTest.php
 │   │   │   └── PresetCompositionSyncCutoverTest.php
 │   │   ├── ProjectState
-│   │   │   └── ProjectStateControllerTest.php
+│   │   │   ├── MessagingProjectStateRoundTripTest.php
+│   │   │   ├── ProjectStateControllerTest.php
+│   │   │   ├── TasksProjectStateRoundTripTest.php
+│   │   │   └── WebinarProjectStateRoundTripTest.php
 │   │   ├── Scheduling
 │   │   │   ├── AppointmentLifecycleActionTest.php
 │   │   │   ├── BookableSlotOfferAndBookingHoldActionTest.php
@@ -1920,4 +1929,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-504 directories, 1417 files
+505 directories, 1425 files

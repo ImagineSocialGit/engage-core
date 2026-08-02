@@ -139,6 +139,18 @@ class ProjectStateManager
                     rows: $rows,
                     warnings: $warnings,
                 );
+                $this->appendJsonPathValueMapWarnings(
+                    table: $table,
+                    definition: $definition,
+                    rows: $rows,
+                    warnings: $warnings,
+                );
+                $this->appendPolymorphicReferenceWarnings(
+                    table: $table,
+                    definition: $definition,
+                    rows: $rows,
+                    warnings: $warnings,
+                );
 
                 if ($definition['mode'] === 'insert_empty'
                     && $this->connection()->table($table)->exists()
@@ -380,6 +392,8 @@ class ProjectStateManager
         $deferredReferences = $definition['deferred_references'] ?? [];
         $nullOnImport = $definition['null_on_import'] ?? [];
         $importValueMaps = $definition['import_value_maps'] ?? [];
+        $jsonPathValueMaps = $definition['json_path_value_maps'] ?? [];
+        $polymorphicReferences = $definition['polymorphic_references'] ?? [];
         $preserveId = (bool) ($definition['preserve_id'] ?? true);
 
         if (! in_array($mode, ['insert_empty', 'upsert'], true)
@@ -392,6 +406,8 @@ class ProjectStateManager
             || ! $this->isReferenceMap($references)
             || ! $this->isReferenceMap($deferredReferences)
             || ! $this->isImportValueMap($importValueMaps)
+            || ! $this->isJsonPathValueMap($jsonPathValueMaps)
+            || ! $this->isPolymorphicReferenceList($polymorphicReferences)
         ) {
             throw new RuntimeException("Project-state table [{$table}] configuration is invalid.");
         }
@@ -419,10 +435,20 @@ class ProjectStateManager
             ...$nullOnImport,
             ...$referencedColumns,
             ...array_keys($importValueMaps),
+            ...array_keys($jsonPathValueMaps),
+            ...$this->polymorphicReferenceColumns($polymorphicReferences),
         ] as $column) {
             if (! in_array($column, $columns, true)) {
                 throw new RuntimeException(
                     "Project-state table [{$table}] references unknown column [{$column}]."
+                );
+            }
+        }
+
+        foreach (array_keys($jsonPathValueMaps) as $column) {
+            if (! in_array($column, $jsonColumns, true)) {
+                throw new RuntimeException(
+                    "Project-state table [{$table}] JSON path value map [{$column}] is not a JSON column."
                 );
             }
         }
@@ -441,6 +467,16 @@ class ProjectStateManager
             );
         }
 
+        $polymorphicReferences = array_map(
+            fn (array $reference): array => [
+                'type_column' => $reference['type_column'],
+                'id_column' => $reference['id_column'],
+                'targets' => $reference['targets'],
+                'deferred' => (bool) ($reference['deferred'] ?? false),
+            ],
+            $polymorphicReferences,
+        );
+
         return [
             'mode' => $mode,
             'identity' => array_values($identity),
@@ -453,6 +489,8 @@ class ProjectStateManager
             'deferred_references' => $deferredReferences,
             'null_on_import' => array_values($nullOnImport),
             'import_value_maps' => $importValueMaps,
+            'json_path_value_maps' => $jsonPathValueMaps,
+            'polymorphic_references' => $polymorphicReferences,
         ];
     }
 
@@ -515,6 +553,33 @@ class ProjectStateManager
         array $row,
         array $definition,
     ): array {
+        foreach ($definition['polymorphic_references'] as $reference) {
+            $type = $row[$reference['type_column']] ?? null;
+            $sourceId = $row[$reference['id_column']] ?? null;
+            $referencedTable = is_string($type)
+                ? ($reference['targets'][$type] ?? null)
+                : null;
+
+            if (! is_string($referencedTable)
+                || $sourceId === null
+                || ! $this->documentTableContainsId(
+                    $referencedTable,
+                    $sourceId,
+                )
+            ) {
+                continue;
+            }
+
+            $row[$reference['id_column']] = $reference['deferred']
+                ? null
+                : $this->mappedReferenceId(
+                    table: $table,
+                    column: $reference['id_column'],
+                    referencedTable: $referencedTable,
+                    sourceId: $sourceId,
+                );
+        }
+
         foreach ($definition['references'] as $column => $referencedTable) {
             $row[$column] = $this->mappedReferenceId(
                 table: $table,
@@ -537,6 +602,31 @@ class ProjectStateManager
                 value: $row[$column] ?? null,
                 valueMap: $valueMap,
             );
+        }
+
+        foreach ($definition['json_path_value_maps'] as $column => $pathMaps) {
+            $value = $row[$column] ?? null;
+
+            if (! is_array($value)) {
+                continue;
+            }
+
+            foreach ($pathMaps as $path => $valueMap) {
+                if (! Arr::has($value, $path)) {
+                    continue;
+                }
+
+                Arr::set(
+                    $value,
+                    $path,
+                    $this->mappedImportValue(
+                        value: Arr::get($value, $path),
+                        valueMap: $valueMap,
+                    ),
+                );
+            }
+
+            $row[$column] = $value;
         }
 
         if (! $definition['preserve_id']) {
@@ -691,6 +781,27 @@ class ProjectStateManager
                 }
             }
         }
+
+        foreach ($definition['polymorphic_references'] as $reference) {
+            foreach ($rows as $index => $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                $type = $row[$reference['type_column']] ?? null;
+                $value = $row[$reference['id_column']] ?? null;
+
+                if (($type === null) !== ($value === null)) {
+                    $errors[] = sprintf(
+                        'Project-state polymorphic reference [%s.%d.%s/%s] must provide both type and ID or neither.',
+                        $table,
+                        $index,
+                        $reference['type_column'],
+                        $reference['id_column'],
+                    );
+                }
+            }
+        }
     }
 
     /**
@@ -736,13 +847,124 @@ class ProjectStateManager
     }
 
     /**
+     * @param array<string, mixed> $definition
+     * @param array<int, mixed> $rows
+     * @param array<int, string> $warnings
+     */
+    private function appendJsonPathValueMapWarnings(
+        string $table,
+        array $definition,
+        array $rows,
+        array &$warnings,
+    ): void {
+        foreach ($definition['json_path_value_maps'] as $column => $pathMaps) {
+            foreach ($pathMaps as $path => $valueMap) {
+                $counts = [];
+
+                foreach ($rows as $row) {
+                    if (! is_array($row)
+                        || ! is_array($row[$column] ?? null)
+                        || ! Arr::has($row[$column], $path)
+                    ) {
+                        continue;
+                    }
+
+                    $sourceValue = Arr::get($row[$column], $path);
+                    $targetValue = $this->mappedImportValue(
+                        $sourceValue,
+                        $valueMap,
+                    );
+
+                    if ($sourceValue === $targetValue) {
+                        continue;
+                    }
+
+                    $key = $this->displayValue($sourceValue)
+                        .' → '
+                        .$this->displayValue($targetValue);
+                    $counts[$key] = ($counts[$key] ?? 0) + 1;
+                }
+
+                foreach ($counts as $mapping => $count) {
+                    $warnings[] = sprintf(
+                        'Import will map [%s.%s.%s] %s for %d row(s).',
+                        $table,
+                        $column,
+                        $path,
+                        $mapping,
+                        $count,
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     * @param array<int, mixed> $rows
+     * @param array<int, string> $warnings
+     */
+    private function appendPolymorphicReferenceWarnings(
+        string $table,
+        array $definition,
+        array $rows,
+        array &$warnings,
+    ): void {
+        foreach ($definition['polymorphic_references'] as $reference) {
+            $counts = [];
+
+            foreach ($rows as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                $type = $row[$reference['type_column']] ?? null;
+                $sourceId = $row[$reference['id_column']] ?? null;
+                $referencedTable = is_string($type)
+                    ? ($reference['targets'][$type] ?? null)
+                    : null;
+
+                if (! is_string($referencedTable)
+                    || $sourceId === null
+                    || $this->documentTableContainsId(
+                        $referencedTable,
+                        $sourceId,
+                    )
+                ) {
+                    continue;
+                }
+
+                $key = $type.' #'.(string) $sourceId;
+                $counts[$key] = ($counts[$key] ?? 0) + 1;
+            }
+
+            foreach ($counts as $referenceLabel => $count) {
+                $warnings[] = sprintf(
+                    'Historical polymorphic reference [%s.%s] to [%s] is not present in the current document and will be preserved without remapping for %d row(s).',
+                    $table,
+                    $reference['id_column'],
+                    $referenceLabel,
+                    $count,
+                );
+            }
+        }
+    }
+
+    /**
      * @param array<string, array<string, mixed>> $sections
      */
     private function applyDeferredReferences(array $sections): void
     {
         foreach ($sections as $section) {
             foreach ($section['tables'] as $table => $definition) {
-                if ($definition['deferred_references'] === []) {
+                $deferredPolymorphicReferences = array_values(array_filter(
+                    $definition['polymorphic_references'],
+                    fn (array $reference): bool => $reference['deferred'],
+                ));
+
+                if ($definition['deferred_references'] === []
+                    && $deferredPolymorphicReferences === []
+                ) {
                     continue;
                 }
 
@@ -765,6 +987,29 @@ class ProjectStateManager
                                 $referencedTable,
                                 $sourceReferenceId,
                             );
+                    }
+
+                    foreach ($deferredPolymorphicReferences as $reference) {
+                        $type = $row[$reference['type_column']] ?? null;
+                        $sourceReferenceId = $row[$reference['id_column']] ?? null;
+                        $referencedTable = is_string($type)
+                            ? ($reference['targets'][$type] ?? null)
+                            : null;
+
+                        if (! is_string($referencedTable)
+                            || $sourceReferenceId === null
+                            || ! $this->documentTableContainsId(
+                                $referencedTable,
+                                $sourceReferenceId,
+                            )
+                        ) {
+                            continue;
+                        }
+
+                        $updates[$reference['id_column']] = $this->importedId(
+                            $referencedTable,
+                            $sourceReferenceId,
+                        );
                     }
 
                     if ($updates !== []) {
@@ -888,6 +1133,28 @@ class ProjectStateManager
     private function documentTableRows(string $table): ?array
     {
         return $this->validationDocumentTables[$table] ?? null;
+    }
+
+    private function documentTableContainsId(
+        string $table,
+        mixed $sourceId,
+    ): bool {
+        $rows = $this->documentTableRows($table);
+
+        if ($rows === null) {
+            return false;
+        }
+
+        foreach ($rows as $row) {
+            if (is_array($row)
+                && array_key_exists('id', $row)
+                && (string) $row['id'] === (string) $sourceId
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -1018,6 +1285,72 @@ class ProjectStateManager
         }
 
         return true;
+    }
+
+    private function isJsonPathValueMap(mixed $value): bool
+    {
+        if (! is_array($value)) {
+            return false;
+        }
+
+        foreach ($value as $column => $pathMaps) {
+            if (! is_string($column)
+                || trim($column) === ''
+                || ! is_array($pathMaps)
+            ) {
+                return false;
+            }
+
+            foreach ($pathMaps as $path => $valueMap) {
+                if (! is_string($path)
+                    || trim($path) === ''
+                    || ! is_array($valueMap)
+                ) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private function isPolymorphicReferenceList(mixed $value): bool
+    {
+        if (! is_array($value) || ! array_is_list($value)) {
+            return false;
+        }
+
+        foreach ($value as $reference) {
+            if (! is_array($reference)
+                || ! is_string($reference['type_column'] ?? null)
+                || trim($reference['type_column']) === ''
+                || ! is_string($reference['id_column'] ?? null)
+                || trim($reference['id_column']) === ''
+                || ! $this->isReferenceMap($reference['targets'] ?? null)
+                || (array_key_exists('deferred', $reference)
+                    && ! is_bool($reference['deferred']))
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $references
+     * @return array<int, string>
+     */
+    private function polymorphicReferenceColumns(array $references): array
+    {
+        $columns = [];
+
+        foreach ($references as $reference) {
+            $columns[] = $reference['type_column'];
+            $columns[] = $reference['id_column'];
+        }
+
+        return array_values(array_unique($columns));
     }
 
     private function connection(): ConnectionInterface
