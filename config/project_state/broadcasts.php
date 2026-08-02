@@ -38,7 +38,14 @@ return [
             'null_on_import' => ['user_id'],
             'import_value_maps' => [
                 'status' => [
-                    'sending' => 'scheduled',
+                    'sending' => 'paused',
+                ],
+            ],
+            'resume_items' => [
+                [
+                    'category' => 'broadcasts',
+                    'column' => 'status',
+                    'statuses' => ['sending'],
                 ],
             ],
         ],

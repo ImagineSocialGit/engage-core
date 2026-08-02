@@ -16,6 +16,7 @@ return [
     'authorized_email' => env('PROJECT_STATE_ADMIN_EMAIL'),
 
     'max_upload_kilobytes' => 102400,
+    'resume_batch_size' => 500,
     'enforce_client_key' => true,
 
     /*

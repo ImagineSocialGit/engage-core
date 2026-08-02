@@ -3,9 +3,11 @@
 namespace Tests\Feature\ProjectState;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\FlowRoutes\Jobs\ResumeFlowRouteProgressJob;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Support\ProjectState\ProjectStateManager;
+use App\Support\ProjectState\ProjectStateResumeManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -85,7 +87,7 @@ class FlowRoutesProjectStateRoundTripTest extends TestCase
             'recipient_id' => 60,
             'behavior_owner_type' => FlowRoutePoint::class,
             'behavior_owner_id' => 300,
-            'status' => 'pending',
+            'status' => 'paused',
         ]);
 
         $messageMeta = $this->jsonColumn(
@@ -183,6 +185,20 @@ class FlowRoutesProjectStateRoundTripTest extends TestCase
         );
 
         $this->assertSame('waiting', $progressMeta['project_state']['original_status']);
+        $this->assertDatabaseHas('project_state_resume_items', [
+            'category' => 'flow_routes',
+            'source_table' => 'contact_flow_route_progress',
+            'source_record_id' => '110',
+            'original_status' => 'waiting',
+            'state' => 'pending',
+        ]);
+        $this->assertDatabaseHas('project_state_resume_items', [
+            'category' => 'scheduled_messages',
+            'source_table' => 'scheduled_messages',
+            'source_record_id' => '150',
+            'original_status' => 'pending',
+            'state' => 'pending',
+        ]);
         $this->assertSame(
             240,
             $progressMeta['started_from_workflow_transition']['from_contact_status_id'],
@@ -330,6 +346,49 @@ class FlowRoutesProjectStateRoundTripTest extends TestCase
             140,
             $progressItemResult['meta']['flow_routes']['flow_route_progress_item_id'],
         );
+
+        app(ProjectStateResumeManager::class)
+            ->resume(ProjectStateResumeManager::CATEGORY_FLOW_ROUTES);
+
+        $this->assertDatabaseHas('contact_flow_route_progress', [
+            'id' => 110,
+            'status' => 'waiting',
+        ]);
+        $this->assertDatabaseHas('contact_flow_route_plans', [
+            'id' => 120,
+            'status' => 'active',
+        ]);
+        $this->assertDatabaseHas('contact_flow_route_plan_items', [
+            'id' => 130,
+            'status' => 'waiting',
+        ]);
+        $this->assertDatabaseHas('contact_flow_route_plan_items', [
+            'id' => 131,
+            'status' => 'pending',
+        ]);
+        $this->assertDatabaseHas('contact_flow_route_progress_items', [
+            'id' => 140,
+            'status' => 'waiting',
+        ]);
+        $this->assertDatabaseMissing('project_state_resume_items', [
+            'category' => 'flow_routes',
+            'state' => 'pending',
+        ]);
+
+        $resumedProgressMeta = $this->jsonColumn(
+            table: 'contact_flow_route_progress',
+            id: 110,
+            column: 'meta',
+        );
+
+        $this->assertArrayNotHasKey('project_state', $resumedProgressMeta);
+        Queue::assertPushed(
+            ResumeFlowRouteProgressJob::class,
+            fn (ResumeFlowRouteProgressJob $job): bool =>
+                $job->contactFlowRouteProgressId === 110,
+        );
+
+        Queue::assertPushed(ResumeFlowRouteProgressJob::class, 1);
     }
 
     public function test_validation_rejects_a_broken_flow_route_point_reference_inside_runtime_metadata(): void

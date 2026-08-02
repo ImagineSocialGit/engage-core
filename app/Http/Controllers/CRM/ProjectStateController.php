@@ -4,11 +4,13 @@ namespace App\Http\Controllers\CRM;
 
 use App\Http\Controllers\Controller;
 use App\Support\ProjectState\ProjectStateManager;
+use App\Support\ProjectState\ProjectStateResumeManager;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProjectStateController extends Controller
@@ -27,7 +29,14 @@ class ProjectStateController extends Controller
         $this->authorizeOwner($request);
         $this->validatePassword($request);
 
-        $document = $projectState->export();
+        try {
+            $document = $projectState->export();
+        } catch (RuntimeException $exception) {
+            throw ValidationException::withMessages([
+                'project_state' => $exception->getMessage(),
+            ]);
+        }
+
         $contents = $projectState->encode($document);
         $clientKey = preg_replace(
             '/[^A-Za-z0-9_-]+/',
@@ -117,15 +126,57 @@ class ProjectStateController extends Controller
         return $this->view($report);
     }
 
+    public function resume(
+        Request $request,
+        ProjectStateResumeManager $resumeManager,
+    ): View {
+        $this->authorizeOwner($request);
+
+        $validated = $request->validate([
+            'category' => ['required', 'string', 'max:80'],
+            'current_password' => ['required', 'string'],
+            'confirmation' => ['required', 'string'],
+        ]);
+
+        $this->validatePassword($request);
+
+        if ($validated['confirmation'] !== 'RESUME') {
+            throw ValidationException::withMessages([
+                'confirmation' => 'Type RESUME exactly to continue the selected imported activity.',
+            ]);
+        }
+
+        try {
+            $resumeReport = $resumeManager->resume($validated['category']);
+        } catch (InvalidArgumentException|RuntimeException $exception) {
+            throw ValidationException::withMessages([
+                'category' => $exception->getMessage(),
+            ]);
+        }
+
+        return $this->view(resumeReport: $resumeReport);
+    }
+
     /**
      * @param array<string, mixed>|null $report
+     * @param array<string, mixed>|null $resumeReport
      */
-    private function view(?array $report = null): View
-    {
+    private function view(
+        ?array $report = null,
+        ?array $resumeReport = null,
+    ): View {
+        $resumeManager = app(ProjectStateResumeManager::class);
+
         return view('crm.project-state.index', [
             'title' => 'Project State',
             'heading' => 'Project State',
             'report' => $report,
+            'resumeReport' => $resumeReport,
+            'resumeSummary' => $resumeManager->summary(),
+            'resumeBatchSize' => min(
+                5000,
+                max(1, (int) config('project_state.resume_batch_size', 500)),
+            ),
             'format' => (string) config('project_state.format'),
             'formatVersion' => (int) config('project_state.version'),
             'maxUploadMegabytes' => round(

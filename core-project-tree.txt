@@ -1063,7 +1063,8 @@
 │       │   ├── PresetContributionRegistry.php
 │       │   └── PresetPackageResolver.php
 │       ├── ProjectState
-│       │   └── ProjectStateManager.php
+│       │   ├── ProjectStateManager.php
+│       │   └── ProjectStateResumeManager.php
 │       ├── Queues
 │       │   └── QueueContract.php
 │       ├── SetupValidation
@@ -1347,6 +1348,7 @@
 │   │   ├── 2026_07_30_224001_create_message_chain_runtime_support_tables.php
 │   │   ├── 2026_07_31_210000_create_webinar_schedule_profile_chain_bindings_table.php
 │   │   ├── 2026_08_01_023600_create_webinar_series_message_chain_bindings_table.php
+│   │   ├── 2026_08_02_013000_create_project_state_resume_items_table.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -1612,6 +1614,7 @@
 │   ├── create-client.sh
 │   ├── dump-all-config.sh
 │   ├── dump-client-files.sh
+│   ├── dump-migrations
 │   ├── make-module-dependency-cone-dump.sh
 │   ├── operations
 │   │   ├── configure-client-logging.sh
@@ -1937,4 +1940,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-505 directories, 1433 files
+505 directories, 1436 files

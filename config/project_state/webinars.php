@@ -179,6 +179,14 @@ return [
                     ],
                 ],
             ],
+            'resume_items' => [
+                [
+                    'category' => 'webinar_finalizations',
+                    'json_column' => 'meta',
+                    'path' => 'registration_finalization.status',
+                    'statuses' => ['pending', 'queued', 'processing'],
+                ],
+            ],
         ],
 
         'webinar_registration_responses' => [

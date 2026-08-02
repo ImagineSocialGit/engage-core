@@ -5,6 +5,7 @@ namespace Tests\Feature\ProjectState;
 use App\Http\Middleware\ForceStagingAccess;
 use App\Models\User;
 use App\Support\ProjectState\ProjectStateManager;
+use App\Support\ProjectState\ProjectStateResumeManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -44,6 +45,113 @@ class ProjectStateControllerTest extends TestCase
             ->assertOk()
             ->assertSee('Download current state')
             ->assertSee('Validate or apply current-format state');
+    }
+
+    public function test_resume_surface_is_owner_only_password_confirmed_and_dependency_guarded(): void
+    {
+        $owner = $this->user('owner@example.com');
+        $other = $this->user('other@example.com');
+        $now = now()->startOfSecond();
+
+        DB::table('project_state_resume_items')->insert([
+            [
+                'category' => ProjectStateResumeManager::CATEGORY_MESSAGE_CHAINS,
+                'source_table' => 'message_chain_enrollments',
+                'source_record_id' => '140',
+                'original_status' => 'active',
+                'state' => ProjectStateResumeManager::STATE_PENDING,
+                'result_code' => null,
+                'resumed_at' => null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+            [
+                'category' => ProjectStateResumeManager::CATEGORY_SCHEDULED_MESSAGES,
+                'source_table' => 'scheduled_messages',
+                'source_record_id' => '150',
+                'original_status' => 'pending',
+                'state' => ProjectStateResumeManager::STATE_PENDING,
+                'result_code' => null,
+                'resumed_at' => null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+        ]);
+
+        $this
+            ->actingAs($owner)
+            ->get(route('crm.project-state.index'))
+            ->assertOk()
+            ->assertSee('Resume imported activity one category at a time')
+            ->assertSee('Message-chain enrollments')
+            ->assertSee('Pending scheduled messages')
+            ->assertSee('Complete first:');
+
+        $this
+            ->actingAs($other)
+            ->post(route('crm.project-state.resume'), [
+                'category' => ProjectStateResumeManager::CATEGORY_MESSAGE_CHAINS,
+                'current_password' => 'secret-password',
+                'confirmation' => 'RESUME',
+            ])
+            ->assertForbidden();
+
+        $this
+            ->actingAs($owner)
+            ->post(route('crm.project-state.resume'), [
+                'category' => ProjectStateResumeManager::CATEGORY_MESSAGE_CHAINS,
+                'current_password' => 'wrong-password',
+                'confirmation' => 'RESUME',
+            ])
+            ->assertSessionHasErrors('current_password');
+
+        $this
+            ->actingAs($owner)
+            ->post(route('crm.project-state.resume'), [
+                'category' => ProjectStateResumeManager::CATEGORY_MESSAGE_CHAINS,
+                'current_password' => 'secret-password',
+                'confirmation' => 'resume',
+            ])
+            ->assertSessionHasErrors('confirmation');
+
+        $this
+            ->actingAs($owner)
+            ->post(route('crm.project-state.resume'), [
+                'category' => ProjectStateResumeManager::CATEGORY_SCHEDULED_MESSAGES,
+                'current_password' => 'secret-password',
+                'confirmation' => 'RESUME',
+            ])
+            ->assertSessionHasErrors('category');
+
+        $this->assertDatabaseHas('project_state_resume_items', [
+            'category' => ProjectStateResumeManager::CATEGORY_SCHEDULED_MESSAGES,
+            'state' => ProjectStateResumeManager::STATE_PENDING,
+        ]);
+    }
+
+    public function test_export_is_blocked_while_imported_activity_still_requires_resume(): void
+    {
+        $owner = $this->user('owner@example.com');
+        $now = now()->startOfSecond();
+
+        DB::table('project_state_resume_items')->insert([
+            'category' => ProjectStateResumeManager::CATEGORY_SCHEDULED_MESSAGES,
+            'source_table' => 'scheduled_messages',
+            'source_record_id' => '150',
+            'original_status' => 'pending',
+            'state' => ProjectStateResumeManager::STATE_PENDING,
+            'result_code' => null,
+            'resumed_at' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $this
+            ->actingAs($owner)
+            ->post(route('crm.project-state.export'), [
+                'current_password' => 'secret-password',
+            ])
+            ->assertSessionHasErrors('project_state');
     }
 
     public function test_owner_can_download_a_current_format_core_state_file(): void

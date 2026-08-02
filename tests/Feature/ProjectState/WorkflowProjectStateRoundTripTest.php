@@ -5,10 +5,13 @@ namespace Tests\Feature\ProjectState;
 use App\Modules\Workflow\Events\ContactWorkflowStatusChanged;
 use App\Modules\Workflow\Models\ContactWorkflowProfile;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
+use App\Support\AutomationEvents\Jobs\PublishAutomationEventOutboxEventsJob;
 use App\Support\ProjectState\ProjectStateManager;
+use App\Support\ProjectState\ProjectStateResumeManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -26,6 +29,7 @@ class WorkflowProjectStateRoundTripTest extends TestCase
 
     public function test_workflow_and_automation_event_state_round_trip_without_replaying_imported_events(): void
     {
+        Queue::fake();
         Event::fake([
             AutomationEventRecorded::class,
             ContactWorkflowStatusChanged::class,
@@ -140,7 +144,29 @@ class WorkflowProjectStateRoundTripTest extends TestCase
             'event_id' => $eventId,
             'consumer' => 'workflow.contact_status_changed',
         ]);
+        $this->assertDatabaseHas('project_state_resume_items', [
+            'category' => 'automation_events',
+            'source_table' => 'automation_event_outbox_events',
+            'source_record_id' => '80',
+            'original_status' => 'processing',
+            'state' => 'pending',
+        ]);
 
+        app(ProjectStateResumeManager::class)
+            ->resume(ProjectStateResumeManager::CATEGORY_AUTOMATION_EVENTS);
+
+        $this->assertDatabaseHas('automation_event_outbox_events', [
+            'id' => 80,
+            'status' => 'pending',
+            'claim_token' => null,
+            'claim_expires_at' => null,
+        ]);
+        $this->assertDatabaseMissing('project_state_resume_items', [
+            'category' => 'automation_events',
+            'state' => 'pending',
+        ]);
+
+        Queue::assertPushed(PublishAutomationEventOutboxEventsJob::class, 1);
         Event::assertNotDispatched(AutomationEventRecorded::class);
         Event::assertNotDispatched(ContactWorkflowStatusChanged::class);
     }

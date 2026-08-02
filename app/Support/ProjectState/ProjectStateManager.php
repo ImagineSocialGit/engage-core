@@ -24,6 +24,8 @@ class ProjectStateManager
      */
     public function export(): array
     {
+        $this->assertNoPendingResumeItemsForExport();
+
         $sections = [];
 
         foreach ($this->sections() as $sectionKey => $section) {
@@ -238,6 +240,12 @@ class ProjectStateManager
                                     sourceId: $row['id'],
                                     targetId: $targetId,
                                 );
+                                $this->recordResumeItems(
+                                    table: $table,
+                                    targetId: $targetId,
+                                    sourceRow: $row,
+                                    definition: $definition,
+                                );
 
                                 $applied[$table]++;
                             }
@@ -267,6 +275,12 @@ class ProjectStateManager
                                     table: $table,
                                     sourceId: $row['id'],
                                     targetId: $row['id'],
+                                );
+                                $this->recordResumeItems(
+                                    table: $table,
+                                    targetId: $row['id'],
+                                    sourceRow: $row,
+                                    definition: $definition,
                                 );
                             }
                         }
@@ -396,6 +410,7 @@ class ProjectStateManager
         $jsonPathValueMaps = $definition['json_path_value_maps'] ?? [];
         $jsonPathReferences = $definition['json_path_references'] ?? [];
         $polymorphicReferences = $definition['polymorphic_references'] ?? [];
+        $resumeItems = $definition['resume_items'] ?? [];
         $preserveId = (bool) ($definition['preserve_id'] ?? true);
 
         if (! in_array($mode, ['insert_empty', 'upsert'], true)
@@ -412,6 +427,7 @@ class ProjectStateManager
             || ! $this->isJsonPathValueMap($jsonPathValueMaps)
             || ! $this->isJsonPathReferenceMap($jsonPathReferences)
             || ! $this->isPolymorphicReferenceList($polymorphicReferences)
+            || ! $this->isResumeItemList($resumeItems)
         ) {
             throw new RuntimeException("Project-state table [{$table}] configuration is invalid.");
         }
@@ -443,6 +459,7 @@ class ProjectStateManager
             ...array_keys($jsonPathValueMaps),
             ...array_keys($jsonPathReferences),
             ...$this->polymorphicReferenceColumns($polymorphicReferences),
+            ...$this->resumeItemColumns($resumeItems),
         ] as $column) {
             if (! in_array($column, $columns, true)) {
                 throw new RuntimeException(
@@ -477,6 +494,16 @@ class ProjectStateManager
             if (! in_array($column, $jsonColumns, true)) {
                 throw new RuntimeException(
                     "Project-state table [{$table}] JSON path reference [{$column}] is not a JSON column."
+                );
+            }
+        }
+
+        foreach ($resumeItems as $resumeItem) {
+            $jsonColumn = $resumeItem['json_column'] ?? null;
+
+            if ($jsonColumn !== null && ! in_array($jsonColumn, $jsonColumns, true)) {
+                throw new RuntimeException(
+                    "Project-state table [{$table}] resume item source [{$jsonColumn}] is not a JSON column."
                 );
             }
         }
@@ -516,6 +543,23 @@ class ProjectStateManager
             $polymorphicReferences,
         );
 
+        $resumeItems = array_map(
+            fn (array $resumeItem): array => [
+                'category' => trim($resumeItem['category']),
+                'statuses' => array_values($resumeItem['statuses']),
+                'column' => isset($resumeItem['column'])
+                    ? trim($resumeItem['column'])
+                    : null,
+                'json_column' => isset($resumeItem['json_column'])
+                    ? trim($resumeItem['json_column'])
+                    : null,
+                'path' => isset($resumeItem['path'])
+                    ? trim($resumeItem['path'])
+                    : null,
+            ],
+            $resumeItems,
+        );
+
         return [
             'mode' => $mode,
             'identity' => array_values($identity),
@@ -532,6 +576,7 @@ class ProjectStateManager
             'json_path_value_maps' => $jsonPathValueMaps,
             'json_path_references' => $normalizedJsonPathReferences,
             'polymorphic_references' => $polymorphicReferences,
+            'resume_items' => $resumeItems,
         ];
     }
 
@@ -1233,6 +1278,86 @@ class ProjectStateManager
         }
     }
 
+    /**
+     * @param array<string, mixed> $sourceRow
+     * @param array<string, mixed> $definition
+     */
+    private function recordResumeItems(
+        string $table,
+        mixed $targetId,
+        array $sourceRow,
+        array $definition,
+    ): void {
+        if ($definition['resume_items'] === []) {
+            return;
+        }
+
+        if (! Schema::hasTable('project_state_resume_items')) {
+            throw new RuntimeException(
+                'Project-state resume tracking is unavailable until its migration has been applied.'
+            );
+        }
+
+        foreach ($definition['resume_items'] as $resumeItem) {
+            $sourceStatus = $this->resumeItemSourceStatus(
+                sourceRow: $sourceRow,
+                resumeItem: $resumeItem,
+            );
+
+            if ($sourceStatus === null
+                || ! in_array($sourceStatus, $resumeItem['statuses'], true)
+            ) {
+                continue;
+            }
+
+            $now = now();
+
+            $this->connection()
+                ->table('project_state_resume_items')
+                ->updateOrInsert(
+                    [
+                        'source_table' => $table,
+                        'source_record_id' => (string) $targetId,
+                    ],
+                    [
+                        'category' => $resumeItem['category'],
+                        'original_status' => $sourceStatus,
+                        'state' => ProjectStateResumeManager::STATE_PENDING,
+                        'result_code' => null,
+                        'resumed_at' => null,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ],
+                );
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $sourceRow
+     * @param array<string, mixed> $resumeItem
+     */
+    private function resumeItemSourceStatus(
+        array $sourceRow,
+        array $resumeItem,
+    ): ?string {
+        $value = $resumeItem['column'] !== null
+            ? ($sourceRow[$resumeItem['column']] ?? null)
+            : (is_array($sourceRow[$resumeItem['json_column']] ?? null)
+                ? Arr::get(
+                    $sourceRow[$resumeItem['json_column']],
+                    $resumeItem['path'],
+                )
+                : null);
+
+        if (! is_string($value) && ! is_int($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value !== '' ? $value : null;
+    }
+
     private function mappedReferenceId(
         string $table,
         string $column,
@@ -1600,6 +1725,60 @@ class ProjectStateManager
         return true;
     }
 
+    private function isResumeItemList(mixed $value): bool
+    {
+        if (! is_array($value) || ! array_is_list($value)) {
+            return false;
+        }
+
+        foreach ($value as $resumeItem) {
+            if (! is_array($resumeItem)
+                || ! is_string($resumeItem['category'] ?? null)
+                || trim($resumeItem['category']) === ''
+                || ! $this->isStringList(
+                    $resumeItem['statuses'] ?? null,
+                    allowEmpty: false,
+                )
+            ) {
+                return false;
+            }
+
+            $column = $resumeItem['column'] ?? null;
+            $jsonColumn = $resumeItem['json_column'] ?? null;
+            $path = $resumeItem['path'] ?? null;
+            $hasColumn = is_string($column) && trim($column) !== '';
+            $hasJsonPath = is_string($jsonColumn)
+                && trim($jsonColumn) !== ''
+                && is_string($path)
+                && trim($path) !== '';
+
+            if ($hasColumn === $hasJsonPath) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $resumeItems
+     * @return array<int, string>
+     */
+    private function resumeItemColumns(array $resumeItems): array
+    {
+        $columns = [];
+
+        foreach ($resumeItems as $resumeItem) {
+            $column = $resumeItem['column'] ?? $resumeItem['json_column'] ?? null;
+
+            if (is_string($column) && trim($column) !== '') {
+                $columns[] = trim($column);
+            }
+        }
+
+        return array_values(array_unique($columns));
+    }
+
     /**
      * @param array<int, array<string, mixed>> $references
      * @return array<int, string>
@@ -1614,6 +1793,25 @@ class ProjectStateManager
         }
 
         return array_values(array_unique($columns));
+    }
+
+    private function assertNoPendingResumeItemsForExport(): void
+    {
+        if (! Schema::hasTable('project_state_resume_items')) {
+            return;
+        }
+
+        $pending = (int) $this->connection()
+            ->table('project_state_resume_items')
+            ->where('state', ProjectStateResumeManager::STATE_PENDING)
+            ->count();
+
+        if ($pending > 0) {
+            throw new RuntimeException(sprintf(
+                'Project-state export is blocked while %d imported work item(s) still require explicit resume.',
+                $pending,
+            ));
+        }
     }
 
     private function connection(): ConnectionInterface

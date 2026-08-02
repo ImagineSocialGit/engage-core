@@ -43,6 +43,10 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:5,1')
         ->name('crm.project-state.import');
 
+    Route::post('/project-state/resume', [ProjectStateController::class, 'resume'])
+        ->middleware('throttle:5,1')
+        ->name('crm.project-state.resume');
+
     Route::middleware('module:webinars')->group(function () {
         Route::get('/webinars', [WebinarController::class, 'index'])
             ->name('crm.webinar-series.index');

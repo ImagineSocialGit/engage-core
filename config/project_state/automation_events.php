@@ -73,6 +73,13 @@ return [
                     'processing' => 'paused',
                 ],
             ],
+            'resume_items' => [
+                [
+                    'category' => 'automation_events',
+                    'column' => 'status',
+                    'statuses' => ['pending', 'processing'],
+                ],
+            ],
         ],
 
         'automation_event_consumer_receipts' => [

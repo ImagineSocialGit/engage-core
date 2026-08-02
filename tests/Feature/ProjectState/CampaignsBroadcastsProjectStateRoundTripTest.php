@@ -5,10 +5,13 @@ namespace Tests\Feature\ProjectState;
 use App\Models\User;
 use App\Modules\Broadcasts\Models\Broadcast;
 use App\Modules\Core\Models\Contact;
+use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
 use App\Modules\Messaging\Payloads\EmailPayload;
 use App\Support\ProjectState\ProjectStateManager;
+use App\Support\ProjectState\ProjectStateResumeManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
@@ -25,6 +28,8 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
 
     public function test_campaign_and_broadcast_state_round_trips_with_deferred_metadata_remapping(): void
     {
+        Queue::fake();
+
         $this->seedSourceState();
 
         $projectState = app(ProjectStateManager::class);
@@ -50,7 +55,11 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             $warnings,
         );
         $this->assertStringContainsString(
-            '[broadcasts.status] [sending] → [scheduled]',
+            '[broadcasts.status] [sending] → [paused]',
+            $warnings,
+        );
+        $this->assertStringContainsString(
+            '[scheduled_messages.status] [pending] → [paused]',
             $warnings,
         );
 
@@ -103,7 +112,7 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             'id' => 140,
             'user_id' => null,
             'name' => 'Production broadcast',
-            'status' => 'scheduled',
+            'status' => 'paused',
         ]);
         $this->assertDatabaseHas('broadcast_recipients', [
             'id' => 141,
@@ -117,7 +126,7 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
             'context_id' => 140,
             'behavior_owner_type' => Broadcast::class,
             'behavior_owner_id' => 140,
-            'status' => 'pending',
+            'status' => 'paused',
         ]);
 
         $broadcastMessageMeta = $this->jsonColumn(
@@ -136,6 +145,63 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
                 column: 'scheduled_message_ids',
             ),
         );
+        $this->assertDatabaseHas('project_state_resume_items', [
+            'category' => 'campaign_enrollments',
+            'source_table' => 'campaign_enrollments',
+            'source_record_id' => '120',
+            'original_status' => 'active',
+            'state' => 'pending',
+        ]);
+        $this->assertDatabaseHas('project_state_resume_items', [
+            'category' => 'broadcasts',
+            'source_table' => 'broadcasts',
+            'source_record_id' => '140',
+            'original_status' => 'sending',
+            'state' => 'pending',
+        ]);
+        $this->assertDatabaseHas('project_state_resume_items', [
+            'category' => 'scheduled_messages',
+            'source_table' => 'scheduled_messages',
+            'source_record_id' => '150',
+            'original_status' => 'pending',
+            'state' => 'pending',
+        ]);
+
+        $resume = app(ProjectStateResumeManager::class);
+        $resume->resume(ProjectStateResumeManager::CATEGORY_CAMPAIGNS);
+        $resume->resume(ProjectStateResumeManager::CATEGORY_BROADCASTS);
+        $resume->resume(ProjectStateResumeManager::CATEGORY_SCHEDULED_MESSAGES);
+
+        $this->assertDatabaseHas('campaign_enrollments', [
+            'id' => 120,
+            'status' => 'active',
+        ]);
+        $this->assertDatabaseHas('broadcasts', [
+            'id' => 140,
+            'status' => 'scheduled',
+        ]);
+        $this->assertDatabaseHas('scheduled_messages', [
+            'id' => 130,
+            'status' => 'pending',
+        ]);
+        $this->assertDatabaseHas('scheduled_messages', [
+            'id' => 150,
+            'status' => 'pending',
+        ]);
+        $this->assertDatabaseMissing('project_state_resume_items', [
+            'category' => 'campaign_enrollments',
+            'state' => 'pending',
+        ]);
+        $this->assertDatabaseMissing('project_state_resume_items', [
+            'category' => 'broadcasts',
+            'state' => 'pending',
+        ]);
+        $this->assertDatabaseMissing('project_state_resume_items', [
+            'category' => 'scheduled_messages',
+            'state' => 'pending',
+        ]);
+
+        Queue::assertPushed(SendScheduledMessageJob::class, 2);
     }
 
     public function test_validation_rejects_a_broken_campaign_id_inside_scheduled_message_metadata(): void

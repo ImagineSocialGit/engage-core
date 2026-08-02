@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\ProjectState;
 
+use App\Modules\Webinars\Jobs\SyncWebinarRegistrationToProviderJob;
 use App\Support\ProjectState\ProjectStateManager;
+use App\Support\ProjectState\ProjectStateResumeManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class WebinarProjectStateRoundTripTest extends TestCase
@@ -21,6 +24,8 @@ class WebinarProjectStateRoundTripTest extends TestCase
 
     public function test_webinar_state_round_trips_after_preset_sync_with_reference_remapping_and_paused_finalization(): void
     {
+        Queue::fake();
+
         $this->seedSourceState();
 
         $projectState = app(ProjectStateManager::class);
@@ -160,6 +165,7 @@ class WebinarProjectStateRoundTripTest extends TestCase
             'message_template_version_id' => 211,
             'message_chain_enrollment_id' => 140,
             'message_chain_step_variant_id' => 223,
+            'status' => 'paused',
         ]);
         $this->assertDatabaseHas('contact_permission_invitations', [
             'id' => 155,
@@ -167,6 +173,45 @@ class WebinarProjectStateRoundTripTest extends TestCase
             'context_id' => 330,
             'scheduled_message_id' => 150,
         ]);
+        $this->assertDatabaseHas('project_state_resume_items', [
+            'category' => 'webinar_finalizations',
+            'source_table' => 'webinar_registrations',
+            'source_record_id' => '330',
+            'original_status' => 'processing',
+            'state' => 'pending',
+        ]);
+        $this->assertDatabaseHas('project_state_resume_items', [
+            'category' => 'scheduled_messages',
+            'source_table' => 'scheduled_messages',
+            'source_record_id' => '150',
+            'original_status' => 'pending',
+            'state' => 'pending',
+        ]);
+
+        $resume = app(ProjectStateResumeManager::class);
+        $resume->resume(ProjectStateResumeManager::CATEGORY_MESSAGE_CHAINS);
+        $resume->resume(ProjectStateResumeManager::CATEGORY_WEBINAR_FINALIZATIONS);
+
+        $resumedRegistrationMeta = json_decode(
+            (string) DB::table('webinar_registrations')
+                ->where('id', 330)
+                ->value('meta'),
+            true,
+        );
+
+        $this->assertSame(
+            'queued',
+            data_get($resumedRegistrationMeta, 'registration_finalization.status'),
+        );
+        $this->assertNotNull(
+            data_get($resumedRegistrationMeta, 'registration_finalization.queue_token'),
+        );
+        $this->assertDatabaseMissing('project_state_resume_items', [
+            'category' => 'webinar_finalizations',
+            'state' => 'pending',
+        ]);
+
+        Queue::assertPushed(SyncWebinarRegistrationToProviderJob::class, 1);
     }
 
     public function test_historical_orphaned_webinar_polymorphic_reference_is_warned_and_preserved(): void

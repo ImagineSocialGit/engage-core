@@ -2,9 +2,14 @@
 
 namespace Tests\Feature\ProjectState;
 
+use App\Modules\Messaging\Jobs\PublishScheduledMessageOutboxEventsJob;
+use App\Modules\Messaging\Jobs\SendScheduledMessageJob;
 use App\Support\ProjectState\ProjectStateManager;
+use App\Support\ProjectState\ProjectStateResumeManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class MessagingProjectStateRoundTripTest extends TestCase
@@ -21,6 +26,8 @@ class MessagingProjectStateRoundTripTest extends TestCase
 
     public function test_messaging_state_round_trips_after_preset_sync_with_reference_remapping_and_paused_runtime(): void
     {
+        Queue::fake();
+
         $this->seedSourceState();
 
         $projectState = app(ProjectStateManager::class);
@@ -39,6 +46,10 @@ class MessagingProjectStateRoundTripTest extends TestCase
         $this->assertTrue($report['valid']);
         $this->assertStringContainsString(
             '[message_chain_enrollments.status] [active] → [paused]',
+            $warnings,
+        );
+        $this->assertStringContainsString(
+            '[scheduled_messages.status] [sending] → [paused]',
             $warnings,
         );
         $this->assertStringContainsString(
@@ -141,7 +152,7 @@ class MessagingProjectStateRoundTripTest extends TestCase
             'message_template_version_id' => 211,
             'message_chain_enrollment_id' => 140,
             'message_chain_step_variant_id' => 223,
-            'status' => 'sending',
+            'status' => 'paused',
         ]);
         $this->assertDatabaseHas('scheduled_messages', [
             'id' => 160,
@@ -179,6 +190,119 @@ class MessagingProjectStateRoundTripTest extends TestCase
             'delivery_attempt_id' => 163,
             'status' => 'paused',
         ]);
+        $this->assertDatabaseHas('project_state_resume_items', [
+            'category' => 'message_chain_enrollments',
+            'source_table' => 'message_chain_enrollments',
+            'source_record_id' => '140',
+            'original_status' => 'active',
+            'state' => 'pending',
+        ]);
+        $this->assertDatabaseHas('project_state_resume_items', [
+            'category' => 'message_deliveries',
+            'source_table' => 'scheduled_messages',
+            'source_record_id' => '150',
+            'original_status' => 'sending',
+            'state' => 'pending',
+        ]);
+        $this->assertDatabaseHas('project_state_resume_items', [
+            'category' => 'scheduled_message_outbox',
+            'source_table' => 'scheduled_message_outbox_events',
+            'source_record_id' => '164',
+            'original_status' => 'pending',
+            'state' => 'pending',
+        ]);
+
+        $resume = app(ProjectStateResumeManager::class);
+        $resume->resume(ProjectStateResumeManager::CATEGORY_MESSAGE_CHAINS);
+        $resume->resume(ProjectStateResumeManager::CATEGORY_MESSAGE_DELIVERIES);
+        $resume->resume(ProjectStateResumeManager::CATEGORY_SCHEDULED_MESSAGE_OUTBOX);
+
+        $this->assertDatabaseHas('message_chain_enrollments', [
+            'id' => 140,
+            'status' => 'active',
+        ]);
+        $this->assertDatabaseHas('scheduled_messages', [
+            'id' => 150,
+            'status' => 'pending',
+        ]);
+        $this->assertDatabaseHas('scheduled_message_delivery_attempts', [
+            'id' => 153,
+            'status' => 'recovered',
+            'claim_token' => '11111111-1111-4111-8111-111111111111',
+            'reason_code' => 'project_state_import_claim_recovered',
+        ]);
+        $this->assertDatabaseHas('scheduled_message_outbox_events', [
+            'id' => 164,
+            'status' => 'pending',
+            'claim_token' => null,
+            'claim_expires_at' => null,
+        ]);
+        $this->assertDatabaseMissing('project_state_resume_items', [
+            'category' => 'message_chain_enrollments',
+            'state' => 'pending',
+        ]);
+        $this->assertDatabaseMissing('project_state_resume_items', [
+            'category' => 'message_deliveries',
+            'state' => 'pending',
+        ]);
+        $this->assertDatabaseMissing('project_state_resume_items', [
+            'category' => 'scheduled_message_outbox',
+            'state' => 'pending',
+        ]);
+
+        Queue::assertPushed(SendScheduledMessageJob::class, 1);
+        Queue::assertPushed(PublishScheduledMessageOutboxEventsJob::class, 1);
+    }
+
+    public function test_interrupted_provider_submission_is_failed_instead_of_blindly_resent(): void
+    {
+        Queue::fake();
+        Event::fake();
+        config()->set('messaging.email.provider', 'dev_sink');
+        config()->set(
+            'messaging.delivery.provider_idempotency.email.dev_sink.enabled',
+            false,
+        );
+
+        $this->seedSourceState();
+
+        DB::table('scheduled_message_delivery_attempts')
+            ->where('id', 153)
+            ->update([
+                'status' => 'submitting',
+                'provider_submission_started_at' => now(),
+            ]);
+
+        $projectState = app(ProjectStateManager::class);
+        $document = $projectState->export();
+        $this->prepareFreshPresetSyncedTarget();
+        $projectState->import($document);
+
+        $resume = app(ProjectStateResumeManager::class);
+        $resume->resume(ProjectStateResumeManager::CATEGORY_MESSAGE_CHAINS);
+        $resume->resume(ProjectStateResumeManager::CATEGORY_MESSAGE_DELIVERIES);
+
+        $this->assertDatabaseHas('scheduled_messages', [
+            'id' => 150,
+            'status' => 'failed',
+        ]);
+        $this->assertDatabaseHas('scheduled_message_delivery_attempts', [
+            'id' => 153,
+            'status' => 'failed',
+            'reason_code' => 'project_state_import_provider_outcome_unknown',
+        ]);
+        $this->assertDatabaseHas('scheduled_message_outbox_events', [
+            'scheduled_message_id' => 150,
+            'delivery_attempt_id' => 153,
+            'event_type' => 'failed',
+            'reason_code' => 'project_state_import_provider_outcome_unknown',
+        ]);
+        $this->assertDatabaseMissing('project_state_resume_items', [
+            'category' => 'message_deliveries',
+            'state' => 'pending',
+        ]);
+
+        Queue::assertNotPushed(SendScheduledMessageJob::class);
     }
 
     public function test_validation_rejects_a_broken_messaging_reference_before_import(): void

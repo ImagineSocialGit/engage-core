@@ -1,4 +1,4 @@
-    <x-layouts.crm
+<x-layouts.crm
     :title="$title"
     :heading="$heading"
     subheading="Download the current application state or validate and apply a current-format JSON file after a clean rebuild."
@@ -111,6 +111,32 @@
             </section>
         @endif
 
+        @if(is_array($resumeReport))
+            <section class="rounded-3xl border border-emerald-300 bg-emerald-50 p-6 shadow-sm sm:p-8">
+                <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-emerald-800">
+                    Resume completed
+                </p>
+                <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-emerald-950">
+                    {{ $resumeReport['label'] }}
+                </h2>
+                <p class="mt-3 text-sm leading-6 text-emerald-950">
+                    Processed {{ number_format($resumeReport['processed']) }} imported work item(s).
+                    {{ number_format($resumeReport['pending_count']) }} remain in this category.
+                </p>
+
+                @if(!empty($resumeReport['outcomes']))
+                    <dl class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        @foreach($resumeReport['outcomes'] as $outcome => $count)
+                            <div class="rounded-2xl border border-emerald-200 bg-white/80 p-4">
+                                <dt class="font-mono text-xs text-slate-600">{{ $outcome }}</dt>
+                                <dd class="mt-1 text-2xl font-extrabold text-slate-950">{{ number_format($count) }}</dd>
+                            </div>
+                        @endforeach
+                    </dl>
+                @endif
+            </section>
+        @endif
+
         <div class="grid gap-6 xl:grid-cols-2">
             <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
                 <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">Export</p>
@@ -196,5 +222,113 @@
                 </form>
             </section>
         </div>
+
+        <section class="rounded-3xl border border-orange-300 bg-orange-50 p-6 shadow-sm sm:p-8">
+            <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-orange-800">
+                Explicit post-import resume
+            </p>
+            <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-orange-950">
+                Resume imported activity one category at a time
+            </h2>
+            <p class="mt-3 max-w-4xl text-sm leading-6 text-orange-950">
+                Import restores runnable work in inert states and records exactly what was paused.
+                Resume the categories below in dependency order only after the application, workers,
+                providers, and client configuration are ready. Each submission processes up to
+                {{ number_format($resumeBatchSize) }} items; repeat a category while its pending count remains above zero.
+            </p>
+
+            <div class="mt-6 grid gap-4 lg:grid-cols-2">
+                @foreach($resumeSummary as $category)
+                    <article class="rounded-2xl border {{ $category['pending_count'] > 0 ? 'border-orange-300 bg-white' : 'border-slate-200 bg-white/70' }} p-5">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <h3 class="font-bold text-slate-950">{{ $category['label'] }}</h3>
+                                <p class="mt-1 text-sm leading-5 text-slate-600">{{ $category['description'] }}</p>
+                            </div>
+                            <span class="inline-flex min-w-10 justify-center rounded-full px-3 py-1 text-xs font-extrabold {{ $category['pending_count'] > 0 ? 'bg-orange-200 text-orange-950' : 'bg-slate-200 text-slate-700' }}">
+                                {{ number_format($category['pending_count']) }}
+                            </span>
+                        </div>
+
+                        @if(!empty($category['blocked_by']))
+                            <p class="mt-3 text-xs font-semibold text-amber-800">
+                                Complete first:
+                                @foreach($category['blocked_by'] as $dependency)
+                                    {{ $resumeSummary[$dependency]['label'] ?? $dependency }}{{ $loop->last ? '' : ', ' }}
+                                @endforeach
+                            </p>
+                        @elseif($category['pending_count'] > 0)
+                            <p class="mt-3 text-xs font-semibold text-emerald-800">Ready for explicit resume.</p>
+                        @else
+                            <p class="mt-3 text-xs font-semibold text-slate-500">No pending imported work.</p>
+                        @endif
+                    </article>
+                @endforeach
+            </div>
+
+            @php
+                $resumableCategories = collect($resumeSummary)
+                    ->filter(fn (array $category): bool =>
+                        $category['pending_count'] > 0
+                        && $category['blocked_by'] === []
+                    );
+            @endphp
+
+            @if($resumableCategories->isNotEmpty())
+                <form method="POST" action="{{ route('crm.project-state.resume') }}" class="mt-6 grid gap-4 rounded-2xl border border-orange-300 bg-white p-5 lg:grid-cols-3">
+                    @csrf
+
+                    <div>
+                        <label for="resume-category" class="text-sm font-semibold text-slate-900">Category</label>
+                        <select
+                            id="resume-category"
+                            name="category"
+                            required
+                            class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200"
+                        >
+                            @foreach($resumableCategories as $category)
+                                <option value="{{ $category['key'] }}">
+                                    {{ $category['label'] }} — {{ number_format($category['pending_count']) }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="resume-current-password" class="text-sm font-semibold text-slate-900">Current password</label>
+                        <input
+                            id="resume-current-password"
+                            name="current_password"
+                            type="password"
+                            autocomplete="current-password"
+                            required
+                            class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="resume-confirmation" class="text-sm font-semibold text-slate-900">Type RESUME</label>
+                        <input
+                            id="resume-confirmation"
+                            name="confirmation"
+                            type="text"
+                            autocomplete="off"
+                            required
+                            class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200"
+                        >
+                    </div>
+
+                    <div class="lg:col-span-3">
+                        <button type="submit" class="inline-flex items-center justify-center rounded-xl bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-800">
+                            Resume Selected Activity
+                        </button>
+                    </div>
+                </form>
+            @else
+                <p class="mt-6 rounded-2xl border border-slate-200 bg-white/70 p-4 text-sm text-slate-700">
+                    No category is currently ready for resume. Complete any listed prerequisites first, or there is no imported activity waiting.
+                </p>
+            @endif
+        </section>
     </div>
 </x-layouts.crm>

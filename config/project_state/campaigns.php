@@ -159,6 +159,13 @@ return [
                     'active' => 'paused',
                 ],
             ],
+            'resume_items' => [
+                [
+                    'category' => 'campaign_enrollments',
+                    'column' => 'status',
+                    'statuses' => ['active'],
+                ],
+            ],
         ],
     ],
 ];

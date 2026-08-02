@@ -438,6 +438,13 @@ return [
                     'active' => 'paused',
                 ],
             ],
+            'resume_items' => [
+                [
+                    'category' => 'message_chain_enrollments',
+                    'column' => 'status',
+                    'statuses' => ['active'],
+                ],
+            ],
         ],
 
         'scheduled_messages' => [
@@ -509,6 +516,24 @@ return [
                         'App\\Modules\\FlowRoutes\\Models\\FlowRoutePoint' => 'flow_route_points',
                     ],
                     'deferred' => true,
+                ],
+            ],
+            'import_value_maps' => [
+                'status' => [
+                    'pending' => 'paused',
+                    'sending' => 'paused',
+                ],
+            ],
+            'resume_items' => [
+                [
+                    'category' => 'scheduled_messages',
+                    'column' => 'status',
+                    'statuses' => ['pending'],
+                ],
+                [
+                    'category' => 'message_deliveries',
+                    'column' => 'status',
+                    'statuses' => ['sending'],
                 ],
             ],
             'json_path_references' => [
@@ -717,10 +742,21 @@ return [
                 'scheduled_message_id' => 'scheduled_messages',
                 'delivery_attempt_id' => 'scheduled_message_delivery_attempts',
             ],
+            'null_on_import' => [
+                'claim_token',
+                'claim_expires_at',
+            ],
             'import_value_maps' => [
                 'status' => [
                     'pending' => 'paused',
                     'processing' => 'paused',
+                ],
+            ],
+            'resume_items' => [
+                [
+                    'category' => 'scheduled_message_outbox',
+                    'column' => 'status',
+                    'statuses' => ['pending', 'processing'],
                 ],
             ],
         ],

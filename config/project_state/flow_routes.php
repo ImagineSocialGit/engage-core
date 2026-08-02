@@ -334,6 +334,13 @@ return [
                 ],
             ],
             'import_value_map_backups' => $statusBackup,
+            'resume_items' => [
+                [
+                    'category' => 'flow_routes',
+                    'column' => 'status',
+                    'statuses' => ['active', 'waiting'],
+                ],
+            ],
             'json_path_references' => [
                 'meta' => [
                     'started_from_workflow_transition.from_contact_status_id' => [
