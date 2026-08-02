@@ -1152,12 +1152,14 @@
 │   │           └── tasks.php
 │   ├── presets.php
 │   ├── project_state
+│   │   ├── automation_events.php
 │   │   ├── broadcasts.php
 │   │   ├── campaigns.php
 │   │   ├── core.php
 │   │   ├── messaging.php
 │   │   ├── tasks.php
-│   │   └── webinars.php
+│   │   ├── webinars.php
+│   │   └── workflow.php
 │   ├── project_state.php
 │   ├── queue.php
 │   ├── reference
@@ -1814,7 +1816,8 @@
 │   │   │   ├── MessagingProjectStateRoundTripTest.php
 │   │   │   ├── ProjectStateControllerTest.php
 │   │   │   ├── TasksProjectStateRoundTripTest.php
-│   │   │   └── WebinarProjectStateRoundTripTest.php
+│   │   │   ├── WebinarProjectStateRoundTripTest.php
+│   │   │   └── WorkflowProjectStateRoundTripTest.php
 │   │   ├── Scheduling
 │   │   │   ├── AppointmentLifecycleActionTest.php
 │   │   │   ├── BookableSlotOfferAndBookingHoldActionTest.php
@@ -1932,4 +1935,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-505 directories, 1428 files
+505 directories, 1431 files
