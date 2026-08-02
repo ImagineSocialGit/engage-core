@@ -128,19 +128,20 @@ class ProjectStateCoverageContractTest extends TestCase
 
     public function test_export_is_blocked_when_unsupported_durable_state_exists(): void
     {
-        $now = now()->startOfSecond();
+        config()->set('project_state.table_policies.cache', [
+            'mode' => 'must_be_empty',
+            'reason' => 'Test unsupported state must be cleared before export.',
+        ]);
 
-        DB::table('mortgage_stages')->insert([
-            'name' => 'Unsupported Mortgage Stage',
-            'category' => 'pipeline',
-            'sort_order' => 10,
-            'created_at' => $now,
-            'updated_at' => $now,
+        DB::table('cache')->insert([
+            'key' => 'project-state-unsupported-test',
+            'value' => '1',
+            'expiration' => now()->addHour()->timestamp,
         ]);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'Project-state export is blocked because [mortgage_stages] contains 1 row(s).'
+            'Project-state export is blocked because [cache] contains 1 row(s).'
         );
 
         app(ProjectStateManager::class)->export();

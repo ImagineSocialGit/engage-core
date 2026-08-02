@@ -45,7 +45,7 @@ class TasksProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(9, $document['version']);
+        $this->assertSame(10, $document['version']);
         $this->assertCount(
             1,
             $document['sections']['tasks']['tables']['task_templates'],

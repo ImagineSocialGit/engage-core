@@ -33,7 +33,7 @@ class MessagingProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(9, $document['version']);
+        $this->assertSame(10, $document['version']);
         $this->assertCount(1, $document['sections']['messaging']['tables']['message_templates']);
         $this->assertCount(2, $document['sections']['messaging']['tables']['scheduled_messages']);
         $this->assertCount(2, $document['sections']['messaging']['tables']['scheduled_message_delivery_attempts']);
