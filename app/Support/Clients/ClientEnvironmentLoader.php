@@ -23,8 +23,6 @@ final class ClientEnvironmentLoader
         'CRM_APP_URL',
         'SCHEDULING_APP_URL',
 
-        'PROJECT_STATE_ADMIN_EMAIL',
-
         'DB_DATABASE',
         'DB_USERNAME',
         'DB_PASSWORD',
@@ -63,6 +61,8 @@ final class ClientEnvironmentLoader
         'INTERNAL_NOTIFICATION_FROM_ADDRESS',
         'INTERNAL_NOTIFICATION_FROM_NAME',
         'INBOUND_REPLY_DEFAULT_TEAM_MEMBER_EMAIL',
+
+        'PROJECT_STATE_ADMIN_EMAIL',
 
         'SMS_ENABLED',
         'SMS_PROVIDER',

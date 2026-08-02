@@ -13,6 +13,12 @@ use Throwable;
 
 class ProjectStateManager
 {
+    /** @var array<string, array<int, mixed>> */
+    private array $validationDocumentTables = [];
+
+    /** @var array<string, array<string, int|string>> */
+    private array $importedIds = [];
+
     /**
      * @return array<string, mixed>
      */
@@ -127,6 +133,12 @@ class ProjectStateManager
 
                 $counts[$table] = count($rows);
                 $this->validateRows($table, $definition, $rows, $errors);
+                $this->appendImportValueMapWarnings(
+                    table: $table,
+                    definition: $definition,
+                    rows: $rows,
+                    warnings: $warnings,
+                );
 
                 if ($definition['mode'] === 'insert_empty'
                     && $this->connection()->table($table)->exists()
@@ -175,44 +187,88 @@ class ProjectStateManager
         }
 
         $applied = [];
+        $this->importedIds = [];
 
-        $this->connection()->transaction(function () use ($document, &$applied): void {
-            foreach ($this->sections() as $sectionKey => $section) {
-                $tables = $document['sections'][$sectionKey]['tables'];
+        try {
+            $this->connection()->transaction(function () use ($document, &$applied): void {
+                $sections = $this->sections();
 
-                foreach ($section['tables'] as $table => $definition) {
-                    $rows = $tables[$table];
-                    $applied[$table] = 0;
+                foreach ($sections as $sectionKey => $section) {
+                    $tables = $document['sections'][$sectionKey]['tables'];
 
-                    if ($definition['mode'] === 'upsert') {
-                        foreach ($rows as $row) {
-                            $importRow = $this->importRow($row, $definition);
-                            $identity = Arr::only($importRow, $definition['identity']);
+                    foreach ($section['tables'] as $table => $definition) {
+                        $rows = $tables[$table];
+                        $applied[$table] = 0;
 
-                            $this->connection()
-                                ->table($table)
-                                ->updateOrInsert($identity, $importRow);
+                        if ($definition['mode'] === 'upsert') {
+                            foreach ($rows as $row) {
+                                $importRow = $this->importRow(
+                                    table: $table,
+                                    row: $row,
+                                    definition: $definition,
+                                );
+                                $identity = Arr::only(
+                                    $importRow,
+                                    $definition['identity'],
+                                );
 
-                            $applied[$table]++;
+                                $this->connection()
+                                    ->table($table)
+                                    ->updateOrInsert($identity, $importRow);
+
+                                $targetId = $this->targetIdForIdentity(
+                                    table: $table,
+                                    identity: $identity,
+                                );
+
+                                $this->rememberImportedId(
+                                    table: $table,
+                                    sourceId: $row['id'],
+                                    targetId: $targetId,
+                                );
+
+                                $applied[$table]++;
+                            }
+
+                            continue;
                         }
 
-                        continue;
-                    }
+                        foreach (array_chunk($rows, 500) as $chunk) {
+                            $importRows = array_map(
+                                fn (array $row): array => $this->importRow(
+                                    table: $table,
+                                    row: $row,
+                                    definition: $definition,
+                                ),
+                                $chunk,
+                            );
 
-                    foreach (array_chunk($rows, 500) as $chunk) {
-                        $importRows = array_map(
-                            fn (array $row): array => $this->importRow($row, $definition),
-                            $chunk,
-                        );
+                            if ($importRows === []) {
+                                continue;
+                            }
 
-                        if ($importRows !== []) {
                             $this->connection()->table($table)->insert($importRows);
                             $applied[$table] += count($importRows);
+
+                            foreach ($chunk as $row) {
+                                $this->rememberImportedId(
+                                    table: $table,
+                                    sourceId: $row['id'],
+                                    targetId: $row['id'],
+                                );
+                            }
                         }
                     }
                 }
-            }
-        }, attempts: 1);
+
+                $this->applyDeferredReferences($sections);
+            }, attempts: 1);
+        } catch (Throwable $exception) {
+            throw new InvalidArgumentException(
+                'Project-state import failed and was rolled back: '.$exception->getMessage(),
+                previous: $exception,
+            );
+        }
 
         $report['applied'] = true;
         $report['applied_counts'] = $applied;
@@ -288,6 +344,10 @@ class ProjectStateManager
             $tables = [];
 
             foreach ($section['tables'] as $table => $definition) {
+                if (! is_string($table) || trim($table) === '') {
+                    throw new RuntimeException('Project-state table configuration is invalid.');
+                }
+
                 $tables[$table] = $this->normalizeDefinition($table, $definition);
             }
 
@@ -314,17 +374,24 @@ class ProjectStateManager
         $columns = $definition['columns'] ?? null;
         $orderBy = $definition['order_by'] ?? ['id'];
         $identity = $definition['identity'] ?? [];
+        $nullableIdentity = $definition['nullable_identity'] ?? [];
         $jsonColumns = $definition['json_columns'] ?? [];
         $references = $definition['references'] ?? [];
+        $deferredReferences = $definition['deferred_references'] ?? [];
+        $nullOnImport = $definition['null_on_import'] ?? [];
+        $importValueMaps = $definition['import_value_maps'] ?? [];
+        $preserveId = (bool) ($definition['preserve_id'] ?? true);
 
         if (! in_array($mode, ['insert_empty', 'upsert'], true)
-            || ! is_array($columns)
-            || $columns === []
-            || ! is_array($orderBy)
-            || $orderBy === []
-            || ! is_array($identity)
-            || ! is_array($jsonColumns)
-            || ! is_array($references)
+            || ! $this->isStringList($columns, allowEmpty: false)
+            || ! $this->isStringList($orderBy, allowEmpty: false)
+            || ! $this->isStringList($identity)
+            || ! $this->isStringList($nullableIdentity)
+            || ! $this->isStringList($jsonColumns)
+            || ! $this->isStringList($nullOnImport)
+            || ! $this->isReferenceMap($references)
+            || ! $this->isReferenceMap($deferredReferences)
+            || ! $this->isImportValueMap($importValueMaps)
         ) {
             throw new RuntimeException("Project-state table [{$table}] configuration is invalid.");
         }
@@ -333,14 +400,59 @@ class ProjectStateManager
             throw new RuntimeException("Project-state table [{$table}] requires an upsert identity.");
         }
 
+        if ($mode === 'insert_empty' && ! $preserveId) {
+            throw new RuntimeException(
+                "Project-state table [{$table}] must preserve IDs in insert-empty mode."
+            );
+        }
+
+        $referencedColumns = [
+            ...array_keys($references),
+            ...array_keys($deferredReferences),
+        ];
+
+        foreach ([
+            ...$orderBy,
+            ...$identity,
+            ...$nullableIdentity,
+            ...$jsonColumns,
+            ...$nullOnImport,
+            ...$referencedColumns,
+            ...array_keys($importValueMaps),
+        ] as $column) {
+            if (! in_array($column, $columns, true)) {
+                throw new RuntimeException(
+                    "Project-state table [{$table}] references unknown column [{$column}]."
+                );
+            }
+        }
+
+        foreach ($nullableIdentity as $column) {
+            if (! in_array($column, $identity, true)) {
+                throw new RuntimeException(
+                    "Project-state table [{$table}] nullable identity [{$column}] is not an identity column."
+                );
+            }
+        }
+
+        if (array_intersect(array_keys($references), array_keys($deferredReferences)) !== []) {
+            throw new RuntimeException(
+                "Project-state table [{$table}] repeats a reference as immediate and deferred."
+            );
+        }
+
         return [
             'mode' => $mode,
             'identity' => array_values($identity),
-            'preserve_id' => (bool) ($definition['preserve_id'] ?? true),
+            'nullable_identity' => array_values($nullableIdentity),
+            'preserve_id' => $preserveId,
             'order_by' => array_values($orderBy),
             'columns' => array_values($columns),
             'json_columns' => array_values($jsonColumns),
             'references' => $references,
+            'deferred_references' => $deferredReferences,
+            'null_on_import' => array_values($nullOnImport),
+            'import_value_maps' => $importValueMaps,
         ];
     }
 
@@ -398,8 +510,35 @@ class ProjectStateManager
      * @param array<string, mixed> $definition
      * @return array<string, mixed>
      */
-    private function importRow(array $row, array $definition): array
-    {
+    private function importRow(
+        string $table,
+        array $row,
+        array $definition,
+    ): array {
+        foreach ($definition['references'] as $column => $referencedTable) {
+            $row[$column] = $this->mappedReferenceId(
+                table: $table,
+                column: $column,
+                referencedTable: $referencedTable,
+                sourceId: $row[$column] ?? null,
+            );
+        }
+
+        foreach ($definition['deferred_references'] as $column => $referencedTable) {
+            $row[$column] = null;
+        }
+
+        foreach ($definition['null_on_import'] as $column) {
+            $row[$column] = null;
+        }
+
+        foreach ($definition['import_value_maps'] as $column => $valueMap) {
+            $row[$column] = $this->mappedImportValue(
+                value: $row[$column] ?? null,
+                valueMap: $valueMap,
+            );
+        }
+
         if (! $definition['preserve_id']) {
             unset($row['id']);
         }
@@ -435,6 +574,7 @@ class ProjectStateManager
         $expectedColumns = $definition['columns'];
         sort($expectedColumns);
         $seenIdentities = [];
+        $seenSourceIds = [];
 
         foreach ($rows as $index => $row) {
             if (! is_array($row)) {
@@ -450,6 +590,21 @@ class ProjectStateManager
                 continue;
             }
 
+            $sourceId = $row['id'] ?? null;
+
+            if ($sourceId === null || $sourceId === '') {
+                $errors[] = "Project-state row [{$table}.{$index}] requires [id].";
+                continue;
+            }
+
+            $sourceIdKey = (string) $sourceId;
+
+            if (isset($seenSourceIds[$sourceIdKey])) {
+                $errors[] = "Project-state table [{$table}] contains duplicate source ID [{$sourceIdKey}].";
+            }
+
+            $seenSourceIds[$sourceIdKey] = true;
+
             foreach ($definition['json_columns'] as $column) {
                 if ($row[$column] !== null && ! is_array($row[$column])) {
                     $errors[] = "Project-state value [{$table}.{$index}.{$column}] must be an object, array, or null.";
@@ -464,13 +619,20 @@ class ProjectStateManager
 
             foreach ($identityColumns as $column) {
                 $value = $row[$column] ?? null;
+                $nullable = in_array(
+                    $column,
+                    $definition['nullable_identity'],
+                    true,
+                );
 
-                if ($value === null || $value === '') {
+                if (($value === null || $value === '') && ! $nullable) {
                     $errors[] = "Project-state row [{$table}.{$index}] requires [{$column}].";
                     continue 2;
                 }
 
-                $identityValues[] = (string) $value;
+                $identityValues[] = $value === null
+                    ? '<null>'
+                    : get_debug_type($value).':'.(string) $value;
             }
 
             $identityKey = implode('|', $identityValues);
@@ -496,10 +658,16 @@ class ProjectStateManager
         array $rows,
         array &$errors,
     ): void {
-        foreach ($definition['references'] as $column => $referencedTable) {
+        $references = array_merge(
+            $definition['references'],
+            $definition['deferred_references'],
+        );
+
+        foreach ($references as $column => $referencedTable) {
             $referencedRows = $this->documentTableRows($referencedTable);
 
             if ($referencedRows === null) {
+                $errors[] = "Project-state reference target [{$referencedTable}] is not configured in the document.";
                 continue;
             }
 
@@ -526,18 +694,201 @@ class ProjectStateManager
     }
 
     /**
-     * This method is replaced during validate() with the current document table
-     * cache. It exists only to keep reference validation isolated.
-     *
+     * @param array<string, mixed> $definition
+     * @param array<int, mixed> $rows
+     * @param array<int, string> $warnings
+     */
+    private function appendImportValueMapWarnings(
+        string $table,
+        array $definition,
+        array $rows,
+        array &$warnings,
+    ): void {
+        foreach ($definition['import_value_maps'] as $column => $valueMap) {
+            $counts = [];
+
+            foreach ($rows as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                $sourceValue = $row[$column] ?? null;
+                $targetValue = $this->mappedImportValue($sourceValue, $valueMap);
+
+                if ($sourceValue === $targetValue) {
+                    continue;
+                }
+
+                $key = $this->displayValue($sourceValue).' → '.$this->displayValue($targetValue);
+                $counts[$key] = ($counts[$key] ?? 0) + 1;
+            }
+
+            foreach ($counts as $mapping => $count) {
+                $warnings[] = sprintf(
+                    'Import will map [%s.%s] %s for %d row(s).',
+                    $table,
+                    $column,
+                    $mapping,
+                    $count,
+                );
+            }
+        }
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $sections
+     */
+    private function applyDeferredReferences(array $sections): void
+    {
+        foreach ($sections as $section) {
+            foreach ($section['tables'] as $table => $definition) {
+                if ($definition['deferred_references'] === []) {
+                    continue;
+                }
+
+                $rows = $this->documentTableRows($table) ?? [];
+
+                foreach ($rows as $row) {
+                    if (! is_array($row)) {
+                        continue;
+                    }
+
+                    $sourceId = $row['id'] ?? null;
+                    $targetId = $this->importedId($table, $sourceId);
+                    $updates = [];
+
+                    foreach ($definition['deferred_references'] as $column => $referencedTable) {
+                        $sourceReferenceId = $row[$column] ?? null;
+                        $updates[$column] = $sourceReferenceId === null
+                            ? null
+                            : $this->importedId(
+                                $referencedTable,
+                                $sourceReferenceId,
+                            );
+                    }
+
+                    if ($updates !== []) {
+                        $this->connection()
+                            ->table($table)
+                            ->where('id', $targetId)
+                            ->update($updates);
+                    }
+                }
+            }
+        }
+    }
+
+    private function mappedReferenceId(
+        string $table,
+        string $column,
+        string $referencedTable,
+        mixed $sourceId,
+    ): mixed {
+        if ($sourceId === null) {
+            return null;
+        }
+
+        try {
+            return $this->importedId($referencedTable, $sourceId);
+        } catch (RuntimeException $exception) {
+            throw new RuntimeException(
+                "Project-state reference [{$table}.{$column}] could not resolve source ID [{$sourceId}] in [{$referencedTable}].",
+                previous: $exception,
+            );
+        }
+    }
+
+    private function rememberImportedId(
+        string $table,
+        mixed $sourceId,
+        mixed $targetId,
+    ): void {
+        if (($sourceId === null || $sourceId === '')
+            || ($targetId === null || $targetId === '')
+        ) {
+            throw new RuntimeException(
+                "Project-state table [{$table}] could not establish an ID mapping."
+            );
+        }
+
+        $this->importedIds[$table][(string) $sourceId] = $targetId;
+    }
+
+    private function importedId(string $table, mixed $sourceId): int|string
+    {
+        $mapped = $this->importedIds[$table][(string) $sourceId] ?? null;
+
+        if (! is_int($mapped) && ! is_string($mapped)) {
+            throw new RuntimeException(
+                "Project-state source ID [{$sourceId}] has not been imported for [{$table}]."
+            );
+        }
+
+        return $mapped;
+    }
+
+    /**
+     * @param array<string, mixed> $identity
+     */
+    private function targetIdForIdentity(string $table, array $identity): int|string
+    {
+        $query = $this->connection()->table($table);
+
+        foreach ($identity as $column => $value) {
+            $value === null
+                ? $query->whereNull($column)
+                : $query->where($column, $value);
+        }
+
+        $targetId = $query->value('id');
+
+        if (! is_int($targetId) && ! is_string($targetId)) {
+            throw new RuntimeException(
+                "Project-state upsert identity for [{$table}] did not resolve a target ID."
+            );
+        }
+
+        return $targetId;
+    }
+
+    /**
+     * @param array<int|string, mixed> $valueMap
+     */
+    private function mappedImportValue(mixed $value, array $valueMap): mixed
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $key = is_bool($value)
+            ? ($value ? '1' : '0')
+            : (string) $value;
+
+        return array_key_exists($key, $valueMap)
+            ? $valueMap[$key]
+            : $value;
+    }
+
+    private function displayValue(mixed $value): string
+    {
+        if ($value === null) {
+            return '[null]';
+        }
+
+        if (is_bool($value)) {
+            return $value ? '[true]' : '[false]';
+        }
+
+        return '['.(string) $value.']';
+    }
+
+    /**
      * @return array<int, mixed>|null
      */
     private function documentTableRows(string $table): ?array
     {
         return $this->validationDocumentTables[$table] ?? null;
     }
-
-    /** @var array<string, array<int, mixed>> */
-    private array $validationDocumentTables = [];
 
     /**
      * @param array<string, mixed> $document
@@ -612,6 +963,61 @@ class ProjectStateManager
                     | JSON_THROW_ON_ERROR,
             ),
         );
+    }
+
+    private function isStringList(mixed $value, bool $allowEmpty = true): bool
+    {
+        if (! is_array($value)
+            || (! $allowEmpty && $value === [])
+            || ! array_is_list($value)
+        ) {
+            return false;
+        }
+
+        foreach ($value as $item) {
+            if (! is_string($item) || trim($item) === '') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function isReferenceMap(mixed $value): bool
+    {
+        if (! is_array($value)) {
+            return false;
+        }
+
+        foreach ($value as $column => $table) {
+            if (! is_string($column)
+                || trim($column) === ''
+                || ! is_string($table)
+                || trim($table) === ''
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function isImportValueMap(mixed $value): bool
+    {
+        if (! is_array($value)) {
+            return false;
+        }
+
+        foreach ($value as $column => $valueMap) {
+            if (! is_string($column)
+                || trim($column) === ''
+                || ! is_array($valueMap)
+            ) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function connection(): ConnectionInterface
