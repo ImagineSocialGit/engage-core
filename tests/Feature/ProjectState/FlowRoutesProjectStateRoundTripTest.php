@@ -34,7 +34,7 @@ class FlowRoutesProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(7, $document['version']);
+        $this->assertSame(8, $document['version']);
 
         $tables = $document['sections']['flow_routes']['tables'];
 

@@ -495,6 +495,7 @@ return [
                     'id_column' => 'recipient_id',
                     'targets' => [
                         'App\\Modules\\Core\\Models\\Contact' => 'contacts',
+                        'App\\Modules\\InternalNotifications\\Models\\TeamMember' => 'team_members',
                     ],
                 ],
                 [
@@ -504,6 +505,8 @@ return [
                         'App\\Modules\\Webinars\\Models\\WebinarRegistration' => 'webinar_registrations',
                         'App\\Modules\\Webinars\\Models\\WebinarWaitlistSignup' => 'webinar_waitlist_signups',
                         'App\\Modules\\Broadcasts\\Models\\Broadcast' => 'broadcasts',
+                        'App\\Modules\\Tasks\\Models\\Task' => 'tasks',
+                        'App\\Modules\\InboundMessaging\\Models\\InboundMessage' => 'inbound_messages',
                     ],
                     'deferred' => true,
                 ],

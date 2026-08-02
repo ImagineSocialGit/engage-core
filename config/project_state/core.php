@@ -109,6 +109,13 @@ return [
             'references' => [
                 'contact_id' => 'contacts',
             ],
+            'polymorphic_references' => [
+                [
+                    'type_column' => 'related_type',
+                    'id_column' => 'related_id',
+                    'targets' => [],
+                ],
+            ],
         ],
 
         'site_settings' => [

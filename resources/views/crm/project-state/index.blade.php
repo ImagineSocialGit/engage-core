@@ -1,7 +1,7 @@
 <x-layouts.crm
     :title="$title"
     :heading="$heading"
-    subheading="Download the current application state or validate and apply a current-format JSON file after a clean rebuild."
+    subheading="Download the currently supported project state or validate and apply a current-format JSON file after a clean rebuild."
 >
     <div class="space-y-6">
         <section class="rounded-3xl border border-amber-300 bg-amber-50 p-6 shadow-sm sm:p-8">
@@ -142,7 +142,7 @@
                 <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-500">Export</p>
                 <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-slate-950">Download current state</h2>
                 <p class="mt-3 text-sm leading-6 text-slate-600">
-                    Generates the current JSON contract directly from the database and downloads it without leaving a public server-side copy.
+                    Generates the supported JSON contract from one consistent database snapshot and downloads it without leaving a public server-side copy. Export is blocked when schema changes are unclassified, unsupported durable tables contain rows, operational receipts are not terminal, or polymorphic references cannot be restored safely.
                 </p>
 
                 <form method="POST" action="{{ route('crm.project-state.export') }}" class="mt-6 space-y-4">

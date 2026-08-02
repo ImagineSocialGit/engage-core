@@ -1158,7 +1158,9 @@
 │   │   ├── campaigns.php
 │   │   ├── core.php
 │   │   ├── flow_routes.php
+│   │   ├── internal_notifications.php
 │   │   ├── messaging.php
+│   │   ├── table_policies.php
 │   │   ├── tasks.php
 │   │   ├── webinars.php
 │   │   └── workflow.php
@@ -1818,8 +1820,10 @@
 │   │   ├── ProjectState
 │   │   │   ├── CampaignsBroadcastsProjectStateRoundTripTest.php
 │   │   │   ├── FlowRoutesProjectStateRoundTripTest.php
+│   │   │   ├── InternalNotificationsProjectStateRoundTripTest.php
 │   │   │   ├── MessagingProjectStateRoundTripTest.php
 │   │   │   ├── ProjectStateControllerTest.php
+│   │   │   ├── ProjectStateCoverageContractTest.php
 │   │   │   ├── TasksProjectStateRoundTripTest.php
 │   │   │   ├── WebinarProjectStateRoundTripTest.php
 │   │   │   └── WorkflowProjectStateRoundTripTest.php
@@ -1940,4 +1944,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-505 directories, 1436 files
+505 directories, 1440 files

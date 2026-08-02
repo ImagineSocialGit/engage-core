@@ -2,6 +2,7 @@
 
 namespace App\Support\ProjectState;
 
+use Closure;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -24,55 +25,67 @@ class ProjectStateManager
      */
     public function export(): array
     {
-        $this->assertNoPendingResumeItemsForExport();
+        return $this->withConsistentReadSnapshot(function (): array {
+            $this->assertNoPendingResumeItemsForExport();
 
-        $sections = [];
+            $configuredSections = $this->sections();
 
-        foreach ($this->sections() as $sectionKey => $section) {
-            $tables = [];
+            $this->assertSchemaCoverage($configuredSections);
+            $this->assertExportTablePolicies();
 
-            foreach ($section['tables'] as $table => $definition) {
-                $this->assertTargetSchema($table, $definition);
+            $sections = [];
 
-                $query = $this->connection()
-                    ->table($table)
-                    ->select($definition['columns']);
+            foreach ($configuredSections as $sectionKey => $section) {
+                $tables = [];
 
-                foreach ($definition['order_by'] as $column) {
-                    $query->orderBy($column);
+                foreach ($section['tables'] as $table => $definition) {
+                    $this->assertTargetSchema($table, $definition);
+
+                    $query = $this->connection()
+                        ->table($table)
+                        ->select($definition['columns']);
+
+                    foreach ($definition['order_by'] as $column) {
+                        $query->orderBy($column);
+                    }
+
+                    $tables[$table] = $query
+                        ->get()
+                        ->map(fn (object $row): array => $this->exportRow(
+                            (array) $row,
+                            $definition,
+                        ))
+                        ->values()
+                        ->all();
                 }
 
-                $tables[$table] = $query
-                    ->get()
-                    ->map(fn (object $row): array => $this->exportRow(
-                        (array) $row,
-                        $definition,
-                    ))
-                    ->values()
-                    ->all();
+                $sections[$sectionKey] = [
+                    'version' => $section['version'],
+                    'tables' => $tables,
+                ];
             }
 
-            $sections[$sectionKey] = [
-                'version' => $section['version'],
-                'tables' => $tables,
+            $this->assertExportReferences(
+                configuredSections: $configuredSections,
+                exportedSections: $sections,
+            );
+
+            $document = [
+                'format' => $this->format(),
+                'version' => $this->version(),
+                'exported_at' => now('UTC')->toISOString(),
+                'client_key' => (string) config('client.key', ''),
+                'source' => [
+                    'environment' => app()->environment(),
+                    'database' => $this->connection()->getDatabaseName(),
+                ],
+                'sections' => $sections,
             ];
-        }
 
-        $document = [
-            'format' => $this->format(),
-            'version' => $this->version(),
-            'exported_at' => now('UTC')->toISOString(),
-            'client_key' => (string) config('client.key', ''),
-            'source' => [
-                'environment' => app()->environment(),
-                'database' => $this->connection()->getDatabaseName(),
-            ],
-            'sections' => $sections,
-        ];
+            $document['checksum'] = $this->checksum($document);
 
-        $document['checksum'] = $this->checksum($document);
-
-        return $document;
+            return $document;
+        });
     }
 
     /**
@@ -142,6 +155,12 @@ class ProjectStateManager
                     warnings: $warnings,
                 );
                 $this->appendJsonPathValueMapWarnings(
+                    table: $table,
+                    definition: $definition,
+                    rows: $rows,
+                    warnings: $warnings,
+                );
+                $this->appendNullOnImportWarnings(
                     table: $table,
                     definition: $definition,
                     rows: $rows,
@@ -596,6 +615,34 @@ class ProjectStateManager
                 );
             }
         }
+
+        $declaredColumns = $definition['columns'];
+        $actualColumns = $this->connection()
+            ->getSchemaBuilder()
+            ->getColumnListing($table);
+
+        sort($declaredColumns, SORT_STRING);
+        sort($actualColumns, SORT_STRING);
+
+        if ($actualColumns !== $declaredColumns) {
+            $missing = array_values(array_diff($actualColumns, $declaredColumns));
+            $obsolete = array_values(array_diff($declaredColumns, $actualColumns));
+            $details = [];
+
+            if ($missing !== []) {
+                $details[] = 'unclassified column(s): '.implode(', ', $missing);
+            }
+
+            if ($obsolete !== []) {
+                $details[] = 'missing configured column(s): '.implode(', ', $obsolete);
+            }
+
+            throw new RuntimeException(sprintf(
+                'Project-state table [%s] does not match its complete column contract (%s).',
+                $table,
+                implode('; ', $details),
+            ));
+        }
     }
 
     /**
@@ -945,6 +992,40 @@ class ProjectStateManager
                         $reference['type_column'],
                         $reference['id_column'],
                     );
+
+                    continue;
+                }
+
+                if ($type === null) {
+                    continue;
+                }
+
+                if (! is_string($type)
+                    || ! array_key_exists($type, $reference['targets'])
+                ) {
+                    $errors[] = sprintf(
+                        'Project-state polymorphic reference [%s.%d.%s] uses unsupported type [%s].',
+                        $table,
+                        $index,
+                        $reference['type_column'],
+                        is_scalar($type) ? (string) $type : get_debug_type($type),
+                    );
+
+                    continue;
+                }
+
+                $referencedTable = $reference['targets'][$type];
+                $referencedRows = $this->documentTableRows($referencedTable);
+
+                if ($referencedRows === null) {
+                    $errors[] = sprintf(
+                        'Project-state polymorphic reference [%s.%d.%s/%s] targets unexported table [%s].',
+                        $table,
+                        $index,
+                        $reference['type_column'],
+                        $reference['id_column'],
+                        $referencedTable,
+                    );
                 }
             }
         }
@@ -1085,6 +1166,40 @@ class ProjectStateManager
      * @param array<int, mixed> $rows
      * @param array<int, string> $warnings
      */
+    private function appendNullOnImportWarnings(
+        string $table,
+        array $definition,
+        array $rows,
+        array &$warnings,
+    ): void {
+        foreach ($definition['null_on_import'] as $column) {
+            $count = 0;
+
+            foreach ($rows as $row) {
+                if (is_array($row)
+                    && array_key_exists($column, $row)
+                    && $row[$column] !== null
+                ) {
+                    $count++;
+                }
+            }
+
+            if ($count > 0) {
+                $warnings[] = sprintf(
+                    'Import will clear [%s.%s] for %d row(s).',
+                    $table,
+                    $column,
+                    $count,
+                );
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     * @param array<int, mixed> $rows
+     * @param array<int, string> $warnings
+     */
     private function appendPolymorphicReferenceWarnings(
         string $table,
         array $definition,
@@ -1107,6 +1222,7 @@ class ProjectStateManager
 
                 if (! is_string($referencedTable)
                     || $sourceId === null
+                    || $this->documentTableRows($referencedTable) === null
                     || $this->documentTableContainsId(
                         $referencedTable,
                         $sourceId,
@@ -1793,6 +1909,245 @@ class ProjectStateManager
         }
 
         return array_values(array_unique($columns));
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $sections
+     */
+    private function assertSchemaCoverage(array $sections): void
+    {
+        $exportedTables = [];
+
+        foreach ($sections as $section) {
+            $exportedTables = [
+                ...$exportedTables,
+                ...array_keys($section['tables']),
+            ];
+        }
+
+        $policyTables = array_keys($this->tablePolicies());
+        $duplicates = array_values(array_intersect($exportedTables, $policyTables));
+
+        if ($duplicates !== []) {
+            sort($duplicates, SORT_STRING);
+
+            throw new RuntimeException(
+                'Project-state table policy duplicates exported table(s): '.implode(', ', $duplicates).'.'
+            );
+        }
+
+        $database = $this->connection()->getDatabaseName();
+
+        if (! is_string($database) || trim($database) === '') {
+            throw new RuntimeException(
+                'Project-state export cannot resolve the active database schema.'
+            );
+        }
+
+        $actualTables = array_values(array_filter(
+            $this->connection()
+                ->getSchemaBuilder()
+                ->getTableListing($database, false),
+            fn (mixed $table): bool => is_string($table) && trim($table) !== '',
+        ));
+        $ignoredTables = config('project_state.schema_ignored_tables', []);
+
+        if (! $this->isStringList($ignoredTables)) {
+            throw new RuntimeException('Project-state ignored schema table configuration is invalid.');
+        }
+
+        $unclassified = array_values(array_diff(
+            $actualTables,
+            $exportedTables,
+            $policyTables,
+            $ignoredTables,
+        ));
+
+        if ($unclassified !== []) {
+            sort($unclassified, SORT_STRING);
+
+            throw new RuntimeException(
+                'Project-state export is blocked by unclassified database table(s): '
+                .implode(', ', $unclassified)
+                .'. Add transfer support or an explicit table policy first.'
+            );
+        }
+    }
+
+    private function assertExportTablePolicies(): void
+    {
+        foreach ($this->tablePolicies() as $table => $policy) {
+            if (! Schema::hasTable($table)) {
+                continue;
+            }
+
+            if ($policy['mode'] === 'must_be_empty') {
+                $count = (int) $this->connection()->table($table)->count();
+
+                if ($count > 0) {
+                    throw new RuntimeException(sprintf(
+                        'Project-state export is blocked because [%s] contains %d row(s). %s',
+                        $table,
+                        $count,
+                        $policy['reason'],
+                    ));
+                }
+
+                continue;
+            }
+
+            if ($policy['mode'] !== 'terminal_only') {
+                continue;
+            }
+
+            $column = $policy['column'];
+            $values = $policy['values'];
+            $count = (int) $this->connection()
+                ->table($table)
+                ->where(function ($query) use ($column, $values): void {
+                    $query
+                        ->whereNull($column)
+                        ->orWhereNotIn($column, $values);
+                })
+                ->count();
+
+            if ($count > 0) {
+                throw new RuntimeException(sprintf(
+                    'Project-state export is blocked because [%s] contains %d nonterminal row(s) in [%s]. Allowed terminal value(s): %s. %s',
+                    $table,
+                    $count,
+                    $column,
+                    implode(', ', $values),
+                    $policy['reason'],
+                ));
+            }
+        }
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $configuredSections
+     * @param array<string, array<string, mixed>> $exportedSections
+     */
+    private function assertExportReferences(
+        array $configuredSections,
+        array $exportedSections,
+    ): void {
+        $this->validationDocumentTables = [];
+
+        foreach ($exportedSections as $section) {
+            foreach ($section['tables'] as $table => $rows) {
+                $this->validationDocumentTables[$table] = $rows;
+            }
+        }
+
+        $errors = [];
+
+        try {
+            foreach ($configuredSections as $section) {
+                foreach ($section['tables'] as $table => $definition) {
+                    $this->validateReferences(
+                        table: $table,
+                        definition: $definition,
+                        rows: $this->validationDocumentTables[$table] ?? [],
+                        errors: $errors,
+                    );
+                }
+            }
+        } finally {
+            $this->validationDocumentTables = [];
+        }
+
+        if ($errors !== []) {
+            throw new RuntimeException(
+                'Project-state export reference validation failed: '.implode(' ', $errors)
+            );
+        }
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private function tablePolicies(): array
+    {
+        $policies = config('project_state.table_policies', []);
+
+        if (! is_array($policies)) {
+            throw new RuntimeException('Project-state table policy configuration is invalid.');
+        }
+
+        $normalized = [];
+
+        foreach ($policies as $table => $policy) {
+            if (! is_string($table)
+                || trim($table) === ''
+                || ! is_array($policy)
+                || ! is_string($policy['mode'] ?? null)
+                || ! in_array($policy['mode'], [
+                    'environment_owned',
+                    'resettable',
+                    'must_be_empty',
+                    'terminal_only',
+                ], true)
+                || ! is_string($policy['reason'] ?? null)
+                || trim($policy['reason']) === ''
+            ) {
+                throw new RuntimeException('Project-state table policy configuration is invalid.');
+            }
+
+            $entry = [
+                'mode' => $policy['mode'],
+                'reason' => trim($policy['reason']),
+            ];
+
+            if ($policy['mode'] === 'terminal_only') {
+                if (! is_string($policy['column'] ?? null)
+                    || trim($policy['column']) === ''
+                    || ! $this->isStringList(
+                        $policy['values'] ?? null,
+                        allowEmpty: false,
+                    )
+                ) {
+                    throw new RuntimeException(
+                        "Project-state terminal table policy [{$table}] is invalid."
+                    );
+                }
+
+                $entry['column'] = trim($policy['column']);
+                $entry['values'] = array_values($policy['values']);
+
+                if (Schema::hasTable($table)
+                    && ! Schema::hasColumn($table, $entry['column'])
+                ) {
+                    throw new RuntimeException(
+                        "Project-state terminal table policy [{$table}] references missing column [{$entry['column']}]."
+                    );
+                }
+            }
+
+            $normalized[$table] = $entry;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @template T
+     * @param Closure(): T $callback
+     * @return T
+     */
+    private function withConsistentReadSnapshot(Closure $callback): mixed
+    {
+        $connection = $this->connection();
+
+        if ($connection->getDriverName() === 'mysql'
+            && $connection->transactionLevel() === 0
+        ) {
+            $connection->statement(
+                'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ'
+            );
+        }
+
+        return $connection->transaction($callback, attempts: 1);
     }
 
     private function assertNoPendingResumeItemsForExport(): void

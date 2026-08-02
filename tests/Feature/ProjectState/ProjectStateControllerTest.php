@@ -44,6 +44,7 @@ class ProjectStateControllerTest extends TestCase
             ->get(route('crm.project-state.index'))
             ->assertOk()
             ->assertSee('Download current state')
+            ->assertSee('one consistent database snapshot')
             ->assertSee('Validate or apply current-format state');
     }
 
@@ -174,7 +175,7 @@ class ProjectStateControllerTest extends TestCase
         );
 
         $this->assertSame('engage-core-project-state', $document['format']);
-        $this->assertSame(7, $document['version']);
+        $this->assertSame(8, $document['version']);
         $this->assertSame('test-client', $document['client_key']);
         $this->assertStringStartsWith('sha256:', $document['checksum']);
 

@@ -2,7 +2,7 @@
 
 return [
     'format' => 'engage-core-project-state',
-    'version' => 7,
+    'version' => 8,
 
     /*
     |--------------------------------------------------------------------------
@@ -19,6 +19,13 @@ return [
     'resume_batch_size' => 500,
     'enforce_client_key' => true,
 
+    'schema_ignored_tables' => [
+        'migrations',
+        'sqlite_sequence',
+    ],
+
+    'table_policies' => require __DIR__.'/project_state/table_policies.php',
+
     /*
     |--------------------------------------------------------------------------
     | Current-format state sections
@@ -31,6 +38,7 @@ return [
     */
     'sections' => [
         'core' => require __DIR__.'/project_state/core.php',
+        'internal_notifications' => require __DIR__.'/project_state/internal_notifications.php',
         'messaging' => require __DIR__.'/project_state/messaging.php',
         'webinars' => require __DIR__.'/project_state/webinars.php',
         'tasks' => require __DIR__.'/project_state/tasks.php',
