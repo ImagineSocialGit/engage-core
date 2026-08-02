@@ -1152,6 +1152,8 @@
 │   │           └── tasks.php
 │   ├── presets.php
 │   ├── project_state
+│   │   ├── broadcasts.php
+│   │   ├── campaigns.php
 │   │   ├── core.php
 │   │   ├── messaging.php
 │   │   ├── tasks.php
@@ -1808,6 +1810,7 @@
 │   │   │   ├── ModuleFirstPresetCompositionTest.php
 │   │   │   └── PresetCompositionSyncCutoverTest.php
 │   │   ├── ProjectState
+│   │   │   ├── CampaignsBroadcastsProjectStateRoundTripTest.php
 │   │   │   ├── MessagingProjectStateRoundTripTest.php
 │   │   │   ├── ProjectStateControllerTest.php
 │   │   │   ├── TasksProjectStateRoundTripTest.php
@@ -1929,4 +1932,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-505 directories, 1425 files
+505 directories, 1428 files

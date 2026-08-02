@@ -2,7 +2,7 @@
 
 return [
     'format' => 'engage-core-project-state',
-    'version' => 4,
+    'version' => 5,
 
     /*
     |--------------------------------------------------------------------------
@@ -33,5 +33,7 @@ return [
         'messaging' => require __DIR__.'/project_state/messaging.php',
         'webinars' => require __DIR__.'/project_state/webinars.php',
         'tasks' => require __DIR__.'/project_state/tasks.php',
+        'campaigns' => require __DIR__.'/project_state/campaigns.php',
+        'broadcasts' => require __DIR__.'/project_state/broadcasts.php',
     ],
 ];

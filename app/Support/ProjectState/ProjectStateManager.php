@@ -393,6 +393,7 @@ class ProjectStateManager
         $nullOnImport = $definition['null_on_import'] ?? [];
         $importValueMaps = $definition['import_value_maps'] ?? [];
         $jsonPathValueMaps = $definition['json_path_value_maps'] ?? [];
+        $jsonPathReferences = $definition['json_path_references'] ?? [];
         $polymorphicReferences = $definition['polymorphic_references'] ?? [];
         $preserveId = (bool) ($definition['preserve_id'] ?? true);
 
@@ -407,6 +408,7 @@ class ProjectStateManager
             || ! $this->isReferenceMap($deferredReferences)
             || ! $this->isImportValueMap($importValueMaps)
             || ! $this->isJsonPathValueMap($jsonPathValueMaps)
+            || ! $this->isJsonPathReferenceMap($jsonPathReferences)
             || ! $this->isPolymorphicReferenceList($polymorphicReferences)
         ) {
             throw new RuntimeException("Project-state table [{$table}] configuration is invalid.");
@@ -436,6 +438,7 @@ class ProjectStateManager
             ...$referencedColumns,
             ...array_keys($importValueMaps),
             ...array_keys($jsonPathValueMaps),
+            ...array_keys($jsonPathReferences),
             ...$this->polymorphicReferenceColumns($polymorphicReferences),
         ] as $column) {
             if (! in_array($column, $columns, true)) {
@@ -453,6 +456,14 @@ class ProjectStateManager
             }
         }
 
+        foreach (array_keys($jsonPathReferences) as $column) {
+            if (! in_array($column, $jsonColumns, true)) {
+                throw new RuntimeException(
+                    "Project-state table [{$table}] JSON path reference [{$column}] is not a JSON column."
+                );
+            }
+        }
+
         foreach ($nullableIdentity as $column) {
             if (! in_array($column, $identity, true)) {
                 throw new RuntimeException(
@@ -465,6 +476,17 @@ class ProjectStateManager
             throw new RuntimeException(
                 "Project-state table [{$table}] repeats a reference as immediate and deferred."
             );
+        }
+
+        $normalizedJsonPathReferences = [];
+
+        foreach ($jsonPathReferences as $column => $pathReferences) {
+            foreach ($pathReferences as $path => $reference) {
+                $normalizedJsonPathReferences[$column][$path] = [
+                    'table' => $reference['table'],
+                    'deferred' => (bool) ($reference['deferred'] ?? false),
+                ];
+            }
         }
 
         $polymorphicReferences = array_map(
@@ -490,6 +512,7 @@ class ProjectStateManager
             'null_on_import' => array_values($nullOnImport),
             'import_value_maps' => $importValueMaps,
             'json_path_value_maps' => $jsonPathValueMaps,
+            'json_path_references' => $normalizedJsonPathReferences,
             'polymorphic_references' => $polymorphicReferences,
         ];
     }
@@ -622,6 +645,39 @@ class ProjectStateManager
                     $this->mappedImportValue(
                         value: Arr::get($value, $path),
                         valueMap: $valueMap,
+                    ),
+                );
+            }
+
+            $row[$column] = $value;
+        }
+
+        foreach ($definition['json_path_references'] as $column => $pathReferences) {
+            $value = $row[$column] ?? null;
+
+            if (! is_array($value)) {
+                continue;
+            }
+
+            foreach ($pathReferences as $path => $reference) {
+                if ($reference['deferred'] || ! Arr::has($value, $path)) {
+                    continue;
+                }
+
+                $sourceId = Arr::get($value, $path);
+
+                if ($sourceId === null) {
+                    continue;
+                }
+
+                Arr::set(
+                    $value,
+                    $path,
+                    $this->mappedReferenceId(
+                        table: $table,
+                        column: $column.'.'.$path,
+                        referencedTable: $reference['table'],
+                        sourceId: $sourceId,
                     ),
                 );
             }
@@ -802,6 +858,41 @@ class ProjectStateManager
                 }
             }
         }
+
+        foreach ($definition['json_path_references'] as $column => $pathReferences) {
+            foreach ($pathReferences as $path => $reference) {
+                $referencedTable = $reference['table'];
+                $referencedRows = $this->documentTableRows($referencedTable);
+
+                if ($referencedRows === null) {
+                    $errors[] = "Project-state JSON reference target [{$referencedTable}] is not configured in the document.";
+                    continue;
+                }
+
+                $referencedIds = [];
+
+                foreach ($referencedRows as $referencedRow) {
+                    if (is_array($referencedRow) && isset($referencedRow['id'])) {
+                        $referencedIds[(string) $referencedRow['id']] = true;
+                    }
+                }
+
+                foreach ($rows as $index => $row) {
+                    if (! is_array($row)
+                        || ! is_array($row[$column] ?? null)
+                        || ! Arr::has($row[$column], $path)
+                    ) {
+                        continue;
+                    }
+
+                    $value = Arr::get($row[$column], $path);
+
+                    if ($value !== null && ! isset($referencedIds[(string) $value])) {
+                        $errors[] = "Project-state JSON reference [{$table}.{$index}.{$column}.{$path}] does not exist in [{$referencedTable}].";
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -961,9 +1052,19 @@ class ProjectStateManager
                     $definition['polymorphic_references'],
                     fn (array $reference): bool => $reference['deferred'],
                 ));
+                $deferredJsonPathReferences = [];
+
+                foreach ($definition['json_path_references'] as $column => $pathReferences) {
+                    foreach ($pathReferences as $path => $reference) {
+                        if ($reference['deferred']) {
+                            $deferredJsonPathReferences[$column][$path] = $reference;
+                        }
+                    }
+                }
 
                 if ($definition['deferred_references'] === []
                     && $deferredPolymorphicReferences === []
+                    && $deferredJsonPathReferences === []
                 ) {
                     continue;
                 }
@@ -1010,6 +1111,48 @@ class ProjectStateManager
                             $referencedTable,
                             $sourceReferenceId,
                         );
+                    }
+
+                    foreach ($deferredJsonPathReferences as $column => $pathReferences) {
+                        $value = $row[$column] ?? null;
+
+                        if (! is_array($value)) {
+                            continue;
+                        }
+
+                        $changed = false;
+
+                        foreach ($pathReferences as $path => $reference) {
+                            if (! Arr::has($value, $path)) {
+                                continue;
+                            }
+
+                            $sourceReferenceId = Arr::get($value, $path);
+
+                            if ($sourceReferenceId === null) {
+                                continue;
+                            }
+
+                            Arr::set(
+                                $value,
+                                $path,
+                                $this->importedId(
+                                    $reference['table'],
+                                    $sourceReferenceId,
+                                ),
+                            );
+                            $changed = true;
+                        }
+
+                        if ($changed) {
+                            $updates[$column] = json_encode(
+                                $value,
+                                JSON_UNESCAPED_SLASHES
+                                    | JSON_UNESCAPED_UNICODE
+                                    | JSON_INVALID_UTF8_SUBSTITUTE
+                                    | JSON_THROW_ON_ERROR,
+                            );
+                        }
                     }
 
                     if ($updates !== []) {
@@ -1305,6 +1448,37 @@ class ProjectStateManager
                 if (! is_string($path)
                     || trim($path) === ''
                     || ! is_array($valueMap)
+                ) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private function isJsonPathReferenceMap(mixed $value): bool
+    {
+        if (! is_array($value)) {
+            return false;
+        }
+
+        foreach ($value as $column => $pathReferences) {
+            if (! is_string($column)
+                || trim($column) === ''
+                || ! is_array($pathReferences)
+            ) {
+                return false;
+            }
+
+            foreach ($pathReferences as $path => $reference) {
+                if (! is_string($path)
+                    || trim($path) === ''
+                    || ! is_array($reference)
+                    || ! is_string($reference['table'] ?? null)
+                    || trim($reference['table']) === ''
+                    || (array_key_exists('deferred', $reference)
+                        && ! is_bool($reference['deferred']))
                 ) {
                     return false;
                 }

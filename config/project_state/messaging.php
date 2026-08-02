@@ -496,8 +496,46 @@ return [
                     'targets' => [
                         'App\\Modules\\Webinars\\Models\\WebinarRegistration' => 'webinar_registrations',
                         'App\\Modules\\Webinars\\Models\\WebinarWaitlistSignup' => 'webinar_waitlist_signups',
+                        'App\\Modules\\Broadcasts\\Models\\Broadcast' => 'broadcasts',
                     ],
                     'deferred' => true,
+                ],
+                [
+                    'type_column' => 'behavior_owner_type',
+                    'id_column' => 'behavior_owner_id',
+                    'targets' => [
+                        'App\\Modules\\Messaging\\Models\\MessageChainEnrollment' => 'message_chain_enrollments',
+                        'App\\Modules\\Broadcasts\\Models\\Broadcast' => 'broadcasts',
+                    ],
+                    'deferred' => true,
+                ],
+            ],
+            'json_path_references' => [
+                'meta' => [
+                    'campaign_enrollment_id' => [
+                        'table' => 'campaign_enrollments',
+                        'deferred' => true,
+                    ],
+                    'campaign_id' => [
+                        'table' => 'campaigns',
+                        'deferred' => true,
+                    ],
+                    'campaign_step_id' => [
+                        'table' => 'campaign_steps',
+                        'deferred' => true,
+                    ],
+                    'campaign_step_variant_id' => [
+                        'table' => 'campaign_step_variants',
+                        'deferred' => true,
+                    ],
+                    'broadcast_id' => [
+                        'table' => 'broadcasts',
+                        'deferred' => true,
+                    ],
+                    'broadcast_recipient_id' => [
+                        'table' => 'broadcast_recipients',
+                        'deferred' => true,
+                    ],
                 ],
             ],
         ],
