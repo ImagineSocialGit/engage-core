@@ -23,6 +23,8 @@ final class ClientEnvironmentLoader
         'CRM_APP_URL',
         'SCHEDULING_APP_URL',
 
+        'PROJECT_STATE_ADMIN_EMAIL',
+
         'DB_DATABASE',
         'DB_USERNAME',
         'DB_PASSWORD',

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CRM\DashboardController;
+use App\Http\Controllers\CRM\ProjectStateController;
 use App\Modules\Broadcasts\Controllers\BroadcastController;
 use App\Modules\Campaigns\Controllers\CRM\CampaignMessageTemplateController;
 use App\Modules\Core\Controllers\ContactController;
@@ -29,6 +30,18 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/dashboard/acknowledgements', [DashboardController::class, 'acknowledge'])
         ->name('crm.dashboard.acknowledgements.store');
+
+
+    Route::get('/project-state', [ProjectStateController::class, 'index'])
+        ->name('crm.project-state.index');
+
+    Route::post('/project-state/export', [ProjectStateController::class, 'export'])
+        ->middleware('throttle:5,1')
+        ->name('crm.project-state.export');
+
+    Route::post('/project-state/import', [ProjectStateController::class, 'import'])
+        ->middleware('throttle:5,1')
+        ->name('crm.project-state.import');
 
     Route::middleware('module:webinars')->group(function () {
         Route::get('/webinars', [WebinarController::class, 'index'])

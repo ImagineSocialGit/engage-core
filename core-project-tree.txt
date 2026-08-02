@@ -11,7 +11,8 @@
 │   │   │   │   └── LoginController.php
 │   │   │   ├── Controller.php
 │   │   │   └── CRM
-│   │   │       └── DashboardController.php
+│   │   │       ├── DashboardController.php
+│   │   │       └── ProjectStateController.php
 │   │   └── Middleware
 │   │       ├── EnsureModuleEnabled.php
 │   │       ├── ForceStagingAccess.php
@@ -1061,6 +1062,8 @@
 │       │   ├── PresetCompositionResolver.php
 │       │   ├── PresetContributionRegistry.php
 │       │   └── PresetPackageResolver.php
+│       ├── ProjectState
+│       │   └── ProjectStateManager.php
 │       ├── Queues
 │       │   └── QueueContract.php
 │       ├── SetupValidation
@@ -1148,6 +1151,7 @@
 │   │           ├── flow-routes.php
 │   │           └── tasks.php
 │   ├── presets.php
+│   ├── project_state.php
 │   ├── queue.php
 │   ├── reference
 │   │   ├── keys.php
@@ -1540,6 +1544,8 @@
 │       │   ├── messaging
 │       │   │   └── message-templates
 │       │   │       └── index.blade.php
+│       │   ├── project-state
+│       │   │   └── index.blade.php
 │       │   ├── scheduling
 │       │   │   ├── index.blade.php
 │       │   │   ├── reschedule.blade.php
@@ -1795,6 +1801,8 @@
 │   │   ├── Presets
 │   │   │   ├── ModuleFirstPresetCompositionTest.php
 │   │   │   └── PresetCompositionSyncCutoverTest.php
+│   │   ├── ProjectState
+│   │   │   └── ProjectStateControllerTest.php
 │   │   ├── Scheduling
 │   │   │   ├── AppointmentLifecycleActionTest.php
 │   │   │   ├── BookableSlotOfferAndBookingHoldActionTest.php
@@ -1912,4 +1920,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-501 directories, 1412 files
+504 directories, 1417 files
