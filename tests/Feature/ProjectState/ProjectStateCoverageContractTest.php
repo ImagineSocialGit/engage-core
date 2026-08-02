@@ -130,18 +130,17 @@ class ProjectStateCoverageContractTest extends TestCase
     {
         $now = now()->startOfSecond();
 
-        DB::table('inbound_messages')->insert([
-            'channel' => 'sms',
-            'provider' => 'telnyx',
-            'classification' => 'normal_reply',
-            'received_at' => $now,
+        DB::table('mortgage_stages')->insert([
+            'name' => 'Unsupported Mortgage Stage',
+            'category' => 'pipeline',
+            'sort_order' => 10,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'Project-state export is blocked because [inbound_messages] contains 1 row(s).'
+            'Project-state export is blocked because [mortgage_stages] contains 1 row(s).'
         );
 
         app(ProjectStateManager::class)->export();
@@ -201,7 +200,7 @@ class ProjectStateCoverageContractTest extends TestCase
 
         $document = app(ProjectStateManager::class)->export();
 
-        $this->assertSame(8, $document['version']);
+        $this->assertSame(10, $document['version']);
         $this->assertArrayNotHasKey(
             'inbound_message_receipts',
             $document['sections']['core']['tables'],

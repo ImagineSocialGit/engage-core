@@ -61,10 +61,6 @@ return [
         'reason' => 'Resume rows coordinate only the current target import.',
     ],
 
-    'inbound_messages' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'InboundMessaging transfer support has not been added yet.',
-    ],
     'mortgage_stages' => [
         'mode' => 'must_be_empty',
         'reason' => 'Mortgage transfer support has not been added yet.',
@@ -72,14 +68,6 @@ return [
     'contact_mortgage_profiles' => [
         'mode' => 'must_be_empty',
         'reason' => 'Mortgage transfer support has not been added yet.',
-    ],
-    'automation_behavior_occurrences' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Shared Automation Opportunities transfer support has not been added yet.',
-    ],
-    'automation_opportunities' => [
-        'mode' => 'must_be_empty',
-        'reason' => 'Shared Automation Opportunities transfer support has not been added yet.',
     ],
 
     'inbound_message_receipts' => [

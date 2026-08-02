@@ -1154,10 +1154,12 @@
 │   ├── presets.php
 │   ├── project_state
 │   │   ├── automation_events.php
+│   │   ├── automation_opportunities.php
 │   │   ├── broadcasts.php
 │   │   ├── campaigns.php
 │   │   ├── core.php
 │   │   ├── flow_routes.php
+│   │   ├── inbound_messaging.php
 │   │   ├── internal_notifications.php
 │   │   ├── messaging.php
 │   │   ├── table_policies.php
@@ -1818,8 +1820,10 @@
 │   │   │   ├── ModuleFirstPresetCompositionTest.php
 │   │   │   └── PresetCompositionSyncCutoverTest.php
 │   │   ├── ProjectState
+│   │   │   ├── AutomationOpportunitiesProjectStateRoundTripTest.php
 │   │   │   ├── CampaignsBroadcastsProjectStateRoundTripTest.php
 │   │   │   ├── FlowRoutesProjectStateRoundTripTest.php
+│   │   │   ├── InboundMessagingProjectStateRoundTripTest.php
 │   │   │   ├── InternalNotificationsProjectStateRoundTripTest.php
 │   │   │   ├── MessagingProjectStateRoundTripTest.php
 │   │   │   ├── ProjectStateControllerTest.php
@@ -1944,4 +1948,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-505 directories, 1440 files
+505 directories, 1444 files

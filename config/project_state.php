@@ -2,7 +2,7 @@
 
 return [
     'format' => 'engage-core-project-state',
-    'version' => 8,
+    'version' => 10,
 
     /*
     |--------------------------------------------------------------------------
@@ -39,12 +39,14 @@ return [
     'sections' => [
         'core' => require __DIR__.'/project_state/core.php',
         'internal_notifications' => require __DIR__.'/project_state/internal_notifications.php',
+        'inbound_messaging' => require __DIR__.'/project_state/inbound_messaging.php',
         'messaging' => require __DIR__.'/project_state/messaging.php',
         'webinars' => require __DIR__.'/project_state/webinars.php',
         'tasks' => require __DIR__.'/project_state/tasks.php',
         'campaigns' => require __DIR__.'/project_state/campaigns.php',
         'broadcasts' => require __DIR__.'/project_state/broadcasts.php',
         'workflow' => require __DIR__.'/project_state/workflow.php',
+        'automation_opportunities' => require __DIR__.'/project_state/automation_opportunities.php',
         'automation_events' => require __DIR__.'/project_state/automation_events.php',
         'flow_routes' => require __DIR__.'/project_state/flow_routes.php',
     ],
