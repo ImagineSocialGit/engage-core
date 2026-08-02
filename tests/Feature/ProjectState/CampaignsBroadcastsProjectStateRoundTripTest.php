@@ -30,7 +30,7 @@ class CampaignsBroadcastsProjectStateRoundTripTest extends TestCase
         $projectState = app(ProjectStateManager::class);
         $document = $projectState->export();
 
-        $this->assertSame(6, $document['version']);
+        $this->assertSame(7, $document['version']);
         $this->assertCount(1, $document['sections']['campaigns']['tables']['campaigns']);
         $this->assertCount(1, $document['sections']['campaigns']['tables']['campaign_steps']);
         $this->assertCount(1, $document['sections']['campaigns']['tables']['campaign_step_variants']);

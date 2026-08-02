@@ -506,6 +506,7 @@ return [
                     'targets' => [
                         'App\\Modules\\Messaging\\Models\\MessageChainEnrollment' => 'message_chain_enrollments',
                         'App\\Modules\\Broadcasts\\Models\\Broadcast' => 'broadcasts',
+                        'App\\Modules\\FlowRoutes\\Models\\FlowRoutePoint' => 'flow_route_points',
                     ],
                     'deferred' => true,
                 ],
@@ -534,6 +535,34 @@ return [
                     ],
                     'broadcast_recipient_id' => [
                         'table' => 'broadcast_recipients',
+                        'deferred' => true,
+                    ],
+                    'flow_route.flow_route_progress_id' => [
+                        'table' => 'contact_flow_route_progress',
+                        'deferred' => true,
+                    ],
+                    'flow_route.flow_route_plan_id' => [
+                        'table' => 'contact_flow_route_plans',
+                        'deferred' => true,
+                    ],
+                    'flow_route.flow_route_plan_item_id' => [
+                        'table' => 'contact_flow_route_plan_items',
+                        'deferred' => true,
+                    ],
+                    'flow_route.flow_route_progress_item_id' => [
+                        'table' => 'contact_flow_route_progress_items',
+                        'deferred' => true,
+                    ],
+                    'flow_route.flow_route_id' => [
+                        'table' => 'flow_routes',
+                        'deferred' => true,
+                    ],
+                    'flow_route.flow_route_point_id' => [
+                        'table' => 'flow_route_points',
+                        'deferred' => true,
+                    ],
+                    'flow_route.flow_route_capability_id' => [
+                        'table' => 'flow_route_capabilities',
                         'deferred' => true,
                     ],
                 ],

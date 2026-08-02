@@ -392,6 +392,7 @@ class ProjectStateManager
         $deferredReferences = $definition['deferred_references'] ?? [];
         $nullOnImport = $definition['null_on_import'] ?? [];
         $importValueMaps = $definition['import_value_maps'] ?? [];
+        $importValueMapBackups = $definition['import_value_map_backups'] ?? [];
         $jsonPathValueMaps = $definition['json_path_value_maps'] ?? [];
         $jsonPathReferences = $definition['json_path_references'] ?? [];
         $polymorphicReferences = $definition['polymorphic_references'] ?? [];
@@ -407,6 +408,7 @@ class ProjectStateManager
             || ! $this->isReferenceMap($references)
             || ! $this->isReferenceMap($deferredReferences)
             || ! $this->isImportValueMap($importValueMaps)
+            || ! $this->isImportValueMapBackupMap($importValueMapBackups)
             || ! $this->isJsonPathValueMap($jsonPathValueMaps)
             || ! $this->isJsonPathReferenceMap($jsonPathReferences)
             || ! $this->isPolymorphicReferenceList($polymorphicReferences)
@@ -437,6 +439,7 @@ class ProjectStateManager
             ...$nullOnImport,
             ...$referencedColumns,
             ...array_keys($importValueMaps),
+            ...array_keys($importValueMapBackups),
             ...array_keys($jsonPathValueMaps),
             ...array_keys($jsonPathReferences),
             ...$this->polymorphicReferenceColumns($polymorphicReferences),
@@ -452,6 +455,20 @@ class ProjectStateManager
             if (! in_array($column, $jsonColumns, true)) {
                 throw new RuntimeException(
                     "Project-state table [{$table}] JSON path value map [{$column}] is not a JSON column."
+                );
+            }
+        }
+
+        foreach ($importValueMapBackups as $column => $backup) {
+            if (! array_key_exists($column, $importValueMaps)) {
+                throw new RuntimeException(
+                    "Project-state table [{$table}] import value-map backup [{$column}] has no import value map."
+                );
+            }
+
+            if (! in_array($backup['json_column'], $jsonColumns, true)) {
+                throw new RuntimeException(
+                    "Project-state table [{$table}] import value-map backup [{$column}] does not target a JSON column."
                 );
             }
         }
@@ -511,6 +528,7 @@ class ProjectStateManager
             'deferred_references' => $deferredReferences,
             'null_on_import' => array_values($nullOnImport),
             'import_value_maps' => $importValueMaps,
+            'import_value_map_backups' => $importValueMapBackups,
             'json_path_value_maps' => $jsonPathValueMaps,
             'json_path_references' => $normalizedJsonPathReferences,
             'polymorphic_references' => $polymorphicReferences,
@@ -621,10 +639,37 @@ class ProjectStateManager
         }
 
         foreach ($definition['import_value_maps'] as $column => $valueMap) {
-            $row[$column] = $this->mappedImportValue(
-                value: $row[$column] ?? null,
+            $sourceValue = $row[$column] ?? null;
+            $targetValue = $this->mappedImportValue(
+                value: $sourceValue,
                 valueMap: $valueMap,
             );
+            $backup = $definition['import_value_map_backups'][$column] ?? null;
+
+            if ($sourceValue !== $targetValue && is_array($backup)) {
+                $jsonColumn = $backup['json_column'];
+                $jsonValue = $row[$jsonColumn] ?? [];
+
+                if ($jsonValue === null) {
+                    $jsonValue = [];
+                }
+
+                if (! is_array($jsonValue)) {
+                    throw new RuntimeException(
+                        "Project-state import value-map backup [{$table}.{$column}] requires JSON object [{$jsonColumn}]."
+                    );
+                }
+
+                Arr::set(
+                    $jsonValue,
+                    $backup['path'],
+                    $sourceValue,
+                );
+
+                $row[$jsonColumn] = $jsonValue;
+            }
+
+            $row[$column] = $targetValue;
         }
 
         foreach ($definition['json_path_value_maps'] as $column => $pathMaps) {
@@ -1114,7 +1159,29 @@ class ProjectStateManager
                     }
 
                     foreach ($deferredJsonPathReferences as $column => $pathReferences) {
-                        $value = $row[$column] ?? null;
+                        $storedValue = $this->connection()
+                            ->table($table)
+                            ->where('id', $targetId)
+                            ->value($column);
+
+                        if ($storedValue === null) {
+                            continue;
+                        }
+
+                        try {
+                            $value = is_array($storedValue)
+                                ? $storedValue
+                                : json_decode(
+                                    (string) $storedValue,
+                                    associative: true,
+                                    flags: JSON_THROW_ON_ERROR,
+                                );
+                        } catch (JsonException $exception) {
+                            throw new RuntimeException(
+                                "Imported JSON in [{$table}.{$column}] could not apply deferred references.",
+                                previous: $exception,
+                            );
+                        }
 
                         if (! is_array($value)) {
                             continue;
@@ -1422,6 +1489,28 @@ class ProjectStateManager
             if (! is_string($column)
                 || trim($column) === ''
                 || ! is_array($valueMap)
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function isImportValueMapBackupMap(mixed $value): bool
+    {
+        if (! is_array($value)) {
+            return false;
+        }
+
+        foreach ($value as $column => $backup) {
+            if (! is_string($column)
+                || trim($column) === ''
+                || ! is_array($backup)
+                || ! is_string($backup['json_column'] ?? null)
+                || trim($backup['json_column']) === ''
+                || ! is_string($backup['path'] ?? null)
+                || trim($backup['path']) === ''
             ) {
                 return false;
             }
