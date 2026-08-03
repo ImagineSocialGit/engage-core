@@ -19,6 +19,7 @@ class ProjectStateContractRegistry
         }
 
         $normalized = [];
+        $tableOwners = [];
 
         foreach ($sections as $sectionKey => $section) {
             if (! is_string($sectionKey)
@@ -37,6 +38,16 @@ class ProjectStateContractRegistry
                     throw new RuntimeException('Project-state table configuration is invalid.');
                 }
 
+                if (array_key_exists($table, $tableOwners)) {
+                    throw new RuntimeException(sprintf(
+                        'Project-state table [%s] is configured in both [%s] and [%s].',
+                        $table,
+                        $tableOwners[$table],
+                        $sectionKey,
+                    ));
+                }
+
+                $tableOwners[$table] = $sectionKey;
                 $tables[$table] = $this->normalizeDefinition($table, $definition);
             }
 
@@ -222,6 +233,23 @@ class ProjectStateContractRegistry
             ],
             $resumeItems,
         );
+        if ($resumeItems !== []) {
+            $supportedResumeCategories = ProjectStateResumeManager::supportedCategoryKeys();
+
+            foreach ($resumeItems as $resumeItem) {
+                if (! in_array(
+                    $resumeItem['category'],
+                    $supportedResumeCategories,
+                    true,
+                )) {
+                    throw new RuntimeException(sprintf(
+                        'Project-state table [%s] resume item uses unsupported category [%s].',
+                        $table,
+                        $resumeItem['category'],
+                    ));
+                }
+            }
+        }
 
         return [
             'mode' => $mode,

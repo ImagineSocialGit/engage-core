@@ -30,6 +30,14 @@ class ProjectStateDocumentValidator
 
         $this->validateEnvelope($document, $errors, $warnings);
 
+        foreach ($this->referenceResolver->duplicateDocumentTables($document) as $table => $sectionKeys) {
+            $errors[] = sprintf(
+                'Project-state table [%s] appears in multiple sections: [%s].',
+                $table,
+                implode('], [', $sectionKeys),
+            );
+        }
+
         $configuredSections = $this->contractRegistry->sections();
         $documentSections = $document['sections'] ?? null;
 

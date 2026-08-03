@@ -26,13 +26,49 @@ class ProjectStateReferenceResolver
             }
 
             foreach ($section['tables'] as $table => $rows) {
-                if (is_string($table) && is_array($rows)) {
+                if (is_string($table)
+                    && is_array($rows)
+                    && ! array_key_exists($table, $tables)
+                ) {
                     $tables[$table] = $rows;
                 }
             }
         }
 
         return $tables;
+    }
+
+    /**
+     * @param array<string, mixed> $document
+     * @return array<string, array<int, string>>
+     */
+    public function duplicateDocumentTables(array $document): array
+    {
+        $locations = [];
+        $documentSections = $document['sections'] ?? [];
+
+        if (! is_array($documentSections)) {
+            return [];
+        }
+
+        foreach ($documentSections as $sectionKey => $section) {
+            if (! is_array($section) || ! is_array($section['tables'] ?? null)) {
+                continue;
+            }
+
+            foreach ($section['tables'] as $table => $rows) {
+                if (! is_string($table) || ! is_array($rows)) {
+                    continue;
+                }
+
+                $locations[$table][] = (string) $sectionKey;
+            }
+        }
+
+        return array_filter(
+            $locations,
+            fn (array $sections): bool => count($sections) > 1,
+        );
     }
 
     /**

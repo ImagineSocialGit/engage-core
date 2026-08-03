@@ -1841,6 +1841,7 @@
 │   │   │   ├── ProjectStateControllerTest.php
 │   │   │   ├── ProjectStateCoverageContractTest.php
 │   │   │   ├── ProjectStateExporterExtractionTest.php
+│   │   │   ├── ProjectStateFinalArchitectureTest.php
 │   │   │   ├── ProjectStateImporterExtractionTest.php
 │   │   │   ├── ProjectStateInfrastructureExtractionTest.php
 │   │   │   ├── ProjectStateValidationInfrastructureExtractionTest.php
@@ -1964,4 +1965,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-505 directories, 1460 files
+505 directories, 1461 files

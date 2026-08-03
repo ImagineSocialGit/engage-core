@@ -66,7 +66,7 @@ class ProjectStateResumeManager
      */
     public function summary(): array
     {
-        $definitions = $this->categoryDefinitions();
+        $definitions = self::categoryDefinitions();
         $counts = [];
 
         if (Schema::hasTable('project_state_resume_items')) {
@@ -119,7 +119,7 @@ class ProjectStateResumeManager
     public function resume(string $category): array
     {
         $category = trim($category);
-        $definitions = $this->categoryDefinitions();
+        $definitions = self::categoryDefinitions();
 
         if (! array_key_exists($category, $definitions)) {
             throw new InvalidArgumentException(
@@ -855,6 +855,12 @@ class ProjectStateResumeManager
         return $outcomes;
     }
 
+    /** @return array<int, string> */
+    public static function supportedCategoryKeys(): array
+    {
+        return array_keys(self::categoryDefinitions());
+    }
+
     /**
      * @return array<string, array{
      *     label: string,
@@ -862,7 +868,7 @@ class ProjectStateResumeManager
      *     dependencies: array<int, string>,
      * }>
      */
-    private function categoryDefinitions(): array
+    private static function categoryDefinitions(): array
     {
         return [
             self::CATEGORY_MESSAGE_CHAINS => [
