@@ -228,6 +228,19 @@
 │   │   │   ├── Requests
 │   │   │   ├── Services
 │   │   │   └── Support
+│   │   ├── Events
+│   │   │   ├── Contracts
+│   │   │   │   └── EventDefinitionContributor.php
+│   │   │   ├── Data
+│   │   │   │   └── EventDefinitionContribution.php
+│   │   │   ├── Enums
+│   │   │   │   ├── EventAttendanceMode.php
+│   │   │   │   ├── EventAttendanceStatus.php
+│   │   │   │   └── EventStatus.php
+│   │   │   ├── Providers
+│   │   │   │   └── EventsModuleServiceProvider.php
+│   │   │   └── Services
+│   │   │       └── EventDefinitionRegistry.php
 │   │   ├── FlowRoutes
 │   │   │   ├── Actions
 │   │   │   │   ├── AdvanceContactFlowRouteProgressAction.php
@@ -1131,6 +1144,7 @@
 │   ├── client.php
 │   ├── contacts.php
 │   ├── database.php
+│   ├── events.php
 │   ├── filesystems.php
 │   ├── flow_routes.php
 │   ├── generated
@@ -1728,6 +1742,8 @@
 │   │   │   └── DocumentsFoundationTest.php
 │   │   ├── Email
 │   │   │   └── HandleInboundEmailWebhookActionTest.php
+│   │   ├── Events
+│   │   │   └── EventDefinitionRegistryTest.php
 │   │   ├── FlowRoutes
 │   │   │   ├── AutomationEventReceiptTest.php
 │   │   │   ├── AutomationPointAuthoringRegistryTest.php
@@ -1982,4 +1998,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-506 directories, 1477 files
+513 directories, 1486 files

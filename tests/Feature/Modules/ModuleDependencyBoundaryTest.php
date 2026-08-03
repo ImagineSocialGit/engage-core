@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Modules;
 
+use App\Modules\Events\Providers\EventsModuleServiceProvider;
 use App\Support\Modules\ModuleManager;
 use FilesystemIterator;
 use Illuminate\Support\Str;
@@ -47,6 +48,7 @@ class ModuleDependencyBoundaryTest extends TestCase
         $this->assertContains('internal_notifications', $registered);
         $this->assertContains('tasks', $registered);
         $this->assertContains('scheduling', $registered);
+        $this->assertContains('events', $registered);
         $this->assertContains('portal', $registered);
         $this->assertContains('workflow', $registered);
         $this->assertContains('flow_routes', $registered);
@@ -56,6 +58,42 @@ class ModuleDependencyBoundaryTest extends TestCase
         $this->assertContains('webinars', $registered);
         $this->assertContains('mortgage', $registered);
         $this->assertContains('reporting', $registered);
+    }
+
+    public function test_events_module_depends_only_on_core_and_has_no_navigation_yet(): void
+    {
+        $definition = config('modules.modules.events');
+
+        $this->assertIsArray($definition);
+        $this->assertSame(['core'], $definition['depends_on']);
+        $this->assertSame([
+            EventsModuleServiceProvider::class,
+        ], $definition['providers']);
+        $this->assertArrayNotHasKey('nav', $definition);
+    }
+
+    public function test_events_module_does_not_import_optional_feature_modules(): void
+    {
+        $this->assertModuleDoesNotImport('Events', [
+            'Broadcasts',
+            'Campaigns',
+            'Commerce',
+            'Documents',
+            'FlowRoutes',
+            'Forms',
+            'InboundMessaging',
+            'InternalNotifications',
+            'Location',
+            'Messaging',
+            'Mortgage',
+            'Music',
+            'Portal',
+            'Reporting',
+            'Scheduling',
+            'Tasks',
+            'Webinars',
+            'Workflow',
+        ]);
     }
 
     public function test_messaging_module_does_not_import_feature_modules(): void
@@ -535,5 +573,4 @@ class ModuleDependencyBoundaryTest extends TestCase
         $this->assertStringNotContainsString('FlowRoutePointType::EnrollCampaign', $pointFields);
         $this->assertStringNotContainsString('FlowRoutePointType::CancelCampaign', $pointFields);
     }
-
 }

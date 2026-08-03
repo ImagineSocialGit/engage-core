@@ -7,6 +7,7 @@ use App\Support\Presets\ClientPresetContributor;
 use App\Modules\Core\Providers\CoreModuleServiceProvider;
 use App\Modules\Commerce\Providers\CommerceModuleServiceProvider;
 use App\Modules\Documents\Providers\DocumentsModuleServiceProvider;
+use App\Modules\Events\Providers\EventsModuleServiceProvider;
 use App\Modules\FlowRoutes\Providers\FlowRoutesModuleServiceProvider;
 use App\Modules\Forms\Providers\FormsModuleServiceProvider;
 use App\Modules\InboundMessaging\Providers\InboundMessagingModuleServiceProvider;
@@ -519,6 +520,17 @@ return [
             'depends_on' => ['core'],
             'providers' => [
                 LocationModuleServiceProvider::class,
+            ],
+        ],
+
+        'events' => [
+            'name' => 'Events',
+            'ui' => [
+                'tone' => 'blue',
+            ],
+            'depends_on' => ['core'],
+            'providers' => [
+                EventsModuleServiceProvider::class,
             ],
         ],
 
