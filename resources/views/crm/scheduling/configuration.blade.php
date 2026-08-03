@@ -50,6 +50,24 @@
             </x-ui.feedback.alert>
         @endif
 
+        <x-ui.card>
+            <div class="flex flex-wrap items-center justify-between gap-4" data-scheduling-availability-configuration-link>
+                <div>
+                    <p class="text-sm font-semibold text-slate-900">Availability and blackout rules</p>
+                    <p class="mt-1 text-sm text-slate-500">
+                        Manage weekly schedules, absolute exceptions, capacities, and resolved-slot previews in the dedicated workspace.
+                    </p>
+                </div>
+
+                <a
+                    href="{{ route('crm.scheduling.configuration.availability.index') }}"
+                    class="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                >
+                    Manage availability
+                </a>
+            </div>
+        </x-ui.card>
+
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <x-ui.card>
                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Hosts</p>

@@ -1,4 +1,3 @@
-
 # Scheduling Module
 
 Scheduling is a current universal module.
@@ -841,7 +840,31 @@ Assignment synchronization is transactional. Existing assignment rows omitted fr
 
 `SchedulingReadService` supplies ordered configuration collections, source ownership, editability, assignment state, availability-window counts, and Appointment usage counts. Controllers and Blade views do not rebuild those Scheduling queries.
 
-The configuration workspace still omits availability-window editing, calendar visualization, provider synchronization, and reminder management.
+The host/service workspace links to a separate availability-rule workspace. Calendar visualization, provider synchronization, and reminder management remain deferred.
+
+### CRM availability and blackout workspace
+
+The authenticated `/scheduling/configuration/availability` workspace manages manual `scheduling_availability_windows` through `SchedulingAvailabilityConfigurationWriter`. The writer is the only CRM mutation boundary for these rows. It creates server-owned manual rules with null metadata, locks every target and rule before mutation, verifies optimistic `updated_at` versions, and never hard-deletes a rule.
+
+The editor supports the existing closed rule contract:
+
+```text
+available or blackout
+service-wide, host-wide, or service-host-specific scope
+weekly recurring or absolute shape
+rule timezone
+optional overall capacity ceiling
+```
+
+Weekly rules persist `weekday`, `start_time`, and `end_time` as recurring wall-clock values in the selected timezone. They do not persist converted UTC clock times, so the resolver continues to apply the intended local schedule across daylight-saving changes.
+
+Absolute forms submit local `YYYY-MM-DDTHH:MM` values plus an IANA timezone. The writer resolves those inputs to authoritative UTC `starts_at` and `ends_at` values. Nonexistent spring-forward values and ambiguous repeated-hour values are rejected rather than normalized or guessed. The browser cannot submit raw UTC instants, `source`, `meta`, deletion timestamps, or synchronization identity.
+
+A manual rule may target a manual, system-owned, or provider-owned service or host without changing that target's ownership. A service-host-specific rule requires a durable `bookable_service_hosts` row for that pair. The assignment may be inactive so configuration can be retained for later reactivation, but an unrelated pair cannot receive a misleading combined rule.
+
+Provider- and system-owned availability rows are listed for diagnosis but are read-only. Manual rows may be updated, soft-deleted as archived, and restored. Restore revalidates target existence and the combined assignment before making the rule active again. Archived rows remain durable and are excluded automatically by the existing resolver query.
+
+The workspace also provides a bounded live preview by service, optional actively assigned host, and local date. Preview slots come directly from `SchedulingReadService::availabilityForDate()` and `FindBookableAvailabilityAction`; the Blade page does not reproduce precedence or capacity calculations. Preview output therefore includes current notice and horizon boundaries, active Appointment and hold occupancy, effective capacity, source scopes, and source-window identities from the actual engine.
 
 ## Appointment lifecycle state machine
 
@@ -996,13 +1019,15 @@ Implemented CRM workspace seams:
 ```text
 SchedulingReadService
 SchedulingConfigurationWriter
+SchedulingAvailabilityConfigurationWriter
 SchedulingController
 SchedulingConfigurationController
+SchedulingAvailabilityController
 AppointmentController
 StoreAppointmentRequest
 CancelAppointmentRequest
 RescheduleAppointmentRequest
-CRM Scheduling creation, detail, lifecycle, reschedule, Contact-panel, and configuration workspaces
+CRM Scheduling creation, detail, lifecycle, reschedule, Contact-panel, host/service configuration, and availability-rule workspaces
 ```
 
 Planned:
@@ -1023,10 +1048,9 @@ Do not add `flow_route_*` foreign keys to Scheduling artifacts merely for proven
 
 ## Deferred work
 
-Deferred after the host, service, and assignment configuration workspace:
+Deferred after the availability and blackout configuration workspace:
 
 ```text
-Phase 4A.2 — CRM availability-window and blackout editor
 Phase 4B.1 — resource-aware occupancy and selective overlap
 Phase 4B.2 — location normalization and travel-time-aware availability
 Phase 4B.3 — appointment-type-first progressive public booking

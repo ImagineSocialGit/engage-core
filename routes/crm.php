@@ -14,6 +14,7 @@ use App\Modules\FlowRoutes\Controllers\CRM\FlowRouteEditorController;
 use App\Modules\Messaging\Controllers\ContactImportBatchPermissionInvitationController;
 use App\Modules\Messaging\Controllers\CRM\MessageTemplatePresetController;
 use App\Modules\Scheduling\Controllers\CRM\AppointmentController;
+use App\Modules\Scheduling\Controllers\CRM\SchedulingAvailabilityController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingConfigurationController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingController;
 use App\Modules\Tasks\Controllers\TaskController;
@@ -261,6 +262,22 @@ Route::middleware('auth')->group(function () {
 
             Route::get('/configuration', [SchedulingConfigurationController::class, 'index'])
                 ->name('configuration.index');
+
+            Route::get('/configuration/availability', [SchedulingAvailabilityController::class, 'index'])
+                ->name('configuration.availability.index');
+
+            Route::post('/configuration/availability', [SchedulingAvailabilityController::class, 'store'])
+                ->name('configuration.availability.store');
+
+            Route::patch('/configuration/availability/{availabilityWindow}', [SchedulingAvailabilityController::class, 'update'])
+                ->name('configuration.availability.update');
+
+            Route::delete('/configuration/availability/{availabilityWindow}', [SchedulingAvailabilityController::class, 'archive'])
+                ->name('configuration.availability.archive');
+
+            Route::post('/configuration/availability/{availabilityWindow}/restore', [SchedulingAvailabilityController::class, 'restore'])
+                ->withTrashed()
+                ->name('configuration.availability.restore');
 
             Route::post('/configuration/hosts', [SchedulingConfigurationController::class, 'storeHost'])
                 ->name('configuration.hosts.store');

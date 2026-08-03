@@ -1,4 +1,3 @@
-
 # Engage Core TODO
 
 ## Config generation lock-in
@@ -83,7 +82,7 @@ The durable Scheduling architecture is documented in [`modules/scheduling.md`](m
 - [x] Complete CRM Appointment creation, detail, lifecycle, rescheduling, and Contact-panel workflows.
 - [x] Complete manual host, service, and service-host assignment configuration.
 - [x] Clarify current overall-concurrency capacity semantics and the progressive public-booking roadmap.
-- [ ] Phase 4A.2: add the CRM weekly/absolute availability and blackout editor with timezone-safe validation and preview.
+- [x] Phase 4A.2: add the CRM weekly/absolute availability and blackout editor with timezone-safe validation and preview.
 - [ ] Phase 4B.1: add normalized host resources, service requirements, Appointment/Hold resource occupancy, and selective-overlap calculation.
 - [ ] Phase 4B.2: add normalized appointment locations, provider-neutral travel-time resolution, conservative fallback policies, adjacent-Appointment travel checks, and reservation-time revalidation.
 - [ ] Phase 4B.3: restructure public booking around appointment-type-first progressive steps; require customer-site location before authoritative availability and keep all page transitions server authoritative.

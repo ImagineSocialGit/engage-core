@@ -9,6 +9,7 @@ use App\Modules\Scheduling\Data\BookableSlot;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookableServiceHost;
+use App\Modules\Scheduling\Models\SchedulingAvailabilityWindow;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -20,6 +21,7 @@ class SchedulingReadService
     public function __construct(
         private readonly FindBookableAvailabilityAction $findAvailability,
         private readonly SchedulingConfigurationWriter $configurationWriter,
+        private readonly SchedulingAvailabilityConfigurationWriter $availabilityConfigurationWriter,
     ) {}
 
     /**
@@ -172,6 +174,39 @@ class SchedulingReadService
             $service->setAttribute(
                 'crm_editable',
                 $this->configurationWriter->serviceIsEditable($service),
+            );
+        });
+    }
+
+    /**
+     * @return Collection<int, SchedulingAvailabilityWindow>
+     */
+    public function configurationAvailabilityWindows(): Collection
+    {
+        $windows = SchedulingAvailabilityWindow::withTrashed()
+            ->with([
+                'bookableService',
+                'schedulingHost',
+            ])
+            ->orderByRaw('case when deleted_at is null then 0 else 1 end')
+            ->orderByRaw('case when is_available = 1 then 0 else 1 end')
+            ->orderBy('bookable_service_id')
+            ->orderBy('scheduling_host_id')
+            ->orderBy('window_type')
+            ->orderBy('weekday')
+            ->orderBy('start_time')
+            ->orderBy('starts_at')
+            ->orderBy('id')
+            ->get();
+
+        return $windows->each(function (SchedulingAvailabilityWindow $window): void {
+            $window->setAttribute(
+                'crm_editable',
+                $this->availabilityConfigurationWriter->windowIsEditable($window),
+            );
+            $window->setAttribute(
+                'crm_scope',
+                $this->availabilityConfigurationWriter->scope($window),
             );
         });
     }

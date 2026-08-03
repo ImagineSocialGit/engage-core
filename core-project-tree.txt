@@ -682,6 +682,7 @@
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
 │   │   │   │   │   ├── AppointmentController.php
+│   │   │   │   │   ├── SchedulingAvailabilityController.php
 │   │   │   │   │   ├── SchedulingConfigurationController.php
 │   │   │   │   │   └── SchedulingController.php
 │   │   │   │   └── PublicBookingController.php
@@ -722,6 +723,7 @@
 │   │   │   │   │   └── BookingOccupancyResolver.php
 │   │   │   │   ├── ContactShow
 │   │   │   │   │   └── SchedulingContactPanelProvider.php
+│   │   │   │   ├── SchedulingAvailabilityConfigurationWriter.php
 │   │   │   │   ├── SchedulingConfigurationWriter.php
 │   │   │   │   └── SchedulingReadService.php
 │   │   │   └── Support
@@ -1583,6 +1585,7 @@
 │       │   ├── project-state
 │       │   │   └── index.blade.php
 │       │   ├── scheduling
+│       │   │   ├── availability.blade.php
 │       │   │   ├── configuration.blade.php
 │       │   │   ├── contact-panel.blade.php
 │       │   │   ├── index.blade.php
@@ -1872,6 +1875,7 @@
 │   │   │   ├── RescheduleSlotOfferAndBookingHoldActionTest.php
 │   │   │   ├── SchedulingAppointmentRescheduleWorkspaceTest.php
 │   │   │   ├── SchedulingAppointmentWorkspaceTest.php
+│   │   │   ├── SchedulingAvailabilityConfigurationWorkspaceTest.php
 │   │   │   ├── SchedulingAvailabilityWindowFoundationTest.php
 │   │   │   ├── SchedulingConfigurationWorkspaceTest.php
 │   │   │   ├── SchedulingContactPanelTest.php
@@ -1978,4 +1982,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-506 directories, 1473 files
+506 directories, 1477 files

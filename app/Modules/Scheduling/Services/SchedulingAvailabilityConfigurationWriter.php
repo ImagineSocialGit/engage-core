@@ -1,0 +1,621 @@
+<?php
+
+namespace App\Modules\Scheduling\Services;
+
+use App\Modules\Scheduling\Enums\SchedulingAvailabilityWindowType;
+use App\Modules\Scheduling\Models\BookableService;
+use App\Modules\Scheduling\Models\BookableServiceHost;
+use App\Modules\Scheduling\Models\SchedulingAvailabilityWindow;
+use App\Modules\Scheduling\Models\SchedulingHost;
+use Carbon\CarbonImmutable;
+use DateTimeImmutable;
+use DateTimeZone;
+use DomainException;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+use Throwable;
+
+class SchedulingAvailabilityConfigurationWriter
+{
+    public const SCOPE_SERVICE = 'service';
+    public const SCOPE_HOST = 'host';
+    public const SCOPE_SERVICE_HOST = 'service_host';
+
+    /**
+     * @param array<string, mixed> $attributes
+     */
+    public function create(array $attributes): SchedulingAvailabilityWindow
+    {
+        return DB::transaction(function () use ($attributes): SchedulingAvailabilityWindow {
+            [$service, $host] = $this->lockedTargets($attributes);
+
+            return SchedulingAvailabilityWindow::query()->create([
+                ...$this->windowAttributes($attributes, $service, $host),
+                'source' => SchedulingAvailabilityWindow::SOURCE_MANUAL,
+                'meta' => null,
+            ])->refresh();
+        });
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     */
+    public function update(
+        SchedulingAvailabilityWindow $window,
+        array $attributes,
+        string $expectedUpdatedAt,
+    ): SchedulingAvailabilityWindow {
+        return DB::transaction(function () use (
+            $window,
+            $attributes,
+            $expectedUpdatedAt,
+        ): SchedulingAvailabilityWindow {
+            $locked = SchedulingAvailabilityWindow::withTrashed()
+                ->whereKey($window->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->assertEditable($locked);
+            $this->assertActive($locked);
+            $this->assertFresh($locked, $expectedUpdatedAt);
+
+            [$service, $host] = $this->lockedTargets($attributes);
+
+            $locked->forceFill(
+                $this->windowAttributes($attributes, $service, $host),
+            );
+            $this->saveWithVersionBump($locked);
+
+            return $locked->refresh();
+        });
+    }
+
+    public function archive(
+        SchedulingAvailabilityWindow $window,
+        string $expectedUpdatedAt,
+    ): SchedulingAvailabilityWindow {
+        return DB::transaction(function () use (
+            $window,
+            $expectedUpdatedAt,
+        ): SchedulingAvailabilityWindow {
+            $locked = SchedulingAvailabilityWindow::withTrashed()
+                ->whereKey($window->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->assertEditable($locked);
+            $this->assertActive($locked);
+            $this->assertFresh($locked, $expectedUpdatedAt);
+
+            $next = $this->nextVersion($locked);
+
+            $locked->forceFill([
+                'deleted_at' => $next,
+                'updated_at' => $next,
+            ])->saveQuietly();
+
+            return $locked;
+        });
+    }
+
+    public function restore(
+        SchedulingAvailabilityWindow $window,
+        string $expectedUpdatedAt,
+    ): SchedulingAvailabilityWindow {
+        return DB::transaction(function () use (
+            $window,
+            $expectedUpdatedAt,
+        ): SchedulingAvailabilityWindow {
+            $locked = SchedulingAvailabilityWindow::withTrashed()
+                ->whereKey($window->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->assertEditable($locked);
+            $this->assertArchived($locked);
+            $this->assertFresh($locked, $expectedUpdatedAt);
+            $this->lockedTargets([
+                'scope' => $this->scope($locked),
+                'bookable_service_id' => $locked->bookable_service_id,
+                'scheduling_host_id' => $locked->scheduling_host_id,
+            ]);
+
+            $locked->forceFill(['deleted_at' => null]);
+            $this->saveWithVersionBump($locked);
+
+            return $locked->refresh();
+        });
+    }
+
+    public function windowIsEditable(SchedulingAvailabilityWindow $window): bool
+    {
+        return $window->source === SchedulingAvailabilityWindow::SOURCE_MANUAL;
+    }
+
+    public function scope(SchedulingAvailabilityWindow $window): string
+    {
+        if ($window->bookable_service_id !== null
+            && $window->scheduling_host_id !== null
+        ) {
+            return self::SCOPE_SERVICE_HOST;
+        }
+
+        if ($window->scheduling_host_id !== null) {
+            return self::SCOPE_HOST;
+        }
+
+        return self::SCOPE_SERVICE;
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     * @return array{0: BookableService|null, 1: SchedulingHost|null}
+     */
+    private function lockedTargets(array $attributes): array
+    {
+        $scope = $this->scopeValue($attributes['scope'] ?? null);
+        $serviceId = $this->nullablePositiveInteger(
+            $attributes['bookable_service_id'] ?? null,
+            'bookable service ID',
+        );
+        $hostId = $this->nullablePositiveInteger(
+            $attributes['scheduling_host_id'] ?? null,
+            'scheduling host ID',
+        );
+
+        if ($scope === self::SCOPE_SERVICE && ($serviceId === null || $hostId !== null)) {
+            throw new InvalidArgumentException(
+                'Service-wide availability requires exactly one bookable service.',
+            );
+        }
+
+        if ($scope === self::SCOPE_HOST && ($hostId === null || $serviceId !== null)) {
+            throw new InvalidArgumentException(
+                'Host-wide availability requires exactly one scheduling host.',
+            );
+        }
+
+        if ($scope === self::SCOPE_SERVICE_HOST
+            && ($serviceId === null || $hostId === null)
+        ) {
+            throw new InvalidArgumentException(
+                'Service-and-host availability requires both targets.',
+            );
+        }
+
+        $service = $serviceId !== null
+            ? BookableService::withTrashed()
+                ->whereKey($serviceId)
+                ->lockForUpdate()
+                ->first()
+            : null;
+        $host = $hostId !== null
+            ? SchedulingHost::withTrashed()
+                ->whereKey($hostId)
+                ->lockForUpdate()
+                ->first()
+            : null;
+
+        if ($serviceId !== null && (! $service instanceof BookableService || $service->trashed())) {
+            throw new DomainException(
+                'The selected bookable service no longer exists.',
+            );
+        }
+
+        if ($hostId !== null && (! $host instanceof SchedulingHost || $host->trashed())) {
+            throw new DomainException(
+                'The selected scheduling host no longer exists.',
+            );
+        }
+
+        if ($scope === self::SCOPE_SERVICE_HOST) {
+            $assignment = BookableServiceHost::query()
+                ->where('bookable_service_id', $serviceId)
+                ->where('scheduling_host_id', $hostId)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $assignment instanceof BookableServiceHost) {
+                throw new DomainException(
+                    'Service-and-host availability requires an existing service assignment.',
+                );
+            }
+        }
+
+        return [$service, $host];
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     * @return array<string, mixed>
+     */
+    private function windowAttributes(
+        array $attributes,
+        ?BookableService $service,
+        ?SchedulingHost $host,
+    ): array {
+        $windowType = $this->windowType($attributes['window_type'] ?? null);
+        $timezone = $this->timezone($attributes['timezone'] ?? null);
+        $capacity = $this->nullablePositiveInteger(
+            $attributes['capacity'] ?? null,
+            'availability capacity',
+        );
+
+        $shape = $windowType === SchedulingAvailabilityWindowType::Weekly
+            ? $this->weeklyShape($attributes)
+            : $this->absoluteShape($attributes, $timezone);
+
+        return [
+            'bookable_service_id' => $service?->getKey(),
+            'scheduling_host_id' => $host?->getKey(),
+            'window_type' => $windowType,
+            'timezone' => $timezone,
+            ...$shape,
+            'capacity' => $capacity,
+            'is_available' => (bool) ($attributes['is_available'] ?? false),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     * @return array<string, mixed>
+     */
+    private function weeklyShape(array $attributes): array
+    {
+        $weekday = $this->integerBetween(
+            $attributes['weekday'] ?? null,
+            0,
+            6,
+            'weekday',
+        );
+        $startTime = $this->weeklyTime(
+            $attributes['start_time'] ?? null,
+            'weekly start time',
+        );
+        $endTime = $this->weeklyTime(
+            $attributes['end_time'] ?? null,
+            'weekly end time',
+        );
+
+        if ($this->timeInSeconds($startTime) >= $this->timeInSeconds($endTime)) {
+            throw new InvalidArgumentException(
+                'Weekly availability requires a start time before the end time.',
+            );
+        }
+
+        return [
+            'weekday' => $weekday,
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+            'starts_at' => null,
+            'ends_at' => null,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     * @return array<string, mixed>
+     */
+    private function absoluteShape(array $attributes, string $timezone): array
+    {
+        $startsAt = $this->strictLocalDateTime(
+            $attributes['local_starts_at'] ?? null,
+            $timezone,
+            'absolute start',
+        );
+        $endsAt = $this->strictLocalDateTime(
+            $attributes['local_ends_at'] ?? null,
+            $timezone,
+            'absolute end',
+        );
+
+        if (! $startsAt->lessThan($endsAt)) {
+            throw new InvalidArgumentException(
+                'Absolute availability requires a start before the end.',
+            );
+        }
+
+        return [
+            'weekday' => null,
+            'start_time' => null,
+            'end_time' => null,
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+        ];
+    }
+
+    private function strictLocalDateTime(
+        mixed $value,
+        string $timezone,
+        string $label,
+    ): CarbonImmutable {
+        $value = $this->requiredString($value, $label);
+
+        if (preg_match(
+            '/^(?<date>\d{4}-\d{2}-\d{2})T(?<hour>[01]\d|2[0-3]):(?<minute>[0-5]\d)$/',
+            $value,
+            $matches,
+        ) !== 1) {
+            throw new InvalidArgumentException(
+                "The {$label} must use YYYY-MM-DDTHH:MM local format.",
+            );
+        }
+
+        $normalized = sprintf(
+            '%s %s:%s:00',
+            $matches['date'],
+            $matches['hour'],
+            $matches['minute'],
+        );
+        $candidates = $this->utcCandidatesForLocal($normalized, $timezone);
+
+        if ($candidates === []) {
+            throw new InvalidArgumentException(
+                "The {$label} does not exist in timezone [{$timezone}] because of a clock transition.",
+            );
+        }
+
+        if (count($candidates) > 1) {
+            throw new InvalidArgumentException(
+                "The {$label} is ambiguous in timezone [{$timezone}] because the local clock repeats that time.",
+            );
+        }
+
+        return CarbonImmutable::createFromTimestampUTC($candidates[0]);
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function utcCandidatesForLocal(
+        string $normalized,
+        string $timezone,
+    ): array {
+        try {
+            $naive = CarbonImmutable::createFromFormat(
+                '!Y-m-d H:i:s',
+                $normalized,
+                'UTC',
+            );
+        } catch (Throwable) {
+            return [];
+        }
+
+        if (! $naive instanceof CarbonImmutable
+            || $naive->format('Y-m-d H:i:s') !== $normalized
+        ) {
+            return [];
+        }
+
+        $zone = new DateTimeZone($timezone);
+        $naiveTimestamp = $naive->getTimestamp();
+        $transitions = $zone->getTransitions(
+            $naiveTimestamp - 172800,
+            $naiveTimestamp + 172800,
+        );
+        $offsets = [];
+
+        if (is_array($transitions)) {
+            foreach ($transitions as $transition) {
+                $offsets[] = (int) ($transition['offset'] ?? 0);
+            }
+        }
+
+        $offsets[] = $zone->getOffset(
+            (new DateTimeImmutable('@'.$naiveTimestamp))->setTimezone($zone),
+        );
+        $offsets = array_values(array_unique($offsets));
+        $candidates = [];
+
+        foreach ($offsets as $offset) {
+            $candidate = $naiveTimestamp - $offset;
+            $local = CarbonImmutable::createFromTimestampUTC($candidate)
+                ->setTimezone($timezone);
+
+            if ($local->format('Y-m-d H:i:s') === $normalized) {
+                $candidates[] = $candidate;
+            }
+        }
+
+        $candidates = array_values(array_unique($candidates));
+        sort($candidates, SORT_NUMERIC);
+
+        return $candidates;
+    }
+
+    private function assertEditable(SchedulingAvailabilityWindow $window): void
+    {
+        if (! $this->windowIsEditable($window)) {
+            throw new DomainException(
+                'Provider- and system-owned availability rules are read-only in CRM configuration.',
+            );
+        }
+    }
+
+    private function assertActive(SchedulingAvailabilityWindow $window): void
+    {
+        if ($window->trashed()) {
+            throw new DomainException(
+                'Archived availability rules must be restored before they can be changed.',
+            );
+        }
+    }
+
+    private function assertArchived(SchedulingAvailabilityWindow $window): void
+    {
+        if (! $window->trashed()) {
+            throw new DomainException(
+                'Only archived availability rules can be restored.',
+            );
+        }
+    }
+
+    private function assertFresh(
+        SchedulingAvailabilityWindow $window,
+        string $expectedUpdatedAt,
+    ): void {
+        $expectedUpdatedAt = trim($expectedUpdatedAt);
+
+        if ($expectedUpdatedAt === '') {
+            throw new InvalidArgumentException(
+                'Availability-rule changes require the current record version.',
+            );
+        }
+
+        try {
+            $expected = CarbonImmutable::parse($expectedUpdatedAt)->utc();
+        } catch (Throwable $exception) {
+            throw new InvalidArgumentException(
+                'The availability-rule record version is invalid.',
+                previous: $exception,
+            );
+        }
+
+        $actual = $window->getAttribute('updated_at');
+
+        if ($actual === null
+            || ! CarbonImmutable::instance($actual)->utc()->equalTo($expected)
+        ) {
+            throw new DomainException(
+                'The availability rule changed after this form was loaded. Refresh and try again.',
+            );
+        }
+    }
+
+    private function saveWithVersionBump(Model $model): void
+    {
+        $model->forceFill([
+            'updated_at' => $this->nextVersion($model),
+        ])->saveQuietly();
+    }
+
+    private function nextVersion(Model $model): CarbonImmutable
+    {
+        $current = $model->getOriginal('updated_at');
+        $current = $current !== null
+            ? CarbonImmutable::parse($current)->utc()
+            : null;
+        $now = CarbonImmutable::now('UTC');
+
+        return $current instanceof CarbonImmutable && ! $now->greaterThan($current)
+            ? $current->addSecond()
+            : $now;
+    }
+
+    private function scopeValue(mixed $value): string
+    {
+        $value = $this->requiredString($value, 'availability scope');
+
+        if (! in_array($value, [
+            self::SCOPE_SERVICE,
+            self::SCOPE_HOST,
+            self::SCOPE_SERVICE_HOST,
+        ], true)) {
+            throw new InvalidArgumentException(
+                "Availability scope [{$value}] is invalid.",
+            );
+        }
+
+        return $value;
+    }
+
+    private function windowType(mixed $value): SchedulingAvailabilityWindowType
+    {
+        $value = $this->requiredString($value, 'availability window type');
+        $type = SchedulingAvailabilityWindowType::tryFrom($value);
+
+        if (! $type instanceof SchedulingAvailabilityWindowType) {
+            throw new InvalidArgumentException(
+                "Availability window type [{$value}] is invalid.",
+            );
+        }
+
+        return $type;
+    }
+
+    private function weeklyTime(mixed $value, string $label): string
+    {
+        $value = $this->requiredString($value, $label);
+
+        if (preg_match(
+            '/^(?<hour>[01]\d|2[0-3]):(?<minute>[0-5]\d)(?::(?<second>[0-5]\d))?$/',
+            $value,
+            $matches,
+        ) !== 1) {
+            throw new InvalidArgumentException(
+                "The {$label} must use HH:MM local time.",
+            );
+        }
+
+        return sprintf(
+            '%02d:%02d:%02d',
+            (int) $matches['hour'],
+            (int) $matches['minute'],
+            (int) ($matches['second'] ?? 0),
+        );
+    }
+
+    private function timeInSeconds(string $time): int
+    {
+        [$hour, $minute, $second] = array_map('intval', explode(':', $time));
+
+        return ($hour * 3600) + ($minute * 60) + $second;
+    }
+
+    private function requiredString(mixed $value, string $label): string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            throw new InvalidArgumentException(
+                "A non-empty {$label} is required.",
+            );
+        }
+
+        return trim($value);
+    }
+
+    private function nullablePositiveInteger(mixed $value, string $label): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (! is_numeric($value) || (int) $value < 1) {
+            throw new InvalidArgumentException("{$label} must be at least 1.");
+        }
+
+        return (int) $value;
+    }
+
+    private function integerBetween(
+        mixed $value,
+        int $minimum,
+        int $maximum,
+        string $label,
+    ): int {
+        if (! is_numeric($value)) {
+            throw new InvalidArgumentException("{$label} must be an integer.");
+        }
+
+        $value = (int) $value;
+
+        if ($value < $minimum || $value > $maximum) {
+            throw new InvalidArgumentException(
+                "{$label} must be between {$minimum} and {$maximum}.",
+            );
+        }
+
+        return $value;
+    }
+
+    private function timezone(mixed $value): string
+    {
+        $value = $this->requiredString($value, 'availability timezone');
+
+        if (! in_array($value, timezone_identifiers_list(), true)) {
+            throw new InvalidArgumentException("Timezone [{$value}] is invalid.");
+        }
+
+        return $value;
+    }
+}
