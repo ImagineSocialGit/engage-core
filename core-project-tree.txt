@@ -1066,6 +1066,7 @@
 │       │   ├── ProjectStateContractRegistry.php
 │       │   ├── ProjectStateDocumentCodec.php
 │       │   ├── ProjectStateDocumentValidator.php
+│       │   ├── ProjectStateExporter.php
 │       │   ├── ProjectStateImportValueMapper.php
 │       │   ├── ProjectStateManager.php
 │       │   ├── ProjectStateReferenceResolver.php
@@ -1834,6 +1835,7 @@
 │   │   │   ├── MessagingProjectStateRoundTripTest.php
 │   │   │   ├── ProjectStateControllerTest.php
 │   │   │   ├── ProjectStateCoverageContractTest.php
+│   │   │   ├── ProjectStateExporterExtractionTest.php
 │   │   │   ├── ProjectStateInfrastructureExtractionTest.php
 │   │   │   ├── ProjectStateValidationInfrastructureExtractionTest.php
 │   │   │   ├── TasksProjectStateRoundTripTest.php
@@ -1956,4 +1958,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-505 directories, 1452 files
+505 directories, 1454 files
