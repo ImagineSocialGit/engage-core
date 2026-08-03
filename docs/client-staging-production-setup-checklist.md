@@ -313,6 +313,7 @@ REDIS_PREFIX
 HORIZON_PREFIX
 provider credentials and webhook secrets
 sender identities and phone numbers
+PROJECT_STATE_ADMIN_EMAIL when the owner-only transfer surface is deliberately enabled
 storage credentials/bucket/CDN URL
 other selected-client deployment values
 ```
@@ -1034,7 +1035,40 @@ See `deployment-safety-and-troubleshooting.md`.
 
 # Phase 6 — Client data import or migration
 
-Run client data migration only after the environment itself is green.
+## Controlled Project State clean-rebuild transfer
+
+Use Project State only for an approved clean rebuild that must preserve the currently supported Engage Core database state.
+
+Authoritative procedure:
+
+[`operations/project-state-transfer-runbook.md`](operations/project-state-transfer-runbook.md)
+
+Required sequence:
+
+```text
+1. Verify the source code/schema/client identity and create an independent database backup.
+2. Freeze writes; stop Horizon and Scheduler.
+3. Export the current-format Project State file from the owner-only CRM surface.
+4. Preserve the immutable export and its SHA-256.
+5. Clear only the exact stale Redis queue/runtime namespace before IDs are reused.
+6. Deploy the intended target code/client configuration.
+7. Run migrate:fresh --force only inside the approved controlled rebuild.
+8. Run presets:sync.
+9. Run setup:validate.
+10. Recreate environment-owned CRM users.
+11. Upload the file with Validate Only and resolve every error.
+12. Apply with the current password and exact IMPORT confirmation.
+13. Verify counts and inert runtime state.
+14. Restore workers/providers/Scheduler.
+15. Resume imported work category by category until pending counts are zero.
+16. Verify providers, queues, relationships, and external side effects before reopening traffic.
+```
+
+Project State does not transfer users, sessions, Redis jobs, cache/locks, provider state, or currently unsupported module data. Mortgage and Scheduling durable rows must remain empty until explicit transfer support exists.
+
+## Other client data imports or migrations
+
+Run other client data migration only after the environment itself is green.
 
 Recommended order:
 
@@ -1088,6 +1122,9 @@ Import rules:
 [ ] presets:sync completed
 [ ] setup:validate passes
 [ ] Initial CRM user exists
+[ ] PROJECT_STATE_ADMIN_EMAIL is deliberately blank or matches the authorized CRM owner
+[ ] Any controlled Project State transfer completed validation, apply, and dependency-ordered resume
+[ ] No pending Project State resume items remain unless deliberately reconciled
 [ ] Resend configured/tested when enabled
 [ ] Telnyx configured/tested when enabled
 [ ] Zoom Webinar and Meeting capabilities configured/tested when enabled

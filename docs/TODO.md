@@ -46,17 +46,34 @@ Do not create one-to-one payload or metadata tables that preserve the same bytes
 
 ## DB snapshot / export / import safety
 
-- [ ] Define a versioned export envelope and manifest for the current post-15B schema.
-- [ ] Export Contacts, contact statuses/tags, consent history, permission invitations as needed, Webinar series/occurrences/registrations, and selected Messaging records required for historical truth.
-- [ ] Explicitly classify historical queued/pending Campaign or ScheduledMessage rows as mapped, intentionally dropped, or unsupported.
-- [ ] Validate source schema/version, required references, enum/status values, and destination compatibility before apply.
-- [ ] Provide deterministic dry-run output with creates/updates/skips/conflicts/errors and no mutations.
-- [ ] Apply through owning module actions/import services where runtime invariants require them; use direct inserts only for clearly defined historical/state restoration paths.
-- [ ] Make imports idempotent through stable external/export identities and prove safe reruns.
-- [ ] Add semantic round-trip tests from export -> fresh migrate -> import -> invariant comparison.
-- [ ] Flag legacy ScheduledMessage terminal fields and copied provider/meta snapshots rather than silently importing them into removed columns.
-- [ ] Preserve current Campaign/Broadcast transitional fields until explicit later migrations provide versioned translators.
-- [ ] Document production backup, verification, rollback, and post-import queue/Horizon safety steps.
+Current Project State implementation is complete for the supported v10 scope.
+
+- [x] Define the `engage-core-project-state` versioned envelope, checksum, client-key guard, and exact current-format validation.
+- [x] Split the transfer contract into dependency-ordered module/shared sections with complete closed column contracts.
+- [x] Transfer the current supported Core, InternalNotifications, InboundMessaging, Messaging, Webinars, Tasks, Campaigns, Broadcasts, Workflow, Automation Opportunities, Automation Events, and FlowRoutes state.
+- [x] Classify every other application table with an explicit environment-owned, resettable, must-be-empty, or terminal-only policy.
+- [x] Block export for unclassified tables/columns, unsupported durable rows, nonterminal receipts, pending resume work, and unsafe references.
+- [x] Support stable-identity upserts, preserved-ID insert-empty tables, immediate/deferred/polymorphic/JSON-path remapping, import value maps, and environment-local nulling.
+- [x] Import all configured state in one transaction without firing ordinary Eloquent model events.
+- [x] Import runnable work inert and require dependency-aware owner-confirmed resume.
+- [x] Fail ambiguous interrupted provider submissions closed instead of blindly resending them.
+- [x] Add owner-only CRM export, validate, apply, and resume controls.
+- [x] Add coverage, architecture, controller, and module/shared round-trip tests.
+- [x] Document developer extension rules and the controlled transfer runbook.
+
+Durable references:
+
+- [`project-state-extension-guide.md`](project-state-extension-guide.md)
+- [`operations/project-state-transfer-runbook.md`](operations/project-state-transfer-runbook.md)
+
+Separate future scope:
+
+- [ ] Add explicit transfer support for Mortgage only after its persistence contract is ready.
+- [ ] Add explicit transfer support for Scheduling only after its persistence contract is stable.
+- [ ] Add transfer sections for Location, Portal, Forms, Documents, or Commerce when those modules become active durable scope.
+- [ ] Add external translators when a real older Project State format must be carried forward.
+- [ ] Add a richer create/update/skip/conflict preview only when operational need justifies it; do not weaken the current closed validator.
+- [ ] Add production-sized transfer timing and memory measurements before materially larger client datasets.
 
 ## Run through after completing an item or system update
 

@@ -147,8 +147,35 @@ Do not run `FLUSHDB` until you know whether sessions, cache, queues, locks, Hori
 Production rule:
 
 ```text
-Once real data matters, do not use destructive database resets as a deployment technique.
+Once real data matters, do not use destructive database resets as a routine deployment technique.
 ```
+
+## Controlled Project State rebuild exception
+
+Project State supports a deliberately approved clean rebuild only when the current transfer contract covers every durable row that must survive.
+
+This is not permission to run `migrate:fresh` during a normal deploy. The controlled path requires:
+
+```text
+independent database backup
+maintenance/write freeze
+Horizon and Scheduler stopped
+current-format Project State export
+exact Redis namespace cleanup
+target migrate:fresh
+presets:sync
+setup:validate
+validation-only upload
+transactional apply
+explicit dependency-ordered resume
+provider and queue reconciliation
+```
+
+Project State does not export Redis jobs. Old delayed jobs must be removed from the exact source/target Redis namespace before primary keys are reused. Supported runnable database work is imported inert and recreated only through explicit resume.
+
+Export is blocked when pending resume items remain, unsupported durable tables contain rows, database-backed jobs exist, operational receipts are nonterminal, schema changes are unclassified, or references cannot be restored safely.
+
+Use [`operations/project-state-transfer-runbook.md`](operations/project-state-transfer-runbook.md) for the complete procedure.
 
 ---
 
@@ -665,7 +692,9 @@ Before launch or a live Webinar event:
 [ ] Actual Horizon process path verified
 [ ] Explicit queue list covers executable queues
 [ ] Redis prefixes understood
-[ ] No stale jobs after disposable-data resets
+[ ] No stale jobs after disposable-data resets or a controlled Project State rebuild
+[ ] Project State export/import/resume record preserved when a controlled rebuild was performed
+[ ] No pending Project State resume items remain unless deliberately reconciled
 [ ] No placeholder domains
 [ ] Config cache cleared after env changes
 [ ] setup:validate passes

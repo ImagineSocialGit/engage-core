@@ -218,6 +218,12 @@ SETUP_USER_EMAIL=
 SETUP_USER_PASSWORD=
 ```
 
+Project State owner authorization:
+
+```env
+PROJECT_STATE_ADMIN_EMAIL=
+```
+
 These are separate concepts.
 
 ```text
@@ -226,9 +232,14 @@ STAGING_USER / STAGING_PASSWORD
 
 SETUP_USER_*
     initial CRM/application user seed/bootstrap input
+
+PROJECT_STATE_ADMIN_EMAIL
+    exact CRM user email allowed to open and operate the owner-only Project State surface
 ```
 
-Remove or rotate bootstrap secrets after use according to operational policy.
+`PROJECT_STATE_ADMIN_EMAIL` is a selected-client environment value. A blank value intentionally disables Project State access because no authenticated user can match it. The configured user must still provide the current password for export, apply, and resume operations.
+
+Remove or rotate bootstrap secrets after use according to operational policy. Keep the Project State owner email deliberately configured only for operators who should retain that maintenance authority.
 
 ---
 
@@ -834,6 +845,7 @@ Before deleting an existing live environment variable, search the full repositor
 [ ] Telnyx sender numbers/profile IDs correct when enabled
 [ ] Webinars/Zoom provider and credentials correct when enabled
 [ ] setup user values handled securely
+[ ] PROJECT_STATE_ADMIN_EMAIL is blank or matches the deliberately authorized CRM owner
 [ ] staging credentials only used where intended
 [ ] php artisan optimize:clear run after client/env changes
 [ ] php artisan setup:validate passes

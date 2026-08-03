@@ -175,7 +175,7 @@ next data-safety work
     DB snapshot/export/import tooling against the post-15B schema
 ```
 
-The cross-module Messaging persistence refactor is complete and green. The current post-15B schema is now the target for the project-state export/import work. Remaining Campaign, Broadcast content/FK, FlowRoutes authoring-identity, and inbound-provider cleanup items are separate future module refactors and must be mapped explicitly rather than silently assumed complete.
+The cross-module Messaging persistence refactor and the Project State v10 transfer contract are complete and green against the current post-15B schema. Remaining Campaign, Broadcast content/FK, FlowRoutes authoring-identity, and inbound-provider cleanup items are separate future module refactors and must be mapped explicitly into Project State when their durable contracts change rather than silently assumed complete.
 
 ## Messaging, consent, and Rob Webinar production-prep completion
 
@@ -294,12 +294,15 @@ Completed runway pieces:
 - FlowRoutes event-wait/task-completed resume behavior on top of route plan/progress item correlation.
 - `task.completed` resume through the generic `AutomationEventRecorded` seam without broad contact-only fallback.
 
-Remaining near-term sequence:
+The Project State data-safety path is now complete for the current v10 scope:
 
-1. Build the project-state DB snapshot/export/import safety tool against the current post-15B schema.
-2. Prove deterministic dry-run, validation, mapping, and semantic round-trip behavior before production use.
-3. Keep current Campaign/Broadcast transitional records in the export contract until their separate migrations exist.
-4. Resume focused Routes / FlowRoutes product completion, dashboard/contact polish, and broader module-schema audits after the export/import safety path is established.
+1. The current post-15B schema is classified as transferred, explicitly policy-controlled, or narrowly ignored.
+2. Export uses one consistent snapshot and fails closed on schema, policy, and reference drift.
+3. Validation, stable-identity mapping, preserved-ID restoration, semantic round trips, and owner-only apply are covered.
+4. Runnable work imports inert and resumes explicitly in dependency order.
+5. Campaign/Broadcast transitional records remain represented until their separate migrations exist.
+
+The next sequence can return to focused Routes / FlowRoutes product completion, dashboard/contact polish, Reporting foundation work, and broader module-schema audits without treating Project State as unfinished runway.
 
 Completed in the current client-readiness sequence:
 
@@ -1155,11 +1158,16 @@ This is durable schema/architecture work completed before production rollout, no
 
 ## Recommended next documentation and implementation targets
 
-The next branch is a **Reporting foundation documentation and audit branch**. Reporting is currently only a minimal module placeholder, so the first deliverable is a durable module document and phased plan—not migrations or runtime implementation.
+The Project State v10 export/validate/import/resume system and its documentation are complete for the current supported schema. Its durable references are:
+
+- [`project-state-extension-guide.md`](project-state-extension-guide.md)
+- [`operations/project-state-transfer-runbook.md`](operations/project-state-transfer-runbook.md)
+
+The next branch remains a **Reporting foundation documentation and audit branch**. Reporting is currently only a minimal module placeholder, so the first deliverable is a durable module document and phased plan—not migrations or runtime implementation.
 
 The Reporting documentation must keep Reporting optional, independent, privacy-first, and malleable. It should use mature FOSS analytics/reporting systems only as feature-shape references, audit current first-party/server observability inputs, define event/identity/attribution/correlation and retention boundaries, and specify the first Webinar traffic-to-registration/conversion report.
 
-The Messaging persistence architecture and implementation are complete through 15B4. The next data-safety target is the **DB snapshot/export/import tool** defined by the current project-state migration work. Reporting schema/collection work must consume normalized delivery authority rather than copy ScheduledMessage payload/meta or provider attempt history.
+Reporting schema/collection work must consume normalized delivery authority rather than copy ScheduledMessage payload/meta or provider attempt history. Project State should be extended only when a new durable table or relationship becomes real supported transfer scope.
 
 **Phase 12 — Standalone and multi-link Tasks is complete.** The focused and full automated suites are green after the Task generalization and the expanded FlowRoutes contributor refactor.
 

@@ -15,6 +15,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProjectStateController extends Controller
 {
+
+    public function __construct(
+        private readonly ProjectStateResumeManager $resumeManager,
+    ) {}
+
     public function index(Request $request): View
     {
         $this->authorizeOwner($request);
@@ -126,10 +131,7 @@ class ProjectStateController extends Controller
         return $this->view($report);
     }
 
-    public function resume(
-        Request $request,
-        ProjectStateResumeManager $resumeManager,
-    ): View {
+    public function resume(Request $request): View {
         $this->authorizeOwner($request);
 
         $validated = $request->validate([
@@ -147,7 +149,7 @@ class ProjectStateController extends Controller
         }
 
         try {
-            $resumeReport = $resumeManager->resume($validated['category']);
+            $resumeReport = $this->resumeManager->resume($validated['category']);
         } catch (InvalidArgumentException|RuntimeException $exception) {
             throw ValidationException::withMessages([
                 'category' => $exception->getMessage(),
@@ -165,14 +167,13 @@ class ProjectStateController extends Controller
         ?array $report = null,
         ?array $resumeReport = null,
     ): View {
-        $resumeManager = app(ProjectStateResumeManager::class);
 
         return view('crm.project-state.index', [
             'title' => 'Project State',
             'heading' => 'Project State',
             'report' => $report,
             'resumeReport' => $resumeReport,
-            'resumeSummary' => $resumeManager->summary(),
+            'resumeSummary' => $this->resumeManager->summary(),
             'resumeBatchSize' => min(
                 5000,
                 max(1, (int) config('project_state.resume_batch_size', 500)),

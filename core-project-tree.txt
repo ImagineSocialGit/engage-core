@@ -1425,12 +1425,14 @@
 │   │   ├── webinars.md
 │   │   └── workflow.md
 │   ├── operations
-│   │   └── observability
-│   │       └── README.md
+│   │   ├── observability
+│   │   │   └── README.md
+│   │   └── project-state-transfer-runbook.md
 │   ├── permission-invitations.md
 │   ├── possible-scenarios.md
 │   ├── product-principles.md
 │   ├── project-organization.md
+│   ├── project-state-extension-guide.md
 │   ├── TODO.md
 │   └── ui-ux-guide.md
 ├── ops
@@ -1965,4 +1967,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-505 directories, 1461 files
+505 directories, 1463 files

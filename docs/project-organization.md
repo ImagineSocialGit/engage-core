@@ -40,7 +40,31 @@ A new module-owned Route action should not require central FlowRoutes imports or
 
 This document is a quick orientation map for Engage Core. It classifies the project into Core, universal modules, vertical modules, and integrations/adapters.
 
-Use `module-boundaries.md` for detailed ownership and dependency rules. Use `TODO.md` for actionable implementation backlog. Use `model-persistence-bloat-audit.md` for the current system-wide audit of model creation, JSON payload shape, duplicated snapshots, and database-write boundaries.
+Use `module-boundaries.md` for detailed ownership and dependency rules. Use `TODO.md` for actionable implementation backlog. Use `model-persistence-bloat-audit.md` for the current system-wide audit of model creation, JSON payload shape, duplicated snapshots, and database-write boundaries. Use `project-state-extension-guide.md` for the shared database-transfer contract.
+
+## Shared Project State transfer infrastructure
+
+Project State is shared app-level transfer infrastructure, not a feature module.
+
+```text
+app/Support/ProjectState
+    current-format export, validation, import, ID remapping, schema/policy guards,
+    inert runtime restoration, and explicit post-import resume
+
+config/project_state.php
+config/project_state/*.php
+    dependency-ordered section contracts and explicit policies for every excluded table
+```
+
+`ProjectStateManager` is the stable five-operation facade. Specialized collaborators own export, validation, import, reference mapping, schema coverage, and resume behavior. The system intentionally uses current-format-only documents, exact complete-column contracts, one consistent export snapshot, one import transaction, and explicit category-by-category resume for runnable work.
+
+Every application table must be transferred by exactly one section, covered by exactly one explicit policy, or narrowly ignored as framework/schema bookkeeping. New tables and columns block export until classified.
+
+Project State does not make a module own another module's data. Each section declares how the owning module's current durable state crosses a controlled clean rebuild; the shared infrastructure remains neutral.
+
+Developer guidance: [`project-state-extension-guide.md`](project-state-extension-guide.md)
+
+Operator guidance: [`operations/project-state-transfer-runbook.md`](operations/project-state-transfer-runbook.md)
 
 ## Layers
 
