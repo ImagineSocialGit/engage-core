@@ -1064,12 +1064,17 @@
 │       │   └── PresetPackageResolver.php
 │       ├── ProjectState
 │       │   ├── ProjectStateContractRegistry.php
+│       │   ├── ProjectStateDeferredReferenceApplier.php
 │       │   ├── ProjectStateDocumentCodec.php
 │       │   ├── ProjectStateDocumentValidator.php
 │       │   ├── ProjectStateExporter.php
+│       │   ├── ProjectStateImporter.php
+│       │   ├── ProjectStateImportIdMap.php
+│       │   ├── ProjectStateImportRowTransformer.php
 │       │   ├── ProjectStateImportValueMapper.php
 │       │   ├── ProjectStateManager.php
 │       │   ├── ProjectStateReferenceResolver.php
+│       │   ├── ProjectStateResumeItemRecorder.php
 │       │   ├── ProjectStateResumeManager.php
 │       │   └── ProjectStateSchemaGuard.php
 │       ├── Queues
@@ -1836,6 +1841,7 @@
 │   │   │   ├── ProjectStateControllerTest.php
 │   │   │   ├── ProjectStateCoverageContractTest.php
 │   │   │   ├── ProjectStateExporterExtractionTest.php
+│   │   │   ├── ProjectStateImporterExtractionTest.php
 │   │   │   ├── ProjectStateInfrastructureExtractionTest.php
 │   │   │   ├── ProjectStateValidationInfrastructureExtractionTest.php
 │   │   │   ├── TasksProjectStateRoundTripTest.php
@@ -1958,4 +1964,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-505 directories, 1454 files
+505 directories, 1460 files
