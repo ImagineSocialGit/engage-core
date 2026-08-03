@@ -727,7 +727,41 @@ The panel shows the next operational Appointment, other upcoming `pending`, `sch
 
 The panel's Schedule Appointment action links to `/scheduling?contact_id={contact}`. `SchedulingController` validates that Contact identity, preserves it through service, host, and date selection, initializes the existing Core Contact autocomplete state, and keeps the Contact selected after successful creation. The browser still submits the ordinary `contact_id`; the query parameter grants no additional authority.
 
-This workspace still omits calendar visualization, provider synchronization, and reminder management.
+### CRM Scheduling configuration workspace
+
+The authenticated `/scheduling/configuration` workspace provides the first CRM-owned setup surface for durable Scheduling identity and service policy. It manages manual `scheduling_hosts`, manual `bookable_services`, and `bookable_service_hosts` assignments without exposing raw metadata, provider identity, polymorphic host ownership, or synchronization fields.
+
+`SchedulingConfigurationWriter` is the sole mutation boundary for this workspace. It creates manual records with server-owned `source`, null provider identity, null hostable identity, and null metadata. Existing keys are immutable because they are durable references used by public booking, configuration, and future integrations.
+
+A host is editable only when it is a non-deleted manual record with no polymorphic `hostable` identity. A service is editable only when it is a non-deleted manual record with no provider, external ID, or external URL. Provider-, system-, and model-owned rows remain visible with usage counts but are read-only. Controller validation also rejects caller-authored `source`, provider fields, hostable fields, metadata, timestamps, and other unknown configuration input.
+
+Host and service updates carry the record's current `updated_at` value. The writer reloads and locks the row, verifies that version, and rejects stale forms before applying changes. This is optimistic concurrency for ordinary CRM edits; it does not replace the lock-backed booking and lifecycle transactions.
+
+Host status and service status use explicit `active`, `inactive`, and `archived` values. The workspace does not hard-delete configuration. Making a service inactive or archived also makes it non-public so a stale public visibility flag cannot keep an unavailable service discoverable.
+
+Service policy editing includes:
+
+```text
+duration and slot interval
+buffers
+minimum booking notice
+booking horizon
+cancellation and reschedule notice
+service timezone
+structured location label and URL
+capacity
+confirmation requirement
+public visibility
+sort order
+```
+
+The browser never submits raw `location_details` JSON. The writer projects the ordinary location fields into the Scheduling-owned structured snapshot while preserving any unrelated existing location keys on an editable manual service.
+
+Assignment synchronization is transactional. Existing assignment rows omitted from a submission or explicitly disabled are retained with `is_active = false`; they are not deleted, and their presence continues to prevent accidental fallback to unhosted booking. A new inactive host does not create an unnecessary assignment row. Active assignments require an active, non-deleted host and may carry a positive capacity override plus sort order. The service is touched after synchronization so concurrent assignment forms become stale.
+
+`SchedulingReadService` supplies ordered configuration collections, source ownership, editability, assignment state, availability-window counts, and Appointment usage counts. Controllers and Blade views do not rebuild those Scheduling queries.
+
+The configuration workspace still omits availability-window editing, calendar visualization, provider synchronization, and reminder management.
 
 ## Appointment lifecycle state machine
 
@@ -859,12 +893,14 @@ Implemented CRM workspace seams:
 
 ```text
 SchedulingReadService
+SchedulingConfigurationWriter
 SchedulingController
+SchedulingConfigurationController
 AppointmentController
 StoreAppointmentRequest
 CancelAppointmentRequest
 RescheduleAppointmentRequest
-CRM Scheduling creation, detail, lifecycle, and reschedule workspace
+CRM Scheduling creation, detail, lifecycle, reschedule, Contact-panel, and configuration workspaces
 ```
 
 Planned:
@@ -885,9 +921,10 @@ Do not add `flow_route_*` foreign keys to Scheduling artifacts merely for proven
 
 ## Deferred work
 
-Deferred after the CRM Contact appointment panel:
+Deferred after the host, service, and assignment configuration workspace:
 
 ```text
+CRM availability-window editor
 SCHEDULING_APP_URL setup validation
 calendar views
 provider connection and synchronization persistence

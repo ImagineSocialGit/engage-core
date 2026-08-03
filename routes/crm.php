@@ -14,6 +14,7 @@ use App\Modules\FlowRoutes\Controllers\CRM\FlowRouteEditorController;
 use App\Modules\Messaging\Controllers\ContactImportBatchPermissionInvitationController;
 use App\Modules\Messaging\Controllers\CRM\MessageTemplatePresetController;
 use App\Modules\Scheduling\Controllers\CRM\AppointmentController;
+use App\Modules\Scheduling\Controllers\CRM\SchedulingConfigurationController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingController;
 use App\Modules\Tasks\Controllers\TaskController;
 use App\Modules\Webinars\Controllers\CRM\WebinarController;
@@ -257,6 +258,24 @@ Route::middleware('auth')->group(function () {
 
             Route::post('/appointments', [SchedulingController::class, 'store'])
                 ->name('appointments.store');
+
+            Route::get('/configuration', [SchedulingConfigurationController::class, 'index'])
+                ->name('configuration.index');
+
+            Route::post('/configuration/hosts', [SchedulingConfigurationController::class, 'storeHost'])
+                ->name('configuration.hosts.store');
+
+            Route::patch('/configuration/hosts/{schedulingHost}', [SchedulingConfigurationController::class, 'updateHost'])
+                ->name('configuration.hosts.update');
+
+            Route::post('/configuration/services', [SchedulingConfigurationController::class, 'storeService'])
+                ->name('configuration.services.store');
+
+            Route::patch('/configuration/services/{bookableService}', [SchedulingConfigurationController::class, 'updateService'])
+                ->name('configuration.services.update');
+
+            Route::put('/configuration/services/{bookableService}/hosts', [SchedulingConfigurationController::class, 'updateServiceHosts'])
+                ->name('configuration.services.hosts.update');
 
             Route::get('/appointments/{appointment}/reschedule', [AppointmentController::class, 'reschedule'])
                 ->name('appointments.reschedule');

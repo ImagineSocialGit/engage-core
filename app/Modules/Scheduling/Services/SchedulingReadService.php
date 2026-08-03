@@ -19,6 +19,7 @@ class SchedulingReadService
 {
     public function __construct(
         private readonly FindBookableAvailabilityAction $findAvailability,
+        private readonly SchedulingConfigurationWriter $configurationWriter,
     ) {}
 
     /**
@@ -104,6 +105,75 @@ class SchedulingReadService
             ->orderByDesc('id')
             ->limit($this->boundedContactLimit($limit))
             ->get();
+    }
+
+    /**
+     * @return Collection<int, SchedulingHost>
+     */
+    public function configurationHosts(): Collection
+    {
+        $hosts = SchedulingHost::query()
+            ->select('scheduling_hosts.*')
+            ->selectSub(
+                Appointment::query()
+                    ->selectRaw('count(*)')
+                    ->whereColumn(
+                        'appointments.scheduling_host_id',
+                        'scheduling_hosts.id',
+                    ),
+                'appointments_count',
+            )
+            ->withCount([
+                'serviceAssignments',
+                'serviceAssignments as active_service_assignments_count' =>
+                    fn ($query) => $query->where('is_active', true),
+                'availabilityWindows',
+            ])
+            ->orderByRaw("case status when 'active' then 0 when 'inactive' then 1 else 2 end")
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+
+        return $hosts->each(function (SchedulingHost $host): void {
+            $host->setAttribute(
+                'crm_editable',
+                $this->configurationWriter->hostIsEditable($host),
+            );
+        });
+    }
+
+    /**
+     * @return Collection<int, BookableService>
+     */
+    public function configurationServices(): Collection
+    {
+        $services = BookableService::query()
+            ->with([
+                'hostAssignments' => fn ($query) => $query
+                    ->with('schedulingHost')
+                    ->orderBy('sort_order')
+                    ->orderBy('id'),
+            ])
+            ->withCount([
+                'appointments',
+                'availabilityWindows',
+                'hostAssignments',
+                'hostAssignments as active_host_assignments_count' =>
+                    fn ($query) => $query->where('is_active', true),
+            ])
+            ->orderByRaw("case status when 'active' then 0 when 'inactive' then 1 else 2 end")
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+
+        return $services->each(function (BookableService $service): void {
+            $service->setAttribute(
+                'crm_editable',
+                $this->configurationWriter->serviceIsEditable($service),
+            );
+        });
     }
 
     /**

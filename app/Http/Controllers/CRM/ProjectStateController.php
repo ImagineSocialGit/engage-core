@@ -15,7 +15,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProjectStateController extends Controller
 {
-
     public function __construct(
         private readonly ProjectStateResumeManager $resumeManager,
     ) {}
@@ -131,7 +130,8 @@ class ProjectStateController extends Controller
         return $this->view($report);
     }
 
-    public function resume(Request $request): View {
+    public function resume(Request $request): View
+    {
         $this->authorizeOwner($request);
 
         $validated = $request->validate([

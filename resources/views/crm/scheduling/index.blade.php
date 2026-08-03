@@ -4,6 +4,16 @@
     subheading="Review upcoming appointments and schedule a contact into a currently available time."
 >
     <div class="space-y-6">
+        <div class="flex justify-end">
+            <a
+                href="{{ route('crm.scheduling.configuration.index') }}"
+                class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                data-scheduling-configuration-link
+            >
+                Manage configuration
+            </a>
+        </div>
+
         @if (session('success'))
             <x-ui.feedback.alert type="success">
                 {{ session('success') }}
