@@ -30,6 +30,7 @@ class SchedulingController extends Controller
         SchedulingReadService $read,
     ): View {
         $query = $request->validate([
+            'contact_id' => ['nullable', 'integer', 'exists:contacts,id'],
             'bookable_service_id' => ['nullable', 'integer'],
             'scheduling_host_id' => ['nullable', 'integer'],
             'date' => ['nullable', 'date_format:Y-m-d'],
@@ -95,10 +96,17 @@ class SchedulingController extends Controller
             )
             : [];
         $upcomingAppointments = $read->upcomingAppointments();
-        $oldContactId = (int) $request->old('contact_id', 0);
-        $selectedContact = $oldContactId > 0
-            ? Contact::query()->find($oldContactId)
+        $requestedContactId = $this->oldOrQueryInteger(
+            request: $request,
+            oldKey: 'contact_id',
+            query: $query,
+        );
+        $selectedContact = $requestedContactId > 0
+            ? Contact::query()->find($requestedContactId)
             : null;
+        $selectedContactLabel = $selectedContact instanceof Contact
+            ? $this->contactLabel($selectedContact)
+            : '';
 
         return view('crm.scheduling.index', [
             'title' => 'Scheduling',
@@ -118,6 +126,7 @@ class SchedulingController extends Controller
                 ->where('status', Appointment::STATUS_PENDING)
                 ->count(),
             'selectedContact' => $selectedContact,
+            'selectedContactLabel' => $selectedContactLabel,
             'idempotencyKey' => $request->old(
                 'idempotency_key',
                 (string) Str::uuid(),
@@ -182,6 +191,7 @@ class SchedulingController extends Controller
 
         return redirect()
             ->route('crm.scheduling.index', array_filter([
+                'contact_id' => $contact->getKey(),
                 'bookable_service_id' => $service->getKey(),
                 'scheduling_host_id' => $host?->getKey(),
                 'date' => $appointment->starts_at
@@ -194,6 +204,25 @@ class SchedulingController extends Controller
                     ? 'Appointment created and awaiting confirmation.'
                     : 'Appointment scheduled.',
             );
+    }
+
+    private function contactLabel(Contact $contact): string
+    {
+        $name = trim((string) ($contact->name ?: trim(
+            trim((string) $contact->first_name).' '.trim((string) $contact->last_name),
+        )));
+
+        if ($name !== '' && filled($contact->email)) {
+            return $name.' — '.$contact->email;
+        }
+
+        if ($name !== '') {
+            return $name;
+        }
+
+        return $contact->email
+            ?: $contact->phone
+            ?: 'Contact #'.$contact->getKey();
     }
 
     /**

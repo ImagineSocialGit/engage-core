@@ -721,7 +721,13 @@ Service identity, duration, end time, offer and hold identities, replacement sta
 
 A successful reschedule redirects to the replacement Appointment. Matching replay submissions return that same replacement without creating another offer, hold, attendee set, lifecycle event, or automation event. Reusing the replay key for another source Appointment, host, or start time is rejected.
 
-This workspace still omits Contact-page appointment panels, calendar visualization, provider synchronization, and reminder management.
+The Scheduling module also contributes a Contact-page panel through Core's module-filtered `ContactPanelProvider` seam. `SchedulingContactPanelProvider` uses bounded Scheduling-owned queries keyed only by `appointments.contact_id`; Core does not gain Scheduling relationships or query knowledge.
+
+The panel shows the next operational Appointment, other upcoming `pending`, `scheduled`, or `confirmed` Appointments, pending-confirmation attention, and recent `completed`, `canceled`, or `no_show` outcomes. Service, host, primary attendee ordering, and reschedule lineage are loaded by `SchedulingReadService`, and every row links to the authoritative CRM Appointment detail surface rather than duplicating lifecycle controls.
+
+The panel's Schedule Appointment action links to `/scheduling?contact_id={contact}`. `SchedulingController` validates that Contact identity, preserves it through service, host, and date selection, initializes the existing Core Contact autocomplete state, and keeps the Contact selected after successful creation. The browser still submits the ordinary `contact_id`; the query parameter grants no additional authority.
+
+This workspace still omits calendar visualization, provider synchronization, and reminder management.
 
 ## Appointment lifecycle state machine
 
@@ -879,10 +885,9 @@ Do not add `flow_route_*` foreign keys to Scheduling artifacts merely for proven
 
 ## Deferred work
 
-Deferred after the CRM Appointment reschedule workspace:
+Deferred after the CRM Contact appointment panel:
 
 ```text
-Contact-page appointment panel
 SCHEDULING_APP_URL setup validation
 calendar views
 provider connection and synchronization persistence

@@ -158,6 +158,18 @@
                         action="{{ route('crm.scheduling.index') }}"
                         class="space-y-4"
                     >
+                        @if($selectedContact)
+                            <input type="hidden" name="contact_id" value="{{ $selectedContact->id }}">
+
+                            <div
+                                class="rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm text-teal-950"
+                                data-scheduling-preselected-contact="{{ $selectedContact->id }}"
+                            >
+                                <span class="font-semibold">Scheduling for:</span>
+                                {{ $selectedContactLabel }}
+                            </div>
+                        @endif
+
                         <div>
                             <x-ui.form.label for="bookable_service_id">
                                 Service
@@ -256,7 +268,7 @@
                             action="{{ route('crm.scheduling.appointments.store') }}"
                             class="space-y-5"
                             x-data="{
-                                query: @js($selectedContact?->name ?: $selectedContact?->email ?: ''),
+                                query: @js(old('contact_search', $selectedContactLabel)),
                                 selectedId: @js((string) old('contact_id', $selectedContact?->id ?? '')),
                                 results: [],
                                 loading: false,

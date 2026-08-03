@@ -2,6 +2,7 @@
 
 namespace App\Modules\Scheduling\Services;
 
+use App\Modules\Core\Models\Contact;
 use App\Modules\Scheduling\Actions\FindBookableAvailabilityAction;
 use App\Modules\Scheduling\Data\AvailabilitySearch;
 use App\Modules\Scheduling\Data\BookableSlot;
@@ -11,6 +12,7 @@ use App\Modules\Scheduling\Models\BookableServiceHost;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
 class SchedulingReadService
@@ -63,6 +65,45 @@ class SchedulingReadService
                     ->orderBy('id'),
             ])
             ->findOrFail($appointment->getKey());
+    }
+
+    /**
+     * @return Collection<int, Appointment>
+     */
+    public function contactUpcomingAppointments(
+        Contact $contact,
+        int $limit = 5,
+    ): Collection {
+        return $this->contactAppointmentsQuery($contact)
+            ->whereIn('status', [
+                Appointment::STATUS_PENDING,
+                Appointment::STATUS_SCHEDULED,
+                Appointment::STATUS_CONFIRMED,
+            ])
+            ->where('starts_at', '>=', CarbonImmutable::now('UTC'))
+            ->orderBy('starts_at')
+            ->orderBy('id')
+            ->limit($this->boundedContactLimit($limit))
+            ->get();
+    }
+
+    /**
+     * @return Collection<int, Appointment>
+     */
+    public function contactRecentTerminalAppointments(
+        Contact $contact,
+        int $limit = 5,
+    ): Collection {
+        return $this->contactAppointmentsQuery($contact)
+            ->whereIn('status', [
+                Appointment::STATUS_COMPLETED,
+                Appointment::STATUS_CANCELED,
+                Appointment::STATUS_NO_SHOW,
+            ])
+            ->orderByDesc('starts_at')
+            ->orderByDesc('id')
+            ->limit($this->boundedContactLimit($limit))
+            ->get();
     }
 
     /**
@@ -189,6 +230,30 @@ class SchedulingReadService
             evaluatedAt: CarbonImmutable::now('UTC'),
             rescheduleAppointment: $rescheduleAppointment,
         ));
+    }
+
+    /**
+     * @return Builder<Appointment>
+     */
+    private function contactAppointmentsQuery(Contact $contact): Builder
+    {
+        return Appointment::query()
+            ->with([
+                'bookableService',
+                'schedulingHost',
+                'attendees' => fn ($query) => $query
+                    ->orderByRaw("case when role = 'primary' then 0 else 1 end")
+                    ->orderBy('id'),
+                'rescheduledFrom',
+                'rescheduledAppointments' => fn ($query) => $query
+                    ->orderBy('id'),
+            ])
+            ->where('contact_id', $contact->getKey());
+    }
+
+    private function boundedContactLimit(int $limit): int
+    {
+        return max(1, min(20, $limit));
     }
 
     private function sameHost(mixed $left, mixed $right): bool

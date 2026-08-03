@@ -719,6 +719,8 @@
 │   │   │   │   │   ├── AppointmentOccupancyResolver.php
 │   │   │   │   │   ├── AvailabilityRuleResolver.php
 │   │   │   │   │   └── BookingOccupancyResolver.php
+│   │   │   │   ├── ContactShow
+│   │   │   │   │   └── SchedulingContactPanelProvider.php
 │   │   │   │   └── SchedulingReadService.php
 │   │   │   └── Support
 │   │   ├── Tasks
@@ -1577,6 +1579,7 @@
 │       │   ├── project-state
 │       │   │   └── index.blade.php
 │       │   ├── scheduling
+│       │   │   ├── contact-panel.blade.php
 │       │   │   ├── index.blade.php
 │       │   │   ├── reschedule.blade.php
 │       │   │   └── show.blade.php
@@ -1864,6 +1867,7 @@
 │   │   │   ├── SchedulingAppointmentRescheduleWorkspaceTest.php
 │   │   │   ├── SchedulingAppointmentWorkspaceTest.php
 │   │   │   ├── SchedulingAvailabilityWindowFoundationTest.php
+│   │   │   ├── SchedulingContactPanelTest.php
 │   │   │   ├── SchedulingFoundationTest.php
 │   │   │   ├── SchedulingHostAndServiceFoundationTest.php
 │   │   │   └── SchedulingWorkspaceTest.php
@@ -1967,4 +1971,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-505 directories, 1463 files
+506 directories, 1466 files

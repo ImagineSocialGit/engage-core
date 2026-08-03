@@ -2,7 +2,9 @@
 
 namespace App\Modules\Scheduling\Providers;
 
+use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use App\Modules\Scheduling\Jobs\ExpireBookingHoldsJob;
+use App\Modules\Scheduling\Services\ContactShow\SchedulingContactPanelProvider;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -16,8 +18,15 @@ class SchedulingModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->registerContactPanel();
         $this->registerBookingHoldExpiration();
         $this->registerPublicRoutes();
+    }
+
+    private function registerContactPanel(): void
+    {
+        $this->app->make(ContactPanelRegistry::class)
+            ->register(SchedulingContactPanelProvider::class, 'scheduling');
     }
 
     private function registerBookingHoldExpiration(): void
