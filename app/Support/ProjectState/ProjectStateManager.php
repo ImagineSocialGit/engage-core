@@ -14,11 +14,17 @@ use Throwable;
 
 class ProjectStateManager
 {
-    /** @var array<string, array<int, mixed>> */
-    private array $validationDocumentTables = [];
-
     /** @var array<string, array<string, int|string>> */
     private array $importedIds = [];
+
+    public function __construct(
+        private readonly ProjectStateDocumentCodec $documentCodec,
+        private readonly ProjectStateContractRegistry $contractRegistry,
+        private readonly ProjectStateSchemaGuard $schemaGuard,
+        private readonly ProjectStateDocumentValidator $documentValidator,
+        private readonly ProjectStateReferenceResolver $referenceResolver,
+        private readonly ProjectStateImportValueMapper $importValueMapper,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -28,10 +34,10 @@ class ProjectStateManager
         return $this->withConsistentReadSnapshot(function (): array {
             $this->assertNoPendingResumeItemsForExport();
 
-            $configuredSections = $this->sections();
+            $configuredSections = $this->contractRegistry->sections();
 
-            $this->assertSchemaCoverage($configuredSections);
-            $this->assertExportTablePolicies();
+            $this->schemaGuard->assertSchemaCoverage($configuredSections);
+            $this->schemaGuard->assertExportTablePolicies();
 
             $sections = [];
 
@@ -39,7 +45,7 @@ class ProjectStateManager
                 $tables = [];
 
                 foreach ($section['tables'] as $table => $definition) {
-                    $this->assertTargetSchema($table, $definition);
+                    $this->schemaGuard->assertTargetSchema($table, $definition);
 
                     $query = $this->connection()
                         ->table($table)
@@ -65,14 +71,14 @@ class ProjectStateManager
                 ];
             }
 
-            $this->assertExportReferences(
+            $this->referenceResolver->assertExportReferences(
                 configuredSections: $configuredSections,
                 exportedSections: $sections,
             );
 
             $document = [
-                'format' => $this->format(),
-                'version' => $this->version(),
+                'format' => $this->contractRegistry->format(),
+                'version' => $this->contractRegistry->version(),
                 'exported_at' => now('UTC')->toISOString(),
                 'client_key' => (string) config('client.key', ''),
                 'source' => [
@@ -82,7 +88,7 @@ class ProjectStateManager
                 'sections' => $sections,
             ];
 
-            $document['checksum'] = $this->checksum($document);
+            $document['checksum'] = $this->documentCodec->checksum($document);
 
             return $document;
         });
@@ -94,115 +100,7 @@ class ProjectStateManager
      */
     public function validate(array $document): array
     {
-        $errors = [];
-        $warnings = [];
-        $counts = [];
-
-        $this->validateEnvelope($document, $errors, $warnings);
-
-        $configuredSections = $this->sections();
-        $documentSections = $document['sections'] ?? null;
-
-        if (! is_array($documentSections)) {
-            $errors[] = 'The project-state document must contain a sections object.';
-            $documentSections = [];
-        }
-
-        foreach ($configuredSections as $sectionKey => $section) {
-            $documentSection = $documentSections[$sectionKey] ?? null;
-
-            if (! is_array($documentSection)) {
-                $errors[] = "Required project-state section [{$sectionKey}] is missing.";
-                continue;
-            }
-
-            if (($documentSection['version'] ?? null) !== $section['version']) {
-                $errors[] = sprintf(
-                    'Project-state section [%s] requires version [%d].',
-                    $sectionKey,
-                    $section['version'],
-                );
-            }
-
-            $documentTables = $documentSection['tables'] ?? null;
-
-            if (! is_array($documentTables)) {
-                $errors[] = "Project-state section [{$sectionKey}] must contain a tables object.";
-                continue;
-            }
-
-            foreach ($section['tables'] as $table => $definition) {
-                try {
-                    $this->assertTargetSchema($table, $definition);
-                } catch (Throwable $exception) {
-                    $errors[] = $exception->getMessage();
-                    continue;
-                }
-
-                $rows = $documentTables[$table] ?? null;
-
-                if (! is_array($rows) || ! array_is_list($rows)) {
-                    $errors[] = "Project-state table [{$table}] must be a JSON array.";
-                    continue;
-                }
-
-                $counts[$table] = count($rows);
-                $this->validateRows($table, $definition, $rows, $errors);
-                $this->appendImportValueMapWarnings(
-                    table: $table,
-                    definition: $definition,
-                    rows: $rows,
-                    warnings: $warnings,
-                );
-                $this->appendJsonPathValueMapWarnings(
-                    table: $table,
-                    definition: $definition,
-                    rows: $rows,
-                    warnings: $warnings,
-                );
-                $this->appendNullOnImportWarnings(
-                    table: $table,
-                    definition: $definition,
-                    rows: $rows,
-                    warnings: $warnings,
-                );
-                $this->appendPolymorphicReferenceWarnings(
-                    table: $table,
-                    definition: $definition,
-                    rows: $rows,
-                    warnings: $warnings,
-                );
-
-                if ($definition['mode'] === 'insert_empty'
-                    && $this->connection()->table($table)->exists()
-                ) {
-                    $errors[] = "Target table [{$table}] must be empty before import.";
-                }
-            }
-
-            foreach (array_keys($documentTables) as $table) {
-                if (! array_key_exists($table, $section['tables'])) {
-                    $warnings[] = "Unknown table [{$sectionKey}.{$table}] will not be imported.";
-                }
-            }
-        }
-
-        foreach (array_keys($documentSections) as $sectionKey) {
-            if (! array_key_exists($sectionKey, $configuredSections)) {
-                $warnings[] = "Unknown section [{$sectionKey}] will not be imported.";
-            }
-        }
-
-        return [
-            'valid' => $errors === [],
-            'format' => $document['format'] ?? null,
-            'version' => $document['version'] ?? null,
-            'client_key' => $document['client_key'] ?? null,
-            'counts' => $counts,
-            'errors' => $errors,
-            'warnings' => $warnings,
-            'applied' => false,
-        ];
+        return $this->documentValidator->validate($document);
     }
 
     /**
@@ -221,10 +119,11 @@ class ProjectStateManager
 
         $applied = [];
         $this->importedIds = [];
+        $documentTables = $this->referenceResolver->documentTables($document);
 
         try {
-            $this->connection()->transaction(function () use ($document, &$applied): void {
-                $sections = $this->sections();
+            $this->connection()->transaction(function () use ($document, $documentTables, &$applied): void {
+                $sections = $this->contractRegistry->sections();
 
                 foreach ($sections as $sectionKey => $section) {
                     $tables = $document['sections'][$sectionKey]['tables'];
@@ -239,6 +138,7 @@ class ProjectStateManager
                                     table: $table,
                                     row: $row,
                                     definition: $definition,
+                                    documentTables: $documentTables,
                                 );
                                 $identity = Arr::only(
                                     $importRow,
@@ -278,6 +178,7 @@ class ProjectStateManager
                                     table: $table,
                                     row: $row,
                                     definition: $definition,
+                                    documentTables: $documentTables,
                                 ),
                                 $chunk,
                             );
@@ -306,7 +207,7 @@ class ProjectStateManager
                     }
                 }
 
-                $this->applyDeferredReferences($sections);
+                $this->applyDeferredReferences($sections, $documentTables);
             }, attempts: 1);
         } catch (Throwable $exception) {
             throw new InvalidArgumentException(
@@ -326,14 +227,7 @@ class ProjectStateManager
      */
     public function encode(array $document): string
     {
-        return json_encode(
-            $document,
-            JSON_PRETTY_PRINT
-                | JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_INVALID_UTF8_SUBSTITUTE
-                | JSON_THROW_ON_ERROR,
-        ).PHP_EOL;
+        return $this->documentCodec->encode($document);
     }
 
     /**
@@ -341,308 +235,7 @@ class ProjectStateManager
      */
     public function decode(string $json): array
     {
-        try {
-            $document = json_decode(
-                $json,
-                associative: true,
-                flags: JSON_THROW_ON_ERROR,
-            );
-        } catch (JsonException $exception) {
-            throw new InvalidArgumentException(
-                'The uploaded project-state file is not valid JSON: '.$exception->getMessage(),
-                previous: $exception,
-            );
-        }
-
-        if (! is_array($document)) {
-            throw new InvalidArgumentException(
-                'The uploaded project-state file must contain a JSON object.'
-            );
-        }
-
-        return $document;
-    }
-
-    /**
-     * @return array<string, array<string, mixed>>
-     */
-    private function sections(): array
-    {
-        $sections = config('project_state.sections', []);
-
-        if (! is_array($sections) || $sections === []) {
-            throw new RuntimeException('No project-state sections are configured.');
-        }
-
-        $normalized = [];
-
-        foreach ($sections as $sectionKey => $section) {
-            if (! is_string($sectionKey)
-                || trim($sectionKey) === ''
-                || ! is_array($section)
-                || ! is_int($section['version'] ?? null)
-                || ! is_array($section['tables'] ?? null)
-            ) {
-                throw new RuntimeException('Project-state section configuration is invalid.');
-            }
-
-            $tables = [];
-
-            foreach ($section['tables'] as $table => $definition) {
-                if (! is_string($table) || trim($table) === '') {
-                    throw new RuntimeException('Project-state table configuration is invalid.');
-                }
-
-                $tables[$table] = $this->normalizeDefinition($table, $definition);
-            }
-
-            $normalized[$sectionKey] = [
-                'version' => $section['version'],
-                'tables' => $tables,
-            ];
-        }
-
-        return $normalized;
-    }
-
-    /**
-     * @param mixed $definition
-     * @return array<string, mixed>
-     */
-    private function normalizeDefinition(string $table, mixed $definition): array
-    {
-        if (! is_array($definition)) {
-            throw new RuntimeException("Project-state table [{$table}] configuration is invalid.");
-        }
-
-        $mode = $definition['mode'] ?? null;
-        $columns = $definition['columns'] ?? null;
-        $orderBy = $definition['order_by'] ?? ['id'];
-        $identity = $definition['identity'] ?? [];
-        $nullableIdentity = $definition['nullable_identity'] ?? [];
-        $jsonColumns = $definition['json_columns'] ?? [];
-        $references = $definition['references'] ?? [];
-        $deferredReferences = $definition['deferred_references'] ?? [];
-        $nullOnImport = $definition['null_on_import'] ?? [];
-        $importValueMaps = $definition['import_value_maps'] ?? [];
-        $importValueMapBackups = $definition['import_value_map_backups'] ?? [];
-        $jsonPathValueMaps = $definition['json_path_value_maps'] ?? [];
-        $jsonPathReferences = $definition['json_path_references'] ?? [];
-        $polymorphicReferences = $definition['polymorphic_references'] ?? [];
-        $resumeItems = $definition['resume_items'] ?? [];
-        $preserveId = (bool) ($definition['preserve_id'] ?? true);
-
-        if (! in_array($mode, ['insert_empty', 'upsert'], true)
-            || ! $this->isStringList($columns, allowEmpty: false)
-            || ! $this->isStringList($orderBy, allowEmpty: false)
-            || ! $this->isStringList($identity)
-            || ! $this->isStringList($nullableIdentity)
-            || ! $this->isStringList($jsonColumns)
-            || ! $this->isStringList($nullOnImport)
-            || ! $this->isReferenceMap($references)
-            || ! $this->isReferenceMap($deferredReferences)
-            || ! $this->isImportValueMap($importValueMaps)
-            || ! $this->isImportValueMapBackupMap($importValueMapBackups)
-            || ! $this->isJsonPathValueMap($jsonPathValueMaps)
-            || ! $this->isJsonPathReferenceMap($jsonPathReferences)
-            || ! $this->isPolymorphicReferenceList($polymorphicReferences)
-            || ! $this->isResumeItemList($resumeItems)
-        ) {
-            throw new RuntimeException("Project-state table [{$table}] configuration is invalid.");
-        }
-
-        if ($mode === 'upsert' && $identity === []) {
-            throw new RuntimeException("Project-state table [{$table}] requires an upsert identity.");
-        }
-
-        if ($mode === 'insert_empty' && ! $preserveId) {
-            throw new RuntimeException(
-                "Project-state table [{$table}] must preserve IDs in insert-empty mode."
-            );
-        }
-
-        $referencedColumns = [
-            ...array_keys($references),
-            ...array_keys($deferredReferences),
-        ];
-
-        foreach ([
-            ...$orderBy,
-            ...$identity,
-            ...$nullableIdentity,
-            ...$jsonColumns,
-            ...$nullOnImport,
-            ...$referencedColumns,
-            ...array_keys($importValueMaps),
-            ...array_keys($importValueMapBackups),
-            ...array_keys($jsonPathValueMaps),
-            ...array_keys($jsonPathReferences),
-            ...$this->polymorphicReferenceColumns($polymorphicReferences),
-            ...$this->resumeItemColumns($resumeItems),
-        ] as $column) {
-            if (! in_array($column, $columns, true)) {
-                throw new RuntimeException(
-                    "Project-state table [{$table}] references unknown column [{$column}]."
-                );
-            }
-        }
-
-        foreach (array_keys($jsonPathValueMaps) as $column) {
-            if (! in_array($column, $jsonColumns, true)) {
-                throw new RuntimeException(
-                    "Project-state table [{$table}] JSON path value map [{$column}] is not a JSON column."
-                );
-            }
-        }
-
-        foreach ($importValueMapBackups as $column => $backup) {
-            if (! array_key_exists($column, $importValueMaps)) {
-                throw new RuntimeException(
-                    "Project-state table [{$table}] import value-map backup [{$column}] has no import value map."
-                );
-            }
-
-            if (! in_array($backup['json_column'], $jsonColumns, true)) {
-                throw new RuntimeException(
-                    "Project-state table [{$table}] import value-map backup [{$column}] does not target a JSON column."
-                );
-            }
-        }
-
-        foreach (array_keys($jsonPathReferences) as $column) {
-            if (! in_array($column, $jsonColumns, true)) {
-                throw new RuntimeException(
-                    "Project-state table [{$table}] JSON path reference [{$column}] is not a JSON column."
-                );
-            }
-        }
-
-        foreach ($resumeItems as $resumeItem) {
-            $jsonColumn = $resumeItem['json_column'] ?? null;
-
-            if ($jsonColumn !== null && ! in_array($jsonColumn, $jsonColumns, true)) {
-                throw new RuntimeException(
-                    "Project-state table [{$table}] resume item source [{$jsonColumn}] is not a JSON column."
-                );
-            }
-        }
-
-        foreach ($nullableIdentity as $column) {
-            if (! in_array($column, $identity, true)) {
-                throw new RuntimeException(
-                    "Project-state table [{$table}] nullable identity [{$column}] is not an identity column."
-                );
-            }
-        }
-
-        if (array_intersect(array_keys($references), array_keys($deferredReferences)) !== []) {
-            throw new RuntimeException(
-                "Project-state table [{$table}] repeats a reference as immediate and deferred."
-            );
-        }
-
-        $normalizedJsonPathReferences = [];
-
-        foreach ($jsonPathReferences as $column => $pathReferences) {
-            foreach ($pathReferences as $path => $reference) {
-                $normalizedJsonPathReferences[$column][$path] = [
-                    'table' => $reference['table'],
-                    'deferred' => (bool) ($reference['deferred'] ?? false),
-                ];
-            }
-        }
-
-        $polymorphicReferences = array_map(
-            fn (array $reference): array => [
-                'type_column' => $reference['type_column'],
-                'id_column' => $reference['id_column'],
-                'targets' => $reference['targets'],
-                'deferred' => (bool) ($reference['deferred'] ?? false),
-            ],
-            $polymorphicReferences,
-        );
-
-        $resumeItems = array_map(
-            fn (array $resumeItem): array => [
-                'category' => trim($resumeItem['category']),
-                'statuses' => array_values($resumeItem['statuses']),
-                'column' => isset($resumeItem['column'])
-                    ? trim($resumeItem['column'])
-                    : null,
-                'json_column' => isset($resumeItem['json_column'])
-                    ? trim($resumeItem['json_column'])
-                    : null,
-                'path' => isset($resumeItem['path'])
-                    ? trim($resumeItem['path'])
-                    : null,
-            ],
-            $resumeItems,
-        );
-
-        return [
-            'mode' => $mode,
-            'identity' => array_values($identity),
-            'nullable_identity' => array_values($nullableIdentity),
-            'preserve_id' => $preserveId,
-            'order_by' => array_values($orderBy),
-            'columns' => array_values($columns),
-            'json_columns' => array_values($jsonColumns),
-            'references' => $references,
-            'deferred_references' => $deferredReferences,
-            'null_on_import' => array_values($nullOnImport),
-            'import_value_maps' => $importValueMaps,
-            'import_value_map_backups' => $importValueMapBackups,
-            'json_path_value_maps' => $jsonPathValueMaps,
-            'json_path_references' => $normalizedJsonPathReferences,
-            'polymorphic_references' => $polymorphicReferences,
-            'resume_items' => $resumeItems,
-        ];
-    }
-
-    /**
-     * @param array<string, mixed> $definition
-     */
-    private function assertTargetSchema(string $table, array $definition): void
-    {
-        if (! Schema::hasTable($table)) {
-            throw new RuntimeException("Required project-state table [{$table}] does not exist.");
-        }
-
-        foreach ($definition['columns'] as $column) {
-            if (! Schema::hasColumn($table, $column)) {
-                throw new RuntimeException(
-                    "Required project-state column [{$table}.{$column}] does not exist."
-                );
-            }
-        }
-
-        $declaredColumns = $definition['columns'];
-        $actualColumns = $this->connection()
-            ->getSchemaBuilder()
-            ->getColumnListing($table);
-
-        sort($declaredColumns, SORT_STRING);
-        sort($actualColumns, SORT_STRING);
-
-        if ($actualColumns !== $declaredColumns) {
-            $missing = array_values(array_diff($actualColumns, $declaredColumns));
-            $obsolete = array_values(array_diff($declaredColumns, $actualColumns));
-            $details = [];
-
-            if ($missing !== []) {
-                $details[] = 'unclassified column(s): '.implode(', ', $missing);
-            }
-
-            if ($obsolete !== []) {
-                $details[] = 'missing configured column(s): '.implode(', ', $obsolete);
-            }
-
-            throw new RuntimeException(sprintf(
-                'Project-state table [%s] does not match its complete column contract (%s).',
-                $table,
-                implode('; ', $details),
-            ));
-        }
+        return $this->documentCodec->decode($json);
     }
 
     /**
@@ -685,6 +278,7 @@ class ProjectStateManager
         string $table,
         array $row,
         array $definition,
+        array $documentTables,
     ): array {
         foreach ($definition['polymorphic_references'] as $reference) {
             $type = $row[$reference['type_column']] ?? null;
@@ -695,9 +289,10 @@ class ProjectStateManager
 
             if (! is_string($referencedTable)
                 || $sourceId === null
-                || ! $this->documentTableContainsId(
-                    $referencedTable,
-                    $sourceId,
+                || ! $this->referenceResolver->documentTableContainsId(
+                    documentTables: $documentTables,
+                    table: $referencedTable,
+                    sourceId: $sourceId,
                 )
             ) {
                 continue;
@@ -732,7 +327,7 @@ class ProjectStateManager
 
         foreach ($definition['import_value_maps'] as $column => $valueMap) {
             $sourceValue = $row[$column] ?? null;
-            $targetValue = $this->mappedImportValue(
+            $targetValue = $this->importValueMapper->map(
                 value: $sourceValue,
                 valueMap: $valueMap,
             );
@@ -779,7 +374,7 @@ class ProjectStateManager
                 Arr::set(
                     $value,
                     $path,
-                    $this->mappedImportValue(
+                    $this->importValueMapper->map(
                         value: Arr::get($value, $path),
                         valueMap: $valueMap,
                     ),
@@ -844,414 +439,13 @@ class ProjectStateManager
     }
 
     /**
-     * @param array<int, mixed> $rows
-     * @param array<int, string> $errors
-     * @param array<string, mixed> $definition
-     */
-    private function validateRows(
-        string $table,
-        array $definition,
-        array $rows,
-        array &$errors,
-    ): void {
-        $expectedColumns = $definition['columns'];
-        sort($expectedColumns);
-        $seenIdentities = [];
-        $seenSourceIds = [];
-
-        foreach ($rows as $index => $row) {
-            if (! is_array($row)) {
-                $errors[] = "Project-state row [{$table}.{$index}] must be an object.";
-                continue;
-            }
-
-            $actualColumns = array_keys($row);
-            sort($actualColumns);
-
-            if ($actualColumns !== $expectedColumns) {
-                $errors[] = "Project-state row [{$table}.{$index}] does not match the current column contract.";
-                continue;
-            }
-
-            $sourceId = $row['id'] ?? null;
-
-            if ($sourceId === null || $sourceId === '') {
-                $errors[] = "Project-state row [{$table}.{$index}] requires [id].";
-                continue;
-            }
-
-            $sourceIdKey = (string) $sourceId;
-
-            if (isset($seenSourceIds[$sourceIdKey])) {
-                $errors[] = "Project-state table [{$table}] contains duplicate source ID [{$sourceIdKey}].";
-            }
-
-            $seenSourceIds[$sourceIdKey] = true;
-
-            foreach ($definition['json_columns'] as $column) {
-                if ($row[$column] !== null && ! is_array($row[$column])) {
-                    $errors[] = "Project-state value [{$table}.{$index}.{$column}] must be an object, array, or null.";
-                }
-            }
-
-            $identityColumns = $definition['mode'] === 'upsert'
-                ? $definition['identity']
-                : ['id'];
-
-            $identityValues = [];
-
-            foreach ($identityColumns as $column) {
-                $value = $row[$column] ?? null;
-                $nullable = in_array(
-                    $column,
-                    $definition['nullable_identity'],
-                    true,
-                );
-
-                if (($value === null || $value === '') && ! $nullable) {
-                    $errors[] = "Project-state row [{$table}.{$index}] requires [{$column}].";
-                    continue 2;
-                }
-
-                $identityValues[] = $value === null
-                    ? '<null>'
-                    : get_debug_type($value).':'.(string) $value;
-            }
-
-            $identityKey = implode('|', $identityValues);
-
-            if (isset($seenIdentities[$identityKey])) {
-                $errors[] = "Project-state table [{$table}] contains duplicate identity [{$identityKey}].";
-            }
-
-            $seenIdentities[$identityKey] = true;
-        }
-
-        $this->validateReferences($table, $definition, $rows, $errors);
-    }
-
-    /**
-     * @param array<int, mixed> $rows
-     * @param array<int, string> $errors
-     * @param array<string, mixed> $definition
-     */
-    private function validateReferences(
-        string $table,
-        array $definition,
-        array $rows,
-        array &$errors,
-    ): void {
-        $references = array_merge(
-            $definition['references'],
-            $definition['deferred_references'],
-        );
-
-        foreach ($references as $column => $referencedTable) {
-            $referencedRows = $this->documentTableRows($referencedTable);
-
-            if ($referencedRows === null) {
-                $errors[] = "Project-state reference target [{$referencedTable}] is not configured in the document.";
-                continue;
-            }
-
-            $referencedIds = [];
-
-            foreach ($referencedRows as $referencedRow) {
-                if (is_array($referencedRow) && isset($referencedRow['id'])) {
-                    $referencedIds[(string) $referencedRow['id']] = true;
-                }
-            }
-
-            foreach ($rows as $index => $row) {
-                if (! is_array($row)) {
-                    continue;
-                }
-
-                $value = $row[$column] ?? null;
-
-                if ($value !== null && ! isset($referencedIds[(string) $value])) {
-                    $errors[] = "Project-state reference [{$table}.{$index}.{$column}] does not exist in [{$referencedTable}].";
-                }
-            }
-        }
-
-        foreach ($definition['polymorphic_references'] as $reference) {
-            foreach ($rows as $index => $row) {
-                if (! is_array($row)) {
-                    continue;
-                }
-
-                $type = $row[$reference['type_column']] ?? null;
-                $value = $row[$reference['id_column']] ?? null;
-
-                if (($type === null) !== ($value === null)) {
-                    $errors[] = sprintf(
-                        'Project-state polymorphic reference [%s.%d.%s/%s] must provide both type and ID or neither.',
-                        $table,
-                        $index,
-                        $reference['type_column'],
-                        $reference['id_column'],
-                    );
-
-                    continue;
-                }
-
-                if ($type === null) {
-                    continue;
-                }
-
-                if (! is_string($type)
-                    || ! array_key_exists($type, $reference['targets'])
-                ) {
-                    $errors[] = sprintf(
-                        'Project-state polymorphic reference [%s.%d.%s] uses unsupported type [%s].',
-                        $table,
-                        $index,
-                        $reference['type_column'],
-                        is_scalar($type) ? (string) $type : get_debug_type($type),
-                    );
-
-                    continue;
-                }
-
-                $referencedTable = $reference['targets'][$type];
-                $referencedRows = $this->documentTableRows($referencedTable);
-
-                if ($referencedRows === null) {
-                    $errors[] = sprintf(
-                        'Project-state polymorphic reference [%s.%d.%s/%s] targets unexported table [%s].',
-                        $table,
-                        $index,
-                        $reference['type_column'],
-                        $reference['id_column'],
-                        $referencedTable,
-                    );
-                }
-            }
-        }
-
-        foreach ($definition['json_path_references'] as $column => $pathReferences) {
-            foreach ($pathReferences as $path => $reference) {
-                $referencedTable = $reference['table'];
-                $referencedRows = $this->documentTableRows($referencedTable);
-
-                if ($referencedRows === null) {
-                    $errors[] = "Project-state JSON reference target [{$referencedTable}] is not configured in the document.";
-                    continue;
-                }
-
-                $referencedIds = [];
-
-                foreach ($referencedRows as $referencedRow) {
-                    if (is_array($referencedRow) && isset($referencedRow['id'])) {
-                        $referencedIds[(string) $referencedRow['id']] = true;
-                    }
-                }
-
-                foreach ($rows as $index => $row) {
-                    if (! is_array($row)
-                        || ! is_array($row[$column] ?? null)
-                        || ! Arr::has($row[$column], $path)
-                    ) {
-                        continue;
-                    }
-
-                    $value = Arr::get($row[$column], $path);
-
-                    if ($value !== null && ! isset($referencedIds[(string) $value])) {
-                        $errors[] = "Project-state JSON reference [{$table}.{$index}.{$column}.{$path}] does not exist in [{$referencedTable}].";
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * @param array<string, mixed> $definition
-     * @param array<int, mixed> $rows
-     * @param array<int, string> $warnings
-     */
-    private function appendImportValueMapWarnings(
-        string $table,
-        array $definition,
-        array $rows,
-        array &$warnings,
-    ): void {
-        foreach ($definition['import_value_maps'] as $column => $valueMap) {
-            $counts = [];
-
-            foreach ($rows as $row) {
-                if (! is_array($row)) {
-                    continue;
-                }
-
-                $sourceValue = $row[$column] ?? null;
-                $targetValue = $this->mappedImportValue($sourceValue, $valueMap);
-
-                if ($sourceValue === $targetValue) {
-                    continue;
-                }
-
-                $key = $this->displayValue($sourceValue).' → '.$this->displayValue($targetValue);
-                $counts[$key] = ($counts[$key] ?? 0) + 1;
-            }
-
-            foreach ($counts as $mapping => $count) {
-                $warnings[] = sprintf(
-                    'Import will map [%s.%s] %s for %d row(s).',
-                    $table,
-                    $column,
-                    $mapping,
-                    $count,
-                );
-            }
-        }
-    }
-
-    /**
-     * @param array<string, mixed> $definition
-     * @param array<int, mixed> $rows
-     * @param array<int, string> $warnings
-     */
-    private function appendJsonPathValueMapWarnings(
-        string $table,
-        array $definition,
-        array $rows,
-        array &$warnings,
-    ): void {
-        foreach ($definition['json_path_value_maps'] as $column => $pathMaps) {
-            foreach ($pathMaps as $path => $valueMap) {
-                $counts = [];
-
-                foreach ($rows as $row) {
-                    if (! is_array($row)
-                        || ! is_array($row[$column] ?? null)
-                        || ! Arr::has($row[$column], $path)
-                    ) {
-                        continue;
-                    }
-
-                    $sourceValue = Arr::get($row[$column], $path);
-                    $targetValue = $this->mappedImportValue(
-                        $sourceValue,
-                        $valueMap,
-                    );
-
-                    if ($sourceValue === $targetValue) {
-                        continue;
-                    }
-
-                    $key = $this->displayValue($sourceValue)
-                        .' → '
-                        .$this->displayValue($targetValue);
-                    $counts[$key] = ($counts[$key] ?? 0) + 1;
-                }
-
-                foreach ($counts as $mapping => $count) {
-                    $warnings[] = sprintf(
-                        'Import will map [%s.%s.%s] %s for %d row(s).',
-                        $table,
-                        $column,
-                        $path,
-                        $mapping,
-                        $count,
-                    );
-                }
-            }
-        }
-    }
-
-    /**
-     * @param array<string, mixed> $definition
-     * @param array<int, mixed> $rows
-     * @param array<int, string> $warnings
-     */
-    private function appendNullOnImportWarnings(
-        string $table,
-        array $definition,
-        array $rows,
-        array &$warnings,
-    ): void {
-        foreach ($definition['null_on_import'] as $column) {
-            $count = 0;
-
-            foreach ($rows as $row) {
-                if (is_array($row)
-                    && array_key_exists($column, $row)
-                    && $row[$column] !== null
-                ) {
-                    $count++;
-                }
-            }
-
-            if ($count > 0) {
-                $warnings[] = sprintf(
-                    'Import will clear [%s.%s] for %d row(s).',
-                    $table,
-                    $column,
-                    $count,
-                );
-            }
-        }
-    }
-
-    /**
-     * @param array<string, mixed> $definition
-     * @param array<int, mixed> $rows
-     * @param array<int, string> $warnings
-     */
-    private function appendPolymorphicReferenceWarnings(
-        string $table,
-        array $definition,
-        array $rows,
-        array &$warnings,
-    ): void {
-        foreach ($definition['polymorphic_references'] as $reference) {
-            $counts = [];
-
-            foreach ($rows as $row) {
-                if (! is_array($row)) {
-                    continue;
-                }
-
-                $type = $row[$reference['type_column']] ?? null;
-                $sourceId = $row[$reference['id_column']] ?? null;
-                $referencedTable = is_string($type)
-                    ? ($reference['targets'][$type] ?? null)
-                    : null;
-
-                if (! is_string($referencedTable)
-                    || $sourceId === null
-                    || $this->documentTableRows($referencedTable) === null
-                    || $this->documentTableContainsId(
-                        $referencedTable,
-                        $sourceId,
-                    )
-                ) {
-                    continue;
-                }
-
-                $key = $type.' #'.(string) $sourceId;
-                $counts[$key] = ($counts[$key] ?? 0) + 1;
-            }
-
-            foreach ($counts as $referenceLabel => $count) {
-                $warnings[] = sprintf(
-                    'Historical polymorphic reference [%s.%s] to [%s] is not present in the current document and will be preserved without remapping for %d row(s).',
-                    $table,
-                    $reference['id_column'],
-                    $referenceLabel,
-                    $count,
-                );
-            }
-        }
-    }
-
-    /**
      * @param array<string, array<string, mixed>> $sections
+     * @param array<string, array<int, mixed>> $documentTables
      */
-    private function applyDeferredReferences(array $sections): void
-    {
+    private function applyDeferredReferences(
+        array $sections,
+        array $documentTables,
+    ): void {
         foreach ($sections as $section) {
             foreach ($section['tables'] as $table => $definition) {
                 $deferredPolymorphicReferences = array_values(array_filter(
@@ -1275,7 +469,10 @@ class ProjectStateManager
                     continue;
                 }
 
-                $rows = $this->documentTableRows($table) ?? [];
+                $rows = $this->referenceResolver->documentTableRows(
+                    documentTables: $documentTables,
+                    table: $table,
+                ) ?? [];
 
                 foreach ($rows as $row) {
                     if (! is_array($row)) {
@@ -1305,9 +502,10 @@ class ProjectStateManager
 
                         if (! is_string($referencedTable)
                             || $sourceReferenceId === null
-                            || ! $this->documentTableContainsId(
-                                $referencedTable,
-                                $sourceReferenceId,
+                            || ! $this->referenceResolver->documentTableContainsId(
+                                documentTables: $documentTables,
+                                table: $referencedTable,
+                                sourceId: $sourceReferenceId,
                             )
                         ) {
                             continue;
@@ -1548,589 +746,6 @@ class ProjectStateManager
     }
 
     /**
-     * @param array<int|string, mixed> $valueMap
-     */
-    private function mappedImportValue(mixed $value, array $valueMap): mixed
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        $key = is_bool($value)
-            ? ($value ? '1' : '0')
-            : (string) $value;
-
-        return array_key_exists($key, $valueMap)
-            ? $valueMap[$key]
-            : $value;
-    }
-
-    private function displayValue(mixed $value): string
-    {
-        if ($value === null) {
-            return '[null]';
-        }
-
-        if (is_bool($value)) {
-            return $value ? '[true]' : '[false]';
-        }
-
-        return '['.(string) $value.']';
-    }
-
-    /**
-     * @return array<int, mixed>|null
-     */
-    private function documentTableRows(string $table): ?array
-    {
-        return $this->validationDocumentTables[$table] ?? null;
-    }
-
-    private function documentTableContainsId(
-        string $table,
-        mixed $sourceId,
-    ): bool {
-        $rows = $this->documentTableRows($table);
-
-        if ($rows === null) {
-            return false;
-        }
-
-        foreach ($rows as $row) {
-            if (is_array($row)
-                && array_key_exists('id', $row)
-                && (string) $row['id'] === (string) $sourceId
-            ) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param array<string, mixed> $document
-     * @param array<int, string> $errors
-     * @param array<int, string> $warnings
-     */
-    private function validateEnvelope(array $document, array &$errors, array &$warnings): void
-    {
-        $this->validationDocumentTables = [];
-        $documentSections = $document['sections'] ?? [];
-
-        if (! is_array($documentSections)) {
-            $documentSections = [];
-        }
-
-        foreach ($documentSections as $section) {
-            if (! is_array($section) || ! is_array($section['tables'] ?? null)) {
-                continue;
-            }
-
-            foreach ($section['tables'] as $table => $rows) {
-                if (is_string($table) && is_array($rows)) {
-                    $this->validationDocumentTables[$table] = $rows;
-                }
-            }
-        }
-
-        if (($document['format'] ?? null) !== $this->format()) {
-            $errors[] = 'The project-state format is not supported by this application.';
-        }
-
-        if (($document['version'] ?? null) !== $this->version()) {
-            $errors[] = sprintf(
-                'The project-state document must use version [%d].',
-                $this->version(),
-            );
-        }
-
-        $clientKey = (string) ($document['client_key'] ?? '');
-        $expectedClientKey = (string) config('client.key', '');
-
-        if ((bool) config('project_state.enforce_client_key', true)
-            && $clientKey !== $expectedClientKey
-        ) {
-            $errors[] = "The project-state client key [{$clientKey}] does not match [{$expectedClientKey}].";
-        }
-
-        $checksum = $document['checksum'] ?? null;
-
-        if ($checksum === null) {
-            $warnings[] = 'The project-state file does not contain an integrity checksum.';
-        } elseif (! is_string($checksum) || ! hash_equals($this->checksum($document), $checksum)) {
-            $errors[] = 'The project-state checksum is invalid.';
-        }
-    }
-
-    /**
-     * @param array<string, mixed> $document
-     */
-    private function checksum(array $document): string
-    {
-        unset($document['checksum']);
-
-        return 'sha256:'.hash(
-            'sha256',
-            json_encode(
-                $document,
-                JSON_UNESCAPED_SLASHES
-                    | JSON_UNESCAPED_UNICODE
-                    | JSON_INVALID_UTF8_SUBSTITUTE
-                    | JSON_PRESERVE_ZERO_FRACTION
-                    | JSON_THROW_ON_ERROR,
-            ),
-        );
-    }
-
-    private function isStringList(mixed $value, bool $allowEmpty = true): bool
-    {
-        if (! is_array($value)
-            || (! $allowEmpty && $value === [])
-            || ! array_is_list($value)
-        ) {
-            return false;
-        }
-
-        foreach ($value as $item) {
-            if (! is_string($item) || trim($item) === '') {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function isReferenceMap(mixed $value): bool
-    {
-        if (! is_array($value)) {
-            return false;
-        }
-
-        foreach ($value as $column => $table) {
-            if (! is_string($column)
-                || trim($column) === ''
-                || ! is_string($table)
-                || trim($table) === ''
-            ) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function isImportValueMap(mixed $value): bool
-    {
-        if (! is_array($value)) {
-            return false;
-        }
-
-        foreach ($value as $column => $valueMap) {
-            if (! is_string($column)
-                || trim($column) === ''
-                || ! is_array($valueMap)
-            ) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function isImportValueMapBackupMap(mixed $value): bool
-    {
-        if (! is_array($value)) {
-            return false;
-        }
-
-        foreach ($value as $column => $backup) {
-            if (! is_string($column)
-                || trim($column) === ''
-                || ! is_array($backup)
-                || ! is_string($backup['json_column'] ?? null)
-                || trim($backup['json_column']) === ''
-                || ! is_string($backup['path'] ?? null)
-                || trim($backup['path']) === ''
-            ) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function isJsonPathValueMap(mixed $value): bool
-    {
-        if (! is_array($value)) {
-            return false;
-        }
-
-        foreach ($value as $column => $pathMaps) {
-            if (! is_string($column)
-                || trim($column) === ''
-                || ! is_array($pathMaps)
-            ) {
-                return false;
-            }
-
-            foreach ($pathMaps as $path => $valueMap) {
-                if (! is_string($path)
-                    || trim($path) === ''
-                    || ! is_array($valueMap)
-                ) {
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
-
-    private function isJsonPathReferenceMap(mixed $value): bool
-    {
-        if (! is_array($value)) {
-            return false;
-        }
-
-        foreach ($value as $column => $pathReferences) {
-            if (! is_string($column)
-                || trim($column) === ''
-                || ! is_array($pathReferences)
-            ) {
-                return false;
-            }
-
-            foreach ($pathReferences as $path => $reference) {
-                if (! is_string($path)
-                    || trim($path) === ''
-                    || ! is_array($reference)
-                    || ! is_string($reference['table'] ?? null)
-                    || trim($reference['table']) === ''
-                    || (array_key_exists('deferred', $reference)
-                        && ! is_bool($reference['deferred']))
-                ) {
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
-
-    private function isPolymorphicReferenceList(mixed $value): bool
-    {
-        if (! is_array($value) || ! array_is_list($value)) {
-            return false;
-        }
-
-        foreach ($value as $reference) {
-            if (! is_array($reference)
-                || ! is_string($reference['type_column'] ?? null)
-                || trim($reference['type_column']) === ''
-                || ! is_string($reference['id_column'] ?? null)
-                || trim($reference['id_column']) === ''
-                || ! $this->isReferenceMap($reference['targets'] ?? null)
-                || (array_key_exists('deferred', $reference)
-                    && ! is_bool($reference['deferred']))
-            ) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function isResumeItemList(mixed $value): bool
-    {
-        if (! is_array($value) || ! array_is_list($value)) {
-            return false;
-        }
-
-        foreach ($value as $resumeItem) {
-            if (! is_array($resumeItem)
-                || ! is_string($resumeItem['category'] ?? null)
-                || trim($resumeItem['category']) === ''
-                || ! $this->isStringList(
-                    $resumeItem['statuses'] ?? null,
-                    allowEmpty: false,
-                )
-            ) {
-                return false;
-            }
-
-            $column = $resumeItem['column'] ?? null;
-            $jsonColumn = $resumeItem['json_column'] ?? null;
-            $path = $resumeItem['path'] ?? null;
-            $hasColumn = is_string($column) && trim($column) !== '';
-            $hasJsonPath = is_string($jsonColumn)
-                && trim($jsonColumn) !== ''
-                && is_string($path)
-                && trim($path) !== '';
-
-            if ($hasColumn === $hasJsonPath) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $resumeItems
-     * @return array<int, string>
-     */
-    private function resumeItemColumns(array $resumeItems): array
-    {
-        $columns = [];
-
-        foreach ($resumeItems as $resumeItem) {
-            $column = $resumeItem['column'] ?? $resumeItem['json_column'] ?? null;
-
-            if (is_string($column) && trim($column) !== '') {
-                $columns[] = trim($column);
-            }
-        }
-
-        return array_values(array_unique($columns));
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $references
-     * @return array<int, string>
-     */
-    private function polymorphicReferenceColumns(array $references): array
-    {
-        $columns = [];
-
-        foreach ($references as $reference) {
-            $columns[] = $reference['type_column'];
-            $columns[] = $reference['id_column'];
-        }
-
-        return array_values(array_unique($columns));
-    }
-
-    /**
-     * @param array<string, array<string, mixed>> $sections
-     */
-    private function assertSchemaCoverage(array $sections): void
-    {
-        $exportedTables = [];
-
-        foreach ($sections as $section) {
-            $exportedTables = [
-                ...$exportedTables,
-                ...array_keys($section['tables']),
-            ];
-        }
-
-        $policyTables = array_keys($this->tablePolicies());
-        $duplicates = array_values(array_intersect($exportedTables, $policyTables));
-
-        if ($duplicates !== []) {
-            sort($duplicates, SORT_STRING);
-
-            throw new RuntimeException(
-                'Project-state table policy duplicates exported table(s): '.implode(', ', $duplicates).'.'
-            );
-        }
-
-        $database = $this->connection()->getDatabaseName();
-
-        if (! is_string($database) || trim($database) === '') {
-            throw new RuntimeException(
-                'Project-state export cannot resolve the active database schema.'
-            );
-        }
-
-        $actualTables = array_values(array_filter(
-            $this->connection()
-                ->getSchemaBuilder()
-                ->getTableListing($database, false),
-            fn (mixed $table): bool => is_string($table) && trim($table) !== '',
-        ));
-        $ignoredTables = config('project_state.schema_ignored_tables', []);
-
-        if (! $this->isStringList($ignoredTables)) {
-            throw new RuntimeException('Project-state ignored schema table configuration is invalid.');
-        }
-
-        $unclassified = array_values(array_diff(
-            $actualTables,
-            $exportedTables,
-            $policyTables,
-            $ignoredTables,
-        ));
-
-        if ($unclassified !== []) {
-            sort($unclassified, SORT_STRING);
-
-            throw new RuntimeException(
-                'Project-state export is blocked by unclassified database table(s): '
-                .implode(', ', $unclassified)
-                .'. Add transfer support or an explicit table policy first.'
-            );
-        }
-    }
-
-    private function assertExportTablePolicies(): void
-    {
-        foreach ($this->tablePolicies() as $table => $policy) {
-            if (! Schema::hasTable($table)) {
-                continue;
-            }
-
-            if ($policy['mode'] === 'must_be_empty') {
-                $count = (int) $this->connection()->table($table)->count();
-
-                if ($count > 0) {
-                    throw new RuntimeException(sprintf(
-                        'Project-state export is blocked because [%s] contains %d row(s). %s',
-                        $table,
-                        $count,
-                        $policy['reason'],
-                    ));
-                }
-
-                continue;
-            }
-
-            if ($policy['mode'] !== 'terminal_only') {
-                continue;
-            }
-
-            $column = $policy['column'];
-            $values = $policy['values'];
-            $count = (int) $this->connection()
-                ->table($table)
-                ->where(function ($query) use ($column, $values): void {
-                    $query
-                        ->whereNull($column)
-                        ->orWhereNotIn($column, $values);
-                })
-                ->count();
-
-            if ($count > 0) {
-                throw new RuntimeException(sprintf(
-                    'Project-state export is blocked because [%s] contains %d nonterminal row(s) in [%s]. Allowed terminal value(s): %s. %s',
-                    $table,
-                    $count,
-                    $column,
-                    implode(', ', $values),
-                    $policy['reason'],
-                ));
-            }
-        }
-    }
-
-    /**
-     * @param array<string, array<string, mixed>> $configuredSections
-     * @param array<string, array<string, mixed>> $exportedSections
-     */
-    private function assertExportReferences(
-        array $configuredSections,
-        array $exportedSections,
-    ): void {
-        $this->validationDocumentTables = [];
-
-        foreach ($exportedSections as $section) {
-            foreach ($section['tables'] as $table => $rows) {
-                $this->validationDocumentTables[$table] = $rows;
-            }
-        }
-
-        $errors = [];
-
-        try {
-            foreach ($configuredSections as $section) {
-                foreach ($section['tables'] as $table => $definition) {
-                    $this->validateReferences(
-                        table: $table,
-                        definition: $definition,
-                        rows: $this->validationDocumentTables[$table] ?? [],
-                        errors: $errors,
-                    );
-                }
-            }
-        } finally {
-            $this->validationDocumentTables = [];
-        }
-
-        if ($errors !== []) {
-            throw new RuntimeException(
-                'Project-state export reference validation failed: '.implode(' ', $errors)
-            );
-        }
-    }
-
-    /**
-     * @return array<string, array<string, mixed>>
-     */
-    private function tablePolicies(): array
-    {
-        $policies = config('project_state.table_policies', []);
-
-        if (! is_array($policies)) {
-            throw new RuntimeException('Project-state table policy configuration is invalid.');
-        }
-
-        $normalized = [];
-
-        foreach ($policies as $table => $policy) {
-            if (! is_string($table)
-                || trim($table) === ''
-                || ! is_array($policy)
-                || ! is_string($policy['mode'] ?? null)
-                || ! in_array($policy['mode'], [
-                    'environment_owned',
-                    'resettable',
-                    'must_be_empty',
-                    'terminal_only',
-                ], true)
-                || ! is_string($policy['reason'] ?? null)
-                || trim($policy['reason']) === ''
-            ) {
-                throw new RuntimeException('Project-state table policy configuration is invalid.');
-            }
-
-            $entry = [
-                'mode' => $policy['mode'],
-                'reason' => trim($policy['reason']),
-            ];
-
-            if ($policy['mode'] === 'terminal_only') {
-                if (! is_string($policy['column'] ?? null)
-                    || trim($policy['column']) === ''
-                    || ! $this->isStringList(
-                        $policy['values'] ?? null,
-                        allowEmpty: false,
-                    )
-                ) {
-                    throw new RuntimeException(
-                        "Project-state terminal table policy [{$table}] is invalid."
-                    );
-                }
-
-                $entry['column'] = trim($policy['column']);
-                $entry['values'] = array_values($policy['values']);
-
-                if (Schema::hasTable($table)
-                    && ! Schema::hasColumn($table, $entry['column'])
-                ) {
-                    throw new RuntimeException(
-                        "Project-state terminal table policy [{$table}] references missing column [{$entry['column']}]."
-                    );
-                }
-            }
-
-            $normalized[$table] = $entry;
-        }
-
-        return $normalized;
-    }
-
-    /**
      * @template T
      * @param Closure(): T $callback
      * @return T
@@ -2174,13 +789,4 @@ class ProjectStateManager
         return DB::connection();
     }
 
-    private function format(): string
-    {
-        return (string) config('project_state.format', 'engage-core-project-state');
-    }
-
-    private function version(): int
-    {
-        return (int) config('project_state.version', 1);
-    }
 }
