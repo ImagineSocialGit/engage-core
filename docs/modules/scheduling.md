@@ -1,3 +1,4 @@
+
 # Scheduling Module
 
 Scheduling is a current universal module.
@@ -78,6 +79,40 @@ The opaque hold page accepts attendee name, email, and optional phone only while
 All public booking, cancellation, and reschedule URLs should resolve from the configured base URL.
 
 The universal booking surface is separate from CRM, Portal, and Webinars. A webinar-triggered booking journey may add source context, eligibility, and tailored copy through a thin client-specific integration layer, but it must consume generic Scheduling contracts and must not shape Scheduling around Webinars.
+
+### Planned progressive public booking contract
+
+The currently implemented public flow remains service page → availability → capacity-consuming hold → attendee completion. The future mobile-service and abuse-resistant flow must begin with appointment type because the selected service determines which prerequisites are required before authoritative availability can be calculated.
+
+The planned visitor sequence is:
+
+```text
+1. choose appointment type
+2. provide only the details required for that type
+3. view authoritative availability
+4. select one short-lived non-blocking slot offer
+5. verify one reachable email or SMS destination when Messaging can deliver
+6. revalidate service, location, slot, and capacity
+7. create the capacity-consuming hold
+8. review and complete the booking
+```
+
+Blade and Alpine may present these steps as sliding or progressively revealed pages. The animation is presentation only. Each transition that changes trusted state must be server validated, and later pages must not trust hidden browser-authored service, host, duration, location, verification, offer, or capacity fields.
+
+Service location policy determines the details step:
+
+```text
+phone or virtual service
+    no customer location prerequisite
+
+fixed-location service
+    use the configured fixed location
+
+customer-site service
+    collect and normalize the service address before calculating availability
+```
+
+Customer-site availability must not be presented as authoritative until Scheduling has a normalized server-owned location. Browser-supplied coordinates, travel durations, or a boolean claiming that a destination was verified are never authoritative.
 
 ## Responsibility
 
@@ -473,6 +508,51 @@ no_show
 
 The candidate appointment's buffers and each existing appointment service's buffers are applied before testing overlap. A reschedule search excludes only its explicitly supplied same-service source Appointment, including that Appointment's buffers. Every other Appointment and active hold continues to consume capacity normally.
 
+### Capacity semantics and planned selective overlap
+
+The current capacity fields are coarse overall-concurrency limits. They answer how many Appointments may overlap within the service, host, assignment, or availability-window dimension. They do not describe which appointment types are compatible.
+
+For example, raising one contractor host from capacity `1` to capacity `2` would allow a phone consultation during site work, but it would also permit two simultaneous physical-presence Appointments. That is not an acceptable substitute for selective overlap.
+
+Selective overlap requires a normalized Scheduling-owned resource model rather than service-specific exceptions or JSON metadata. The planned model must support:
+
+```text
+host resource capacities
+service resource requirements
+Appointment and BookingHold resource occupancy
+resource-aware remaining-capacity calculation
+```
+
+Example resource identities may include:
+
+```text
+physical_presence
+phone_attention
+room
+vehicle
+crew
+equipment
+```
+
+A contractor host could therefore have overall concurrency `2`, `physical_presence` capacity `1`, and `phone_attention` capacity `1`. Site work and a phone consultation may overlap, while two physical-presence Appointments remain blocked. Existing overall capacity fields remain valid as outer ceilings after resource-aware occupancy is added.
+
+### Fixed buffers and planned travel-aware occupancy
+
+Current `buffer_before_minutes` and `buffer_after_minutes` are fixed service-level elapsed-minute buffers. Appointment location snapshots are presentation and historical data; the availability engine does not currently calculate distance or travel time.
+
+Travel-aware Scheduling must use estimated travel time rather than straight-line distance. For every candidate customer-site Appointment, availability must check both adjacent directions:
+
+```text
+previous in-person location → candidate location
+candidate location → next in-person location
+```
+
+The required gap is the resolved travel duration plus configurable parking, setup, or safety padding. A timed site-work commitment must carry a start, end, and normalized location; a date-only marker is insufficient. Such a commitment consumes physical-presence resources while compatible phone or virtual work may remain available.
+
+Scheduling should own a provider-neutral `TravelTimeResolver` contract and the normalized location/travel policy consumed by availability. Optional Integrations adapters may use routing providers. Scheduling must also support a deterministic conservative fallback, such as zones or configured travel durations, when no routing provider is available.
+
+Travel, location, and resource requirements must be revalidated during reservation or direct Appointment creation. They must not be accepted from browser-authored hidden fields or persisted as redundant snapshots in arbitrary `meta` payloads.
+
 ### Host resolution
 
 When a host filter is supplied, only that active, actively assigned host is evaluated.
@@ -817,6 +897,28 @@ Scheduling owns appointment communication timing and intent. Messaging owns temp
 
 Push notification support belongs to Messaging as another delivery channel. Scheduling must not hard-code email and SMS as the only possible channels.
 
+### Planned public identity verification
+
+Public booking should require control of one reachable transactional destination before creating a capacity-consuming hold whenever Messaging can actually deliver through an eligible channel.
+
+"Messaging can deliver" means the channel is runtime supported, provider enabled, valid for the submitted destination, and eligible for the public-booking verification purpose. Merely enabling the Messaging module is not enough. When both email and SMS are eligible, the visitor may choose one; verification of both channels is not required. When no eligible channel is deliverable, Scheduling remains independently usable and continues to rely on its ordinary throttles and server-authoritative booking checks.
+
+Verification is transactional security activity. It must not grant marketing consent, revoke consent, or imply permission for later marketing communication.
+
+The verification contract must include:
+
+```text
+short-lived single-use challenge
+hashed code or secret storage; never raw challenge storage
+resend cooldown
+maximum attempts
+per-IP, per-destination, and per-challenge throttling
+expiration and invalidation after success
+server-owned verified state
+```
+
+Sending a challenge must not create an Appointment, Contact, or capacity-consuming BookingHold. The preferred flow may issue a short-lived non-blocking slot offer first, verify one destination, then revalidate all trusted booking inputs before creating the hold. A browser-authored `verified` field is never accepted as evidence.
+
 Scheduling may create follow-up work through Tasks public actions. It must not write Tasks internals directly.
 
 Scheduling should record its own state first and then emit neutral automation events through:
@@ -924,7 +1026,11 @@ Do not add `flow_route_*` foreign keys to Scheduling artifacts merely for proven
 Deferred after the host, service, and assignment configuration workspace:
 
 ```text
-CRM availability-window editor
+Phase 4A.2 — CRM availability-window and blackout editor
+Phase 4B.1 — resource-aware occupancy and selective overlap
+Phase 4B.2 — location normalization and travel-time-aware availability
+Phase 4B.3 — appointment-type-first progressive public booking
+Phase 4B.4 — Messaging-backed email/SMS verification before capacity hold
 SCHEDULING_APP_URL setup validation
 calendar views
 provider connection and synchronization persistence
@@ -932,7 +1038,6 @@ external free/busy adapters
 meeting-link generation
 appointment reminder scheduling
 paid booking integration
-resource booking
 round-robin or weighted host routing
 Reporting dashboards
 vertical-specific Scheduling interpretation

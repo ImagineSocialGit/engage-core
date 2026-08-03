@@ -1,3 +1,4 @@
+
 # Engage Core TODO
 
 ## Config generation lock-in
@@ -74,6 +75,20 @@ Separate future scope:
 - [ ] Add external translators when a real older Project State format must be carried forward.
 - [ ] Add a richer create/update/skip/conflict preview only when operational need justifies it; do not weaken the current closed validator.
 - [ ] Add production-sized transfer timing and memory measurements before materially larger client datasets.
+
+## Scheduling product completion
+
+The durable Scheduling architecture is documented in [`modules/scheduling.md`](modules/scheduling.md). Keep the implementation order explicit so coarse capacity, resource compatibility, travel, public verification, and Project State support are not mistaken for one feature.
+
+- [x] Complete CRM Appointment creation, detail, lifecycle, rescheduling, and Contact-panel workflows.
+- [x] Complete manual host, service, and service-host assignment configuration.
+- [x] Clarify current overall-concurrency capacity semantics and the progressive public-booking roadmap.
+- [ ] Phase 4A.2: add the CRM weekly/absolute availability and blackout editor with timezone-safe validation and preview.
+- [ ] Phase 4B.1: add normalized host resources, service requirements, Appointment/Hold resource occupancy, and selective-overlap calculation.
+- [ ] Phase 4B.2: add normalized appointment locations, provider-neutral travel-time resolution, conservative fallback policies, adjacent-Appointment travel checks, and reservation-time revalidation.
+- [ ] Phase 4B.3: restructure public booking around appointment-type-first progressive steps; require customer-site location before authoritative availability and keep all page transitions server authoritative.
+- [ ] Phase 4B.4: when Messaging has an eligible deliverable transactional channel, verify one email or SMS destination before creating a capacity-consuming hold; keep verification independent from marketing consent.
+- [ ] Add Scheduling Project State transfer support only after these durable configuration and public-booking contracts are stable.
 
 ## Run through after completing an item or system update
 

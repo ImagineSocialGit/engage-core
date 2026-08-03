@@ -134,8 +134,11 @@
                     </label>
 
                     <label class="{{ $labelClass }}">
-                        Capacity
+                        Overall concurrent appointment capacity
                         <input class="{{ $inputClass }}" type="number" min="1" max="100000" name="capacity" value="{{ old('capacity', 1) }}" required>
+                        <span class="mt-1 block text-xs font-normal text-slate-500">
+                            Maximum simultaneous Appointments for this host. This is not a physical-presence or appointment-type-specific limit.
+                        </span>
                     </label>
 
                     <label class="{{ $labelClass }}">
@@ -238,8 +241,11 @@
                                 </label>
 
                                 <label class="{{ $labelClass }}">
-                                    Capacity
+                                    Overall concurrent appointment capacity
                                     <input class="{{ $inputClass }}" type="number" min="1" max="100000" name="capacity" value="{{ $host->capacity }}" required>
+                                    <span class="mt-1 block text-xs font-normal text-slate-500">
+                                        Maximum simultaneous Appointments for this host. This is not a physical-presence or appointment-type-specific limit.
+                                    </span>
                                 </label>
 
                                 <label class="{{ $labelClass }}">
@@ -375,8 +381,11 @@
                     </label>
 
                     <label class="{{ $labelClass }}">
-                        Capacity
+                        Overall concurrent appointment capacity
                         <input class="{{ $inputClass }}" type="number" min="1" max="100000" name="capacity" value="{{ old('capacity', 1) }}" required>
+                        <span class="mt-1 block text-xs font-normal text-slate-500">
+                            Maximum simultaneous Appointments for this service before host, assignment, and availability-window limits are applied.
+                        </span>
                     </label>
 
                     <label class="{{ $labelClass }}">
@@ -524,8 +533,11 @@
                                     </label>
 
                                     <label class="{{ $labelClass }}">
-                                        Capacity
+                                        Overall concurrent appointment capacity
                                         <input class="{{ $inputClass }}" type="number" min="1" max="100000" name="capacity" value="{{ $service->capacity }}" required>
+                                        <span class="mt-1 block text-xs font-normal text-slate-500">
+                                            Maximum simultaneous Appointments for this service before host, assignment, and availability-window limits are applied.
+                                        </span>
                                     </label>
 
                                     <label class="{{ $labelClass }}">
@@ -639,12 +651,12 @@
                                                     {{ $host->name }}
                                                 </label>
                                                 <p class="mt-1 text-xs text-slate-500">
-                                                    {{ $host->status }} · {{ $host->timezone }} · capacity {{ $host->capacity }}
+                                                    {{ $host->status }} · {{ $host->timezone }} · overall capacity {{ $host->capacity }}
                                                 </p>
                                             </div>
 
                                             <label class="{{ $labelClass }}">
-                                                Capacity override
+                                                Overall concurrency override
                                                 <input
                                                     class="{{ $inputClass }}"
                                                     type="number"
@@ -653,6 +665,9 @@
                                                     name="assignments[{{ $loop->index }}][capacity_override]"
                                                     value="{{ $assignment?->capacity_override }}"
                                                 >
+                                                <span class="mt-1 block text-xs font-normal text-slate-500">
+                                                    Optional total-concurrency limit for this service and host pairing; it does not define which appointment types may overlap.
+                                                </span>
                                             </label>
 
                                             <label class="{{ $labelClass }}">
