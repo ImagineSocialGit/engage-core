@@ -717,10 +717,14 @@
 │   │   │   │   ├── Appointment.php
 │   │   │   │   ├── BookableServiceHost.php
 │   │   │   │   ├── BookableService.php
+│   │   │   │   ├── BookableServiceResourceRequirement.php
 │   │   │   │   ├── BookableSlotOffer.php
 │   │   │   │   ├── BookingHold.php
 │   │   │   │   ├── SchedulingAvailabilityWindow.php
-│   │   │   │   └── SchedulingHost.php
+│   │   │   │   ├── SchedulingHost.php
+│   │   │   │   ├── SchedulingHostResource.php
+│   │   │   │   ├── SchedulingResourceOccupancy.php
+│   │   │   │   └── SchedulingResource.php
 │   │   │   ├── Providers
 │   │   │   │   └── SchedulingModuleServiceProvider.php
 │   │   │   ├── Requests
@@ -733,7 +737,8 @@
 │   │   │   │   ├── Availability
 │   │   │   │   │   ├── AppointmentOccupancyResolver.php
 │   │   │   │   │   ├── AvailabilityRuleResolver.php
-│   │   │   │   │   └── BookingOccupancyResolver.php
+│   │   │   │   │   ├── BookingOccupancyResolver.php
+│   │   │   │   │   └── ResourceOccupancyResolver.php
 │   │   │   │   ├── ContactShow
 │   │   │   │   │   └── SchedulingContactPanelProvider.php
 │   │   │   │   ├── SchedulingAvailabilityConfigurationWriter.php
@@ -1385,6 +1390,7 @@
 │   │   ├── 2026_07_31_210000_create_webinar_schedule_profile_chain_bindings_table.php
 │   │   ├── 2026_08_01_023600_create_webinar_series_message_chain_bindings_table.php
 │   │   ├── 2026_08_02_013000_create_project_state_resume_items_table.php
+│   │   ├── 2026_08_03_190000_create_scheduling_resource_occupancy_tables.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -1889,6 +1895,7 @@
 │   │   │   ├── PublicSchedulingSurfaceTest.php
 │   │   │   ├── RescheduleAppointmentActionTest.php
 │   │   │   ├── RescheduleSlotOfferAndBookingHoldActionTest.php
+│   │   │   ├── ResourceAwareOccupancyTest.php
 │   │   │   ├── SchedulingAppointmentRescheduleWorkspaceTest.php
 │   │   │   ├── SchedulingAppointmentWorkspaceTest.php
 │   │   │   ├── SchedulingAvailabilityConfigurationWorkspaceTest.php
@@ -1998,4 +2005,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-513 directories, 1486 files
+513 directories, 1493 files

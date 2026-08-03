@@ -12,6 +12,7 @@ use App\Modules\Scheduling\Models\BookableServiceHost;
 use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Services\Availability\BookingOccupancyResolver;
+use App\Modules\Scheduling\Services\Availability\ResourceOccupancyResolver;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Database\Eloquent\Collection;
@@ -24,6 +25,7 @@ class CreateAppointmentAction
     public function __construct(
         private readonly FindBookableAvailabilityAction $findAvailability,
         private readonly BookingOccupancyResolver $occupancy,
+        private readonly ResourceOccupancyResolver $resourceOccupancy,
         private readonly TransitionAppointmentStatusAction $lifecycle,
     ) {}
 
@@ -60,6 +62,10 @@ class CreateAppointmentAction
                 [$host] = $this->lockedTarget(
                     service: $service,
                     requestedHost: $data->host,
+                );
+                $resourceSnapshot = $this->resourceOccupancy->lockRequirementSnapshot(
+                    service: $service,
+                    host: $host,
                 );
                 $evaluatedAt = CarbonImmutable::now('UTC');
                 $endsAt = $data->startsAt->addMinutes(
@@ -156,6 +162,15 @@ class CreateAppointmentAction
                         ],
                     ),
                 ]);
+
+                if ($resourceSnapshot !== [] && $host instanceof SchedulingHost) {
+                    $this->resourceOccupancy->createForAppointment(
+                        appointment: $appointment,
+                        service: $service,
+                        host: $host,
+                        snapshot: $resourceSnapshot,
+                    );
+                }
 
                 $this->lifecycle->recordInitial(
                     appointment: $appointment,

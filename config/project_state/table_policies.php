@@ -136,6 +136,22 @@ return [
         'mode' => 'must_be_empty',
         'reason' => 'Scheduling transfer support has not been added yet.',
     ],
+    'scheduling_resources' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Scheduling transfer support has not been added yet.',
+    ],
+    'scheduling_host_resources' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Scheduling transfer support has not been added yet.',
+    ],
+    'bookable_service_resource_requirements' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Scheduling transfer support has not been added yet.',
+    ],
+    'scheduling_resource_occupancies' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Scheduling transfer support has not been added yet.',
+    ],
 
     'portal_users' => [
         'mode' => 'must_be_empty',

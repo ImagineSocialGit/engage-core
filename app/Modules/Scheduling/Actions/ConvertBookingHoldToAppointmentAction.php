@@ -10,6 +10,7 @@ use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookableSlotOffer;
 use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingHost;
+use App\Modules\Scheduling\Services\Availability\ResourceOccupancyResolver;
 use Carbon\CarbonImmutable;
 use Closure;
 use DomainException;
@@ -21,6 +22,7 @@ class ConvertBookingHoldToAppointmentAction
 {
     public function __construct(
         private readonly TransitionAppointmentStatusAction $lifecycle,
+        private readonly ResourceOccupancyResolver $resourceOccupancy,
     ) {}
 
     public function handle(
@@ -102,6 +104,8 @@ class ConvertBookingHoldToAppointmentAction
             $now = CarbonImmutable::now('UTC');
 
             if (! $hold->isEffectivelyActive($now)) {
+                $this->resourceOccupancy->deleteForHold($hold);
+
                 $hold->forceFill([
                     'status' => BookingHold::STATUS_EXPIRED,
                 ])->save();
@@ -198,6 +202,11 @@ class ConvertBookingHoldToAppointmentAction
                         'slot_offer_id' => $offer->offer_id,
                     ], static fn (mixed $value): bool => $value !== null),
                 ),
+            );
+
+            $this->resourceOccupancy->transferHoldToAppointment(
+                hold: $hold,
+                appointment: $appointment,
             );
 
             $hold->forceFill([

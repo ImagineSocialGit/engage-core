@@ -3,6 +3,7 @@
 namespace App\Modules\Scheduling\Actions;
 
 use App\Modules\Scheduling\Models\BookingHold;
+use App\Modules\Scheduling\Services\Availability\ResourceOccupancyResolver;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +11,10 @@ use InvalidArgumentException;
 
 class ReleaseBookingHoldAction
 {
+    public function __construct(
+        private readonly ResourceOccupancyResolver $resourceOccupancy,
+    ) {}
+
     public function handle(string $holdId): BookingHold
     {
         $holdId = $this->requiredHoldId($holdId);
@@ -37,12 +42,16 @@ class ReleaseBookingHoldAction
             $now = CarbonImmutable::now('UTC');
 
             if (! $hold->isEffectivelyActive($now)) {
+                $this->resourceOccupancy->deleteForHold($hold);
+
                 $hold->forceFill([
                     'status' => BookingHold::STATUS_EXPIRED,
                 ])->save();
 
                 return $hold->refresh();
             }
+
+            $this->resourceOccupancy->deleteForHold($hold);
 
             $hold->forceFill([
                 'status' => BookingHold::STATUS_RELEASED,

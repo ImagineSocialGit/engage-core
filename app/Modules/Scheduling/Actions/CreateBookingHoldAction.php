@@ -11,6 +11,7 @@ use App\Modules\Scheduling\Models\BookableSlotOffer;
 use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Services\Availability\BookingOccupancyResolver;
+use App\Modules\Scheduling\Services\Availability\ResourceOccupancyResolver;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Database\Eloquent\Collection;
@@ -30,6 +31,7 @@ class CreateBookingHoldAction
     public function __construct(
         private readonly FindBookableAvailabilityAction $findAvailability,
         private readonly BookingOccupancyResolver $occupancy,
+        private readonly ResourceOccupancyResolver $resourceOccupancy,
     ) {}
 
     public function handle(
@@ -93,6 +95,10 @@ class CreateBookingHoldAction
                     offer: $offer,
                     service: $service,
                 );
+                $resourceSnapshot = $this->resourceOccupancy->lockRequirementSnapshot(
+                    service: $service,
+                    host: $host,
+                );
                 $search = new AvailabilitySearch(
                     service: $service,
                     startsAt: $offer->starts_at,
@@ -154,6 +160,14 @@ class CreateBookingHoldAction
                         'source_window_ids' => $currentSlot->sourceWindowIds,
                     ],
                 ]);
+
+                if ($resourceSnapshot !== [] && $host instanceof SchedulingHost) {
+                    $this->resourceOccupancy->createForHold(
+                        hold: $hold,
+                        host: $host,
+                        snapshot: $resourceSnapshot,
+                    );
+                }
 
                 $offer->forceFill([
                     'consumed_at' => $now,

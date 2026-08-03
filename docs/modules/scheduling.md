@@ -478,6 +478,7 @@ service capacity
 host capacity
 service-host assignment capacity_override
 availability-window capacity
+resource-derived capacity, when the service has active requirements
 ```
 
 Remaining capacity is calculated independently for each limiting dimension across blocking Appointments and effectively active BookingHolds:
@@ -485,7 +486,8 @@ Remaining capacity is calculated independently for each limiting dimension acros
 ```text
 service/service-host occupancy consumes service, assignment, and window capacity
 all appointments and active holds on a host consume host capacity
-converted holds stop consuming capacity as holds because their Appointment replaces that occupancy atomically
+resource snapshots consume only their named host resources
+converted holds transfer their resource snapshot to the Appointment atomically
 released, expired, and elapsed active holds do not consume capacity
 ```
 
@@ -505,24 +507,20 @@ completed
 no_show
 ```
 
-The candidate appointment's buffers and each existing appointment service's buffers are applied before testing overlap. A reschedule search excludes only its explicitly supplied same-service source Appointment, including that Appointment's buffers. Every other Appointment and active hold continues to consume capacity normally.
+The candidate appointment's buffers and each existing appointment service's buffers are applied before testing coarse overlap. Resource occupancy snapshots store their own buffered UTC range so later service-buffer edits do not retroactively change an existing commitment. A reschedule search excludes only its explicitly supplied same-service source Appointment from both coarse and resource occupancy. Every other Appointment and active hold continues to consume capacity normally.
 
-### Capacity semantics and planned selective overlap
+### Resource-aware occupancy and selective overlap
 
-The current capacity fields are coarse overall-concurrency limits. They answer how many Appointments may overlap within the service, host, assignment, or availability-window dimension. They do not describe which appointment types are compatible.
-
-For example, raising one contractor host from capacity `1` to capacity `2` would allow a phone consultation during site work, but it would also permit two simultaneous physical-presence Appointments. That is not an acceptable substitute for selective overlap.
-
-Selective overlap requires a normalized Scheduling-owned resource model rather than service-specific exceptions or JSON metadata. The planned model must support:
+Scheduling now owns a normalized resource model:
 
 ```text
-host resource capacities
-service resource requirements
-Appointment and BookingHold resource occupancy
-resource-aware remaining-capacity calculation
+scheduling_resources
+scheduling_host_resources
+bookable_service_resource_requirements
+scheduling_resource_occupancies
 ```
 
-Example resource identities may include:
+`scheduling_resources` stores durable resource identities such as:
 
 ```text
 physical_presence
@@ -533,7 +531,65 @@ crew
 equipment
 ```
 
-A contractor host could therefore have overall concurrency `2`, `physical_presence` capacity `1`, and `phone_attention` capacity `1`. Site work and a phone consultation may overlap, while two physical-presence Appointments remain blocked. Existing overall capacity fields remain valid as outer ceilings after resource-aware occupancy is added.
+Resource keys are durable identities. Status is `active`, `inactive`, or `archived`; source is `manual`, `system`, or `provider`. Resource configuration is database-owned, but the CRM resource editor remains the next implementation slice.
+
+`scheduling_host_resources` defines the active capacity a host owns for a resource. `bookable_service_resource_requirements` defines the positive quantity consumed by one Appointment of a service. Both retain explicit inactive rows rather than interpreting omission as fallback behavior.
+
+For each active requirement, total resource-derived Appointment capacity is:
+
+```text
+floor(active host resource capacity / service requirement quantity)
+```
+
+Remaining resource-derived capacity is:
+
+```text
+floor(
+    (active host resource capacity - overlapping resource occupancy quantity)
+    / service requirement quantity
+)
+```
+
+The lowest result across all required resources applies. A required resource closes availability when the resource is inactive or archived, the service is unhosted, the host lacks an active capacity row, the capacity is invalid, or the requirement quantity exceeds host capacity.
+
+Resources refine rather than replace overall concurrency. A contractor host may therefore have:
+
+```text
+overall host capacity: 2
+physical_presence capacity: 1
+phone_attention capacity: 1
+```
+
+An on-site service requiring `physical_presence × 1` may overlap a phone service requiring `phone_attention × 1`, while two simultaneous physical-presence Appointments remain blocked.
+
+### Resource commitment snapshots
+
+Resource requirements are resolved and locked whenever capacity is committed:
+
+```text
+direct Appointment creation
+BookingHold creation
+```
+
+A resource-requiring service must use a persisted active host. The transaction locks the current active service requirements, required resource identities, and host resource-capacity rows before exact-slot revalidation. The resulting occupancy stores only normalized operational facts:
+
+```text
+resource identity
+host identity
+Appointment or BookingHold identity
+quantity
+buffered occupancy start/end UTC instants
+```
+
+It does not copy names, labels, host capacities, service configuration, or JSON requirement snapshots.
+
+An active hold owns the immutable resource snapshot for the reservation. Ordinary conversion and reschedule conversion transfer those same occupancy rows from the hold to the resulting Appointment; they do not recalculate against possibly changed service requirements. Direct Appointment retries and converted-hold retries do not create duplicate occupancy rows.
+
+Changing a service requirement or host capacity affects future commitments only. Existing Appointment snapshots remain durable. Active hold snapshots remain authoritative until conversion, release, or expiration.
+
+Temporary hold resource rows are removed transactionally when a hold is released or expires. Conversion transfers them to the Appointment, leaving no terminal hold occupancy. `ExpireBookingHoldsJob` cleans resource occupancy in the same transaction that marks due holds expired.
+
+Services with no active resource requirements retain the previous coarse-capacity behavior exactly.
 
 ### Fixed buffers and planned travel-aware occupancy
 
@@ -1048,10 +1104,10 @@ Do not add `flow_route_*` foreign keys to Scheduling artifacts merely for proven
 
 ## Deferred work
 
-Deferred after the availability and blackout configuration workspace:
+Deferred after the resource-aware occupancy runtime:
 
 ```text
-Phase 4B.1 — resource-aware occupancy and selective overlap
+Phase 4B.1B — resource identity, host-capacity, and service-requirement CRM configuration
 Phase 4B.2 — location normalization and travel-time-aware availability
 Phase 4B.3 — appointment-type-first progressive public booking
 Phase 4B.4 — Messaging-backed email/SMS verification before capacity hold

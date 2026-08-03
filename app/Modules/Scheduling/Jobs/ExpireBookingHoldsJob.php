@@ -3,10 +3,12 @@
 namespace App\Modules\Scheduling\Jobs;
 
 use App\Modules\Scheduling\Models\BookingHold;
+use App\Modules\Scheduling\Services\Availability\ResourceOccupancyResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\DB;
 
 class ExpireBookingHoldsJob implements ShouldBeUnique, ShouldQueue
 {
@@ -20,31 +22,44 @@ class ExpireBookingHoldsJob implements ShouldBeUnique, ShouldQueue
         return 'scheduling:expire-booking-holds';
     }
 
-    public function handle(): int
+    public function handle(?ResourceOccupancyResolver $resourceOccupancy = null): int
     {
+        $resourceOccupancy ??= app(ResourceOccupancyResolver::class);
         $now = CarbonImmutable::now('UTC');
         $batchSize = max(
             1,
             (int) config('scheduling.booking_holds.expiration_batch_size', 500),
         );
 
-        $ids = BookingHold::query()
-            ->dueForExpiration($now)
-            ->orderBy('id')
-            ->limit($batchSize)
-            ->pluck('id');
+        return DB::transaction(function () use (
+            $resourceOccupancy,
+            $now,
+            $batchSize,
+        ): int {
+            $holds = BookingHold::query()
+                ->dueForExpiration($now)
+                ->orderBy('id')
+                ->limit($batchSize)
+                ->lockForUpdate()
+                ->get();
 
-        if ($ids->isEmpty()) {
-            return 0;
-        }
+            if ($holds->isEmpty()) {
+                return 0;
+            }
 
-        return BookingHold::query()
-            ->whereKey($ids->all())
-            ->where('status', BookingHold::STATUS_ACTIVE)
-            ->where('expires_at', '<=', $now)
-            ->update([
-                'status' => BookingHold::STATUS_EXPIRED,
-                'updated_at' => $now,
-            ]);
+            $ids = $holds
+                ->modelKeys();
+
+            $resourceOccupancy->deleteForHoldIds($ids);
+
+            return BookingHold::query()
+                ->whereKey($ids)
+                ->where('status', BookingHold::STATUS_ACTIVE)
+                ->where('expires_at', '<=', $now)
+                ->update([
+                    'status' => BookingHold::STATUS_EXPIRED,
+                    'updated_at' => $now,
+                ]);
+        });
     }
 }

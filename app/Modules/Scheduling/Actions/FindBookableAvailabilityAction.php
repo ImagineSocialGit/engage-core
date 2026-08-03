@@ -146,11 +146,18 @@ class FindBookableAvailabilityAction
                 $coverage = $this->coverage($run, $slotStartsAt, $slotEndsAt);
 
                 if ($coverage !== null) {
+                    $resourceCapacity = $this->occupancy->resourceCapacity(
+                        search: $search,
+                        host: $host,
+                        startsAt: $slotStartsAt,
+                        endsAt: $slotEndsAt,
+                    );
                     $capacity = $this->effectiveCapacity(
                         service: $search->service,
                         host: $host,
                         assignment: $assignment,
                         availability: $coverage,
+                        resourceCapacity: $resourceCapacity['capacity'],
                     );
 
                     $remainingCapacity = $this->occupancy->remainingCapacity(
@@ -162,6 +169,7 @@ class FindBookableAvailabilityAction
                         endsAt: $slotEndsAt,
                         appointments: $appointments,
                         holds: $holds,
+                        resourceRemainingCapacity: $resourceCapacity['remaining'],
                     );
 
                     if ($remainingCapacity > 0) {
@@ -293,6 +301,7 @@ class FindBookableAvailabilityAction
         ?SchedulingHost $host,
         ?BookableServiceHost $assignment,
         AvailabilityInterval $availability,
+        ?int $resourceCapacity,
     ): int {
         $capacities = [max(1, (int) $service->capacity)];
 
@@ -306,6 +315,10 @@ class FindBookableAvailabilityAction
 
         if ($availability->capacity !== null) {
             $capacities[] = max(1, $availability->capacity);
+        }
+
+        if ($resourceCapacity !== null) {
+            $capacities[] = max(0, $resourceCapacity);
         }
 
         return min($capacities);

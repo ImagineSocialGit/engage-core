@@ -16,6 +16,7 @@ class BookingOccupancyResolver
 {
     public function __construct(
         private readonly AppointmentOccupancyResolver $appointments,
+        private readonly ResourceOccupancyResolver $resources,
     ) {}
 
     /**
@@ -72,6 +73,7 @@ class BookingOccupancyResolver
         CarbonImmutable $endsAt,
         Collection $appointments,
         Collection $holds,
+        ?int $resourceRemainingCapacity = null,
     ): int {
         $candidateStartsAt = $startsAt->subMinutes(
             max(0, (int) $service->buffer_before_minutes),
@@ -152,7 +154,31 @@ class BookingOccupancyResolver
             );
         }
 
+        if ($resourceRemainingCapacity !== null) {
+            $remaining[] = max(0, $resourceRemainingCapacity);
+        }
+
         return min($remaining);
+    }
+
+
+    /**
+     * @return array{capacity: int|null, remaining: int|null}
+     */
+    public function resourceCapacity(
+        AvailabilitySearch $search,
+        ?SchedulingHost $host,
+        CarbonImmutable $startsAt,
+        CarbonImmutable $endsAt,
+    ): array {
+        return $this->resources->capacityFor(
+            service: $search->service,
+            host: $host,
+            startsAt: $startsAt,
+            endsAt: $endsAt,
+            evaluatedAt: $search->evaluatedAt,
+            rescheduleAppointment: $search->rescheduleAppointment,
+        );
     }
 
     private function appointmentBlocks(

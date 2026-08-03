@@ -9,6 +9,7 @@ use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookableSlotOffer;
 use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingHost;
+use App\Modules\Scheduling\Services\Availability\ResourceOccupancyResolver;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Database\Eloquent\Collection;
@@ -25,6 +26,7 @@ class RescheduleAppointmentAction
 
     public function __construct(
         private readonly TransitionAppointmentStatusAction $lifecycle,
+        private readonly ResourceOccupancyResolver $resourceOccupancy,
     ) {}
 
     public function handle(AppointmentRescheduleData $data): Appointment
@@ -96,6 +98,8 @@ class RescheduleAppointmentAction
             $now = CarbonImmutable::now('UTC');
 
             if (! $hold->isEffectivelyActive($now)) {
+                $this->resourceOccupancy->deleteForHold($hold);
+
                 $hold->forceFill([
                     'status' => BookingHold::STATUS_EXPIRED,
                 ])->save();
@@ -239,6 +243,11 @@ class RescheduleAppointmentAction
                     'preserved_confirmation' => $preserveConfirmation,
                     'canceled_attendee_count' => $canceledAttendeeCount,
                 ],
+            );
+
+            $this->resourceOccupancy->transferHoldToAppointment(
+                hold: $hold,
+                appointment: $replacement,
             );
 
             $hold->forceFill([
