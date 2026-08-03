@@ -1412,6 +1412,8 @@
 │   │   ├── commerce.md
 │   │   ├── core.md
 │   │   ├── documents.md
+│   │   ├── events.md
+│   │   ├── experiences.md
 │   │   ├── flow-routes.md
 │   │   ├── forms.md
 │   │   ├── inbound-messaging.md
@@ -1638,8 +1640,9 @@
 │   ├── create-client.sh
 │   ├── dump-all-config.sh
 │   ├── dump-client-files.sh
-│   ├── dump-migrations
+│   ├── dump-migrations.sh
 │   ├── make-module-dependency-cone-dump.sh
+│   ├── make-project-state-dependency-cone-dump.sh
 │   ├── operations
 │   │   ├── configure-client-logging.sh
 │   │   ├── install-observability.sh
@@ -1975,4 +1978,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-506 directories, 1470 files
+506 directories, 1473 files

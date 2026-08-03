@@ -573,6 +573,23 @@ Everything else belongs to a first-party module, vertical module, or app-global 
 
 A table should not move ownership after client rollout unless there is a clear architectural mistake.
 
+Reserved ownership for approved but not-yet-created schema:
+
+```text
+events                         Events
+event_external_references      Events
+event_stakeholders             Events
+event_attendances              Events
+commerce_product_variants      Commerce
+commerce_offers                Commerce
+commerce_offer_variants        Commerce
+Experience-owned tables        Experiences, after its schema is approved
+```
+
+Reserved ownership does not mean the tables currently exist. Add each table to the executable schema ownership and Project State coverage contracts in the same implementation workstream that creates it.
+
+No new durable feature table may become operational while Project State still treats it as unclassified or must-be-empty. Credentials, secrets, ephemeral carts/checkouts, signed URLs, caches, and other reconstructible runtime artifacts should remain outside durable transfer.
+
 ## Module Tiers
 
 Engage Core should be organized in four layers:
@@ -584,7 +601,7 @@ Engage Core should be organized in four layers:
 
 Core is the minimal identity/contact foundation. It should almost never change unless a new universal capability requires a genuinely generic Core seam. When Core does change, prefer adding a module-neutral extension point, contract, or registry rather than storing new domain state on Core models.
 
-Universal modules are reusable capability modules. They may not be enabled for every client, but they are not tied to one business vertical. Universal modules own generic capabilities such as messaging, tasks, scheduling, forms, documents, portal access, commerce, webinars, reporting, and automation.
+Universal modules are reusable capability modules. They may not be enabled for every client, but they are not tied to one business vertical. Universal modules own generic capabilities such as messaging, tasks, scheduling, forms, documents, portal access, commerce, Events, webinars, reporting, and automation.
 
 Vertical modules compose Core and universal modules into a business-specific product. Vertical modules own domain language, domain records, vertical-specific workflow meaning, and vertical-specific integrations or mappings.
 
@@ -628,7 +645,7 @@ Current universal modules include:
 
 Planned universal modules include:
 
-- None currently documented.
+- `Events`
 
 Current vertical modules include:
 
@@ -638,6 +655,7 @@ Planned vertical modules include:
 
 - `PetServices`
 - `Music`
+- `Experiences`
 
 Blade views intentionally remain under:
 
@@ -658,7 +676,7 @@ Adapters are not modules. They sit behind module-owned contracts/managers/servic
 
 ## How to Add a Universal Module
 
-Use this process when adding a reusable capability module such as Scheduling, Portal, Forms, Documents, Commerce, or Location.
+Use this process when adding a reusable capability module such as Scheduling, Portal, Forms, Documents, Commerce, Location, or Events.
 
 The goal is to establish durable ownership and dependency direction without forcing Core to understand the new module or adding speculative vertical behavior.
 
@@ -677,8 +695,9 @@ Scheduling = universal appointment/booking capability.
 Portal = universal external/customer account capability.
 Forms = universal configurable form/submission capability.
 Documents = universal document request/upload/review capability.
-Commerce = universal normalized product/order/purchase capability.
+Commerce = universal catalog/offer/checkout-orchestration/purchase capability.
 Location = universal geographic/address/radius capability.
+Events = universal concrete-event catalog and reconciliation capability.
 ```
 
 Do not create a universal module when the behavior is only vertical-specific. Vertical-specific interpretation belongs to a vertical module.
@@ -764,6 +783,7 @@ Forms -> Core when contact-linked
 Documents -> Core when contact-linked
 Commerce -> Core
 Location -> Core
+Events -> Core
 ```
 
 Optional integrations with Messaging, Tasks, InternalNotifications, Portal, Campaigns, Broadcasts, FlowRoutes, Reporting, or adapters should go through public services/contracts/events, not direct writes into private internals.
@@ -934,11 +954,15 @@ Accepted dependency direction:
 - Documents -> Core, when documents are contact-linked
 - Documents may optionally use Portal, Tasks, and Messaging through public services/contracts when those modules are enabled
 - Commerce -> Core, when commerce customers/orders are contact-linked
+- Commerce may optionally use Events through the Events public promotion gate for Event-linked offers
 - Commerce may optionally use Messaging, Broadcasts, Campaigns, FlowRoutes, Portal, and Reporting through public services/contracts when those modules are enabled
-- Commerce may use Integrations through provider contracts/managers such as a Shopify adapter
+- Commerce may use Integrations through provider contracts/managers; Shopify is the first planned provider adapter
 - Location -> Core
+- Events -> Core
+- Events remains independently usable and must not depend on FlowRoutes, Messaging, Campaigns, Broadcasts, Tasks, Music, Experiences, Commerce, Webinars, Reporting, or Location
+- Experiences may consume Core, Events, and Commerce as foundation dependencies and may optionally consume Messaging, Tasks, FlowRoutes, InternalNotifications, Reporting, Location, and Integrations through public seams
 - PetServices may consume Core, Scheduling, Portal, Forms, Documents, Tasks, Messaging, Campaigns, FlowRoutes, Reporting, and Integrations as needed
-- Music may consume Core, Commerce, Messaging, Campaigns, Broadcasts, FlowRoutes, Reporting, Scheduling, Portal, and Integrations as needed
+- Music may consume Core, Events, Commerce, Experiences, Messaging, Campaigns, Broadcasts, FlowRoutes, Tasks, Reporting, Scheduling, Portal, Location, and Integrations as needed
 - Mortgage may consume Core, Workflow, FlowRoutes, Tasks, Messaging, Campaigns, Broadcasts, Webinars, Reporting, and Integrations as needed
 - Messaging may use Integrations through provider contracts/managers
 - Webinars may use Integrations through provider contracts/managers
@@ -962,6 +986,8 @@ Avoid:
 - Core -> Documents
 - Core -> Commerce
 - Core -> Location
+- Core -> Events
+- Core -> Experiences
 - Core -> PetServices
 - Core -> Music
 - Messaging -> InternalNotifications
@@ -1165,7 +1191,7 @@ Core contacts should answer:
 
 > Who is this person, how can we reach them, and where did they come from?
 
-Core contacts should not contain workflow, sales, mortgage, webinar, campaign, task assignment, internal notification, messaging, inbound message, or automation lifecycle state.
+Core contacts should not contain workflow, sales, mortgage, webinar, Event, Experience, commerce, campaign, task assignment, internal notification, messaging, inbound message, or automation lifecycle state.
 
 Avoid these fields on `contacts`:
 
@@ -2427,9 +2453,31 @@ Reporting should avoid becoming a dumping ground for cross-module business logic
 
 Reporting should not mutate another module’s internal state directly.
 
-## Current universal module docs
+## Events Module
 
-Detailed foundation docs for the current universal modules live in:
+Events is a planned universal module documented in `docs/modules/events.md`.
+
+Events owns one concrete occurrence's universal identity, schedule and historical location snapshot, lifecycle, announcement embargo, authoritative promotion gate, structured passive external references, occurrence-specific external stakeholders, readiness, duplicate warnings, and generic Contact attendance outcomes.
+
+Events depends only on Core and remains usable without FlowRoutes, Messaging, Campaigns, Broadcasts, Tasks, Music, Experiences, Commerce, Webinars, Reporting, or Location.
+
+Events must not own ticketing, event production, venue operations, payments, public promotion delivery, artist/tour meaning, Commerce purchasing, Experience fulfillment, or a workflow engine.
+
+Each Event is one concrete occurrence. Do not add EventSeries or recurrence to the foundation.
+
+Events stores an inline historical location snapshot and does not require `location_id`. Location may later geocode or associate the Event subject through public seams without rewriting Event history.
+
+`announcement_at` is an upstream embargo. The Events public promotion gate must block downstream Commerce, Experiences, Messaging, Campaigns, Broadcasts, FlowRoutes, listing exports, social publishing, and public surfaces until lifecycle, readiness, and announcement rules allow promotion.
+
+Automatic completion is allowed only after a non-null `ends_at` has passed. A missing end time must not be inferred from `starts_at`.
+
+Events records domain state first and emits compact neutral automation events through the shared outbox. Current contact-centered FlowRoutes cannot start contactless Event lifecycle routes until the planned subject-first generalization is complete.
+
+Events durable tables must receive a dependency-safe Project State section in the Events foundation workstream.
+
+## Current and planned universal module docs
+
+Detailed foundation and approved architecture docs live in:
 
 ```text
 docs/modules/scheduling.md
@@ -2438,19 +2486,21 @@ docs/modules/forms.md
 docs/modules/documents.md
 docs/modules/commerce.md
 docs/modules/location.md
+docs/modules/events.md
 ```
 
-This file should not duplicate those module-specific docs. Keep module-specific schema notes, FOSS feature-shape notes, table notes, deferred work, and open questions in the module docs.
+This file should not duplicate those module-specific docs. Keep module-specific schema notes, table notes, implementation status, deferred work, and open questions in the module docs.
 
 Global rules from those modules that belong here:
 
-- Core stays minimal; do not add appointment, portal, form, document, commerce, or location state to `contacts`.
+- Core stays minimal; do not add appointment, portal, form, document, commerce, location, Event, or Experience state to `contacts`.
 - Universal module tables may exist in every install even when the feature is not enabled or visible.
 - Optional schema relationships between universal modules do not automatically change `config/modules.php` feature visibility dependencies.
 - Public seams should be added before a consumer directly mutates another module's internals.
-- Do not add public seams, filters, builders, provider adapters, or vertical behavior until a concrete workflow needs them, unless a schema gap must be fixed pre-rollout.
+- New durable module tables require Project State transfer or an explicit must-be-empty policy before export can proceed; operational production use requires transfer support.
 - Scheduling can optionally reference saved Location records for appointments, while still using freeform location fields when Location is not enabled.
-- Commerce is purchase-history/intelligence first, not a storefront, checkout, payment, fulfillment, or inventory engine.
+- Commerce owns provider-neutral catalog/variant identity, public offers, checkout orchestration, normalized orders, and purchase outcomes; Shopify remains authoritative for provider price, inventory, checkout, payment, and order state.
+- Events owns one concrete Event's identity, schedule/location snapshot, lifecycle, announcement/promotion gates, passive references, stakeholders, readiness, and generic attendance outcomes.
 - Location is address/location intelligence first, not GIS, route optimization, or map-provider replacement.
 
 ## Mortgage Module
@@ -2543,50 +2593,48 @@ Bad:
 
 ## Music Module
 
-Music is a planned vertical module.
+Music is a planned vertical module documented in `docs/modules/music.md`.
 
-Music should own music-specific business meaning and fan/customer strategy.
+Music owns artist/show association, concert meaning, lineup, setlist, tour context, music-specific production requirements, fan/customer strategy, music-specific Commerce/Experience interpretation, and Bandsintown mapping.
 
-Music may own, when implemented:
+Music may consume Core, Events, Commerce, Experiences, Messaging, Campaigns, Broadcasts, FlowRoutes, Tasks, Scheduling, Portal, Location, Reporting, and Integrations.
 
-- artist/fan-specific profile data, if needed
-- release campaign configuration/meaning
-- music product interest categories
-- fan segmentation rules that are music-specific
-- show/event interest behavior that is not generic Scheduling or Location
-- music-specific Commerce mappings, if generic Commerce records are not enough
-- music-specific FlowRoute/Campaign presets
+Events owns the universal Event. Music owns the artist/show meaning. Commerce owns Shopify-backed purchase facts. Experiences owns VIP entitlements, participants, credentials, scanning, and fulfillment.
 
-Music may consume:
-
-- Core
-- Commerce
-- Messaging
-- Campaigns
-- Broadcasts
-- FlowRoutes
-- Scheduling
-- Portal
-- Location
-- Reporting
-- Integrations
-
-Music must not push music-specific state into Core contacts.
+Music must not push music-specific state into Core Contacts or add artist/tour/lineup/setlist columns to Events.
 
 Vertical-specific migrations should live in:
 
-    database/migrations/verticals/music
+```text
+database/migrations/verticals/music
+```
 
-Good:
+## Experiences Module
 
-    Commerce owns normalized Shopify orders
-    Music decides what buying vinyl, merch, or tickets means for fan segmentation
-    Location provides show-radius contact filtering when needed
+Experiences is a planned optional vertical module documented in `docs/modules/experiences.md`.
 
-Bad:
+Experiences owns post-purchase package entitlements, participants, benefits, management access, credentials, scanning, check-in, manifests, and fulfillment.
 
-    Core contacts store purchased_shopify_product_ids
-    Music imports Shopify adapter directly for generic order sync
+Experiences is not Scheduling and is not Commerce.
+
+```text
+Scheduling
+    appointment availability and lifecycle
+
+Commerce
+    public offer, Shopify cart/checkout orchestration, order reconciliation, purchase outcome
+
+Experiences
+    post-purchase entitlement and operational access fulfillment
+```
+
+An Experience occurrence may stand alone or reference at most one Event through an Experiences-owned nullable relationship. Event-linked Experiences inherit the Event promotion gate. Events remains unaware of Experiences.
+
+The public Experiences host is client-configured and operational only. Use separate management and scanning route groups on the same host. Commerce owns public discovery and purchasing; Experiences must not expose a second storefront catalog.
+
+Experiences must consume Shopify purchases only through Commerce's provider-neutral purchase-confirmed contract. It must not import Shopify adapter classes or infer payment from a browser return URL.
+
+Experiences durable state requires a dedicated Project State section before production use.
 
 ## Adapters / Integrations
 
@@ -2597,7 +2645,7 @@ Examples:
 - Resend powers email
 - Telnyx/Twilio power SMS
 - Zoom powers webinar behavior
-- Shopify adapter powers Commerce
+- Shopify Admin/Storefront GraphQL adapters power Commerce catalog, checkout orchestration, and reconciliation
 - External calendar adapters may power Scheduling sync later
 - Geocoding/address providers may power Location later
 - Arive may power mortgage LOS behavior later
@@ -2616,7 +2664,7 @@ Current examples:
     app/Integrations/Messaging/Sms/Telnyx
     app/Integrations/Messaging/Sms/Twilio
     app/Integrations/Webinars/Zoom
-    app/Integrations/Commerce/Shopify, later
+    app/Integrations/Commerce/Shopify, first Commerce provider integration
     app/Integrations/Scheduling, later
     app/Integrations/Location, later
 

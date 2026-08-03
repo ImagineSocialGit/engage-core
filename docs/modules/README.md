@@ -30,6 +30,12 @@ Use `../TODO.md` for actionable backlog.
 | Commerce | `commerce.md` |
 | Location | `location.md` |
 
+## Planned universal modules
+
+| Module | Doc |
+| --- | --- |
+| Events | `events.md` |
+
 ## Current and planned vertical modules
 
 | Module | Doc |
@@ -37,6 +43,7 @@ Use `../TODO.md` for actionable backlog.
 | Mortgage | `mortgage.md` |
 | PetServices | `pet-services.md` |
 | Music | `music.md` |
+| Experiences | `experiences.md` |
 
 ## Split rule
 

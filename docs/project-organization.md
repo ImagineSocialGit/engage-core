@@ -58,7 +58,7 @@ config/project_state/*.php
 
 `ProjectStateManager` is the stable five-operation facade. Specialized collaborators own export, validation, import, reference mapping, schema coverage, and resume behavior. The system intentionally uses current-format-only documents, exact complete-column contracts, one consistent export snapshot, one import transaction, and explicit category-by-category resume for runnable work.
 
-Every application table must be transferred by exactly one section, covered by exactly one explicit policy, or narrowly ignored as framework/schema bookkeeping. New tables and columns block export until classified.
+Every application table must be transferred by exactly one section, covered by exactly one explicit policy, or narrowly ignored as framework/schema bookkeeping. New tables and columns block export until classified. A new durable feature may remain under a must-be-empty policy during foundation work, but it must receive transfer support before operational production use.
 
 Project State does not make a module own another module's data. Each section declares how the owning module's current durable state crosses a controlled clean rebuild; the shared infrastructure remains neutral.
 
@@ -114,6 +114,8 @@ Core should not own:
 - form submissions
 - document uploads
 - commerce orders or purchases
+- Event identity, lifecycle, or attendance
+- Experience entitlements, participants, or credentials
 - pet/dog data
 - music/fan-specific data
 - mortgage-specific data
@@ -198,12 +200,14 @@ Universal modules are reusable capability modules. They may be disabled for many
 | Portal | External/customer accounts, portal auth, account invitations, contact-account links, customer-facing shell. |
 | Forms | Form definitions, versions, schemas, submissions, submission review state. |
 | Documents | Document requests, uploaded document records, review events, document lifecycle state. |
-| Commerce | Commerce customers, products, orders, order items, order events, provider-synced purchase history. |
+| Commerce | Provider-neutral customers, products, variants, public offers, Shopify-backed checkout orchestration, normalized orders/items/events, and purchase outcomes. The current repository implements only the customer/product/order history foundation. |
 | Location | Contact locations, reusable saved places, addresses, geocoding-derived coordinates, markets/regions, radius/service-area filters. |
 
 ### Planned universal modules
 
-None currently documented.
+| Module | Responsibility |
+| --- | --- |
+| Events | One concrete Event's canonical identity, schedule/location snapshot, lifecycle, announcement/promotion gates, structured references, stakeholders, readiness, and generic Contact attendance outcomes. |
 
 Universal modules should expose public actions/services/contracts/events where other modules need them. Other modules should not write directly to their internals when a public seam exists.
 
@@ -224,8 +228,19 @@ Vertical modules should not push domain-specific fields into Core contacts.
 | Module | Responsibility | Universal modules it likely consumes |
 | --- | --- | --- |
 | PetServices | Pets/dogs, pet profiles, training goals, training programs, behavior notes, pet-service-specific rules/workflows. | Scheduling, Portal, Forms, Documents, Tasks, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Reporting. |
-| Music | Music-specific fan/customer meaning, release/fan strategy, music product interest categories, show/release logic, music-specific segmentation. | Commerce, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Scheduling, Portal, Reporting. |
+| Music | Artist/show associations, music-specific fan/customer meaning, release/fan strategy, lineup/setlist/tour context, Bandsintown mapping, and music-specific segmentation/presets. | Events, Commerce, Experiences, Messaging, Campaigns, Broadcasts, FlowRoutes, Tasks, Location, Scheduling, Portal, Reporting. |
+| Experiences | Post-purchase special-access packages, entitlements, participants, benefits, management access, credentials, scanning, check-in, manifests, and fulfillment. | Core, Events, Commerce, plus optional Messaging, Tasks, FlowRoutes, InternalNotifications, Location, and Reporting. |
 
+Approved implementation order:
+
+```text
+Events foundation and Project State support
+-> Shopify-capable Commerce contracts, persistence, reconciliation, and Project State support
+-> Experiences entitlement and operational fulfillment
+-> optional Music/Bandsintown and cross-module automation/audience contributors
+```
+
+Commerce owns public discovery and purchase. Experiences owns post-purchase operations. Event-linked Commerce offers and Experiences inherit the Events promotion gate.
 
 ## Cross-module FlowRoutes integration pattern
 
@@ -262,7 +277,7 @@ Task emits neutral lifecycle event
 FlowRoutes resumes through its own correlation state
 ```
 
-This keeps future Scheduling, Documents, Forms, Portal, Commerce, Mortgage, PetServices, Music, and other integrations consistent at the ownership boundary without forcing every module to carry FlowRoutes internals.
+This keeps future Scheduling, Documents, Forms, Portal, Commerce, Events, Experiences, Mortgage, PetServices, Music, and other integrations consistent at the ownership boundary without forcing every module to carry FlowRoutes internals.
 
 ## Cross-module resolved message dispatch pattern
 
@@ -308,7 +323,7 @@ Adapters should live behind the owning module's contracts, managers, resolvers, 
 | Telnyx | Messaging / InboundMessaging |
 | Twilio | Messaging / InboundMessaging |
 | Zoom | Webinars |
-| Shopify, later | Commerce |
+| Shopify Admin/Storefront GraphQL, first Commerce provider integration | Commerce |
 | External calendar providers, later | Scheduling |
 | Geocoding/address providers, later | Location |
 | LOS providers such as Arive, later | Mortgage |
@@ -333,9 +348,11 @@ Examples:
 | Customer login/account | Portal |
 | Intake questionnaire | Forms |
 | Uploaded file/document request | Documents |
-| Shopify purchase sync | Commerce + Shopify adapter |
+| Shopify purchase sync or hosted-checkout orchestration | Commerce + Shopify adapter |
+| Canonical concert/seminar/open-house occurrence | Events |
+| VIP entitlement, participant, credential, or scan | Experiences |
 | Dog profile/training goals | PetServices |
-| Music fan/release strategy | Music |
+| Music artist/show/fan strategy | Music |
 | Radius-based targeting | Location |
 
 ## Core Change Standard

@@ -165,6 +165,7 @@ Core
 Scheduling
 Portal
 Commerce
+Events through provider-neutral subject/read contracts when a Location-owned operation needs Event context
 Reporting
 Integrations/adapters
 ```
@@ -187,6 +188,8 @@ Location may be consumed by:
 ```text
 Scheduling
 Commerce
+Events
+Experiences
 Music
 PetServices
 Mortgage
@@ -405,6 +408,48 @@ Notes:
 Assignments allow precomputed/manual membership without forcing every future area query to be calculated dynamically.
 role can distinguish member, serviceable, or excluded records.
 ```
+
+## Events integration boundary
+
+Events owns the historical schedule and inline location snapshot that was operationally true for one concrete Event.
+
+The Events foundation must not add `events.location_id`. Location remains optional, and updating a saved Location record must not rewrite historical Event address facts.
+
+Preferred later integration:
+
+```text
+Event snapshot
+    authoritative Event history
+
+Location public geocoding/read services
+    may geocode the Event snapshot
+    may create a Location-owned subject assignment or derived association
+    may calculate radius/area behavior
+
+Events
+    remains independently usable without Location
+```
+
+Coarse Event targeting may use Event-owned city, region, and country snapshot fields. Radius, service-area, or geographic-distance targeting requires Location-owned coordinates and query services.
+
+Location must not copy Event lifecycle, announcement, artist, ticket, Commerce, or Experience state into Location tables.
+
+Experience occurrences may consume Location separately for operational places. Event-linked Experiences must not assume that the Event snapshot and every Experience operational meeting place are identical.
+
+## Project State
+
+Location durable tables are currently part of the repository schema but do not yet have a first-class Project State transfer section. They must remain empty until Location becomes operational or until an explicit transfer contract is added.
+
+Before production geocoding, area assignment, service-area filtering, or reusable saved-place behavior is enabled, Project State must transfer the durable Location records required by that workflow:
+
+```text
+locations
+contact_locations
+location_areas
+location_area_assignments
+```
+
+Do not transfer provider credentials, ephemeral geocoding requests, or reconstructible caches. Keep provider payload retention minimal and justified.
 
 ## First foundation slice
 
