@@ -1,8 +1,3 @@
-
-
-
-
-
 # Engage Core Product Principles
 
 ## Config authoring and export
@@ -189,6 +184,34 @@ The capability composes cleanly with other modules through public seams.
 
 A module capability is suspect when it primarily creates a new thing for the client to design, configure, maintain, or relearn.
 
+## Module product surface standard
+
+Feature modules have a product-surface mode independent from architectural ownership:
+
+```text
+loud
+    owns a recognizable client/operator/public workflow
+
+silent
+    supplies supporting capability through another workflow, embedded context, or shared settings
+```
+
+A silent module may own substantial data and behavior. It should remain invisible as a standalone product unless a real operator workflow proves otherwise.
+
+The consuming loud module owns the user experience. For example, Scheduling owns the address-collection, availability, and travel-result experience while a silent Location capability may normalize the address or supply geographic facts.
+
+Explicit module enablement and dependency provider loading do not automatically create navigation. Top-level product surfaces must be deliberate.
+
+See [`module-surfaces.md`](module-surfaces.md) for the current classification registry and module-definition template.
+
+## Research findings are not product requirements
+
+FOSS reviews, competitive audits, provider capability lists, and roomy foundation schemas are possibility inventories.
+
+They may help identify durable shapes, but a feature becomes a requirement only when a concrete Engage Core workflow needs it, the owning module is clear, and the smallest useful contract passes the product barometer.
+
+Do not build a client-facing builder, CRUD workspace, provider feature, or schema expansion merely because another product has one or an existing table could support it.
+
 ## Universal internal terminology
 
 The universal internal person concept is `Contact`.
@@ -321,4 +344,3 @@ A blank-canvas builder is not client-ready merely because the underlying runtime
 The product direction is guided, preset-backed setup with focused editing and clear consequence/placement guardrails. Advanced runtime capability should remain internal unless a concrete product workflow proves it belongs in normal authoring.
 
 Detailed language rules, reusable UI patterns, automation-warning patterns, and UI review checklists live in `docs/ui-ux-guide.md`.
-

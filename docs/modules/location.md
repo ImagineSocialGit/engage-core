@@ -1,111 +1,92 @@
 # Location Module
 
-Location is a current universal module.
-
-Location owns reusable address, contact-location, geocoding-result, market, region, and service-area capability that can be used by multiple verticals without pushing location state into Core contacts or vertical-specific tables.
-
-Location is not intended to become a full GIS platform, a route optimizer, a map product, or a replacement for geocoding/map providers.
-
-The intended product shape is:
+## Identity
 
 ```text
-Engage Core stores enough location intelligence to make admin/client work easier.
-Admins can answer practical business questions quickly.
-Provider-specific geocoding or map behavior stays behind adapters later.
-Vertical modules decide what a location means in their domain.
+Architecture tier:   universal module
+Product surface:     silent
+Standalone value:    no
+Primary users:       consuming modules and developer/operators
+Primary surfaces:    embedded only; shared settings only when a concrete provider/setup need exists
 ```
 
-## Product barometer
+Location is supporting infrastructure for reusable location facts. It is not a standalone client product and should not receive a Location sidebar link, generic place-management dashboard, map builder, or GIS-style workspace merely because its tables exist.
 
-Location should follow the Engage Core product barometer:
+Current repository implementation is a persistence foundation only:
 
 ```text
-If the client-facing task cannot realistically be completed in Engage Core in 10-15 minutes total, it should usually not be a client-facing workflow.
+locations
+contact_locations
+location_areas
+location_area_assignments
+
+Location
+ContactLocation
+LocationArea
+LocationAreaAssignment
+
+LocationModuleServiceProvider
+LocationFoundationTest
 ```
 
-For Location, client-facing/admin-facing work should be practical and action-oriented:
+The service provider currently exposes no operational capability. All Location durable tables must remain empty while Project State classifies Location as unsupported.
+
+## Current committed responsibility
+
+Location should provide the smallest reusable capability needed by real consuming workflows:
 
 ```text
-See which contacts are in a service area.
-Find contacts near a city, region, market, or point.
-Store a clean billing, shipping, home, work, or service address.
-Check whether a customer is eligible for an in-person service.
-Target contacts near an upcoming show or event.
-Group contacts into markets or regions for reporting and outreach.
+normalize an address or place into a provider-neutral representation
+optionally resolve coordinates, timezone, precision, and confidence
+persist a reusable saved Location only when a workflow needs durable reuse
+link a Contact or another supported subject to a saved Location when that relationship has product value
+expose compact read/normalization contracts to consuming modules
 ```
 
-Developer/operator work includes:
+Location answers:
 
 ```text
-Choose the geocoding provider.
-Configure service areas or markets.
-Decide whether a vertical uses radius, postal codes, counties, manual areas, or provider-derived geometry.
-Wire provider adapters.
-Expose location-aware filters later.
-Connect Scheduling, Broadcasts, Campaigns, Reporting, or vertical modules through public seams later.
+What normalized place or address is this?
+What provider-neutral geographic facts are known about it?
+Which Contact or supported subject is linked to a reusable saved Location?
 ```
 
-Location should make life easier for the site admin. It should not recreate Google Maps, ArcGIS, routing software, or a full GIS editor inside Engage Core.
+Location does not decide what those facts mean to Scheduling, Commerce, Events, Music, Mortgage, PetServices, or another vertical.
 
-## Responsibility
+## Product boundary
 
-Location should answer:
+Location is intentionally not:
 
 ```text
-What locations are known, which contacts or subjects are linked to them, what areas or markets exist, and which records belong to those areas?
+a replacement for Google Maps, ArcGIS, or another map product
+a route planner or travel-time policy engine
+a general map/marker browser
+a polygon editor
+a territory-management product
+a client-facing location database
+a generic geospatial reporting product
+a reason to create Location CRUD screens for every table
 ```
 
-Location should stay vertical-neutral.
+A consuming loud module owns the user's workflow.
 
-It may support customer addresses, service addresses, business locations, event venues, show markets, dog trainer service areas, appointment eligibility, radius targeting, imported locations, and geocoded provider data without owning vertical-specific meaning.
-
-## FOSS feature-shape assumptions
-
-Before proposing schema, Location was evaluated against common patterns in mature open-source and open-source-adjacent geocoding, place, address, and geographic-data systems.
-
-Those systems commonly separate:
+Example:
 
 ```text
-- normalized address/location records
-- latitude/longitude and geocoding metadata
-- reverse geocoding
-- location search/geosearch
-- geographic places or administrative areas
-- service areas, territories, zones, or markets
-- provider/source attribution
-- confidence or precision
-- geometry or boundary data when territory logic is needed
-- links between people/business records and locations
+Scheduling
+    decides when an address is required
+    asks for and validates the address
+    explains availability/travel outcomes
+    owns Appointment location policy and historical snapshots
+    owns travel-time availability decisions
+
+Location
+    normalizes the submitted address
+    optionally resolves provider-neutral geographic facts
+    optionally persists a reusable saved place
 ```
 
-Engage Core should use those products as feature-shape references, not as implementation sources.
-
-The durable conclusion is that Location should have a roomy, generic foundation for normalized location records, contact-location links, areas/markets/service zones, and area assignments while consuming other Engage Core modules only through later public seams.
-
-## Intended authoring model
-
-Location should support developer/operator-authored locations and areas first.
-
-Likely authoring sources:
-
-```text
-manual admin/operator entry
-client-specific setup/config later
-provider-synced/geocoded data later
-import-derived contact address data later
-vertical-specific setup/presets later
-```
-
-The first implementation should not require a polished client-facing location builder or polygon editor.
-
-Default client-facing actions should be simple:
-
-```text
-choose a saved service area
-view contacts in this market
-store/update a contact address
-run a location-aware outreach/reporting action later
-```
+The user should not have to leave Scheduling to operate Location.
 
 ## Owns
 
@@ -116,74 +97,46 @@ locations
 contact_locations
 location_areas
 location_area_assignments
+provider-neutral address/location normalization contracts
+provider-neutral geocoding result shape when implemented
+reusable saved-location identity when a workflow needs it
+Contact-to-Location and supported subject-to-Location relationships
+Location-owned read services for normalized facts
 ```
 
-Location should also own, when implemented:
-
-```text
-address/location normalization
-contact-location lifecycle
-geocoding result storage
-service area, market, region, territory, and zone definitions
-radius/area membership support
-location read/query services
-optional saved-place support for modules that have a first-class location relationship
-geocoding provider contracts/managers
-location-aware contact filter provider, when a consuming surface needs it
-```
+The existing area tables remain Location-owned schema, but their presence does not commit Engage Core to service-area, territory, zone, radius, polygon, market, or assignment workflows. Those concepts remain dormant until a concrete consuming workflow requires one of them.
 
 ## Does not own
 
 Location does not own:
 
 ```text
-Core Contact records
-Scheduling appointment lifecycle
-Portal accounts
+Core Contact identity
+Scheduling service policy, Appointment lifecycle, availability, or travel decisions
+Commerce billing/shipping workflow or purchase state
+Event lifecycle or historical Event location snapshots
+Portal accounts or profile workflows
 Messaging delivery
-Commerce orders
-Documents uploads
-vertical-specific territory strategy
-provider adapter internals
-route optimization
-full GIS editing UX
-map tile/layer management
-turn-by-turn routing
-tax jurisdiction behavior
+Reporting dashboards
+vertical-specific territory or market meaning
+routing-provider travel estimates used to make Scheduling availability decisions
+provider credentials
+map tiles, layers, directions, or turn-by-turn navigation
 ```
 
-Do not add latitude, longitude, address, market, or service-area fields directly to `contacts` by default.
+Do not add address, latitude, longitude, market, or service-area fields directly to `contacts` by default.
 
 ## Consumes
 
-For the first foundation slice, Location depends only on Core.
+Location depends only on Core for its current foundation.
 
-Location may later consume these modules through public seams when enabled:
+When operational capability is added, Location may use provider adapters behind Location-owned contracts for address normalization or geocoding. Provider credentials remain environment/config state and do not become Location records.
 
-```text
-Core
-Scheduling
-Portal
-Commerce
-Events through provider-neutral subject/read contracts when a Location-owned operation needs Event context
-Reporting
-Integrations/adapters
-```
-
-Expected usage:
-
-```text
-Core -> contact-linked locations
-Scheduling -> appointment eligibility or service-area checks later
-Portal -> customer-facing profile/address screens later
-Commerce -> billing/shipping location normalization later
-Reporting -> location-aware summaries later
-Integrations -> geocoding/address provider adapters behind Location-owned contracts later
-```
+Location should not import consuming loud modules merely to understand why normalization was requested.
 
 ## Consumed by
 
-Location may be consumed by:
+Potential consumers include:
 
 ```text
 Scheduling
@@ -194,90 +147,75 @@ Music
 PetServices
 Mortgage
 Reporting
-FlowRoutes
-Campaigns
-Broadcasts
 Portal
 ```
 
-Consumers should use public Location actions/services/contracts/events/read services rather than directly mutating Location internals when those seams exist.
+A consumer should use a narrow public Location contract rather than mutating Location internals.
 
-Expected future examples:
+Consumer demand determines which contract is implemented. Do not add every theoretical read service, filter, area engine, or provider manager at once.
 
-```text
-Broadcasts asks a future Core/Location filter seam for contacts in a service area.
-Scheduling checks whether a contact is inside a service area before offering an appointment.
-Music targets contacts near an upcoming show.
-PetServices checks whether a dog trainer serves the customer's location.
-Reporting summarizes contacts/orders by market or region.
-```
+## Scheduling boundary
 
-Scheduling appointments may optionally reference saved Location records for reusable places. This does not make Location required for Scheduling feature visibility; Scheduling can still use freeform `location_type` and `location_details` when Location is not enabled or when a saved place is unnecessary.
+Scheduling is the first approved consumer that needs additional Location capability.
 
-## Public seams to add later
-
-The first foundation slice does not need full actions yet.
-
-Likely future public seams:
+The required sequence is consumer-driven:
 
 ```text
-CreateLocationAction
-UpdateLocationAction
-LinkContactLocationAction
-CreateLocationAreaAction
-AssignLocationAreaAction
-GeocodeLocationAction
-LocationReadService
-LocationAreaReadService
-LocationEligibilityService
-LocationContactFilterProvider
-LocationProviderManager
-GeocodingProvider
+1. Scheduling defines the exact server-owned address/location facts required for customer-site and fixed-location appointments.
+2. Location adds only the normalization/geographic-fact contract required by that Scheduling flow.
+3. Scheduling owns Appointment location policy and immutable Appointment/Hold snapshots.
+4. Scheduling owns provider-neutral travel-time resolution and availability decisions.
+5. A reusable Location row is created only when durable reuse is intentionally required.
 ```
 
-Public actions should exist before other modules directly create or mutate Location records.
+A public booking address may be normalized transiently and copied into a Scheduling-owned immutable snapshot without creating a durable Location record. This avoids abandoned-booking Location-row bloat.
 
-Do not add the filter seam until a consuming workflow needs it, unless the future seam exposes a schema gap that must be fixed pre-rollout.
+Browser-authored coordinates, travel durations, confidence values, or verified-location flags are never authoritative.
+
+## Public seams to add only when required
+
+The next approved Location seam should be deliberately small, likely shaped around a transient normalized result rather than automatic persistence.
+
+Conceptual capability:
+
+```text
+NormalizeLocationInput
+    input:
+        address_line_1
+        address_line_2 nullable
+        city
+        region
+        postal_code
+        country
+
+    output:
+        normalized address fields
+        formatted_address
+        latitude/longitude nullable
+        timezone nullable
+        precision nullable
+        confidence nullable
+        provider identity nullable
+```
+
+Rules:
+
+```text
+no raw provider payload escapes through the public DTO
+no Location row is automatically created
+no client-facing Location UI is required
+normalization failure is explicit
+provider enrichment is optional
+provider credentials remain outside durable records
+```
+
+Create/update/link/read actions should be added only when a real reusable-saved-location workflow needs them.
 
 ## Schema foundation
 
-The first Location foundation adds:
-
-```text
-locations
-contact_locations
-location_areas
-location_area_assignments
-```
-
-These tables are intentionally roomy but generic.
-
-They include:
-
-```text
-normalized address fields
-optional coordinates
-timezone
-precision/confidence
-provider/external identifiers
-raw provider payload storage
-contact links
-subject morphs
-service area/market/region fields
-boundary type and optional geometry/radius/settings
-area assignment records
-meta
-timestamps
-soft deletes
-```
-
-They avoid vertical-specific territory meaning, UI-builder assumptions, routing optimization, and provider-specific first-class behavior before implementation exists.
-
-## Table notes
-
 ### locations
 
-Represents a normalized address, place, virtual location, or region-like location record.
+Represents a reusable normalized address, place, virtual location, or region-like record.
 
 Important fields:
 
@@ -308,17 +246,18 @@ raw_payload
 meta
 ```
 
-Notes:
+Current rules:
 
 ```text
-latitude/longitude are nullable because not every useful location is geocoded yet.
-precision/confidence are generic provider-result hints, not provider-specific decisions.
-raw_payload preserves provider output without promoting provider-specific fields into universal schema.
+latitude/longitude remain nullable
+precision/confidence are generic provider-result hints
+raw_payload is provider evidence, not a public contract or general token source
+persistence is justified only when the Location will be reused or referenced durably
 ```
 
 ### contact_locations
 
-Links Core contacts to Location-owned records.
+Links a Core Contact to a reusable Location.
 
 Important fields:
 
@@ -337,18 +276,13 @@ source
 meta
 ```
 
-Notes:
-
-```text
-type supports practical roles such as home, work, service, billing, and shipping.
-subject morph allows a contact-location link to be about another record later without Core owning that context.
-```
+Do not create a ContactLocation merely because a transient booking address was submitted. Create the link only when durable Contact-address reuse is part of the approved workflow.
 
 ### location_areas
 
-Represents a market, service area, territory, region, zone, radius area, or custom location grouping.
+Represents a possible reusable area definition.
 
-Important fields:
+Important fields include:
 
 ```text
 key
@@ -375,19 +309,13 @@ settings
 meta
 ```
 
-Notes:
-
-```text
-boundary_type describes how the area is meant to be interpreted later.
-settings can store postal-code lists, county/state lists, provider hints, or other generic area configuration until runtime behavior deserves first-class tables.
-geometry is nullable JSON and does not imply a polygon editor or spatial database dependency.
-```
+This table is dormant foundation. Its schema does not require Engage Core to build markets, territories, zones, postal-code engines, polygons, or a spatial editor.
 
 ### location_area_assignments
 
-Links a contact, location, or future subject to a LocationArea.
+Represents a possible durable relationship between a LocationArea and a Contact, Location, or supported subject.
 
-Important fields:
+Important fields include:
 
 ```text
 location_area_id
@@ -402,99 +330,49 @@ source
 meta
 ```
 
-Notes:
+This table is also dormant until a proven workflow needs precomputed or manual area membership.
 
-```text
-Assignments allow precomputed/manual membership without forcing every future area query to be calculated dynamically.
-role can distinguish member, serviceable, or excluded records.
-```
+## Events boundary
 
-## Events integration boundary
+Events owns the historical schedule and inline location snapshot that was true for one concrete Event.
 
-Events owns the historical schedule and inline location snapshot that was operationally true for one concrete Event.
+Updating a reusable Location must not rewrite historical Event facts. Event integration should remain optional and should use Location only for narrowly required normalization, geocoding, or derived geographic decisions.
 
-The Events foundation must not add `events.location_id`. Location remains optional, and updating a saved Location record must not rewrite historical Event address facts.
-
-Preferred later integration:
-
-```text
-Event snapshot
-    authoritative Event history
-
-Location public geocoding/read services
-    may geocode the Event snapshot
-    may create a Location-owned subject assignment or derived association
-    may calculate radius/area behavior
-
-Events
-    remains independently usable without Location
-```
-
-Coarse Event targeting may use Event-owned city, region, and country snapshot fields. Radius, service-area, or geographic-distance targeting requires Location-owned coordinates and query services.
-
-Location must not copy Event lifecycle, announcement, artist, ticket, Commerce, or Experience state into Location tables.
-
-Experience occurrences may consume Location separately for operational places. Event-linked Experiences must not assume that the Event snapshot and every Experience operational meeting place are identical.
+Location must not copy Event lifecycle, announcement, artist, ticket, Commerce, or Experience state.
 
 ## Project State
 
-Location durable tables are currently part of the repository schema but do not yet have a first-class Project State transfer section. They must remain empty until Location becomes operational or until an explicit transfer contract is added.
+Location durable tables currently have no first-class Project State transfer section and must remain empty.
 
-Before production geocoding, area assignment, service-area filtering, or reusable saved-place behavior is enabled, Project State must transfer the durable Location records required by that workflow:
+Before any workflow persists Location, ContactLocation, LocationArea, or LocationAreaAssignment records that must survive a controlled clean rebuild, add explicit Location transfer support for exactly the operational tables and references in use.
+
+Do not transfer:
 
 ```text
-locations
-contact_locations
-location_areas
-location_area_assignments
+provider credentials
+short-lived normalization requests
+reconstructible caches
+unjustified full provider payload archives
 ```
 
-Do not transfer provider credentials, ephemeral geocoding requests, or reconstructible caches. Keep provider payload retention minimal and justified.
+## Deferred possibilities
 
-## First foundation slice
-
-Schema/model/migration changes:
+These remain possibilities, not current requirements:
 
 ```text
-app/Modules/Location/Providers/LocationModuleServiceProvider.php
-app/Modules/Location/Models/Location.php
-app/Modules/Location/Models/ContactLocation.php
-app/Modules/Location/Models/LocationArea.php
-app/Modules/Location/Models/LocationAreaAssignment.php
-database/migrations/*_create_locations_table.php
-database/migrations/*_create_contact_locations_table.php
-database/migrations/*_create_location_areas_table.php
-database/migrations/*_create_location_area_assignments_table.php
-database/factories/LocationFactory.php
-database/factories/ContactLocationFactory.php
-database/factories/LocationAreaFactory.php
-database/factories/LocationAreaAssignmentFactory.php
-```
-
-Code integration changes:
-
-```text
-Register location in config/modules.php.
-Keep it disabled by default.
-Depend only on Core.
-```
-
-Tests only:
-
-```text
-tests/Feature/Location/LocationFoundationTest.php
-```
-
-Deferred work:
-
-```text
-geocoding provider adapters
+standalone saved-place management
+Contact address editing outside a consuming workflow
+service-area eligibility
 radius queries
-service-area eligibility service
-Scheduling service-area eligibility beyond optional saved appointment places
-Broadcast/Campaign location filters
-Portal location/profile screens
-vertical-specific location interpretation
-reporting surfaces
-route optimization, if ever needed
+postal-code or region membership
+markets and territories
+polygon geometry and spatial queries
+location-aware Broadcast/Campaign filters
+location reporting surfaces
+Portal profile/address screens
+reverse geocoding
+provider-specific place search
+route optimization
 ```
+
+Implement one only when a concrete loud-module or vertical workflow proves its value and defines the smallest required Location contract.

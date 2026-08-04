@@ -37,6 +37,27 @@ This matters architecturally because powerful modules should expose simple runti
 
 Use `ui-ux-guide.md` for client/operator-facing language, screen patterns, and UI review standards.
 
+
+## Module Product Surfaces
+
+Architectural ownership and product visibility are separate classifications.
+
+Feature modules are either:
+
+```text
+loud
+    a recognizable client/operator/public workflow
+
+silent
+    a supporting capability normally encountered through another workflow, a Contact panel, or shared settings
+```
+
+Silent does not mean optional, trivial, stateless, or unimportant. A silent module may own substantial schema and runtime behavior while intentionally having no standalone navigation or client-facing builder.
+
+Core is the platform foundation rather than a normal feature-surface classification. Integrations/adapters are not modules and remain behind the owning module's product surface.
+
+Use [`module-surfaces.md`](module-surfaces.md) for the complete classification registry, navigation rules, module-definition template, and the rule that FOSS/competitive audits are possibility inventories rather than requirements.
+
 ## Core Rule
 
 Modules may depend on another module’s public API, but should not depend on another module’s private internals.
@@ -113,31 +134,33 @@ client/{CLIENT_KEY}/config/modules.php
 -> config('modules.enabled')
 -> ModuleManager
 
-Provider loading may additionally include dependency modules without making those modules explicitly enabled or visible for the selected client.
+Provider loading may additionally include dependency modules without making those modules explicitly enabled.
+
+Explicit enablement means the runtime capability is available to the selected client. It does not by itself require a top-level navigation item or standalone product workspace. Product visibility also depends on the module's loud/silent classification and deliberate surface contribution.
 
 Do not put module-enabled conditionals inside normal shared migrations.
 
 During pre-rollout branch work, replace current branch migrations when a table shape changes instead of adding modify-table migrations. Once a migration has shipped to a real environment that must be preserved, use normal append-only migrations.
 
-The database can contain reusable capability tables even when a module is not visible to the current client.
+The database can contain reusable capability tables even when a module is not explicitly available or independently visible to the current client.
 
-Optional schema relationships are allowed when they make a future workflow simpler, but they do not automatically create feature visibility dependencies. For example, `appointments.location_id` may reference a saved Location record while Scheduling still depends only on Core for normal feature visibility. If Location is not enabled or visible, Scheduling can still use its freeform location fields.
+Optional schema relationships are allowed when they make a real workflow simpler, but they do not automatically create navigation or standalone-surface dependencies. For example, Scheduling may optionally reference a saved Location record while keeping the entire address/travel experience inside Scheduling. Location remains a silent supporting module.
 
 ## Module Enabled vs Provider Loaded
 
 There is an important distinction:
 
-- `module_enabled('x')` means the feature module is explicitly enabled for the client.
+- `module_enabled('x')` means the capability is explicitly enabled for the client.
 - Provider loading may include dependency modules needed by explicitly enabled modules.
+- Product visibility is a separate deliberate decision governed by loud/silent surface mode and the actual surface contribution.
 
 Example:
 
 - If `inbound_messaging` depends on `messaging`, the Messaging provider may need to load.
-- But Messaging UI should not appear unless `messaging` itself is explicitly enabled.
+- Explicitly enabling Messaging still does not require a primary Messaging sidebar item because Messaging is a silent module.
+- Messaging templates or delivery settings may appear contextually or inside shared settings when their workflows require them.
 
-Feature visibility should follow explicit module enablement.
-
-Provider availability may include dependencies.
+Provider availability may include dependencies. Navigation must not be inferred mechanically from provider loading or the enabled-module list.
 
 SMS code may exist even when SMS UI is hidden. SMS provider integrations, consent handling, STOP/HELP behavior, and runtime gates may remain available while config hides SMS options from Broadcast, Campaign, permission-invitation, or other client/admin builders.
 
@@ -607,6 +630,8 @@ Vertical modules compose Core and universal modules into a business-specific pro
 
 Integrations/adapters connect modules to external providers. They are not modules. They live behind module-owned contracts, managers, services, or provider abstractions.
 
+Architecture tier is independent from product surface mode. A universal or vertical module may be loud or silent. Core is the platform exception; integrations/adapters remain silent implementation details rather than modules.
+
 Decision rule:
 
     Core = required identity/contact foundation.
@@ -684,6 +709,16 @@ Each current universal module with a foundation doc should keep module-specific 
 
 ### 1. Classify the module
 
+Confirm both classifications before implementation:
+
+```text
+architecture tier
+    Core | universal | vertical | integration/adapter
+
+product surface
+    loud | silent
+```
+
 Confirm the capability is truly universal rather than Core, vertical, or integration code.
 
 A universal module should be reusable across multiple verticals and should own a capability rather than a business-specific meaning.
@@ -696,11 +731,20 @@ Portal = universal external/customer account capability.
 Forms = universal configurable form/submission capability.
 Documents = universal document request/upload/review capability.
 Commerce = universal catalog/offer/checkout-orchestration/purchase capability.
-Location = universal geographic/address/radius capability.
+Location = universal normalized location/address facts and optional geographic-provider capability.
 Events = universal concrete-event catalog and reconciliation capability.
 ```
 
-Do not create a universal module when the behavior is only vertical-specific. Vertical-specific interpretation belongs to a vertical module.
+Examples of product-surface classification:
+
+```text
+Scheduling = loud universal module.
+Broadcasts = loud universal module.
+Location = silent universal module.
+InternalNotifications = silent universal module.
+```
+
+Do not create a universal module when the behavior is only vertical-specific. Vertical-specific interpretation belongs to a vertical module. Do not create a standalone surface for a silent module merely because its schema or service provider exists.
 
 ### 2. Decide ownership before schema
 
@@ -772,7 +816,7 @@ provider
 depends_on
 ```
 
-Keep dependencies one-way and minimal. Use explicit module enablement for feature visibility. Provider loading for dependencies must not accidentally expose UI.
+Keep dependencies one-way and minimal. Use explicit module enablement for runtime capability availability. Product surfaces must follow the loud/silent classification and deliberate navigation/settings contributions. Provider loading for dependencies must not accidentally expose UI.
 
 Typical planned universal dependencies:
 
@@ -2495,10 +2539,10 @@ Global rules from those modules that belong here:
 
 - Core stays minimal; do not add appointment, portal, form, document, commerce, location, Event, or Experience state to `contacts`.
 - Universal module tables may exist in every install even when the feature is not enabled or visible.
-- Optional schema relationships between universal modules do not automatically change `config/modules.php` feature visibility dependencies.
+- Optional schema relationships between universal modules do not automatically change explicit runtime availability, surface mode, or navigation.
 - Public seams should be added before a consumer directly mutates another module's internals.
 - New durable module tables require Project State transfer or an explicit must-be-empty policy before export can proceed; operational production use requires transfer support.
-- Scheduling can optionally reference saved Location records for appointments, while still using freeform location fields when Location is not enabled.
+- Scheduling may consume silent Location normalization or optionally reference reusable saved Location records while keeping appointment location policy, snapshots, and user experience inside Scheduling.
 - Commerce owns provider-neutral catalog/variant identity, public offers, checkout orchestration, normalized orders, and purchase outcomes; Shopify remains authoritative for provider price, inventory, checkout, payment, and order state.
 - Events owns one concrete Event's identity, schedule/location snapshot, lifecycle, announcement/promotion gates, passive references, stakeholders, readiness, and generic attendance outcomes.
 - Location is address/location intelligence first, not GIS, route optimization, or map-provider replacement.

@@ -23,6 +23,18 @@ Detailed sequencing and open decisions are in
 
 This file is intentionally disposable. Add work here when it is real but not yet ready for an implementation slice. Delete items as they are completed. Do not treat this as an architectural reference; long-lived decisions belong in `module-boundaries.md` or a feature-specific doc.
 
+## Module product surfaces
+
+The loud/silent product-surface framework is documented in [`module-surfaces.md`](module-surfaces.md).
+
+- [x] Separate architecture tier from product-surface classification.
+- [x] Define loud and silent module behavior, navigation expectations, and the consuming-module UX rule.
+- [x] Classify current and planned modules without adding runtime config fields merely for documentation symmetry.
+- [x] Establish that FOSS/competitive audits are possibility inventories rather than module requirements.
+- [x] Narrow Location to a silent supporting capability and revise Scheduling's location/travel roadmap from the consumer workflow backward.
+- [ ] Apply the module identity template when each module doc is next materially revised; do not churn files solely for wording symmetry.
+- [ ] Add executable navigation/settings contribution metadata only when a concrete registry or UI workflow requires it.
+
 ## Messaging persistence refactor
 
 - [x] Audit Messaging, Campaigns, Broadcasts, Webinars, FlowRoutes, and InboundMessaging write paths and lock the ownership rules in [`model-persistence-bloat-audit.md`](model-persistence-bloat-audit.md).
@@ -85,7 +97,9 @@ The durable Scheduling architecture is documented in [`modules/scheduling.md`](m
 - [x] Phase 4A.2: add the CRM weekly/absolute availability and blackout editor with timezone-safe validation and preview.
 - [x] Phase 4B.1A: add normalized host resources, service requirements, immutable Appointment/Hold resource snapshots, selective-overlap calculation, and terminal hold cleanup.
 - [x] Phase 4B.1B: add CRM management for resource identities, host capacities, and service requirements with ownership, immutable keys, stale-write protection, and live effects.
-- [ ] Phase 4B.2: add normalized appointment locations, provider-neutral travel-time resolution, conservative fallback policies, adjacent-Appointment travel checks, and reservation-time revalidation.
+- [ ] Phase 4B.2A: define Scheduling-owned service location policy and immutable snapshot requirements, then add only the minimal silent Location normalization contract those requirements need.
+- [ ] Phase 4B.2B: add authoritative BookingHold/Appointment location snapshots and fixed/customer-site policy without persisting abandoned public-booking addresses as Location rows.
+- [ ] Phase 4B.2C: add Scheduling-owned provider-neutral travel-time resolution, conservative fallback, adjacent-Appointment checks, and reservation/direct-creation revalidation.
 - [ ] Phase 4B.3: restructure public booking around appointment-type-first progressive steps; require customer-site location before authoritative availability and keep all page transitions server authoritative.
 - [ ] Phase 4B.4: when Messaging has an eligible deliverable transactional channel, verify one email or SMS destination before creating a capacity-consuming hold; keep verification independent from marketing consent.
 - [ ] Add Scheduling Project State transfer support only after these durable configuration and public-booking contracts are stable.
@@ -649,6 +663,9 @@ Remaining polish audit:
   - Keep music-specific purchase/interest state out of Core contacts unless represented through a proper universal module relation.
 
 ### Documentation maintenance
+
+- [ ] When materially revising a module, confirm its architecture tier, loud/silent surface, current committed workflows, deferred possibilities, and Project State status against `docs/module-surfaces.md`.
+- [ ] Treat FOSS, competitive, and provider feature inventories as non-binding research unless an approved Engage Core workflow adopts the capability.
 
 - [ ] Regenerate `core-project-tree.txt` from the repo after structural module/file changes.
   - Do not hand-maintain it.

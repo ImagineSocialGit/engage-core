@@ -184,30 +184,30 @@ Universal modules are reusable capability modules. They may be disabled for many
 
 ### Current universal modules
 
-| Module | Responsibility |
-| --- | --- |
-| Messaging | Outbound/scheduled email/SMS, consent, revocations, suppressions, gates, payloads, providers, opt-outs, permission invitations. |
-| InboundMessaging | Inbound SMS/email webhooks, inbound message recording, inbound classification/routing. |
-| InternalNotifications | Team members, notification preferences, internal notification gates/routing. |
-| Tasks | Generic live work records, optional TaskTemplates, zero-to-many cross-module TaskLinks, assignment/responsibility, lifecycle, Task index/show, and optional notification/digest behavior. |
-| Workflow | Contact workflow/profile state and status transition services. |
-| FlowRoutes | Automation/control-flow routes, route points, waits, event waits, subject-scoped route progress, instance plans/items, progress/execution items, capability catalog/bindings, and created-artifact tracking/correlation. |
-| Campaigns | Enrolled multi-step message journeys and campaign progression. |
-| Broadcasts | One-time/batch sends and recipient bookkeeping. |
-| Webinars | Webinar series, webinars, registrations, waitlists, schedule profiles, provider behavior, attendance, replay/follow-up orchestration. |
-| Reporting | Reporting queries, dashboards, data objects, and report surfaces. |
-| Scheduling | Appointments, availability, optional saved appointment places, booking/reschedule/cancel behavior, appointment reminders. |
-| Portal | External/customer accounts, portal auth, account invitations, contact-account links, customer-facing shell. |
-| Forms | Form definitions, versions, schemas, submissions, submission review state. |
-| Documents | Document requests, uploaded document records, review events, document lifecycle state. |
-| Commerce | Provider-neutral customers, products, variants, public offers, Shopify-backed checkout orchestration, normalized orders/items/events, and purchase outcomes. The current repository implements only the customer/product/order history foundation. |
-| Location | Contact locations, reusable saved places, addresses, geocoding-derived coordinates, markets/regions, radius/service-area filters. |
+| Module | Surface | Responsibility |
+| --- | --- | --- |
+| Messaging | Silent | Outbound/scheduled email/SMS, consent, revocations, suppressions, gates, templates, delivery, opt-outs, and permission invitations exposed through consuming workflows or shared settings. |
+| InboundMessaging | Silent | Inbound SMS/email webhooks, message recording, classification, and routing surfaced through Contact/contextual operational views. |
+| InternalNotifications | Silent | Team members, notification preferences, and internal delivery behavior used by dashboards, Contact context, shared settings, and consuming modules. |
+| Tasks | Loud | Generic live work records, optional TaskTemplates, zero-to-many TaskLinks, assignment/responsibility, lifecycle, and Task index/show workflows. |
+| Workflow | Silent | Contact workflow/profile state and status transition services presented through Contact and consuming-module surfaces. |
+| FlowRoutes | Loud | Routes, assignments, automation/control flow, waits, subject-scoped progress, instance plans, capability bindings, and created-artifact correlation. |
+| Campaigns | Loud | Campaign identity, activation, enrollment intent, journey presentation, and Campaign-specific reporting. |
+| Broadcasts | Loud | One-time/batch send authoring, scheduling, recipients, cancellation, and outcome visibility. |
+| Webinars | Loud | Webinar series, occurrences, registrations, waitlists, provider behavior, attendance, and follow-up operations. |
+| Reporting | Loud | Reporting queries, dashboards, data objects, and report surfaces. |
+| Scheduling | Loud | Appointments, availability, resource compatibility, booking/reschedule/cancel behavior, configuration, and public booking. |
+| Portal | Loud | External/customer accounts, authentication, invitations, contact-account links, and customer-facing shell. |
+| Forms | Loud | Form definitions/versions plus submission, review, and public/portal form workflows. |
+| Documents | Loud | Document requests, uploads, review events, checklist state, and document lifecycle workflows. |
+| Commerce | Loud | Provider-neutral purchase history plus planned offers and Shopify-backed checkout orchestration. The current repository implements only the customer/product/order history foundation. |
+| Location | Silent | Reusable normalized location/address facts and optional geographic provider results used through consuming modules; no standalone Location product by default. |
 
 ### Planned universal modules
 
-| Module | Responsibility |
-| --- | --- |
-| Events | One concrete Event's canonical identity, schedule/location snapshot, lifecycle, announcement/promotion gates, structured references, stakeholders, readiness, and generic Contact attendance outcomes. |
+| Module | Surface | Responsibility |
+| --- | --- | --- |
+| Events | Loud | One concrete Event's canonical identity, schedule/location snapshot, lifecycle, announcement/promotion gates, structured references, stakeholders, readiness, and generic Contact attendance outcomes. |
 
 Universal modules should expose public actions/services/contracts/events where other modules need them. Other modules should not write directly to their internals when a public seam exists.
 
@@ -219,17 +219,17 @@ Vertical modules should not push domain-specific fields into Core contacts.
 
 ### Current vertical modules
 
-| Module | Responsibility |
-| --- | --- |
-| Mortgage | Mortgage stages, contact mortgage profiles, mortgage-specific state, LOS/domain-specific behavior, mortgage presets. |
+| Module | Surface | Responsibility |
+| --- | --- | --- |
+| Mortgage | Loud | Mortgage stages, contact mortgage profiles, mortgage-specific state, LOS/domain-specific behavior, and mortgage presets. |
 
 ### Planned vertical modules
 
-| Module | Responsibility | Universal modules it likely consumes |
-| --- | --- | --- |
-| PetServices | Pets/dogs, pet profiles, training goals, training programs, behavior notes, pet-service-specific rules/workflows. | Scheduling, Portal, Forms, Documents, Tasks, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Reporting. |
-| Music | Artist/show associations, music-specific fan/customer meaning, release/fan strategy, lineup/setlist/tour context, Bandsintown mapping, and music-specific segmentation/presets. | Events, Commerce, Experiences, Messaging, Campaigns, Broadcasts, FlowRoutes, Tasks, Location, Scheduling, Portal, Reporting. |
-| Experiences | Post-purchase special-access packages, entitlements, participants, benefits, management access, credentials, scanning, check-in, manifests, and fulfillment. | Core, Events, Commerce, plus optional Messaging, Tasks, FlowRoutes, InternalNotifications, Location, and Reporting. |
+| Module | Surface | Responsibility | Universal modules it likely consumes |
+| --- | --- | --- | --- |
+| PetServices | Loud | Pets/dogs, pet profiles, training goals, training programs, behavior notes, and pet-service-specific rules/workflows. | Scheduling, Portal, Forms, Documents, Tasks, Messaging, Campaigns, Broadcasts, FlowRoutes, Location, Reporting. |
+| Music | Loud | Artist/show associations, music-specific fan/customer meaning, release/fan strategy, lineup/setlist/tour context, Bandsintown mapping, and music-specific segmentation/presets. | Events, Commerce, Experiences, Messaging, Campaigns, Broadcasts, FlowRoutes, Tasks, Location, Scheduling, Portal, Reporting. |
+| Experiences | Loud | Post-purchase special-access packages, entitlements, participants, benefits, management access, credentials, scanning, check-in, manifests, and fulfillment. | Core, Events, Commerce, plus optional Messaging, Tasks, FlowRoutes, InternalNotifications, Location, and Reporting. |
 
 Approved implementation order:
 
@@ -330,7 +330,9 @@ Adapters should live behind the owning module's contracts, managers, resolvers, 
 
 ## Classification Rule
 
-Use this rule when deciding where a new capability belongs:
+Classify architecture and product surface separately.
+
+Architecture:
 
 ```text
 Core = required identity/contact foundation.
@@ -338,6 +340,15 @@ Universal module = reusable capability many verticals can use.
 Vertical module = business-domain-specific concepts/rules/language.
 Integration = external provider adapter behind the owning module.
 ```
+
+Product surface:
+
+```text
+Loud = recognizable client/operator/public workflow.
+Silent = supporting capability normally encountered through another workflow, embedded context, or shared settings.
+```
+
+See [`module-surfaces.md`](module-surfaces.md) for the complete registry and navigation rules.
 
 Examples:
 
@@ -353,7 +364,7 @@ Examples:
 | VIP entitlement, participant, credential, or scan | Experiences |
 | Dog profile/training goals | PetServices |
 | Music artist/show/fan strategy | Music |
-| Radius-based targeting | Location |
+| Address normalization or provider-neutral geographic facts | Location |
 
 ## Core Change Standard
 

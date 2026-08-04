@@ -4,6 +4,15 @@ Scheduling is a current universal module.
 
 Scheduling owns reusable appointment and booking capability that can be used by multiple verticals without pushing appointment state into Core or vertical-specific tables.
 
+```text
+Architecture tier:   universal module
+Product surface:     loud
+Standalone value:    yes
+Primary surfaces:    CRM workspace, configuration, Contact context, public booking
+```
+
+Scheduling owns the complete user-facing appointment and booking experience even when it consumes silent supporting capabilities such as Location, Messaging, or InternalNotifications.
+
 ## Product expectation
 
 Scheduling should follow the Engage Core product barometer:
@@ -166,7 +175,7 @@ public slot reservation with deterministic hidden-host selection and authoritati
 public attendee capture, safe Contact resolution, and replay-safe hold-to-Appointment completion
 ```
 
-Scheduling does not own message delivery, consent, task lifecycle, portal accounts, form definitions, commerce records, geocoding, or provider adapter internals.
+Scheduling does not own message delivery, consent, task lifecycle, portal accounts, form definitions, commerce records, reusable Location identity, address/geocoding provider contracts, or provider adapter internals outside Scheduling-owned calendar, meeting, and travel-resolution contracts.
 
 ## Consumes
 
@@ -194,7 +203,7 @@ Tasks -> manual work generated from appointment outcomes
 Portal -> authenticated customer schedule views or booking entry
 Forms -> intake submissions associated with booking flows
 Commerce -> optional paid-booking order/payment state
-Location -> optional reusable saved places and service-area checks
+Location -> optional address normalization, provider-neutral geographic facts, and reusable saved places; Scheduling remains the owner of appointment policy, snapshots, UI, and travel decisions
 Integrations -> calendar and meeting-provider adapters behind Scheduling contracts
 ```
 
@@ -624,6 +633,27 @@ Changing resource configuration affects future commitments only. Existing `sched
 
 Current `buffer_before_minutes` and `buffer_after_minutes` are fixed service-level elapsed-minute buffers. Appointment location snapshots are presentation and historical data; the availability engine does not currently calculate distance or travel time.
 
+Location is a silent supporting module. Scheduling must not wait for, or create, a standalone Location product before implementing customer-site booking.
+
+The consumer-owned responsibility split is:
+
+```text
+Scheduling
+    owns service location policy
+    owns the public/CRM address-collection experience
+    owns whether authoritative availability may be shown
+    owns Appointment and BookingHold location snapshots
+    owns travel-time policy, fallback, and availability decisions
+    owns reservation/direct-creation revalidation
+
+Location
+    normalizes address/place input
+    optionally supplies provider-neutral coordinates, timezone, precision, and confidence
+    persists a reusable saved Location only when durable reuse is intentional
+```
+
+A transient customer-site address may be normalized without creating a Location row. Scheduling should persist the compact immutable location facts needed for the commitment on the BookingHold and Appointment. An optional Location reference may identify a reusable saved place, but mutable saved-place edits must not rewrite historical appointment facts.
+
 Travel-aware Scheduling must use estimated travel time rather than straight-line distance. For every candidate customer-site Appointment, availability must check both adjacent directions:
 
 ```text
@@ -633,7 +663,9 @@ candidate location → next in-person location
 
 The required gap is the resolved travel duration plus configurable parking, setup, or safety padding. A timed site-work commitment must carry a start, end, and normalized location; a date-only marker is insufficient. Such a commitment consumes physical-presence resources while compatible phone or virtual work may remain available.
 
-Scheduling should own a provider-neutral `TravelTimeResolver` contract and the normalized location/travel policy consumed by availability. Optional Integrations adapters may use routing providers. Scheduling must also support a deterministic conservative fallback, such as zones or configured travel durations, when no routing provider is available.
+Scheduling owns a provider-neutral `TravelTimeResolver` contract because travel duration affects Scheduling availability. Optional routing adapters sit behind that contract. Location may supply normalized geographic facts, but it does not decide whether an Appointment fits.
+
+Scheduling must also support a deterministic conservative fallback, such as configured travel bands or durations, when no routing provider is available. Do not implement general Location areas, territories, polygons, or map editing merely to satisfy this fallback unless the chosen Scheduling policy specifically requires one of those concepts.
 
 Travel, location, and resource requirements must be revalidated during reservation or direct Appointment creation. They must not be accepted from browser-authored hidden fields or persisted as redundant snapshots in arbitrary `meta` payloads.
 
@@ -1138,7 +1170,9 @@ Do not add `flow_route_*` foreign keys to Scheduling artifacts merely for proven
 Deferred after the resource configuration workspace:
 
 ```text
-Phase 4B.2 — location normalization and travel-time-aware availability
+Phase 4B.2A — define the exact Scheduling location policy/snapshot contract and add only the minimal silent Location normalization DTO/service required by that contract
+Phase 4B.2B — persist authoritative BookingHold/Appointment location snapshots and fixed/customer-site service policy without creating abandoned-booking Location rows
+Phase 4B.2C — add Scheduling-owned travel-time resolution, conservative fallback, adjacent-Appointment checks, and transaction-time revalidation
 Phase 4B.3 — appointment-type-first progressive public booking
 Phase 4B.4 — Messaging-backed email/SMS verification before capacity hold
 SCHEDULING_APP_URL setup validation

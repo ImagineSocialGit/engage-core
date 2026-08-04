@@ -37,13 +37,20 @@ return [
     |
     | Core is always treated as enabled by ModuleManager.
     |
-    | enabled controls explicit feature visibility. Providers may load as
-    | dependencies without making a module visible.
+    | enabled controls explicit runtime capability availability. It does not by
+    | itself require a sidebar link, standalone workspace, or other product
+    | visibility. Providers may load as dependencies without making a module
+    | explicitly enabled or independently visible.
+    |
+    | Loud/silent product-surface classification is documented in
+    | docs/module-surfaces.md. Do not add a surface_mode config field merely for
+    | documentation symmetry. Add executable surface metadata only when a real
+    | navigation/settings registry requires it.
     |
     | Shared schema may include optional relationships between universal
     | modules. That does not automatically make the target module visible.
-    | Example: Scheduling can optionally reference saved Location records while
-    | Scheduling still depends only on Core for feature visibility.
+    | Example: Scheduling can consume silent Location normalization or reference
+    | a saved Location while keeping the complete user experience in Scheduling.
     |
     | Keep dependency direction one-way and intentional. Do not enable vertical
     | modules unless that vertical is installed.
@@ -65,8 +72,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | Module validation should reject unknown enabled module keys and impossible
-    | dependency graphs. Explicit feature visibility remains distinct from provider
-    | loading for dependencies.
+    | dependency graphs. Explicit capability availability remains distinct from
+    | provider loading and from deliberate product-surface/navigation exposure.
     |
     | Other setup validators should use the canonical module manager/provider state
     | rather than duplicating ad hoc module-enabled checks.
