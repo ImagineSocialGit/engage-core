@@ -697,7 +697,8 @@
 │   │   │   │   │   ├── AppointmentController.php
 │   │   │   │   │   ├── SchedulingAvailabilityController.php
 │   │   │   │   │   ├── SchedulingConfigurationController.php
-│   │   │   │   │   └── SchedulingController.php
+│   │   │   │   │   ├── SchedulingController.php
+│   │   │   │   │   └── SchedulingResourceController.php
 │   │   │   │   └── PublicBookingController.php
 │   │   │   ├── Data
 │   │   │   │   ├── AppointmentBookingData.php
@@ -743,7 +744,8 @@
 │   │   │   │   │   └── SchedulingContactPanelProvider.php
 │   │   │   │   ├── SchedulingAvailabilityConfigurationWriter.php
 │   │   │   │   ├── SchedulingConfigurationWriter.php
-│   │   │   │   └── SchedulingReadService.php
+│   │   │   │   ├── SchedulingReadService.php
+│   │   │   │   └── SchedulingResourceConfigurationWriter.php
 │   │   │   └── Support
 │   │   ├── Tasks
 │   │   │   ├── Actions
@@ -1610,6 +1612,7 @@
 │       │   │   ├── contact-panel.blade.php
 │       │   │   ├── index.blade.php
 │       │   │   ├── reschedule.blade.php
+│       │   │   ├── resources.blade.php
 │       │   │   └── show.blade.php
 │       │   ├── tasks
 │       │   │   ├── index.blade.php
@@ -1904,6 +1907,7 @@
 │   │   │   ├── SchedulingContactPanelTest.php
 │   │   │   ├── SchedulingFoundationTest.php
 │   │   │   ├── SchedulingHostAndServiceFoundationTest.php
+│   │   │   ├── SchedulingResourceConfigurationWorkspaceTest.php
 │   │   │   └── SchedulingWorkspaceTest.php
 │   │   ├── SetupValidation
 │   │   │   ├── ConfigContractsSetupValidationContributorTest.php
@@ -2005,4 +2009,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-513 directories, 1493 files
+513 directories, 1497 files

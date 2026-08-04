@@ -531,7 +531,7 @@ crew
 equipment
 ```
 
-Resource keys are durable identities. Status is `active`, `inactive`, or `archived`; source is `manual`, `system`, or `provider`. Resource configuration is database-owned, but the CRM resource editor remains the next implementation slice.
+Resource keys are durable identities. Status is `active`, `inactive`, or `archived`; source is `manual`, `system`, or `provider`. Resource configuration is database-owned and is manageable through the authenticated Scheduling resource workspace.
 
 `scheduling_host_resources` defines the active capacity a host owns for a resource. `bookable_service_resource_requirements` defines the positive quantity consumed by one Appointment of a service. Both retain explicit inactive rows rather than interpreting omission as fallback behavior.
 
@@ -590,6 +590,35 @@ Changing a service requirement or host capacity affects future commitments only.
 Temporary hold resource rows are removed transactionally when a hold is released or expires. Conversion transfers them to the Appointment, leaving no terminal hold occupancy. `ExpireBookingHoldsJob` cleans resource occupancy in the same transaction that marks due holds expired.
 
 Services with no active resource requirements retain the previous coarse-capacity behavior exactly.
+
+### Resource configuration workspace
+
+The authenticated CRM resource workspace manages the normalized Batch 20 resource contract without mutating existing Appointment or hold snapshots.
+
+It supports:
+
+```text
+manual scheduling-resource creation and update
+immutable resource keys
+active, inactive, and archived resource status
+manual host resource-capacity rows
+manual service resource-requirement rows
+positive active capacities and quantities
+explicit inactive-row preservation
+provider/system row visibility without CRM mutation
+optimistic stale-form protection
+configured service-host resource ceilings and closed reasons
+```
+
+Resource, host-capacity, and service-requirement mutations use closed request fields and transactional row locks. CRM-created rows always use `source = manual`; callers cannot submit source, metadata, timestamps, deleted state, or occupancy identities.
+
+Provider- and system-owned resource identities and association rows are read-only. A manual association may target a provider- or model-backed host or a provider-backed service without changing ownership of that target. Updating host capacities bumps the host version; updating service requirements bumps the service version.
+
+An active host capacity or service requirement requires an active, non-deleted resource and a positive capacity or quantity. Existing manual rows omitted from a complete sync are retained as inactive. A never-configured inactive selection does not create a row. A resource cannot be archived while any active host capacity or service requirement still references it.
+
+The workspace calculates the configured resource ceiling for each active service-host assignment from the same normalized capacities and requirements consumed by runtime. It surfaces closed states for inactive targets, inactive resources, missing host capacities, and quantities that exceed capacity. This is a configuration diagnostic only; authoritative date/time availability remains the server-resolved availability preview because Appointments, active holds, availability rules, notice, horizon, and other capacity ceilings are time-dependent.
+
+Changing resource configuration affects future commitments only. Existing `scheduling_resource_occupancies` rows remain immutable operational snapshots and are never rewritten by the configuration workspace.
 
 ### Fixed buffers and planned travel-aware occupancy
 
@@ -1076,14 +1105,16 @@ Implemented CRM workspace seams:
 SchedulingReadService
 SchedulingConfigurationWriter
 SchedulingAvailabilityConfigurationWriter
+SchedulingResourceConfigurationWriter
 SchedulingController
 SchedulingConfigurationController
 SchedulingAvailabilityController
+SchedulingResourceController
 AppointmentController
 StoreAppointmentRequest
 CancelAppointmentRequest
 RescheduleAppointmentRequest
-CRM Scheduling creation, detail, lifecycle, reschedule, Contact-panel, host/service configuration, and availability-rule workspaces
+CRM Scheduling creation, detail, lifecycle, reschedule, Contact-panel, host/service configuration, availability-rule, and resource-configuration workspaces
 ```
 
 Planned:
@@ -1104,10 +1135,9 @@ Do not add `flow_route_*` foreign keys to Scheduling artifacts merely for proven
 
 ## Deferred work
 
-Deferred after the resource-aware occupancy runtime:
+Deferred after the resource configuration workspace:
 
 ```text
-Phase 4B.1B — resource identity, host-capacity, and service-requirement CRM configuration
 Phase 4B.2 — location normalization and travel-time-aware availability
 Phase 4B.3 — appointment-type-first progressive public booking
 Phase 4B.4 — Messaging-backed email/SMS verification before capacity hold

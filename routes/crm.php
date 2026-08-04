@@ -16,6 +16,7 @@ use App\Modules\Messaging\Controllers\CRM\MessageTemplatePresetController;
 use App\Modules\Scheduling\Controllers\CRM\AppointmentController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingAvailabilityController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingConfigurationController;
+use App\Modules\Scheduling\Controllers\CRM\SchedulingResourceController;
 use App\Modules\Scheduling\Controllers\CRM\SchedulingController;
 use App\Modules\Tasks\Controllers\TaskController;
 use App\Modules\Webinars\Controllers\CRM\WebinarController;
@@ -262,6 +263,21 @@ Route::middleware('auth')->group(function () {
 
             Route::get('/configuration', [SchedulingConfigurationController::class, 'index'])
                 ->name('configuration.index');
+
+            Route::get('/configuration/resources', [SchedulingResourceController::class, 'index'])
+                ->name('configuration.resources.index');
+
+            Route::post('/configuration/resources', [SchedulingResourceController::class, 'store'])
+                ->name('configuration.resources.store');
+
+            Route::patch('/configuration/resources/{schedulingResource}', [SchedulingResourceController::class, 'update'])
+                ->name('configuration.resources.update');
+
+            Route::put('/configuration/resources/hosts/{schedulingHost}', [SchedulingResourceController::class, 'updateHostResources'])
+                ->name('configuration.resources.hosts.update');
+
+            Route::put('/configuration/resources/services/{bookableService}', [SchedulingResourceController::class, 'updateServiceRequirements'])
+                ->name('configuration.resources.services.update');
 
             Route::get('/configuration/availability', [SchedulingAvailabilityController::class, 'index'])
                 ->name('configuration.availability.index');

@@ -51,6 +51,24 @@
         @endif
 
         <x-ui.card>
+            <div class="flex flex-wrap items-center justify-between gap-4" data-scheduling-resource-configuration-link>
+                <div>
+                    <p class="text-sm font-semibold text-slate-900">Selective-overlap resources</p>
+                    <p class="mt-1 text-sm text-slate-500">
+                        Manage resource identities, host capacities, service requirements, and configured resource ceilings in the dedicated workspace.
+                    </p>
+                </div>
+
+                <a
+                    href="{{ route('crm.scheduling.configuration.resources.index') }}"
+                    class="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                >
+                    Manage resources
+                </a>
+            </div>
+        </x-ui.card>
+
+        <x-ui.card>
             <div class="flex flex-wrap items-center justify-between gap-4" data-scheduling-availability-configuration-link>
                 <div>
                     <p class="text-sm font-semibold text-slate-900">Availability and blackout rules</p>

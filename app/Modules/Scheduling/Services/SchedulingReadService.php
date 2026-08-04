@@ -9,12 +9,16 @@ use App\Modules\Scheduling\Data\BookableSlot;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookableServiceHost;
+use App\Modules\Scheduling\Models\BookableServiceResourceRequirement;
 use App\Modules\Scheduling\Models\SchedulingAvailabilityWindow;
 use App\Modules\Scheduling\Models\SchedulingHost;
+use App\Modules\Scheduling\Models\SchedulingHostResource;
+use App\Modules\Scheduling\Models\SchedulingResource;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection as SupportCollection;
 
 class SchedulingReadService
 {
@@ -22,6 +26,7 @@ class SchedulingReadService
         private readonly FindBookableAvailabilityAction $findAvailability,
         private readonly SchedulingConfigurationWriter $configurationWriter,
         private readonly SchedulingAvailabilityConfigurationWriter $availabilityConfigurationWriter,
+        private readonly SchedulingResourceConfigurationWriter $resourceConfigurationWriter,
     ) {}
 
     /**
@@ -176,6 +181,231 @@ class SchedulingReadService
                 $this->configurationWriter->serviceIsEditable($service),
             );
         });
+    }
+
+    /**
+     * @return Collection<int, SchedulingResource>
+     */
+    public function configurationResources(): Collection
+    {
+        $resources = SchedulingResource::withTrashed()
+            ->withCount([
+                'hostCapacities',
+                'hostCapacities as active_host_capacities_count' =>
+                    fn ($query) => $query->where('is_active', true),
+                'serviceRequirements',
+                'serviceRequirements as active_service_requirements_count' =>
+                    fn ($query) => $query->where('is_active', true),
+                'occupancies',
+            ])
+            ->orderByRaw('case when deleted_at is null then 0 else 1 end')
+            ->orderByRaw("case status when 'active' then 0 when 'inactive' then 1 else 2 end")
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+
+        return $resources->each(function (SchedulingResource $resource): void {
+            $resource->setAttribute(
+                'crm_editable',
+                $this->resourceConfigurationWriter->resourceIsEditable($resource),
+            );
+        });
+    }
+
+    /**
+     * @return Collection<int, SchedulingHost>
+     */
+    public function configurationResourceHosts(): Collection
+    {
+        $hosts = $this->configurationHosts();
+        $rows = SchedulingHostResource::query()
+            ->with('schedulingResource')
+            ->orderBy('sort_order')
+            ->orderBy('scheduling_resource_id')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('scheduling_host_id');
+
+        return $hosts->each(function (SchedulingHost $host) use ($rows): void {
+            $hostRows = new Collection(
+                $rows->get($host->getKey(), collect())
+                    ->each(function (SchedulingHostResource $row): void {
+                        $row->setAttribute(
+                            'crm_editable',
+                            $this->resourceConfigurationWriter->hostResourceIsEditable($row),
+                        );
+                    })
+                    ->values()
+                    ->all(),
+            );
+
+            $host->setRelation('resourceCapacities', $hostRows);
+        });
+    }
+
+    /**
+     * @return Collection<int, BookableService>
+     */
+    public function configurationResourceServices(): Collection
+    {
+        $services = $this->configurationServices();
+        $rows = BookableServiceResourceRequirement::query()
+            ->with('schedulingResource')
+            ->orderBy('sort_order')
+            ->orderBy('scheduling_resource_id')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('bookable_service_id');
+
+        return $services->each(function (BookableService $service) use ($rows): void {
+            $serviceRows = new Collection(
+                $rows->get($service->getKey(), collect())
+                    ->each(function (BookableServiceResourceRequirement $row): void {
+                        $row->setAttribute(
+                            'crm_editable',
+                            $this->resourceConfigurationWriter->serviceRequirementIsEditable($row),
+                        );
+                    })
+                    ->values()
+                    ->all(),
+            );
+
+            $service->setRelation('resourceRequirements', $serviceRows);
+        });
+    }
+
+    /**
+     * @return SupportCollection<int, array<string, mixed>>
+     */
+    public function resourceConfigurationEffects(): SupportCollection
+    {
+        $assignments = BookableServiceHost::query()
+            ->with([
+                'bookableService',
+                'schedulingHost',
+            ])
+            ->where('is_active', true)
+            ->orderBy('bookable_service_id')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+        $requirements = BookableServiceResourceRequirement::query()
+            ->with('schedulingResource')
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('scheduling_resource_id')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('bookable_service_id');
+        $capacities = SchedulingHostResource::query()
+            ->with('schedulingResource')
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('scheduling_resource_id')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('scheduling_host_id')
+            ->map(fn ($rows) => $rows->keyBy('scheduling_resource_id'));
+
+        return $assignments
+            ->map(function (BookableServiceHost $assignment) use (
+                $requirements,
+                $capacities,
+            ): array {
+                $service = $assignment->bookableService;
+                $host = $assignment->schedulingHost;
+                $serviceRequirements = $requirements->get(
+                    $assignment->bookable_service_id,
+                    collect(),
+                );
+                $hostCapacities = $capacities->get(
+                    $assignment->scheduling_host_id,
+                    collect(),
+                );
+                $state = 'available';
+                $reason = null;
+                $ceilings = [];
+                $details = [];
+
+                if (! $service instanceof BookableService
+                    || $service->trashed()
+                    || $service->status !== BookableService::STATUS_ACTIVE
+                ) {
+                    $state = 'closed';
+                    $reason = 'service_inactive';
+                } elseif (! $host instanceof SchedulingHost
+                    || $host->trashed()
+                    || $host->status !== SchedulingHost::STATUS_ACTIVE
+                ) {
+                    $state = 'closed';
+                    $reason = 'host_inactive';
+                } elseif ($serviceRequirements->isEmpty()) {
+                    $state = 'no_limit';
+                } else {
+                    foreach ($serviceRequirements as $requirement) {
+                        $resource = $requirement->schedulingResource;
+                        $capacity = $hostCapacities->get(
+                            $requirement->scheduling_resource_id,
+                        );
+                        $quantity = max(0, (int) $requirement->quantity);
+                        $configured = $capacity instanceof SchedulingHostResource
+                            ? max(0, (int) $capacity->capacity)
+                            : 0;
+                        $ceiling = $quantity > 0
+                            ? intdiv($configured, $quantity)
+                            : 0;
+
+                        $details[] = [
+                            'resource_id' => (int) $requirement->scheduling_resource_id,
+                            'resource_key' => $resource?->key,
+                            'resource_name' => $resource?->name,
+                            'resource_status' => $resource?->status,
+                            'quantity' => $quantity,
+                            'host_capacity' => $configured,
+                            'ceiling' => $ceiling,
+                        ];
+
+                        if (! $resource instanceof SchedulingResource
+                            || $resource->trashed()
+                            || $resource->status !== SchedulingResource::STATUS_ACTIVE
+                        ) {
+                            $state = 'closed';
+                            $reason = 'resource_inactive';
+                            break;
+                        }
+
+                        if (! $capacity instanceof SchedulingHostResource) {
+                            $state = 'closed';
+                            $reason = 'host_capacity_missing';
+                            break;
+                        }
+
+                        if ($quantity < 1 || $configured < $quantity) {
+                            $state = 'closed';
+                            $reason = 'quantity_exceeds_capacity';
+                            break;
+                        }
+
+                        $ceilings[] = $ceiling;
+                    }
+                }
+
+                return [
+                    'assignment_id' => (int) $assignment->getKey(),
+                    'service_id' => (int) $assignment->bookable_service_id,
+                    'service_name' => $service?->name,
+                    'host_id' => (int) $assignment->scheduling_host_id,
+                    'host_name' => $host?->name,
+                    'state' => $state,
+                    'reason' => $reason,
+                    'resource_ceiling' => $state === 'available' && $ceilings !== []
+                        ? min($ceilings)
+                        : null,
+                    'requirements' => $details,
+                ];
+            })
+            ->values();
     }
 
     /**

@@ -84,7 +84,7 @@ The durable Scheduling architecture is documented in [`modules/scheduling.md`](m
 - [x] Clarify current overall-concurrency capacity semantics and the progressive public-booking roadmap.
 - [x] Phase 4A.2: add the CRM weekly/absolute availability and blackout editor with timezone-safe validation and preview.
 - [x] Phase 4B.1A: add normalized host resources, service requirements, immutable Appointment/Hold resource snapshots, selective-overlap calculation, and terminal hold cleanup.
-- [ ] Phase 4B.1B: add CRM management for resource identities, host capacities, and service requirements with ownership, immutable keys, stale-write protection, and live effects.
+- [x] Phase 4B.1B: add CRM management for resource identities, host capacities, and service requirements with ownership, immutable keys, stale-write protection, and live effects.
 - [ ] Phase 4B.2: add normalized appointment locations, provider-neutral travel-time resolution, conservative fallback policies, adjacent-Appointment travel checks, and reservation-time revalidation.
 - [ ] Phase 4B.3: restructure public booking around appointment-type-first progressive steps; require customer-site location before authoritative availability and keep all page transitions server authoritative.
 - [ ] Phase 4B.4: when Messaging has an eligible deliverable transactional channel, verify one email or SMS destination before creating a capacity-consuming hold; keep verification independent from marketing consent.
