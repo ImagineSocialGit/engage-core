@@ -237,6 +237,9 @@
 │   │   │   │   ├── EventAttendanceMode.php
 │   │   │   │   ├── EventAttendanceStatus.php
 │   │   │   │   └── EventStatus.php
+│   │   │   ├── Models
+│   │   │   │   ├── EventExternalReference.php
+│   │   │   │   └── Event.php
 │   │   │   ├── Providers
 │   │   │   │   └── EventsModuleServiceProvider.php
 │   │   │   └── Services
@@ -1277,6 +1280,8 @@
 │   │   ├── DocumentRequirementDefinitionFactory.php
 │   │   ├── DocumentReviewEventFactory.php
 │   │   ├── DocumentUploadFactory.php
+│   │   ├── EventExternalReferenceFactory.php
+│   │   ├── EventFactory.php
 │   │   ├── FlowRouteCapabilityBindingFactory.php
 │   │   ├── FlowRouteCapabilityFactory.php
 │   │   ├── FlowRouteFactory.php
@@ -1401,6 +1406,9 @@
 │   │   ├── 2026_08_01_023600_create_webinar_series_message_chain_bindings_table.php
 │   │   ├── 2026_08_02_013000_create_project_state_resume_items_table.php
 │   │   ├── 2026_08_03_190000_create_scheduling_resource_occupancy_tables.php
+│   │   ├── 2026_08_03_200000_create_events_table.php
+│   │   ├── 2026_08_03_200001_create_event_external_references_table.php
+│   │   ├── 2026_08_03_200002_add_primary_external_reference_id_to_events_table.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -1761,7 +1769,8 @@
 │   │   ├── Email
 │   │   │   └── HandleInboundEmailWebhookActionTest.php
 │   │   ├── Events
-│   │   │   └── EventDefinitionRegistryTest.php
+│   │   │   ├── EventDefinitionRegistryTest.php
+│   │   │   └── EventsFoundationTest.php
 │   │   ├── FlowRoutes
 │   │   │   ├── AutomationEventReceiptTest.php
 │   │   │   ├── AutomationPointAuthoringRegistryTest.php
@@ -2019,4 +2028,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-514 directories, 1506 files
+515 directories, 1514 files

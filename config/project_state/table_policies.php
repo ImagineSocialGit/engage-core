@@ -204,6 +204,15 @@ return [
         'reason' => 'Documents transfer support has not been added yet.',
     ],
 
+    'events' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Events transfer support has not been added yet.',
+    ],
+    'event_external_references' => [
+        'mode' => 'must_be_empty',
+        'reason' => 'Events transfer support has not been added yet.',
+    ],
+
     'commerce_customers' => [
         'mode' => 'must_be_empty',
         'reason' => 'Commerce transfer support has not been added yet.',
