@@ -12,24 +12,31 @@ Primary surfaces:    embedded only; shared settings only when a concrete provide
 
 Location is supporting infrastructure for reusable location facts. It is not a standalone client product and should not receive a Location sidebar link, generic place-management dashboard, map builder, or GIS-style workspace merely because its tables exist.
 
-Current repository implementation is a persistence foundation only:
+Current repository implementation now contains two deliberately separate foundations:
 
 ```text
-locations
-contact_locations
-location_areas
-location_area_assignments
+transient normalization capability
+    LocationNormalizationInput
+    NormalizedLocationData
+    LocationNormalizationProvider
+    DeterministicLocationNormalizationProvider
+    NormalizeLocationInputAction
+    LocationNormalizationException
 
-Location
-ContactLocation
-LocationArea
-LocationAreaAssignment
-
-LocationModuleServiceProvider
-LocationFoundationTest
+optional reusable persistence foundation
+    locations
+    contact_locations
+    location_areas
+    location_area_assignments
+    Location
+    ContactLocation
+    LocationArea
+    LocationAreaAssignment
 ```
 
-The service provider currently exposes no operational capability. All Location durable tables must remain empty while Project State classifies Location as unsupported.
+`LocationModuleServiceProvider` binds the configured normalization provider. The built-in deterministic provider performs text cleanup and stable formatting only; it does not invent coordinates, timezone, precision, confidence, verification, or external provider identity.
+
+The normalization capability performs no database writes. All Location durable tables must remain empty while Project State classifies Location as unsupported.
 
 ## Current committed responsibility
 
@@ -130,7 +137,7 @@ Do not add address, latitude, longitude, market, or service-area fields directly
 
 Location depends only on Core for its current foundation.
 
-When operational capability is added, Location may use provider adapters behind Location-owned contracts for address normalization or geocoding. Provider credentials remain environment/config state and do not become Location records.
+Location may use provider adapters behind `LocationNormalizationProvider` for address normalization or geocoding. The selected provider class is configured at `location.normalization.provider`. Provider credentials remain environment/provider config state and do not become Location records or public DTO fields.
 
 Location should not import consuming loud modules merely to understand why normalization was requested.
 
@@ -156,60 +163,86 @@ Consumer demand determines which contract is implemented. Do not add every theor
 
 ## Scheduling boundary
 
-Scheduling is the first approved consumer that needs additional Location capability.
+Scheduling is the first approved consumer of the transient normalization capability.
 
-The required sequence is consumer-driven:
+The consumer-driven sequence is:
 
 ```text
-1. Scheduling defines the exact server-owned address/location facts required for customer-site and fixed-location appointments.
-2. Location adds only the normalization/geographic-fact contract required by that Scheduling flow.
-3. Scheduling owns Appointment location policy and immutable Appointment/Hold snapshots.
-4. Scheduling owns provider-neutral travel-time resolution and availability decisions.
-5. A reusable Location row is created only when durable reuse is intentionally required.
+1. Scheduling defines the exact server-owned address/location facts required for customer-site and fixed-location appointments. COMPLETE IN ARCHITECTURE
+2. Location exposes only the transient normalization/geographic-fact contract required by that flow. COMPLETE
+3. Scheduling integrates the action and owns Appointment location policy plus immutable Appointment/Hold snapshots. NEXT
+4. Scheduling owns provider-neutral travel-time resolution and availability decisions. DEFERRED
+5. A reusable Location row is created only when durable reuse is intentionally required. DEFERRED
 ```
 
 A public booking address may be normalized transiently and copied into a Scheduling-owned immutable snapshot without creating a durable Location record. This avoids abandoned-booking Location-row bloat.
 
 Browser-authored coordinates, travel durations, confidence values, or verified-location flags are never authoritative.
 
-## Public seams to add only when required
+## Implemented transient normalization seam
 
-The next approved Location seam should be deliberately small, likely shaped around a transient normalized result rather than automatic persistence.
-
-Conceptual capability:
+The implemented public capability is deliberately small:
 
 ```text
-NormalizeLocationInput
-    input:
-        address_line_1
-        address_line_2 nullable
-        city
-        region
-        postal_code
-        country
+NormalizeLocationInputAction
+    accepts:
+        LocationNormalizationInput
+        or one closed snake_case input array
 
-    output:
-        normalized address fields
-        formatted_address
-        latitude/longitude nullable
-        timezone nullable
-        precision nullable
-        confidence nullable
-        provider identity nullable
+LocationNormalizationInput
+    address_line_1
+    address_line_2 nullable
+    city
+    region
+    postal_code
+    country (two-letter code)
+
+NormalizedLocationData
+    normalized address fields
+    formatted_address
+    latitude/longitude nullable
+    timezone nullable
+    precision nullable
+    confidence nullable
+    provider nullable
 ```
 
-Rules:
+Contract rules:
 
 ```text
-no raw provider payload escapes through the public DTO
+unknown input fields are rejected
+required address fields are validated and whitespace-normalized
+country is normalized to an uppercase two-letter code
+latitude and longitude are either both present or both absent
+coordinates, confidence, timezone, precision, and provider values are invariant-checked
+no raw provider payload or external provider record escapes through the DTO
 no Location row is automatically created
-no client-facing Location UI is required
-normalization failure is explicit
-provider enrichment is optional
-provider credentials remain outside durable records
+provider failure raises LocationNormalizationException
 ```
 
-Create/update/link/read actions should be added only when a real reusable-saved-location workflow needs them.
+The built-in `DeterministicLocationNormalizationProvider` is intentionally modest:
+
+```text
+normalizes whitespace
+formats one stable provider-neutral address string
+returns no coordinates
+returns no timezone
+returns no precision or confidence
+returns no provider identity
+```
+
+This is not a fake geocoder or verification service.
+
+The configured provider is selected through:
+
+```text
+config/location.php
+location.normalization.provider
+```
+
+The provider class must implement `LocationNormalizationProvider`. A future geocoding adapter may replace the deterministic provider when Scheduling or another proven consumer needs provider-backed enrichment. The direct contract binding is sufficient for the current single-provider requirement; do not add a provider manager, retry layer, cache, or provider registry until an implemented workflow needs those behaviors.
+
+Create/update/link/read actions remain deferred until a real reusable-saved-location workflow needs them.
 
 ## Schema foundation
 

@@ -203,7 +203,7 @@ Tasks -> manual work generated from appointment outcomes
 Portal -> authenticated customer schedule views or booking entry
 Forms -> intake submissions associated with booking flows
 Commerce -> optional paid-booking order/payment state
-Location -> optional address normalization, provider-neutral geographic facts, and reusable saved places; Scheduling remains the owner of appointment policy, snapshots, UI, and travel decisions
+Location -> optional `NormalizeLocationInputAction` for transient address normalization and provider-neutral geographic facts; reusable saved places remain deferred, and Scheduling remains the owner of appointment policy, snapshots, UI, and travel decisions
 Integrations -> calendar and meeting-provider adapters behind Scheduling contracts
 ```
 
@@ -647,12 +647,14 @@ Scheduling
     owns reservation/direct-creation revalidation
 
 Location
-    normalizes address/place input
-    optionally supplies provider-neutral coordinates, timezone, precision, and confidence
+    exposes the implemented transient `NormalizeLocationInputAction`
+    validates one closed address input and returns `NormalizedLocationData`
+    uses a deterministic text-only provider by default
+    may later supply provider-neutral coordinates, timezone, precision, and confidence through the same contract
     persists a reusable saved Location only when durable reuse is intentional
 ```
 
-A transient customer-site address may be normalized without creating a Location row. Scheduling should persist the compact immutable location facts needed for the commitment on the BookingHold and Appointment. An optional Location reference may identify a reusable saved place, but mutable saved-place edits must not rewrite historical appointment facts.
+The transient Location normalization seam is implemented, but Scheduling does not consume it yet. The next Scheduling slice should normalize customer-site or fixed-location input without creating a Location row, then persist the compact immutable facts needed for the commitment on the BookingHold and Appointment. An optional Location reference may later identify a reusable saved place, but mutable saved-place edits must not rewrite historical appointment facts.
 
 Travel-aware Scheduling must use estimated travel time rather than straight-line distance. For every candidate customer-site Appointment, availability must check both adjacent directions:
 
@@ -1170,8 +1172,8 @@ Do not add `flow_route_*` foreign keys to Scheduling artifacts merely for proven
 Deferred after the resource configuration workspace:
 
 ```text
-Phase 4B.2A — define the exact Scheduling location policy/snapshot contract and add only the minimal silent Location normalization DTO/service required by that contract
-Phase 4B.2B — persist authoritative BookingHold/Appointment location snapshots and fixed/customer-site service policy without creating abandoned-booking Location rows
+Phase 4B.2A — COMPLETE: define the Scheduling-owned location/snapshot boundary and add the minimal silent transient Location normalization contract with deterministic text-only fallback
+Phase 4B.2B — integrate Location normalization and persist authoritative BookingHold/Appointment location snapshots plus fixed/customer-site service policy without creating abandoned-booking Location rows
 Phase 4B.2C — add Scheduling-owned travel-time resolution, conservative fallback, adjacent-Appointment checks, and transaction-time revalidation
 Phase 4B.3 — appointment-type-first progressive public booking
 Phase 4B.4 — Messaging-backed email/SMS verification before capacity hold

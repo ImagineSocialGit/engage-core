@@ -97,8 +97,8 @@ The durable Scheduling architecture is documented in [`modules/scheduling.md`](m
 - [x] Phase 4A.2: add the CRM weekly/absolute availability and blackout editor with timezone-safe validation and preview.
 - [x] Phase 4B.1A: add normalized host resources, service requirements, immutable Appointment/Hold resource snapshots, selective-overlap calculation, and terminal hold cleanup.
 - [x] Phase 4B.1B: add CRM management for resource identities, host capacities, and service requirements with ownership, immutable keys, stale-write protection, and live effects.
-- [ ] Phase 4B.2A: define Scheduling-owned service location policy and immutable snapshot requirements, then add only the minimal silent Location normalization contract those requirements need.
-- [ ] Phase 4B.2B: add authoritative BookingHold/Appointment location snapshots and fixed/customer-site policy without persisting abandoned public-booking addresses as Location rows.
+- [x] Phase 4B.2A: define the Scheduling-owned location/snapshot boundary and add the minimal silent transient Location normalization contract with deterministic text-only fallback and no persistence.
+- [ ] Phase 4B.2B: integrate Location normalization and add authoritative BookingHold/Appointment location snapshots plus fixed/customer-site policy without persisting abandoned public-booking addresses as Location rows.
 - [ ] Phase 4B.2C: add Scheduling-owned provider-neutral travel-time resolution, conservative fallback, adjacent-Appointment checks, and reservation/direct-creation revalidation.
 - [ ] Phase 4B.3: restructure public booking around appointment-type-first progressive steps; require customer-site location before authoritative availability and keep all page transitions server authoritative.
 - [ ] Phase 4B.4: when Messaging has an eligible deliverable transactional channel, verify one email or SMS destination before creating a capacity-consuming hold; keep verification independent from marketing consent.

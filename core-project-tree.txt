@@ -441,9 +441,15 @@
 │   │   │   └── Support
 │   │   ├── Location
 │   │   │   ├── Actions
+│   │   │   │   └── NormalizeLocationInputAction.php
 │   │   │   ├── Contracts
+│   │   │   │   └── LocationNormalizationProvider.php
 │   │   │   ├── Controllers
 │   │   │   ├── Data
+│   │   │   │   ├── LocationNormalizationInput.php
+│   │   │   │   └── NormalizedLocationData.php
+│   │   │   ├── Exceptions
+│   │   │   │   └── LocationNormalizationException.php
 │   │   │   ├── Models
 │   │   │   │   ├── ContactLocation.php
 │   │   │   │   ├── LocationAreaAssignment.php
@@ -453,6 +459,7 @@
 │   │   │   │   └── LocationModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
+│   │   │   │   └── DeterministicLocationNormalizationProvider.php
 │   │   │   └── Support
 │   │   ├── Messaging
 │   │   │   ├── Actions
@@ -1156,6 +1163,7 @@
 │   ├── flow_routes.php
 │   ├── generated
 │   ├── horizon.php
+│   ├── location.php
 │   ├── logging.php
 │   ├── mail.php
 │   ├── messaging
@@ -1788,7 +1796,8 @@
 │   │   │           └── Telnyx
 │   │   │               └── TelnyxSmsProviderRealSendTest.php
 │   │   ├── Location
-│   │   │   └── LocationFoundationTest.php
+│   │   │   ├── LocationFoundationTest.php
+│   │   │   └── LocationNormalizationCapabilityTest.php
 │   │   ├── Messaging
 │   │   │   ├── CampaignVariantTemplateAssignmentResolutionTest.php
 │   │   │   ├── CanonicalMessageTemplateRuntimeCutoverTest.php
@@ -2010,4 +2019,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-513 directories, 1498 files
+514 directories, 1506 files
