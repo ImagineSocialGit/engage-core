@@ -18,6 +18,18 @@ class BookableService extends Model
     public const STATUS_INACTIVE = 'inactive';
     public const STATUS_ARCHIVED = 'archived';
 
+    public const LOCATION_TYPE_PHONE = 'phone';
+    public const LOCATION_TYPE_VIRTUAL = 'virtual';
+    public const LOCATION_TYPE_FIXED = 'fixed';
+    public const LOCATION_TYPE_CUSTOMER_SITE = 'customer_site';
+
+    public const LOCATION_TYPES = [
+        self::LOCATION_TYPE_PHONE,
+        self::LOCATION_TYPE_VIRTUAL,
+        self::LOCATION_TYPE_FIXED,
+        self::LOCATION_TYPE_CUSTOMER_SITE,
+    ];
+
     protected $attributes = [
         'status' => self::STATUS_ACTIVE,
         'slot_interval_minutes' => 15,

@@ -717,7 +717,8 @@
 │   │   │   │   ├── AppointmentRescheduleData.php
 │   │   │   │   ├── AvailabilityInterval.php
 │   │   │   │   ├── AvailabilitySearch.php
-│   │   │   │   └── BookableSlot.php
+│   │   │   │   ├── BookableSlot.php
+│   │   │   │   └── SchedulingLocationSnapshot.php
 │   │   │   ├── Enums
 │   │   │   │   └── SchedulingAvailabilityWindowType.php
 │   │   │   ├── Jobs
@@ -754,6 +755,7 @@
 │   │   │   │   │   └── SchedulingContactPanelProvider.php
 │   │   │   │   ├── SchedulingAvailabilityConfigurationWriter.php
 │   │   │   │   ├── SchedulingConfigurationWriter.php
+│   │   │   │   ├── SchedulingLocationSnapshotResolver.php
 │   │   │   │   ├── SchedulingReadService.php
 │   │   │   │   └── SchedulingResourceConfigurationWriter.php
 │   │   │   └── Support
@@ -1408,7 +1410,7 @@
 │   │   ├── 2026_08_03_190000_create_scheduling_resource_occupancy_tables.php
 │   │   ├── 2026_08_03_200000_create_events_table.php
 │   │   ├── 2026_08_03_200001_create_event_external_references_table.php
-│   │   ├── 2026_08_03_200002_add_primary_external_reference_id_to_events_table.php
+│   │   ├── 2026_08_04_190000_add_location_snapshots_to_booking_holds.php
 │   │   └── verticals
 │   │       └── mortgage
 │   │           ├── 2026_06_02_211108_create_mortgage_stages_table.php
@@ -1910,6 +1912,8 @@
 │   │   │   ├── AppointmentLifecycleActionTest.php
 │   │   │   ├── BookableSlotOfferAndBookingHoldActionTest.php
 │   │   │   ├── BookingHoldConversionAndReleaseActionTest.php
+│   │   │   ├── Concerns
+│   │   │   │   └── BootsSchedulingLocationDependency.php
 │   │   │   ├── CreateAppointmentActionTest.php
 │   │   │   ├── FindBookableAvailabilityActionTest.php
 │   │   │   ├── PublicBookingCompletionTest.php
@@ -1926,6 +1930,7 @@
 │   │   │   ├── SchedulingContactPanelTest.php
 │   │   │   ├── SchedulingFoundationTest.php
 │   │   │   ├── SchedulingHostAndServiceFoundationTest.php
+│   │   │   ├── SchedulingLocationSnapshotRuntimeTest.php
 │   │   │   ├── SchedulingResourceConfigurationWorkspaceTest.php
 │   │   │   └── SchedulingWorkspaceTest.php
 │   │   ├── SetupValidation
@@ -2028,4 +2033,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-515 directories, 1514 files
+516 directories, 1518 files

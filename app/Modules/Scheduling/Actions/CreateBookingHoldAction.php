@@ -4,6 +4,7 @@ namespace App\Modules\Scheduling\Actions;
 
 use App\Modules\Scheduling\Data\AvailabilitySearch;
 use App\Modules\Scheduling\Data\BookableSlot;
+use App\Modules\Scheduling\Data\SchedulingLocationSnapshot;
 use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookableServiceHost;
@@ -12,6 +13,7 @@ use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Services\Availability\BookingOccupancyResolver;
 use App\Modules\Scheduling\Services\Availability\ResourceOccupancyResolver;
+use App\Modules\Scheduling\Services\SchedulingLocationSnapshotResolver;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Database\Eloquent\Collection;
@@ -32,11 +34,13 @@ class CreateBookingHoldAction
         private readonly FindBookableAvailabilityAction $findAvailability,
         private readonly BookingOccupancyResolver $occupancy,
         private readonly ResourceOccupancyResolver $resourceOccupancy,
+        private readonly SchedulingLocationSnapshotResolver $locations,
     ) {}
 
     public function handle(
         string $offerId,
         string $idempotencyKey,
+        ?SchedulingLocationSnapshot $location = null,
     ): BookingHold {
         $offerId = $this->requiredString($offerId, 'offer ID', 36);
         $idempotencyKey = $this->requiredString(
@@ -46,7 +50,7 @@ class CreateBookingHoldAction
         );
 
         try {
-            return DB::transaction(function () use ($offerId, $idempotencyKey): BookingHold {
+            return DB::transaction(function () use ($offerId, $idempotencyKey, $location): BookingHold {
                 $now = CarbonImmutable::now('UTC');
                 $offer = BookableSlotOffer::query()
                     ->where('offer_id', $offerId)
@@ -68,6 +72,8 @@ class CreateBookingHoldAction
                             'The booking hold idempotency key was already used for another slot offer.',
                         );
                     }
+
+                    $this->assertRequestedLocationMatches($existing, $location);
 
                     return $existing;
                 }
@@ -94,6 +100,11 @@ class CreateBookingHoldAction
                 $rescheduleAppointment = $this->lockedRescheduleAppointment(
                     offer: $offer,
                     service: $service,
+                );
+                $locationSnapshot = $this->locations->forCommitment(
+                    service: $service,
+                    requested: $location,
+                    rescheduleSource: $rescheduleAppointment,
                 );
                 $resourceSnapshot = $this->resourceOccupancy->lockRequirementSnapshot(
                     service: $service,
@@ -153,6 +164,8 @@ class CreateBookingHoldAction
                     'occupancy_starts_at' => $occupancyStartsAt,
                     'occupancy_ends_at' => $occupancyEndsAt,
                     'capacity' => $currentSlot->capacity,
+                    'location_type' => $locationSnapshot?->type,
+                    'location_details' => $locationSnapshot?->details,
                     'held_at' => $now,
                     'expires_at' => $now->addSeconds($ttlSeconds),
                     'meta' => [
@@ -196,7 +209,24 @@ class CreateBookingHoldAction
                 );
             }
 
+            $this->assertRequestedLocationMatches($existing, $location);
+
             return $existing;
+        }
+    }
+
+    private function assertRequestedLocationMatches(
+        BookingHold $hold,
+        ?SchedulingLocationSnapshot $requested,
+    ): void {
+        if ($requested === null) {
+            return;
+        }
+
+        if (! $hold->locationSnapshot()?->hasSameCommitmentIdentity($requested)) {
+            throw new LogicException(
+                'The booking hold idempotency key was already used with another location snapshot.',
+            );
         }
     }
 

@@ -87,10 +87,9 @@ Scheduling
     owns Appointment location policy and historical snapshots
     owns travel-time availability decisions
 
-Location
-    normalizes the submitted address
-    optionally resolves provider-neutral geographic facts
-    optionally persists a reusable saved place
+Location, when separately enabled through an optional integration bridge
+    may enrich the submitted address with provider-neutral geographic facts
+    may persist a reusable saved place when durable reuse has product value
 ```
 
 The user should not have to leave Scheduling to operate Location.
@@ -163,19 +162,22 @@ Consumer demand determines which contract is implemented. Do not add every theor
 
 ## Scheduling boundary
 
-Scheduling is the first approved consumer of the transient normalization capability.
+Scheduling is not dependent on Location. Scheduling owns the baseline address validation, deterministic text normalization, BookingHold/Appointment snapshots, travel policy, and all booking decisions required for phone, virtual, fixed-location, and customer-site appointments.
 
 The consumer-driven sequence is:
 
 ```text
-1. Scheduling defines the exact server-owned address/location facts required for customer-site and fixed-location appointments. COMPLETE IN ARCHITECTURE
-2. Location exposes only the transient normalization/geographic-fact contract required by that flow. COMPLETE
-3. Scheduling integrates the action and owns Appointment location policy plus immutable Appointment/Hold snapshots. NEXT
+1. Scheduling defines and validates the exact server-owned address/location facts required for customer-site and fixed-location appointments. COMPLETE
+2. Scheduling normalizes deterministic text-only address snapshots and owns immutable BookingHold/Appointment location commitments without Location. COMPLETE
+3. Scheduling adds closed service-location authoring and customer-site address collection before authoritative availability. NEXT
 4. Scheduling owns provider-neutral travel-time resolution and availability decisions. DEFERRED
-5. A reusable Location row is created only when durable reuse is intentionally required. DEFERRED
+5. An app-level optional bridge may use Location to enrich snapshots or attach reusable saved-place identity when both modules are enabled. DEFERRED
+6. A reusable Location row is created only when durable reuse is intentionally required. DEFERRED
 ```
 
-A public booking address may be normalized transiently and copied into a Scheduling-owned immutable snapshot without creating a durable Location record. This avoids abandoned-booking Location-row bloat.
+The Location transient normalization capability remains available to consumers that intentionally opt into it, but Scheduling does not import or dependency-load Location. A future bridge must implement a Scheduling-owned extension seam and fall back cleanly to Scheduling's own deterministic snapshot behavior when Location is absent.
+
+A booking address may be normalized transiently and copied into a Scheduling-owned immutable BookingHold/Appointment snapshot without creating a durable Location record. This avoids abandoned-booking Location-row bloat. Scheduling's current public form does not collect the address yet; that consumer-owned step remains the next slice.
 
 Browser-authored coordinates, travel durations, confidence values, or verified-location flags are never authoritative.
 

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Scheduling\Models;
 
+use App\Modules\Scheduling\Data\SchedulingLocationSnapshot;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -41,6 +42,8 @@ class BookingHold extends Model
         'occupancy_starts_at',
         'occupancy_ends_at',
         'capacity',
+        'location_type',
+        'location_details',
         'held_at',
         'expires_at',
         'released_at',
@@ -77,6 +80,7 @@ class BookingHold extends Model
             'occupancy_starts_at' => 'immutable_datetime',
             'occupancy_ends_at' => 'immutable_datetime',
             'capacity' => 'integer',
+            'location_details' => 'array',
             'held_at' => 'immutable_datetime',
             'expires_at' => 'immutable_datetime',
             'released_at' => 'immutable_datetime',
@@ -103,6 +107,14 @@ class BookingHold extends Model
     public function appointment(): BelongsTo
     {
         return $this->belongsTo(Appointment::class);
+    }
+
+    public function locationSnapshot(): ?SchedulingLocationSnapshot
+    {
+        return SchedulingLocationSnapshot::fromPersisted(
+            type: $this->location_type,
+            details: $this->location_details,
+        );
     }
 
     public function scopeEffectivelyActive(
@@ -244,6 +256,16 @@ class BookingHold extends Model
             throw new InvalidArgumentException(
                 'Booking hold capacity must be at least 1.',
             );
+        }
+
+        if ($this->location_type === null && $this->location_details !== null) {
+            throw new InvalidArgumentException(
+                'Booking hold location details require a location type.',
+            );
+        }
+
+        if ($this->location_type !== null) {
+            $this->locationSnapshot();
         }
 
         $this->assertValidStatusState();

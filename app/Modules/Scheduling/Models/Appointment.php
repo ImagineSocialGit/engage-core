@@ -3,6 +3,7 @@
 namespace App\Modules\Scheduling\Models;
 
 use App\Modules\Core\Models\Contact;
+use App\Modules\Scheduling\Data\SchedulingLocationSnapshot;
 use Database\Factories\AppointmentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -108,6 +109,14 @@ class Appointment extends Model
             __FUNCTION__,
             'location_reference_type',
             'location_reference_id',
+        );
+    }
+
+    public function locationSnapshot(): ?SchedulingLocationSnapshot
+    {
+        return SchedulingLocationSnapshot::fromPersisted(
+            type: $this->location_type,
+            details: $this->location_details,
         );
     }
 

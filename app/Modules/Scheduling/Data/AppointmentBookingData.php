@@ -20,6 +20,7 @@ final readonly class AppointmentBookingData
         ?string $phone = null,
         ?string $title = null,
         ?string $description = null,
+        public ?SchedulingLocationSnapshot $location = null,
         public ?Model $sourceContext = null,
         public ?Model $createdBy = null,
         string $source = 'public_booking',

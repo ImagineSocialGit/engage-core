@@ -13,6 +13,7 @@ use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Services\Availability\BookingOccupancyResolver;
 use App\Modules\Scheduling\Services\Availability\ResourceOccupancyResolver;
+use App\Modules\Scheduling\Services\SchedulingLocationSnapshotResolver;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Database\Eloquent\Collection;
@@ -27,6 +28,7 @@ class CreateAppointmentAction
         private readonly BookingOccupancyResolver $occupancy,
         private readonly ResourceOccupancyResolver $resourceOccupancy,
         private readonly TransitionAppointmentStatusAction $lifecycle,
+        private readonly SchedulingLocationSnapshotResolver $locations,
     ) {}
 
     public function handle(AppointmentCreationData $data): Appointment
@@ -62,6 +64,10 @@ class CreateAppointmentAction
                 [$host] = $this->lockedTarget(
                     service: $service,
                     requestedHost: $data->host,
+                );
+                $locationSnapshot = $this->locations->forCommitment(
+                    service: $service,
+                    requested: $data->booking->location,
                 );
                 $resourceSnapshot = $this->resourceOccupancy->lockRequirementSnapshot(
                     service: $service,
@@ -121,8 +127,8 @@ class CreateAppointmentAction
                     'status' => $status,
                     'title' => $booking->title ?? $service->name,
                     'description' => $booking->description,
-                    'location_type' => $service->location_type,
-                    'location_details' => $service->location_details,
+                    'location_type' => $locationSnapshot?->type,
+                    'location_details' => $locationSnapshot?->details,
                     'timezone' => $service->timezone,
                     'starts_at' => $slot->startsAt,
                     'ends_at' => $slot->endsAt,
@@ -329,6 +335,8 @@ class CreateAppointmentAction
                 expectedType: $primaryAttendee?->getMorphClass(),
                 expectedId: $primaryAttendee?->getKey(),
             )
+            || ($data->booking->location !== null
+                && ! $appointment->locationSnapshot()?->hasSameCommitmentIdentity($data->booking->location))
         ) {
             throw new LogicException(
                 'The appointment idempotency key was already used for another creation request.',

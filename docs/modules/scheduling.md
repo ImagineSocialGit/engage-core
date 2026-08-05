@@ -11,7 +11,7 @@ Standalone value:    yes
 Primary surfaces:    CRM workspace, configuration, Contact context, public booking
 ```
 
-Scheduling owns the complete user-facing appointment and booking experience even when it consumes silent supporting capabilities such as Location, Messaging, or InternalNotifications.
+Scheduling owns the complete user-facing appointment and booking experience. Optional supporting modules such as Location, Messaging, or InternalNotifications may enhance that experience through explicit seams, but Scheduling must remain usable without them.
 
 ## Product expectation
 
@@ -203,7 +203,7 @@ Tasks -> manual work generated from appointment outcomes
 Portal -> authenticated customer schedule views or booking entry
 Forms -> intake submissions associated with booking flows
 Commerce -> optional paid-booking order/payment state
-Location -> optional `NormalizeLocationInputAction` for transient address normalization and provider-neutral geographic facts; reusable saved places remain deferred, and Scheduling remains the owner of appointment policy, snapshots, UI, and travel decisions
+Location -> optional enrichment or reusable saved-place identity through a future app-level bridge when both modules are enabled; Scheduling does not import or dependency-load Location and remains the owner of baseline normalization, appointment policy, snapshots, UI, and travel decisions
 Integrations -> calendar and meeting-provider adapters behind Scheduling contracts
 ```
 
@@ -378,7 +378,7 @@ created_by_type / created_by_id
 meta
 ```
 
-The optional `locationReference` morph allows a saved Location-owned place without creating a Scheduling-to-Location module dependency. Freeform `location_type` and `location_details` remain valid for virtual, phone, one-off, provider-generated, or not-yet-normalized locations.
+The optional `locationReference` morph may point to a saved Location-owned place when Location is separately installed and an explicit integration supplies that reference. Mutable Location data is never authoritative for a historical Appointment, and Scheduling does not require Location for this polymorphic field to remain null. Existing noncanonical `location_type` and `location_details` values remain readable as legacy snapshots, while new commitment behavior uses the canonical `phone`, `virtual`, `fixed`, and `customer_site` modes.
 
 External calendar systems never own appointment lifecycle. Provider failure leaves the local Appointment valid and later synchronization work pending or failed.
 
@@ -641,20 +641,23 @@ The consumer-owned responsibility split is:
 Scheduling
     owns service location policy
     owns the public/CRM address-collection experience
+    owns closed baseline address validation and deterministic text normalization
     owns whether authoritative availability may be shown
     owns Appointment and BookingHold location snapshots
     owns travel-time policy, fallback, and availability decisions
     owns reservation/direct-creation revalidation
 
-Location
-    exposes the implemented transient `NormalizeLocationInputAction`
-    validates one closed address input and returns `NormalizedLocationData`
-    uses a deterministic text-only provider by default
-    may later supply provider-neutral coordinates, timezone, precision, and confidence through the same contract
-    persists a reusable saved Location only when durable reuse is intentional
+Location, when separately enabled through an optional app-level bridge
+    may enrich Scheduling-owned address facts with coordinates, timezone, precision, and confidence
+    may attach reusable saved-place identity when durable reuse is intentional
+    does not become required for Scheduling booking or Appointment lifecycle
 ```
 
-The transient Location normalization seam is implemented, but Scheduling does not consume it yet. The next Scheduling slice should normalize customer-site or fixed-location input without creating a Location row, then persist the compact immutable facts needed for the commitment on the BookingHold and Appointment. An optional Location reference may later identify a reusable saved place, but mutable saved-place edits must not rewrite historical appointment facts.
+`SchedulingLocationSnapshotResolver` creates canonical fixed or customer-site address snapshots using Scheduling-owned deterministic normalization, validates canonical phone/virtual/fixed/customer-site commitment details, and preserves existing noncanonical snapshots only as a compatibility read path. It does not import Location or create a Location row.
+
+`BookingHold` now stores `location_type` and `location_details` as the authoritative location commitment. Ordinary hold conversion and rescheduling copy that immutable hold snapshot into the Appointment. Later edits to a BookableService or reusable saved Location cannot rewrite the held or historical facts. Customer-site direct creation and hold creation require a normalized booking-specific snapshot; fixed, phone, and virtual snapshots are derived from server-owned service configuration.
+
+The next slice adds closed CRM service-location authoring plus the customer-site public/CRM address-collection step. The current public form still does not collect an address, so customer-site public services should not be exposed until that step is applied.
 
 Travel-aware Scheduling must use estimated travel time rather than straight-line distance. For every candidate customer-site Appointment, availability must check both adjacent directions:
 
@@ -743,6 +746,8 @@ status
 starts_at / ends_at
 occupancy_starts_at / occupancy_ends_at
 capacity
+location_type
+location_details
 held_at
 expires_at
 released_at
@@ -758,25 +763,30 @@ released
 expired
 ```
 
-`CreateBookingHoldAction` accepts only:
+`CreateBookingHoldAction` accepts:
 
 ```text
 offer_id
 idempotency_key
+optional canonical customer_site location snapshot
 ```
+
+The optional location is accepted only for a `customer_site` service. Phone, virtual, and fixed locations are derived from locked server-owned service configuration. A customer-site reschedule may reuse the source Appointment's immutable customer-site snapshot when the address is unchanged.
 
 It locks the offer, service, optional host, optional assignment, optional reschedule source Appointment, relevant blocking appointments, and overlapping active holds in a deterministic transaction. It reruns exact-slot availability, applies current buffers and capacity, rejects stale or consumed offers, and prevents separate offers from over-reserving one slot.
 
-The same idempotency key returns the original hold for the same offer and is rejected when reused for another offer.
+The same idempotency key returns the original hold for the same offer and commitment location. It is rejected when reused for another offer or another customer-site address.
 
 ### Public reservation transaction
 
-The public browser does not receive an offer ID. Each displayed time posts only:
+The public browser does not receive an offer ID. The currently implemented non-customer-site form posts only:
 
 ```text
 starts_at
 idempotency_key
 ```
+
+The action contract can also receive a server-normalized customer-site snapshot. The progressive customer-site details step that produces that snapshot is deferred to Phase 4B.2B2.
 
 `CreatePublicBookingHoldAction` accepts the already-resolved public `BookableService`, parses the requested instant as UTC, checks for an idempotent existing hold, and recalculates exact current availability for one service-duration interval. It selects the first matching `BookableSlot` in the engine's deterministic order, then calls `IssueBookableSlotOfferAction` and `CreateBookingHoldAction` inside one outer database transaction.
 
@@ -817,7 +827,7 @@ The caller cannot nominate an Appointment to exclude. `CreateBookingHoldAction` 
 
 `RescheduleAppointmentAction` accepts an `AppointmentRescheduleData` containing the opaque hold ID, transport-neutral lifecycle context, and an explicit confirmation-preservation decision. It locks the authoritative offer, service, optional host, hold, source Appointment, and source attendees; enforces `bookable_services.reschedule_notice_minutes` unless force authorization is supplied; and completes the replacement in one transaction.
 
-The replacement copies the source Appointment's Contact, polymorphic primary subject, source context, location reference and snapshot, title, description, timezone, and attendee snapshots. This keeps the common Contact-only one-on-one path simple while preserving future vertical-owned subjects such as pets without adding a Scheduling dependency on Pet Services.
+The replacement copies the source Appointment's Contact, polymorphic primary subject, source context, location reference, title, description, timezone, and attendee snapshots. Its location snapshot comes from the authoritative reschedule hold; customer-site reschedules reuse the source snapshot unless a later booking flow deliberately supplies a newly normalized address. This keeps the common Contact-only one-on-one path simple while preserving future vertical-owned subjects such as pets without adding a Scheduling dependency on Pet Services.
 
 The replacement host and start/end interval come only from the active reschedule hold. The source Appointment becomes `canceled` with the reschedule reason, and its active attendee rows become canceled. No standalone `appointment.canceled` lifecycle or automation event is emitted for that internal replacement step.
 
@@ -848,7 +858,7 @@ The caller may provide a Core Contact and a separate polymorphic primary attende
 
 Services with `requires_confirmation = false` create a `scheduled` Appointment, an accepted primary attendee with `responded_at` set to booking time, and a `scheduled` lifecycle event. Services requiring confirmation create a `pending` Appointment, an invited primary attendee with no response timestamp, and a `created` lifecycle event whose target status is `pending`.
 
-Conversion copies the held start/end interval plus current service-owned host identity, location snapshot, and operational timezone from authoritative Scheduling records. Caller-provided service, host, time, capacity, or location values are never authoritative conversion inputs.
+Conversion copies the held start/end interval and immutable held location snapshot plus current service-owned host identity and operational timezone from authoritative Scheduling records. Caller-provided service, host, time, capacity, or location values are never authoritative conversion inputs.
 
 ### Non-hold appointment creation
 
@@ -860,7 +870,7 @@ The caller supplies:
 persisted BookableService
 optional explicit SchedulingHost
 starts_at
-AppointmentBookingData
+AppointmentBookingData, including an optional normalized customer-site location
 idempotency_key
 AppointmentLifecycleContext
 ```
@@ -869,7 +879,7 @@ The action reloads and locks the service, then requires an explicit active host 
 
 The server derives the end time from the current service duration and revalidates the exact slot through the executable availability engine. It locks the selected service, explicit host and assignment, relevant blocking Appointments, and active BookingHolds before creation. This preserves service capacity, assignment capacity, availability-window capacity, buffers, minimum notice, booking horizon, and host capacity shared across different services.
 
-Direct creation snapshots the current service location and timezone, creates one primary attendee snapshot, applies the same `requires_confirmation` policy as hold conversion, and records the initial lifecycle plus neutral automation event in the same transaction.
+Direct creation derives phone, virtual, and fixed snapshots from locked service configuration. Customer-site creation requires the optional normalized location carried by `AppointmentBookingData`. It snapshots the resolved location and current timezone, creates one primary attendee snapshot, applies the same `requires_confirmation` policy as hold conversion, and records the initial lifecycle plus neutral automation event in the same transaction.
 
 `appointments.idempotency_key` is nullable and unique. Repeating a matching key returns the original Appointment, including a soft-deleted historical row, without creating another attendee or event. Reusing the key for another service, host, start time, Contact, or polymorphic primary subject is rejected. Nullable keys preserve imported, provider-originated, and legacy records that do not participate in this direct-creation replay contract.
 
@@ -1172,8 +1182,9 @@ Do not add `flow_route_*` foreign keys to Scheduling artifacts merely for proven
 Deferred after the resource configuration workspace:
 
 ```text
-Phase 4B.2A — COMPLETE: define the Scheduling-owned location/snapshot boundary and add the minimal silent transient Location normalization contract with deterministic text-only fallback
-Phase 4B.2B — integrate Location normalization and persist authoritative BookingHold/Appointment location snapshots plus fixed/customer-site service policy without creating abandoned-booking Location rows
+Phase 4B.2A — COMPLETE: define the Scheduling-owned location/snapshot boundary and retain Location as a separate optional silent capability
+Phase 4B.2B1 — COMPLETE: add Scheduling-owned deterministic address normalization and canonical phone/virtual/fixed/customer-site snapshots, persist authoritative BookingHold location snapshots, copy hold snapshots into Appointment conversion/rescheduling, and require booking-specific customer-site snapshots without creating Location rows
+Phase 4B.2B2 — add closed CRM service-location authoring and customer-site public/CRM address collection before authoritative availability
 Phase 4B.2C — add Scheduling-owned travel-time resolution, conservative fallback, adjacent-Appointment checks, and transaction-time revalidation
 Phase 4B.3 — appointment-type-first progressive public booking
 Phase 4B.4 — Messaging-backed email/SMS verification before capacity hold

@@ -189,8 +189,13 @@ class ModuleDependencyBoundaryTest extends TestCase
         ]);
     }
 
-    public function test_scheduling_module_does_not_import_location_models(): void
+    public function test_scheduling_does_not_import_optional_location_module(): void
     {
+        $definition = config('modules.modules.scheduling');
+
+        $this->assertIsArray($definition);
+        $this->assertEquals(['core'], $definition['depends_on']);
+
         $this->assertModuleDoesNotImport('Scheduling', [
             'Location',
         ]);

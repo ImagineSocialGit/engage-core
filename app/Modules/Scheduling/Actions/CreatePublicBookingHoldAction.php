@@ -4,6 +4,7 @@ namespace App\Modules\Scheduling\Actions;
 
 use App\Modules\Scheduling\Data\AvailabilitySearch;
 use App\Modules\Scheduling\Data\BookableSlot;
+use App\Modules\Scheduling\Data\SchedulingLocationSnapshot;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookingHold;
 use Carbon\CarbonImmutable;
@@ -25,6 +26,7 @@ class CreatePublicBookingHoldAction
         BookableService $service,
         CarbonInterface $startsAt,
         string $idempotencyKey,
+        ?SchedulingLocationSnapshot $location = null,
     ): BookingHold {
         $serviceId = $this->requiredServiceId($service);
         $startsAt = CarbonImmutable::instance($startsAt)->utc();
@@ -40,6 +42,7 @@ class CreatePublicBookingHoldAction
                 hold: $existing,
                 serviceId: $serviceId,
                 startsAt: $startsAt,
+                location: $location,
             );
         }
 
@@ -48,6 +51,7 @@ class CreatePublicBookingHoldAction
                 $serviceId,
                 $startsAt,
                 $idempotencyKey,
+                $location,
             ): BookingHold {
                 $service = BookableService::query()
                     ->whereKey($serviceId)
@@ -72,6 +76,7 @@ class CreatePublicBookingHoldAction
                         hold: $existing,
                         serviceId: $serviceId,
                         startsAt: $startsAt,
+                        location: $location,
                     );
                 }
 
@@ -96,12 +101,14 @@ class CreatePublicBookingHoldAction
                 $hold = $this->createBookingHold->handle(
                     offerId: $offer->offer_id,
                     idempotencyKey: $idempotencyKey,
+                    location: $location,
                 );
 
                 return $this->matchingExistingHold(
                     hold: $hold->loadMissing('bookableSlotOffer'),
                     serviceId: $serviceId,
                     startsAt: $startsAt,
+                    location: $location,
                 );
             });
         } catch (LogicException $exception) {
@@ -115,6 +122,7 @@ class CreatePublicBookingHoldAction
                     hold: $existing,
                     serviceId: $serviceId,
                     startsAt: $startsAt,
+                    location: $location,
                 );
             }
 
@@ -154,6 +162,7 @@ class CreatePublicBookingHoldAction
         BookingHold $hold,
         int $serviceId,
         CarbonImmutable $startsAt,
+        ?SchedulingLocationSnapshot $location,
     ): BookingHold {
         $offer = $hold->bookableSlotOffer;
 
@@ -161,6 +170,7 @@ class CreatePublicBookingHoldAction
             || ! $hold->starts_at?->equalTo($startsAt)
             || $offer === null
             || $offer->reschedule_appointment_id !== null
+            || ($location !== null && ! $hold->locationSnapshot()?->hasSameCommitmentIdentity($location))
         ) {
             throw new DomainException(
                 'The reservation replay key was already used for another booking request.',
