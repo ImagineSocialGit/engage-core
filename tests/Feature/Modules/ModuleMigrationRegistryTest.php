@@ -1,0 +1,160 @@
+<?php
+
+namespace Tests\Feature\Modules;
+
+use App\Support\Modules\Migrations\ModuleMigrationRegistry;
+use App\Support\Modules\ModuleManager;
+use Illuminate\Support\Facades\File;
+use InvalidArgumentException;
+use Tests\TestCase;
+
+class ModuleMigrationRegistryTest extends TestCase
+{
+    public function test_registry_declares_platform_and_schema_managed_module_ownership(): void
+    {
+        $registry = app(ModuleMigrationRegistry::class);
+
+        $this->assertSame(
+            'database/migrations/platform',
+            $registry->platform()->path,
+        );
+        $this->assertSame(1, $registry->platform()->schemaVersion);
+        $this->assertCount(10, $registry->platform()->migrationFiles);
+
+        $this->assertEquals([
+            'core',
+            'messaging',
+            'inbound_messaging',
+            'internal_notifications',
+            'tasks',
+            'scheduling',
+            'portal',
+            'forms',
+            'documents',
+            'commerce',
+            'location',
+            'events',
+            'workflow',
+            'flow_routes',
+            'campaigns',
+            'broadcasts',
+            'webinars',
+            'mortgage',
+        ], array_keys($registry->modules()));
+
+        $this->assertFalse($registry->hasModule('dashboard'));
+        $this->assertFalse($registry->hasModule('integrations'));
+        $this->assertFalse($registry->hasModule('reporting'));
+        $this->assertSame(
+            'database/migrations/verticals/mortgage',
+            $registry->requireModule('mortgage')->path,
+        );
+    }
+
+    public function test_every_current_migration_has_exactly_one_registered_owner(): void
+    {
+        $registry = app(ModuleMigrationRegistry::class);
+        $currentFiles = collect(File::allFiles(database_path('migrations')))
+            ->filter(
+                static fn (\SplFileInfo $file): bool => $file->getExtension() === 'php',
+            )
+            ->map(
+                static fn (\SplFileInfo $file): string => $file->getFilename(),
+            )
+            ->sort()
+            ->values()
+            ->all();
+
+        $this->assertCount(94, $currentFiles);
+        $this->assertEquals($currentFiles, $registry->migrationFiles());
+
+        foreach ($currentFiles as $migrationFile) {
+            $this->assertNotNull(
+                $registry->ownerFor($migrationFile),
+                "Migration [{$migrationFile}] has no registered owner.",
+            );
+        }
+    }
+
+    public function test_scheduling_and_location_are_independent_schema_scopes(): void
+    {
+        $registry = app(ModuleMigrationRegistry::class);
+        $modules = app(ModuleManager::class);
+
+        $this->assertEquals(['core'], $modules->dependencies('scheduling'));
+        $this->assertEquals(['core'], $modules->dependencies('location'));
+        $this->assertTrue($registry->hasModule('scheduling'));
+        $this->assertTrue($registry->hasModule('location'));
+        $this->assertNotSame(
+            $registry->requireModule('scheduling')->path,
+            $registry->requireModule('location')->path,
+        );
+    }
+
+    public function test_registry_rejects_unknown_module_keys(): void
+    {
+        config()->set('module_migrations.modules.unknown_module', [
+            'path' => 'database/migrations/modules/unknown_module',
+            'schema_version' => 1,
+            'migrations' => [
+                '2026_08_05_000000_create_unknown_table.php',
+            ],
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'Migration scope references unknown module [unknown_module].',
+        );
+
+        app(ModuleMigrationRegistry::class)->definitions();
+    }
+
+    public function test_registry_rejects_duplicate_target_paths(): void
+    {
+        config()->set(
+            'module_migrations.modules.location.path',
+            'database/migrations/modules/scheduling',
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'Migration scopes [scheduling] and [location] share target path [database/migrations/modules/scheduling].',
+        );
+
+        app(ModuleMigrationRegistry::class)->definitions();
+    }
+
+    public function test_registry_rejects_duplicate_migration_ownership(): void
+    {
+        $duplicate = config(
+            'module_migrations.modules.scheduling.migrations.0',
+        );
+
+        config()->push(
+            'module_migrations.modules.location.migrations',
+            $duplicate,
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            "Migration [{$duplicate}] is owned by both [scheduling] and [location].",
+        );
+
+        app(ModuleMigrationRegistry::class)->definitions();
+    }
+
+    public function test_scope_definitions_reject_unsafe_paths_and_unknown_fields(): void
+    {
+        config()->set(
+            'module_migrations.modules.core.path',
+            'database/migrations/../outside',
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'Migration scope [core] path must be a normalized repository-relative directory under database/migrations.',
+        );
+
+        app(ModuleMigrationRegistry::class)->definitions();
+    }
+}

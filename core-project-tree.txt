@@ -1087,6 +1087,9 @@
 │       │   │   └── DashboardPanelProvider.php
 │       │   └── DashboardPanelRegistry.php
 │       ├── Modules
+│       │   ├── Migrations
+│       │   │   ├── MigrationScopeDefinition.php
+│       │   │   └── ModuleMigrationRegistry.php
 │       │   └── ModuleManager.php
 │       ├── Presets
 │       │   ├── ClientPresetContributor.php
@@ -1191,6 +1194,7 @@
 │   │   │           └── webinar.php
 │   │   └── sms.php
 │   ├── messaging.php
+│   ├── module_migrations.php
 │   ├── modules.php
 │   ├── presets
 │   │   └── modules
@@ -1447,6 +1451,7 @@
 │   │   └── webinar-schedule-profiles-template.php
 │   ├── deployment-safety-and-troubleshooting.md
 │   ├── model-persistence-bloat-audit.md
+│   ├── modular-migrations.md
 │   ├── module-boundaries.md
 │   ├── modules
 │   │   ├── broadcasts.md
@@ -1881,6 +1886,7 @@
 │   │   │   ├── ContactShowModuleVisibilityTest.php
 │   │   │   ├── ModuleDependencyBoundaryTest.php
 │   │   │   ├── ModuleManagerTest.php
+│   │   │   ├── ModuleMigrationRegistryTest.php
 │   │   │   ├── ModuleNavigationTest.php
 │   │   │   └── ModuleRouteMiddlewareTest.php
 │   │   ├── Observability
@@ -1912,8 +1918,6 @@
 │   │   │   ├── AppointmentLifecycleActionTest.php
 │   │   │   ├── BookableSlotOfferAndBookingHoldActionTest.php
 │   │   │   ├── BookingHoldConversionAndReleaseActionTest.php
-│   │   │   ├── Concerns
-│   │   │   │   └── BootsSchedulingLocationDependency.php
 │   │   │   ├── CreateAppointmentActionTest.php
 │   │   │   ├── FindBookableAvailabilityActionTest.php
 │   │   │   ├── PublicBookingCompletionTest.php
@@ -2033,4 +2037,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-516 directories, 1518 files
+516 directories, 1522 files
