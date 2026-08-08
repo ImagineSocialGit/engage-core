@@ -1,3 +1,4 @@
+
 # Engage Core — Client Staging & Production Setup Checklist
 
 ## Purpose
@@ -18,6 +19,7 @@ This checklist intentionally separates:
 Third-party provider work is detailed in `client-third-party-services-checklist.md`.
 Environment-variable ownership and staging/production differences are detailed in `client-environment-reference.md`.
 Operational failure modes and destructive-reset safety are detailed in `deployment-safety-and-troubleshooting.md`.
+The canonical command-level install and deployment sequence is detailed in `operations/deployment-command-workflow.md`.
 
 ## Authority
 
@@ -566,23 +568,36 @@ cd <APP_PATH>
 
 Do not run `schedule:work` in parallel with the cron entry. The working directory and environment must resolve the intended `CLIENT_KEY`, database, Redis namespace, and client configuration.
 
-## 19. Run migrations
+## 19. Apply staging schema
 
-For a normal staging deployment:
+For a brand-new staging database after client configuration is complete, use the full installer:
+
+```bash
+php artisan engage:install --force
+```
+
+That command applies platform migrations, installs the configured schema-owning module dependency closure, synchronizes presets, and runs setup validation. It does not rewrite runtime module configuration.
+
+For an existing staging database, use the normal upgrade path:
 
 ```bash
 php artisan migrate --force
+php artisan modules:migrate --force
 ```
+
+After the modular migration path-selection cutover, plain `migrate` is platform-only. `modules:migrate` upgrades only ledger-installed module scopes. Do not substitute a broad `migrate --path` scan of optional module directories.
 
 A destructive reset is acceptable only when the environment data is disposable and queued Redis state has been handled first. See `deployment-safety-and-troubleshooting.md`.
 
 ## 20. Sync DB-owned definitions
 
-Run the canonical orchestrator:
+Run the canonical orchestrator when preset/config definitions changed or when this stage was not already completed by `engage:install`:
 
 ```bash
 php artisan presets:sync
 ```
+
+Rerunning preset sync after a successful `engage:install` is allowed but normally redundant unless configuration changed afterward.
 
 Current sync architecture may materialize, when selected/enabled:
 
@@ -600,7 +615,10 @@ Do not assume an old list of separate sync commands remains necessary. Use the c
 
 ## 21. Run setup validation
 
+Run setup validation after any additional config or preset changes, even when the initial install already completed its validation stage:
+
 ```bash
+php artisan modules:status
 php artisan setup:validate
 ```
 
@@ -614,19 +632,27 @@ clean: proceed
 
 Do not auto-fix validation failures by broadening config contracts or adding unsupported config keys.
 
-## 22. Bootstrap the initial CRM user when required
+## 22. Create the initial CRM user when required
 
-The current setup config supports:
+For an interactive new-client installation, `engage:install` offers to create the first CRM user after the four installation stages succeed.
 
-```env
-SETUP_USER_NAME=
-SETUP_USER_EMAIL=
-SETUP_USER_PASSWORD=
+If user creation was skipped, or another CRM user is needed later, run:
+
+```bash
+php artisan engage:user:add
 ```
 
-Use the actual current setup/seeding command for the repository.
+The command prompts for name, email, password, and password confirmation. Password input is hidden and is not stored in `.env`.
 
-Treat the bootstrap password as a secret. After the initial user exists and the command no longer needs the env values, remove or rotate the secret according to the operational policy.
+If a CRM password is forgotten, reset it explicitly:
+
+```bash
+php artisan engage:user:password user@example.com
+```
+
+Do not use `db:seed`, `UserSeeder`, or `SETUP_USER_*` environment values for operational CRM users.
+
+See `operations/crm-user-administration.md` for the complete contract.
 
 ---
 
@@ -889,13 +915,22 @@ php artisan optimize:clear
 
 Apply any project-approved config/route/view caching only after the final environment is complete.
 
-## 36. Run production migrations
+## 36. Apply production schema
 
-Normal production path:
+For a brand-new production database after the final client configuration is deployed:
+
+```bash
+php artisan engage:install --force
+```
+
+For an existing production database, run platform and installed-module upgrades separately:
 
 ```bash
 php artisan migrate --force
+php artisan modules:migrate --force
 ```
+
+Plain `migrate` is platform-only. The module command uses the installation ledger and dependency planner to upgrade only installed scopes.
 
 Do not use `migrate:fresh` after real data matters.
 
@@ -903,12 +938,15 @@ For pre-launch disposable-data resets, stop workers and handle Redis queue state
 
 ## 37. Sync presets and validate setup
 
+When definitions changed after installation, or when this is an existing-client upgrade:
+
 ```bash
 php artisan presets:sync
+php artisan modules:status
 php artisan setup:validate
 ```
 
-Resolve errors before launch.
+A brand-new environment already ran preset sync and setup validation inside `engage:install`; rerun these checks when configuration changed afterward or when you want an explicit final gate. Resolve errors before launch.
 
 ## 38. Restart Horizon through Supervisor
 
@@ -1052,16 +1090,15 @@ Required sequence:
 4. Preserve the immutable export and its SHA-256.
 5. Clear only the exact stale Redis queue/runtime namespace before IDs are reused.
 6. Deploy the intended target code/client configuration.
-7. Run migrate:fresh --force only inside the approved controlled rebuild.
-8. Run presets:sync.
-9. Run setup:validate.
-10. Recreate environment-owned CRM users.
-11. Upload the file with Validate Only and resolve every error.
-12. Apply with the current password and exact IMPORT confirmation.
-13. Verify counts and inert runtime state.
-14. Restore workers/providers/Scheduler.
-15. Resume imported work category by category until pending counts are zero.
-16. Verify providers, queues, relationships, and external side effects before reopening traffic.
+7. Run `php artisan migrate:fresh --force` only inside the approved controlled rebuild; after the path-selection cutover this rebuilds the platform foundation only.
+8. Run `php artisan engage:install --force` to install the configured module schema, synchronize presets, and validate setup.
+9. Recreate environment-owned CRM users.
+10. Upload the file with Validate Only and resolve every error.
+11. Apply with the current password and exact IMPORT confirmation.
+12. Verify counts and inert runtime state.
+13. Restore workers/providers/Scheduler.
+14. Resume imported work category by category until pending counts are zero.
+15. Verify providers, queues, relationships, and external side effects before reopening traffic.
 ```
 
 Project State does not transfer users, sessions, Redis jobs, cache/locks, provider state, or currently unsupported module data. Mortgage and Scheduling durable rows must remain empty until explicit transfer support exists.
@@ -1074,9 +1111,9 @@ Recommended order:
 
 ```text
 1. Deploy application/config.
-2. Run migrations.
-3. Run presets:sync.
-4. Run setup:validate.
+2. Apply schema using engage:install for a new environment, or migrate + modules:migrate for an existing environment.
+3. Run presets:sync when definitions changed and were not already materialized by engage:install.
+4. Run modules:status and setup:validate.
 5. Verify providers and workers.
 6. Dry-run the import.
 7. Inspect exact row-level output.
@@ -1109,6 +1146,7 @@ Import rules:
 [ ] APP_KEY unique and preserved
 [ ] No placeholder environment values
 [ ] Production DB verified
+[ ] Installed module migration scopes reviewed with `modules:status`
 [ ] Redis isolation verified
 [ ] Cache prefix unique
 [ ] Horizon prefix unique
@@ -1151,12 +1189,13 @@ For normal post-launch deployments:
 4. Build assets when frontend changed.
 5. Apply new environment variables before code paths require them.
 6. Run php artisan optimize:clear after env/config/route changes.
-7. Run php artisan migrate --force.
-8. Run php artisan presets:sync when config/presets changed.
-9. Run php artisan setup:validate when setup/config changed.
-10. Restart Horizon through Supervisor after any queued-job runtime code change; use the exact `<CLIENT_HORIZON_PROGRAM>` discovered from Supervisor.
-11. Verify actual Horizon process path and queue list.
-12. Run focused production-safe smoke checks for touched providers/modules.
+7. Run php artisan migrate --force for platform migrations.
+8. Run php artisan modules:migrate --force for ledger-installed module scopes.
+9. Run php artisan presets:sync when config/presets changed.
+10. Run php artisan modules:status and php artisan setup:validate as the readiness gate.
+11. Restart Horizon through Supervisor after any queued-job runtime code change; use the exact `<CLIENT_HORIZON_PROGRAM>` discovered from Supervisor.
+12. Verify actual Horizon process path and queue list.
+13. Run focused production-safe smoke checks for touched providers/modules.
 ```
 
 Do not clear Redis indiscriminately during ordinary deployments.

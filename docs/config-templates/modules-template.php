@@ -5,6 +5,7 @@ use App\Modules\Campaigns\Providers\CampaignsModuleServiceProvider;
 use App\Modules\Commerce\Providers\CommerceModuleServiceProvider;
 use App\Modules\Core\Providers\CoreModuleServiceProvider;
 use App\Modules\Documents\Providers\DocumentsModuleServiceProvider;
+use App\Modules\Events\Providers\EventsModuleServiceProvider;
 use App\Modules\FlowRoutes\Providers\FlowRoutesModuleServiceProvider;
 use App\Modules\Forms\Providers\FormsModuleServiceProvider;
 use App\Modules\InboundMessaging\Providers\InboundMessagingModuleServiceProvider;
@@ -188,6 +189,14 @@ return [
             'depends_on' => ['core'],
             'providers' => [
                 CommerceModuleServiceProvider::class,
+            ],
+        ],
+
+        'events' => [
+            'name' => 'Events',
+            'depends_on' => ['core'],
+            'providers' => [
+                EventsModuleServiceProvider::class,
             ],
         ],
 

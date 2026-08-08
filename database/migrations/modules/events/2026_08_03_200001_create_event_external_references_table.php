@@ -34,10 +34,26 @@ return new class extends Migration
                 'event_external_references_event_type_index',
             );
         });
+
+        Schema::table('events', function (Blueprint $table): void {
+            $table->foreign(
+                'primary_external_reference_id',
+                'events_primary_external_reference_fk',
+            )
+                ->references('id')
+                ->on('event_external_references')
+                ->nullOnDelete();
+        });
     }
 
     public function down(): void
     {
+        Schema::table('events', function (Blueprint $table): void {
+            $table->dropForeign(
+                'events_primary_external_reference_fk',
+            );
+        });
+
         Schema::dropIfExists('event_external_references');
     }
 };

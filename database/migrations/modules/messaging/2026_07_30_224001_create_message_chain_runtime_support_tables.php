@@ -134,15 +134,21 @@ return new class extends Migration
         Schema::dropIfExists('scheduled_message_render_contexts');
 
         Schema::table('scheduled_messages', function (Blueprint $table): void {
+            $table->dropForeign([
+                'message_chain_step_variant_id',
+            ]);
+            $table->dropForeign([
+                'message_chain_enrollment_id',
+            ]);
+
             $table->dropIndex(
                 'scheduled_messages_chain_enrollment_variant_index',
             );
-            $table->dropConstrainedForeignId(
+
+            $table->dropColumn([
                 'message_chain_step_variant_id',
-            );
-            $table->dropConstrainedForeignId(
                 'message_chain_enrollment_id',
-            );
+            ]);
         });
 
         Schema::dropIfExists('message_chain_enrollments');

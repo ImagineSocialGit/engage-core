@@ -33,6 +33,8 @@ class WebinarsSetupValidationContributorTest extends TestCase
         ]);
         Config::set('messaging.email', []);
         Config::set('messaging.sms', []);
+        Config::set('webinars.post_event.attendance.enabled', true);
+        Config::set('webinars.post_event.recordings.enabled', true);
 
         $this->configureValidZoomReadiness();
         $this->configureMessageAreas();
@@ -62,24 +64,48 @@ class WebinarsSetupValidationContributorTest extends TestCase
         $this->assertSame('app.webinar_url', $finding['path']);
     }
 
-    public function test_it_reports_missing_zoom_server_to_server_oauth_credentials(): void
+    public function test_it_warns_for_missing_zoom_server_to_server_oauth_credentials_in_testing(): void
     {
         Config::set('services.zoom.account_id', null);
         Config::set('services.zoom.client_id', '');
         Config::set('services.zoom.client_secret', null);
 
-        $paths = collect($this->findings())
+        $findings = collect($this->findings())
             ->where('code', 'webinars.zoom.oauth_credential_missing')
-            ->pluck('path')
-            ->sort()
-            ->values()
-            ->all();
+            ->values();
 
         $this->assertEquals([
             'services.zoom.account_id',
             'services.zoom.client_id',
             'services.zoom.client_secret',
-        ], $paths);
+        ], $findings
+            ->pluck('path')
+            ->sort()
+            ->values()
+            ->all());
+        $this->assertEquals(
+            [SetupValidationFinding::SEVERITY_WARNING],
+            $findings->pluck('severity')->unique()->values()->all(),
+        );
+    }
+
+    public function test_it_errors_for_missing_zoom_server_to_server_oauth_credentials_in_production(): void
+    {
+        $this->app->detectEnvironment(fn (): string => 'production');
+        Config::set('app.env', 'production');
+        Config::set('services.zoom.account_id', null);
+        Config::set('services.zoom.client_id', '');
+        Config::set('services.zoom.client_secret', null);
+
+        $findings = collect($this->findings())
+            ->where('code', 'webinars.zoom.oauth_credential_missing')
+            ->values();
+
+        $this->assertCount(3, $findings);
+        $this->assertEquals(
+            [SetupValidationFinding::SEVERITY_ERROR],
+            $findings->pluck('severity')->unique()->values()->all(),
+        );
     }
 
     public function test_it_reports_insecure_or_malformed_zoom_endpoints(): void
@@ -165,6 +191,51 @@ class WebinarsSetupValidationContributorTest extends TestCase
             $codes,
         );
         $this->assertContains('webinars.zoom.oauth_token_ttl_invalid', $codes);
+    }
+
+    public function test_it_skips_zoom_webhook_readiness_when_attendance_and_recordings_are_disabled(): void
+    {
+        Config::set('webinars.post_event.attendance.enabled', false);
+        Config::set('webinars.post_event.recordings.enabled', false);
+        Config::set('services.zoom.webhook_secret', null);
+        Config::set('services.zoom.max_timestamp_drift_seconds', 0);
+        Config::set('webinars.providers.zoom.webhook_events', []);
+
+        $codes = array_column($this->findings(), 'code');
+
+        $this->assertNotContains('webinars.zoom.webhook_secret_missing', $codes);
+        $this->assertNotContains('webinars.zoom.webhook_timestamp_drift_invalid', $codes);
+        $this->assertNotContains('webinars.zoom.webhook_event_mapping_invalid', $codes);
+    }
+
+    public function test_zoom_webhook_mapping_requirements_follow_enabled_post_event_capabilities(): void
+    {
+        Config::set('webinars.post_event.attendance.enabled', false);
+        Config::set('webinars.post_event.recordings.enabled', true);
+
+        $events = Config::get('webinars.providers.zoom.webhook_events', []);
+        unset($events['webinar.ended'], $events['meeting.ended']);
+        Config::set('webinars.providers.zoom.webhook_events', $events);
+
+        $mappingFindings = collect($this->findings())
+            ->where('code', 'webinars.zoom.webhook_event_mapping_invalid')
+            ->values()
+            ->all();
+
+        $this->assertEquals([], $mappingFindings);
+
+        unset($events['recording.completed']);
+        Config::set('webinars.providers.zoom.webhook_events', $events);
+
+        $mappingFindings = collect($this->findings())
+            ->where('code', 'webinars.zoom.webhook_event_mapping_invalid')
+            ->values();
+
+        $this->assertCount(1, $mappingFindings);
+        $this->assertSame(
+            'webinars.providers.zoom.webhook_events.recording.completed',
+            $mappingFindings[0]['path'],
+        );
     }
 
     public function test_it_accepts_complete_zoom_webinar_and_meeting_readiness_configuration(): void

@@ -10,15 +10,8 @@ use App\Support\Presets\Enums\PresetDomain;
 
 class SyncContactStatusPresetsAction
 {
+    
     /**
-     * @return array{
-     *     created: int,
-     *     updated: int,
-     *     skipped: int,
-     *     errors: array<int, string>,
-     * }
-     */
-/**
      * @return array{
      *     created: int,
      *     updated: int,
@@ -77,7 +70,15 @@ class SyncContactStatusPresetsAction
                     ...$this->attributes($definition),
                     'is_customized' => $force ? false : (bool) $status->is_customized,
                     'customized_at' => $force ? null : $status->customized_at,
-                ])->save();
+                ]);
+
+                if (! $status->isDirty()) {
+                    $result['skipped']++;
+
+                    continue;
+                }
+
+                $status->save();
 
                 $result['updated']++;
             }
@@ -85,10 +86,6 @@ class SyncContactStatusPresetsAction
             return $result;
         });
     }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
 
     /**
      * @param array<string, mixed> $definition

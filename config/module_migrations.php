@@ -10,10 +10,10 @@ return [
     | This registry declares the durable owner, target path, schema version,
     | and migration manifest for platform and module-owned schema.
     |
-    | Target paths are architectural destinations. Until the relocation batches
-    | are applied, migration files may still exist in the legacy root directory.
-    | Normal application bootstrap must not infer migration execution from this
-    | file. Installation and upgrade commands will consume it in later batches.
+    | The platform path is registered unconditionally by the platform migration
+    | provider. Module target paths remain architectural destinations until their
+    | relocation batches are applied. Installation and upgrade commands will
+    | consume module paths in later batches.
     |
     */
 
@@ -31,6 +31,7 @@ return [
             '2026_07_18_220001_create_automation_event_consumer_receipts_table.php',
             '2026_07_19_040000_create_webhook_inbox_receipts_table.php',
             '2026_08_02_013000_create_project_state_resume_items_table.php',
+            '2026_08_05_180000_create_module_installations_table.php',
         ],
     ],
 
@@ -109,7 +110,6 @@ return [
                 '2026_07_21_180100_create_bookable_slot_offers_table.php',
                 '2026_07_21_180101_create_booking_holds_table.php',
                 '2026_08_03_190000_create_scheduling_resource_occupancy_tables.php',
-                '2026_08_04_190000_add_location_snapshots_to_booking_holds.php',
             ],
         ],
 

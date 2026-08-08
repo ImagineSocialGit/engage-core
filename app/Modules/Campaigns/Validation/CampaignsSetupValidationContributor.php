@@ -12,7 +12,6 @@ use App\Modules\Campaigns\Models\CampaignStepVariant;
 use App\Modules\Campaigns\Services\CampaignMessageDefinitionResolver;
 use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Messaging\Enums\MessagePurpose;
-use App\Modules\Messaging\Services\MessageChannelAvailability;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
 use Illuminate\Support\Collection;
@@ -35,7 +34,6 @@ class CampaignsSetupValidationContributor implements SetupValidationContributor
 
     public function __construct(
         private readonly CampaignMessageDefinitionResolver $campaignMessageDefinitionResolver,
-        private readonly MessageChannelAvailability $messageChannelAvailability,
         private readonly PresetCompositionResolver $compositionResolver,
         private readonly PresetPackageResolver $packageResolver,
     ) {}
@@ -708,6 +706,31 @@ class CampaignsSetupValidationContributor implements SetupValidationContributor
             );
         }
 
+        $availabilityCheckableVariants = $activeVariants
+            ->filter(fn (CampaignStepVariant $variant): bool =>
+                in_array($variant->channel, MessageChannel::values(), true)
+                && in_array($variant->purpose, MessagePurpose::values(), true)
+            )
+            ->values();
+
+        if ($availabilityCheckableVariants->isNotEmpty()
+            && ! $availabilityCheckableVariants->contains(
+                fn (CampaignStepVariant $variant): bool =>
+                    $this->campaignMessageDefinitionResolver->isVariantChannelAvailable(
+                        campaign: $campaign,
+                        step: $step,
+                        variant: $variant,
+                    ),
+            )
+        ) {
+            yield $this->warning(
+                code: 'campaigns.runtime_available_variants_missing',
+                message: "Active Campaign [{$campaign->key}] step [{$step->step_number}] has no currently available Messaging variants; the step cannot schedule a delivery until at least one configured channel and provider is available.",
+                path: "{$path}.variants",
+                context: $context,
+            );
+        }
+
         $siblingKeys = $activeVariants
             ->map(fn (CampaignStepVariant $variant): string => $this->normalizeSegment((string) $variant->key))
             ->all();
@@ -810,19 +833,11 @@ class CampaignsSetupValidationContributor implements SetupValidationContributor
             context: $context,
         );
 
-        if (! $this->messageChannelAvailability->isVisibleForSurface(
-            channel: $variant->channel,
-            surface: 'campaigns',
-            purpose: $variant->purpose,
-            scope: $variant->scope,
+        if (! $this->campaignMessageDefinitionResolver->isVariantChannelAvailable(
+            campaign: $campaign,
+            step: $step,
+            variant: $variant,
         )) {
-            yield $this->warning(
-                code: 'campaigns.channel_unavailable_for_surface',
-                message: "Active Campaign variant [{$campaign->key}:{$step->step_number}:{$variantKey}] references channel [{$variant->channel}] that is not currently available for Campaigns.",
-                path: "{$path}.channel",
-                context: $context,
-            );
-
             return;
         }
 

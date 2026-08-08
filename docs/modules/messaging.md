@@ -118,6 +118,41 @@ Do not create a second token allowlist from template text, config reference file
 
 Client-facing aliases may normalize to canonical fields such as `contact.first_name`, but aliases do not create new runtime fields or schema.
 
+## Definition availability and module ownership
+
+Messaging may store reusable copy for consuming modules, but globally loaded config is not automatically effective runtime configuration for every client.
+
+Effective definition availability follows the owning runtime module:
+
+```text
+standard webinar* definitions
+    owned by Webinars
+    available only when Webinars is in the enabled runtime dependency closure
+
+campaigns subtrees inside Messaging definition config
+    owned by Campaigns
+    available only when Campaigns is in the enabled runtime dependency closure
+
+other standard Messaging definitions
+    owned by Messaging
+    available when Messaging is in the enabled runtime dependency closure
+```
+
+Campaign ownership is independent of the surrounding scope name. A Campaign definition under `webinar_nurture` remains Campaign-owned and does not create a Campaigns -> Webinars dependency. The caller remains responsible for supplying any producer-specific context the Campaign template actually requires.
+
+The same availability boundary must be used by:
+
+```text
+config -> DB template/preset sync
+runtime config fallback
+DB-backed assignment resolution
+Messaging setup validation
+```
+
+Definitions owned by disabled modules are dormant. They must not be synced into active config-owned template rows, selected from persisted assignments, used as runtime fallback, or block setup validation because their producer token contexts are intentionally unavailable. Uncustomized config-owned rows that become dormant may be reconciled away by normal sync; customized historical rows may remain stored but are runtime-inert until their owning module is enabled again.
+
+This availability rule is separate from preset contribution discovery. Installed modules may expose preset contributions independently of runtime enablement, but reusable Messaging definitions become executable only through the owning module's runtime availability.
+
 ## Message templates
 
 ### `message_templates`

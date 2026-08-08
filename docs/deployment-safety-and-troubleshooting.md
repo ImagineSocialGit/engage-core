@@ -1,3 +1,4 @@
+
 # Engage Core — Deployment Safety & Troubleshooting
 
 ## Purpose
@@ -17,6 +18,8 @@ post-event Webinar debugging
 duplicate registrations
 join-link scanner/prefetch safety
 ```
+
+The canonical command-level install and deployment sequence is [`operations/deployment-command-workflow.md`](operations/deployment-command-workflow.md). After the modular migration cutover, plain `php artisan migrate` and `migrate:fresh` operate on the platform path only; module schema is handled by the explicit module commands or `engage:install`.
 
 ---
 
@@ -162,9 +165,8 @@ maintenance/write freeze
 Horizon and Scheduler stopped
 current-format Project State export
 exact Redis namespace cleanup
-target migrate:fresh
-presets:sync
-setup:validate
+target platform-only migrate:fresh
+engage:install for configured module schema, presets, and setup validation
 validation-only upload
 transactional apply
 explicit dependency-ordered resume
@@ -673,12 +675,15 @@ php artisan route:list | grep -i zoom
 ps aux | grep "[a]rtisan horizon"
 ```
 
-## Validation
+## Deployment and validation
 
 ```bash
+php artisan modules:status
 php artisan presets:sync
 php artisan setup:validate
 ```
+
+For the exact new-client, existing-client, module-addition, and controlled-rebuild command sequences, use `docs/operations/deployment-command-workflow.md`.
 
 ---
 

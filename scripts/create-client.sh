@@ -75,7 +75,7 @@ mkdir -p "$TEMP_CLIENT_DIR/config"
 mkdir -p "$TEMP_CLIENT_DIR/resources/views"
 mkdir -p "$TEMP_CLIENT_DIR/resources/images/raw"
 
-cat > "$TEMP_CLIENT_DIR/config/client.php" <<EOF
+cat > "$TEMP_CLIENT_DIR/config/client.php" <<EOF_CLIENT
 <?php
 
 return [
@@ -86,9 +86,9 @@ return [
 
     'preset' => 'basic',
 ];
-EOF
+EOF_CLIENT
 
-cat > "$TEMP_CLIENT_DIR/config/modules.php" <<'EOF'
+cat > "$TEMP_CLIENT_DIR/config/modules.php" <<'EOF_MODULES'
 <?php
 
 return [
@@ -97,13 +97,13 @@ return [
         'workflow',
     ],
 ];
-EOF
+EOF_MODULES
 
-cat > "$TEMP_CLIENT_DIR/resources/images/manifest.json" <<'EOF'
+cat > "$TEMP_CLIENT_DIR/resources/images/manifest.json" <<'EOF_MANIFEST'
 {}
-EOF
+EOF_MANIFEST
 
-cat > "$TEMP_CLIENT_DIR/.env.example" <<'EOF'
+cat > "$TEMP_CLIENT_DIR/.env.example" <<'EOF_ENV'
 # Engage Core client deployment environment
 #
 # This file contains runtime values that should follow the selected CLIENT_KEY.
@@ -135,6 +135,9 @@ CRM_APP_URL=
 # Optional when the Webinars module is enabled.
 # WEBINAR_APP_URL=
 
+# Optional when the Scheduling public surface is enabled.
+# SCHEDULING_APP_URL=
+
 ################################
 # DATABASE IDENTITY / CREDENTIALS
 ################################
@@ -160,7 +163,6 @@ HORIZON_PREFIX=
 # FILE STORAGE / DIGITALOCEAN SPACES
 ################################
 
-FILESYSTEM_DISK=spaces
 DO_SPACES_KEY=
 DO_SPACES_SECRET=
 DO_SPACES_ENDPOINT=https://nyc3.digitaloceanspaces.com
@@ -188,7 +190,6 @@ FROM_NAME_MARKETING=
 
 RESEND_API_KEY=
 RESEND_WEBHOOK_SECRET=
-RESEND_WEBHOOK_TIMESTAMP_DRIFT_SECONDS=300
 
 # Optional provider-specific sender overrides.
 # Leave commented to preserve normal FROM_* / MAIL_FROM_* fallbacks.
@@ -203,6 +204,13 @@ RESEND_WEBHOOK_TIMESTAMP_DRIFT_SECONDS=300
 
 # Optional override. Leave commented to preserve the APP_URL fallback.
 # PERMISSION_INVITATION_PUBLIC_URL=
+
+################################
+# PROJECT STATE
+################################
+
+# Optional owner authorization. Leave commented to keep Project State disabled.
+# PROJECT_STATE_ADMIN_EMAIL=
 
 ################################
 # INTERNAL NOTIFICATIONS / INBOUND REPLIES
@@ -247,13 +255,17 @@ SMS_PROVIDER=telnyx
 
 # Enable and populate only when the Webinars module is part of the client package.
 # WEBINAR_PROVIDER=zoom
+
+# Optional client booking URL used by webinar copy when configured.
+# WEBINAR_BOOKING_URL=
+
 # ZOOM_ACCOUNT_ID=
 # ZOOM_CLIENT_ID=
 # ZOOM_CLIENT_SECRET=
 # ZOOM_WEBHOOK_SECRET=
-EOF
+EOF_ENV
 
-cat > "$TEMP_CLIENT_DIR/README.md" <<EOF
+cat > "$TEMP_CLIENT_DIR/README.md" <<EOF_README
 # $CLIENT_NAME
 
 Engage Core client configuration, content, views, and deployment-specific runtime environment.
@@ -287,11 +299,12 @@ This scaffold intentionally starts with the \`basic\` preset and the Tasks and W
    CLIENT_KEY=$CLIENT_KEY
    \`\`\`
 
-4. Clear cached configuration and validate the selected package:
+4. Clear cached configuration and run the new-client installer:
 
    \`\`\`bash
    php artisan optimize:clear
-   php artisan presets:sync
+   php artisan engage:install
+   php artisan modules:status
    php artisan setup:validate
    \`\`\`
 
@@ -317,7 +330,7 @@ Client \`.env\`
 
 Root \`.env\`
 : Application/process infrastructure and the active \`CLIENT_KEY\`.
-EOF
+EOF_README
 
 php -l "$TEMP_CLIENT_DIR/config/client.php" >/dev/null
 php -l "$TEMP_CLIENT_DIR/config/modules.php" >/dev/null
@@ -349,7 +362,7 @@ trap - EXIT
 
 CURRENT_USER="$(id -un)"
 
-cat <<EOF
+cat <<EOF_DONE
 Created client: $CLIENT_DIR
 Name: $CLIENT_NAME
 Timezone: $CLIENT_TIMEZONE
@@ -364,6 +377,7 @@ Next:
   # Populate client/$CLIENT_KEY/.env
   # Set CLIENT_KEY=$CLIENT_KEY in the root .env
   php artisan optimize:clear
-  php artisan presets:sync
+  php artisan engage:install
+  php artisan modules:status
   php artisan setup:validate
-EOF
+EOF_DONE

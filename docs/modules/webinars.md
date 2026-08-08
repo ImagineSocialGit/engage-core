@@ -55,6 +55,23 @@ Webinars may depend on:
 
 Webinars may use Messaging to send registration confirmations, reminders, waitlist notices, and post-webinar transactional follow-ups. Webinar surfaces may collect consent, but consent-domain storage and consent acknowledgements are Messaging-owned.
 
+## Optional capability boundaries
+
+Messaging is a hard Webinar module dependency because Webinars uses Messaging-owned template, consent, chain, and dispatch infrastructure. That dependency does not make every Webinar message mandatory. Registration confirmations, reminders, waitlist notices, and post-event transactional messages remain controlled by Webinar message-area and schedule-profile enablement. Intentionally disabled message areas must not create definition-readiness errors.
+
+Attendance tracking and provider recording resolution are independent Webinar-owned post-event capabilities:
+
+```text
+webinars.post_event.attendance.enabled
+webinars.post_event.recordings.enabled
+```
+
+When attendance tracking is disabled, Webinars does not require attendance webhook mappings or provider attendance reconciliation readiness. When recording resolution is disabled, Webinars does not require the recording-completed webhook mapping or provider recording lookup readiness. If both capabilities are disabled, Zoom webhook-secret, timestamp-drift, and post-event webhook-mapping readiness are not installation requirements.
+
+Campaigns is not a Webinar dependency. Webinars may emit neutral automation events such as `webinar.attended`, `webinar.missed`, `webinar.ended`, and `webinar.replay_available`; Campaigns or FlowRoutes may consume those events when their own modules and definitions are enabled. Enabling Webinars must not install or require Campaigns.
+
+Reporting is not a Webinar dependency. Webinars owns registration, attendance, and public-page source facts; Reporting may consume those facts when enabled, but Webinar registration and public pages must continue to work without Reporting.
+
 ## Provider event types and adapter selection
 
 Provider family and provider event type are separate identities.
@@ -110,20 +127,15 @@ cancellation requests.
 
 ## Zoom readiness contract
 
-`setup:validate` performs non-network readiness checks when Zoom is the selected Webinar
-provider. It validates:
+`setup:validate` separates structural provider configuration from environment/provider readiness when Zoom is the selected Webinar provider.
 
-- Server-to-Server OAuth account ID, client ID, and client secret;
-- HTTPS API and OAuth endpoints without embedded credentials;
-- OAuth token cache TTL between 60 and 3600 seconds;
-- explicit Webinar and Meeting adapter classes implementing `WebinarProvider`;
-- webhook secret and timestamp-drift configuration;
-- native mappings for `webinar.ended`, `meeting.ended`, and `recording.completed`.
+Structural problems remain errors in every environment. These include malformed or insecure API/OAuth endpoints, invalid OAuth token TTL, missing/invalid provider event-type adapter definitions, and invalid webhook mappings for capabilities that are enabled.
 
-Setup validation does not prove that Zoom granted the required Marketplace scopes or
-account-role permissions. Deployment must still exercise the exact provider calls and a
-real signed webhook. The authoritative scope/event checklist lives in
-`docs/client-third-party-services-checklist.md`.
+Missing Server-to-Server OAuth account ID, client ID, or client secret is a provider-readiness finding rather than a schema/installability failure. It is a warning in `local` and `testing`, where a developer may legitimately install and exercise Webinar-owned behavior without a usable Zoom account. It is an error in `staging` and `production`, where provider-backed Webinar operations are expected to be deployable.
+
+Webhook readiness follows the enabled post-event capabilities. Attendance tracking requires `webinar.ended` and `meeting.ended` mappings. Recording resolution requires the `recording.completed` mapping. A webhook secret and valid timestamp-drift setting are required only when at least one of those provider-webhook capabilities is enabled. Missing webhook credentials use the same local/testing warning and staging/production error policy as missing OAuth credentials.
+
+Setup validation does not prove that Zoom granted the required Marketplace scopes or account-role permissions. Deployment must still exercise the exact provider calls and a real signed webhook when those capabilities are enabled. The authoritative scope/event checklist lives in `docs/client-third-party-services-checklist.md`.
 
 ## Provider synchronization and metadata ownership
 

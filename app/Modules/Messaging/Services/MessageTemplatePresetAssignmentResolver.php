@@ -14,6 +14,7 @@ class MessageTemplatePresetAssignmentResolver
 {
     public function __construct(
         private readonly MessageDefinitionConfigSetResolver $configSetResolver,
+        private readonly MessageDefinitionModuleAvailability $moduleAvailability,
     ) {}
 
     /**
@@ -27,6 +28,11 @@ class MessageTemplatePresetAssignmentResolver
         $channel = $this->normalizeChannel($channel);
         $purpose = $this->normalizeSegment($purpose);
         $scope = $this->normalizeSegment($scope);
+
+        if (! $this->moduleAvailability->standardDefinitionsAvailable($scope)) {
+            return [];
+        }
+
         $configuredKeys = $this->configuredDefinitionKeysByMessageType($channel, $purpose, $scope);
 
         /** @var Collection<int, MessageTemplatePresetAssignment> $assignments */
@@ -79,6 +85,10 @@ class MessageTemplatePresetAssignmentResolver
         ?string $variantKey = null,
         ?Model $context = null,
     ): ?array {
+        if (! $this->moduleAvailability->campaignDefinitionsAvailable()) {
+            return null;
+        }
+
         $variantKey = $this->normalizeNullableSegment($variantKey);
 
         if ($context instanceof Model && $variantKey !== null) {

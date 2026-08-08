@@ -22,6 +22,7 @@ use App\Support\Presets\PresetContributionRegistry;
 use App\Support\Presets\PresetPackageResolver;
 use App\Support\SetupValidation\Contributors\ConfigContractsSetupValidationContributor;
 use App\Support\SetupValidation\Contributors\ModuleDependenciesSetupValidationContributor;
+use App\Support\SetupValidation\Contributors\ModuleMigrationsSetupValidationContributor;
 use App\Support\SetupValidation\Contributors\PresetCompositionSetupValidationContributor;
 use App\Support\SetupValidation\Contributors\ReferenceRegistrySetupValidationContributor;
 use App\Support\SetupValidation\SetupValidationManager;
@@ -123,6 +124,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->tag([
             ConfigContractsSetupValidationContributor::class,
             ModuleDependenciesSetupValidationContributor::class,
+            ModuleMigrationsSetupValidationContributor::class,
             PresetCompositionSetupValidationContributor::class,
             ReferenceRegistrySetupValidationContributor::class,
         ], 'setup.validation_contributors');

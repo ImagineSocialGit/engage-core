@@ -13,6 +13,7 @@ class MessageConfigValidator
         private readonly MessageTemplateTokenValidator $messageTemplateTokenValidator,
         private readonly QueueContract $queueContract,
         private readonly MessageDefinitionConfigSetResolver $configSetResolver,
+        private readonly MessageDefinitionModuleAvailability $moduleAvailability,
     ) {}
 
     /**
@@ -41,8 +42,16 @@ class MessageConfigValidator
         $scopeConfig = config($scopePath);
 
         if (! is_array($scopeConfig)) {
+            if (! $this->moduleAvailability->standardDefinitionsAvailable($scope)) {
+                return $issues;
+            }
+
             $issues[] = $this->issue('error', $scopePath, 'Message config route is missing or not an array.');
 
+            return $issues;
+        }
+
+        if (! $this->moduleAvailability->scopeContainsAvailableDefinitions($scope, $scopeConfig)) {
             return $issues;
         }
 
@@ -93,17 +102,23 @@ class MessageConfigValidator
 
         foreach ($definitions as $messageType => $definition) {
             if ($messageType === 'campaigns') {
-                $issues = array_merge(
-                    $issues,
-                    $this->validateCampaigns(
-                        campaigns: $definition,
-                        basePath: "{$basePath}.campaigns",
-                        channel: $channel,
-                        purpose: $purpose,
-                        scope: $scope,
-                    ),
-                );
+                if ($this->moduleAvailability->campaignDefinitionsAvailable()) {
+                    $issues = array_merge(
+                        $issues,
+                        $this->validateCampaigns(
+                            campaigns: $definition,
+                            basePath: "{$basePath}.campaigns",
+                            channel: $channel,
+                            purpose: $purpose,
+                            scope: $scope,
+                        ),
+                    );
+                }
 
+                continue;
+            }
+
+            if (! $this->moduleAvailability->standardDefinitionsAvailable($scope)) {
                 continue;
             }
 
@@ -176,6 +191,10 @@ class MessageConfigValidator
         string $purpose,
         string $scope,
     ): array {
+        if (! $this->moduleAvailability->campaignDefinitionsAvailable()) {
+            return [];
+        }
+
         if (! is_array($campaigns)) {
             return [$this->issue('error', $basePath, 'Campaign message templates must be an array.')];
         }

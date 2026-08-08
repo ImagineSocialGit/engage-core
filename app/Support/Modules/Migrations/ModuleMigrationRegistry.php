@@ -146,6 +146,17 @@ final class ModuleMigrationRegistry
         return $this->resolved = $definitions;
     }
 
+    public function manifestHash(MigrationScopeDefinition $definition): string
+    {
+        return hash('sha256', json_encode([
+            'key' => $definition->key,
+            'module_key' => $definition->moduleKey,
+            'path' => $definition->path,
+            'schema_version' => $definition->schemaVersion,
+            'migrations' => $definition->migrationFiles,
+        ], JSON_THROW_ON_ERROR));
+    }
+
     public function ownerFor(string $migrationFile): ?MigrationScopeDefinition
     {
         $migrationFile = basename(trim($migrationFile));

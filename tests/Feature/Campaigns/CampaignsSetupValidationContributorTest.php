@@ -232,7 +232,7 @@ class CampaignsSetupValidationContributorTest extends TestCase
         );
     }
 
-    public function test_it_warns_when_runtime_channel_is_unavailable_without_reporting_missing_definition(): void
+    public function test_it_warns_once_when_runtime_step_has_no_available_variants(): void
     {
         Config::set('messaging.channel_availability.email.surfaces.campaigns', false);
 
@@ -255,8 +255,60 @@ class CampaignsSetupValidationContributorTest extends TestCase
 
         $codes = array_column($this->findings(), 'code');
 
-        $this->assertContains('campaigns.channel_unavailable_for_surface', $codes);
+        $this->assertContains('campaigns.runtime_available_variants_missing', $codes);
         $this->assertNotContains('campaigns.messaging_definition_missing', $codes);
+        $this->assertNotContains('campaigns.messaging_definition_payload_unusable', $codes);
+    }
+
+    public function test_unavailable_sms_fallback_does_not_warn_when_email_variant_is_available(): void
+    {
+        $this->configureCampaignMessagingDefinition();
+        $this->configureUnavailableSms();
+
+        [$campaign, $step] = $this->runtimeCampaign();
+        $step->forceFill([
+            'variant_strategy' => 'dependency_aware',
+        ])->save();
+
+        CampaignStepVariant::query()->create([
+            'campaign_step_id' => $step->id,
+            'key' => 'sms',
+            'name' => 'SMS',
+            'sort_order' => 0,
+            'dispatch_key' => 'campaign_step_due',
+            'channel' => 'sms',
+            'purpose' => 'marketing',
+            'scope' => 'webinar_nurture',
+            'is_active' => true,
+            'criteria' => [],
+            'dependency_rules' => [],
+            'meta' => [],
+        ]);
+
+        CampaignStepVariant::query()->create([
+            'campaign_step_id' => $step->id,
+            'key' => 'email',
+            'name' => 'Email fallback',
+            'sort_order' => 1,
+            'dispatch_key' => 'campaign_step_due',
+            'channel' => 'email',
+            'purpose' => 'marketing',
+            'scope' => 'webinar_nurture',
+            'is_active' => true,
+            'criteria' => [],
+            'dependency_rules' => [
+                'requires_variant_states' => [
+                    'sms' => ['sent', 'unavailable'],
+                ],
+            ],
+            'meta' => [],
+        ]);
+
+        $codes = array_column($this->findings(), 'code');
+
+        $this->assertNotContains('campaigns.runtime_available_variants_missing', $codes);
+        $this->assertNotContains('campaigns.messaging_definition_missing', $codes);
+        $this->assertNotContains('campaigns.messaging_definition_payload_unusable', $codes);
     }
 
     public function test_it_resolves_variant_aware_messaging_definition_for_runtime_campaign(): void
@@ -392,6 +444,16 @@ class CampaignsSetupValidationContributorTest extends TestCase
         Config::set('messaging.channel_availability.email.provider_enabled', true);
         Config::set('messaging.channel_availability.email.surfaces.campaigns', true);
         Config::set('messaging.channel_availability.email.purpose_scopes', [
+            'marketing:webinar_nurture' => true,
+        ]);
+    }
+
+    private function configureUnavailableSms(): void
+    {
+        Config::set('messaging.channel_availability.sms.runtime_supported', true);
+        Config::set('messaging.channel_availability.sms.provider_enabled', false);
+        Config::set('messaging.channel_availability.sms.surfaces.campaigns', true);
+        Config::set('messaging.channel_availability.sms.purpose_scopes', [
             'marketing:webinar_nurture' => true,
         ]);
     }

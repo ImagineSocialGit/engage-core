@@ -20,6 +20,29 @@ return [
 
     'packages' => [
 
+        'core' => [
+            'name' => 'Core',
+            'description' => 'Core contact starter definitions without optional-module presets.',
+            'contacts' => [
+                'labels' => [
+                    'singular' => 'contact',
+                    'plural' => 'contacts',
+                ],
+
+                'routes' => [
+                    'plural' => 'contacts',
+                ],
+            ],
+            'groups' => [
+                'contact_statuses' => [
+                    'default',
+                ],
+                'tasks' => [],
+                'campaigns' => [],
+                'flow_routes' => [],
+            ],
+        ],
+
         'basic' => [
             'contacts' => [
                 'labels' => [

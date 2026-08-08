@@ -19,7 +19,7 @@ class ModuleMigrationRegistryTest extends TestCase
             $registry->platform()->path,
         );
         $this->assertSame(1, $registry->platform()->schemaVersion);
-        $this->assertCount(10, $registry->platform()->migrationFiles);
+        $this->assertCount(11, $registry->platform()->migrationFiles);
 
         $this->assertEquals([
             'core',
@@ -85,8 +85,15 @@ class ModuleMigrationRegistryTest extends TestCase
         $this->assertEquals(['core'], $modules->dependencies('location'));
         $this->assertTrue($registry->hasModule('scheduling'));
         $this->assertTrue($registry->hasModule('location'));
+
+        $scheduling = $registry->requireModule('scheduling');
+
+        $this->assertCount(10, $scheduling->migrationFiles);
+        $this->assertFalse($scheduling->owns(
+            '2026_08_04_190000_add_location_snapshots_to_booking_holds.php',
+        ));
         $this->assertNotSame(
-            $registry->requireModule('scheduling')->path,
+            $scheduling->path,
             $registry->requireModule('location')->path,
         );
     }

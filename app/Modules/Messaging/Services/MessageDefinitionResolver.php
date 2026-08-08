@@ -13,6 +13,7 @@ class MessageDefinitionResolver
     public function __construct(
         private readonly MessageTemplatePresetAssignmentResolver $assignmentResolver,
         private readonly MessageDefinitionConfigSetResolver $configSetResolver,
+        private readonly MessageDefinitionModuleAvailability $moduleAvailability,
     ) {}
 
     /**
@@ -32,6 +33,10 @@ class MessageDefinitionResolver
         $scope = $this->normalizeSegment($scope);
 
         if ($channel === '' || $purpose === '' || $scope === '') {
+            return [];
+        }
+
+        if (! $this->moduleAvailability->standardDefinitionsAvailable($scope)) {
             return [];
         }
 
@@ -172,6 +177,10 @@ class MessageDefinitionResolver
         $variantKey = $this->normalizeNullableSegment($variantKey);
 
         if ($channel === '' || $purpose === '' || $scope === '' || $campaignKey === '' || $stepNumber < 1 || $dispatchKey === '' || $variantKey === null) {
+            return null;
+        }
+
+        if (! $this->moduleAvailability->campaignDefinitionsAvailable()) {
             return null;
         }
 

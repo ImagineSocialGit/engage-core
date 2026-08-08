@@ -37,6 +37,8 @@ return new class extends Migration
             $table->dateTime('occupancy_starts_at');
             $table->dateTime('occupancy_ends_at');
             $table->unsignedInteger('capacity');
+            $table->string('location_type', 80)->nullable();
+            $table->json('location_details')->nullable();
             $table->dateTime('held_at');
             $table->dateTime('expires_at');
             $table->dateTime('released_at')->nullable();

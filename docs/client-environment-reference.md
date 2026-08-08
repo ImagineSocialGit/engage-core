@@ -210,13 +210,25 @@ STAGING_USER=
 STAGING_PASSWORD=
 ```
 
-Initial application user bootstrap:
+CRM application users are not environment configuration.
 
-```env
-SETUP_USER_NAME=
-SETUP_USER_EMAIL=
-SETUP_USER_PASSWORD=
+Create the first CRM user, and later users, with:
+
+```bash
+php artisan engage:user:add
 ```
+
+Reset a forgotten CRM password with:
+
+```bash
+php artisan engage:user:password user@example.com
+```
+
+Passwords are entered through hidden terminal prompts and must not be retained in `.env`.
+
+Keep the existing STAGING_USER / STAGING_PASSWORD and PROJECT_STATE_ADMIN_EMAIL documentation. Those values serve separate access/authorization purposes.
+
+See `operations/crm-user-administration.md` for the complete user-administration contract.
 
 Project State owner authorization:
 
@@ -229,9 +241,6 @@ These are separate concepts.
 ```text
 STAGING_USER / STAGING_PASSWORD
     environment access gate
-
-SETUP_USER_*
-    initial CRM/application user seed/bootstrap input
 
 PROJECT_STATE_ADMIN_EMAIL
     exact CRM user email allowed to open and operate the owner-only Project State surface

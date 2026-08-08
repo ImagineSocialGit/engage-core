@@ -31,9 +31,12 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
     private const REGISTER_PAGE_SOURCE = 'webinars.register';
     private const MODULE = 'webinars';
 
-    private const ZOOM_REQUIRED_WEBHOOK_MAPPINGS = [
+    private const ZOOM_ATTENDANCE_WEBHOOK_MAPPINGS = [
         'webinar.ended' => 'webinar.ended',
         'meeting.ended' => 'webinar.ended',
+    ];
+
+    private const ZOOM_RECORDING_WEBHOOK_MAPPINGS = [
         'recording.completed' => 'webinar.recording_completed',
     ];
 
@@ -256,7 +259,7 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
                 continue;
             }
 
-            yield $this->error(
+            yield $this->providerReadinessFinding(
                 code: 'webinars.zoom.oauth_credential_missing',
                 message: "Zoom Server-to-Server OAuth credential [{$credential}] is missing.",
                 path: "services.zoom.{$credential}",
@@ -300,11 +303,20 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
             );
         }
 
+        $requiredWebhookMappings = $this->requiredZoomWebhookMappings();
+
+        if ($requiredWebhookMappings === []) {
+            return;
+        }
+
         if (! $this->filledString(config('services.zoom.webhook_secret'))) {
-            yield $this->error(
+            yield $this->providerReadinessFinding(
                 code: 'webinars.zoom.webhook_secret_missing',
-                message: 'Zoom webhook signature verification requires a webhook secret.',
+                message: 'Zoom webhook signature verification requires a webhook secret for the enabled Webinar post-event capabilities.',
                 path: 'services.zoom.webhook_secret',
+                context: [
+                    'capabilities' => $this->enabledZoomWebhookCapabilities(),
+                ],
                 source: self::ZOOM_SERVICE_SOURCE,
             );
         }
@@ -325,7 +337,7 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
 
         $webhookMappings = $providerConfig['webhook_events'] ?? null;
 
-        foreach (self::ZOOM_REQUIRED_WEBHOOK_MAPPINGS as $nativeEvent => $normalizedEvent) {
+        foreach ($requiredWebhookMappings as $nativeEvent => $normalizedEvent) {
             $configuredMapping = is_array($webhookMappings)
                 ? ($webhookMappings[$nativeEvent] ?? null)
                 : null;
@@ -336,16 +348,89 @@ class WebinarsSetupValidationContributor implements SetupValidationContributor
 
             yield $this->error(
                 code: 'webinars.zoom.webhook_event_mapping_invalid',
-                message: "Zoom webhook event [{$nativeEvent}] must map to [{$normalizedEvent}].",
+                message: "Zoom webhook event [{$nativeEvent}] must map to [{$normalizedEvent}] for the enabled Webinar post-event capabilities.",
                 path: "webinars.providers.zoom.webhook_events.{$nativeEvent}",
                 context: [
                     'native_event' => $nativeEvent,
                     'expected_mapping' => $normalizedEvent,
                     'configured_mapping' => $this->displayValue($configuredMapping),
+                    'capabilities' => $this->enabledZoomWebhookCapabilities(),
                 ],
                 source: self::PROVIDER_SOURCE,
             );
         }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function requiredZoomWebhookMappings(): array
+    {
+        $mappings = [];
+
+        if (config('webinars.post_event.attendance.enabled', true) === true) {
+            $mappings = array_replace(
+                $mappings,
+                self::ZOOM_ATTENDANCE_WEBHOOK_MAPPINGS,
+            );
+        }
+
+        if (config('webinars.post_event.recordings.enabled', false) === true) {
+            $mappings = array_replace(
+                $mappings,
+                self::ZOOM_RECORDING_WEBHOOK_MAPPINGS,
+            );
+        }
+
+        return $mappings;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function enabledZoomWebhookCapabilities(): array
+    {
+        return array_values(array_filter([
+            config('webinars.post_event.attendance.enabled', true) === true
+                ? 'attendance'
+                : null,
+            config('webinars.post_event.recordings.enabled', false) === true
+                ? 'recordings'
+                : null,
+        ]));
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     * @param array<string, mixed> $meta
+     */
+    private function providerReadinessFinding(
+        string $code,
+        string $message,
+        string $path,
+        array $context = [],
+        array $meta = [],
+        ?string $source = null,
+    ): SetupValidationFinding {
+        return new SetupValidationFinding(
+            severity: $this->providerReadinessBlocksSetup()
+                ? SetupValidationFinding::SEVERITY_ERROR
+                : SetupValidationFinding::SEVERITY_WARNING,
+            code: $code,
+            message: $message,
+            source: $source ?? self::PROVIDER_SOURCE,
+            path: $path,
+            module: self::MODULE,
+            context: $context + [
+                'environment' => app()->environment(),
+            ],
+            meta: $meta,
+        );
+    }
+
+    private function providerReadinessBlocksSetup(): bool
+    {
+        return app()->environment('staging', 'production');
     }
 
     private function secureAbsoluteUrl(mixed $value): bool

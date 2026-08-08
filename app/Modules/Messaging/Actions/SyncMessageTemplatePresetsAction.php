@@ -7,6 +7,7 @@ use App\Modules\Messaging\Models\MessageTemplateCatalogEntry;
 use App\Modules\Messaging\Models\MessageTemplatePreset;
 use App\Modules\Messaging\Models\MessageTemplatePresetAssignment;
 use App\Modules\Messaging\Services\MessageDefinitionConfigSetResolver;
+use App\Modules\Messaging\Services\MessageDefinitionModuleAvailability;
 use App\Modules\Messaging\Services\MessageTemplateTokenValidator;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,7 @@ class SyncMessageTemplatePresetsAction
         private readonly MessageTemplateTokenValidator $messageTemplateTokenValidator,
         private readonly PublishMessageTemplateVersionAction $publishMessageTemplateVersion,
         private readonly MessageDefinitionConfigSetResolver $configSetResolver,
+        private readonly MessageDefinitionModuleAvailability $moduleAvailability,
     ) {}
 
     /**
@@ -426,15 +428,21 @@ class SyncMessageTemplatePresetsAction
     ): iterable {
         foreach ($definitions as $messageType => $definition) {
             if ($messageType === 'campaigns') {
-                yield from $this->campaignDefinitionsFromConfig(
-                    channel: $channel,
-                    purpose: $purpose,
-                    scope: $scope,
-                    templateSetKey: $templateSetKey,
-                    campaigns: $definition,
-                    baseConfigPath: "{$scopeConfigPath}.campaigns",
-                );
+                if ($this->moduleAvailability->campaignDefinitionsAvailable()) {
+                    yield from $this->campaignDefinitionsFromConfig(
+                        channel: $channel,
+                        purpose: $purpose,
+                        scope: $scope,
+                        templateSetKey: $templateSetKey,
+                        campaigns: $definition,
+                        baseConfigPath: "{$scopeConfigPath}.campaigns",
+                    );
+                }
 
+                continue;
+            }
+
+            if (! $this->moduleAvailability->standardDefinitionsAvailable($scope)) {
                 continue;
             }
 
@@ -497,6 +505,10 @@ class SyncMessageTemplatePresetsAction
         mixed $campaigns,
         string $baseConfigPath,
     ): iterable {
+        if (! $this->moduleAvailability->campaignDefinitionsAvailable()) {
+            return;
+        }
+
         if (! is_array($campaigns)) {
             return;
         }

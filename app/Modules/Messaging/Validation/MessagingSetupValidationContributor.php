@@ -10,6 +10,7 @@ use App\Modules\Messaging\Models\ScheduledMessage;
 use App\Modules\Messaging\Services\ConsentDomainRegistry;
 use App\Modules\Messaging\Services\MessageConfigValidator;
 use App\Modules\Messaging\Services\MessageDefinitionConfigSetResolver;
+use App\Modules\Messaging\Services\MessageDefinitionModuleAvailability;
 use App\Modules\Messaging\Support\MessageDefinitionConfigPath;
 use App\Support\Queues\QueueContract;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
@@ -24,6 +25,7 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
     public function __construct(
         private readonly MessageConfigValidator $messageConfigValidator,
         private readonly MessageDefinitionConfigSetResolver $configSetResolver,
+        private readonly MessageDefinitionModuleAvailability $moduleAvailability,
         private readonly ConsentDomainRegistry $consentDomainRegistry,
         private readonly QueueContract $queueContract,
     ) {}
@@ -137,6 +139,10 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
                     $scopePath = MessageDefinitionConfigPath::scope($channel, $purpose, $scope);
 
                     if (! is_array($scopeConfig)) {
+                        if (! $this->moduleAvailability->standardDefinitionsAvailable($scope)) {
+                            continue;
+                        }
+
                         yield $this->error(
                             code: 'messaging.scope_config_invalid',
                             message: "Messaging scope config [{$channel}.{$purpose}.{$scope}] must be an array.",
@@ -149,6 +155,10 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
                             ],
                         );
 
+                        continue;
+                    }
+
+                    if (! $this->moduleAvailability->scopeContainsAvailableDefinitions($scope, $scopeConfig)) {
                         continue;
                     }
 
@@ -184,11 +194,16 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
             ->where('is_customized', true)
             ->with([
                 'catalogEntries' => fn ($query) => $query->active()->orderBy('item_order')->orderBy('id'),
+                'assignments' => fn ($query) => $query->orderByDesc('is_active')->orderBy('id'),
             ])
             ->orderBy('key')
             ->get();
 
         foreach ($presets as $preset) {
+            if (! $this->customizedPresetAvailable($preset)) {
+                continue;
+            }
+
             $path = "message_template_presets.{$preset->getKey()}";
 
             if (! $this->filledString($preset->key)) {
@@ -285,6 +300,10 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
             ->get();
 
         foreach ($assignments as $assignment) {
+            if (! $this->assignmentAvailable($assignment)) {
+                continue;
+            }
+
             $preset = $assignment->messageTemplatePreset;
             $path = "message_template_preset_assignments.{$assignment->getKey()}";
             $context = [
@@ -469,7 +488,10 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
             ->with('messageTemplatePreset')
             ->orderBy('id')
             ->get()
-            ->filter(fn (MessageTemplatePresetAssignment $assignment): bool => (bool) $assignment->messageTemplatePreset?->isActive());
+            ->filter(fn (MessageTemplatePresetAssignment $assignment): bool =>
+                (bool) $assignment->messageTemplatePreset?->isActive()
+                && $this->assignmentAvailable($assignment)
+            );
 
         foreach ($assignments as $assignment) {
             $configuredKeys = $this->configuredDefinitionKeysForMessageType(
@@ -546,6 +568,10 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
         string $scope,
         string $messageType,
     ): array {
+        if (! $this->moduleAvailability->standardDefinitionsAvailable($scope)) {
+            return [];
+        }
+
         $definitions = config(MessageDefinitionConfigPath::scope(
             $this->normalizedNullableString($channel),
             $this->normalizedNullableString($purpose),
@@ -609,7 +635,10 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
             ->with('messageTemplatePreset')
             ->orderBy('id')
             ->get()
-            ->filter(fn (MessageTemplatePresetAssignment $assignment): bool => (bool) $assignment->messageTemplatePreset?->isActive());
+            ->filter(fn (MessageTemplatePresetAssignment $assignment): bool =>
+                (bool) $assignment->messageTemplatePreset?->isActive()
+                && $this->assignmentAvailable($assignment)
+            );
 
         $groups = $assignments->groupBy(
             fn (MessageTemplatePresetAssignment $assignment): string => $this->assignmentIdentityKey($assignment),
@@ -646,6 +675,50 @@ class MessagingSetupValidationContributor implements SetupValidationContributor
                 ],
             );
         }
+    }
+
+    private function customizedPresetAvailable(MessageTemplatePreset $preset): bool
+    {
+        $catalogModuleKey = $preset->catalogEntries
+            ->pluck('module_key')
+            ->first(fn (mixed $moduleKey): bool => $this->filledString($moduleKey));
+
+        if (is_string($catalogModuleKey)) {
+            return $this->moduleAvailability->catalogDefinitionAvailable(
+                moduleKey: $catalogModuleKey,
+                scope: (string) $preset->scope,
+            );
+        }
+
+        $campaignAssignment = $preset->assignments->first(
+            fn (MessageTemplatePresetAssignment $assignment): bool =>
+                $this->filledString($assignment->campaign_key)
+                || $assignment->campaign_step !== null,
+        );
+
+        if ($campaignAssignment instanceof MessageTemplatePresetAssignment) {
+            return $this->moduleAvailability->campaignDefinitionsAvailable();
+        }
+
+        return $this->moduleAvailability->standardDefinitionsAvailable(
+            (string) $preset->scope,
+        );
+    }
+
+    private function assignmentAvailable(
+        MessageTemplatePresetAssignment $assignment,
+    ): bool {
+        $campaignStep = $assignment->campaign_step;
+
+        return $this->moduleAvailability->assignmentAvailable(
+            scope: (string) $assignment->scope,
+            campaignKey: is_string($assignment->campaign_key)
+                ? $assignment->campaign_key
+                : null,
+            campaignStep: is_int($campaignStep)
+                ? $campaignStep
+                : (is_numeric($campaignStep) ? (int) $campaignStep : null),
+        );
     }
 
     private function assignmentIdentityKey(MessageTemplatePresetAssignment $assignment): string

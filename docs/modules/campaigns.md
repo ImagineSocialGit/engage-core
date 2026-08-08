@@ -1,3 +1,4 @@
+
 # Campaigns Module
 
 ## Status
@@ -61,6 +62,14 @@ Campaigns does not own:
 - Webinar registrations.
 
 Campaigns may depend on Core and Messaging.
+
+## Runtime variant availability
+
+Campaign variant availability is provider-aware. A variant is currently available only when Messaging exposes its channel for the Campaign surface, its purpose/scope is enabled, and the channel's provider is enabled.
+
+An unavailable sibling variant is normal runtime state, not a broken Messaging definition. Strategies such as `first_available` and `dependency_aware` may intentionally fall back to another active variant, and dependency state `unavailable` explicitly represents that condition. Setup validation therefore skips definition/payload findings for an unavailable variant when another active variant can run.
+
+If an active Campaign step has no currently available variants at all, setup validation emits one step-level warning. This preserves visibility that the step cannot deliver while avoiding misleading per-variant `missing payload` warnings for intentionally unavailable providers.
 
 ## Campaign lifecycle authority
 
