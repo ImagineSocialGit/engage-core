@@ -84,6 +84,11 @@ class PublicSchedulingSurfaceTest extends TestCase
             'key' => 'inactive-service',
             'name' => 'Inactive Service',
         ]);
+        BookableService::factory()->rangeDuration()->create([
+            'key' => 'range-service',
+            'name' => 'Range Service',
+            'is_public' => true,
+        ]);
 
         $response = $this->get('https://booking.test/');
 
@@ -91,7 +96,11 @@ class PublicSchedulingSurfaceTest extends TestCase
             ->assertOk()
             ->assertSeeInOrder(['First Service', 'Second Service'])
             ->assertDontSee('Private Service')
-            ->assertDontSee('Inactive Service');
+            ->assertDontSee('Inactive Service')
+            ->assertDontSee('Range Service');
+
+        $this->get('https://booking.test/services/range-service')
+            ->assertNotFound();
     }
 
     public function test_service_page_renders_bounded_local_availability_without_internal_booking_details(): void

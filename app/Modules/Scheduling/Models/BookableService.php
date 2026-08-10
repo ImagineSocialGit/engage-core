@@ -18,6 +18,16 @@ class BookableService extends Model
     public const STATUS_INACTIVE = 'inactive';
     public const STATUS_ARCHIVED = 'archived';
 
+    public const DURATION_MODE_FIXED = 'fixed';
+    public const DURATION_MODE_RANGE = 'range';
+
+    public const DURATION_MODES = [
+        self::DURATION_MODE_FIXED,
+        self::DURATION_MODE_RANGE,
+    ];
+
+    public const MAX_RANGE_DURATION_MINUTES = 366 * 1440;
+
     public const LOCATION_TYPE_PHONE = 'phone';
     public const LOCATION_TYPE_VIRTUAL = 'virtual';
     public const LOCATION_TYPE_FIXED = 'fixed';
@@ -32,6 +42,7 @@ class BookableService extends Model
 
     protected $attributes = [
         'status' => self::STATUS_ACTIVE,
+        'duration_mode' => self::DURATION_MODE_FIXED,
         'slot_interval_minutes' => 15,
         'buffer_before_minutes' => 0,
         'buffer_after_minutes' => 0,
@@ -52,7 +63,10 @@ class BookableService extends Model
         'name',
         'description',
         'status',
+        'duration_mode',
         'duration_minutes',
+        'minimum_duration_minutes',
+        'maximum_duration_minutes',
         'slot_interval_minutes',
         'buffer_before_minutes',
         'buffer_after_minutes',
@@ -79,10 +93,79 @@ class BookableService extends Model
         return BookableServiceFactory::new();
     }
 
+
+    public function usesFixedDuration(): bool
+    {
+        return $this->duration_mode !== self::DURATION_MODE_RANGE;
+    }
+
+    public function usesRangeDuration(): bool
+    {
+        return $this->duration_mode === self::DURATION_MODE_RANGE;
+    }
+
+    public function defaultDurationMinutes(): int
+    {
+        return max(1, (int) $this->duration_minutes);
+    }
+
+    public function minimumDurationMinutes(): int
+    {
+        if ($this->usesFixedDuration()) {
+            return $this->defaultDurationMinutes();
+        }
+
+        return max(
+            1,
+            (int) ($this->minimum_duration_minutes ?? $this->defaultDurationMinutes()),
+        );
+    }
+
+    public function maximumDurationMinutes(): int
+    {
+        if ($this->usesFixedDuration()) {
+            return $this->defaultDurationMinutes();
+        }
+
+        return max(
+            1,
+            (int) ($this->maximum_duration_minutes ?? $this->defaultDurationMinutes()),
+        );
+    }
+
+    public function hasValidDurationPolicy(): bool
+    {
+        if (! in_array($this->duration_mode, self::DURATION_MODES, true)) {
+            return false;
+        }
+
+        if ($this->usesFixedDuration()) {
+            return true;
+        }
+
+        $minimum = $this->minimumDurationMinutes();
+        $maximum = $this->maximumDurationMinutes();
+        $default = $this->defaultDurationMinutes();
+
+        return $minimum <= $maximum
+            && $maximum <= self::MAX_RANGE_DURATION_MINUTES
+            && $default >= $minimum
+            && $default <= $maximum;
+    }
+
+    public function allowsDurationMinutes(int $durationMinutes): bool
+    {
+        return $this->hasValidDurationPolicy()
+            && $durationMinutes >= $this->minimumDurationMinutes()
+            && $durationMinutes <= $this->maximumDurationMinutes();
+    }
+
     protected function casts(): array
     {
         return [
             'duration_minutes' => 'integer',
+            'minimum_duration_minutes' => 'integer',
+            'maximum_duration_minutes' => 'integer',
             'slot_interval_minutes' => 'integer',
             'buffer_before_minutes' => 'integer',
             'buffer_after_minutes' => 'integer',

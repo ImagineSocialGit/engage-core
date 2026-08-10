@@ -240,7 +240,7 @@ class ModuleMigrationUpgradeAndReconciliationTest extends TestCase
 
         $this->assertStringContainsString('updated', Artisan::output());
         $this->assertTrue($updated->installed_at?->equalTo($installedAt));
-        $this->assertSame(1, $updated->schema_version);
+        $this->assertSame($scope->schemaVersion, $updated->schema_version);
         $this->assertSame(
             app(ModuleMigrationRegistry::class)->manifestHash($scope),
             $updated->manifest_hash,

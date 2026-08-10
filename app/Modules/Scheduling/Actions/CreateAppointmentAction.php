@@ -13,6 +13,7 @@ use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Services\Availability\BookingOccupancyResolver;
 use App\Modules\Scheduling\Services\Availability\ResourceOccupancyResolver;
+use App\Modules\Scheduling\Services\SchedulingDurationResolver;
 use App\Modules\Scheduling\Services\SchedulingLocationSnapshotResolver;
 use Carbon\CarbonImmutable;
 use DomainException;
@@ -29,6 +30,7 @@ class CreateAppointmentAction
         private readonly ResourceOccupancyResolver $resourceOccupancy,
         private readonly TransitionAppointmentStatusAction $lifecycle,
         private readonly SchedulingLocationSnapshotResolver $locations,
+        private readonly SchedulingDurationResolver $durations,
     ) {}
 
     public function handle(AppointmentCreationData $data): Appointment
@@ -74,8 +76,16 @@ class CreateAppointmentAction
                     host: $host,
                 );
                 $evaluatedAt = CarbonImmutable::now('UTC');
-                $endsAt = $data->startsAt->addMinutes(
-                    max(1, (int) $service->duration_minutes),
+                $endsAt = $this->durations->resolveEndsAt(
+                    service: $service,
+                    startsAt: $data->startsAt,
+                    requestedEndsAt: $data->endsAt,
+                    requireExplicitRange: $service->usesRangeDuration(),
+                );
+                $candidateDurationMinutes = $this->durations->durationMinutes(
+                    service: $service,
+                    startsAt: $data->startsAt,
+                    endsAt: $endsAt,
                 );
                 $search = new AvailabilitySearch(
                     service: $service,
@@ -85,6 +95,7 @@ class CreateAppointmentAction
                     displayTimezone: $service->timezone,
                     evaluatedAt: $evaluatedAt,
                     location: $locationSnapshot,
+                    candidateDurationMinutes: $candidateDurationMinutes,
                 );
 
                 $appointments = $this->occupancy
@@ -319,6 +330,12 @@ class CreateAppointmentAction
         AppointmentCreationData $data,
     ): Appointment {
         $primaryAttendee = $data->booking->primaryAttendee();
+        $expectedEndsAt = $this->durations->resolveEndsAt(
+            service: $data->service,
+            startsAt: $data->startsAt,
+            requestedEndsAt: $data->endsAt,
+            requireExplicitRange: $data->service->usesRangeDuration(),
+        );
 
         if ((int) $appointment->bookable_service_id !== (int) $data->service->getKey()
             || ! $this->sameHost(
@@ -326,6 +343,7 @@ class CreateAppointmentAction
                 $data->host?->getKey(),
             )
             || ! $appointment->starts_at?->equalTo($data->startsAt)
+            || ! $appointment->ends_at?->equalTo($expectedEndsAt)
             || ! $this->sameNullableInteger(
                 $appointment->contact_id,
                 $data->booking->contact?->getKey(),

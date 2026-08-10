@@ -16,6 +16,7 @@ use App\Modules\Scheduling\Models\SchedulingHostResource;
 use App\Modules\Scheduling\Models\SchedulingResource;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as SupportCollection;
@@ -27,6 +28,7 @@ class SchedulingReadService
         private readonly SchedulingConfigurationWriter $configurationWriter,
         private readonly SchedulingAvailabilityConfigurationWriter $availabilityConfigurationWriter,
         private readonly SchedulingResourceConfigurationWriter $resourceConfigurationWriter,
+        private readonly SchedulingDurationResolver $durations,
     ) {}
 
     /**
@@ -520,12 +522,22 @@ class SchedulingReadService
             return [];
         }
 
+        $candidateDurationMinutes = $this->rescheduleDurationMinutes(
+            service: $service,
+            appointment: $appointment,
+        );
+
+        if ($candidateDurationMinutes === null) {
+            return [];
+        }
+
         return array_values(array_filter(
             $this->dateAvailability(
                 service: $service,
                 date: $date,
                 host: $host,
                 rescheduleAppointment: $appointment,
+                candidateDurationMinutes: $candidateDurationMinutes,
             ),
             fn (BookableSlot $slot): bool => ! (
                 $appointment->starts_at?->equalTo($slot->startsAt)
@@ -555,6 +567,15 @@ class SchedulingReadService
             || $service->status !== BookableService::STATUS_ACTIVE
             || ($this->serviceRequiresHost($service) && $host === null)
         ) {
+            return [];
+        }
+
+        $candidateDurationMinutes = $this->rescheduleDurationMinutes(
+            service: $service,
+            appointment: $appointment,
+        );
+
+        if ($candidateDurationMinutes === null) {
             return [];
         }
 
@@ -601,6 +622,7 @@ class SchedulingReadService
             evaluatedAt: $evaluatedAt,
             rescheduleAppointment: $appointment,
             location: $appointment->locationSnapshot(),
+            candidateDurationMinutes: $candidateDurationMinutes,
         );
         $slots = array_values(array_filter(
             $this->findAvailability->handle($search),
@@ -635,6 +657,7 @@ class SchedulingReadService
         CarbonInterface $date,
         ?SchedulingHost $host = null,
         ?Appointment $rescheduleAppointment = null,
+        ?int $candidateDurationMinutes = null,
     ): array {
         if ($this->serviceRequiresHost($service) && $host === null) {
             return [];
@@ -645,17 +668,51 @@ class SchedulingReadService
             ->setTimezone($timezone)
             ->startOfDay();
         $localEnd = $localStart->addDay();
-
-        return $this->findAvailability->handle(new AvailabilitySearch(
+        $rangeDurationMinutes = $service->usesRangeDuration()
+            ? ($candidateDurationMinutes ?? $service->defaultDurationMinutes())
+            : null;
+        $searchEnd = $rangeDurationMinutes !== null
+            ? $localEnd->addMinutes($rangeDurationMinutes)
+            : $localEnd;
+        $slots = $this->findAvailability->handle(new AvailabilitySearch(
             service: $service,
             startsAt: $localStart->utc(),
-            endsAt: $localEnd->utc(),
+            endsAt: $searchEnd->utc(),
             host: $host,
             displayTimezone: $timezone,
             evaluatedAt: CarbonImmutable::now('UTC'),
             rescheduleAppointment: $rescheduleAppointment,
             location: $rescheduleAppointment?->locationSnapshot(),
+            candidateDurationMinutes: $candidateDurationMinutes,
         ));
+
+        if (! $service->usesRangeDuration()) {
+            return $slots;
+        }
+
+        $dayStartsAt = $localStart->utc();
+        $dayEndsAt = $localEnd->utc();
+
+        return array_values(array_filter(
+            $slots,
+            static fn (BookableSlot $slot): bool =>
+                $slot->startsAt->greaterThanOrEqualTo($dayStartsAt)
+                && $slot->startsAt->lessThan($dayEndsAt),
+        ));
+    }
+
+    private function rescheduleDurationMinutes(
+        BookableService $service,
+        Appointment $appointment,
+    ): ?int {
+        try {
+            return $this->durations->rescheduleDurationMinutes(
+                service: $service,
+                appointment: $appointment,
+            );
+        } catch (DomainException) {
+            return null;
+        }
     }
 
     /**

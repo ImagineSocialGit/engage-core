@@ -12,6 +12,7 @@ use InvalidArgumentException;
 final readonly class AppointmentCreationData
 {
     public CarbonImmutable $startsAt;
+    public ?CarbonImmutable $endsAt;
     public string $idempotencyKey;
     public AppointmentLifecycleContext $lifecycle;
 
@@ -22,11 +23,22 @@ final readonly class AppointmentCreationData
         string $idempotencyKey,
         public ?SchedulingHost $host = null,
         ?AppointmentLifecycleContext $lifecycle = null,
+        ?CarbonInterface $endsAt = null,
     ) {
         $this->assertPersisted($service, 'bookable service');
         $this->assertPersisted($host, 'scheduling host');
 
         $this->startsAt = CarbonImmutable::instance($startsAt)->utc();
+        $this->endsAt = $endsAt !== null
+            ? CarbonImmutable::instance($endsAt)->utc()
+            : null;
+
+        if ($this->endsAt !== null && $this->startsAt->greaterThanOrEqualTo($this->endsAt)) {
+            throw new InvalidArgumentException(
+                'Appointment creation requires endsAt after startsAt when an explicit end time is provided.',
+            );
+        }
+
         $this->idempotencyKey = $this->requiredString(
             value: $idempotencyKey,
             label: 'idempotency key',

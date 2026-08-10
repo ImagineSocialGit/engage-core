@@ -632,7 +632,7 @@ Current relocation and path-selection contract tests prove:
 
 ## Current ownership contract
 
-The registry classifies all 94 current migration files exactly once.
+The registry classifies all 95 current migration files exactly once.
 
 Ownership totals:
 
@@ -643,7 +643,7 @@ messaging                     12
 inbound_messaging              2
 internal_notifications         2
 tasks                          3
-scheduling                    10
+scheduling                    11
 portal                         4
 forms                          4
 documents                      4
@@ -657,6 +657,14 @@ broadcasts                     2
 webinars                       8
 mortgage                       2
 ```
+
+Scheduling schema version 2 adds the append-only range-duration policy migration:
+
+```text
+2026_08_10_040000_add_range_duration_policy_to_bookable_services.php
+```
+
+It adds `duration_mode`, `minimum_duration_minutes`, and `maximum_duration_minutes` without changing Scheduling's dependency closure or Location independence. Existing installed Scheduling scopes upgrade through `php artisan modules:migrate scheduling`.
 
 Scheduling and Location remain independent optional schema scopes:
 

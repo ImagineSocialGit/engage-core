@@ -17,7 +17,11 @@ return new class extends Migration
 
             $table->string('status')->default('active')->index();
 
+            $table->string('duration_mode')->default('fixed')->index();
             $table->unsignedInteger('duration_minutes');
+            $table->unsignedInteger('minimum_duration_minutes')->nullable();
+            $table->unsignedInteger('maximum_duration_minutes')->nullable();
+
             $table->unsignedInteger('slot_interval_minutes')->default(15);
             $table->unsignedInteger('buffer_before_minutes')->default(0);
             $table->unsignedInteger('buffer_after_minutes')->default(0);

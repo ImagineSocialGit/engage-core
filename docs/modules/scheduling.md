@@ -238,7 +238,10 @@ Important policy fields:
 ```text
 key
 status
+duration_mode
 duration_minutes
+minimum_duration_minutes
+maximum_duration_minutes
 slot_interval_minutes
 buffer_before_minutes
 buffer_after_minutes
@@ -255,6 +258,22 @@ location_details
 source
 meta
 ```
+
+Duration policy is now first-class:
+
+```text
+fixed
+    duration_minutes is the exact authoritative interval length
+    minimum_duration_minutes / maximum_duration_minutes are unused
+
+range
+    starts_at + ends_at define the authoritative booking interval
+    duration_minutes is the default candidate length for availability previews
+    minimum_duration_minutes / maximum_duration_minutes bound accepted intervals
+    maximum range duration cannot exceed the existing 366-day Scheduling search limit
+```
+
+Range mode is universal Scheduling policy rather than PetServices-specific state. A multi-day stay remains one Appointment/Hold interval; a vertical such as PetServices owns pet, vaccination, intake, feeding, medication, and pricing meaning around that interval.
 
 Provider identity currently retained on this table is legacy foundation state. Provider connection, remote identity, and synchronization state should move to dedicated provider-owned persistence when that batch is implemented.
 
@@ -476,7 +495,7 @@ Appointment duration and slot interval represent elapsed minutes. A slot crossin
 
 Candidate starts align to `slot_interval_minutes` on the service timezone wall-clock grid.
 
-A candidate must be continuously covered for its full `duration_minutes`. When it crosses adjacent interval segments with different capacity limits, the lowest capacity across the covered segments applies.
+Fixed-duration candidates must be continuously covered for their full configured duration. Range-duration candidates use availability windows as admissible check-in and check-out boundaries instead: the stay may continue across closed hours between those boundaries while Appointment/Hold/resource occupancy still spans the complete authoritative start/end interval. Range-duration callers may supply an explicit candidate duration derived from the requested start/end interval; when no override is supplied, `duration_minutes` remains the default preview duration. For range candidates, availability-window capacity is resolved from the check-in/check-out boundaries while service, host, assignment, Appointment/Hold, and resource capacity are evaluated across the full stay interval.
 
 ### Effective capacity
 
@@ -800,9 +819,9 @@ The address fields are required only for `customer_site` and prohibited for phon
 
 Fixed-location availability can now be travel-aware immediately because its authoritative location is already server-owned. The current customer-site date/time list remains a pre-location candidate surface: the visitor's normalized customer-site address is not available until the reservation POST. That POST passes the normalized snapshot into the exact-slot transaction, which performs authoritative travel revalidation before capacity is consumed. Phase 4B.3 will move customer-site address collection ahead of the displayed availability so the visitor sees only travel-aware authoritative times in the first place.
 
-`CreatePublicBookingHoldAction` accepts the already-resolved public `BookableService`, parses the requested instant as UTC, checks for an idempotent existing hold, and recalculates exact current availability for one service-duration interval. It selects the first matching `BookableSlot` in the engine's deterministic order, then calls `IssueBookableSlotOfferAction` and `CreateBookingHoldAction` inside one outer database transaction.
+`CreatePublicBookingHoldAction` accepts the already-resolved public `BookableService`, parses the requested start instant as UTC, checks for an idempotent existing hold, and recalculates exact current availability. Fixed-duration services derive the end from service policy. Range-duration services now require an explicit end time at the action boundary and validate the whole interval against the service minimum/maximum duration policy before issuing an offer or consuming capacity. The action selects the first matching `BookableSlot` in the engine's deterministic order, then calls `IssueBookableSlotOfferAction` and `CreateBookingHoldAction` inside one outer database transaction.
 
-This preserves the opaque-offer trust boundary while allowing a simple public form. The server remains authoritative for service identity, eligible host, duration, end time, capacity, availability provenance, offer identity, and hold expiration. When multiple hosts expose the same visitor-facing time, the lowest current deterministic slot ordering wins; round-robin and weighted allocation remain deferred.
+This preserves the opaque-offer trust boundary while allowing a simple public form. The server remains authoritative for service identity, eligible host, duration policy, validated end time, capacity, availability provenance, offer identity, and hold expiration. The current public Blade/request flow still exposes fixed-duration start selection only; range check-in/check-out authoring belongs to Phase 4B.2D2. When multiple hosts expose the same visitor-facing time, the lowest current deterministic slot ordering wins; round-robin and weighted allocation remain deferred.
 
 Public replay keys are UUIDs. Repeating the same service, start time, and replay key returns the original hold without issuing another offer. Reusing the key for another service, time, or reschedule-scoped hold is rejected. A concurrency loser reloads the matching committed hold after its speculative offer transaction rolls back.
 
@@ -882,6 +901,7 @@ The caller supplies:
 persisted BookableService
 optional explicit SchedulingHost
 starts_at
+optional explicit ends_at for range-duration services
 AppointmentBookingData, including an optional normalized customer-site location
 idempotency_key
 AppointmentLifecycleContext
@@ -889,7 +909,7 @@ AppointmentLifecycleContext
 
 The action reloads and locks the service, then requires an explicit active host assignment whenever the service has any assignment rows. A service with no assignment rows may be created unhosted. Host selection is never silently delegated to the public surface's deterministic first-slot behavior.
 
-The server derives the end time from the current service duration and revalidates the exact slot through the executable availability engine. It locks the selected service, explicit host and assignment, relevant blocking Appointments, and active BookingHolds before creation. This preserves service capacity, assignment capacity, availability-window capacity, buffers, minimum notice, booking horizon, and host capacity shared across different services.
+For fixed-duration services, the server derives the end time from the configured exact duration. Range-duration direct creation requires an explicit end time, validates whole-minute duration boundaries plus the service minimum/maximum range, and revalidates that exact interval through the executable availability engine. It locks the selected service, explicit host and assignment, relevant blocking Appointments, and active BookingHolds before creation. This preserves service capacity, assignment capacity, availability-window capacity, buffers, minimum notice, booking horizon, host capacity, and resource occupancy across the complete interval.
 
 Direct creation derives phone, virtual, and fixed snapshots from locked service configuration. Customer-site creation requires the optional normalized location carried by `AppointmentBookingData`. It snapshots the resolved location and current timezone, creates one primary attendee snapshot, applies the same `requires_confirmation` policy as hold conversion, and records the initial lifecycle plus neutral automation event in the same transaction.
 
@@ -940,7 +960,7 @@ preserve_confirmation
 override_reschedule_notice
 ```
 
-Service identity, duration, end time, offer and hold identities, replacement status, attendee copying, original cancellation, lifecycle events, automation events, and lineage remain server-owned. The reason is required. Confirmation preservation is offered only when the original is confirmed and the service requires confirmation. Rescheduling after the configured notice deadline requires an explicit override, which is preserved in lifecycle and automation provenance.
+Service identity, duration, end time, offer and hold identities, replacement status, attendee copying, original cancellation, lifecycle events, automation events, and lineage remain server-owned. Fixed-duration rescheduling uses the service's current exact duration. Range-duration rescheduling preserves the source Appointment's full start/end duration and validates that interval against the current range policy before searching or committing a replacement. The reason is required. Confirmation preservation is offered only when the original is confirmed and the service requires confirmation. Rescheduling after the configured notice deadline requires an explicit override, which is preserved in lifecycle and automation provenance.
 
 A successful reschedule redirects to the replacement Appointment. Matching replay submissions return that same replacement without creating another offer, hold, attendee set, lifecycle event, or automation event. Reusing the replay key for another source Appointment, host, or start time is rejected.
 
@@ -1211,7 +1231,8 @@ Phase 4B.2A — COMPLETE: define the Scheduling-owned location/snapshot boundary
 Phase 4B.2B1 — COMPLETE: add Scheduling-owned deterministic address normalization and canonical phone/virtual/fixed/customer-site snapshots, persist authoritative BookingHold location snapshots, copy hold snapshots into Appointment conversion/rescheduling, and require booking-specific customer-site snapshots without creating Location rows
 Phase 4B.2B2 — COMPLETE: add closed CRM service-location authoring and customer-site public/CRM raw-address collection with server-owned normalization before commitment
 Phase 4B.2C — COMPLETE: add Scheduling-owned provider-neutral travel-time resolution, conservative fallback, adjacent Appointment/active-hold checks, transaction-time revalidation, and admin reschedule slot suggestions that preserve the source booking criteria; optional app-level geographic enrichment may improve travel ranking without making Location a dependency
-Phase 4B.2D — add authoritative range-duration booking for consecutive-day stays such as pet boarding, including check-in/check-out intervals, full-stay capacity/resource occupancy, holds, cancellation/rescheduling, and lifecycle; fixed-location PetServices stays must not require Location, and PetServices continues to own pet/compliance/feeding/medication meaning
+Phase 4B.2D1 — COMPLETE: add first-class fixed/range service-duration policy, module schema v2, explicit range interval validation, check-in/check-out boundary availability, full-stay hold/capacity/resource occupancy, direct range creation, and range-preserving reschedule runtime
+Phase 4B.2D2 — expose closed CRM range-service authoring plus public/internal check-in/check-out input and range-specific reschedule presentation; fixed-location PetServices stays must not require Location, and PetServices continues to own pet/compliance/feeding/medication meaning
 Phase 4B.3 — appointment-type-first progressive public booking
 Phase 4B.4 — Messaging-backed email/SMS verification before capacity hold
 SCHEDULING_APP_URL setup validation

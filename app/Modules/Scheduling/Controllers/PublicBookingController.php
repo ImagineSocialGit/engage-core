@@ -169,6 +169,7 @@ class PublicBookingController extends Controller
     {
         return BookableService::query()
             ->where('status', BookableService::STATUS_ACTIVE)
+            ->where('duration_mode', BookableService::DURATION_MODE_FIXED)
             ->where('is_public', true)
             ->orderBy('sort_order')
             ->orderBy('name')
@@ -187,6 +188,7 @@ class PublicBookingController extends Controller
         $service = BookableService::query()
             ->where('key', $serviceKey)
             ->where('status', BookableService::STATUS_ACTIVE)
+            ->where('duration_mode', BookableService::DURATION_MODE_FIXED)
             ->where('is_public', true)
             ->first();
 

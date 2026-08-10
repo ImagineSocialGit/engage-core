@@ -36,6 +36,7 @@ class FindBookableAvailabilityAction
         if (! $service->exists
             || $service->trashed()
             || $service->status !== BookableService::STATUS_ACTIVE
+            || ! $service->hasValidDurationPolicy()
             || ! $search->hasEffectiveRange()
         ) {
             return [];
@@ -170,6 +171,19 @@ class FindBookableAvailabilityAction
 
         $appointments = $this->occupancy->blockingAppointments($search, $host);
         $holds = $this->occupancy->activeHolds($search, $host);
+
+        if ($search->service->usesRangeDuration()) {
+            return $this->rangeSlotsForTarget(
+                search: $search,
+                host: $host,
+                assignment: $assignment,
+                candidateLocation: $candidateLocation,
+                intervals: $intervals,
+                appointments: $appointments,
+                holds: $holds,
+            );
+        }
+
         $slots = [];
 
         foreach ($this->continuousRuns($intervals) as $run) {
@@ -191,58 +205,20 @@ class FindBookableAvailabilityAction
                 $coverage = $this->coverage($run, $slotStartsAt, $slotEndsAt);
 
                 if ($coverage !== null) {
-                    $resourceCapacity = $this->occupancy->resourceCapacity(
+                    $slot = $this->bookableSlot(
                         search: $search,
                         host: $host,
-                        startsAt: $slotStartsAt,
-                        endsAt: $slotEndsAt,
-                    );
-                    $capacity = $this->effectiveCapacity(
-                        service: $search->service,
-                        host: $host,
                         assignment: $assignment,
-                        availability: $coverage,
-                        resourceCapacity: $resourceCapacity['capacity'],
-                    );
-
-                    $remainingCapacity = $this->occupancy->remainingCapacity(
-                        service: $search->service,
-                        host: $host,
-                        assignment: $assignment,
+                        candidateLocation: $candidateLocation,
                         availability: $coverage,
                         startsAt: $slotStartsAt,
                         endsAt: $slotEndsAt,
                         appointments: $appointments,
                         holds: $holds,
-                        resourceRemainingCapacity: $resourceCapacity['remaining'],
                     );
 
-                    if ($remainingCapacity > 0) {
-                        $travel = $this->travel->assess(
-                            search: $search,
-                            host: $host,
-                            startsAt: $slotStartsAt,
-                            endsAt: $slotEndsAt,
-                            candidateLocation: $candidateLocation,
-                            appointments: $appointments,
-                            holds: $holds,
-                        );
-
-                        if ($travel->feasible) {
-                            $slots[] = new BookableSlot(
-                                bookableServiceId: (int) $search->service->getKey(),
-                                schedulingHostId: $host?->getKey(),
-                                startsAt: $slotStartsAt,
-                                endsAt: $slotEndsAt,
-                                displayTimezone: $search->displayTimezone,
-                                capacity: $capacity,
-                                remainingCapacity: min($capacity, $remainingCapacity),
-                                sourceScopes: $coverage->sourceScopes,
-                                sourceWindowIds: $coverage->sourceWindowIds,
-                                travelMinutesBefore: $travel->minutesBefore,
-                                travelMinutesAfter: $travel->minutesAfter,
-                            );
-                        }
+                    if ($slot instanceof BookableSlot) {
+                        $slots[] = $slot;
                     }
                 }
 
@@ -253,6 +229,215 @@ class FindBookableAvailabilityAction
         }
 
         return $slots;
+    }
+
+    /**
+     * Range-duration services use availability windows as admissible check-in
+     * and check-out boundaries. Capacity and resource occupancy are still
+     * evaluated across the complete stay interval, including closed hours
+     * between those boundaries.
+     *
+     * @param array<int, AvailabilityInterval> $intervals
+     * @param \Illuminate\Database\Eloquent\Collection<int, Appointment> $appointments
+     * @param \Illuminate\Database\Eloquent\Collection<int, \App\Modules\Scheduling\Models\BookingHold> $holds
+     * @return array<int, BookableSlot>
+     */
+    private function rangeSlotsForTarget(
+        AvailabilitySearch $search,
+        ?SchedulingHost $host,
+        ?BookableServiceHost $assignment,
+        ?SchedulingLocationSnapshot $candidateLocation,
+        array $intervals,
+        \Illuminate\Database\Eloquent\Collection $appointments,
+        \Illuminate\Database\Eloquent\Collection $holds,
+    ): array {
+        usort(
+            $intervals,
+            static fn (AvailabilityInterval $left, AvailabilityInterval $right): int =>
+                $left->startsAt->getTimestamp() <=> $right->startsAt->getTimestamp(),
+        );
+
+        $slots = [];
+        $durationMinutes = $search->durationMinutes();
+
+        foreach ($intervals as $startInterval) {
+            $slotStartsAt = $this->alignUp(
+                instant: $startInterval->startsAt,
+                intervalMinutes: $search->slotIntervalMinutes(),
+                timezone: $search->serviceTimezone(),
+            );
+
+            while ($slotStartsAt->lessThan($startInterval->endsAt)) {
+                $slotEndsAt = $slotStartsAt->addMinutes($durationMinutes);
+
+                if ($slotEndsAt->greaterThan($search->effectiveEndsAt)) {
+                    break;
+                }
+
+                $endInterval = $this->rangeEndBoundaryInterval(
+                    intervals: $intervals,
+                    endsAt: $slotEndsAt,
+                );
+
+                if ($endInterval instanceof AvailabilityInterval) {
+                    $availability = $this->rangeBoundaryCoverage(
+                        startsAt: $slotStartsAt,
+                        endsAt: $slotEndsAt,
+                        startInterval: $startInterval,
+                        endInterval: $endInterval,
+                    );
+                    $slot = $this->bookableSlot(
+                        search: $search,
+                        host: $host,
+                        assignment: $assignment,
+                        candidateLocation: $candidateLocation,
+                        availability: $availability,
+                        startsAt: $slotStartsAt,
+                        endsAt: $slotEndsAt,
+                        appointments: $appointments,
+                        holds: $holds,
+                    );
+
+                    if ($slot instanceof BookableSlot) {
+                        $slots[] = $slot;
+                    }
+                }
+
+                $slotStartsAt = $slotStartsAt->addMinutes(
+                    $search->slotIntervalMinutes(),
+                );
+            }
+        }
+
+        return $slots;
+    }
+
+    /**
+     * @param array<int, AvailabilityInterval> $intervals
+     */
+    private function rangeEndBoundaryInterval(
+        array $intervals,
+        CarbonImmutable $endsAt,
+    ): ?AvailabilityInterval {
+        $startingAtBoundary = null;
+
+        foreach ($intervals as $interval) {
+            if ($interval->startsAt->lessThan($endsAt)
+                && $interval->endsAt->greaterThanOrEqualTo($endsAt)
+            ) {
+                return $interval;
+            }
+
+            if ($interval->startsAt->equalTo($endsAt)) {
+                $startingAtBoundary ??= $interval;
+            }
+        }
+
+        return $startingAtBoundary;
+    }
+
+    private function rangeBoundaryCoverage(
+        CarbonImmutable $startsAt,
+        CarbonImmutable $endsAt,
+        AvailabilityInterval $startInterval,
+        AvailabilityInterval $endInterval,
+    ): AvailabilityInterval {
+        $capacities = array_values(array_filter([
+            $startInterval->capacity,
+            $endInterval->capacity,
+        ], static fn (?int $capacity): bool => $capacity !== null));
+
+        return new AvailabilityInterval(
+            startsAt: $startsAt,
+            endsAt: $endsAt,
+            hostId: $startInterval->hostId,
+            capacity: $capacities === [] ? null : min($capacities),
+            sourceScopes: [
+                ...$startInterval->sourceScopes,
+                ...$endInterval->sourceScopes,
+            ],
+            sourceWindowIds: [
+                ...$startInterval->sourceWindowIds,
+                ...$endInterval->sourceWindowIds,
+            ],
+            sourceTimezones: [
+                ...$startInterval->sourceTimezones,
+                ...$endInterval->sourceTimezones,
+            ],
+        );
+    }
+
+    /**
+     * @param \Illuminate\Database\Eloquent\Collection<int, Appointment> $appointments
+     * @param \Illuminate\Database\Eloquent\Collection<int, \App\Modules\Scheduling\Models\BookingHold> $holds
+     */
+    private function bookableSlot(
+        AvailabilitySearch $search,
+        ?SchedulingHost $host,
+        ?BookableServiceHost $assignment,
+        ?SchedulingLocationSnapshot $candidateLocation,
+        AvailabilityInterval $availability,
+        CarbonImmutable $startsAt,
+        CarbonImmutable $endsAt,
+        \Illuminate\Database\Eloquent\Collection $appointments,
+        \Illuminate\Database\Eloquent\Collection $holds,
+    ): ?BookableSlot {
+        $resourceCapacity = $this->occupancy->resourceCapacity(
+            search: $search,
+            host: $host,
+            startsAt: $startsAt,
+            endsAt: $endsAt,
+        );
+        $capacity = $this->effectiveCapacity(
+            service: $search->service,
+            host: $host,
+            assignment: $assignment,
+            availability: $availability,
+            resourceCapacity: $resourceCapacity['capacity'],
+        );
+        $remainingCapacity = $this->occupancy->remainingCapacity(
+            service: $search->service,
+            host: $host,
+            assignment: $assignment,
+            availability: $availability,
+            startsAt: $startsAt,
+            endsAt: $endsAt,
+            appointments: $appointments,
+            holds: $holds,
+            resourceRemainingCapacity: $resourceCapacity['remaining'],
+        );
+
+        if ($remainingCapacity < 1) {
+            return null;
+        }
+
+        $travel = $this->travel->assess(
+            search: $search,
+            host: $host,
+            startsAt: $startsAt,
+            endsAt: $endsAt,
+            candidateLocation: $candidateLocation,
+            appointments: $appointments,
+            holds: $holds,
+        );
+
+        if (! $travel->feasible) {
+            return null;
+        }
+
+        return new BookableSlot(
+            bookableServiceId: (int) $search->service->getKey(),
+            schedulingHostId: $host?->getKey(),
+            startsAt: $startsAt,
+            endsAt: $endsAt,
+            displayTimezone: $search->displayTimezone,
+            capacity: $capacity,
+            remainingCapacity: min($capacity, $remainingCapacity),
+            sourceScopes: $availability->sourceScopes,
+            sourceWindowIds: $availability->sourceWindowIds,
+            travelMinutesBefore: $travel->minutesBefore,
+            travelMinutesAfter: $travel->minutesAfter,
+        );
     }
 
     /**

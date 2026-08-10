@@ -13,6 +13,7 @@ use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Services\Availability\BookingOccupancyResolver;
 use App\Modules\Scheduling\Services\Availability\ResourceOccupancyResolver;
+use App\Modules\Scheduling\Services\SchedulingDurationResolver;
 use App\Modules\Scheduling\Services\SchedulingLocationSnapshotResolver;
 use Carbon\CarbonImmutable;
 use DomainException;
@@ -35,6 +36,7 @@ class CreateBookingHoldAction
         private readonly BookingOccupancyResolver $occupancy,
         private readonly ResourceOccupancyResolver $resourceOccupancy,
         private readonly SchedulingLocationSnapshotResolver $locations,
+        private readonly SchedulingDurationResolver $durations,
     ) {}
 
     public function handle(
@@ -110,6 +112,11 @@ class CreateBookingHoldAction
                     service: $service,
                     host: $host,
                 );
+                $candidateDurationMinutes = $this->durations->durationMinutes(
+                    service: $service,
+                    startsAt: $offer->starts_at,
+                    endsAt: $offer->ends_at,
+                );
                 $search = new AvailabilitySearch(
                     service: $service,
                     startsAt: $offer->starts_at,
@@ -119,6 +126,7 @@ class CreateBookingHoldAction
                     evaluatedAt: $now,
                     rescheduleAppointment: $rescheduleAppointment,
                     location: $locationSnapshot,
+                    candidateDurationMinutes: $candidateDurationMinutes,
                 );
 
                 $appointments = $this->occupancy

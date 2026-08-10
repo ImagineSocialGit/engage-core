@@ -7,6 +7,7 @@ use App\Modules\Scheduling\Data\BookableSlot;
 use App\Modules\Scheduling\Data\SchedulingLocationSnapshot;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookingHold;
+use App\Modules\Scheduling\Services\SchedulingDurationResolver;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use DomainException;
@@ -20,6 +21,7 @@ class CreatePublicBookingHoldAction
         private readonly FindBookableAvailabilityAction $findAvailability,
         private readonly IssueBookableSlotOfferAction $issueSlotOffer,
         private readonly CreateBookingHoldAction $createBookingHold,
+        private readonly SchedulingDurationResolver $durations,
     ) {}
 
     public function handle(
@@ -27,9 +29,16 @@ class CreatePublicBookingHoldAction
         CarbonInterface $startsAt,
         string $idempotencyKey,
         ?SchedulingLocationSnapshot $location = null,
+        ?CarbonInterface $endsAt = null,
     ): BookingHold {
         $serviceId = $this->requiredServiceId($service);
         $startsAt = CarbonImmutable::instance($startsAt)->utc();
+        $resolvedEndsAt = $this->durations->resolveEndsAt(
+            service: $service,
+            startsAt: $startsAt,
+            requestedEndsAt: $endsAt,
+            requireExplicitRange: $service->usesRangeDuration(),
+        );
         $idempotencyKey = $this->requiredIdempotencyKey($idempotencyKey);
 
         $existing = BookingHold::query()
@@ -42,6 +51,7 @@ class CreatePublicBookingHoldAction
                 hold: $existing,
                 serviceId: $serviceId,
                 startsAt: $startsAt,
+                endsAt: $resolvedEndsAt,
                 location: $location,
             );
         }
@@ -52,6 +62,7 @@ class CreatePublicBookingHoldAction
                 $startsAt,
                 $idempotencyKey,
                 $location,
+                $endsAt,
             ): BookingHold {
                 $service = BookableService::query()
                     ->whereKey($serviceId)
@@ -66,6 +77,13 @@ class CreatePublicBookingHoldAction
                     );
                 }
 
+                $resolvedEndsAt = $this->durations->resolveEndsAt(
+                    service: $service,
+                    startsAt: $startsAt,
+                    requestedEndsAt: $endsAt,
+                    requireExplicitRange: $service->usesRangeDuration(),
+                );
+
                 $existing = BookingHold::query()
                     ->with('bookableSlotOffer')
                     ->where('idempotency_key', $idempotencyKey)
@@ -76,6 +94,7 @@ class CreatePublicBookingHoldAction
                         hold: $existing,
                         serviceId: $serviceId,
                         startsAt: $startsAt,
+                        endsAt: $resolvedEndsAt,
                         location: $location,
                     );
                 }
@@ -84,6 +103,7 @@ class CreatePublicBookingHoldAction
                 $slot = $this->currentSlot(
                     service: $service,
                     startsAt: $startsAt,
+                    endsAt: $resolvedEndsAt,
                     evaluatedAt: $now,
                     location: $location,
                 );
@@ -109,6 +129,7 @@ class CreatePublicBookingHoldAction
                     hold: $hold->loadMissing('bookableSlotOffer'),
                     serviceId: $serviceId,
                     startsAt: $startsAt,
+                    endsAt: $resolvedEndsAt,
                     location: $location,
                 );
             });
@@ -123,6 +144,7 @@ class CreatePublicBookingHoldAction
                     hold: $existing,
                     serviceId: $serviceId,
                     startsAt: $startsAt,
+                    endsAt: $resolvedEndsAt,
                     location: $location,
                 );
             }
@@ -134,11 +156,14 @@ class CreatePublicBookingHoldAction
     private function currentSlot(
         BookableService $service,
         CarbonImmutable $startsAt,
+        CarbonImmutable $endsAt,
         CarbonImmutable $evaluatedAt,
         ?SchedulingLocationSnapshot $location = null,
     ): ?BookableSlot {
-        $endsAt = $startsAt->addMinutes(
-            max(1, (int) $service->duration_minutes),
+        $candidateDurationMinutes = $this->durations->durationMinutes(
+            service: $service,
+            startsAt: $startsAt,
+            endsAt: $endsAt,
         );
 
         $slots = $this->findAvailability->handle(new AvailabilitySearch(
@@ -148,6 +173,7 @@ class CreatePublicBookingHoldAction
             displayTimezone: $service->timezone,
             evaluatedAt: $evaluatedAt,
             location: $location,
+            candidateDurationMinutes: $candidateDurationMinutes,
         ));
 
         foreach ($slots as $slot) {
@@ -165,12 +191,14 @@ class CreatePublicBookingHoldAction
         BookingHold $hold,
         int $serviceId,
         CarbonImmutable $startsAt,
+        CarbonImmutable $endsAt,
         ?SchedulingLocationSnapshot $location,
     ): BookingHold {
         $offer = $hold->bookableSlotOffer;
 
         if ((int) $hold->bookable_service_id !== $serviceId
             || ! $hold->starts_at?->equalTo($startsAt)
+            || ! $hold->ends_at?->equalTo($endsAt)
             || $offer === null
             || $offer->reschedule_appointment_id !== null
             || ($location !== null && ! $hold->locationSnapshot()?->hasSameCommitmentIdentity($location))

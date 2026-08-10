@@ -769,6 +769,7 @@
 │   │   │   │   │   └── SchedulingContactPanelProvider.php
 │   │   │   │   ├── SchedulingAvailabilityConfigurationWriter.php
 │   │   │   │   ├── SchedulingConfigurationWriter.php
+│   │   │   │   ├── SchedulingDurationResolver.php
 │   │   │   │   ├── SchedulingLocationSnapshotResolver.php
 │   │   │   │   ├── SchedulingReadService.php
 │   │   │   │   └── SchedulingResourceConfigurationWriter.php
@@ -1981,6 +1982,7 @@
 │   │   │   ├── PublicBookingCompletionTest.php
 │   │   │   ├── PublicBookingHoldTest.php
 │   │   │   ├── PublicSchedulingSurfaceTest.php
+│   │   │   ├── RangeDurationBookingFoundationTest.php
 │   │   │   ├── RescheduleAppointmentActionTest.php
 │   │   │   ├── RescheduleSlotOfferAndBookingHoldActionTest.php
 │   │   │   ├── ResourceAwareOccupancyTest.php
@@ -2099,4 +2101,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-538 directories, 1562 files
+538 directories, 1564 files

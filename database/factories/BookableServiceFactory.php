@@ -22,7 +22,10 @@ class BookableServiceFactory extends Factory
             'name' => Str::title($name),
             'description' => fake()->optional()->paragraph(),
             'status' => BookableService::STATUS_ACTIVE,
+            'duration_mode' => BookableService::DURATION_MODE_FIXED,
             'duration_minutes' => 60,
+            'minimum_duration_minutes' => null,
+            'maximum_duration_minutes' => null,
             'slot_interval_minutes' => 15,
             'buffer_before_minutes' => 0,
             'buffer_after_minutes' => 0,
@@ -50,6 +53,19 @@ class BookableServiceFactory extends Factory
         return $this->state([
             'status' => BookableService::STATUS_INACTIVE,
             'is_public' => false,
+        ]);
+    }
+
+    public function rangeDuration(
+        int $defaultMinutes = 1440,
+        int $minimumMinutes = 1440,
+        int $maximumMinutes = 10080,
+    ): self {
+        return $this->state([
+            'duration_mode' => BookableService::DURATION_MODE_RANGE,
+            'duration_minutes' => $defaultMinutes,
+            'minimum_duration_minutes' => $minimumMinutes,
+            'maximum_duration_minutes' => $maximumMinutes,
         ]);
     }
 }

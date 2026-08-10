@@ -8,6 +8,7 @@ use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookableSlotOffer;
 use App\Modules\Scheduling\Models\SchedulingHost;
+use App\Modules\Scheduling\Services\SchedulingDurationResolver;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use DomainException;
@@ -24,6 +25,7 @@ class IssueBookableSlotOfferAction
 
     public function __construct(
         private readonly FindBookableAvailabilityAction $findAvailability,
+        private readonly SchedulingDurationResolver $durations,
     ) {}
 
     public function handle(
@@ -178,6 +180,11 @@ class IssueBookableSlotOfferAction
         CarbonImmutable $evaluatedAt,
         ?Appointment $rescheduleAppointment,
     ): ?BookableSlot {
+        $candidateDurationMinutes = $this->durations->durationMinutes(
+            service: $service,
+            startsAt: $slot->startsAt,
+            endsAt: $slot->endsAt,
+        );
         $search = new AvailabilitySearch(
             service: $service,
             startsAt: $slot->startsAt,
@@ -186,6 +193,7 @@ class IssueBookableSlotOfferAction
             displayTimezone: $slot->displayTimezone,
             evaluatedAt: $evaluatedAt,
             rescheduleAppointment: $rescheduleAppointment,
+            candidateDurationMinutes: $candidateDurationMinutes,
         );
 
         foreach ($this->findAvailability->handle($search) as $candidate) {

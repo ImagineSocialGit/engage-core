@@ -17,6 +17,7 @@ final readonly class AvailabilitySearch
     public ?SchedulingHost $host;
     public ?Appointment $rescheduleAppointment;
     public ?SchedulingLocationSnapshot $location;
+    public ?int $candidateDurationMinutes;
     public CarbonImmutable $requestedStartsAt;
     public CarbonImmutable $requestedEndsAt;
     public CarbonImmutable $effectiveStartsAt;
@@ -33,6 +34,7 @@ final readonly class AvailabilitySearch
         ?CarbonInterface $evaluatedAt = null,
         ?Appointment $rescheduleAppointment = null,
         ?SchedulingLocationSnapshot $location = null,
+        ?int $candidateDurationMinutes = null,
     ) {
         $requestedStartsAt = CarbonImmutable::instance($startsAt)->utc();
         $requestedEndsAt = CarbonImmutable::instance($endsAt)->utc();
@@ -58,6 +60,21 @@ final readonly class AvailabilitySearch
             appointment: $rescheduleAppointment,
         );
 
+        if ($candidateDurationMinutes !== null) {
+            if ($candidateDurationMinutes < 1) {
+                throw new InvalidArgumentException(
+                    'Availability candidate duration must be at least 1 minute.',
+                );
+            }
+
+            if (! $service->allowsDurationMinutes($candidateDurationMinutes)) {
+                throw new InvalidArgumentException(sprintf(
+                    'Availability candidate duration [%d] is outside the service duration policy.',
+                    $candidateDurationMinutes,
+                ));
+            }
+        }
+
         $displayTimezone = $this->validatedTimezone(
             $displayTimezone ?? $service->timezone ?? 'UTC',
         );
@@ -74,6 +91,7 @@ final readonly class AvailabilitySearch
         $this->host = $host;
         $this->rescheduleAppointment = $rescheduleAppointment;
         $this->location = $location;
+        $this->candidateDurationMinutes = $candidateDurationMinutes;
         $this->requestedStartsAt = $requestedStartsAt;
         $this->requestedEndsAt = $requestedEndsAt;
         $this->effectiveStartsAt = $requestedStartsAt->greaterThan($noticeBoundary)
@@ -115,7 +133,8 @@ final readonly class AvailabilitySearch
 
     public function durationMinutes(): int
     {
-        return max(1, (int) $this->service->duration_minutes);
+        return $this->candidateDurationMinutes
+            ?? $this->service->defaultDurationMinutes();
     }
 
     public function slotIntervalMinutes(): int
