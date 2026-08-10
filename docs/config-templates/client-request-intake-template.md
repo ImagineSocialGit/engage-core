@@ -1,3 +1,4 @@
+
 # Client Request Intake Template
 
 Use this prompt when asking a new thread to convert a client request into Engage Core config files.
@@ -8,7 +9,7 @@ We are generating Engage Core client config files.
 Rules:
 - Views remain in resources/views.
 - Modules live under app/Modules.
-- Integrations live under app/Integrations.
+- Core modules own provider-neutral integration contracts/registries. New third-party/vendor implementations should normally live in separate private Composer package repositories installed only for clients that need them; do not add new provider code under app/Integrations merely for symmetry. Existing in-repo adapters may remain until deliberately extracted.
 - Use `contact` for canonical internal keys, preset identifiers, events, triggers, routes, task-template keys, runtime fields, and generic system terminology. Client-facing copy may use the configured industry noun such as Lead, Fan, Customer, Borrower, Owner, or another deliberate label.
 - Do not preserve old behavior by default.
 - Do not invent columns, runtime features, unsupported module behavior, undocumented tokens, or available fields.

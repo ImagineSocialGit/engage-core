@@ -5,11 +5,15 @@ namespace App\Modules\Scheduling\Actions;
 use App\Modules\Scheduling\Data\AvailabilityInterval;
 use App\Modules\Scheduling\Data\AvailabilitySearch;
 use App\Modules\Scheduling\Data\BookableSlot;
+use App\Modules\Scheduling\Data\SchedulingLocationSnapshot;
+use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookableServiceHost;
 use App\Modules\Scheduling\Models\SchedulingHost;
-use App\Modules\Scheduling\Services\Availability\BookingOccupancyResolver;
 use App\Modules\Scheduling\Services\Availability\AvailabilityRuleResolver;
+use App\Modules\Scheduling\Services\Availability\BookingOccupancyResolver;
+use App\Modules\Scheduling\Services\Availability\TravelFeasibilityResolver;
+use App\Modules\Scheduling\Services\SchedulingLocationSnapshotResolver;
 use Carbon\CarbonImmutable;
 use Throwable;
 
@@ -18,6 +22,8 @@ class FindBookableAvailabilityAction
     public function __construct(
         private readonly AvailabilityRuleResolver $rules,
         private readonly BookingOccupancyResolver $occupancy,
+        private readonly TravelFeasibilityResolver $travel,
+        private readonly SchedulingLocationSnapshotResolver $locations,
     ) {}
 
     /**
@@ -35,11 +41,24 @@ class FindBookableAvailabilityAction
             return [];
         }
 
+        $candidateLocation = $this->candidateLocation($search);
+
+        if ($search->service->location_type === BookableService::LOCATION_TYPE_FIXED
+            && ! $candidateLocation instanceof SchedulingLocationSnapshot
+        ) {
+            return [];
+        }
+
         $targets = $this->targets($search);
         $slots = [];
 
         foreach ($targets as [$host, $assignment]) {
-            foreach ($this->slotsForTarget($search, $host, $assignment) as $slot) {
+            foreach ($this->slotsForTarget(
+                search: $search,
+                host: $host,
+                assignment: $assignment,
+                candidateLocation: $candidateLocation,
+            ) as $slot) {
                 $slots[$this->slotKey($slot)] = $slot;
             }
         }
@@ -55,6 +74,31 @@ class FindBookableAvailabilityAction
         );
 
         return $slots;
+    }
+
+    private function candidateLocation(AvailabilitySearch $search): ?SchedulingLocationSnapshot
+    {
+        if ($search->location instanceof SchedulingLocationSnapshot) {
+            return $search->location;
+        }
+
+        if ($search->rescheduleAppointment instanceof Appointment) {
+            try {
+                return $search->rescheduleAppointment->locationSnapshot();
+            } catch (Throwable) {
+                return null;
+            }
+        }
+
+        if ($search->service->location_type === BookableService::LOCATION_TYPE_CUSTOMER_SITE) {
+            return null;
+        }
+
+        try {
+            return $this->locations->forCommitment($search->service);
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /**
@@ -116,6 +160,7 @@ class FindBookableAvailabilityAction
         AvailabilitySearch $search,
         ?SchedulingHost $host,
         ?BookableServiceHost $assignment,
+        ?SchedulingLocationSnapshot $candidateLocation,
     ): array {
         $intervals = $this->rules->resolve($search, $host);
 
@@ -173,17 +218,31 @@ class FindBookableAvailabilityAction
                     );
 
                     if ($remainingCapacity > 0) {
-                        $slots[] = new BookableSlot(
-                            bookableServiceId: (int) $search->service->getKey(),
-                            schedulingHostId: $host?->getKey(),
+                        $travel = $this->travel->assess(
+                            search: $search,
+                            host: $host,
                             startsAt: $slotStartsAt,
                             endsAt: $slotEndsAt,
-                            displayTimezone: $search->displayTimezone,
-                            capacity: $capacity,
-                            remainingCapacity: min($capacity, $remainingCapacity),
-                            sourceScopes: $coverage->sourceScopes,
-                            sourceWindowIds: $coverage->sourceWindowIds,
+                            candidateLocation: $candidateLocation,
+                            appointments: $appointments,
+                            holds: $holds,
                         );
+
+                        if ($travel->feasible) {
+                            $slots[] = new BookableSlot(
+                                bookableServiceId: (int) $search->service->getKey(),
+                                schedulingHostId: $host?->getKey(),
+                                startsAt: $slotStartsAt,
+                                endsAt: $slotEndsAt,
+                                displayTimezone: $search->displayTimezone,
+                                capacity: $capacity,
+                                remainingCapacity: min($capacity, $remainingCapacity),
+                                sourceScopes: $coverage->sourceScopes,
+                                sourceWindowIds: $coverage->sourceWindowIds,
+                                travelMinutesBefore: $travel->minutesBefore,
+                                travelMinutesAfter: $travel->minutesAfter,
+                            );
+                        }
                     }
                 }
 

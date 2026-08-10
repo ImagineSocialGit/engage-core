@@ -629,9 +629,9 @@ The workspace calculates the configured resource ceiling for each active service
 
 Changing resource configuration affects future commitments only. Existing `scheduling_resource_occupancies` rows remain immutable operational snapshots and are never rewritten by the configuration workspace.
 
-### Fixed buffers and planned travel-aware occupancy
+### Fixed buffers and travel-aware occupancy
 
-Current `buffer_before_minutes` and `buffer_after_minutes` are fixed service-level elapsed-minute buffers. Appointment location snapshots are presentation and historical data; the availability engine does not currently calculate distance or travel time.
+`buffer_before_minutes` and `buffer_after_minutes` remain fixed service-level elapsed-minute buffers. For physical hosted work, the availability engine now treats those buffers as occupied setup/parking/safety time and separately requires enough resolved travel time between adjacent physical commitments.
 
 Location is a silent supporting module. Scheduling must not wait for, or create, a standalone Location product before implementing customer-site booking.
 
@@ -659,20 +659,24 @@ Location, when separately enabled through an optional app-level bridge
 
 Phase 4B.2B2 closes the service-location authoring and booking-input surfaces. CRM configuration now accepts only the canonical `phone`, `virtual`, `fixed`, and `customer_site` modes. Fixed services require a Scheduling-normalized address; virtual services may carry a URL; customer-site services store only service-level label/instructions and collect the actual address per booking. Public and CRM customer-site submissions accept only raw address fields and reject caller-authored coordinates, provider identity, formatted address, precision, confidence, or location snapshots. Scheduling normalizes those raw facts before any BookingHold or direct Appointment commitment.
 
-Travel-aware Scheduling must use estimated travel time rather than straight-line distance. For every candidate customer-site Appointment, availability must check both adjacent directions:
+Travel-aware Scheduling uses estimated travel time rather than straight-line distance. For every hosted physical candidate, availability checks both adjacent directions:
 
 ```text
-previous in-person location → candidate location
-candidate location → next in-person location
+previous physical commitment → candidate location
+candidate location → next physical commitment
 ```
 
-The required gap is the resolved travel duration plus configurable parking, setup, or safety padding. A timed site-work commitment must carry a start, end, and normalized location; a date-only marker is insufficient. Such a commitment consumes physical-presence resources while compatible phone or virtual work may remain available.
+The physical commitment set includes active `pending`, `scheduled`, and `confirmed` Appointments plus active BookingHolds. Holds participate because reservation safety must prevent two individually valid offers from becoming simultaneous commitments that leave the same host without enough travel time. Phone and virtual commitments do not create travel constraints.
 
-Scheduling owns a provider-neutral `TravelTimeResolver` contract because travel duration affects Scheduling availability. Optional routing adapters sit behind that contract. Location may supply normalized geographic facts, but it does not decide whether an Appointment fits.
+The required gap is the resolved travel duration after the existing Appointment/Hold occupancy buffers are applied. A timed site-work commitment therefore needs a start, end, and canonical physical location snapshot; a date-only marker is insufficient. Same-address physical commitments resolve to zero additional travel under the built-in fallback and remain subject to ordinary capacity, resource, and buffer rules.
 
-Scheduling must also support a deterministic conservative fallback, such as configured travel bands or durations, when no routing provider is available. Do not implement general Location areas, territories, polygons, or map editing merely to satisfy this fallback unless the chosen Scheduling policy specifically requires one of those concepts.
+Scheduling owns the provider-neutral `TravelTimeResolver` extension contract. `SchedulingTravelTimeResolver` uses an explicitly bound provider when an app-level integration supplies one and otherwise falls back to `ConservativeTravelTimeResolver`. The built-in fallback returns zero minutes for the same normalized address and otherwise uses `scheduling.travel.conservative_minutes`, currently 45 minutes, bounded by `scheduling.travel.maximum_minutes`, currently 240 minutes. The maximum also bounds the neighboring commitment query required to evaluate candidate slots safely.
 
-Travel, location, and resource requirements must be revalidated during reservation or direct Appointment creation. They must not be accepted from browser-authored hidden fields or persisted as redundant snapshots in arbitrary `meta` payloads.
+A richer routing or geographic integration may bind `TravelTimeResolver` without changing Scheduling's dependency graph. Optional Location enrichment may help that app-level integration obtain coordinates or other provider-neutral geographic facts, but Scheduling does not import or dependency-load Location and remains authoritative for whether the candidate fits.
+
+`FindBookableAvailabilityAction` attaches resolved travel minutes before/after to server-side `BookableSlot` objects for internal ranking while keeping the existing public slot serialization contract compact. `CreateBookingHoldAction` and `CreateAppointmentAction` rerun travel-aware exact-slot availability inside their existing lock-backed transactions, so an offer or earlier availability result cannot bypass a newly created adjacent Appointment or active hold.
+
+Travel, location, and resource requirements are never accepted from browser-authored travel-duration or verification fields and are not copied into arbitrary `meta` payloads.
 
 ### Host resolution
 
@@ -794,7 +798,7 @@ country
 
 The address fields are required only for `customer_site` and prohibited for phone, virtual, and fixed services. Caller-authored normalized or enrichment fields such as `location_type`, `location_details`, `formatted_address`, coordinates, timezone, precision, confidence, or provider identity are rejected. `PublicBookingController` normalizes the raw address through the Scheduling-owned resolver before it invokes the hold action.
 
-The current date/time list remains a pre-travel candidate surface. Phase 4B.2C and the progressive Phase 4B.3 flow will use the already-collected normalized customer-site location before presenting travel-aware authoritative availability.
+Fixed-location availability can now be travel-aware immediately because its authoritative location is already server-owned. The current customer-site date/time list remains a pre-location candidate surface: the visitor's normalized customer-site address is not available until the reservation POST. That POST passes the normalized snapshot into the exact-slot transaction, which performs authoritative travel revalidation before capacity is consumed. Phase 4B.3 will move customer-site address collection ahead of the displayed availability so the visitor sees only travel-aware authoritative times in the first place.
 
 `CreatePublicBookingHoldAction` accepts the already-resolved public `BookableService`, parses the requested instant as UTC, checks for an idempotent existing hold, and recalculates exact current availability for one service-duration interval. It selects the first matching `BookableSlot` in the engine's deterministic order, then calls `IssueBookableSlotOfferAction` and `CreateBookingHoldAction` inside one outer database transaction.
 
@@ -940,7 +944,9 @@ Service identity, duration, end time, offer and hold identities, replacement sta
 
 A successful reschedule redirects to the replacement Appointment. Matching replay submissions return that same replacement without creating another offer, hold, attendee set, lifecycle event, or automation event. Reusing the replay key for another source Appointment, host, or start time is rejected.
 
-A future CRM rescheduling enhancement should suggest currently open replacement slots using the source Appointment's authoritative service, duration, host/resource requirements, location mode, and other booking criteria rather than forcing the operator to rebuild the search manually. Once travel-aware availability exists, in-person suggestions may be ordered or highlighted by travel convenience. Optional Location enrichment may improve geographic comparison when Location is separately enabled, but the baseline reschedule suggestions and travel-fit decisions remain Scheduling-owned and must work without Location.
+The CRM rescheduling workspace now supplies a small suggested-open-times set in addition to the operator's selected-date availability. Suggestions preserve the source Appointment's authoritative service, historical location snapshot, selected eligible host, resource requirements, availability rules, notice/horizon limits, and reschedule exclusion. They are ordered first by resolved adjacent travel burden and then by temporal proximity to the original Appointment, so a richer `TravelTimeResolver` can naturally improve geographic/travel convenience without changing the reschedule workflow. The final submitted time still runs through `RescheduleAppointmentToSlotAction`, offer issuance, hold creation, and transaction-time revalidation; suggestions grant no booking authority.
+
+Optional Location enrichment may improve the app-level travel resolver when Location is separately enabled, but baseline suggestions and travel-fit decisions remain Scheduling-owned and work without Location.
 
 The Scheduling module also contributes a Contact-page panel through Core's module-filtered `ContactPanelProvider` seam. `SchedulingContactPanelProvider` uses bounded Scheduling-owned queries keyed only by `appointments.contact_id`; Core does not gain Scheduling relationships or query knowledge.
 
@@ -1142,6 +1148,9 @@ Implemented:
 PublicBookingController catalog, availability, reservation, attendee completion, and hold-confirmation surface
 ResolveContactByEmailAction
 FindBookableAvailabilityAction
+TravelTimeResolver
+SchedulingTravelTimeResolver
+TravelFeasibilityResolver
 IssueBookableSlotOfferAction
 CreateBookingHoldAction
 CreatePublicBookingHoldAction
@@ -1201,7 +1210,8 @@ Deferred after the resource configuration workspace:
 Phase 4B.2A — COMPLETE: define the Scheduling-owned location/snapshot boundary and retain Location as a separate optional silent capability
 Phase 4B.2B1 — COMPLETE: add Scheduling-owned deterministic address normalization and canonical phone/virtual/fixed/customer-site snapshots, persist authoritative BookingHold location snapshots, copy hold snapshots into Appointment conversion/rescheduling, and require booking-specific customer-site snapshots without creating Location rows
 Phase 4B.2B2 — COMPLETE: add closed CRM service-location authoring and customer-site public/CRM raw-address collection with server-owned normalization before commitment
-Phase 4B.2C — add Scheduling-owned travel-time resolution, conservative fallback, adjacent-Appointment checks, transaction-time revalidation, and admin reschedule slot suggestions that preserve the source booking criteria; optional Location enrichment may improve proximity ranking without becoming a dependency
+Phase 4B.2C — COMPLETE: add Scheduling-owned provider-neutral travel-time resolution, conservative fallback, adjacent Appointment/active-hold checks, transaction-time revalidation, and admin reschedule slot suggestions that preserve the source booking criteria; optional app-level geographic enrichment may improve travel ranking without making Location a dependency
+Phase 4B.2D — add authoritative range-duration booking for consecutive-day stays such as pet boarding, including check-in/check-out intervals, full-stay capacity/resource occupancy, holds, cancellation/rescheduling, and lifecycle; fixed-location PetServices stays must not require Location, and PetServices continues to own pet/compliance/feeding/medication meaning
 Phase 4B.3 — appointment-type-first progressive public booking
 Phase 4B.4 — Messaging-backed email/SMS verification before capacity hold
 SCHEDULING_APP_URL setup validation

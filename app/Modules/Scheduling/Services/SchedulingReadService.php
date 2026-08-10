@@ -540,6 +540,96 @@ class SchedulingReadService
     /**
      * @return array<int, BookableSlot>
      */
+    public function rescheduleSuggestions(
+        Appointment $appointment,
+        ?SchedulingHost $host = null,
+        ?CarbonInterface $evaluatedAt = null,
+        ?int $limit = null,
+    ): array {
+        $appointment = Appointment::query()
+            ->with('bookableService')
+            ->findOrFail($appointment->getKey());
+        $service = $appointment->bookableService;
+
+        if (! $service instanceof BookableService
+            || $service->status !== BookableService::STATUS_ACTIVE
+            || ($this->serviceRequiresHost($service) && $host === null)
+        ) {
+            return [];
+        }
+
+        $evaluatedAt = $evaluatedAt !== null
+            ? CarbonImmutable::instance($evaluatedAt)->utc()
+            : CarbonImmutable::now('UTC');
+        $lookaheadDays = max(1, min(60, (int) config(
+            'scheduling.reschedule_suggestions.lookahead_days',
+            14,
+        )));
+        $limit = max(1, min(20, $limit ?? (int) config(
+            'scheduling.reschedule_suggestions.limit',
+            6,
+        )));
+        $anchor = $appointment->starts_at !== null
+            ? CarbonImmutable::instance($appointment->starts_at)->utc()
+            : $evaluatedAt;
+        $halfWindowDays = intdiv($lookaheadDays, 2);
+        $startsAt = $anchor->subDays($halfWindowDays);
+
+        if ($startsAt->lessThan($evaluatedAt)) {
+            $startsAt = $evaluatedAt;
+        }
+
+        $horizonEndsAt = $evaluatedAt->addDays(
+            max(0, (int) $service->booking_horizon_days),
+        );
+        $endsAt = $anchor->addDays($lookaheadDays);
+
+        if ($endsAt->greaterThan($horizonEndsAt)) {
+            $endsAt = $horizonEndsAt;
+        }
+
+        if ($startsAt->greaterThanOrEqualTo($endsAt)) {
+            return [];
+        }
+
+        $search = new AvailabilitySearch(
+            service: $service,
+            startsAt: $startsAt,
+            endsAt: $endsAt,
+            host: $host,
+            displayTimezone: $this->validTimezone($service->timezone),
+            evaluatedAt: $evaluatedAt,
+            rescheduleAppointment: $appointment,
+            location: $appointment->locationSnapshot(),
+        );
+        $slots = array_values(array_filter(
+            $this->findAvailability->handle($search),
+            fn (BookableSlot $slot): bool => ! (
+                $appointment->starts_at?->equalTo($slot->startsAt)
+                && $this->sameHost(
+                    $appointment->scheduling_host_id,
+                    $slot->schedulingHostId,
+                )
+            ),
+        ));
+
+        usort($slots, function (BookableSlot $left, BookableSlot $right) use ($anchor): int {
+            $leftTravel = $left->totalTravelMinutes() ?? 0;
+            $rightTravel = $right->totalTravelMinutes() ?? 0;
+            $leftDistance = abs($left->startsAt->getTimestamp() - $anchor->getTimestamp());
+            $rightDistance = abs($right->startsAt->getTimestamp() - $anchor->getTimestamp());
+
+            return $leftTravel <=> $rightTravel
+                ?: $leftDistance <=> $rightDistance
+                ?: $left->startsAt->getTimestamp() <=> $right->startsAt->getTimestamp();
+        });
+
+        return array_slice($slots, 0, $limit);
+    }
+
+    /**
+     * @return array<int, BookableSlot>
+     */
     private function dateAvailability(
         BookableService $service,
         CarbonInterface $date,
@@ -564,6 +654,7 @@ class SchedulingReadService
             displayTimezone: $timezone,
             evaluatedAt: CarbonImmutable::now('UTC'),
             rescheduleAppointment: $rescheduleAppointment,
+            location: $rescheduleAppointment?->locationSnapshot(),
         ));
     }
 

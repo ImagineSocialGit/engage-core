@@ -53,6 +53,17 @@ return [
         'hold_review_rate_limit_per_minute' => 60,
     ],
 
+
+    'travel' => [
+        'maximum_minutes' => 240,
+        'conservative_minutes' => 45,
+    ],
+
+    'reschedule_suggestions' => [
+        'lookahead_days' => 14,
+        'limit' => 6,
+    ],
+
     'slot_offers' => [
         'ttl_seconds' => 300,
     ],

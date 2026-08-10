@@ -710,6 +710,7 @@
 │   │   │   │   ├── RescheduleAppointmentToSlotAction.php
 │   │   │   │   └── TransitionAppointmentStatusAction.php
 │   │   │   ├── Contracts
+│   │   │   │   └── TravelTimeResolver.php
 │   │   │   ├── Controllers
 │   │   │   │   ├── CRM
 │   │   │   │   │   ├── AppointmentController.php
@@ -726,7 +727,9 @@
 │   │   │   │   ├── AvailabilityInterval.php
 │   │   │   │   ├── AvailabilitySearch.php
 │   │   │   │   ├── BookableSlot.php
-│   │   │   │   └── SchedulingLocationSnapshot.php
+│   │   │   │   ├── SchedulingLocationSnapshot.php
+│   │   │   │   ├── TravelFeasibility.php
+│   │   │   │   └── TravelTimeEstimate.php
 │   │   │   ├── Enums
 │   │   │   │   └── SchedulingAvailabilityWindowType.php
 │   │   │   ├── Jobs
@@ -758,7 +761,10 @@
 │   │   │   │   │   ├── AppointmentOccupancyResolver.php
 │   │   │   │   │   ├── AvailabilityRuleResolver.php
 │   │   │   │   │   ├── BookingOccupancyResolver.php
-│   │   │   │   │   └── ResourceOccupancyResolver.php
+│   │   │   │   │   ├── ConservativeTravelTimeResolver.php
+│   │   │   │   │   ├── ResourceOccupancyResolver.php
+│   │   │   │   │   ├── SchedulingTravelTimeResolver.php
+│   │   │   │   │   └── TravelFeasibilityResolver.php
 │   │   │   │   ├── ContactShow
 │   │   │   │   │   └── SchedulingContactPanelProvider.php
 │   │   │   │   ├── SchedulingAvailabilityConfigurationWriter.php
@@ -1988,7 +1994,8 @@
 │   │   │   ├── SchedulingHostAndServiceFoundationTest.php
 │   │   │   ├── SchedulingLocationSnapshotRuntimeTest.php
 │   │   │   ├── SchedulingResourceConfigurationWorkspaceTest.php
-│   │   │   └── SchedulingWorkspaceTest.php
+│   │   │   ├── SchedulingWorkspaceTest.php
+│   │   │   └── TravelAwareAvailabilityTest.php
 │   │   ├── SetupValidation
 │   │   │   ├── ConfigContractsSetupValidationContributorTest.php
 │   │   │   ├── MessageConfigValidatorTest.php
@@ -2092,4 +2099,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-538 directories, 1555 files
+538 directories, 1562 files

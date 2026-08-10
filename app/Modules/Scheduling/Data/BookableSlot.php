@@ -22,6 +22,8 @@ final readonly class BookableSlot
         int $remainingCapacity,
         array $sourceScopes = [],
         array $sourceWindowIds = [],
+        ?int $travelMinutesBefore = null,
+        ?int $travelMinutesAfter = null,
     ) {
         $startsAt = CarbonImmutable::instance($startsAt)->utc();
         $endsAt = CarbonImmutable::instance($endsAt)->utc();
@@ -56,6 +58,8 @@ final readonly class BookableSlot
         $this->remainingCapacity = $remainingCapacity;
         $this->sourceScopes = $this->normalizedStrings($sourceScopes);
         $this->sourceWindowIds = $this->normalizedIntegers($sourceWindowIds);
+        $this->travelMinutesBefore = $this->normalizedTravelMinutes($travelMinutesBefore);
+        $this->travelMinutesAfter = $this->normalizedTravelMinutes($travelMinutesAfter);
     }
 
     public int $bookableServiceId;
@@ -67,6 +71,8 @@ final readonly class BookableSlot
     public int $remainingCapacity;
     public array $sourceScopes;
     public array $sourceWindowIds;
+    public ?int $travelMinutesBefore;
+    public ?int $travelMinutesAfter;
 
     public function localStartsAt(): CarbonImmutable
     {
@@ -76,6 +82,15 @@ final readonly class BookableSlot
     public function localEndsAt(): CarbonImmutable
     {
         return $this->endsAt->setTimezone($this->displayTimezone);
+    }
+
+    public function totalTravelMinutes(): ?int
+    {
+        if ($this->travelMinutesBefore === null && $this->travelMinutesAfter === null) {
+            return null;
+        }
+
+        return ($this->travelMinutesBefore ?? 0) + ($this->travelMinutesAfter ?? 0);
     }
 
     /**
@@ -96,6 +111,21 @@ final readonly class BookableSlot
             'source_scopes' => $this->sourceScopes,
             'source_window_ids' => $this->sourceWindowIds,
         ];
+    }
+
+    private function normalizedTravelMinutes(?int $minutes): ?int
+    {
+        if ($minutes === null) {
+            return null;
+        }
+
+        if ($minutes < 0 || $minutes > 1440) {
+            throw new InvalidArgumentException(
+                'Bookable slot travel minutes must be between 0 and 1440.',
+            );
+        }
+
+        return $minutes;
     }
 
     /**

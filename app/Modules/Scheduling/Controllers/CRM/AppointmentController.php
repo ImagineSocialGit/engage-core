@@ -127,6 +127,10 @@ class AppointmentController extends Controller
                 host: $selectedHost,
             )
             : [];
+        $suggestedSlots = $read->rescheduleSuggestions(
+            appointment: $appointment,
+            host: $selectedHost,
+        );
         $noticeMinutes = max(0, (int) $service->reschedule_notice_minutes);
         $noticeDeadline = $appointment->starts_at?->copy()
             ->subMinutes($noticeMinutes);
@@ -148,6 +152,7 @@ class AppointmentController extends Controller
             'dateMaximum' => $dateMaximum,
             'dateInRange' => $dateInRange,
             'slots' => $slots,
+            'suggestedSlots' => $suggestedSlots,
             'noticeMinutes' => $noticeMinutes,
             'requiresNoticeOverride' => $requiresNoticeOverride,
             'canPreserveConfirmation' => $canPreserveConfirmation,

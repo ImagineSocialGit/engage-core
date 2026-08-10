@@ -84,6 +84,7 @@ class CreateAppointmentAction
                     host: $host,
                     displayTimezone: $service->timezone,
                     evaluatedAt: $evaluatedAt,
+                    location: $locationSnapshot,
                 );
 
                 $appointments = $this->occupancy

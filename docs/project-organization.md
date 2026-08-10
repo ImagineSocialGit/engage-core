@@ -1,3 +1,4 @@
+
 # Engage Core Project Organization
 
 ## Shared config and token contract infrastructure
@@ -315,7 +316,31 @@ Modules do not need to adopt a universal profile/profile-item storage pair. Shar
 
 Integrations/adapters connect modules to external providers. They are not modules.
 
-Adapters should live behind the owning module's contracts, managers, resolvers, or provider services.
+The owning module keeps the provider-neutral contracts, managers, resolvers, DTOs,
+domain state, and public outcomes. Vendor implementations sit behind those seams.
+
+Going forward, new third-party/vendor implementations should normally be separate
+private Composer package repositories installed only for clients that need them.
+
+Preferred direction:
+
+```text
+Engage Core
+    Messaging / Webinars / Commerce / Mortgage / etc.
+    provider-neutral contracts + registration seams
+
+private packages
+    engage-integration-arive
+    engage-integration-shopify
+    future provider packages
+```
+
+Existing adapters under `app/Integrations/**` may remain until extraction has concrete
+maintenance or deployment value. Do not move existing Resend, Telnyx, Twilio, or Zoom
+implementations merely for consistency.
+
+The shared Integrations bootstrap layer is composition/registration infrastructure. It
+does not own vendor-specific business meaning.
 
 | Adapter/integration | Owning/using module |
 | --- | --- |

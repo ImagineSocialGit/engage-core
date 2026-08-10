@@ -1,3 +1,4 @@
+
 # Commerce Module
 
 Commerce is a current universal module with a provider-history foundation already present in the repository.
@@ -239,13 +240,25 @@ Engage Core may cache or normalize provider facts required for public presentati
 
 ## Shopify integration boundary
 
-Shopify is the first Commerce provider adapter.
+Shopify is the first Commerce provider adapter and should establish the external
+provider-package pattern.
 
-Expected adapter location:
+Expected implementation location:
 
 ```text
-app/Integrations/Commerce/Shopify
+separate private Composer package/repository
+    e.g. engage-integration-shopify
 ```
+
+Do not add a new long-lived `app/Integrations/Commerce/Shopify` implementation merely
+because older provider adapters currently live inside Engage Core.
+
+Engage Core's Commerce module owns the provider-neutral Commerce contracts, managers,
+normalized persistence, public offer/checkout orchestration, and purchase outcomes.
+The Shopify package owns Shopify-specific Admin/Storefront GraphQL clients, verification,
+mapping, payload interpretation, and provider implementation. The package should declare
+a compatible Engage Core version and register itself explicitly into Commerce's supported
+provider seams.
 
 Expected provider-facing responsibilities:
 
@@ -775,7 +788,7 @@ Validation should report actionable findings without making external provider ca
 3. normalized product-variant schema/model
 4. Commerce offer and offer-variant schema/model
 5. Project State Commerce section and current-format version bump
-6. Shopify Admin/Storefront GraphQL adapter foundation
+6. external Shopify package: Admin/Storefront GraphQL adapter foundation
 7. verified webhook inbox integration and idempotent reconciliation
 8. provider-neutral purchase-confirmed outcome
 9. Commerce CRM operations

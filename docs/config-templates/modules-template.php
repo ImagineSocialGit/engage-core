@@ -1,3 +1,4 @@
+
 <?php
 
 use App\Modules\Broadcasts\Providers\BroadcastsModuleServiceProvider;
@@ -251,6 +252,14 @@ return [
             ],
         ],
 
+        /*
+        | Integrations is shared registration/bootstrap infrastructure for installed
+        | provider packages. It is not the canonical home for vendor implementations.
+        |
+        | New third-party providers should normally ship as separate private Composer
+        | packages and register against the owning module's provider-neutral contracts.
+        | Existing app/Integrations adapters may remain until deliberately extracted.
+        */
         'integrations' => [
             'name' => 'Integrations',
             'depends_on' => ['core'],

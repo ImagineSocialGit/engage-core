@@ -38,12 +38,13 @@ class BookingOccupancyResolver
     ): Collection {
         $candidateBefore = max(0, (int) $search->service->buffer_before_minutes);
         $candidateAfter = max(0, (int) $search->service->buffer_after_minutes);
+        $travelPadding = $this->travelPaddingMinutes($search, $host);
 
         $query = BookingHold::query()
             ->effectivelyActive($search->evaluatedAt)
             ->overlappingOccupancy(
-                $search->effectiveStartsAt->subMinutes($candidateBefore),
-                $search->effectiveEndsAt->addMinutes($candidateAfter),
+                $search->effectiveStartsAt->subMinutes($candidateBefore + $travelPadding),
+                $search->effectiveEndsAt->addMinutes($candidateAfter + $travelPadding),
             );
 
         if ($host !== null) {
@@ -225,6 +226,21 @@ class BookingOccupancyResolver
             && CarbonImmutable::instance($hold->occupancy_ends_at)
                 ->utc()
                 ->greaterThan($candidateStartsAt);
+    }
+
+
+    private function travelPaddingMinutes(
+        AvailabilitySearch $search,
+        ?SchedulingHost $host,
+    ): int {
+        if ($host === null || ! $search->hasPhysicalLocationContext()) {
+            return 0;
+        }
+
+        return max(
+            0,
+            min(1440, (int) config('scheduling.travel.maximum_minutes', 240)),
+        );
     }
 
     private function sameHost(mixed $left, mixed $right): bool

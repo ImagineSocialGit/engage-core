@@ -16,6 +16,7 @@ final readonly class AvailabilitySearch
     public BookableService $service;
     public ?SchedulingHost $host;
     public ?Appointment $rescheduleAppointment;
+    public ?SchedulingLocationSnapshot $location;
     public CarbonImmutable $requestedStartsAt;
     public CarbonImmutable $requestedEndsAt;
     public CarbonImmutable $effectiveStartsAt;
@@ -31,6 +32,7 @@ final readonly class AvailabilitySearch
         ?string $displayTimezone = null,
         ?CarbonInterface $evaluatedAt = null,
         ?Appointment $rescheduleAppointment = null,
+        ?SchedulingLocationSnapshot $location = null,
     ) {
         $requestedStartsAt = CarbonImmutable::instance($startsAt)->utc();
         $requestedEndsAt = CarbonImmutable::instance($endsAt)->utc();
@@ -71,6 +73,7 @@ final readonly class AvailabilitySearch
         $this->service = $service;
         $this->host = $host;
         $this->rescheduleAppointment = $rescheduleAppointment;
+        $this->location = $location;
         $this->requestedStartsAt = $requestedStartsAt;
         $this->requestedEndsAt = $requestedEndsAt;
         $this->effectiveStartsAt = $requestedStartsAt->greaterThan($noticeBoundary)
@@ -86,6 +89,18 @@ final readonly class AvailabilitySearch
     public function hasEffectiveRange(): bool
     {
         return $this->effectiveStartsAt->lessThan($this->effectiveEndsAt);
+    }
+
+    public function hasPhysicalLocationContext(): bool
+    {
+        if ($this->location?->isPhysical()) {
+            return true;
+        }
+
+        return in_array($this->service->location_type, [
+            BookableService::LOCATION_TYPE_FIXED,
+            BookableService::LOCATION_TYPE_CUSTOMER_SITE,
+        ], true);
     }
 
     public function isRescheduleSearch(): bool

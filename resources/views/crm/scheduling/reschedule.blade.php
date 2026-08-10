@@ -161,6 +161,51 @@
                     <input type="hidden" name="scheduling_host_id" value="{{ $selectedHost?->getKey() }}">
                     <input type="hidden" name="idempotency_key" value="{{ $idempotencyKey }}">
 
+                    @if($suggestedSlots !== [])
+                        <div class="rounded-2xl border border-teal-200 bg-teal-50 p-4">
+                            <div class="flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                    <span class="text-sm font-semibold text-teal-950">Suggested open times</span>
+                                    <p class="mt-1 text-xs leading-5 text-teal-800">
+                                        These preserve the current service, location, host, resource, availability, and travel rules.
+                                    </p>
+                                </div>
+                                <span class="rounded-full bg-white px-2 py-1 text-xs font-semibold text-teal-800">
+                                    Best fit first
+                                </span>
+                            </div>
+
+                            <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                                @foreach($suggestedSlots as $slot)
+                                    @php
+                                        $slotValue = $slot->startsAt->toISOString();
+                                        $slotLocalStart = $slot->startsAt->setTimezone($displayTimezone);
+                                        $slotLocalEnd = $slot->endsAt->setTimezone($displayTimezone);
+                                    @endphp
+
+                                    <label class="cursor-pointer rounded-xl border border-teal-200 bg-white p-3 hover:border-teal-400 has-[:checked]:border-teal-600 has-[:checked]:bg-teal-100">
+                                        <input
+                                            type="radio"
+                                            name="starts_at"
+                                            value="{{ $slotValue }}"
+                                            class="sr-only"
+                                            @checked(old('starts_at') === $slotValue)
+                                        >
+                                        <span class="block text-sm font-semibold text-slate-900">
+                                            {{ $slotLocalStart->format('D, M j') }} · {{ $slotLocalStart->format('g:i A') }}–{{ $slotLocalEnd->format('g:i A') }}
+                                        </span>
+                                        <span class="mt-1 block text-xs text-slate-500">
+                                            {{ $displayTimezone }}
+                                            @if($slot->totalTravelMinutes() !== null)
+                                                · travel-aware
+                                            @endif
+                                        </span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
                     <div>
                         <span class="block text-sm font-medium text-slate-700">
                             Available time

@@ -85,6 +85,7 @@ class CreatePublicBookingHoldAction
                     service: $service,
                     startsAt: $startsAt,
                     evaluatedAt: $now,
+                    location: $location,
                 );
 
                 if (! $slot instanceof BookableSlot) {
@@ -134,6 +135,7 @@ class CreatePublicBookingHoldAction
         BookableService $service,
         CarbonImmutable $startsAt,
         CarbonImmutable $evaluatedAt,
+        ?SchedulingLocationSnapshot $location = null,
     ): ?BookableSlot {
         $endsAt = $startsAt->addMinutes(
             max(1, (int) $service->duration_minutes),
@@ -145,6 +147,7 @@ class CreatePublicBookingHoldAction
             endsAt: $endsAt,
             displayTimezone: $service->timezone,
             evaluatedAt: $evaluatedAt,
+            location: $location,
         ));
 
         foreach ($slots as $slot) {

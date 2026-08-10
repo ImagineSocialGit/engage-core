@@ -1,3 +1,4 @@
+
 # Engage Core Module Boundaries
 
 ## Executable config and token contract ownership
@@ -686,18 +687,24 @@ Blade views intentionally remain under:
 
     resources/views
 
-External provider adapters intentionally remain outside modules under:
+External provider adapters intentionally remain outside feature-module internals.
 
-    app/Integrations
+The long-term default for new third-party/vendor implementations is a separate private
+Composer package/repository installed only for clients that need that provider.
 
 Examples:
 
-- Resend email adapter
-- Telnyx SMS adapter
-- Twilio SMS adapter
-- Zoom webinar adapter
+- `engage-integration-arive`
+- `engage-integration-shopify`
+- future calendar, geocoding, payment, webinar, email, or SMS provider packages
 
-Adapters are not modules. They sit behind module-owned contracts/managers/services.
+Existing provider implementations under `app/Integrations/**` may remain in Engage Core
+until there is a concrete reason to extract them. Do not move Resend, Telnyx, Twilio,
+Zoom, or another existing adapter merely for directory symmetry.
+
+Adapters are not modules. The owning module keeps provider-neutral contracts, managers,
+resolvers, DTOs, domain state, and public outcomes. A provider package implements those
+seams and registers itself through the shared integration-registration/bootstrap layer.
 
 ## How to Add a Universal Module
 
@@ -2694,23 +2701,72 @@ Examples:
 - Geocoding/address providers may power Location later
 - Arive may power mortgage LOS behavior later
 
-Adapters should sit behind contracts, managers, resolvers, or provider services.
+Adapters must sit behind the owning module's provider-neutral contracts, managers,
+resolvers, DTOs, public actions, or provider services.
 
-Modules should depend on contracts/managers/services, not concrete adapter internals.
+The owning module is authoritative for business/domain meaning. A vendor adapter
+translates provider-specific input/output into those neutral seams and must not become
+the place where Contact, Workflow, FlowRoute, Task, Campaign, Commerce, Mortgage, or
+other cross-module business behavior is hard-coded.
 
-Current integration path:
+### Package/repository default
 
-    app/Integrations
+Going forward, a new third-party/vendor integration should normally live in its own
+private Composer package/repository and be installed only for clients that need it.
 
-Current examples:
+Preferred shape:
 
-    app/Integrations/Messaging/Email/Resend
-    app/Integrations/Messaging/Sms/Telnyx
-    app/Integrations/Messaging/Sms/Twilio
-    app/Integrations/Webinars/Zoom
-    app/Integrations/Commerce/Shopify, first Commerce provider integration
-    app/Integrations/Scheduling, later
-    app/Integrations/Location, later
+```text
+Engage Core module
+    owns provider-neutral contracts/domain behavior
+            ^
+            | implements/registers
+            |
+private provider package
+    owns vendor API/webhook/parser/provider implementation
+```
+
+Examples:
+
+```text
+engage-integration-arive
+engage-integration-shopify
+engage-integration-stripe
+engage-integration-square
+```
+
+The exact package naming convention may be finalized when the first package is created,
+but vendor code should not be added to Engage Core merely because `app/Integrations/**`
+currently exists.
+
+The shared Integrations bootstrap/registration layer may discover or register installed
+provider packages. It is infrastructure for composition, not the owner of vendor-specific
+business logic.
+
+A provider package should:
+
+- declare compatible Engage Core versions;
+- depend on the owning module's public contracts rather than private internals;
+- register its implementations explicitly through supported service-provider/registry seams;
+- keep credentials and deployment-specific secrets outside source-controlled package code;
+- emit/return provider-neutral outcomes after authoritative provider work;
+- remain absent from client deployments that do not use the provider.
+
+Existing in-repository adapters are grandfathered:
+
+```text
+app/Integrations/Messaging/Email/Resend
+app/Integrations/Messaging/Sms/Telnyx
+app/Integrations/Messaging/Sms/Twilio
+app/Integrations/Webinars/Zoom
+```
+
+They may be extracted later when there is real maintenance/deployment value. Do not
+perform extraction merely for consistency.
+
+New specialized integrations such as Arive and Shopify should establish the external
+package pattern rather than adding new long-lived vendor directories under
+`app/Integrations/**`.
 
 ## Contact Show UI
 

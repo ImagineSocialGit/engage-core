@@ -118,6 +118,7 @@ class CreateBookingHoldAction
                     displayTimezone: $offer->display_timezone,
                     evaluatedAt: $now,
                     rescheduleAppointment: $rescheduleAppointment,
+                    location: $locationSnapshot,
                 );
 
                 $appointments = $this->occupancy
@@ -132,13 +133,8 @@ class CreateBookingHoldAction
                     ->utc()
                     ->addMinutes(max(0, (int) $service->buffer_after_minutes));
 
-                $this->lockOverlappingHolds(
-                    service: $service,
-                    host: $host,
-                    startsAt: $occupancyStartsAt,
-                    endsAt: $occupancyEndsAt,
-                    now: $now,
-                );
+                $holds = $this->occupancy->activeHolds($search, $host);
+                $this->lockHolds($holds);
 
                 $currentSlot = $this->exactCurrentSlot($search, $offer);
 
@@ -356,26 +352,19 @@ class CreateBookingHoldAction
             ->get();
     }
 
-    private function lockOverlappingHolds(
-        BookableService $service,
-        ?SchedulingHost $host,
-        CarbonImmutable $startsAt,
-        CarbonImmutable $endsAt,
-        CarbonImmutable $now,
-    ): void {
-        $query = BookingHold::query()
-            ->effectivelyActive($now)
-            ->overlappingOccupancy($startsAt, $endsAt);
+    /**
+     * @param Collection<int, BookingHold> $holds
+     */
+    private function lockHolds(Collection $holds): void
+    {
+        $ids = $holds->modelKeys();
 
-        if ($host !== null) {
-            $query->where('scheduling_host_id', $host->getKey());
-        } else {
-            $query
-                ->where('bookable_service_id', $service->getKey())
-                ->whereNull('scheduling_host_id');
+        if ($ids === []) {
+            return;
         }
 
-        $query
+        BookingHold::query()
+            ->whereKey($ids)
             ->orderBy('id')
             ->lockForUpdate()
             ->get();

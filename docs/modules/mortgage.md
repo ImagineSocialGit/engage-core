@@ -1,3 +1,4 @@
+
 # Mortgage Module
 
 This module reference owns the detailed responsibility, dependency, and boundary notes for this module. Keep global architectural rules in `docs/module-boundaries.md`; keep actionable backlog in `docs/TODO.md`.
@@ -11,8 +12,7 @@ Mortgage owns:
 - mortgage stages
 - contact mortgage profiles
 - mortgage-specific fields
-- LOS automation
-- mortgage-specific adapters
+- LOS automation and provider-neutral LOS integration contracts
 - mortgage-specific workflow definitions later
 - mortgage-specific FlowRoute definitions later
 
@@ -34,7 +34,26 @@ Vertical-specific migrations belong under:
 
     database/migrations/verticals/mortgage
 
-Mortgage may depend on Arive or other LOS providers through adapter contracts/services.
+Mortgage may consume installed LOS providers through provider-neutral adapter
+contracts/services. Mortgage must not depend on concrete Arive or other vendor package
+classes.
+
+New LOS provider implementations should normally be separate private Composer packages
+installed only for clients that use them. Arive is the first likely example:
+
+```text
+Engage Core Mortgage
+    owns mortgage/LOS domain meaning and neutral contracts
+            ^
+            |
+engage-integration-arive
+    owns Arive-specific API/webhook/email parsing and provider translation
+```
+
+The exact package name may be finalized when the first external integration package is
+created. Provider-specific transport/notification parsing must not hard-code downstream
+Contact-status, Task, Campaign, or FlowRoute behavior; those outcomes should pass through
+the established Core/Workflow/Automation Event/FlowRoutes/Tasks seams as appropriate.
 
 
 ## FlowRoutes integration
@@ -64,4 +83,3 @@ FlowRoutes
 ```
 
 Do not add `flow_route_*` foreign keys to this module's artifacts merely for provenance symmetry. Add artifact-side provenance only when this module has an independently justified neutral provenance contract that is useful outside FlowRoutes.
-

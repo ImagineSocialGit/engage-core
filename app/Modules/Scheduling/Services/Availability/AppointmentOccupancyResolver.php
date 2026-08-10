@@ -24,6 +24,7 @@ class AppointmentOccupancyResolver
         $maximumAfter = max(0, (int) BookableService::withTrashed()->max('buffer_after_minutes'));
         $candidateBefore = max(0, (int) $search->service->buffer_before_minutes);
         $candidateAfter = max(0, (int) $search->service->buffer_after_minutes);
+        $travelPadding = $this->travelPaddingMinutes($search, $host);
 
         $query = Appointment::query()
             ->with([
@@ -35,9 +36,9 @@ class AppointmentOccupancyResolver
                 Appointment::STATUS_CONFIRMED,
             ])
             ->where('starts_at', '<', $search->effectiveEndsAt
-                ->addMinutes($candidateAfter + $maximumBefore))
+                ->addMinutes($candidateAfter + $maximumBefore + $travelPadding))
             ->where('ends_at', '>', $search->effectiveStartsAt
-                ->subMinutes($candidateBefore + $maximumAfter));
+                ->subMinutes($candidateBefore + $maximumAfter + $travelPadding));
 
         if ($search->rescheduleAppointment !== null) {
             $query->where(
@@ -149,6 +150,21 @@ class AppointmentOccupancyResolver
 
         return $occupiedStartsAt->lessThan($candidateEndsAt)
             && $occupiedEndsAt->greaterThan($candidateStartsAt);
+    }
+
+
+    private function travelPaddingMinutes(
+        AvailabilitySearch $search,
+        ?SchedulingHost $host,
+    ): int {
+        if ($host === null || ! $search->hasPhysicalLocationContext()) {
+            return 0;
+        }
+
+        return max(
+            0,
+            min(1440, (int) config('scheduling.travel.maximum_minutes', 240)),
+        );
     }
 
     private function sameHost(mixed $appointmentHostId, mixed $candidateHostId): bool
