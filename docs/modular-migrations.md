@@ -474,6 +474,8 @@ Supported forms are:
 php artisan engage:install
 php artisan engage:install --modules=tasks,broadcasts,scheduling
 php artisan engage:install --modules=scheduling --preset=basic
+php artisan engage:install --create-user
+php artisan engage:install --force --no-create-user
 ```
 
 When `--modules` is omitted, the installer selects the schema-owning portion of the configured enabled-module dependency closure. Core is always included. When `--modules` is supplied, the comma-separated requested keys are dependency-planned through `ModuleMigrationPlanner`.
@@ -492,6 +494,8 @@ The four installation stages are:
 The platform stage invokes Laravel migration execution with the registered platform path explicitly, so the normal runtime path policy remains platform-only. The module stage delegates the complete dependency-ordered plan to `ModuleMigrationExecutor`; it does not reimplement migration locking, ledger transitions, selected-path execution, or verification.
 
 Preset synchronization delegates to the existing `presets:sync` command. `--preset` is optional and, when supplied, is passed through as the preset package key. Setup validation delegates to the existing read-only `setup:validate` command.
+
+After the four installation stages succeed, interactive installation may create the first CRM login user. `--create-user` requires that onboarding step and collects the password through hidden interactive input. `--no-create-user` skips onboarding and is the appropriate choice for non-interactive deployment automation or a controlled Project State rebuild where environment-owned users are recreated explicitly afterward. The two options are mutually exclusive. CRM user onboarding does not change module selection, migration execution, preset synchronization, or setup-validation semantics.
 
 A non-zero result or exception from any stage stops the installer immediately. Later stages are not attempted. The operator receives the failed stage name and may rerun the same install command after correcting the reported problem. Rerun safety relies on the existing idempotent contracts:
 
@@ -688,7 +692,7 @@ php artisan modules:status {module?}
 php artisan modules:install {module} [--force]
 php artisan modules:migrate {module?} [--force]
 php artisan modules:reconcile {module?} [--force]
-php artisan engage:install [--modules=...] [--preset=...] [--force]
+php artisan engage:install [--modules=...] [--preset=...] [--create-user|--no-create-user] [--force]
 ```
 
 The optional `modules:status` argument limits inspection to that module's dependency-ordered migration plan. Omitting it inspects every registered schema-owning module.

@@ -15,6 +15,10 @@ use Throwable;
 
 class SchedulingConfigurationWriter
 {
+    public function __construct(
+        private readonly SchedulingLocationSnapshotResolver $locationSnapshots,
+    ) {}
+
     /**
      * @param array<string, mixed> $attributes
      */
@@ -336,7 +340,7 @@ class SchedulingConfigurationWriter
         ?BookableService $existing = null,
     ): array {
         $status = $this->serviceStatus($attributes['status'] ?? null);
-        $locationType = $this->nullableString($attributes['location_type'] ?? null);
+        $locationType = $this->locationType($attributes['location_type'] ?? null);
 
         return [
             'name' => $this->requiredString($attributes['name'] ?? null, 'service name'),
@@ -354,7 +358,6 @@ class SchedulingConfigurationWriter
             'location_type' => $locationType,
             'location_details' => $this->locationDetails(
                 attributes: $attributes,
-                existing: $existing,
                 locationType: $locationType,
             ),
             'capacity' => $this->positiveInteger($attributes['capacity'] ?? null, 'service capacity'),
@@ -371,32 +374,209 @@ class SchedulingConfigurationWriter
      */
     private function locationDetails(
         array $attributes,
-        ?BookableService $existing,
         ?string $locationType,
     ): ?array {
         if ($locationType === null) {
+            $this->assertNoLocationFields($attributes, [
+                'location_label',
+                'location_url',
+                'location_instructions',
+                'location_address_line_1',
+                'location_address_line_2',
+                'location_city',
+                'location_region',
+                'location_postal_code',
+                'location_country',
+            ]);
+
             return null;
         }
 
-        $details = is_array($existing?->location_details)
-            ? $existing->location_details
-            : [];
         $label = $this->nullableString($attributes['location_label'] ?? null);
-        $url = $this->nullableString($attributes['location_url'] ?? null);
+        $instructions = $this->nullableString($attributes['location_instructions'] ?? null);
 
-        if ($label === null) {
-            unset($details['label']);
-        } else {
-            $details['label'] = $label;
-        }
+        return match ($locationType) {
+            BookableService::LOCATION_TYPE_PHONE => $this->simpleLocationDetails(
+                attributes: $attributes,
+                label: $label,
+                instructions: $instructions,
+                forbidden: [
+                    'location_url',
+                    'location_address_line_1',
+                    'location_address_line_2',
+                    'location_city',
+                    'location_region',
+                    'location_postal_code',
+                    'location_country',
+                ],
+            ),
+            BookableService::LOCATION_TYPE_VIRTUAL => $this->virtualLocationDetails(
+                attributes: $attributes,
+                label: $label,
+                instructions: $instructions,
+            ),
+            BookableService::LOCATION_TYPE_FIXED => $this->fixedLocationDetails(
+                attributes: $attributes,
+                label: $label,
+                instructions: $instructions,
+            ),
+            BookableService::LOCATION_TYPE_CUSTOMER_SITE => $this->simpleLocationDetails(
+                attributes: $attributes,
+                label: $label,
+                instructions: $instructions,
+                forbidden: [
+                    'location_url',
+                    'location_address_line_1',
+                    'location_address_line_2',
+                    'location_city',
+                    'location_region',
+                    'location_postal_code',
+                    'location_country',
+                ],
+            ),
+            default => throw new LogicException(
+                "Unsupported Scheduling location type [{$locationType}].",
+            ),
+        };
+    }
 
-        if ($url === null) {
-            unset($details['url']);
-        } else {
-            $details['url'] = $url;
-        }
+    /**
+     * @param array<string, mixed> $attributes
+     * @param array<int, string> $forbidden
+     * @return array<string, mixed>|null
+     */
+    private function simpleLocationDetails(
+        array $attributes,
+        ?string $label,
+        ?string $instructions,
+        array $forbidden,
+    ): ?array {
+        $this->assertNoLocationFields($attributes, $forbidden);
+
+        $details = array_filter([
+            'label' => $label,
+            'instructions' => $instructions,
+        ], static fn (mixed $value): bool => $value !== null);
 
         return $details !== [] ? $details : null;
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     * @return array<string, mixed>|null
+     */
+    private function virtualLocationDetails(
+        array $attributes,
+        ?string $label,
+        ?string $instructions,
+    ): ?array {
+        $this->assertNoLocationFields($attributes, [
+            'location_address_line_1',
+            'location_address_line_2',
+            'location_city',
+            'location_region',
+            'location_postal_code',
+            'location_country',
+        ]);
+
+        $url = $this->nullableString($attributes['location_url'] ?? null);
+
+        if ($url !== null) {
+            $parts = parse_url($url);
+            $scheme = is_array($parts) && is_string($parts['scheme'] ?? null)
+                ? strtolower($parts['scheme'])
+                : null;
+            $host = is_array($parts) && is_string($parts['host'] ?? null)
+                ? trim($parts['host'])
+                : null;
+
+            if (! in_array($scheme, ['http', 'https'], true)
+                || ! is_string($host)
+                || $host === ''
+            ) {
+                throw new InvalidArgumentException(
+                    'Virtual Scheduling location URLs must be absolute HTTP or HTTPS URLs.',
+                );
+            }
+        }
+
+        $details = array_filter([
+            'label' => $label,
+            'url' => $url,
+            'instructions' => $instructions,
+        ], static fn (mixed $value): bool => $value !== null);
+
+        return $details !== [] ? $details : null;
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     * @return array<string, mixed>
+     */
+    private function fixedLocationDetails(
+        array $attributes,
+        ?string $label,
+        ?string $instructions,
+    ): array {
+        $this->assertNoLocationFields($attributes, ['location_url']);
+
+        return $this->locationSnapshots->normalizeAddress(
+            type: BookableService::LOCATION_TYPE_FIXED,
+            input: [
+                'address_line_1' => $this->requiredString(
+                    $attributes['location_address_line_1'] ?? null,
+                    'fixed-location address line 1',
+                ),
+                'address_line_2' => $this->nullableString(
+                    $attributes['location_address_line_2'] ?? null,
+                ),
+                'city' => $this->requiredString(
+                    $attributes['location_city'] ?? null,
+                    'fixed-location city',
+                ),
+                'region' => $this->requiredString(
+                    $attributes['location_region'] ?? null,
+                    'fixed-location region',
+                ),
+                'postal_code' => $this->requiredString(
+                    $attributes['location_postal_code'] ?? null,
+                    'fixed-location postal code',
+                ),
+                'country' => $this->requiredString(
+                    $attributes['location_country'] ?? null,
+                    'fixed-location country',
+                ),
+            ],
+            label: $label,
+            instructions: $instructions,
+        )->details ?? throw new LogicException(
+            'Fixed Scheduling locations must produce location details.',
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     * @param array<int, string> $fields
+     */
+    private function assertNoLocationFields(
+        array $attributes,
+        array $fields,
+    ): void {
+        $submitted = array_values(array_filter(
+            $fields,
+            fn (string $field): bool => $this->nullableString(
+                $attributes[$field] ?? null,
+            ) !== null,
+        ));
+
+        if ($submitted === []) {
+            return;
+        }
+
+        throw new InvalidArgumentException(sprintf(
+            'Location type does not accept field(s): [%s].',
+            implode(', ', $submitted),
+        ));
     }
 
     /**
@@ -506,6 +686,28 @@ class SchedulingConfigurationWriter
 
         if (! in_array($value, timezone_identifiers_list(), true)) {
             throw new InvalidArgumentException("Timezone [{$value}] is invalid.");
+        }
+
+        return $value;
+    }
+
+    private function locationType(mixed $value): ?string
+    {
+        $value = $this->nullableString($value);
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (! in_array($value, [
+            BookableService::LOCATION_TYPE_PHONE,
+            BookableService::LOCATION_TYPE_VIRTUAL,
+            BookableService::LOCATION_TYPE_FIXED,
+            BookableService::LOCATION_TYPE_CUSTOMER_SITE,
+        ], true)) {
+            throw new InvalidArgumentException(
+                "Bookable service location type [{$value}] is invalid.",
+            );
         }
 
         return $value;

@@ -370,6 +370,48 @@
                                 <x-ui.form.error name="contact_id" />
                             </div>
 
+                            @if($selectedService->location_type === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_CUSTOMER_SITE)
+                                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                    <h3 class="text-sm font-semibold text-slate-900">Customer service address</h3>
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        Enter the address where this appointment will take place. Scheduling normalizes it into the Appointment snapshot.
+                                    </p>
+
+                                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                                        <div class="sm:col-span-2">
+                                            <x-ui.form.label for="address_line_1">Address line 1</x-ui.form.label>
+                                            <x-ui.form.input id="address_line_1" name="address_line_1" value="{{ old('address_line_1') }}" autocomplete="address-line1" />
+                                            <x-ui.form.error name="address_line_1" />
+                                        </div>
+                                        <div class="sm:col-span-2">
+                                            <x-ui.form.label for="address_line_2">Address line 2</x-ui.form.label>
+                                            <x-ui.form.input id="address_line_2" name="address_line_2" value="{{ old('address_line_2') }}" autocomplete="address-line2" />
+                                            <x-ui.form.error name="address_line_2" />
+                                        </div>
+                                        <div>
+                                            <x-ui.form.label for="city">City</x-ui.form.label>
+                                            <x-ui.form.input id="city" name="city" value="{{ old('city') }}" autocomplete="address-level2" />
+                                            <x-ui.form.error name="city" />
+                                        </div>
+                                        <div>
+                                            <x-ui.form.label for="region">State / region</x-ui.form.label>
+                                            <x-ui.form.input id="region" name="region" value="{{ old('region') }}" autocomplete="address-level1" />
+                                            <x-ui.form.error name="region" />
+                                        </div>
+                                        <div>
+                                            <x-ui.form.label for="postal_code">Postal code</x-ui.form.label>
+                                            <x-ui.form.input id="postal_code" name="postal_code" value="{{ old('postal_code') }}" autocomplete="postal-code" />
+                                            <x-ui.form.error name="postal_code" />
+                                        </div>
+                                        <div>
+                                            <x-ui.form.label for="country">Country code</x-ui.form.label>
+                                            <x-ui.form.input id="country" name="country" value="{{ old('country', 'US') }}" maxlength="2" autocomplete="country" />
+                                            <x-ui.form.error name="country" />
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+
                             <div>
                                 <span class="block text-sm font-medium text-slate-700">
                                     Available time

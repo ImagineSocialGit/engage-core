@@ -12,6 +12,7 @@ use App\Modules\Scheduling\Models\Appointment;
 use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\SchedulingHost;
 use App\Modules\Scheduling\Requests\StoreAppointmentRequest;
+use App\Modules\Scheduling\Services\SchedulingLocationSnapshotResolver;
 use App\Modules\Scheduling\Services\SchedulingReadService;
 use Carbon\CarbonImmutable;
 use DomainException;
@@ -137,6 +138,7 @@ class SchedulingController extends Controller
     public function store(
         StoreAppointmentRequest $request,
         CreateAppointmentAction $createAppointment,
+        SchedulingLocationSnapshotResolver $locationSnapshots,
     ): RedirectResponse {
         $validated = $request->validated();
         $contact = Contact::query()->findOrFail($validated['contact_id']);
@@ -150,6 +152,19 @@ class SchedulingController extends Controller
             : null;
 
         try {
+            $location = $service->location_type === BookableService::LOCATION_TYPE_CUSTOMER_SITE
+                ? $locationSnapshots->normalizeAddress(
+                    type: BookableService::LOCATION_TYPE_CUSTOMER_SITE,
+                    input: $request->customerSiteAddress(),
+                )
+                : null;
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'address_line_1' => $exception->getMessage(),
+            ]);
+        }
+
+        try {
             $appointment = $createAppointment->handle(new AppointmentCreationData(
                 service: $service,
                 host: $host,
@@ -161,6 +176,7 @@ class SchedulingController extends Controller
                     name: $contact->name,
                     email: $contact->email,
                     phone: $contact->phone,
+                    location: $location,
                     createdBy: $request->user(),
                     source: 'crm',
                     appointmentMeta: [

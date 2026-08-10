@@ -305,7 +305,7 @@ Run:
 php artisan optimize:clear
 ```
 
-### 2. Rebuild the database
+### 2. Rebuild the platform database foundation
 
 For the approved controlled clean rebuild:
 
@@ -313,37 +313,40 @@ For the approved controlled clean rebuild:
 php artisan migrate:fresh --force
 ```
 
+After the modular migration path-selection cutover, `migrate:fresh` reconstructs the platform foundation only. It does not install optional module schema.
+
 Do not use this command as an ordinary production deployment technique.
 
-### 3. Materialize DB-owned definitions
+### 3. Install configured module schema and DB-owned definitions
 
 Run:
 
 ```bash
-php artisan presets:sync
+php artisan engage:install --force --no-create-user
+php artisan modules:status
 ```
 
-Project State upserts stable DB-owned definitions against this target state and remaps source IDs to target IDs.
+`engage:install` reruns the already-current platform stage safely, installs the configured schema-owning module dependency closure, materializes DB-owned definitions through `presets:sync`, and runs `setup:validate`. `--no-create-user` keeps environment-owned CRM user recreation explicit in the next step.
 
-### 4. Validate the target setup
+Project State upserts stable DB-owned definitions against this installed target state and remaps source IDs to target IDs.
 
-Run:
+Resolve every installation or setup-validation error before import. Understand every warning, and review `modules:status` to confirm the intended configured scopes are installed and current.
 
-```bash
-php artisan setup:validate
-```
-
-Resolve all errors before import. Understand every warning.
-
-### 5. Recreate environment-owned users
+### 4. Recreate environment-owned users
 
 Users are not transferred.
 
-Create or restore the intended CRM user through the approved environment/bootstrap process. Its email must match `PROJECT_STATE_ADMIN_EMAIL`.
+Create the intended CRM user from an interactive operator session:
+
+```bash
+php artisan engage:user:add
+```
+
+Its email must match `PROJECT_STATE_ADMIN_EMAIL`.
 
 Do not reuse password hashes or sessions from the source transfer file; they are not present.
 
-### 6. Confirm target tables are clean
+### 5. Confirm target tables are clean
 
 `insert_empty` tables must be empty. Validation will reject any non-empty target table in that mode.
 

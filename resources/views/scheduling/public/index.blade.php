@@ -381,6 +381,12 @@
                     <dt>Timezone</dt>
                     <dd>{{ str_replace('_', ' ', $holdSummary['timezone']) }}</dd>
                 </div>
+                @if($holdSummary['location_address'])
+                    <div>
+                        <dt>{{ $holdSummary['location_label'] ?: 'Service address' }}</dt>
+                        <dd>{{ $holdSummary['location_address'] }}</dd>
+                    </div>
+                @endif
             </dl>
 
             @error('booking')
@@ -506,7 +512,18 @@
                 @endforelse
             </section>
 
-            <section class="card availability" aria-live="polite">
+            <section
+                class="card availability"
+                aria-live="polite"
+                x-data="{
+                    addressLine1: @js(old('address_line_1', '')),
+                    addressLine2: @js(old('address_line_2', '')),
+                    city: @js(old('city', '')),
+                    region: @js(old('region', '')),
+                    postalCode: @js(old('postal_code', '')),
+                    country: @js(old('country', 'US')),
+                }"
+            >
                 @if($selectedService)
                     <div class="availability-head">
                         <div>
@@ -549,6 +566,53 @@
                         <p class="error">{{ $message }}</p>
                     @enderror
 
+                    @if($selectedService->location_type === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_CUSTOMER_SITE)
+                        <div class="booking-form" style="margin-bottom: 1rem;">
+                            <div>
+                                <strong>Service address</strong>
+                                <p class="muted">Enter the address where this appointment will take place. It is normalized by Scheduling when you reserve a time.</p>
+                            </div>
+
+                            <div class="booking-fields">
+                                <label class="booking-field" for="address_line_1">
+                                    Address line 1
+                                    <input id="address_line_1" type="text" x-model="addressLine1" autocomplete="address-line1" required>
+                                </label>
+
+                                <label class="booking-field" for="address_line_2">
+                                    Address line 2
+                                    <input id="address_line_2" type="text" x-model="addressLine2" autocomplete="address-line2">
+                                </label>
+
+                                <label class="booking-field" for="city">
+                                    City
+                                    <input id="city" type="text" x-model="city" autocomplete="address-level2" required>
+                                </label>
+
+                                <label class="booking-field" for="region">
+                                    State / region
+                                    <input id="region" type="text" x-model="region" autocomplete="address-level1" required>
+                                </label>
+
+                                <label class="booking-field" for="postal_code">
+                                    Postal code
+                                    <input id="postal_code" type="text" x-model="postalCode" autocomplete="postal-code" required>
+                                </label>
+
+                                <label class="booking-field" for="country">
+                                    Country code
+                                    <input id="country" type="text" maxlength="2" x-model="country" autocomplete="country" required>
+                                </label>
+                            </div>
+
+                            @foreach(['address_line_1', 'address_line_2', 'city', 'region', 'postal_code', 'country'] as $addressField)
+                                @error($addressField)
+                                    <p class="error">{{ $message }}</p>
+                                @enderror
+                            @endforeach
+                        </div>
+                    @endif
+
                     @if($availableTimes !== [])
                         <div class="times" aria-label="Available appointment times">
                             @foreach($availableTimes as $time)
@@ -568,6 +632,14 @@
                                         name="idempotency_key"
                                         value="{{ $time['idempotency_key'] }}"
                                     >
+                                    @if($selectedService->location_type === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_CUSTOMER_SITE)
+                                        <input type="hidden" name="address_line_1" x-model="addressLine1">
+                                        <input type="hidden" name="address_line_2" x-model="addressLine2">
+                                        <input type="hidden" name="city" x-model="city">
+                                        <input type="hidden" name="region" x-model="region">
+                                        <input type="hidden" name="postal_code" x-model="postalCode">
+                                        <input type="hidden" name="country" x-model="country">
+                                    @endif
                                     <button class="time" type="submit">
                                         {{ $time['label'] }}
                                     </button>

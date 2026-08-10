@@ -342,6 +342,7 @@
                     action="{{ route('crm.scheduling.configuration.services.store') }}"
                     class="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
                     data-configuration-service-create
+                    x-data="{ locationType: @js(old('location_type', '')) }"
                 >
                     @csrf
 
@@ -431,18 +432,60 @@
 
                     <label class="{{ $labelClass }}">
                         Location type
-                        <input class="{{ $inputClass }}" name="location_type" value="{{ old('location_type') }}">
+                        <select class="{{ $inputClass }}" name="location_type" x-model="locationType">
+                            <option value="">Not specified</option>
+                            <option value="{{ \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_PHONE }}">Phone</option>
+                            <option value="{{ \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_VIRTUAL }}">Virtual</option>
+                            <option value="{{ \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_FIXED }}">Fixed location</option>
+                            <option value="{{ \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_CUSTOMER_SITE }}">Customer site</option>
+                        </select>
                     </label>
 
                     <label class="{{ $labelClass }}">
                         Location label
-                        <input class="{{ $inputClass }}" name="location_label" value="{{ old('location_label') }}">
+                        <input class="{{ $inputClass }}" name="location_label" value="{{ old('location_label') }}" x-bind:disabled="locationType === ''">
                     </label>
 
-                    <label class="{{ $labelClass }} md:col-span-2">
-                        Location URL
-                        <input class="{{ $inputClass }}" type="url" name="location_url" value="{{ old('location_url') }}">
+                    <label class="{{ $labelClass }} md:col-span-2 xl:col-span-4">
+                        Location instructions
+                        <textarea class="{{ $inputClass }}" name="location_instructions" rows="2" x-bind:disabled="locationType === ''">{{ old('location_instructions') }}</textarea>
                     </label>
+
+                    <label class="{{ $labelClass }} md:col-span-2 xl:col-span-4" x-show="locationType === 'virtual'" x-cloak>
+                        Virtual meeting URL
+                        <input class="{{ $inputClass }}" type="url" name="location_url" value="{{ old('location_url') }}" x-bind:disabled="locationType !== 'virtual'">
+                    </label>
+
+                    <div class="grid gap-4 md:col-span-2 md:grid-cols-2 xl:col-span-4 xl:grid-cols-4" x-show="locationType === 'fixed'" x-cloak>
+                        <label class="{{ $labelClass }} md:col-span-2">
+                            Address line 1
+                            <input class="{{ $inputClass }}" name="location_address_line_1" value="{{ old('location_address_line_1') }}" x-bind:disabled="locationType !== 'fixed'">
+                        </label>
+                        <label class="{{ $labelClass }} md:col-span-2">
+                            Address line 2
+                            <input class="{{ $inputClass }}" name="location_address_line_2" value="{{ old('location_address_line_2') }}" x-bind:disabled="locationType !== 'fixed'">
+                        </label>
+                        <label class="{{ $labelClass }}">
+                            City
+                            <input class="{{ $inputClass }}" name="location_city" value="{{ old('location_city') }}" x-bind:disabled="locationType !== 'fixed'">
+                        </label>
+                        <label class="{{ $labelClass }}">
+                            State / region
+                            <input class="{{ $inputClass }}" name="location_region" value="{{ old('location_region') }}" x-bind:disabled="locationType !== 'fixed'">
+                        </label>
+                        <label class="{{ $labelClass }}">
+                            Postal code
+                            <input class="{{ $inputClass }}" name="location_postal_code" value="{{ old('location_postal_code') }}" x-bind:disabled="locationType !== 'fixed'">
+                        </label>
+                        <label class="{{ $labelClass }}">
+                            Country code
+                            <input class="{{ $inputClass }}" name="location_country" value="{{ old('location_country', 'US') }}" maxlength="2" x-bind:disabled="locationType !== 'fixed'">
+                        </label>
+                    </div>
+
+                    <p class="text-xs text-slate-500 md:col-span-2 xl:col-span-4" x-show="locationType === 'customer_site'" x-cloak>
+                        Customer-site services collect the service address from each booking. Only the optional label and instructions are stored on the service.
+                    </p>
 
                     <div class="flex flex-wrap gap-5 md:col-span-2 xl:col-span-4">
                         <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
@@ -472,6 +515,7 @@
                         $serviceEditable = (bool) $service->getAttribute('crm_editable');
                         $assignmentByHost = $service->hostAssignments->keyBy('scheduling_host_id');
                         $locationDetails = is_array($service->location_details) ? $service->location_details : [];
+                        $locationAddress = is_array($locationDetails['address'] ?? null) ? $locationDetails['address'] : [];
                     @endphp
 
                     <div
@@ -527,6 +571,7 @@
                                     action="{{ route('crm.scheduling.configuration.services.update', $service) }}"
                                     class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
                                     data-configuration-service-update="{{ $service->id }}"
+                                    x-data="{ locationType: @js($service->location_type ?? '') }"
                                 >
                                     @csrf
                                     @method('PATCH')
@@ -613,18 +658,60 @@
 
                                     <label class="{{ $labelClass }}">
                                         Location type
-                                        <input class="{{ $inputClass }}" name="location_type" value="{{ $service->location_type }}">
+                                        <select class="{{ $inputClass }}" name="location_type" x-model="locationType">
+                                            <option value="">Not specified</option>
+                                            <option value="phone">Phone</option>
+                                            <option value="virtual">Virtual</option>
+                                            <option value="fixed">Fixed location</option>
+                                            <option value="customer_site">Customer site</option>
+                                        </select>
                                     </label>
 
                                     <label class="{{ $labelClass }}">
                                         Location label
-                                        <input class="{{ $inputClass }}" name="location_label" value="{{ $locationDetails['label'] ?? '' }}">
+                                        <input class="{{ $inputClass }}" name="location_label" value="{{ $locationDetails['label'] ?? '' }}" x-bind:disabled="locationType === ''">
                                     </label>
 
-                                    <label class="{{ $labelClass }} md:col-span-2">
-                                        Location URL
-                                        <input class="{{ $inputClass }}" type="url" name="location_url" value="{{ $locationDetails['url'] ?? '' }}">
+                                    <label class="{{ $labelClass }} md:col-span-2 xl:col-span-4">
+                                        Location instructions
+                                        <textarea class="{{ $inputClass }}" name="location_instructions" rows="2" x-bind:disabled="locationType === ''">{{ $locationDetails['instructions'] ?? '' }}</textarea>
                                     </label>
+
+                                    <label class="{{ $labelClass }} md:col-span-2 xl:col-span-4" x-show="locationType === 'virtual'" x-cloak>
+                                        Virtual meeting URL
+                                        <input class="{{ $inputClass }}" type="url" name="location_url" value="{{ $locationDetails['url'] ?? '' }}" x-bind:disabled="locationType !== 'virtual'">
+                                    </label>
+
+                                    <div class="grid gap-4 md:col-span-2 md:grid-cols-2 xl:col-span-4 xl:grid-cols-4" x-show="locationType === 'fixed'" x-cloak>
+                                        <label class="{{ $labelClass }} md:col-span-2">
+                                            Address line 1
+                                            <input class="{{ $inputClass }}" name="location_address_line_1" value="{{ $locationAddress['address_line_1'] ?? '' }}" x-bind:disabled="locationType !== 'fixed'">
+                                        </label>
+                                        <label class="{{ $labelClass }} md:col-span-2">
+                                            Address line 2
+                                            <input class="{{ $inputClass }}" name="location_address_line_2" value="{{ $locationAddress['address_line_2'] ?? '' }}" x-bind:disabled="locationType !== 'fixed'">
+                                        </label>
+                                        <label class="{{ $labelClass }}">
+                                            City
+                                            <input class="{{ $inputClass }}" name="location_city" value="{{ $locationAddress['city'] ?? '' }}" x-bind:disabled="locationType !== 'fixed'">
+                                        </label>
+                                        <label class="{{ $labelClass }}">
+                                            State / region
+                                            <input class="{{ $inputClass }}" name="location_region" value="{{ $locationAddress['region'] ?? '' }}" x-bind:disabled="locationType !== 'fixed'">
+                                        </label>
+                                        <label class="{{ $labelClass }}">
+                                            Postal code
+                                            <input class="{{ $inputClass }}" name="location_postal_code" value="{{ $locationAddress['postal_code'] ?? '' }}" x-bind:disabled="locationType !== 'fixed'">
+                                        </label>
+                                        <label class="{{ $labelClass }}">
+                                            Country code
+                                            <input class="{{ $inputClass }}" name="location_country" value="{{ $locationAddress['country'] ?? 'US' }}" maxlength="2" x-bind:disabled="locationType !== 'fixed'">
+                                        </label>
+                                    </div>
+
+                                    <p class="text-xs text-slate-500 md:col-span-2 xl:col-span-4" x-show="locationType === 'customer_site'" x-cloak>
+                                        Customer-site services collect the service address from each booking. Only the optional label and instructions are stored on the service.
+                                    </p>
 
                                     <div class="flex flex-wrap gap-5 md:col-span-2 xl:col-span-4">
                                         <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">

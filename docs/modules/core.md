@@ -68,14 +68,17 @@ Preset sync semantics:
 missing status
     create it
 
-existing non-customized status
+existing non-customized status with changed preset-managed fields
     update it from the selected preset definition
+
+existing non-customized status already matching the preset
+    skip it without a database write or updated_at change
 
 existing customized status
     preserve it during normal sync
 
 force sync
-    overwrite it from preset data and clear is_customized/customized_at
+    overwrite changed values from preset data and clear is_customized/customized_at when needed
 ```
 
 Durable customization fields are:

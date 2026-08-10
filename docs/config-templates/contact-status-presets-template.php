@@ -88,7 +88,8 @@ return [
     |
     | ContactStatus rows are DB-owned.
     |
-    | Normal sync updates non-customized rows and preserves customized rows.
+    | Normal sync updates changed non-customized rows, skips unchanged
+    | non-customized rows without writing them, and preserves customized rows.
     |
     | Explicit force sync may overwrite customized rows and clears:
     |

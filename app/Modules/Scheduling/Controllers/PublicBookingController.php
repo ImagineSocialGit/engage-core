@@ -13,6 +13,7 @@ use App\Modules\Scheduling\Models\BookableService;
 use App\Modules\Scheduling\Models\BookingHold;
 use App\Modules\Scheduling\Requests\CompletePublicBookingRequest;
 use App\Modules\Scheduling\Requests\CreatePublicBookingHoldRequest;
+use App\Modules\Scheduling\Services\SchedulingLocationSnapshotResolver;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
@@ -21,6 +22,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use InvalidArgumentException;
 use Throwable;
 
 class PublicBookingController extends Controller
@@ -67,14 +69,29 @@ class PublicBookingController extends Controller
         CreatePublicBookingHoldRequest $request,
         string $serviceKey,
         CreatePublicBookingHoldAction $createPublicBookingHold,
+        SchedulingLocationSnapshotResolver $locationSnapshots,
     ): RedirectResponse {
         $service = $this->publicService($serviceKey);
+
+        try {
+            $location = $service->location_type === BookableService::LOCATION_TYPE_CUSTOMER_SITE
+                ? $locationSnapshots->normalizeAddress(
+                    type: BookableService::LOCATION_TYPE_CUSTOMER_SITE,
+                    input: $request->customerSiteAddress(),
+                )
+                : null;
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'address_line_1' => $exception->getMessage(),
+            ]);
+        }
 
         try {
             $hold = $createPublicBookingHold->handle(
                 service: $service,
                 startsAt: $request->startsAt(),
                 idempotencyKey: $request->idempotencyKey(),
+                location: $location,
             );
         } catch (DomainException) {
             throw ValidationException::withMessages([
@@ -318,6 +335,10 @@ class PublicBookingController extends Controller
             ? (string) $appointment->status
             : null;
 
+        $locationDetails = is_array($hold->location_details)
+            ? $hold->location_details
+            : [];
+
         return [
             'hold_id' => $hold->hold_id,
             'status' => $status,
@@ -329,6 +350,13 @@ class PublicBookingController extends Controller
             'date_label' => $startsAt->format('l, F j, Y'),
             'time_label' => $startsAt->format('g:i A').'–'.$endsAt->format('g:i A'),
             'timezone' => $timezone,
+            'location_type' => $hold->location_type,
+            'location_label' => is_string($locationDetails['label'] ?? null)
+                ? $locationDetails['label']
+                : null,
+            'location_address' => is_string(data_get($locationDetails, 'address.formatted_address'))
+                ? data_get($locationDetails, 'address.formatted_address')
+                : null,
             'appointment_status' => $appointmentStatus,
             'confirmation_pending' => $appointmentStatus === Appointment::STATUS_PENDING,
         ];

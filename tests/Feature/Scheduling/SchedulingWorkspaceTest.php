@@ -151,6 +151,97 @@ class SchedulingWorkspaceTest extends TestCase
         $this->assertSame(1, $appointment->lifecycleEvents()->count());
     }
 
+
+    public function test_customer_site_workspace_collects_and_commits_normalized_address_snapshot(): void
+    {
+        $user = User::factory()->create();
+        $contact = Contact::factory()->create(['name' => 'Home Visit Contact']);
+        $service = $this->service([
+            'name' => 'Home Visit',
+            'location_type' => BookableService::LOCATION_TYPE_CUSTOMER_SITE,
+            'location_details' => [
+                'label' => 'Customer address',
+                'instructions' => 'Meet the customer at the submitted address.',
+            ],
+        ]);
+        $startsAt = CarbonImmutable::parse('2026-08-04 15:00:00 UTC');
+        $this->availability($service, null, $startsAt, $startsAt->addHour());
+        $workspace = route('crm.scheduling.index', [
+            'bookable_service_id' => $service->id,
+            'date' => '2026-08-04',
+        ]);
+
+        $this->actingAs($user)
+            ->get($workspace)
+            ->assertOk()
+            ->assertSee('Customer service address')
+            ->assertSee('name="address_line_1"', false);
+
+        $base = [
+            'contact_id' => $contact->id,
+            'bookable_service_id' => $service->id,
+            'scheduling_host_id' => null,
+            'starts_at' => $startsAt->toIso8601String(),
+            'idempotency_key' => (string) Str::uuid(),
+        ];
+
+        $this->actingAs($user)
+            ->from($workspace)
+            ->post(route('crm.scheduling.appointments.store'), $base)
+            ->assertRedirect($workspace)
+            ->assertSessionHasErrors([
+                'address_line_1',
+                'city',
+                'region',
+                'postal_code',
+                'country',
+            ]);
+
+        $this->actingAs($user)
+            ->from($workspace)
+            ->post(route('crm.scheduling.appointments.store'), [
+                ...$base,
+                'idempotency_key' => (string) Str::uuid(),
+                'address_line_1' => '100 Customer Road',
+                'city' => 'Denver',
+                'region' => 'CO',
+                'postal_code' => '80203',
+                'country' => 'US',
+                'latitude' => 39.7392,
+            ])
+            ->assertRedirect($workspace)
+            ->assertSessionHasErrors('latitude');
+
+        $this->actingAs($user)
+            ->post(route('crm.scheduling.appointments.store'), [
+                ...$base,
+                'idempotency_key' => (string) Str::uuid(),
+                'address_line_1' => '  100   Customer Road ',
+                'address_line_2' => null,
+                'city' => ' Denver ',
+                'region' => ' CO ',
+                'postal_code' => ' 80203 ',
+                'country' => 'us',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Appointment scheduled.');
+
+        $appointment = Appointment::query()->sole();
+
+        $this->assertSame(BookableService::LOCATION_TYPE_CUSTOMER_SITE, $appointment->location_type);
+        $this->assertSame('Customer address', data_get($appointment->location_details, 'label'));
+        $this->assertSame(
+            'Meet the customer at the submitted address.',
+            data_get($appointment->location_details, 'instructions'),
+        );
+        $this->assertSame('100 Customer Road', data_get($appointment->location_details, 'address.address_line_1'));
+        $this->assertSame('US', data_get($appointment->location_details, 'address.country'));
+        $this->assertSame(
+            '100 Customer Road, Denver, CO 80203, US',
+            data_get($appointment->location_details, 'address.formatted_address'),
+        );
+    }
+
     public function test_confirmation_required_and_unhosted_services_follow_service_policy(): void
     {
         $user = User::factory()->create();

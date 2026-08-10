@@ -657,7 +657,7 @@ Location, when separately enabled through an optional app-level bridge
 
 `BookingHold` now stores `location_type` and `location_details` as the authoritative location commitment. Ordinary hold conversion and rescheduling copy that immutable hold snapshot into the Appointment. Later edits to a BookableService or reusable saved Location cannot rewrite the held or historical facts. Customer-site direct creation and hold creation require a normalized booking-specific snapshot; fixed, phone, and virtual snapshots are derived from server-owned service configuration.
 
-The next slice adds closed CRM service-location authoring plus the customer-site public/CRM address-collection step. The current public form still does not collect an address, so customer-site public services should not be exposed until that step is applied.
+Phase 4B.2B2 closes the service-location authoring and booking-input surfaces. CRM configuration now accepts only the canonical `phone`, `virtual`, `fixed`, and `customer_site` modes. Fixed services require a Scheduling-normalized address; virtual services may carry a URL; customer-site services store only service-level label/instructions and collect the actual address per booking. Public and CRM customer-site submissions accept only raw address fields and reject caller-authored coordinates, provider identity, formatted address, precision, confidence, or location snapshots. Scheduling normalizes those raw facts before any BookingHold or direct Appointment commitment.
 
 Travel-aware Scheduling must use estimated travel time rather than straight-line distance. For every candidate customer-site Appointment, availability must check both adjacent directions:
 
@@ -779,14 +779,22 @@ The same idempotency key returns the original hold for the same offer and commit
 
 ### Public reservation transaction
 
-The public browser does not receive an offer ID. The currently implemented non-customer-site form posts only:
+The public browser does not receive an offer ID. It posts only the selected start time, replay key, and—when the service is `customer_site`—raw booking-specific address fields:
 
 ```text
 starts_at
 idempotency_key
+address_line_1
+address_line_2
+city
+region
+postal_code
+country
 ```
 
-The action contract can also receive a server-normalized customer-site snapshot. The progressive customer-site details step that produces that snapshot is deferred to Phase 4B.2B2.
+The address fields are required only for `customer_site` and prohibited for phone, virtual, and fixed services. Caller-authored normalized or enrichment fields such as `location_type`, `location_details`, `formatted_address`, coordinates, timezone, precision, confidence, or provider identity are rejected. `PublicBookingController` normalizes the raw address through the Scheduling-owned resolver before it invokes the hold action.
+
+The current date/time list remains a pre-travel candidate surface. Phase 4B.2C and the progressive Phase 4B.3 flow will use the already-collected normalized customer-site location before presenting travel-aware authoritative availability.
 
 `CreatePublicBookingHoldAction` accepts the already-resolved public `BookableService`, parses the requested instant as UTC, checks for an idempotent existing hold, and recalculates exact current availability for one service-duration interval. It selects the first matching `BookableSlot` in the engine's deterministic order, then calls `IssueBookableSlotOfferAction` and `CreateBookingHoldAction` inside one outer database transaction.
 
@@ -794,7 +802,7 @@ This preserves the opaque-offer trust boundary while allowing a simple public fo
 
 Public replay keys are UUIDs. Repeating the same service, start time, and replay key returns the original hold without issuing another offer. Reusing the key for another service, time, or reschedule-scoped hold is rejected. A concurrency loser reloads the matching committed hold after its speculative offer transaction rolls back.
 
-The public hold page is capability-addressed by the opaque `hold_id`, marked `noindex`, and renders only service name, local date/time, timezone, effective status, absolute expiration, and authoritative remaining seconds. It does not expose host, capacity, offer, occupancy, or availability-rule details.
+The public hold page is capability-addressed by the opaque `hold_id`, marked `noindex`, and renders only service name, local date/time, timezone, effective status, absolute expiration, authoritative remaining seconds, and the held customer-site formatted address when one exists. It does not expose host, capacity, offer, occupancy, or availability-rule details.
 
 ### Public booking completion
 
@@ -896,11 +904,14 @@ choose Contact
 choose active service
 choose explicit active assigned host when the service has assignments
 choose a date
+for customer_site, enter the booking-specific raw service address
 choose a currently available start time
 create through CreateAppointmentAction
 ```
 
-The browser submits only Contact, service, optional host, selected start instant, and a UUID idempotency key. Duration, end time, location, capacity, status, source, attendee state, and lifecycle output remain server-owned. The controller converts domain conflicts into validation feedback and never writes Scheduling records directly.
+`StoreAppointmentRequest` requires those address fields only for `customer_site`, prohibits them for other service modes, and rejects caller-authored normalized/enrichment fields. `SchedulingController` normalizes the address through the Scheduling-owned resolver and supplies the canonical snapshot in `AppointmentBookingData`; `CreateAppointmentAction` remains authoritative for the final commitment and availability revalidation.
+
+The browser submits only Contact, service, optional host, selected start instant, UUID idempotency key, and the raw customer-site address when applicable. Duration, end time, canonical location snapshot, capacity, status, source, attendee state, and lifecycle output remain server-owned. The controller converts domain conflicts into validation feedback and never writes Scheduling records directly.
 
 Contact selection uses the existing Core Contact lookup endpoint. The workspace does not create or update Contacts, and it does not silently assign a host. A service with exactly one active eligible host may be preselected for convenience, but that explicit host identity is still submitted and revalidated by `CreateAppointmentAction`.
 
@@ -929,6 +940,8 @@ Service identity, duration, end time, offer and hold identities, replacement sta
 
 A successful reschedule redirects to the replacement Appointment. Matching replay submissions return that same replacement without creating another offer, hold, attendee set, lifecycle event, or automation event. Reusing the replay key for another source Appointment, host, or start time is rejected.
 
+A future CRM rescheduling enhancement should suggest currently open replacement slots using the source Appointment's authoritative service, duration, host/resource requirements, location mode, and other booking criteria rather than forcing the operator to rebuild the search manually. Once travel-aware availability exists, in-person suggestions may be ordered or highlighted by travel convenience. Optional Location enrichment may improve geographic comparison when Location is separately enabled, but the baseline reschedule suggestions and travel-fit decisions remain Scheduling-owned and must work without Location.
+
 The Scheduling module also contributes a Contact-page panel through Core's module-filtered `ContactPanelProvider` seam. `SchedulingContactPanelProvider` uses bounded Scheduling-owned queries keyed only by `appointments.contact_id`; Core does not gain Scheduling relationships or query knowledge.
 
 The panel shows the next operational Appointment, other upcoming `pending`, `scheduled`, or `confirmed` Appointments, pending-confirmation attention, and recent `completed`, `canceled`, or `no_show` outcomes. Service, host, primary attendee ordering, and reschedule lineage are loaded by `SchedulingReadService`, and every row links to the authoritative CRM Appointment detail surface rather than duplicating lifecycle controls.
@@ -956,14 +969,17 @@ minimum booking notice
 booking horizon
 cancellation and reschedule notice
 service timezone
-structured location label and URL
+canonical location mode: phone | virtual | fixed | customer_site
+optional location label and instructions
+virtual URL only for virtual services
+normalized fixed address only for fixed services
 capacity
 confirmation requirement
 public visibility
 sort order
 ```
 
-The browser never submits raw `location_details` JSON. The writer projects the ordinary location fields into the Scheduling-owned structured snapshot while preserving any unrelated existing location keys on an editable manual service.
+The browser never submits raw `location_details` JSON or provider/geocoding facts. `SchedulingConfigurationController` rejects unknown location modes and type-incompatible fields. `SchedulingConfigurationWriter` rebuilds the closed Scheduling-owned location details for each edit: phone/customer-site may retain only label/instructions, virtual may additionally retain URL, and fixed stores the canonical normalized address plus optional label/instructions. Changing location modes therefore cannot preserve stale hidden fields from the prior mode.
 
 Assignment synchronization is transactional. Existing assignment rows omitted from a submission or explicitly disabled are retained with `is_active = false`; they are not deleted, and their presence continues to prevent accidental fallback to unhosted booking. A new inactive host does not create an unnecessary assignment row. Active assignments require an active, non-deleted host and may carry a positive capacity override plus sort order. The service is touched after synchronization so concurrent assignment forms become stale.
 
@@ -1184,8 +1200,8 @@ Deferred after the resource configuration workspace:
 ```text
 Phase 4B.2A — COMPLETE: define the Scheduling-owned location/snapshot boundary and retain Location as a separate optional silent capability
 Phase 4B.2B1 — COMPLETE: add Scheduling-owned deterministic address normalization and canonical phone/virtual/fixed/customer-site snapshots, persist authoritative BookingHold location snapshots, copy hold snapshots into Appointment conversion/rescheduling, and require booking-specific customer-site snapshots without creating Location rows
-Phase 4B.2B2 — add closed CRM service-location authoring and customer-site public/CRM address collection before authoritative availability
-Phase 4B.2C — add Scheduling-owned travel-time resolution, conservative fallback, adjacent-Appointment checks, and transaction-time revalidation
+Phase 4B.2B2 — COMPLETE: add closed CRM service-location authoring and customer-site public/CRM raw-address collection with server-owned normalization before commitment
+Phase 4B.2C — add Scheduling-owned travel-time resolution, conservative fallback, adjacent-Appointment checks, transaction-time revalidation, and admin reschedule slot suggestions that preserve the source booking criteria; optional Location enrichment may improve proximity ranking without becoming a dependency
 Phase 4B.3 — appointment-type-first progressive public booking
 Phase 4B.4 — Messaging-backed email/SMS verification before capacity hold
 SCHEDULING_APP_URL setup validation

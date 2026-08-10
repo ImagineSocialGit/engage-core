@@ -224,9 +224,10 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
                 $this->servicePayload([
                     'key' => 'planning_call',
                     'name' => 'Planning Call',
-                    'location_type' => 'video',
+                    'location_type' => BookableService::LOCATION_TYPE_VIRTUAL,
                     'location_label' => 'Video Room',
                     'location_url' => 'https://example.test/room',
+                    'location_instructions' => 'Join from a quiet place.',
                     'requires_confirmation' => true,
                     'is_public' => true,
                 ]),
@@ -248,6 +249,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
         $this->assertEquals([
             'label' => 'Video Room',
             'url' => 'https://example.test/room',
+            'instructions' => 'Join from a quiet place.',
         ], $service->location_details);
 
         $this->actingAs($user)
@@ -259,7 +261,9 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
                     'status' => BookableService::STATUS_INACTIVE,
                     'is_public' => true,
                     'duration_minutes' => 45,
+                    'location_type' => null,
                     'location_label' => '',
+                    'location_instructions' => '',
                     'location_url' => '',
                 ], includeKey: false),
             )
@@ -274,6 +278,83 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
         $this->assertFalse($service->is_public);
         $this->assertSame(45, $service->duration_minutes);
         $this->assertNull($service->location_details);
+    }
+
+
+    public function test_service_location_authoring_is_closed_and_fixed_addresses_are_normalized(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post(
+                route('crm.scheduling.configuration.services.store'),
+                $this->servicePayload([
+                    'key' => 'office_visit',
+                    'name' => 'Office Visit',
+                    'location_type' => BookableService::LOCATION_TYPE_FIXED,
+                    'location_label' => 'Main office',
+                    'location_instructions' => 'Use the north entrance.',
+                    'location_address_line_1' => '  50   Office Plaza ',
+                    'location_city' => ' Denver ',
+                    'location_region' => ' CO ',
+                    'location_postal_code' => ' 80205 ',
+                    'location_country' => 'us',
+                ]),
+            )
+            ->assertSessionHasNoErrors();
+
+        $fixed = BookableService::query()->where('key', 'office_visit')->sole();
+
+        $this->assertSame(BookableService::LOCATION_TYPE_FIXED, $fixed->location_type);
+        $this->assertSame('Main office', data_get($fixed->location_details, 'label'));
+        $this->assertSame('Use the north entrance.', data_get($fixed->location_details, 'instructions'));
+        $this->assertSame('50 Office Plaza', data_get($fixed->location_details, 'address.address_line_1'));
+        $this->assertSame('US', data_get($fixed->location_details, 'address.country'));
+        $this->assertSame(
+            '50 Office Plaza, Denver, CO 80205, US',
+            data_get($fixed->location_details, 'address.formatted_address'),
+        );
+
+        $this->actingAs($user)
+            ->post(
+                route('crm.scheduling.configuration.services.store'),
+                $this->servicePayload([
+                    'key' => 'mobile_visit',
+                    'name' => 'Mobile Visit',
+                    'location_type' => BookableService::LOCATION_TYPE_CUSTOMER_SITE,
+                    'location_label' => 'Customer address',
+                    'location_instructions' => 'Meet the customer at the submitted address.',
+                ]),
+            )
+            ->assertSessionHasNoErrors();
+
+        $customerSite = BookableService::query()->where('key', 'mobile_visit')->sole();
+
+        $this->assertEquals([
+            'label' => 'Customer address',
+            'instructions' => 'Meet the customer at the submitted address.',
+        ], $customerSite->location_details);
+
+        $this->actingAs($user)
+            ->post(
+                route('crm.scheduling.configuration.services.store'),
+                $this->servicePayload([
+                    'key' => 'bad_location_type',
+                    'location_type' => 'video',
+                ]),
+            )
+            ->assertSessionHasErrors('location_type');
+
+        $this->actingAs($user)
+            ->post(
+                route('crm.scheduling.configuration.services.store'),
+                $this->servicePayload([
+                    'key' => 'bad_customer_site',
+                    'location_type' => BookableService::LOCATION_TYPE_CUSTOMER_SITE,
+                    'location_address_line_1' => '123 Should Not Persist',
+                ]),
+            )
+            ->assertSessionHasErrors('location_address_line_1');
     }
 
     public function test_service_updates_reject_provider_owned_immutable_internal_and_stale_changes(): void
@@ -532,7 +613,14 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
             'timezone' => 'UTC',
             'location_type' => null,
             'location_label' => null,
+            'location_instructions' => null,
             'location_url' => null,
+            'location_address_line_1' => null,
+            'location_address_line_2' => null,
+            'location_city' => null,
+            'location_region' => null,
+            'location_postal_code' => null,
+            'location_country' => null,
             'capacity' => 1,
             'requires_confirmation' => false,
             'is_public' => false,

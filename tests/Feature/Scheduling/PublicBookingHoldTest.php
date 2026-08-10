@@ -148,6 +148,95 @@ class PublicBookingHoldTest extends TestCase
         $this->assertDatabaseCount('booking_holds', 0);
     }
 
+
+    public function test_customer_site_public_booking_requires_raw_address_and_commits_normalized_snapshot(): void
+    {
+        CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
+        $this->registerPublicSurface('https://schedule.test');
+
+        $service = $this->publicService('home-visit', [
+            'location_type' => BookableService::LOCATION_TYPE_CUSTOMER_SITE,
+            'location_details' => [
+                'label' => 'Customer address',
+                'instructions' => 'Meet the customer at the submitted address.',
+            ],
+        ]);
+        $this->absoluteAvailability(
+            service: $service,
+            startsAt: '2026-07-23 09:00:00 UTC',
+            endsAt: '2026-07-23 10:00:00 UTC',
+        );
+
+        $serviceUrl = 'https://schedule.test/services/home-visit?date=2026-07-23';
+        $reserveUrl = 'https://schedule.test/services/home-visit/reserve';
+
+        $this->get($serviceUrl)
+            ->assertOk()
+            ->assertSee('Service address')
+            ->assertSee('name="address_line_1"', false)
+            ->assertSee('name="country"', false);
+
+        $base = [
+            'starts_at' => '2026-07-23T09:00:00.000000Z',
+            'idempotency_key' => (string) Str::uuid(),
+        ];
+
+        $this->from($serviceUrl)
+            ->post($reserveUrl, $base)
+            ->assertRedirect($serviceUrl)
+            ->assertSessionHasErrors([
+                'address_line_1',
+                'city',
+                'region',
+                'postal_code',
+                'country',
+            ]);
+
+        $this->from($serviceUrl)
+            ->post($reserveUrl, [
+                ...$base,
+                'idempotency_key' => (string) Str::uuid(),
+                'address_line_1' => '  123   Main Street ',
+                'city' => ' Denver ',
+                'region' => ' CO ',
+                'postal_code' => ' 80202 ',
+                'country' => 'us',
+                'latitude' => 39.7392,
+            ])
+            ->assertRedirect($serviceUrl)
+            ->assertSessionHasErrors('latitude');
+
+        $response = $this->post($reserveUrl, [
+            ...$base,
+            'idempotency_key' => (string) Str::uuid(),
+            'address_line_1' => '  123   Main Street ',
+            'address_line_2' => '',
+            'city' => ' Denver ',
+            'region' => ' CO ',
+            'postal_code' => ' 80202 ',
+            'country' => 'us',
+        ])->assertRedirect();
+
+        $hold = BookingHold::query()->sole();
+
+        $this->assertSame(BookableService::LOCATION_TYPE_CUSTOMER_SITE, $hold->location_type);
+        $this->assertSame('Customer address', data_get($hold->location_details, 'label'));
+        $this->assertSame(
+            'Meet the customer at the submitted address.',
+            data_get($hold->location_details, 'instructions'),
+        );
+        $this->assertSame('123 Main Street', data_get($hold->location_details, 'address.address_line_1'));
+        $this->assertSame('US', data_get($hold->location_details, 'address.country'));
+        $this->assertSame(
+            '123 Main Street, Denver, CO 80202, US',
+            data_get($hold->location_details, 'address.formatted_address'),
+        );
+
+        $this->get((string) $response->headers->get('Location'))
+            ->assertOk()
+            ->assertSee('123 Main Street, Denver, CO 80202, US');
+    }
+
     public function test_private_services_cannot_create_public_holds(): void
     {
         CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
@@ -321,7 +410,10 @@ class PublicBookingHoldTest extends TestCase
         $this->post($url, $payload)->assertStatus(429);
     }
 
-    private function publicService(string $key): BookableService
+    /**
+     * @param array<string, mixed> $overrides
+     */
+    private function publicService(string $key, array $overrides = []): BookableService
     {
         return BookableService::factory()->create([
             'key' => $key,
@@ -332,6 +424,7 @@ class PublicBookingHoldTest extends TestCase
             'timezone' => 'UTC',
             'capacity' => 1,
             'is_public' => true,
+            ...$overrides,
         ]);
     }
 
