@@ -14,6 +14,7 @@ class ResolveRegisterableWebinarAction
     public function getGlobal(): ?Webinar
     {
         return $this->registerableQuery()
+            ->matchingCurrentSeriesProvider()
             ->whereHas(
                 'webinarSeries',
                 fn (Builder $query): Builder => $query->where('status', 'active'),
@@ -29,7 +30,7 @@ class ResolveRegisterableWebinarAction
         }
 
         return $this->registerableQuery()
-            ->where('webinar_series_id', $series->getKey())
+            ->forSeriesProviderIdentity($series)
             ->orderBy('starts_at')
             ->first();
     }
@@ -41,7 +42,7 @@ class ResolveRegisterableWebinarAction
         }
 
         return $this->registerableQuery()
-            ->where('webinar_series_id', $series->getKey())
+            ->forSeriesProviderIdentity($series)
             ->whereKey($webinarId)
             ->first();
     }
@@ -51,7 +52,8 @@ class ResolveRegisterableWebinarAction
         return $webinar->webinar_series_id !== null
             && $webinar->starts_at !== null
             && $webinar->starts_at->greaterThanOrEqualTo($this->lateJoinCutoff())
-            && $webinar->webinarSeries?->status === 'active';
+            && $webinar->webinarSeries?->status === 'active'
+            && $webinar->matchesSeriesProviderIdentity();
     }
 
     public function isRegisterableForSeries(
@@ -60,6 +62,7 @@ class ResolveRegisterableWebinarAction
     ): bool {
         return $series->status === 'active'
             && $webinar->webinar_series_id === $series->getKey()
+            && $webinar->matchesSeriesProviderIdentity($series)
             && $webinar->starts_at !== null
             && $webinar->starts_at->greaterThanOrEqualTo($this->lateJoinCutoff());
     }

@@ -5,6 +5,7 @@ namespace App\Modules\Webinars\Models;
 use App\Modules\Webinars\Actions\FlushWebinarCachesAction;
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
 use Database\Factories\WebinarFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -66,18 +67,21 @@ class Webinar extends Model
         });
 
         static::saved(function (Webinar $webinar): void {
-            if (! $webinar->wasChanged([
-                'starts_at',
-                'ends_at',
-                'webinar_series_id',
-                'replacement_of_webinar_id',
-                'webinar_schedule_profile_id',
-                'platform',
-                'provider_event_type',
-                'registration_url',
-                'join_url',
-                'timezone',
-            ])) {
+            if (
+                ! $webinar->wasRecentlyCreated
+                && ! $webinar->wasChanged([
+                    'starts_at',
+                    'ends_at',
+                    'webinar_series_id',
+                    'replacement_of_webinar_id',
+                    'webinar_schedule_profile_id',
+                    'platform',
+                    'provider_event_type',
+                    'registration_url',
+                    'join_url',
+                    'timezone',
+                ])
+            ) {
                 return;
             }
 
@@ -112,6 +116,41 @@ class Webinar extends Model
     public function registrations(): HasMany
     {
         return $this->hasMany(WebinarRegistration::class);
+    }
+
+    public function scopeForSeriesProviderIdentity(
+        Builder $query,
+        WebinarSeries $series,
+    ): Builder {
+        return $query
+            ->where('webinar_series_id', $series->getKey())
+            ->where('platform', $series->providerKey())
+            ->where('provider_event_type', $series->providerEventTypeKey());
+    }
+
+    public function scopeMatchingCurrentSeriesProvider(Builder $query): Builder
+    {
+        return $query->whereHas(
+            'webinarSeries',
+            fn (Builder $seriesQuery): Builder => $seriesQuery
+                ->whereColumn('webinar_series.platform', 'webinars.platform')
+                ->whereColumn(
+                    'webinar_series.provider_event_type',
+                    'webinars.provider_event_type',
+                ),
+        );
+    }
+
+    public function matchesSeriesProviderIdentity(?WebinarSeries $series = null): bool
+    {
+        $series ??= $this->relationLoaded('webinarSeries')
+            ? $this->getRelation('webinarSeries')
+            : $this->webinarSeries()->first();
+
+        return $series instanceof WebinarSeries
+            && (int) $this->webinar_series_id === (int) $series->getKey()
+            && $this->providerKey() === $series->providerKey()
+            && $this->providerEventTypeKey() === $series->providerEventTypeKey();
     }
 
     public function providerKey(): string

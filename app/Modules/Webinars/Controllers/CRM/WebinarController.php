@@ -88,7 +88,9 @@ class WebinarController extends Controller
                         );
                 }));
         } elseif (! $showArchived) {
-            $query->where('ends_at', '>', now());
+            $query
+                ->where('ends_at', '>', now())
+                ->matchingCurrentSeriesProvider();
         }
 
         $webinars = $query

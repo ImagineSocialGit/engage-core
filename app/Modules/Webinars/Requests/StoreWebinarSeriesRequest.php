@@ -11,7 +11,7 @@ use Illuminate\Validation\Validator;
 
 class StoreWebinarSeriesRequest extends FormRequest
 {
-    private const EXISTING_SERIES_GUIDANCE = 'A webinar series with this title or public slug already exists. Do not create separate Zoom Meeting and Zoom Webinar series. Use the existing series\' Event type control, sync that series, and use occurrence replacement when an old occurrence is being replaced by a new provider event.';
+    private const EXISTING_SERIES_GUIDANCE = 'A webinar series with this title or public slug already exists. Use that series instead: choose its Zoom event type, then sync it. Occurrences of the other provider event type become historical automatically. Use occurrence replacement only when registrations must move to a replacement occurrence.';
 
     public function authorize(): bool
     {
