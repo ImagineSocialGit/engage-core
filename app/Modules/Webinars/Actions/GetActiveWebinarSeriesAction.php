@@ -29,7 +29,15 @@ class GetActiveWebinarSeriesAction
 
     public function findBySlug(string $seriesSlug): ?WebinarSeries
     {
-        return $this->handle()
-            ->firstWhere('slug', $seriesSlug);
+        $matches = $this->handle()
+            ->filter(
+                fn (WebinarSeries $series): bool =>
+                    $series->slug === $seriesSlug,
+            )
+            ->values();
+
+        return $matches->count() === 1
+            ? $matches->first()
+            : null;
     }
 }

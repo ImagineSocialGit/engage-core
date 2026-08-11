@@ -3,14 +3,34 @@
 namespace App\Modules\Webinars\Requests;
 
 use App\Modules\Webinars\Enums\WebinarProviderEventType;
+use App\Modules\Webinars\Models\WebinarSeries;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreWebinarSeriesRequest extends FormRequest
 {
+    private const EXISTING_SERIES_GUIDANCE = 'A webinar series with this title or public slug already exists. Do not create separate Zoom Meeting and Zoom Webinar series. Use the existing series\' Event type control, sync that series, and use occurrence replacement when an old occurrence is being replaced by a new provider event.';
+
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $title = $this->input('title');
+        $providerEventType = $this->input('provider_event_type');
+
+        $this->merge([
+            'title' => is_string($title)
+                ? trim($title)
+                : $title,
+            'provider_event_type' => is_string($providerEventType)
+                ? strtolower(trim($providerEventType))
+                : $providerEventType,
+        ]);
     }
 
     public function rules(): array
@@ -22,6 +42,46 @@ class StoreWebinarSeriesRequest extends FormRequest
                 'string',
                 Rule::in($this->supportedProviderEventTypes()),
             ],
+        ];
+    }
+
+    /**
+     * @return array<int, callable>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                if ($validator->errors()->has('title')) {
+                    return;
+                }
+
+                $title = $this->input('title');
+
+                if (! is_string($title)) {
+                    return;
+                }
+
+                $slug = Str::slug($title);
+
+                if ($slug === '') {
+                    return;
+                }
+
+                if (WebinarSeries::query()->where('slug', $slug)->exists()) {
+                    $validator->errors()->add(
+                        'title',
+                        self::EXISTING_SERIES_GUIDANCE,
+                    );
+                }
+            },
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'title.unique' => self::EXISTING_SERIES_GUIDANCE,
         ];
     }
 

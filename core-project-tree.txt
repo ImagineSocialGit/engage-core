@@ -1825,6 +1825,7 @@
 │   │   ├── CRM
 │   │   │   ├── DashboardControllerTest.php
 │   │   │   ├── UpdateContactStatusActionTest.php
+│   │   │   ├── WebinarSeriesAuthoringGuardTest.php
 │   │   │   └── WebinarSyncTest.php
 │   │   ├── Documents
 │   │   │   └── DocumentsFoundationTest.php
@@ -2106,4 +2107,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-538 directories, 1569 files
+538 directories, 1570 files
