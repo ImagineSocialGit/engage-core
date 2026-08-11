@@ -242,6 +242,83 @@ class SchedulingWorkspaceTest extends TestCase
         );
     }
 
+    public function test_range_duration_workspace_collects_check_in_and_check_out_and_creates_one_multi_day_appointment(): void
+    {
+        $user = User::factory()->create();
+        $contact = Contact::factory()->create([
+            'name' => 'Boarding Contact',
+            'email' => 'boarding@example.test',
+        ]);
+        $service = BookableService::factory()
+            ->rangeDuration(
+                defaultMinutes: 2880,
+                minimumMinutes: 1440,
+                maximumMinutes: 10080,
+            )
+            ->create([
+                'name' => 'Boarding Stay',
+                'status' => BookableService::STATUS_ACTIVE,
+                'slot_interval_minutes' => 60,
+                'minimum_notice_minutes' => 0,
+                'booking_horizon_days' => 30,
+                'timezone' => 'UTC',
+                'capacity' => 1,
+            ]);
+
+        $this->availability(
+            $service,
+            null,
+            CarbonImmutable::parse('2026-08-07 15:00:00 UTC'),
+            CarbonImmutable::parse('2026-08-07 17:00:00 UTC'),
+        );
+        $this->availability(
+            $service,
+            null,
+            CarbonImmutable::parse('2026-08-10 09:00:00 UTC'),
+            CarbonImmutable::parse('2026-08-10 11:00:00 UTC'),
+        );
+
+        $workspace = route('crm.scheduling.index', [
+            'bookable_service_id' => $service->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get($workspace)
+            ->assertOk()
+            ->assertSee('name="range_starts_at"', false)
+            ->assertSee('name="range_ends_at"', false)
+            ->assertDontSee('name="starts_at"', false);
+
+        $response = $this->actingAs($user)
+            ->from($workspace)
+            ->post(route('crm.scheduling.appointments.store'), [
+                'contact_id' => $contact->id,
+                'bookable_service_id' => $service->id,
+                'scheduling_host_id' => null,
+                'range_starts_at' => '2026-08-07T15:00',
+                'range_ends_at' => '2026-08-10T10:00',
+                'idempotency_key' => (string) Str::uuid(),
+            ]);
+
+        $response
+            ->assertRedirect()
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Appointment scheduled.');
+
+        $appointment = Appointment::query()->sole();
+
+        $this->assertSame($service->id, $appointment->bookable_service_id);
+        $this->assertSame($contact->id, $appointment->contact_id);
+        $this->assertTrue($appointment->starts_at->equalTo(
+            CarbonImmutable::parse('2026-08-07 15:00:00 UTC'),
+        ));
+        $this->assertTrue($appointment->ends_at->equalTo(
+            CarbonImmutable::parse('2026-08-10 10:00:00 UTC'),
+        ));
+        $this->assertSame(Appointment::STATUS_SCHEDULED, $appointment->status);
+        $this->assertDatabaseCount('appointments', 1);
+    }
+
     public function test_confirmation_required_and_unhosted_services_follow_service_policy(): void
     {
         $user = User::factory()->create();
@@ -343,7 +420,6 @@ class SchedulingWorkspaceTest extends TestCase
             'starts_at' => $startsAt->toIso8601String(),
             'idempotency_key' => $key,
             'status' => Appointment::STATUS_COMPLETED,
-            'ends_at' => $startsAt->addDays(10)->toIso8601String(),
             'capacity' => 999,
             'source' => 'forged',
         ];

@@ -46,7 +46,7 @@
                             <dd class="mt-1 font-medium text-slate-900">
                                 {{ $appointment->starts_at?->setTimezone($displayTimezone)->format('D, M j, Y \a\t g:i A') }}
                                 –
-                                {{ $appointment->ends_at?->setTimezone($displayTimezone)->format('g:i A') }}
+                                {{ $appointment->ends_at?->setTimezone($displayTimezone)->format($service->usesRangeDuration() ? 'D, M j, Y \a\t g:i A' : 'g:i A') }}
                             </dd>
                             <dd class="mt-1 text-xs text-slate-500">{{ $displayTimezone }}</dd>
                         </div>
@@ -69,7 +69,11 @@
                             Find a replacement time
                         </h2>
                         <p class="mt-1 text-sm text-slate-500">
-                            The current appointment is excluded from availability, but all other appointments, holds, buffers, blackouts, and capacity limits still apply.
+                            @if($service->usesRangeDuration())
+                                The current stay duration is preserved. Choose a replacement check-in date; Scheduling validates the full resulting check-in/check-out interval against all other appointments, holds, resources, blackouts, and capacity limits.
+                            @else
+                                The current appointment is excluded from availability, but all other appointments, holds, buffers, blackouts, and capacity limits still apply.
+                            @endif
                         </p>
                     </div>
 
@@ -111,7 +115,7 @@
 
                         <div>
                             <x-ui.form.label for="date">
-                                Date
+                                {{ $service->usesRangeDuration() ? 'Replacement check-in date' : 'Date' }}
                             </x-ui.form.label>
 
                             <x-ui.form.input
@@ -192,7 +196,11 @@
                                             @checked(old('starts_at') === $slotValue)
                                         >
                                         <span class="block text-sm font-semibold text-slate-900">
-                                            {{ $slotLocalStart->format('D, M j') }} · {{ $slotLocalStart->format('g:i A') }}–{{ $slotLocalEnd->format('g:i A') }}
+                                            @if($service->usesRangeDuration())
+                                                {{ $slotLocalStart->format('D, M j, Y \a\t g:i A') }} – {{ $slotLocalEnd->format('D, M j, Y \a\t g:i A') }}
+                                            @else
+                                                {{ $slotLocalStart->format('D, M j') }} · {{ $slotLocalStart->format('g:i A') }}–{{ $slotLocalEnd->format('g:i A') }}
+                                            @endif
                                         </span>
                                         <span class="mt-1 block text-xs text-slate-500">
                                             {{ $displayTimezone }}
@@ -224,13 +232,11 @@
                                 @foreach($slots as $slot)
                                     @php
                                         $slotValue = $slot->startsAt->toISOString();
-                                        $slotLabel = $slot->startsAt
-                                            ->setTimezone($displayTimezone)
-                                            ->format('g:i A')
-                                            .'–'
-                                            .$slot->endsAt
-                                                ->setTimezone($displayTimezone)
-                                                ->format('g:i A');
+                                        $slotLocalStart = $slot->startsAt->setTimezone($displayTimezone);
+                                        $slotLocalEnd = $slot->endsAt->setTimezone($displayTimezone);
+                                        $slotLabel = $service->usesRangeDuration()
+                                            ? $slotLocalStart->format('D, M j, Y \a\t g:i A').' – '.$slotLocalEnd->format('D, M j, Y \a\t g:i A')
+                                            : $slotLocalStart->format('g:i A').'–'.$slotLocalEnd->format('g:i A');
                                     @endphp
 
                                     <label class="cursor-pointer rounded-xl border border-slate-200 p-3 hover:border-slate-400 has-[:checked]:border-teal-500 has-[:checked]:bg-teal-50">
@@ -310,7 +316,7 @@
                         class="w-full justify-center"
                         :disabled="($requiresHost && ! $selectedHost) || $slots === []"
                     >
-                        Reschedule Appointment
+                        {{ $service->usesRangeDuration() ? 'Reschedule stay' : 'Reschedule Appointment' }}
                     </x-ui.button>
                 </form>
             </x-ui.card>

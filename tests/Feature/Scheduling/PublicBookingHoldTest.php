@@ -237,6 +237,75 @@ class PublicBookingHoldTest extends TestCase
             ->assertSee('123 Main Street, Denver, CO 80202, US');
     }
 
+    public function test_public_range_service_collects_check_in_and_check_out_and_holds_the_complete_stay(): void
+    {
+        CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');
+        $this->registerPublicSurface('https://schedule.test');
+
+        $service = BookableService::factory()
+            ->rangeDuration(
+                defaultMinutes: 2880,
+                minimumMinutes: 1440,
+                maximumMinutes: 10080,
+            )
+            ->create([
+                'key' => 'boarding-stay',
+                'name' => 'Boarding Stay',
+                'status' => BookableService::STATUS_ACTIVE,
+                'slot_interval_minutes' => 60,
+                'minimum_notice_minutes' => 0,
+                'booking_horizon_days' => 10,
+                'timezone' => 'UTC',
+                'capacity' => 1,
+                'is_public' => true,
+            ]);
+
+        $this->absoluteAvailability(
+            service: $service,
+            startsAt: '2026-07-23 15:00:00 UTC',
+            endsAt: '2026-07-23 17:00:00 UTC',
+        );
+        $this->absoluteAvailability(
+            service: $service,
+            startsAt: '2026-07-26 09:00:00 UTC',
+            endsAt: '2026-07-26 11:00:00 UTC',
+        );
+
+        $serviceUrl = 'https://schedule.test/services/boarding-stay';
+
+        $this->get($serviceUrl)
+            ->assertOk()
+            ->assertSee('name="range_starts_at"', false)
+            ->assertSee('name="range_ends_at"', false)
+            ->assertSee('name="idempotency_key"', false)
+            ->assertDontSee('name="starts_at"', false)
+            ->assertDontSee('scheduling_host_id')
+            ->assertDontSee('offer_id');
+
+        $response = $this->post($serviceUrl.'/reserve', [
+            'range_starts_at' => '2026-07-23T15:00',
+            'range_ends_at' => '2026-07-26T10:00',
+            'idempotency_key' => (string) Str::uuid(),
+        ]);
+
+        $response
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $hold = BookingHold::query()->sole();
+
+        $this->assertSame($service->id, $hold->bookable_service_id);
+        $this->assertTrue($hold->starts_at->equalTo(
+            CarbonImmutable::parse('2026-07-23 15:00:00 UTC'),
+        ));
+        $this->assertTrue($hold->ends_at->equalTo(
+            CarbonImmutable::parse('2026-07-26 10:00:00 UTC'),
+        ));
+        $this->assertSame(BookingHold::STATUS_ACTIVE, $hold->status);
+        $this->assertDatabaseCount('bookable_slot_offers', 1);
+        $this->assertDatabaseCount('booking_holds', 1);
+    }
+
     public function test_private_services_cannot_create_public_holds(): void
     {
         CarbonImmutable::setTestNow('2026-07-22 12:00:00 UTC');

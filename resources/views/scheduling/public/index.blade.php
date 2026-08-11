@@ -369,14 +369,21 @@
                     <dt>Service</dt>
                     <dd>{{ $holdSummary['service_name'] }}</dd>
                 </div>
-                <div>
-                    <dt>Date</dt>
-                    <dd>{{ $holdSummary['date_label'] }}</dd>
-                </div>
-                <div>
-                    <dt>Time</dt>
-                    <dd>{{ $holdSummary['time_label'] }}</dd>
-                </div>
+                @if($holdSummary['is_range'])
+                    <div>
+                        <dt>Stay</dt>
+                        <dd>{{ $holdSummary['interval_label'] }}</dd>
+                    </div>
+                @else
+                    <div>
+                        <dt>Date</dt>
+                        <dd>{{ $holdSummary['date_label'] }}</dd>
+                    </div>
+                    <div>
+                        <dt>Time</dt>
+                        <dd>{{ $holdSummary['time_label'] }}</dd>
+                    </div>
+                @endif
                 <div>
                     <dt>Timezone</dt>
                     <dd>{{ str_replace('_', ' ', $holdSummary['timezone']) }}</dd>
@@ -468,10 +475,10 @@
 
                 <a
                     class="button-link"
-                    href="{{ route('scheduling.public.services.show', [
+                    href="{{ route('scheduling.public.services.show', array_filter([
                         'serviceKey' => $holdSummary['service_key'],
-                        'date' => $holdSummary['date'],
-                    ], false) }}"
+                        'date' => $holdSummary['is_range'] ? null : $holdSummary['date'],
+                    ]), false) }}"
                 >
                     View available times
                 </a>
@@ -498,7 +505,11 @@
                     >
                         <strong>{{ $service->name }}</strong>
                         <span>
-                            {{ $service->duration_minutes }} minutes
+                            @if($service->usesRangeDuration())
+                                Flexible check-in/check-out
+                            @else
+                                {{ $service->duration_minutes }} minutes
+                            @endif
                             @if($service->description)
                                 · {{ $service->description }}
                             @endif
@@ -533,25 +544,27 @@
                             </p>
                         </div>
 
-                        <form
-                            class="date-form"
-                            method="GET"
-                            action="{{ route('scheduling.public.services.show', ['serviceKey' => $selectedService->key], false) }}"
-                        >
-                            <label for="date">
-                                Appointment date
-                                <input
-                                    id="date"
-                                    name="date"
-                                    type="date"
-                                    value="{{ old('date', $selectedDate?->format('Y-m-d')) }}"
-                                    min="{{ now($displayTimezone)->format('Y-m-d') }}"
-                                    max="{{ $maximumDate?->format('Y-m-d') }}"
-                                    required
-                                >
-                            </label>
-                            <button type="submit">View times</button>
-                        </form>
+                        @if($selectedService->usesFixedDuration())
+                            <form
+                                class="date-form"
+                                method="GET"
+                                action="{{ route('scheduling.public.services.show', ['serviceKey' => $selectedService->key], false) }}"
+                            >
+                                <label for="date">
+                                    Appointment date
+                                    <input
+                                        id="date"
+                                        name="date"
+                                        type="date"
+                                        value="{{ old('date', $selectedDate?->format('Y-m-d')) }}"
+                                        min="{{ now($displayTimezone)->format('Y-m-d') }}"
+                                        max="{{ $maximumDate?->format('Y-m-d') }}"
+                                        required
+                                    >
+                                </label>
+                                <button type="submit">View times</button>
+                            </form>
+                        @endif
                     </div>
 
                     @error('date')
@@ -559,6 +572,14 @@
                     @enderror
 
                     @error('starts_at')
+                        <p class="error">{{ $message }}</p>
+                    @enderror
+
+                    @error('range_starts_at')
+                        <p class="error">{{ $message }}</p>
+                    @enderror
+
+                    @error('range_ends_at')
                         <p class="error">{{ $message }}</p>
                     @enderror
 
@@ -613,7 +634,60 @@
                         </div>
                     @endif
 
-                    @if($availableTimes !== [])
+                    @if($selectedService->usesRangeDuration())
+                        <form
+                            class="booking-form"
+                            method="POST"
+                            action="{{ route('scheduling.public.services.reserve', ['serviceKey' => $selectedService->key], false) }}"
+                        >
+                            @csrf
+                            <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', (string) \Illuminate\Support\Str::uuid()) }}">
+
+                            <div class="booking-fields">
+                                <label class="booking-field" for="range_starts_at">
+                                    Check-in
+                                    <input
+                                        id="range_starts_at"
+                                        name="range_starts_at"
+                                        type="datetime-local"
+                                        value="{{ old('range_starts_at') }}"
+                                        min="{{ now($displayTimezone)->format('Y-m-d\TH:i') }}"
+                                        max="{{ $maximumDate?->format('Y-m-d\T23:59') }}"
+                                        step="{{ max(60, (int) $selectedService->slot_interval_minutes * 60) }}"
+                                        required
+                                    >
+                                </label>
+
+                                <label class="booking-field" for="range_ends_at">
+                                    Check-out
+                                    <input
+                                        id="range_ends_at"
+                                        name="range_ends_at"
+                                        type="datetime-local"
+                                        value="{{ old('range_ends_at') }}"
+                                        max="{{ $maximumDate?->format('Y-m-d\T23:59') }}"
+                                        step="{{ max(60, (int) $selectedService->slot_interval_minutes * 60) }}"
+                                        required
+                                    >
+                                </label>
+                            </div>
+
+                            @if($selectedService->location_type === \App\Modules\Scheduling\Models\BookableService::LOCATION_TYPE_CUSTOMER_SITE)
+                                <input type="hidden" name="address_line_1" x-model="addressLine1">
+                                <input type="hidden" name="address_line_2" x-model="addressLine2">
+                                <input type="hidden" name="city" x-model="city">
+                                <input type="hidden" name="region" x-model="region">
+                                <input type="hidden" name="postal_code" x-model="postalCode">
+                                <input type="hidden" name="country" x-model="country">
+                            @endif
+
+                            <p class="muted">
+                                Times are interpreted in {{ str_replace('_', ' ', $displayTimezone) }}. Allowed duration: {{ $selectedService->minimumDurationMinutes() }}–{{ $selectedService->maximumDurationMinutes() }} minutes. Scheduling revalidates the entire stay before reserving capacity.
+                            </p>
+
+                            <button type="submit">Reserve stay</button>
+                        </form>
+                    @elseif($availableTimes !== [])
                         <div class="times" aria-label="Available appointment times">
                             @foreach($availableTimes as $time)
                                 <form
@@ -653,7 +727,9 @@
                     @endif
 
                     <p class="footer-note">
-                        Availability is recalculated when a time is selected and may change before a reservation is created.
+                        {{ $selectedService->usesRangeDuration()
+                            ? 'The complete check-in/check-out interval is recalculated when the stay is reserved.'
+                            : 'Availability is recalculated when a time is selected and may change before a reservation is created.' }}
                     </p>
                 @else
                     <h2>Choose a service</h2>

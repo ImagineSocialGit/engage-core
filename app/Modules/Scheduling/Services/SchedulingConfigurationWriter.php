@@ -341,12 +341,13 @@ class SchedulingConfigurationWriter
     ): array {
         $status = $this->serviceStatus($attributes['status'] ?? null);
         $locationType = $this->locationType($attributes['location_type'] ?? null);
+        $durationPolicy = $this->durationPolicy($attributes, $existing);
 
         return [
             'name' => $this->requiredString($attributes['name'] ?? null, 'service name'),
             'description' => $this->nullableString($attributes['description'] ?? null),
             'status' => $status,
-            'duration_minutes' => $this->positiveInteger($attributes['duration_minutes'] ?? null, 'duration'),
+            ...$durationPolicy,
             'slot_interval_minutes' => $this->positiveInteger($attributes['slot_interval_minutes'] ?? null, 'slot interval'),
             'buffer_before_minutes' => $this->nonNegativeInteger($attributes['buffer_before_minutes'] ?? 0, 'buffer before'),
             'buffer_after_minutes' => $this->nonNegativeInteger($attributes['buffer_after_minutes'] ?? 0, 'buffer after'),
@@ -372,6 +373,95 @@ class SchedulingConfigurationWriter
      * @param array<string, mixed> $attributes
      * @return array<string, mixed>|null
      */
+    /**
+     * @param array<string, mixed> $attributes
+     * @return array{duration_mode: string, duration_minutes: int, minimum_duration_minutes: int|null, maximum_duration_minutes: int|null}
+     */
+    private function durationPolicy(
+        array $attributes,
+        ?BookableService $existing = null,
+    ): array {
+        $mode = $this->durationMode(
+            $attributes['duration_mode']
+                ?? $existing?->duration_mode
+                ?? BookableService::DURATION_MODE_FIXED,
+        );
+        $default = $this->positiveInteger(
+            $attributes['duration_minutes'] ?? null,
+            $mode === BookableService::DURATION_MODE_RANGE
+                ? 'default range duration'
+                : 'duration',
+        );
+
+        if ($mode === BookableService::DURATION_MODE_FIXED) {
+            foreach (['minimum_duration_minutes', 'maximum_duration_minutes'] as $field) {
+                if (array_key_exists($field, $attributes)
+                    && $attributes[$field] !== null
+                    && $attributes[$field] !== ''
+                ) {
+                    throw new InvalidArgumentException(
+                        'Fixed-duration services cannot define range duration bounds.',
+                    );
+                }
+            }
+
+            if ($default > 1440) {
+                throw new InvalidArgumentException(
+                    'Fixed service duration cannot exceed 1440 minutes.',
+                );
+            }
+
+            return [
+                'duration_mode' => $mode,
+                'duration_minutes' => $default,
+                'minimum_duration_minutes' => null,
+                'maximum_duration_minutes' => null,
+            ];
+        }
+
+        $minimum = $this->positiveInteger(
+            $attributes['minimum_duration_minutes'] ?? null,
+            'minimum range duration',
+        );
+        $maximum = $this->positiveInteger(
+            $attributes['maximum_duration_minutes'] ?? null,
+            'maximum range duration',
+        );
+
+        if ($maximum > BookableService::MAX_RANGE_DURATION_MINUTES) {
+            throw new InvalidArgumentException(sprintf(
+                'Maximum range duration cannot exceed %d minutes.',
+                BookableService::MAX_RANGE_DURATION_MINUTES,
+            ));
+        }
+
+        if ($minimum > $default || $default > $maximum) {
+            throw new InvalidArgumentException(
+                'Range duration requires minimum <= default <= maximum.',
+            );
+        }
+
+        return [
+            'duration_mode' => $mode,
+            'duration_minutes' => $default,
+            'minimum_duration_minutes' => $minimum,
+            'maximum_duration_minutes' => $maximum,
+        ];
+    }
+
+    private function durationMode(mixed $value): string
+    {
+        $value = $this->requiredString($value, 'duration mode');
+
+        if (! in_array($value, BookableService::DURATION_MODES, true)) {
+            throw new InvalidArgumentException(
+                "Bookable service duration mode [{$value}] is invalid.",
+            );
+        }
+
+        return $value;
+    }
+
     private function locationDetails(
         array $attributes,
         ?string $locationType,

@@ -89,13 +89,15 @@ class SchedulingController extends Controller
             ? $dateMinimum->addDays(max(0, (int) $selectedService->booking_horizon_days))
             : $dateMinimum->addDays(60);
         $dateInRange = $selectedDate->betweenIncluded($dateMinimum, $dateMaximum);
-        $slots = $selectedService instanceof BookableService && $dateInRange
-            ? $read->availabilityForDate(
-                service: $selectedService,
-                date: $selectedDate,
-                host: $selectedHost,
-            )
-            : [];
+        $slots = $selectedService instanceof BookableService
+            && $selectedService->usesFixedDuration()
+            && $dateInRange
+                ? $read->availabilityForDate(
+                    service: $selectedService,
+                    date: $selectedDate,
+                    host: $selectedHost,
+                )
+                : [];
         $upcomingAppointments = $read->upcomingAppointments();
         $requestedContactId = $this->oldOrQueryInteger(
             request: $request,
@@ -165,10 +167,27 @@ class SchedulingController extends Controller
         }
 
         try {
+            $startsAt = $request->startsAt();
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                $service->usesRangeDuration() ? 'range_starts_at' : 'starts_at' => $exception->getMessage(),
+            ]);
+        }
+
+        try {
+            $endsAt = $request->endsAt();
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'range_ends_at' => $exception->getMessage(),
+            ]);
+        }
+
+        try {
             $appointment = $createAppointment->handle(new AppointmentCreationData(
                 service: $service,
                 host: $host,
-                startsAt: CarbonImmutable::parse($validated['starts_at'])->utc(),
+                startsAt: $startsAt,
+                endsAt: $endsAt,
                 idempotencyKey: $validated['idempotency_key'],
                 booking: new AppointmentBookingData(
                     contact: $contact,
@@ -201,7 +220,7 @@ class SchedulingController extends Controller
             ));
         } catch (DomainException|InvalidArgumentException|LogicException $exception) {
             throw ValidationException::withMessages([
-                'starts_at' => $exception->getMessage(),
+                $service->usesRangeDuration() ? 'range_ends_at' : 'starts_at' => $exception->getMessage(),
             ]);
         }
 

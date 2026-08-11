@@ -281,6 +281,52 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
     }
 
 
+    public function test_manual_service_duration_authoring_supports_range_policy_and_clears_bounds_when_returned_to_fixed(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post(
+                route('crm.scheduling.configuration.services.store'),
+                $this->servicePayload([
+                    'key' => 'boarding_stay',
+                    'name' => 'Boarding Stay',
+                    'duration_mode' => BookableService::DURATION_MODE_RANGE,
+                    'duration_minutes' => 2880,
+                    'minimum_duration_minutes' => 1440,
+                    'maximum_duration_minutes' => 10080,
+                ]),
+            )
+            ->assertRedirect(route('crm.scheduling.configuration.index'))
+            ->assertSessionHasNoErrors();
+
+        $service = BookableService::query()->sole();
+
+        $this->assertSame(BookableService::DURATION_MODE_RANGE, $service->duration_mode);
+        $this->assertSame(2880, $service->duration_minutes);
+        $this->assertSame(1440, $service->minimum_duration_minutes);
+        $this->assertSame(10080, $service->maximum_duration_minutes);
+
+        $this->actingAs($user)
+            ->patch(
+                route('crm.scheduling.configuration.services.update', $service),
+                $this->servicePayload([
+                    'current_version' => $service->updated_at->toISOString(),
+                    'duration_mode' => BookableService::DURATION_MODE_FIXED,
+                    'duration_minutes' => 90,
+                ], includeKey: false),
+            )
+            ->assertRedirect(route('crm.scheduling.configuration.index'))
+            ->assertSessionHasNoErrors();
+
+        $service->refresh();
+
+        $this->assertSame(BookableService::DURATION_MODE_FIXED, $service->duration_mode);
+        $this->assertSame(90, $service->duration_minutes);
+        $this->assertNull($service->minimum_duration_minutes);
+        $this->assertNull($service->maximum_duration_minutes);
+    }
+
     public function test_service_location_authoring_is_closed_and_fixed_addresses_are_normalized(): void
     {
         $user = User::factory()->create();
@@ -602,6 +648,7 @@ class SchedulingConfigurationWorkspaceTest extends TestCase
             'name' => 'Configuration Service',
             'description' => null,
             'status' => BookableService::STATUS_ACTIVE,
+            'duration_mode' => BookableService::DURATION_MODE_FIXED,
             'duration_minutes' => 60,
             'slot_interval_minutes' => 15,
             'buffer_before_minutes' => 0,

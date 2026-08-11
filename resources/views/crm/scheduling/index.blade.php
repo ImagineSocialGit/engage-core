@@ -126,7 +126,7 @@
                                         <p class="mt-2 text-sm font-medium text-slate-900">
                                             {{ $appointment->starts_at->setTimezone($displayTimezone)->format('D, M j, Y \a\t g:i A') }}
                                             –
-                                            {{ $appointment->ends_at->setTimezone($displayTimezone)->format('g:i A') }}
+                                            {{ $appointment->ends_at->setTimezone($displayTimezone)->format($appointment->bookableService?->usesRangeDuration() ? 'D, M j, Y \a\t g:i A' : 'g:i A') }}
                                         </p>
 
                                         <p class="mt-1 text-xs text-slate-500">
@@ -236,27 +236,33 @@
                             @endif
 
 
-                            <div>
-                                <x-ui.form.label for="date">
-                                    Date
-                                </x-ui.form.label>
+                            @if($selectedService->usesFixedDuration())
+                                <div>
+                                    <x-ui.form.label for="date">
+                                        Date
+                                    </x-ui.form.label>
 
-                                <x-ui.form.input
-                                    id="date"
-                                    name="date"
-                                    type="date"
-                                    value="{{ $selectedDate->toDateString() }}"
-                                    min="{{ $dateMinimum->toDateString() }}"
-                                    max="{{ $dateMaximum->toDateString() }}"
-                                    onchange="this.form.submit()"
-                                />
+                                    <x-ui.form.input
+                                        id="date"
+                                        name="date"
+                                        type="date"
+                                        value="{{ $selectedDate->toDateString() }}"
+                                        min="{{ $dateMinimum->toDateString() }}"
+                                        max="{{ $dateMaximum->toDateString() }}"
+                                        onchange="this.form.submit()"
+                                    />
 
-                                @unless($dateInRange)
-                                    <p class="mt-2 text-xs font-semibold text-amber-700">
-                                        Choose a date between {{ $dateMinimum->format('M j, Y') }} and {{ $dateMaximum->format('M j, Y') }}.
-                                    </p>
-                                @endunless
-                            </div>
+                                    @unless($dateInRange)
+                                        <p class="mt-2 text-xs font-semibold text-amber-700">
+                                            Choose a date between {{ $dateMinimum->format('M j, Y') }} and {{ $dateMaximum->format('M j, Y') }}.
+                                        </p>
+                                    @endunless
+                                </div>
+                            @else
+                                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 md:col-span-2">
+                                    Enter the exact check-in and check-out below. Scheduling validates the complete stay interval in {{ $selectedService->timezone }}.
+                                </div>
+                            @endif
                         @endif
                     </form>
                 </x-ui.card>
@@ -265,11 +271,13 @@
                     <x-ui.card class="space-y-5">
                         <div>
                             <h2 class="text-lg font-semibold tracking-tight text-slate-900">
-                                Schedule the appointment
+                                {{ $selectedService->usesRangeDuration() ? 'Schedule the stay' : 'Schedule the appointment' }}
                             </h2>
 
                             <p class="mt-1 text-sm text-slate-500">
-                                Select an existing contact and one currently available time.
+                                {{ $selectedService->usesRangeDuration()
+                                    ? 'Select an existing contact and enter the authoritative check-in/check-out interval.'
+                                    : 'Select an existing contact and one currently available time.' }}
                             </p>
                         </div>
 
@@ -413,52 +421,91 @@
                             @endif
 
                             <div>
-                                <span class="block text-sm font-medium text-slate-700">
-                                    Available time
-                                </span>
+                                @if($selectedService->usesRangeDuration())
+                                    <span class="block text-sm font-medium text-slate-700">
+                                        Stay interval
+                                    </span>
 
-                                @if($requiresHost && ! $selectedHost)
-                                    <p class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                                        Choose an active assigned host before selecting a time.
-                                    </p>
-                                @elseif($slots === [])
-                                    <p class="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                                        No appointment times are currently available for this date.
-                                    </p>
+                                    @if($requiresHost && ! $selectedHost)
+                                        <p class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                                            Choose an active assigned host before entering the stay interval.
+                                        </p>
+                                    @else
+                                        <div class="mt-2 grid gap-4 sm:grid-cols-2">
+                                            <div>
+                                                <x-ui.form.label for="range_starts_at">Check-in</x-ui.form.label>
+                                                <x-ui.form.input
+                                                    id="range_starts_at"
+                                                    name="range_starts_at"
+                                                    type="datetime-local"
+                                                    value="{{ old('range_starts_at') }}"
+                                                />
+                                                <x-ui.form.error name="range_starts_at" />
+                                            </div>
+                                            <div>
+                                                <x-ui.form.label for="range_ends_at">Check-out</x-ui.form.label>
+                                                <x-ui.form.input
+                                                    id="range_ends_at"
+                                                    name="range_ends_at"
+                                                    type="datetime-local"
+                                                    value="{{ old('range_ends_at') }}"
+                                                />
+                                                <x-ui.form.error name="range_ends_at" />
+                                            </div>
+                                        </div>
+                                        <p class="mt-2 text-xs text-slate-500">
+                                            Times are interpreted in {{ $selectedService->timezone }}. Allowed duration: {{ $selectedService->minimumDurationMinutes() }}–{{ $selectedService->maximumDurationMinutes() }} minutes.
+                                        </p>
+                                    @endif
                                 @else
-                                    <div class="mt-2 grid gap-2 sm:grid-cols-2">
-                                        @foreach($slots as $slot)
-                                            @php
-                                                $slotValue = $slot->startsAt->toIso8601String();
-                                                $slotLabel = $slot->startsAt
-                                                    ->setTimezone($selectedService->timezone)
-                                                    ->format('g:i A')
-                                                    .'–'
-                                                    .$slot->endsAt
-                                                        ->setTimezone($selectedService->timezone)
-                                                        ->format('g:i A');
-                                            @endphp
+                                    <span class="block text-sm font-medium text-slate-700">
+                                        Available time
+                                    </span>
 
-                                            <label class="cursor-pointer rounded-xl border border-slate-200 p-3 hover:border-slate-400 has-[:checked]:border-teal-500 has-[:checked]:bg-teal-50">
-                                                <input
-                                                    type="radio"
-                                                    name="starts_at"
-                                                    value="{{ $slotValue }}"
-                                                    class="sr-only"
-                                                    @checked(old('starts_at') === $slotValue)
-                                                >
-                                                <span class="block text-sm font-semibold text-slate-900">
-                                                    {{ $slotLabel }}
-                                                </span>
-                                                <span class="mt-1 block text-xs text-slate-500">
-                                                    {{ $selectedService->timezone }}
-                                                </span>
-                                            </label>
-                                        @endforeach
-                                    </div>
+                                    @if($requiresHost && ! $selectedHost)
+                                        <p class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                                            Choose an active assigned host before selecting a time.
+                                        </p>
+                                    @elseif($slots === [])
+                                        <p class="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                                            No appointment times are currently available for this date.
+                                        </p>
+                                    @else
+                                        <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                                            @foreach($slots as $slot)
+                                                @php
+                                                    $slotValue = $slot->startsAt->toIso8601String();
+                                                    $slotLabel = $slot->startsAt
+                                                        ->setTimezone($selectedService->timezone)
+                                                        ->format('g:i A')
+                                                        .'–'
+                                                        .$slot->endsAt
+                                                            ->setTimezone($selectedService->timezone)
+                                                            ->format('g:i A');
+                                                @endphp
+
+                                                <label class="cursor-pointer rounded-xl border border-slate-200 p-3 hover:border-slate-400 has-[:checked]:border-teal-500 has-[:checked]:bg-teal-50">
+                                                    <input
+                                                        type="radio"
+                                                        name="starts_at"
+                                                        value="{{ $slotValue }}"
+                                                        class="sr-only"
+                                                        @checked(old('starts_at') === $slotValue)
+                                                    >
+                                                    <span class="block text-sm font-semibold text-slate-900">
+                                                        {{ $slotLabel }}
+                                                    </span>
+                                                    <span class="mt-1 block text-xs text-slate-500">
+                                                        {{ $selectedService->timezone }}
+                                                    </span>
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                    @endif
+
+                                    <x-ui.form.error name="starts_at" />
                                 @endif
 
-                                <x-ui.form.error name="starts_at" />
                                 <x-ui.form.error name="bookable_service_id" />
                                 <x-ui.form.error name="scheduling_host_id" />
                                 <x-ui.form.error name="idempotency_key" />
@@ -467,9 +514,9 @@
                             <x-ui.button
                                 type="submit"
                                 class="w-full justify-center"
-                                :disabled="($requiresHost && ! $selectedHost) || $slots === []"
+                                :disabled="($requiresHost && ! $selectedHost) || ($selectedService->usesFixedDuration() && $slots === [])"
                             >
-                                Schedule Appointment
+                                {{ $selectedService->usesRangeDuration() ? 'Schedule Stay' : 'Schedule Appointment' }}
                             </x-ui.button>
                         </form>
                     </x-ui.card>

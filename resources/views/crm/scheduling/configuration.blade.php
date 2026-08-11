@@ -342,7 +342,7 @@
                     action="{{ route('crm.scheduling.configuration.services.store') }}"
                     class="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
                     data-configuration-service-create
-                    x-data="{ locationType: @js(old('location_type', '')) }"
+                    x-data="{ locationType: @js(old('location_type', '')), durationMode: @js(old('duration_mode', 'fixed')) }"
                 >
                     @csrf
 
@@ -378,8 +378,26 @@
                     </label>
 
                     <label class="{{ $labelClass }}">
-                        Duration minutes
-                        <input class="{{ $inputClass }}" type="number" min="1" max="1440" name="duration_minutes" value="{{ old('duration_minutes', 60) }}" required>
+                        Duration mode
+                        <select class="{{ $inputClass }}" name="duration_mode" x-model="durationMode" required>
+                            <option value="fixed">Fixed appointment</option>
+                            <option value="range">Range / multi-day stay</option>
+                        </select>
+                    </label>
+
+                    <label class="{{ $labelClass }}">
+                        <span x-text="durationMode === 'range' ? 'Default duration minutes' : 'Duration minutes'"></span>
+                        <input class="{{ $inputClass }}" type="number" min="1" x-bind:max="durationMode === 'range' ? {{ \App\Modules\Scheduling\Models\BookableService::MAX_RANGE_DURATION_MINUTES }} : 1440" name="duration_minutes" value="{{ old('duration_minutes', 60) }}" required>
+                    </label>
+
+                    <label class="{{ $labelClass }}" x-show="durationMode === 'range'" x-cloak>
+                        Minimum duration minutes
+                        <input class="{{ $inputClass }}" type="number" min="1" max="{{ \App\Modules\Scheduling\Models\BookableService::MAX_RANGE_DURATION_MINUTES }}" name="minimum_duration_minutes" value="{{ old('minimum_duration_minutes', 1440) }}" x-bind:disabled="durationMode !== 'range'" x-bind:required="durationMode === 'range'">
+                    </label>
+
+                    <label class="{{ $labelClass }}" x-show="durationMode === 'range'" x-cloak>
+                        Maximum duration minutes
+                        <input class="{{ $inputClass }}" type="number" min="1" max="{{ \App\Modules\Scheduling\Models\BookableService::MAX_RANGE_DURATION_MINUTES }}" name="maximum_duration_minutes" value="{{ old('maximum_duration_minutes', 10080) }}" x-bind:disabled="durationMode !== 'range'" x-bind:required="durationMode === 'range'">
                     </label>
 
                     <label class="{{ $labelClass }}">
@@ -571,7 +589,7 @@
                                     action="{{ route('crm.scheduling.configuration.services.update', $service) }}"
                                     class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
                                     data-configuration-service-update="{{ $service->id }}"
-                                    x-data="{ locationType: @js($service->location_type ?? '') }"
+                                    x-data="{ locationType: @js($service->location_type ?? ''), durationMode: @js($service->duration_mode ?? 'fixed') }"
                                 >
                                     @csrf
                                     @method('PATCH')
@@ -604,8 +622,26 @@
                                     </label>
 
                                     <label class="{{ $labelClass }}">
-                                        Duration minutes
-                                        <input class="{{ $inputClass }}" type="number" min="1" max="1440" name="duration_minutes" value="{{ $service->duration_minutes }}" required>
+                                        Duration mode
+                                        <select class="{{ $inputClass }}" name="duration_mode" x-model="durationMode" required>
+                                            <option value="fixed">Fixed appointment</option>
+                                            <option value="range">Range / multi-day stay</option>
+                                        </select>
+                                    </label>
+
+                                    <label class="{{ $labelClass }}">
+                                        <span x-text="durationMode === 'range' ? 'Default duration minutes' : 'Duration minutes'"></span>
+                                        <input class="{{ $inputClass }}" type="number" min="1" x-bind:max="durationMode === 'range' ? {{ \App\Modules\Scheduling\Models\BookableService::MAX_RANGE_DURATION_MINUTES }} : 1440" name="duration_minutes" value="{{ $service->duration_minutes }}" required>
+                                    </label>
+
+                                    <label class="{{ $labelClass }}" x-show="durationMode === 'range'" x-cloak>
+                                        Minimum duration minutes
+                                        <input class="{{ $inputClass }}" type="number" min="1" max="{{ \App\Modules\Scheduling\Models\BookableService::MAX_RANGE_DURATION_MINUTES }}" name="minimum_duration_minutes" value="{{ $service->minimum_duration_minutes ?? $service->duration_minutes }}" x-bind:disabled="durationMode !== 'range'" x-bind:required="durationMode === 'range'">
+                                    </label>
+
+                                    <label class="{{ $labelClass }}" x-show="durationMode === 'range'" x-cloak>
+                                        Maximum duration minutes
+                                        <input class="{{ $inputClass }}" type="number" min="1" max="{{ \App\Modules\Scheduling\Models\BookableService::MAX_RANGE_DURATION_MINUTES }}" name="maximum_duration_minutes" value="{{ $service->maximum_duration_minutes ?? $service->duration_minutes }}" x-bind:disabled="durationMode !== 'range'" x-bind:required="durationMode === 'range'">
                                     </label>
 
                                     <label class="{{ $labelClass }}">

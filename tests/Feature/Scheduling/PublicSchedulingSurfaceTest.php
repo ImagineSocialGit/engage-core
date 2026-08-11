@@ -88,19 +88,21 @@ class PublicSchedulingSurfaceTest extends TestCase
             'key' => 'range-service',
             'name' => 'Range Service',
             'is_public' => true,
+            'sort_order' => 30,
         ]);
 
         $response = $this->get('https://booking.test/');
 
         $response
             ->assertOk()
-            ->assertSeeInOrder(['First Service', 'Second Service'])
+            ->assertSeeInOrder(['First Service', 'Second Service', 'Range Service'])
             ->assertDontSee('Private Service')
-            ->assertDontSee('Inactive Service')
-            ->assertDontSee('Range Service');
+            ->assertDontSee('Inactive Service');
 
         $this->get('https://booking.test/services/range-service')
-            ->assertNotFound();
+            ->assertOk()
+            ->assertSee('name="range_starts_at"', false)
+            ->assertSee('name="range_ends_at"', false);
     }
 
     public function test_service_page_renders_bounded_local_availability_without_internal_booking_details(): void

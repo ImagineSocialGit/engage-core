@@ -802,26 +802,33 @@ The same idempotency key returns the original hold for the same offer and commit
 
 ### Public reservation transaction
 
-The public browser does not receive an offer ID. It posts only the selected start time, replay key, and—when the service is `customer_site`—raw booking-specific address fields:
+The public browser does not receive an offer ID. Fixed-duration services post the server-issued UTC slot start. Range-duration services instead post local check-in/check-out wall times in the service timezone. Both modes post a replay key and—when the service is `customer_site`—raw booking-specific address fields:
 
 ```text
-starts_at
-idempotency_key
-address_line_1
-address_line_2
-city
-region
-postal_code
-country
+fixed:
+    starts_at
+
+range:
+    range_starts_at
+    range_ends_at
+
+shared:
+    idempotency_key
+    address_line_1
+    address_line_2
+    city
+    region
+    postal_code
+    country
 ```
 
 The address fields are required only for `customer_site` and prohibited for phone, virtual, and fixed services. Caller-authored normalized or enrichment fields such as `location_type`, `location_details`, `formatted_address`, coordinates, timezone, precision, confidence, or provider identity are rejected. `PublicBookingController` normalizes the raw address through the Scheduling-owned resolver before it invokes the hold action.
 
 Fixed-location availability can now be travel-aware immediately because its authoritative location is already server-owned. The current customer-site date/time list remains a pre-location candidate surface: the visitor's normalized customer-site address is not available until the reservation POST. That POST passes the normalized snapshot into the exact-slot transaction, which performs authoritative travel revalidation before capacity is consumed. Phase 4B.3 will move customer-site address collection ahead of the displayed availability so the visitor sees only travel-aware authoritative times in the first place.
 
-`CreatePublicBookingHoldAction` accepts the already-resolved public `BookableService`, parses the requested start instant as UTC, checks for an idempotent existing hold, and recalculates exact current availability. Fixed-duration services derive the end from service policy. Range-duration services now require an explicit end time at the action boundary and validate the whole interval against the service minimum/maximum duration policy before issuing an offer or consuming capacity. The action selects the first matching `BookableSlot` in the engine's deterministic order, then calls `IssueBookableSlotOfferAction` and `CreateBookingHoldAction` inside one outer database transaction.
+`CreatePublicBookingHoldAction` accepts the already-resolved public `BookableService`, checks for an idempotent existing hold, and recalculates exact current availability. Fixed-duration services derive the end from service policy. Range-duration services require an explicit end time at the action boundary and validate the whole interval against the service minimum/maximum duration policy before issuing an offer or consuming capacity. The public request layer resolves exact `YYYY-MM-DDTHH:MM` check-in/check-out values in the service timezone through `SchedulingLocalDateTimeResolver`; nonexistent spring-forward values and ambiguous repeated-hour values are rejected rather than normalized or guessed. The action selects the first matching `BookableSlot` in the engine's deterministic order, then calls `IssueBookableSlotOfferAction` and `CreateBookingHoldAction` inside one outer database transaction.
 
-This preserves the opaque-offer trust boundary while allowing a simple public form. The server remains authoritative for service identity, eligible host, duration policy, validated end time, capacity, availability provenance, offer identity, and hold expiration. The current public Blade/request flow still exposes fixed-duration start selection only; range check-in/check-out authoring belongs to Phase 4B.2D2. When multiple hosts expose the same visitor-facing time, the lowest current deterministic slot ordering wins; round-robin and weighted allocation remain deferred.
+This preserves the opaque-offer trust boundary while allowing a simple public form. The server remains authoritative for service identity, eligible host, duration policy, UTC conversion, validated end time, capacity, availability provenance, offer identity, and hold expiration. Fixed services continue to expose only server-issued available start choices. Range services now expose explicit check-in/check-out inputs and commit one full authoritative stay interval. When multiple hosts expose the same visitor-facing interval, the lowest current deterministic slot ordering wins; round-robin and weighted allocation remain deferred. Phase 4B.3 will restructure both booking modes into the appointment-type-first progressive journey and will move customer-site address collection before authoritative availability.
 
 Public replay keys are UUIDs. Repeating the same service, start time, and replay key returns the original hold without issuing another offer. Reusing the key for another service, time, or reschedule-scoped hold is rejected. A concurrency loser reloads the matching committed hold after its speculative offer transaction rolls back.
 
@@ -927,15 +934,22 @@ The creation flow is:
 choose Contact
 choose active service
 choose explicit active assigned host when the service has assignments
-choose a date
 for customer_site, enter the booking-specific raw service address
-choose a currently available start time
+
+fixed duration:
+    choose a date
+    choose a currently available start time
+
+range duration:
+    enter local check-in
+    enter local check-out
+
 create through CreateAppointmentAction
 ```
 
-`StoreAppointmentRequest` requires those address fields only for `customer_site`, prohibits them for other service modes, and rejects caller-authored normalized/enrichment fields. `SchedulingController` normalizes the address through the Scheduling-owned resolver and supplies the canonical snapshot in `AppointmentBookingData`; `CreateAppointmentAction` remains authoritative for the final commitment and availability revalidation.
+`StoreAppointmentRequest` requires those address fields only for `customer_site`, prohibits them for other service modes, and rejects caller-authored normalized/enrichment fields. Fixed services accept only the existing server-issued UTC `starts_at` slot. Range services prohibit that fixed-slot field and require exact local `range_starts_at` / `range_ends_at` values. `SchedulingLocalDateTimeResolver` resolves those wall times in the service timezone and rejects nonexistent or ambiguous DST values. `SchedulingController` normalizes any customer-site address through the Scheduling-owned resolver and supplies the canonical snapshot in `AppointmentBookingData`; `CreateAppointmentAction` remains authoritative for the final commitment and availability revalidation.
 
-The browser submits only Contact, service, optional host, selected start instant, UUID idempotency key, and the raw customer-site address when applicable. Duration, end time, canonical location snapshot, capacity, status, source, attendee state, and lifecycle output remain server-owned. The controller converts domain conflicts into validation feedback and never writes Scheduling records directly.
+The browser submits only Contact, service, optional host, the mode-appropriate time input, UUID idempotency key, and the raw customer-site address when applicable. Service duration policy, canonical UTC interval, canonical location snapshot, capacity, status, source, attendee state, and lifecycle output remain server-owned. The controller converts domain conflicts into validation feedback and never writes Scheduling records directly.
 
 Contact selection uses the existing Core Contact lookup endpoint. The workspace does not create or update Contacts, and it does not silently assign a host. A service with exactly one active eligible host may be preselected for convenience, but that explicit host identity is still submitted and revalidated by `CreateAppointmentAction`.
 
@@ -989,7 +1003,9 @@ Host status and service status use explicit `active`, `inactive`, and `archived`
 Service policy editing includes:
 
 ```text
-duration and slot interval
+duration mode: fixed | range
+fixed exact duration or range default/minimum/maximum duration
+slot interval
 buffers
 minimum booking notice
 booking horizon
@@ -1004,6 +1020,8 @@ confirmation requirement
 public visibility
 sort order
 ```
+
+The duration editor is closed around the first-class service contract. Fixed mode stores one exact `duration_minutes` value and clears range bounds. Range mode requires default, minimum, and maximum durations, enforces `minimum <= default <= maximum`, and caps the maximum at the Scheduling 366-day search limit. Switching modes therefore cannot leave stale range bounds attached to a fixed service.
 
 The browser never submits raw `location_details` JSON or provider/geocoding facts. `SchedulingConfigurationController` rejects unknown location modes and type-incompatible fields. `SchedulingConfigurationWriter` rebuilds the closed Scheduling-owned location details for each edit: phone/customer-site may retain only label/instructions, virtual may additionally retain URL, and fixed stores the canonical normalized address plus optional label/instructions. Changing location modes therefore cannot preserve stale hidden fields from the prior mode.
 
@@ -1232,7 +1250,7 @@ Phase 4B.2B1 — COMPLETE: add Scheduling-owned deterministic address normalizat
 Phase 4B.2B2 — COMPLETE: add closed CRM service-location authoring and customer-site public/CRM raw-address collection with server-owned normalization before commitment
 Phase 4B.2C — COMPLETE: add Scheduling-owned provider-neutral travel-time resolution, conservative fallback, adjacent Appointment/active-hold checks, transaction-time revalidation, and admin reschedule slot suggestions that preserve the source booking criteria; optional app-level geographic enrichment may improve travel ranking without making Location a dependency
 Phase 4B.2D1 — COMPLETE: add first-class fixed/range service-duration policy, module schema v2, explicit range interval validation, check-in/check-out boundary availability, full-stay hold/capacity/resource occupancy, direct range creation, and range-preserving reschedule runtime
-Phase 4B.2D2 — expose closed CRM range-service authoring plus public/internal check-in/check-out input and range-specific reschedule presentation; fixed-location PetServices stays must not require Location, and PetServices continues to own pet/compliance/feeding/medication meaning
+Phase 4B.2D2 — COMPLETE: expose closed CRM range-service authoring plus public/internal check-in/check-out input, strict service-timezone wall-time resolution, and range-specific reschedule presentation; fixed-location PetServices stays do not require Location, and PetServices continues to own pet/compliance/feeding/medication meaning
 Phase 4B.3 — appointment-type-first progressive public booking
 Phase 4B.4 — Messaging-backed email/SMS verification before capacity hold
 SCHEDULING_APP_URL setup validation

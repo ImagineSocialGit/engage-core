@@ -95,6 +95,57 @@ class SchedulingAppointmentRescheduleWorkspaceTest extends TestCase
             ->assertDontSee('value="'.$currentStart->toISOString().'"', false);
     }
 
+    public function test_range_reschedule_workspace_presents_replacement_check_in_and_full_stay_interval(): void
+    {
+        $user = User::factory()->create();
+        $service = BookableService::factory()
+            ->rangeDuration(
+                defaultMinutes: 2880,
+                minimumMinutes: 1440,
+                maximumMinutes: 10080,
+            )
+            ->create([
+                'status' => BookableService::STATUS_ACTIVE,
+                'slot_interval_minutes' => 60,
+                'minimum_notice_minutes' => 0,
+                'booking_horizon_days' => 30,
+                'reschedule_notice_minutes' => 0,
+                'timezone' => 'UTC',
+                'capacity' => 1,
+            ]);
+        $originalStart = CarbonImmutable::parse('2026-08-04 15:00:00 UTC');
+        $originalEnd = CarbonImmutable::parse('2026-08-07 10:00:00 UTC');
+        $appointment = Appointment::factory()->create([
+            'bookable_service_id' => $service->id,
+            'status' => Appointment::STATUS_SCHEDULED,
+            'starts_at' => $originalStart,
+            'ends_at' => $originalEnd,
+        ]);
+        $this->availability(
+            service: $service,
+            host: null,
+            startsAt: CarbonImmutable::parse('2026-08-10 15:00:00 UTC'),
+            endsAt: CarbonImmutable::parse('2026-08-10 17:00:00 UTC'),
+        );
+        $this->availability(
+            service: $service,
+            host: null,
+            startsAt: CarbonImmutable::parse('2026-08-13 09:00:00 UTC'),
+            endsAt: CarbonImmutable::parse('2026-08-13 11:00:00 UTC'),
+        );
+
+        $this->actingAs($user)
+            ->get(route('crm.scheduling.appointments.reschedule', [
+                'appointment' => $appointment,
+                'date' => '2026-08-10',
+            ]))
+            ->assertOk()
+            ->assertSee('Replacement check-in date')
+            ->assertSee('Reschedule stay')
+            ->assertSee('Mon, Aug 10, 2026 at 3:00 PM')
+            ->assertSee('Thu, Aug 13, 2026 at 10:00 AM');
+    }
+
     public function test_crm_reschedule_changes_host_preserves_confirmation_and_records_provenance(): void
     {
         $user = User::factory()->create();

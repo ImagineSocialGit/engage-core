@@ -41,6 +41,15 @@ class PublicBookingController extends Controller
         $displayTimezone = $this->serviceTimezone($service);
         $today = CarbonImmutable::now($displayTimezone)->startOfDay();
         $maximumDate = $this->maximumPublicDate($service, $today);
+
+        if ($service->usesRangeDuration()) {
+            return view('scheduling.public.index', $this->pageData([
+                'selectedService' => $service,
+                'displayTimezone' => $displayTimezone,
+                'maximumDate' => $maximumDate,
+            ]));
+        }
+
         $selectedDate = $this->selectedDate(
             value: $request->query('date'),
             timezone: $displayTimezone,
@@ -87,15 +96,34 @@ class PublicBookingController extends Controller
         }
 
         try {
+            $startsAt = $request->startsAt();
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                $service->usesRangeDuration() ? 'range_starts_at' : 'starts_at' => $exception->getMessage(),
+            ]);
+        }
+
+        try {
+            $endsAt = $request->endsAt();
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'range_ends_at' => $exception->getMessage(),
+            ]);
+        }
+
+        try {
             $hold = $createPublicBookingHold->handle(
                 service: $service,
-                startsAt: $request->startsAt(),
+                startsAt: $startsAt,
                 idempotencyKey: $request->idempotencyKey(),
                 location: $location,
+                endsAt: $endsAt,
             );
         } catch (DomainException) {
             throw ValidationException::withMessages([
-                'starts_at' => 'That appointment time is no longer available. Choose another time.',
+                $service->usesRangeDuration() ? 'range_ends_at' : 'starts_at' => $service->usesRangeDuration()
+                    ? 'That check-in/check-out interval is no longer available. Choose another stay interval.'
+                    : 'That appointment time is no longer available. Choose another time.',
             ]);
         }
 
@@ -169,7 +197,6 @@ class PublicBookingController extends Controller
     {
         return BookableService::query()
             ->where('status', BookableService::STATUS_ACTIVE)
-            ->where('duration_mode', BookableService::DURATION_MODE_FIXED)
             ->where('is_public', true)
             ->orderBy('sort_order')
             ->orderBy('name')
@@ -188,7 +215,6 @@ class PublicBookingController extends Controller
         $service = BookableService::query()
             ->where('key', $serviceKey)
             ->where('status', BookableService::STATUS_ACTIVE)
-            ->where('duration_mode', BookableService::DURATION_MODE_FIXED)
             ->where('is_public', true)
             ->first();
 
@@ -348,9 +374,13 @@ class PublicBookingController extends Controller
             'expires_at' => $hold->expires_at?->toISOString(),
             'service_key' => $service->key,
             'service_name' => $service->name,
+            'is_range' => $service->usesRangeDuration(),
             'date' => $startsAt->format('Y-m-d'),
             'date_label' => $startsAt->format('l, F j, Y'),
             'time_label' => $startsAt->format('g:i A').'–'.$endsAt->format('g:i A'),
+            'interval_label' => $startsAt->format('D, M j, Y \a\t g:i A')
+                .' – '
+                .$endsAt->format('D, M j, Y \a\t g:i A'),
             'timezone' => $timezone,
             'location_type' => $hold->location_type,
             'location_label' => is_string($locationDetails['label'] ?? null)
