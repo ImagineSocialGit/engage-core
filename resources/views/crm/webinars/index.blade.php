@@ -450,7 +450,7 @@
                                                             @endphp
                                                             <option value="{{ $candidate->getKey() }}">
                                                                 {{ $candidateTypeLabel }} #{{ $candidate->getKey() }}
-                                                                — {{ $candidate->starts_at?->copy()->setTimezone($candidate->timezone)->format('M j, Y g:i A') ?? 'Unscheduled' }}
+                                                                — {{ $candidate->starts_at?->copy()->setTimezone(filled($candidate->timezone) ? $candidate->timezone : config('app.timezone'))->format('M j, Y g:i A') ?? 'Unscheduled' }}
                                                                 — {{ $candidate->external_id }}
                                                             </option>
                                                         @endforeach
