@@ -6,6 +6,8 @@ use App\Modules\Campaigns\Actions\SyncCampaignPresetsAction;
 use App\Modules\Core\Actions\ContactStatuses\SyncContactStatusPresetsAction;
 use App\Modules\FlowRoutes\Actions\SyncFlowRouteCapabilitiesAction;
 use App\Modules\FlowRoutes\Actions\SyncFlowRoutePresetsAction;
+use App\Modules\Forms\Actions\SyncFormPresetsAction;
+use App\Modules\Forms\Data\FormPresetSyncResult;
 use App\Modules\Messaging\Actions\SyncMessageTemplatePresetsAction;
 use App\Modules\Tasks\Actions\SyncTaskPresetsAction;
 use App\Modules\Webinars\Actions\SyncWebinarScheduleProfilesAction;
@@ -36,6 +38,7 @@ class SyncPresetsCommand extends Command
         SyncCampaignPresetsAction $syncCampaignPresets,
         SyncFlowRouteCapabilitiesAction $syncFlowRouteCapabilities,
         SyncFlowRoutePresetsAction $syncFlowRoutePresets,
+        SyncFormPresetsAction $syncFormPresets,
         PresetCompositionResolver $compositionResolver,
         PresetPackageResolver $packageResolver,
         ModuleManager $moduleManager,
@@ -95,6 +98,23 @@ class SyncPresetsCommand extends Command
             } else {
                 $this->line('');
                 $this->warn('Task templates: module disabled or no groups configured; skipped.');
+            }
+
+            if ($this->shouldSyncDomain(
+                packageResolver: $packageResolver,
+                presetKey: $presetKey,
+                domain: PresetDomain::Forms,
+                module: 'forms',
+                runtimeModules: $runtimeModules,
+            )) {
+                $this->renderFormResult(
+                    $syncFormPresets->handle(
+                        $compositionResolver->resolve($presetKey, PresetDomain::Forms),
+                    ),
+                );
+            } else {
+                $this->line('');
+                $this->warn('Forms: module disabled or no groups configured; skipped.');
             }
 
             if (in_array('messaging', $runtimeModules, true)) {
@@ -298,6 +318,23 @@ class SyncPresetsCommand extends Command
         foreach ($result->errors as $error) {
             $this->error($error);
         }
+    }
+
+    private function renderFormResult(FormPresetSyncResult $result): void
+    {
+        $this->line('');
+        $this->info('Forms');
+
+        $this->table(
+            ['Item', 'Count'],
+            [
+                ['Definitions created', $result->definitionsCreated],
+                ['Definitions updated', $result->definitionsUpdated],
+                ['Definitions unchanged', $result->definitionsUnchanged],
+                ['Versions published', $result->versionsPublished],
+                ['Versions reused', $result->versionsReused],
+            ],
+        );
     }
 
     private function renderMessageTemplateResult(array $result): void

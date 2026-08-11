@@ -46,6 +46,7 @@ class PresetPackageConfigContract implements ConfigContract
                 'tasks' => ConfigField::required($stringList, referenceTarget: 'preset_group.tasks'),
                 'campaigns' => ConfigField::required($stringList, referenceTarget: 'preset_group.campaigns'),
                 'flow_routes' => ConfigField::required($stringList, referenceTarget: 'preset_group.flow_routes'),
+                'forms' => ConfigField::optional($stringList, referenceTarget: 'preset_group.forms'),
             ])),
         ]);
     }
@@ -59,6 +60,7 @@ class PresetPackageConfigContract implements ConfigContract
                 'tasks' => ['default'],
                 'campaigns' => [],
                 'flow_routes' => [],
+                'forms' => [],
             ],
         ];
     }

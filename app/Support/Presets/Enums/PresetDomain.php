@@ -8,6 +8,7 @@ enum PresetDomain: string
     case Tasks = 'tasks';
     case Campaigns = 'campaigns';
     case FlowRoutes = 'flow_routes';
+    case Forms = 'forms';
 
     public function referenceRegistryCategory(): ?string
     {
@@ -15,7 +16,7 @@ enum PresetDomain: string
             self::Tasks => 'task_template_keys',
             self::Campaigns => 'campaign_keys',
             self::FlowRoutes => 'flow_route_keys',
-            self::ContactStatuses => null,
+            self::ContactStatuses, self::Forms => null,
         };
     }
 }

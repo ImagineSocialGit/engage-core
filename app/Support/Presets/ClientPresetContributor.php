@@ -47,6 +47,7 @@ final class ClientPresetContributor implements PresetContributor
             PresetDomain::Tasks->value => 'presets.modules.client.tasks',
             PresetDomain::Campaigns->value => 'presets.modules.client.campaigns',
             PresetDomain::FlowRoutes->value => 'presets.modules.client.flow-routes',
+            PresetDomain::Forms->value => 'presets.modules.client.forms',
         ];
     }
 }

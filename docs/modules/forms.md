@@ -138,6 +138,76 @@ trigger follow-up work
 view status
 ```
 
+## Preset-backed definition runtime
+
+Forms now participates in the shared preset-composition architecture through the `forms` preset domain.
+
+Client form contributions live under:
+
+```text
+presets.modules.client.forms
+```
+
+A preset package may optionally select Forms groups through:
+
+```text
+groups.forms
+```
+
+`groups.forms` is intentionally optional so existing preset packages remain valid without immediate Forms configuration.
+
+Selected Forms definitions are synchronized through `SyncFormPresetsAction` when the Forms module is enabled. Global `presets:sync` skips Forms when the module is disabled or no Forms groups are selected.
+
+A selected preset definition owns a stable `FormDefinition` key and an immutable published `FormVersion` snapshot containing:
+
+```text
+name
+description
+schema
+rules
+layout
+settings
+```
+
+The sync contract is version-oriented:
+
+```text
+unchanged authored snapshot
+    -> reuse the existing current FormVersion
+
+changed authored snapshot
+    -> publish the next FormVersion
+    -> move form_definitions.current_form_version_id to the new version
+    -> preserve every older published version unchanged
+```
+
+Published FormVersion records are immutable and cannot be deleted. A changed form must publish another version so historical submissions can always remain traceable to the schema that produced them.
+
+Preset ownership is also explicit. Preset sync will not overwrite a manual/provider-owned FormDefinition with the same key, and a preset-owned definition cannot silently adopt a non-preset current version. Resolve those ownership collisions deliberately instead of converting records during sync.
+
+The first schema contract validates durable authoring identifiers and the supported foundational field vocabulary before any records are written. Form keys, section keys, and field keys use lowercase `snake_case`; section keys and field keys must be unique within one form. Initial supported field types are:
+
+```text
+text
+email
+tel
+url
+number
+textarea
+select
+radio
+checkbox
+checkboxes
+boolean
+date
+datetime
+hidden
+```
+
+This is authoring/schema validation, not submission validation. The submission runtime will still validate each response against the frozen FormVersion used for that submission.
+
+Preset sync does not currently archive stale definitions merely because a group stops selecting them. Lifecycle cleanup must be explicit until Forms has a deliberate archival/customization contract.
+
 ## Owns
 
 Forms owns:
@@ -149,7 +219,7 @@ form_submissions
 form_submission_values
 ```
 
-Forms should also own, when implemented:
+Forms also owns or will own as runtime work lands:
 
 ```text
 form definition lifecycle
@@ -159,7 +229,7 @@ submission validation against the submitted form version
 submission review state
 form-rendering schema normalization
 form-submission domain events
-form preset sync, if default/client forms are added later
+form preset sync and version publication
 ```
 
 Forms should not own message delivery, task lifecycle, portal accounts, document upload/review lifecycle, appointment booking, commerce records, or vertical-specific interpretation of answers.
@@ -681,7 +751,6 @@ Deferred until needed:
 ```text
 client-facing form builder UI
 internal/operator form builder UI
-form preset sync
 public form rendering routes
 portal form submission routes
 form submission review UI
@@ -700,8 +769,6 @@ form request lifecycle table
 ## Open questions
 
 ```text
-Should form definitions be synced from config/presets first, or created only by migrations/seeders/client setup code?
-Should form_definitions.current_form_version_id be nullable in the first migration, or avoided until runtime publishing actions exist?
 Should form_submissions.status and review_status be separate, or should one lifecycle field be enough?
 Should portal_user_id exist immediately, or wait until Portal runtime actions exist?
 Should file upload fields route through Documents from the beginning, or be blocked until Documents exists?
@@ -723,9 +790,6 @@ Submission validation
 
 `FormSubmissionValidator` remains Forms-owned runtime submission validation.
 
-When Forms adds config/preset authoring, it should contribute a Forms-owned validator to the shared app-level setup validation manager rather than adding Forms-specific logic directly to a global command.
+Preset sync now performs mutation-time validation of the foundational Forms authoring contract before writing records. A later Forms-owned setup-validation contributor should reuse that contract so invalid form config can be surfaced by `setup:validate` before mutation or client handoff, rather than adding Forms-specific validation branches directly to a global command.
 
-Setup validation should return reusable structured findings so the same result can support CLI validation now and guided form-authoring UI later.
-
-
-
+Setup validation should return reusable structured findings so the same result can support CLI validation and guided form-authoring UI later.

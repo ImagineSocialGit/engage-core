@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 
 class FormVersion extends Model
 {
@@ -22,6 +23,37 @@ class FormVersion extends Model
     public const STATUS_DRAFT = 'draft';
     public const STATUS_PUBLISHED = 'published';
     public const STATUS_ARCHIVED = 'archived';
+
+    protected static function booted(): void
+    {
+        static::updating(function (FormVersion $version): void {
+            $wasPublished = $version->getOriginal('status') === self::STATUS_PUBLISHED
+                || $version->getOriginal('published_at') !== null;
+
+            if (! $wasPublished) {
+                return;
+            }
+
+            throw new LogicException(sprintf(
+                'Published FormVersion [%s] is immutable. Publish a new version instead of editing the existing snapshot.',
+                $version->getKey(),
+            ));
+        });
+
+        static::deleting(function (FormVersion $version): void {
+            $isPublished = $version->status === self::STATUS_PUBLISHED
+                || $version->published_at !== null;
+
+            if (! $isPublished) {
+                return;
+            }
+
+            throw new LogicException(sprintf(
+                'Published FormVersion [%s] cannot be deleted because submissions must remain traceable to their published schema snapshot.',
+                $version->getKey(),
+            ));
+        });
+    }
 
     protected $fillable = [
         'form_definition_id',
