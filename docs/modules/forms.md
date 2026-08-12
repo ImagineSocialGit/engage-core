@@ -1,3 +1,4 @@
+
 # Forms Module
 
 Forms is a current universal module.
@@ -140,7 +141,7 @@ view status
 
 ## Preset-backed definition runtime
 
-Forms now participates in the shared preset-composition architecture through the `forms` preset domain.
+Forms participates in the shared preset-composition architecture through the `forms` preset domain.
 
 Client form contributions live under:
 
@@ -154,7 +155,7 @@ A preset package may optionally select Forms groups through:
 groups.forms
 ```
 
-`groups.forms` is intentionally optional so existing preset packages remain valid without immediate Forms configuration.
+`groups.forms` remains optional so existing preset packages remain valid without Forms configuration.
 
 Selected Forms definitions are synchronized through `SyncFormPresetsAction` when the Forms module is enabled. Global `presets:sync` skips Forms when the module is disabled or no Forms groups are selected.
 
@@ -183,9 +184,11 @@ changed authored snapshot
 
 Published FormVersion records are immutable and cannot be deleted. A changed form must publish another version so historical submissions can always remain traceable to the schema that produced them.
 
-Preset ownership is also explicit. Preset sync will not overwrite a manual/provider-owned FormDefinition with the same key, and a preset-owned definition cannot silently adopt a non-preset current version. Resolve those ownership collisions deliberately instead of converting records during sync.
+Preset ownership is explicit. Preset sync will not overwrite a manual/provider-owned FormDefinition with the same key, and a preset-owned definition cannot silently adopt a non-preset current version. Resolve those ownership collisions deliberately instead of converting records during sync.
 
-The first schema contract validates durable authoring identifiers and the supported foundational field vocabulary before any records are written. Form keys, section keys, and field keys use lowercase `snake_case`; section keys and field keys must be unique within one form. Initial supported field types are:
+`FormDefinitionConfigContract` and `FormSchemaNormalizer` now define the foundational authored shape used by preset sync and runtime readiness checks. Form keys, section keys, and field keys use lowercase `snake_case`; section keys and field keys must be unique within one form. Fields require stable keys, labels, supported types, and boolean required state. Select/radio/checkboxes fields require explicit option values and labels.
+
+Initial supported field types are:
 
 ```text
 text
@@ -204,7 +207,11 @@ datetime
 hidden
 ```
 
-This is authoring/schema validation, not submission validation. The submission runtime will still validate each response against the frozen FormVersion used for that submission.
+This is authoring/schema validation, not submission validation. The later submission runtime must still validate each response against the exact frozen FormVersion used for that submission.
+
+`PublishedFormResolver` is the current DB-owned runtime read seam. It resolves only an active FormDefinition and its exact current non-archived published FormVersion. Public consumers may additionally require `is_public = true`. The resolver returns the transport-neutral `PublishedForm` contract with stable definition/version identity, frozen schema/rules/layout/settings, and flattened field metadata.
+
+An active definition with a missing, draft, archived, or structurally invalid current version fails closed instead of silently falling back to another historical version.
 
 Preset sync does not currently archive stale definitions merely because a group stops selecting them. Lifecycle cleanup must be explicit until Forms has a deliberate archival/customization contract.
 
@@ -330,11 +337,18 @@ Mortgage reads mortgage intake answers and maps them into mortgage records.
 Reporting reads submission summaries through a Forms read service.
 ```
 
-## Public seams to add later
+## Public seams
 
-The first foundation slice does not need full actions yet.
+The first Forms runtime read seam is now:
 
-Likely future public seams:
+```text
+PublishedFormResolver
+PublishedForm
+```
+
+Consumers should resolve a stable form key through this seam rather than query FormDefinition/FormVersion directly or execute from raw preset config.
+
+Later mutation/review seams still include:
 
 ```text
 CreateFormDefinitionAction
@@ -346,7 +360,6 @@ RejectFormSubmissionAction
 ApproveFormSubmissionAction
 FormsReadService
 FormSubmissionReadService
-FormRendererSchemaNormalizer
 FormSubmissionValidator
 FormSubmissionAutomationEventEmitter
 FormSubmissionTaskOrchestrator
@@ -778,18 +791,37 @@ Should Forms emit `form.submitted` automation events in the foundation slice, or
 
 ## Setup/config validation vs submission validation
 
-Forms has two different validation concerns and they should not be conflated.
+Forms has two different validation concerns and they must remain separate.
 
 ```text
 Setup/config validation
-    Validates form presets, form definitions, field identifiers, rules, module references, and available-field references before client handoff or authoring save.
+    Validates selected form presets and active DB-owned runtime readiness before client handoff.
 
 Submission validation
     Validates one submitted response against the frozen FormVersion schema/rules that apply to that submission.
 ```
 
-`FormSubmissionValidator` remains Forms-owned runtime submission validation.
+The current setup/config path is:
 
-Preset sync now performs mutation-time validation of the foundational Forms authoring contract before writing records. A later Forms-owned setup-validation contributor should reuse that contract so invalid form config can be surfaced by `setup:validate` before mutation or client handoff, rather than adding Forms-specific validation branches directly to a global command.
+```text
+FormDefinitionConfigContract
+    declarative selected-preset shape validation
 
-Setup validation should return reusable structured findings so the same result can support CLI validation and guided form-authoring UI later.
+FormDefinitionConfigContractTargetProvider
+    discovers the selected composed Forms definitions
+
+FormSchemaNormalizer
+    mutation-time and runtime structural validation
+
+FormsSetupValidationContributor
+    validates active DB-owned FormDefinition -> current published FormVersion readiness
+
+setup:validate
+    composes those findings through the existing shared setup-validation system
+```
+
+Preset sync validates the config contract and normalized schema before writing Form records. This prevents `presets:sync` from being a looser mutation path than `setup:validate`.
+
+Runtime readiness is intentionally DB-owned. An active form must point to one non-archived published current version with a valid supported schema. Setup validation reports missing/unpublished/invalid current snapshots rather than allowing a runtime consumer to select some other historical version.
+
+`FormSubmissionValidator` remains later Forms-owned submission validation. It must validate a response against the exact resolved FormVersion and must not reinterpret setup/config validation as proof that submitted values are valid.

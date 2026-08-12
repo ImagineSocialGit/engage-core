@@ -360,10 +360,14 @@
 │   │   ├── Forms
 │   │   │   ├── Actions
 │   │   │   │   └── SyncFormPresetsAction.php
+│   │   │   ├── ConfigContracts
+│   │   │   │   ├── FormDefinitionConfigContract.php
+│   │   │   │   └── FormDefinitionConfigContractTargetProvider.php
 │   │   │   ├── Contracts
 │   │   │   ├── Controllers
 │   │   │   ├── Data
-│   │   │   │   └── FormPresetSyncResult.php
+│   │   │   │   ├── FormPresetSyncResult.php
+│   │   │   │   └── PublishedForm.php
 │   │   │   ├── Models
 │   │   │   │   ├── FormDefinition.php
 │   │   │   │   ├── FormSubmission.php
@@ -373,7 +377,11 @@
 │   │   │   │   └── FormsModuleServiceProvider.php
 │   │   │   ├── Requests
 │   │   │   ├── Services
-│   │   │   └── Support
+│   │   │   │   ├── FormSchemaNormalizer.php
+│   │   │   │   └── PublishedFormResolver.php
+│   │   │   ├── Support
+│   │   │   └── Validation
+│   │   │       └── FormsSetupValidationContributor.php
 │   │   ├── InboundMessaging
 │   │   │   ├── Actions
 │   │   │   │   ├── Email
@@ -1856,8 +1864,11 @@
 │   │   │   ├── HandleContactWorkflowStatusChangedTest.php
 │   │   │   └── SyncFlowRoutePresetsActionTest.php
 │   │   ├── Forms
+│   │   │   ├── FormConfigContractTest.php
 │   │   │   ├── FormPresetSyncTest.php
-│   │   │   └── FormsFoundationTest.php
+│   │   │   ├── FormsFoundationTest.php
+│   │   │   ├── FormsSetupValidationContributorTest.php
+│   │   │   └── PublishedFormRuntimeTest.php
 │   │   ├── InboundMessaging
 │   │   │   ├── HandleInboundEmailWebhookActionTest.php
 │   │   │   ├── InboundMessageAutomationOutboxTest.php
@@ -2108,4 +2119,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-538 directories, 1571 files
+540 directories, 1580 files

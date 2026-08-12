@@ -2,9 +2,11 @@
 
 namespace App\Modules\Forms\Actions;
 
+use App\Modules\Forms\ConfigContracts\FormDefinitionConfigContract;
 use App\Modules\Forms\Data\FormPresetSyncResult;
 use App\Modules\Forms\Models\FormDefinition;
 use App\Modules\Forms\Models\FormVersion;
+use App\Modules\Forms\Services\FormSchemaNormalizer;
 use App\Support\Presets\Data\ResolvedPresetDomain;
 use App\Support\Presets\Enums\PresetDomain;
 use Illuminate\Support\Facades\DB;
@@ -16,23 +18,6 @@ final class SyncFormPresetsAction
 
     private const FORM_KEY_PATTERN = '/^[a-z][a-z0-9_]*$/';
 
-    private const FIELD_TYPES = [
-        'text',
-        'email',
-        'tel',
-        'url',
-        'number',
-        'textarea',
-        'select',
-        'radio',
-        'checkbox',
-        'checkboxes',
-        'boolean',
-        'date',
-        'datetime',
-        'hidden',
-    ];
-
     private const CATEGORIES = [
         FormDefinition::CATEGORY_INTAKE,
         FormDefinition::CATEGORY_QUESTIONNAIRE,
@@ -40,6 +25,11 @@ final class SyncFormPresetsAction
         FormDefinition::CATEGORY_REQUEST,
         FormDefinition::CATEGORY_FEEDBACK,
     ];
+
+    public function __construct(
+        private readonly FormDefinitionConfigContract $contract,
+        private readonly FormSchemaNormalizer $schemas,
+    ) {}
 
     public function handle(ResolvedPresetDomain $resolved): FormPresetSyncResult
     {
@@ -54,6 +44,12 @@ final class SyncFormPresetsAction
         $definitions = [];
 
         foreach ($resolved->definitions as $definitionKey => $definition) {
+            $this->assertContract(
+                definitionKey: $definitionKey,
+                definition: $definition,
+                resolved: $resolved,
+            );
+
             $definitions[] = $this->normalizeDefinition(
                 definitionKey: $definitionKey,
                 definition: $definition,
@@ -218,6 +214,36 @@ final class SyncFormPresetsAction
 
     /**
      * @param array<string, mixed> $definition
+     */
+    private function assertContract(
+        string $definitionKey,
+        array $definition,
+        ResolvedPresetDomain $resolved,
+    ): void {
+        $source = $resolved->provenance[$definitionKey]['source']
+            ?? 'preset_composition.forms';
+        $path = "{$source}.definitions.{$definitionKey}";
+        $violations = $this->contract->schema()->validate(
+            $definition,
+            $path,
+        );
+
+        if ($violations === []) {
+            return;
+        }
+
+        $violation = $violations[0];
+
+        throw new InvalidArgumentException(sprintf(
+            'Form definition [%s] violates the Forms config contract at [%s]: %s',
+            $definitionKey,
+            $violation->path,
+            $violation->message,
+        ));
+    }
+
+    /**
+     * @param array<string, mixed> $definition
      * @return array<string, mixed>
      */
     private function normalizeDefinition(
@@ -269,9 +295,9 @@ final class SyncFormPresetsAction
             );
         }
 
-        $schema = $this->normalizeSchema(
+        $schema = $this->schemas->normalize(
             value: $definition['schema'] ?? null,
-            definitionKey: $definitionKey,
+            context: "Form definition [{$definitionKey}] schema",
         );
         $rules = $this->arrayValue($definition['rules'] ?? [], "Form definition [{$definitionKey}] rules");
         $layout = $this->arrayValue($definition['layout'] ?? [], "Form definition [{$definitionKey}] layout");
@@ -307,105 +333,6 @@ final class SyncFormPresetsAction
                 'settings' => $settings,
             ],
         ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function normalizeSchema(mixed $value, string $definitionKey): array
-    {
-        if (! is_array($value)) {
-            throw new InvalidArgumentException(
-                "Form definition [{$definitionKey}] schema must be an array.",
-            );
-        }
-
-        $sections = $value['sections'] ?? null;
-
-        if (! is_array($sections) || ! array_is_list($sections) || $sections === []) {
-            throw new InvalidArgumentException(
-                "Form definition [{$definitionKey}] schema.sections must be a non-empty list.",
-            );
-        }
-
-        $sectionKeys = [];
-        $fieldKeys = [];
-
-        foreach ($sections as $sectionIndex => $section) {
-            if (! is_array($section)) {
-                throw new InvalidArgumentException(
-                    "Form definition [{$definitionKey}] schema.sections.{$sectionIndex} must be an array.",
-                );
-            }
-
-            $sectionKey = $this->normalizeKey(
-                $section['key'] ?? null,
-                "Form definition [{$definitionKey}] section {$sectionIndex} key",
-            );
-
-            if (isset($sectionKeys[$sectionKey])) {
-                throw new InvalidArgumentException(
-                    "Form definition [{$definitionKey}] contains duplicate section key [{$sectionKey}].",
-                );
-            }
-
-            $sectionKeys[$sectionKey] = true;
-            $value['sections'][$sectionIndex]['key'] = $sectionKey;
-            $fields = $section['fields'] ?? null;
-
-            if (! is_array($fields) || ! array_is_list($fields) || $fields === []) {
-                throw new InvalidArgumentException(
-                    "Form definition [{$definitionKey}] section [{$sectionKey}] fields must be a non-empty list.",
-                );
-            }
-
-            foreach ($fields as $fieldIndex => $field) {
-                if (! is_array($field)) {
-                    throw new InvalidArgumentException(
-                        "Form definition [{$definitionKey}] section [{$sectionKey}] field {$fieldIndex} must be an array.",
-                    );
-                }
-
-                $fieldKey = $this->normalizeKey(
-                    $field['key'] ?? null,
-                    "Form definition [{$definitionKey}] field {$fieldIndex} key",
-                );
-
-                if (isset($fieldKeys[$fieldKey])) {
-                    throw new InvalidArgumentException(
-                        "Form definition [{$definitionKey}] contains duplicate field key [{$fieldKey}].",
-                    );
-                }
-
-                $fieldKeys[$fieldKey] = true;
-                $value['sections'][$sectionIndex]['fields'][$fieldIndex]['key'] = $fieldKey;
-                $fieldType = strtolower($this->requiredString(
-                    $field['type'] ?? null,
-                    "Form definition [{$definitionKey}] field [{$fieldKey}] type",
-                    50,
-                ));
-
-                $value['sections'][$sectionIndex]['fields'][$fieldIndex]['type'] = $fieldType;
-
-                if (! in_array($fieldType, self::FIELD_TYPES, true)) {
-                    throw new InvalidArgumentException(sprintf(
-                        'Form definition [%s] field [%s] type [%s] is unsupported. Allowed field types: %s.',
-                        $definitionKey,
-                        $fieldKey,
-                        $fieldType,
-                        implode(', ', self::FIELD_TYPES),
-                    ));
-                }
-
-                if (array_key_exists('required', $field) && ! is_bool($field['required'])) {
-                    throw new InvalidArgumentException(
-                        "Form definition [{$definitionKey}] field [{$fieldKey}] required must be a boolean.",
-                    );
-                }
-            }
-        }
-
-        return $value;
     }
 
     /**
