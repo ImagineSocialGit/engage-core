@@ -359,6 +359,7 @@
 │   │   │       └── FlowRoutesSetupValidationContributor.php
 │   │   ├── Forms
 │   │   │   ├── Actions
+│   │   │   │   ├── CreateFormSubmissionAction.php
 │   │   │   │   └── SyncFormPresetsAction.php
 │   │   │   ├── ConfigContracts
 │   │   │   │   ├── FormDefinitionConfigContract.php
@@ -367,7 +368,14 @@
 │   │   │   ├── Controllers
 │   │   │   ├── Data
 │   │   │   │   ├── FormPresetSyncResult.php
+│   │   │   │   ├── FormSubmissionInput.php
+│   │   │   │   ├── FormSubmissionResult.php
+│   │   │   │   ├── NormalizedFormSubmission.php
+│   │   │   │   ├── NormalizedFormSubmissionValue.php
 │   │   │   │   └── PublishedForm.php
+│   │   │   ├── Exceptions
+│   │   │   │   ├── FormSubmissionReplayConflictException.php
+│   │   │   │   └── FormSubmissionValidationException.php
 │   │   │   ├── Models
 │   │   │   │   ├── FormDefinition.php
 │   │   │   │   ├── FormSubmission.php
@@ -378,6 +386,8 @@
 │   │   │   ├── Requests
 │   │   │   ├── Services
 │   │   │   │   ├── FormSchemaNormalizer.php
+│   │   │   │   ├── FormSubmissionContactMapper.php
+│   │   │   │   ├── FormSubmissionValidator.php
 │   │   │   │   └── PublishedFormResolver.php
 │   │   │   ├── Support
 │   │   │   └── Validation
@@ -1864,6 +1874,7 @@
 │   │   │   ├── HandleContactWorkflowStatusChangedTest.php
 │   │   │   └── SyncFlowRoutePresetsActionTest.php
 │   │   ├── Forms
+│   │   │   ├── CreateFormSubmissionActionTest.php
 │   │   │   ├── FormConfigContractTest.php
 │   │   │   ├── FormPresetSyncTest.php
 │   │   │   ├── FormsFoundationTest.php
@@ -2119,4 +2130,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-540 directories, 1580 files
+541 directories, 1590 files

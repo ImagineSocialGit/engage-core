@@ -4,9 +4,13 @@ namespace App\Modules\Forms\Validation;
 
 use App\Modules\Forms\Models\FormDefinition;
 use App\Modules\Forms\Models\FormVersion;
+use App\Modules\Forms\Services\FormSubmissionContactMapper;
+use App\Modules\Forms\Services\FormSubmissionValidator;
 use App\Modules\Forms\Services\FormSchemaNormalizer;
+use App\Modules\Forms\Services\PublishedFormResolver;
 use App\Support\SetupValidation\Contracts\SetupValidationContributor;
 use App\Support\SetupValidation\Data\SetupValidationFinding;
+use DomainException;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
@@ -17,6 +21,9 @@ final class FormsSetupValidationContributor implements SetupValidationContributo
 
     public function __construct(
         private readonly FormSchemaNormalizer $schemas,
+        private readonly PublishedFormResolver $publishedForms,
+        private readonly FormSubmissionValidator $submissions,
+        private readonly FormSubmissionContactMapper $contacts,
     ) {}
 
     public function findings(): iterable
@@ -97,6 +104,33 @@ final class FormsSetupValidationContributor implements SetupValidationContributo
                     code: 'forms.runtime.schema_invalid',
                     message: $exception->getMessage(),
                     path: "form_versions.{$version->getKey()}.schema",
+                    context: $versionContext,
+                );
+
+                continue;
+            }
+
+            try {
+                $published = $this->publishedForms->require($definition->key);
+                $this->submissions->validateConfiguration($published);
+            } catch (DomainException $exception) {
+                yield $this->error(
+                    code: 'forms.runtime.submission_rules_invalid',
+                    message: $exception->getMessage(),
+                    path: "form_versions.{$version->getKey()}.rules",
+                    context: $versionContext,
+                );
+
+                continue;
+            }
+
+            try {
+                $this->contacts->validateConfiguration($published);
+            } catch (DomainException $exception) {
+                yield $this->error(
+                    code: 'forms.runtime.submission_mapping_invalid',
+                    message: $exception->getMessage(),
+                    path: "form_versions.{$version->getKey()}.settings",
                     context: $versionContext,
                 );
             }

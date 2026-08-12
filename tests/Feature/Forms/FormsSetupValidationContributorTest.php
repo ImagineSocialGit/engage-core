@@ -83,6 +83,66 @@ class FormsSetupValidationContributorTest extends TestCase
         );
     }
 
+    public function test_invalid_submission_mapping_is_reported_before_runtime_handoff(): void
+    {
+        $definition = FormDefinition::factory()->active()->create([
+            'key' => 'invalid_mapping',
+        ]);
+        $version = FormVersion::factory()->published()->create([
+            'form_definition_id' => $definition->getKey(),
+            'schema' => $this->schema(),
+            'settings' => [
+                'submission' => [
+                    'contact' => [
+                        'fields' => [
+                            'email' => 'missing_email_field',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+        $definition->forceFill([
+            'current_form_version_id' => $version->getKey(),
+        ])->save();
+
+        $finding = collect($this->findings())
+            ->firstWhere('code', 'forms.runtime.submission_mapping_invalid');
+
+        $this->assertNotNull($finding);
+        $this->assertSame(
+            "form_versions.{$version->getKey()}.settings",
+            $finding['path'],
+        );
+        $this->assertSame('invalid_mapping', $finding['context']['form_key']);
+    }
+
+    public function test_invalid_submission_rules_are_reported_before_runtime_handoff(): void
+    {
+        $definition = FormDefinition::factory()->active()->create([
+            'key' => 'invalid_rules',
+        ]);
+        $version = FormVersion::factory()->published()->create([
+            'form_definition_id' => $definition->getKey(),
+            'schema' => $this->schema(),
+            'rules' => [
+                'missing_field' => ['required'],
+            ],
+        ]);
+        $definition->forceFill([
+            'current_form_version_id' => $version->getKey(),
+        ])->save();
+
+        $finding = collect($this->findings())
+            ->firstWhere('code', 'forms.runtime.submission_rules_invalid');
+
+        $this->assertNotNull($finding);
+        $this->assertSame(
+            "form_versions.{$version->getKey()}.rules",
+            $finding['path'],
+        );
+        $this->assertSame('invalid_rules', $finding['context']['form_key']);
+    }
+
     private function publishedDefinition(string $key): FormDefinition
     {
         $definition = FormDefinition::factory()->active()->create([

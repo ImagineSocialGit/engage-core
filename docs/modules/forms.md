@@ -1,4 +1,3 @@
-
 # Forms Module
 
 Forms is a current universal module.
@@ -207,7 +206,7 @@ datetime
 hidden
 ```
 
-This is authoring/schema validation, not submission validation. The later submission runtime must still validate each response against the exact frozen FormVersion used for that submission.
+This is authoring/schema validation, not submission validation. The submission runtime separately validates each response against the exact frozen FormVersion used for that submission.
 
 `PublishedFormResolver` is the current DB-owned runtime read seam. It resolves only an active FormDefinition and its exact current non-archived published FormVersion. Public consumers may additionally require `is_public = true`. The resolver returns the transport-neutral `PublishedForm` contract with stable definition/version identity, frozen schema/rules/layout/settings, and flattened field metadata.
 
@@ -226,7 +225,7 @@ form_submissions
 form_submission_values
 ```
 
-Forms also owns or will own as runtime work lands:
+Forms also owns:
 
 ```text
 form definition lifecycle
@@ -339,11 +338,15 @@ Reporting reads submission summaries through a Forms read service.
 
 ## Public seams
 
-The first Forms runtime read seam is now:
+Current Forms runtime seams are:
 
 ```text
 PublishedFormResolver
 PublishedForm
+CreateFormSubmissionAction
+FormSubmissionInput
+FormSubmissionResult
+FormSubmissionValidator
 ```
 
 Consumers should resolve a stable form key through this seam rather than query FormDefinition/FormVersion directly or execute from raw preset config.
@@ -354,19 +357,84 @@ Later mutation/review seams still include:
 CreateFormDefinitionAction
 PublishFormVersionAction
 ArchiveFormDefinitionAction
-CreateFormSubmissionAction
 ReviewFormSubmissionAction
 RejectFormSubmissionAction
 ApproveFormSubmissionAction
 FormsReadService
 FormSubmissionReadService
-FormSubmissionValidator
 FormSubmissionAutomationEventEmitter
 FormSubmissionTaskOrchestrator
 FormSubmissionNotificationOrchestrator
 ```
 
 Public actions should exist before other modules directly create or mutate Forms records.
+
+## Durable submission runtime
+
+`CreateFormSubmissionAction` is the transport-neutral mutation seam for completed submissions.
+
+It accepts `FormSubmissionInput`, resolves the exact current `PublishedForm`, validates against that frozen version, and returns `FormSubmissionResult`. Neither input nor result exposes an Eloquent model as an external transport contract.
+
+The runtime:
+
+```text
+resolves one active published form identity
+pins form_definition_id and form_version_id
+rejects unknown field keys
+enforces required fields
+normalizes every supported field type
+enforces option-backed values
+applies frozen authored Laravel validation rules
+stores normalized payload separately from raw_payload
+creates typed form_submission_values rows
+optionally resolves a Core Contact through server-owned settings
+optionally adds server-mapped Core ContactTags
+returns an existing submission for a valid external replay
+rejects conflicting reuse of an external replay identity
+```
+
+Submission, values, Contact resolution/update, and additive tag writes occur in one database transaction. A failed validation or mapping contract writes none of those records.
+
+`provider + external_id` is the durable external idempotency identity. Both values must be present together. The authoritative pre-rollout `create_form_submissions_table` migration enforces their uniqueness when non-null; MySQL's multiple-NULL behavior continues allowing Forms submissions that do not participate in external replay protection.
+
+The submission runtime stores an internal logical-request fingerprint in `form_submissions.meta._forms`. The fingerprint includes the form key, source, submitted field values, and durable submission meta. IP address, user agent, and raw transport payload are evidence snapshots but are not replay identity. A valid retry therefore returns the original pinned submission even when the definition's current version has since advanced.
+
+Engage Sites and other transports should generate one stable external UUID per logical submission attempt and reuse the same UUID after transport uncertainty.
+
+## Contact and tag mapping
+
+Contact mapping is optional. Forms remains useful for anonymous or non-contact intake when no mapping is declared.
+
+The frozen FormVersion `settings` contract is:
+
+```text
+submission:
+  contact:
+    fields:
+      email: email
+      first_name: first_name
+      last_name: last_name
+      name: full_name
+      phone: phone
+    source: engage_sites
+    subsource: artist_updates
+  tags:
+    - field: interests
+      values:
+        music: interest:music
+        tour: interest:tour
+        vip: interest:vip
+```
+
+`contact.fields` maps supported Contact attributes to frozen form field keys. Email mapping is required whenever Contact mapping exists. Email must map an `email` field, phone must map a `tel` field, and name components must map `text` fields.
+
+The runtime uses Core's existing Contact resolution and create/update actions. Source/subsource apply when the Contact is first created; a later form submission does not overwrite an existing Contact's original acquisition source.
+
+Tag mappings are server-owned value-to-tag allowlists. Submitted values select only among the declared mappings, so a browser cannot author arbitrary Contact tag names. Tag writes are additive and rely on Core's unique `contact_id + tag` identity. An unchecked or omitted interest never removes an existing tag.
+
+Invalid submission rules or Contact/tag mappings fail closed. `FormsSetupValidationContributor` reports these invalid published contracts before runtime handoff.
+
+The external HTTP endpoint/authentication contract remains later integration work. Messaging consent grants remain an optional bridge and are not performed by this Forms runtime.
 
 ## Definitions and versions
 
@@ -785,8 +853,7 @@ form request lifecycle table
 Should form_submissions.status and review_status be separate, or should one lifecycle field be enough?
 Should portal_user_id exist immediately, or wait until Portal runtime actions exist?
 Should file upload fields route through Documents from the beginning, or be blocked until Documents exists?
-Should submitted values include typed columns immediately, or only JSON value + text value for the first slice?
-Should Forms emit `form.submitted` automation events in the foundation slice, or wait until CreateFormSubmissionAction exists?
+When should `form.submitted` automation events be added after the durable submission transaction commits?
 ```
 
 ## Setup/config validation vs submission validation
@@ -815,6 +882,7 @@ FormSchemaNormalizer
 
 FormsSetupValidationContributor
     validates active DB-owned FormDefinition -> current published FormVersion readiness
+    validates frozen submission rules and Contact/tag mapping contracts
 
 setup:validate
     composes those findings through the existing shared setup-validation system
@@ -824,4 +892,4 @@ Preset sync validates the config contract and normalized schema before writing F
 
 Runtime readiness is intentionally DB-owned. An active form must point to one non-archived published current version with a valid supported schema. Setup validation reports missing/unpublished/invalid current snapshots rather than allowing a runtime consumer to select some other historical version.
 
-`FormSubmissionValidator` remains later Forms-owned submission validation. It must validate a response against the exact resolved FormVersion and must not reinterpret setup/config validation as proof that submitted values are valid.
+`FormSubmissionValidator` is the Forms-owned submission validator. It validates each response against the exact resolved FormVersion and does not reinterpret setup/config validation as proof that submitted values are valid.

@@ -54,7 +54,7 @@ return new class extends Migration
             $table->index(['form_version_id', 'status'], 'form_submissions_version_status_index');
             $table->index(['contact_id', 'status'], 'form_submissions_contact_status_index');
             $table->index(['review_status', 'submitted_at'], 'form_submissions_review_submitted_index');
-            $table->index(['provider', 'external_id'], 'form_submissions_provider_external_index');
+            $table->unique(['provider', 'external_id'], 'form_submissions_provider_external_unique');
         });
     }
 
